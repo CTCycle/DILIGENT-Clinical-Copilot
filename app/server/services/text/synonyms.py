@@ -9,7 +9,7 @@ from services.text.normalization import coerce_text
 SYNONYM_SPLIT_RE = re.compile(r"[;,/\n]+")
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def try_parse_json(value: str) -> Any:
     if not value:
         return None
@@ -19,7 +19,7 @@ def try_parse_json(value: str) -> Any:
         return None
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def extract_synonym_strings(value: Any, seen_refs: set[int] | None = None) -> list[str]:
     if seen_refs is None:
         seen_refs = set()
@@ -56,7 +56,7 @@ def extract_synonym_strings(value: Any, seen_refs: set[int] | None = None) -> li
     return extract_synonym_strings(text, seen_refs)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def parse_synonym_list(value: Any) -> list[str]:
     raw_values = extract_synonym_strings(value)
     synonyms: list[str] = []
@@ -67,7 +67,7 @@ def parse_synonym_list(value: Any) -> list[str]:
     return synonyms
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def split_synonym_variants(value: str) -> list[str]:
     if not value:
         return []

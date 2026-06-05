@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-06-03
+Last updated: 2026-06-05
 
 ## Primary Runtime Files
 - Active env file: `settings/.env`
@@ -27,6 +27,7 @@ Last updated: 2026-06-03
   - job polling interval
   - RAG and ingestion settings
   - external timeout and concurrency settings
+  - excludes all database mode and connection settings
 - `app/resources/catalogs/*.json`
   - canonical deterministic reference catalogs for text normalization, extraction, matching, DILI behavior, language, and security filters
 

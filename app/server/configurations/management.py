@@ -534,15 +534,10 @@ def build_settings_payload_from_json(
 ) -> dict[str, Any]:
     payload = ensure_mapping(config)
     llm_defaults = _default_llm_runtime_defaults(env)
-    database_payload = ensure_mapping(payload.get("database"))
-    database_environment_payload = {
-        **database_payload,
-        **env.database.model_dump(exclude_none=True),
-    }
     database_environment = DatabaseEnvironmentSnapshot.model_validate(
         {
             key: (None if value is None else str(value))
-            for key, value in database_environment_payload.items()
+            for key, value in env.database.model_dump().items()
         }
     )
     jobs_payload = ensure_mapping(payload.get("jobs"))

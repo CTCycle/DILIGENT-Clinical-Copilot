@@ -32,7 +32,7 @@ class FakeGenerateContentConfig:
         self.kwargs = kwargs
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def patch_access_key(monkeypatch, key: str = "provider-key") -> None:
     monkeypatch.setattr(
         cloud_module.CloudLLMClient,
@@ -41,7 +41,7 @@ def patch_access_key(monkeypatch, key: str = "provider-key") -> None:
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_cloud_llm_native_openai_chat_uses_responses_api_and_normalizes_text(
     monkeypatch,
 ) -> None:
@@ -89,7 +89,7 @@ def test_cloud_llm_native_openai_chat_uses_responses_api_and_normalizes_text(
     assert captured["top_p"] == 0.8
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_cloud_llm_native_openai_gpt5_chat_omits_sampling_options(monkeypatch) -> None:
     captured: dict[str, Any] = {}
 
@@ -122,7 +122,7 @@ def test_cloud_llm_native_openai_gpt5_chat_omits_sampling_options(monkeypatch) -
     assert "top_p" not in captured
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_cloud_llm_native_gemini_chat_uses_generate_content_and_normalizes_json(
     monkeypatch,
 ) -> None:
@@ -172,7 +172,7 @@ def test_cloud_llm_native_gemini_chat_uses_generate_content_and_normalizes_json(
     assert captured["config"].kwargs["temperature"] == 2.0
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_cloud_llm_native_llm_text_call_uses_openai_responses_api(monkeypatch) -> None:
     class FakeResponses:
         async def create(self, **kwargs: Any) -> FakeOpenAIResponse:
@@ -203,7 +203,7 @@ def test_cloud_llm_native_llm_text_call_uses_openai_responses_api(monkeypatch) -
     assert text == "wrapped text"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_cloud_llm_native_openai_structured_call_uses_responses_parse(
     monkeypatch,
 ) -> None:
@@ -252,7 +252,7 @@ def test_cloud_llm_native_openai_structured_call_uses_responses_parse(
     assert captured["instructions"] == "Return strict JSON."
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_cloud_llm_native_gemini_structured_call_passes_response_schema(
     monkeypatch,
 ) -> None:
@@ -296,7 +296,7 @@ def test_cloud_llm_native_gemini_structured_call_passes_response_schema(
     assert captured["config"].kwargs["response_json_schema"]["title"] == "ParsedPayload"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_cloud_llm_native_provider_exception_maps_to_existing_error_types(
     monkeypatch,
 ) -> None:

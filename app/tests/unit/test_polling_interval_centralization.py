@@ -55,7 +55,7 @@ class JobManagerStub:
         }
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
     job_manager_stub = JobManagerStub()
     endpoint = get_route_owner(session_routes.router, "/clinical/jobs")
@@ -120,7 +120,7 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
     assert response.poll_interval == get_server_settings().jobs.polling_interval
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_start_pull_job_uses_centralized_poll_interval(monkeypatch) -> None:
     job_manager_stub = JobManagerStub()
     endpoint = get_route_owner(ollama_routes.router, "/pull/jobs")
@@ -134,7 +134,7 @@ def test_start_pull_job_uses_centralized_poll_interval(monkeypatch) -> None:
     assert response.poll_interval == get_server_settings().jobs.polling_interval
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_clinical_progress_callback_raises_when_stop_requested(monkeypatch) -> None:
     class StopRequestedJobManagerStub:
         def should_stop(self, job_id: str) -> bool:

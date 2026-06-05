@@ -26,7 +26,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_serializer() -> tuple[DataSerializer, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
@@ -34,7 +34,7 @@ def build_serializer() -> tuple[DataSerializer, Any]:
     return serializer, engine
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def save_session(
     serializer: DataSerializer,
     *,
@@ -61,7 +61,7 @@ def save_session(
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_session_list_filters_and_search() -> None:
     serializer, _ = build_serializer()
     save_session(
@@ -160,7 +160,7 @@ def test_session_list_filters_and_search() -> None:
     assert items[0]["patient_name"] == "Carol Archive"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_session_report_and_text_use_result_payload_only() -> None:
     serializer, _ = build_serializer()
     serializer.save_clinical_session(
@@ -214,7 +214,7 @@ def test_session_report_and_text_use_result_payload_only() -> None:
     assert legacy_detail["session_text"] == ""
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_catalog_search_and_drug_delete_cleanup() -> None:
     serializer, engine = build_serializer()
     session_factory = sessionmaker(bind=engine, future=True)
@@ -303,7 +303,7 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
         assert session_drugs[0].drug_id is None
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     serializer, _ = build_serializer()
     jobs = JobManager()
@@ -398,7 +398,7 @@ class FakeTimelineExtractor:
         )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_timeline_generation_persists_and_reuses_payload() -> None:
     serializer, _ = build_serializer()
     save_session(

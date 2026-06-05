@@ -22,7 +22,7 @@ def test_openai_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     assert provider.provider == "openai"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_gemini_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
         embeddings_module.CloudEmbeddingGenerator,
@@ -38,7 +38,7 @@ def test_gemini_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     assert provider.provider == "gemini"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_ollama_embedding_provider_selection() -> None:
     provider = embeddings_module.select_embedding_provider(
         backend="ollama",
@@ -47,7 +47,7 @@ def test_ollama_embedding_provider_selection() -> None:
     assert isinstance(provider, embeddings_module.OllamaEmbeddingGenerator)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_single_query_embedding_return_shape(monkeypatch) -> None:
     monkeypatch.setattr(
         embeddings_module.CloudEmbeddingGenerator,
@@ -81,7 +81,7 @@ def test_single_query_embedding_return_shape(monkeypatch) -> None:
     assert vector == [1.0, 2.0]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_batch_embedding_return_shape_and_order_preserved(monkeypatch) -> None:
     class FakeClient:
         def __init__(self, **kwargs):
@@ -105,7 +105,7 @@ def test_batch_embedding_return_shape_and_order_preserved(monkeypatch) -> None:
     assert vectors == [[0.0], [1.0], [2.0]]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_provider_validation_and_exception_mapping(monkeypatch) -> None:
     try:
         embeddings_module.select_embedding_provider(

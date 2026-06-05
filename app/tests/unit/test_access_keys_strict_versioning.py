@@ -16,7 +16,7 @@ from sqlalchemy.orm import sessionmaker
 VALID_TEST_KEY = "openai-secret-value"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_serializer() -> tuple[AccessKeySerializer, sessionmaker]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
@@ -28,7 +28,7 @@ def build_serializer() -> tuple[AccessKeySerializer, sessionmaker]:
     return serializer, factory
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_decryption_fails_when_encryption_key_version_is_missing() -> None:
     serializer, factory = build_serializer()
     row = serializer.create_key("openai", VALID_TEST_KEY)
@@ -50,7 +50,7 @@ def test_decryption_fails_when_encryption_key_version_is_missing() -> None:
         assert "Missing encryption key version metadata" in str(exc)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_decryption_fails_when_referenced_version_does_not_exist() -> None:
     serializer, factory = build_serializer()
     row = serializer.create_key("openai", VALID_TEST_KEY)
@@ -69,7 +69,7 @@ def test_decryption_fails_when_referenced_version_does_not_exist() -> None:
         assert "is not available" in str(exc)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_code_never_reads_access_key_encryption_key_env_var() -> None:
     app_dir = Path(__file__).resolve().parents[2]
     source = (app_dir / "server/common/security/cryptography.py").read_text(
@@ -78,7 +78,7 @@ def test_code_never_reads_access_key_encryption_key_env_var() -> None:
     assert "ACCESS_KEY_ENCRYPTION_KEY" not in source
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_unavailable_key_material_version_fails_loudly() -> None:
     serializer, _ = build_serializer()
     serializer.create_key("openai", VALID_TEST_KEY)

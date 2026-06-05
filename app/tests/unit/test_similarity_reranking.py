@@ -91,7 +91,7 @@ class FailingCrossEncoderStub:
         raise RuntimeError("synthetic rerank failure")
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def sample_rows() -> list[dict[str, Any]]:
     return [
         {
@@ -121,7 +121,7 @@ def sample_rows() -> list[dict[str, Any]]:
     ]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def sample_vectors() -> dict[str, list[float]]:
     return {
         "q": [1.0, 0.0],
@@ -131,7 +131,7 @@ def sample_vectors() -> dict[str, list[float]]:
     }
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_search_with_reranking_reorders_and_trims_results() -> None:
     search = SimilaritySearch(
         vector_database=VectorDatabaseStub(sample_rows()),
@@ -152,7 +152,7 @@ def test_search_with_reranking_reorders_and_trims_results() -> None:
     assert all("rerank_score" in item for item in results)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_search_with_reranking_skips_reorder_when_disabled() -> None:
     search = SimilaritySearch(
         vector_database=VectorDatabaseStub(sample_rows()),
@@ -171,7 +171,7 @@ def test_search_with_reranking_skips_reorder_when_disabled() -> None:
     assert all("rerank_score" not in item for item in results)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_search_with_reranking_enforces_candidate_floor_against_top_n() -> None:
     vector_db = VectorDatabaseStub(sample_rows())
     search = SimilaritySearch(
@@ -191,7 +191,7 @@ def test_search_with_reranking_enforces_candidate_floor_against_top_n() -> None:
     assert vector_db.table.limit_value == 3
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_search_with_reranking_falls_back_when_reranker_fails() -> None:
     search = SimilaritySearch(
         vector_database=VectorDatabaseStub(sample_rows()),
