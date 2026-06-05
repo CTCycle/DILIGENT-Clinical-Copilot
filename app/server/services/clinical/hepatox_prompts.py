@@ -283,7 +283,6 @@ class HepatotoxicityPatternAnalyzer:
 
 ###############################################################################
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
 
 
 def format_similarity_header(

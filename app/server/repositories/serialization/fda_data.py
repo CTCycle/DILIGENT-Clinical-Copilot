@@ -15,7 +15,6 @@ from common.constants import (
 from configurations.startup import get_server_settings
 from services.text.normalization import coerce_text, normalize_drug_name
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
 
 
 def upsert_drugs_catalog_records(

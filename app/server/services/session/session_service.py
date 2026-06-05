@@ -83,6 +83,7 @@ from services.session.text_section_parser import (
 from services.session.session_workflow import (
     build_matched_drugs_payload_workflow,
     build_single_matched_drug_row_workflow,
+    process_revision_patient_workflow,
     process_single_patient_workflow,
     start_clinical_job_workflow,
 )
@@ -1147,6 +1148,38 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         stop_check: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
         return await process_single_patient_workflow(
+            self,
+            payload,
+            patient_image_base64=patient_image_base64,
+            section_extraction=section_extraction,
+            normalized_document=normalized_document,
+            report_mode=report_mode,
+            session_version=session_version,
+            original_session_id=original_session_id,
+            session_metadata=session_metadata,
+            original_session_text=original_session_text,
+            revision_focus_context=revision_focus_context,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
+
+    async def process_revision_patient(
+        self,
+        payload: PatientData,
+        *,
+        patient_image_base64: str | None = None,
+        section_extraction: ClinicalSectionExtractionResult | None = None,
+        normalized_document: Any | None = None,
+        report_mode: str = "faithful_only",
+        session_version: int = 1,
+        original_session_id: int | None = None,
+        session_metadata: dict[str, Any] | None = None,
+        original_session_text: str | None = None,
+        revision_focus_context: str | None = None,
+        progress_callback: Callable[[str, float], None] | None = None,
+        stop_check: Callable[[], None] | None = None,
+    ) -> dict[str, Any]:
+        return await process_revision_patient_workflow(
             self,
             payload,
             patient_image_base64=patient_image_base64,

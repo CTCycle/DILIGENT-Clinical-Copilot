@@ -33,12 +33,13 @@ from repositories.serialization import (
     evidence_aliases,
     evidence_data,
     fda_data,
+    session_revision_data,
     session_result_data,
 )
 from services.retrieval.chunking import SmartDocumentChunker
 
-
-class _RepositorySerializationService:
+###############################################################################
+class DataSerializer:
     def __init__(
         self,
         *,
@@ -231,6 +232,279 @@ class _RepositorySerializationService:
             session_id,
             session_text=session_text,
             metadata=metadata,
+        )
+
+    # -----------------------------------------------------------------------------
+    def update_current_report_text_with_manual_audit(
+        self,
+        session_id: int,
+        *,
+        report_text: str,
+        edited_fields: list[str] | None,
+        reviewer_note: str | None,
+        edited_by: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        return session_revision_data.update_current_report_text_with_manual_audit(
+            self,
+            session_id,
+            report_text=report_text,
+            edited_fields=edited_fields,
+            reviewer_note=reviewer_note,
+            edited_by=edited_by,
+            metadata=metadata,
+        )
+
+    # -----------------------------------------------------------------------------
+    def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
+        return session_revision_data.list_manual_report_edits(self, session_id)
+
+    # -----------------------------------------------------------------------------
+    def update_session_metadata(
+        self,
+        session_id: int,
+        *,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        return session_revision_data.update_session_metadata(
+            self,
+            session_id,
+            metadata=metadata,
+        )
+
+    # -----------------------------------------------------------------------------
+    def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
+        return session_revision_data.list_session_versions(self, session_id)
+
+    # -----------------------------------------------------------------------------
+    def get_session_version_detail(
+        self,
+        session_id: int,
+        *,
+        version_id: int,
+    ) -> dict[str, Any] | None:
+        return session_revision_data.get_session_version_detail(
+            self,
+            session_id,
+            version_id=version_id,
+        )
+
+    # -----------------------------------------------------------------------------
+    def get_latest_version_record_for_session(
+        self,
+        session_id: int,
+    ) -> dict[str, Any] | None:
+        return session_revision_data.get_latest_version_record_for_session(
+            self, session_id
+        )
+
+    # -----------------------------------------------------------------------------
+    def get_version_record_for_session(
+        self,
+        session_id: int,
+    ) -> dict[str, Any] | None:
+        return session_revision_data.get_version_record_for_session(self, session_id)
+
+    # -----------------------------------------------------------------------------
+    def create_revision_version_shell(
+        self,
+        session_id: int,
+        *,
+        reviewer_note: str | None,
+        configuration: dict[str, Any],
+        pipeline_run_id: str | None = None,
+        initiated_by: str | None = None,
+    ) -> dict[str, Any] | None:
+        return session_revision_data.create_revision_version_shell(
+            self,
+            session_id,
+            reviewer_note=reviewer_note,
+            configuration=configuration,
+            pipeline_run_id=pipeline_run_id,
+            initiated_by=initiated_by,
+        )
+
+    # -----------------------------------------------------------------------------
+    def finalize_revision_version(
+        self,
+        *,
+        pipeline_run_id: str,
+        persisted_session_id: int,
+        model_configuration: dict[str, Any] | None = None,
+        version_status: str = "requires_human_review",
+        llm_qa_status: str = "not_run",
+        clinical_review_status: str = "not_reviewed",
+    ) -> dict[str, Any] | None:
+        return session_revision_data.finalize_revision_version(
+            self,
+            pipeline_run_id=pipeline_run_id,
+            persisted_session_id=persisted_session_id,
+            model_configuration=model_configuration,
+            version_status=version_status,
+            llm_qa_status=llm_qa_status,
+            clinical_review_status=clinical_review_status,
+        )
+
+    # -----------------------------------------------------------------------------
+    def create_or_update_revision_run(
+        self,
+        *,
+        pipeline_run_id: str,
+        session_id: int,
+        root_session_id: int,
+        source_version_id: int,
+        target_revision_version_id: int | None,
+        revision_mode: str,
+        revision_kind: str,
+        configuration: dict[str, Any],
+        reviewer_note: str | None,
+        status: str,
+        initiated_by: str | None = None,
+        actor_source: str = "unknown",
+        actor_confidence: str = "unverified",
+        started_at: Any | None = None,
+        completed_at: Any | None = None,
+        error: dict[str, Any] | None = None,
+        trace_id: str | None = None,
+        latency_ms: int | None = None,
+    ) -> dict[str, Any]:
+        return session_revision_data.create_or_update_revision_run(
+            self,
+            pipeline_run_id=pipeline_run_id,
+            session_id=session_id,
+            root_session_id=root_session_id,
+            source_version_id=source_version_id,
+            target_revision_version_id=target_revision_version_id,
+            revision_mode=revision_mode,
+            revision_kind=revision_kind,
+            configuration=configuration,
+            reviewer_note=reviewer_note,
+            status=status,
+            initiated_by=initiated_by,
+            actor_source=actor_source,
+            actor_confidence=actor_confidence,
+            started_at=started_at,
+            completed_at=completed_at,
+            error=error,
+            trace_id=trace_id,
+            latency_ms=latency_ms,
+        )
+
+    # -----------------------------------------------------------------------------
+    def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
+        return session_revision_data.get_revision_run(self, pipeline_run_id)
+
+    # -----------------------------------------------------------------------------
+    def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
+        return session_revision_data.list_revision_steps(self, pipeline_run_id)
+
+    # -----------------------------------------------------------------------------
+    def persist_revision_artifacts(
+        self,
+        *,
+        pipeline_run_id: str,
+        revision_version_id: int,
+        result_payload: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        return session_revision_data.persist_revision_artifacts(
+            self,
+            pipeline_run_id=pipeline_run_id,
+            revision_version_id=revision_version_id,
+            result_payload=result_payload,
+        )
+
+    # -----------------------------------------------------------------------------
+    def list_revision_artifacts_for_version(
+        self,
+        *,
+        revision_version_id: int,
+    ) -> list[dict[str, Any]]:
+        return session_revision_data.list_revision_artifacts_for_version(
+            self,
+            revision_version_id=revision_version_id,
+        )
+
+    # -----------------------------------------------------------------------------
+    def start_revision_step(
+        self,
+        *,
+        pipeline_run_id: str,
+        step_name: str,
+        step_index: int,
+        step_count: int,
+        input_summary: dict[str, Any] | None = None,
+        input_payload: Any = None,
+        schema_name: str | None = None,
+        schema_version: str | None = None,
+        prompt_version: str | None = None,
+        parser_version: str | None = None,
+        model_provider: str | None = None,
+        model_name: str | None = None,
+        started_at: Any | None = None,
+    ) -> dict[str, Any]:
+        return session_revision_data.start_revision_step(
+            self,
+            pipeline_run_id=pipeline_run_id,
+            step_name=step_name,
+            step_index=step_index,
+            step_count=step_count,
+            input_summary=input_summary,
+            input_payload=input_payload,
+            schema_name=schema_name,
+            schema_version=schema_version,
+            prompt_version=prompt_version,
+            parser_version=parser_version,
+            model_provider=model_provider,
+            model_name=model_name,
+            started_at=started_at,
+        )
+
+    # -----------------------------------------------------------------------------
+    def complete_revision_step(
+        self,
+        *,
+        pipeline_run_id: str,
+        step_name: str,
+        attempt_number: int,
+        status: str = "completed",
+        output_summary: dict[str, Any] | None = None,
+        output_payload: dict[str, Any] | None = None,
+        token_usage: dict[str, Any] | None = None,
+        latency_ms: int | None = None,
+        completed_at: Any | None = None,
+    ) -> dict[str, Any] | None:
+        return session_revision_data.complete_revision_step(
+            self,
+            pipeline_run_id=pipeline_run_id,
+            step_name=step_name,
+            attempt_number=attempt_number,
+            status=status,
+            output_summary=output_summary,
+            output_payload=output_payload,
+            token_usage=token_usage,
+            latency_ms=latency_ms,
+            completed_at=completed_at,
+        )
+
+    # -----------------------------------------------------------------------------
+    def fail_revision_step(
+        self,
+        *,
+        pipeline_run_id: str,
+        step_name: str,
+        attempt_number: int,
+        error: dict[str, Any] | None,
+        latency_ms: int | None = None,
+        completed_at: Any | None = None,
+    ) -> dict[str, Any] | None:
+        return session_revision_data.fail_revision_step(
+            self,
+            pipeline_run_id=pipeline_run_id,
+            step_name=step_name,
+            attempt_number=attempt_number,
+            error=error,
+            latency_ms=latency_ms,
+            completed_at=completed_at,
         )
 
     # -----------------------------------------------------------------------------
@@ -580,25 +854,6 @@ class _RepositorySerializationService:
     # -----------------------------------------------------------------------------
     def first_alias_model_term_type(self, aliases: list[DrugAlias]) -> str | None:
         return evidence_aliases.first_alias_model_term_type(self, aliases)
-
-
-###############################################################################
-class DataSerializer:
-    def __init__(
-        self,
-        *,
-        engine: Engine | None = None,
-        session_factory: sessionmaker | None = None,
-    ) -> None:
-        self.service = _RepositorySerializationService(
-            engine=engine,
-            session_factory=session_factory,
-        )
-
-    # -------------------------------------------------------------------------
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self.service, name)
-
 
 ###############################################################################
 class DocumentSerializer:

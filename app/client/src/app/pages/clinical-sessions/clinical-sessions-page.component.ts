@@ -16,11 +16,17 @@ import {
 import {
   deleteInspectionSession,
   fetchClinicalSessionDetail,
+  fetchClinicalSessionRevisionArtifacts,
   fetchClinicalSessionRevisionJobStatus,
+  fetchClinicalSessionRevisionPipelineRun,
+  fetchClinicalSessionRevisionPipelineSteps,
+  fetchClinicalSessionVersions,
   fetchInspectionLiverToxCatalog,
   fetchInspectionRxNavCatalog,
   fetchInspectionSessions,
   generateInspectionSessionTimeline,
+  manualEditClinicalSessionReport,
+  retryClinicalSessionRevisionPipelineRun,
   startClinicalSessionRevisionJob,
   updateClinicalSession,
 } from '../../core/services/inspection-api';
@@ -32,6 +38,10 @@ import {
   InspectionSessionStatus,
   JobStatus,
   LocalModelCard,
+  RevisionArtifact,
+  RevisionPipelineRun,
+  RevisionPipelineStep,
+  SessionVersionSummary,
 } from '../../core/models/types';
 import { resolveCloudChoices } from '../../core/model-config';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
@@ -119,6 +129,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly editorText = signal('');
   readonly editorViewMode = signal<'source' | 'rendered'>('source');
   readonly editorFontSize = signal(16);
+  readonly manualEditReviewerNote = signal('');
+  readonly manualEditEditedBy = signal('');
   readonly metadataText = signal('{\n  "documents": [],\n  "images": []\n}');
   readonly revisionSelection = signal('');
   readonly revisionInstruction = signal('');
@@ -146,6 +158,45 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionStatus = signal('');
   readonly revisionProgress = signal(0);
   readonly revisionJobStatus = signal<JobStatus | null>(null);
+  readonly sessionVersions = signal<SessionVersionSummary[]>([]);
+  readonly revisionHistoryLoading = signal(false);
+  readonly revisionHistoryError = signal<string | null>(null);
+  readonly selectedRevisionVersionId = signal<number | null>(null);
+  readonly selectedRevisionPipelineRun = signal<RevisionPipelineRun | null>(null);
+  readonly selectedRevisionPipelineSteps = signal<RevisionPipelineStep[]>([]);
+  readonly selectedRevisionArtifacts = signal<RevisionArtifact[]>([]);
+  readonly retryRevisionLoading = signal(false);
+  readonly selectedRevisionVersion = computed(() =>
+    this.sessionVersions().find((version) => version.version_id === this.selectedRevisionVersionId()) || null,
+  );
+  readonly selectedRevisionQaArtifact = computed(() =>
+    this.selectedRevisionArtifacts().find((artifact) => artifact.artifact_kind === 'llm_qa_output') || null,
+  );
+  readonly selectedRevisionReportComparisonArtifact = computed(() =>
+    this.selectedRevisionArtifacts().find((artifact) => artifact.artifact_kind === 'report_comparison') || null,
+  );
+  readonly selectedRevisionStructuredCaseArtifacts = computed(() =>
+    this.selectedRevisionArtifacts().filter((artifact) => artifact.artifact_kind === 'structured_case_entity'),
+  );
+  readonly selectedRevisionPipelineArtifacts = computed(() =>
+    this.selectedRevisionArtifacts().filter((artifact) => artifact.artifact_kind === 'pipeline_artifact'),
+  );
+  readonly revisionBusy = computed(() => {
+    const status = this.revisionJobStatus();
+    return status === 'pending' || status === 'running';
+  });
+  readonly selectedRevisionCanRetry = computed(() => {
+    const version = this.selectedRevisionVersion();
+    const run = this.selectedRevisionPipelineRun();
+    return Boolean(
+      version
+      && run
+      && version.version_status === 'draft_revision'
+      && run.status === 'failed'
+      && !this.revisionBusy()
+      && !this.retryRevisionLoading(),
+    );
+  });
   readonly detectedDrugEvidence = signal<DetectedDrugEvidence[]>([]);
   readonly detectedDiseases = signal<string[]>([]);
   readonly labSummary = signal<Array<{ label: string; value: string }>>([]);
@@ -185,8 +236,10 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     try {
       const detail = await fetchClinicalSessionDetail(sessionId);
       this.selected.set(detail);
-      this.editorText.set(this.toEditorHtml(this.previewReport(detail)));
+      this.editorText.set(this.toEditorHtml(this.previewOfficialReport(detail)));
       this.editorViewMode.set('source');
+      this.manualEditReviewerNote.set('');
+      this.manualEditEditedBy.set(this.defaultReviewerLabel(detail));
       this.metadataText.set(JSON.stringify(this.normalizeMetadata(detail.metadata || {}), null, 2));
       this.revisionSelection.set('');
       this.revisionInstruction.set('');
@@ -200,7 +253,9 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.labSummary.set(this.previewLaboratorySummary(detail));
       this.labTimeline.set(this.previewLabTimeline(detail));
       this.hepatotoxicityPattern.set(this.previewHepatotoxicityPattern(detail));
+      this.resetRevisionHistoryState();
       void this.loadDetectedDrugEvidence(detail);
+      void this.loadRevisionHistory(detail.session_id);
     } catch (error) {
       this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
     } finally {
@@ -268,6 +323,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   private clearSelectedSession(): void {
     this.selected.set(null);
     this.editorText.set('');
+    this.manualEditReviewerNote.set('');
+    this.manualEditEditedBy.set('');
     this.metadataText.set('{\n  "documents": [],\n  "images": []\n}');
     this.revisionSelection.set('');
     this.revisionInstruction.set('');
@@ -276,6 +333,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.labSummary.set([]);
     this.labTimeline.set([]);
     this.hepatotoxicityPattern.set('N/A');
+    this.resetRevisionHistoryState();
     this.detailError.set(null);
   }
 
@@ -287,7 +345,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (this.editorViewMode() === mode) return;
     this.editorViewMode.set(mode);
     const detail = this.selected();
-    const sourceText = detail ? this.previewReport(detail) : this.editorText();
+    const sourceText = detail ? this.previewOfficialReport(detail) : this.editorText();
     this.editorText.set(mode === 'rendered' ? this.markdownRenderer.render(sourceText).html : this.toEditorHtml(sourceText));
   }
 
@@ -313,7 +371,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   onEditorKeydown(event: KeyboardEvent): void {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
       event.preventDefault();
-      void this.saveSession();
+      void this.saveManualReportEdit();
       return;
     }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
@@ -356,8 +414,65 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   private editorValueToPersistedText(): string {
     const element = this.sessionTextEditor?.nativeElement;
-    if (!element) return this.editorText();
-    return element.innerHTML.trim();
+    if (!element) return this.editorText().trim();
+    return this.editorHtmlToCanonicalText(element.innerHTML);
+  }
+
+  private editorHtmlToCanonicalText(html: string): string {
+    const parsed = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+    const container = parsed.body.firstElementChild;
+    if (!container) return '';
+    const chunks: string[] = [];
+
+    const appendText = (value: string): void => {
+      const normalized = value.replace(/\s+/g, ' ').trim();
+      if (!normalized) return;
+      const previous = chunks[chunks.length - 1] || '';
+      if (previous && !previous.endsWith('\n') && !previous.endsWith(' ')) {
+        chunks.push(' ');
+      }
+      chunks.push(normalized);
+    };
+
+    const walk = (node: Node, listDepth = 0): void => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        appendText(node.textContent || '');
+        return;
+      }
+      if (!(node instanceof HTMLElement)) return;
+      const tag = node.tagName.toLowerCase();
+      if (tag === 'br') {
+        chunks.push('\n');
+        return;
+      }
+      if (tag === 'li') {
+        chunks.push(`${chunks.length ? '\n' : ''}${'  '.repeat(listDepth)}- `);
+      } else if (['p', 'div', 'section', 'article', 'blockquote', 'pre'].includes(tag)) {
+        if (chunks.length && !chunks[chunks.length - 1].endsWith('\n')) chunks.push('\n');
+      } else if (/^h[1-6]$/.test(tag)) {
+        if (chunks.length && !chunks[chunks.length - 1].endsWith('\n')) chunks.push('\n');
+        chunks.push(`${'#'.repeat(Number(tag[1]))} `);
+      }
+      const nextDepth = tag === 'ul' || tag === 'ol' ? listDepth + 1 : listDepth;
+      for (const child of Array.from(node.childNodes)) {
+        walk(child, nextDepth);
+      }
+      if (['p', 'div', 'section', 'article', 'blockquote', 'pre', 'li'].includes(tag)) {
+        if (!chunks[chunks.length - 1]?.endsWith('\n')) chunks.push('\n');
+      }
+    };
+
+    for (const child of Array.from(container.childNodes)) {
+      walk(child);
+    }
+    return chunks.join('').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  private defaultReviewerLabel(detail: ClinicalSessionDetail): string {
+    const reviewer = this.stringValue(detail.metadata?.['reviewer']);
+    if (reviewer) return reviewer;
+    const manualMetadata = this.recordValue(detail.metadata?.['manual_metadata']);
+    return this.stringValue(manualMetadata?.['reviewer']) || '';
   }
 
   updateMetadataText(value: string): void {
@@ -372,8 +487,40 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.revisionInstruction.set(value);
   }
 
+  updateManualEditReviewerNote(value: string): void {
+    this.manualEditReviewerNote.set(value);
+  }
+
+  updateManualEditEditedBy(value: string): void {
+    this.manualEditEditedBy.set(value);
+  }
+
   setSection(section: 'preview' | 'editor' | 'metadata' | 'revision' | 'timeline'): void {
     this.activeSection.set(section);
+  }
+
+  async selectRevisionVersion(versionId: number): Promise<void> {
+    const version = this.sessionVersions().find((item) => item.version_id === versionId) || null;
+    this.selectedRevisionVersionId.set(version?.version_id ?? null);
+    if (version) {
+      await this.loadRevisionArtifacts(version.version_id);
+    } else {
+      this.selectedRevisionArtifacts.set([]);
+    }
+    if (version?.pipeline_run_id) {
+      await this.loadRevisionPipeline(version.pipeline_run_id);
+      return;
+    }
+    this.selectedRevisionPipelineRun.set(null);
+    this.selectedRevisionPipelineSteps.set([]);
+  }
+
+  async openVersionFromHistory(version: SessionVersionSummary): Promise<void> {
+    if (version.session_id === null) {
+      await this.selectRevisionVersion(version.version_id);
+      return;
+    }
+    await this.openSession(version.session_id);
   }
 
   updateRevisionModelProvider(value: RevisionProvider): void {
@@ -393,7 +540,33 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.revisionRagSearch.set(value);
   }
 
-  async saveSession(): Promise<void> {
+  async saveManualReportEdit(): Promise<void> {
+    const detail = this.selected();
+    if (!detail) return;
+    if (this.revisionBusy()) {
+      this.saveStatus.set('[ERROR] Manual report edits are disabled while a revision job is running.');
+      return;
+    }
+    this.saveStatus.set('Saving manual report edit...');
+    const persistedEditorValue = this.editorValueToPersistedText();
+    try {
+      const response = await manualEditClinicalSessionReport(detail.session_id, {
+        report_text: persistedEditorValue,
+        edited_fields: ['report_text'],
+        reviewer_note: this.manualEditReviewerNote().trim() || null,
+        edited_by: this.manualEditEditedBy().trim() || null,
+        metadata: {},
+      });
+      this.selected.set(response.session);
+      this.editorText.set(persistedEditorValue);
+      this.manualEditReviewerNote.set('');
+      this.saveStatus.set('Manual report edit saved.');
+    } catch (error) {
+      this.saveStatus.set(formatUnknownError(error, 'Failed to save manual report edit.'));
+    }
+  }
+
+  async saveMetadata(): Promise<void> {
     const detail = this.selected();
     if (!detail) return;
     let metadata: Record<string, unknown>;
@@ -403,25 +576,103 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.saveStatus.set('[ERROR] Metadata must be valid JSON.');
       return;
     }
-    this.saveStatus.set('Saving...');
-    const persistedEditorValue = this.editorValueToPersistedText();
+    this.saveStatus.set('Saving metadata...');
     try {
-      const updated = await updateClinicalSession(detail.session_id, {
-        session_text: persistedEditorValue,
-        metadata,
-      });
-      this.selected.set({
-        ...updated,
-        report: persistedEditorValue,
-        result_payload: {
-          ...updated.result_payload,
-          report: persistedEditorValue,
-        },
-      });
-      this.editorText.set(persistedEditorValue);
-      this.saveStatus.set('Saved.');
+      const updated = await updateClinicalSession(detail.session_id, { metadata });
+      this.selected.set(updated);
+      this.saveStatus.set('Metadata saved.');
     } catch (error) {
-      this.saveStatus.set(formatUnknownError(error, 'Failed to save session.'));
+      this.saveStatus.set(formatUnknownError(error, 'Failed to save metadata.'));
+    }
+  }
+
+  private resetRevisionHistoryState(): void {
+    this.sessionVersions.set([]);
+    this.revisionHistoryLoading.set(false);
+    this.revisionHistoryError.set(null);
+    this.selectedRevisionVersionId.set(null);
+    this.selectedRevisionPipelineRun.set(null);
+    this.selectedRevisionPipelineSteps.set([]);
+    this.selectedRevisionArtifacts.set([]);
+    this.retryRevisionLoading.set(false);
+  }
+
+  private async loadRevisionHistory(
+    sessionId: number,
+    options: { preferredVersionId?: number | null; preferredPipelineRunId?: string | null } = {},
+  ): Promise<void> {
+    this.revisionHistoryLoading.set(true);
+    this.revisionHistoryError.set(null);
+    try {
+      const payload = await fetchClinicalSessionVersions(sessionId);
+      if (this.selected()?.session_id !== sessionId) return;
+      const items = payload.items || [];
+      this.sessionVersions.set(items);
+      const resolvedVersion =
+        this.resolveVersionSelection(items, {
+          sessionId,
+          preferredVersionId: options.preferredVersionId ?? this.selectedRevisionVersionId(),
+        });
+      this.selectedRevisionVersionId.set(resolvedVersion?.version_id ?? null);
+      if (resolvedVersion) {
+        await this.loadRevisionArtifacts(resolvedVersion.version_id);
+      } else {
+        this.selectedRevisionArtifacts.set([]);
+      }
+      const pipelineRunId = options.preferredPipelineRunId || resolvedVersion?.pipeline_run_id || null;
+      if (pipelineRunId) {
+        await this.loadRevisionPipeline(pipelineRunId);
+      } else {
+        this.selectedRevisionPipelineRun.set(null);
+        this.selectedRevisionPipelineSteps.set([]);
+      }
+    } catch (error) {
+      this.revisionHistoryError.set(formatUnknownError(error, 'Failed to load revision history.'));
+    } finally {
+      this.revisionHistoryLoading.set(false);
+    }
+  }
+
+  private resolveVersionSelection(
+    versions: SessionVersionSummary[],
+    options: { sessionId: number; preferredVersionId?: number | null },
+  ): SessionVersionSummary | null {
+    const preferredVersionId = options.preferredVersionId ?? null;
+    if (preferredVersionId !== null) {
+      const preferred = versions.find((item) => item.version_id === preferredVersionId) || null;
+      if (preferred) return preferred;
+    }
+    const currentSessionVersion = versions.find((item) => item.session_id === options.sessionId) || null;
+    if (currentSessionVersion) return currentSessionVersion;
+    return versions[versions.length - 1] || null;
+  }
+
+  private async loadRevisionArtifacts(versionId: number): Promise<void> {
+    const detail = this.selected();
+    if (!detail) return;
+    try {
+      const payload = await fetchClinicalSessionRevisionArtifacts(detail.session_id, versionId);
+      if (this.selected()?.session_id !== detail.session_id || this.selectedRevisionVersionId() !== versionId) return;
+      this.selectedRevisionArtifacts.set(payload.items || []);
+    } catch (error) {
+      this.selectedRevisionArtifacts.set([]);
+      this.revisionHistoryError.set(formatUnknownError(error, 'Failed to load revision artifacts.'));
+    }
+  }
+
+  private async loadRevisionPipeline(pipelineRunId: string): Promise<void> {
+    try {
+      const [run, steps] = await Promise.all([
+        fetchClinicalSessionRevisionPipelineRun(pipelineRunId),
+        fetchClinicalSessionRevisionPipelineSteps(pipelineRunId),
+      ]);
+      if (this.selectedRevisionVersion()?.pipeline_run_id !== pipelineRunId) return;
+      this.selectedRevisionPipelineRun.set(run);
+      this.selectedRevisionPipelineSteps.set(steps.items || []);
+    } catch (error) {
+      this.selectedRevisionPipelineRun.set(null);
+      this.selectedRevisionPipelineSteps.set([]);
+      this.revisionHistoryError.set(formatUnknownError(error, 'Failed to load revision pipeline details.'));
     }
   }
 
@@ -438,6 +689,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.stopPoller();
     this.revisionStatus.set('Starting revision...');
     this.revisionProgress.set(0);
+    this.activeSection.set('revision');
+    this.revisionHistoryError.set(null);
     try {
       const started = await startClinicalSessionRevisionJob(detail.session_id, {
         selected_text: this.revisionSelection().trim() || null,
@@ -456,33 +709,77 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  async retrySelectedRevisionRun(): Promise<void> {
+    const detail = this.selected();
+    const run = this.selectedRevisionPipelineRun();
+    const versionId = this.selectedRevisionVersionId();
+    if (!detail || !run || versionId === null || !this.selectedRevisionCanRetry()) return;
+    this.stopPoller();
+    this.retryRevisionLoading.set(true);
+    this.revisionStatus.set('Starting revision retry...');
+    this.revisionProgress.set(0);
+    this.revisionHistoryError.set(null);
+    try {
+      const started = await retryClinicalSessionRevisionPipelineRun(run.pipeline_run_id);
+      this.revisionJobStatus.set(started.status);
+      await this.loadRevisionHistory(detail.session_id, {
+        preferredVersionId: versionId,
+        preferredPipelineRunId: run.pipeline_run_id,
+      });
+      void this.pollRevisionJob(started.job_id, Math.max(1000, started.poll_interval * 1000));
+    } catch (error) {
+      this.revisionStatus.set(formatUnknownError(error, 'Failed to retry revision.'));
+    } finally {
+      this.retryRevisionLoading.set(false);
+    }
+  }
+
   private async pollRevisionJob(jobId: string, intervalMs: number): Promise<void> {
     this.pollCancelled = false;
     while (!this.pollCancelled) {
       try {
         const status = await fetchClinicalSessionRevisionJobStatus(jobId);
-          this.revisionJobStatus.set(status.status);
-          this.revisionProgress.set(status.progress);
+        this.revisionJobStatus.set(status.status);
+        this.revisionProgress.set(status.progress);
+        this.revisionStatus.set(
+          typeof status.result?.progress_message === 'string'
+            ? status.result.progress_message
+            : `Revision ${status.status}`,
+        );
+        if (status.status === 'completed') {
+          this.stopPoller();
+          await this.loadSessions();
+          const revisedSessionId = this.revisedSessionId(status.result);
+          if (revisedSessionId !== null) {
+            await this.openSession(revisedSessionId);
+            this.activeSection.set('preview');
+            return;
+          }
+          const detail = this.selected();
+          const pipelineRunId = this.pipelineRunIdFromJobResult(status.result);
+          if (detail) {
+            await this.loadRevisionHistory(detail.session_id, {
+              preferredPipelineRunId: pipelineRunId,
+            });
+          }
+          return;
+        }
+        if (status.status === 'failed' || status.status === 'cancelled') {
+          this.stopPoller();
           this.revisionStatus.set(
-            typeof status.result?.progress_message === 'string'
-              ? status.result.progress_message
-              : `Revision ${status.status}`,
+            formatErrorMessage(
+              status.error || (status.status === 'cancelled' ? 'Revision cancelled.' : 'Revision failed.'),
+            ),
           );
-          if (status.status === 'completed') {
-            this.stopPoller();
-            await this.loadSessions();
-            const revisedSessionId = this.revisedSessionId(status.result);
-            if (revisedSessionId !== null) {
-              await this.openSession(revisedSessionId);
-              this.activeSection.set('preview');
-            }
-            return;
+          const detail = this.selected();
+          const pipelineRunId = this.pipelineRunIdFromJobResult(status.result);
+          if (detail) {
+            await this.loadRevisionHistory(detail.session_id, {
+              preferredPipelineRunId: pipelineRunId,
+            });
           }
-          if (status.status === 'failed') {
-            this.stopPoller();
-            this.revisionStatus.set(formatErrorMessage(status.error || 'Revision failed.'));
-            return;
-          }
+          return;
+        }
       } catch (error) {
         this.stopPoller();
         this.revisionStatus.set(formatUnknownError(error, 'Revision polling failed.'));
@@ -509,12 +806,16 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   previewReport(detail: ClinicalSessionDetail): string {
-    const report = detail.report || detail.result_payload?.['report'];
+    const report = detail.official_report_text || detail.report || detail.result_payload?.['report'];
     return typeof report === 'string' && report.trim() ? report.trim() : 'No AI report preview is available for this session.';
   }
 
+  previewOfficialReport(detail: ClinicalSessionDetail): string {
+    return this.previewReport(detail);
+  }
+
   previewReportHtml(detail: ClinicalSessionDetail): string {
-    return this.markdownRenderer.render(this.previewReport(detail)).html;
+    return this.markdownRenderer.render(this.previewOfficialReport(detail)).html;
   }
 
   previewDetectedDrugs(detail: ClinicalSessionDetail): string[] {
@@ -1140,6 +1441,102 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   private revisedSessionId(result: Record<string, unknown> | null): number | null {
     const value = result?.['session_id'];
     return typeof value === 'number' && Number.isInteger(value) ? value : null;
+  }
+
+  private pipelineRunIdFromJobResult(result: Record<string, unknown> | null): string | null {
+    const value = result?.['pipeline_run_id'];
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+  }
+
+  revisionStatusLabel(value: string | null | undefined): string {
+    if (!value) return 'Unknown';
+    return value
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  revisionTone(value: string | null | undefined): 'good' | 'warn' | 'bad' | 'neutral' | 'info' {
+    switch (value) {
+      case 'current':
+      case 'completed':
+      case 'llm_qa_passed':
+      case 'passed':
+      case 'approved_by_human':
+      case 'human_approved':
+        return 'good';
+      case 'requires_human_review':
+      case 'pending':
+      case 'pending_qa':
+      case 'under_review':
+      case 'draft_revision':
+      case 'running':
+        return 'warn';
+      case 'failed':
+      case 'qa_failed':
+      case 'human_rejected':
+      case 'rejected_by_human':
+      case 'cancelled':
+        return 'bad';
+      case 'llm_assisted_revision':
+      case 'manual_edit':
+      case 'original':
+      case 'not_run':
+      case 'not_reviewed':
+      case 'superseded':
+        return 'neutral';
+      default:
+        return 'info';
+    }
+  }
+
+  revisionStepSummary(step: RevisionPipelineStep): string {
+    const outputSummary = step.output_summary;
+    if (outputSummary && Object.keys(outputSummary).length > 0) {
+      return Object.entries(outputSummary)
+        .slice(0, 3)
+        .map(([key, value]) => `${this.revisionStatusLabel(key)}: ${String(value)}`)
+        .join(' · ');
+    }
+    const inputSummary = step.input_summary;
+    if (inputSummary && Object.keys(inputSummary).length > 0) {
+      return Object.entries(inputSummary)
+        .slice(0, 3)
+        .map(([key, value]) => `${this.revisionStatusLabel(key)}: ${String(value)}`)
+        .join(' · ');
+    }
+    return 'No structured summary saved.';
+  }
+
+  revisionArtifactSummary(artifact: RevisionArtifact): string {
+    const payload = artifact.payload || {};
+    if (artifact.artifact_kind === 'llm_qa_output') {
+      const blockingIssues = Array.isArray(payload['blocking_issues']) ? payload['blocking_issues'].length : 0;
+      const manualReviewRequired = payload['manual_review_required'] === true;
+      return [
+        blockingIssues ? `${blockingIssues} blocking issue${blockingIssues === 1 ? '' : 's'}` : 'No blocking issues',
+        manualReviewRequired ? 'Manual review required' : 'No manual review flag',
+      ].join(' · ');
+    }
+    if (artifact.artifact_kind === 'report_comparison') {
+      const outcome = typeof payload['outcome'] === 'string' ? payload['outcome'] : artifact.status || 'unknown';
+      const manualReview = typeof payload['manual_review'] === 'string' ? payload['manual_review'] : null;
+      return manualReview ? `Outcome ${outcome} · Manual review ${manualReview}` : `Outcome ${outcome}`;
+    }
+    if (artifact.artifact_kind === 'structured_case_entity') {
+      const role = typeof payload['role'] === 'string' ? payload['role'] : null;
+      return role ? `${this.revisionStatusLabel(artifact.entity_type)} · ${role}` : this.revisionStatusLabel(artifact.entity_type);
+    }
+    const keys = Object.keys(payload);
+    return keys.length
+      ? keys.slice(0, 3).map((key) => this.revisionStatusLabel(key)).join(' · ')
+      : 'No structured payload summary saved.';
+  }
+
+  revisionArtifactPrimaryLabel(artifact: RevisionArtifact): string {
+    if (artifact.artifact_kind === 'structured_case_entity') {
+      return artifact.entity_name || artifact.artifact_key || 'Structured entity';
+    }
+    return artifact.artifact_key || this.revisionStatusLabel(artifact.artifact_kind);
   }
 
   private stopPoller(): void {

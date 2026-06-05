@@ -302,7 +302,6 @@ class HepatotoxicityPatternAnalyzer:
 
 ###############################################################################
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
 
 
 async def run_analysis(

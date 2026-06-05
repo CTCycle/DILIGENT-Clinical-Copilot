@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 from datetime import UTC, date, datetime
 from functools import partial
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Any, Literal
 from common.constants import DOCUMENT_SUPPORTED_EXTENSIONS
 from common.paths import DOCS_PATH, VECTOR_DB_PATH
 from common.utils.logger import logger
+from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.clinical.entities import ClinicalSessionRequest
 from domain.inspection import InspectionJobPhase
@@ -19,7 +21,6 @@ from repositories.serialization.data import (
     DataSerializer,
     DocumentSerializer,
 )
-from repositories.serialization.model_configs import ModelConfigSerializer
 from repositories.vectors import LanceVectorDatabase
 from services.clinical.timeline import PatientTimelineExtractor
 from services.retrieval.settings import build_effective_rag_settings
@@ -68,6 +69,12 @@ class DataInspectionService:
     RAG_JOB_TYPE = "rag_update"
     REVISION_JOB_TYPE = "session_revision"
     RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"
+    REVISION_STEP_SEQUENCE: list[tuple[str, str]] = [
+        ("prepare_runtime", "Preparing revision runtime"),
+        ("preprocess_input", "Preprocessing source clinical text"),
+        ("generate_revision", "Generating revised clinical session"),
+        ("persist_revision", "Persisting revision artifacts"),
+    ]
     UPDATE_PHASES: dict[UpdateTarget, list[PhaseStep]] = {
         "rxnav": [
             ("configuration_accepted", 1, 7, "Configuration accepted"),
@@ -303,16 +310,73 @@ class DataInspectionService:
         return self.serializer.get_session_detail(session_id)
 
     # -------------------------------------------------------------------------
+    def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
+        return self.serializer.list_session_versions(session_id)
+
+    # -------------------------------------------------------------------------
+    def get_session_version_detail(
+        self,
+        session_id: int,
+        *,
+        version_id: int,
+    ) -> dict[str, Any] | None:
+        return self.serializer.get_session_version_detail(
+            session_id,
+            version_id=version_id,
+        )
+
+    # -------------------------------------------------------------------------
+    def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
+        return self.serializer.list_manual_report_edits(session_id)
+
+    # -------------------------------------------------------------------------
     def update_session(
         self,
         session_id: int,
         *,
         session_text: str | None,
+        report_text: str | None = None,
+        edited_fields: list[str] | None = None,
+        reviewer_note: str | None = None,
+        edited_by: str | None = None,
         metadata: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
-        return self.serializer.update_session_text_and_metadata(
+        resolved_report_text = str(report_text or "").strip() or None
+        if resolved_report_text is None:
+            legacy_report_text = str(session_text or "").strip()
+            resolved_report_text = legacy_report_text or None
+        if resolved_report_text is not None:
+            updated = self.serializer.update_current_report_text_with_manual_audit(
+                session_id,
+                report_text=resolved_report_text,
+                edited_fields=edited_fields,
+                reviewer_note=reviewer_note,
+                edited_by=edited_by,
+                metadata=metadata,
+            )
+            return updated["session"] if isinstance(updated, dict) else None
+        return self.serializer.update_session_metadata(
             session_id,
-            session_text=session_text,
+            metadata=metadata,
+        )
+
+    # -------------------------------------------------------------------------
+    def manual_edit_report(
+        self,
+        session_id: int,
+        *,
+        report_text: str,
+        edited_fields: list[str] | None,
+        reviewer_note: str | None,
+        edited_by: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        return self.serializer.update_current_report_text_with_manual_audit(
+            session_id,
+            report_text=report_text,
+            edited_fields=edited_fields,
+            reviewer_note=reviewer_note,
+            edited_by=edited_by,
             metadata=metadata,
         )
 
@@ -413,13 +477,222 @@ class DataInspectionService:
         return extract_revision_drug_names_value(payload)
 
     # -------------------------------------------------------------------------
+    def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
+        return self.serializer.get_revision_run(pipeline_run_id)
+
+    # -------------------------------------------------------------------------
+    def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
+        return self.serializer.list_revision_steps(pipeline_run_id)
+
+    # -------------------------------------------------------------------------
+    def list_revision_artifacts(
+        self,
+        *,
+        revision_version_id: int,
+    ) -> list[dict[str, Any]]:
+        return self.serializer.list_revision_artifacts_for_version(
+            revision_version_id=revision_version_id
+        )
+
+    # -------------------------------------------------------------------------
     @staticmethod
-    def _resolve_override_value(
-        overrides: dict[str, Any],
-        key: str,
-        fallback: Any,
-    ) -> Any:
-        return overrides[key] if key in overrides else fallback
+    def _build_revision_run_configuration(
+        *,
+        selected_text: str | None,
+        revision_instruction: str | None,
+        model_overrides: dict[str, Any],
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        selected_focus_text = str(selected_text or "").strip() or None
+        focus_instruction = str(revision_instruction or "").strip() or None
+        effective_overrides = {
+            key: value for key, value in (model_overrides or {}).items() if value is not None
+        }
+        return {
+            "selected_text": selected_focus_text,
+            "selected_text_present": bool(selected_focus_text),
+            "revision_instruction": focus_instruction,
+            "model_overrides": effective_overrides,
+            "metadata": metadata or {},
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _build_revision_runtime_overrides(
+        *,
+        effective_overrides: dict[str, Any],
+    ) -> dict[str, object]:
+        runtime_overrides: dict[str, object] = {}
+        if "clinical_model" in effective_overrides:
+            runtime_overrides["clinical_model"] = effective_overrides["clinical_model"]
+        if "text_extraction_model" in effective_overrides:
+            runtime_overrides["text_extraction_model"] = effective_overrides[
+                "text_extraction_model"
+            ]
+        if "use_cloud_services" in effective_overrides:
+            runtime_overrides["use_cloud_models"] = effective_overrides[
+                "use_cloud_services"
+            ]
+        if "provider" in effective_overrides:
+            runtime_overrides["cloud_provider"] = effective_overrides["provider"]
+        if "cloud_model" in effective_overrides:
+            runtime_overrides["cloud_model"] = effective_overrides["cloud_model"]
+        if "ollama_temperature" in effective_overrides:
+            runtime_overrides["ollama_temperature"] = effective_overrides[
+                "ollama_temperature"
+            ]
+        if "cloud_temperature" in effective_overrides:
+            runtime_overrides["cloud_temperature"] = effective_overrides[
+                "cloud_temperature"
+            ]
+        if "ollama_reasoning" in effective_overrides:
+            runtime_overrides["ollama_reasoning"] = effective_overrides[
+                "ollama_reasoning"
+            ]
+        return runtime_overrides
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _revision_run_actor_source(metadata: dict[str, Any]) -> str:
+        return (
+            "manual_entry"
+            if str((metadata or {}).get("reviewer") or "").strip()
+            else "unknown"
+        )
+
+    # -------------------------------------------------------------------------
+    def _start_revision_background_job(
+        self,
+        *,
+        pipeline_run_id: str,
+        source_version_id: int,
+        target_revision_version_id: int,
+        session_detail: dict[str, Any],
+        root_session_id: int,
+        version: int,
+        selected_text: str | None,
+        revision_instruction: str | None,
+        model_overrides: dict[str, Any],
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        job_id = self.jobs.start_job(
+            job_type=self.REVISION_JOB_TYPE,
+            runner=self.run_revision_job,
+            kwargs={
+                "job_id": None,
+                "pipeline_run_id": pipeline_run_id,
+                "source_version_id": int(source_version_id),
+                "target_revision_version_id": int(target_revision_version_id),
+                "session_detail": session_detail,
+                "root_session_id": root_session_id,
+                "version": version,
+                "selected_text": selected_text,
+                "revision_instruction": revision_instruction,
+                "model_overrides": model_overrides,
+                "metadata": metadata,
+            },
+        )
+        status_payload = self.jobs.get_job_status(job_id)
+        if status_payload is None:
+            raise RuntimeError("Failed to initialize revision job")
+        self.patch_job_result(
+            job_id=job_id,
+            patch={
+                "pipeline_run_id": pipeline_run_id,
+                "target_revision_version_id": int(target_revision_version_id),
+            },
+        )
+        return status_payload
+
+    # -------------------------------------------------------------------------
+    def _record_revision_step_start(
+        self,
+        *,
+        pipeline_run_id: str,
+        step_name: str,
+        input_summary: dict[str, Any] | None = None,
+        input_payload: Any = None,
+        model_name: str | None = None,
+    ) -> dict[str, Any]:
+        step_index = next(
+            (
+                index
+                for index, (candidate_name, _) in enumerate(
+                    self.REVISION_STEP_SEQUENCE, start=1
+                )
+                if candidate_name == step_name
+            ),
+            None,
+        )
+        if step_index is None:
+            raise ValueError(f"Unknown revision step: {step_name}")
+        return self.serializer.start_revision_step(
+            pipeline_run_id=pipeline_run_id,
+            step_name=step_name,
+            step_index=step_index,
+            step_count=len(self.REVISION_STEP_SEQUENCE),
+            input_summary=input_summary,
+            input_payload=input_payload,
+            model_name=model_name,
+        )
+
+    # -------------------------------------------------------------------------
+    def _record_revision_step_success(
+        self,
+        *,
+        pipeline_run_id: str,
+        step_name: str,
+        attempt_number: int,
+        started_at: datetime,
+        output_summary: dict[str, Any] | None = None,
+        output_payload: dict[str, Any] | None = None,
+    ) -> None:
+        latency_ms = int((datetime.now(UTC) - started_at).total_seconds() * 1000)
+        self.serializer.complete_revision_step(
+            pipeline_run_id=pipeline_run_id,
+            step_name=step_name,
+            attempt_number=attempt_number,
+            output_summary=output_summary,
+            output_payload=output_payload,
+            latency_ms=latency_ms,
+        )
+
+    # -------------------------------------------------------------------------
+    def _record_revision_step_failure(
+        self,
+        *,
+        pipeline_run_id: str,
+        step_name: str,
+        attempt_number: int,
+        started_at: datetime,
+        exc: Exception,
+    ) -> None:
+        latency_ms = int((datetime.now(UTC) - started_at).total_seconds() * 1000)
+        self.serializer.fail_revision_step(
+            pipeline_run_id=pipeline_run_id,
+            step_name=step_name,
+            attempt_number=attempt_number,
+            error={"message": str(exc)[:500]},
+            latency_ms=latency_ms,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _derive_revision_qa_outcome(
+        result_payload: dict[str, Any],
+    ) -> tuple[str, str]:
+        blocking_issues = result_payload.get("blocking_issues")
+        if isinstance(blocking_issues, list) and blocking_issues:
+            return "qa_failed", "failed"
+        if bool(result_payload.get("manual_review_required")):
+            return "requires_human_review", "requires_human_review"
+        pipeline_artifacts = result_payload.get("pipeline_artifacts")
+        if isinstance(pipeline_artifacts, dict) and isinstance(
+            pipeline_artifacts.get("faithfulness_audit"),
+            dict,
+        ):
+            return "llm_qa_passed", "passed"
+        return "requires_human_review", "not_run"
 
     # -------------------------------------------------------------------------
     def start_revision_job(
@@ -438,30 +711,155 @@ class DataInspectionService:
             raise ValueError("Session not found")
         root_session_id = int(detail.get("original_session_id") or session_id)
         version = self.serializer.get_next_session_version(root_session_id)
-        job_id = self.jobs.start_job(
-            job_type=self.REVISION_JOB_TYPE,
-            runner=self.run_revision_job,
-            kwargs={
-                "job_id": None,
-                "session_detail": detail,
-                "root_session_id": root_session_id,
-                "version": version,
-                "selected_text": selected_text,
-                "revision_instruction": revision_instruction,
-                "model_overrides": model_overrides,
-                "metadata": metadata,
-            },
+        source_version = self.serializer.get_version_record_for_session(session_id)
+        if source_version is None:
+            raise ValueError("Session version history is unavailable")
+        run_configuration = self._build_revision_run_configuration(
+            selected_text=selected_text,
+            revision_instruction=revision_instruction,
+            model_overrides=model_overrides,
+            metadata=metadata,
         )
-        status_payload = self.jobs.get_job_status(job_id)
-        if status_payload is None:
-            raise RuntimeError("Failed to initialize revision job")
-        return status_payload
+        effective_overrides = run_configuration["model_overrides"]
+        revision_mode = (
+            "instruction_guided"
+            if str(revision_instruction or "").strip()
+            else "default"
+        )
+        pipeline_run_id = uuid.uuid4().hex
+        target_shell = self.serializer.create_revision_version_shell(
+            session_id,
+            reviewer_note=str(metadata.get("revision_note") or "").strip() or None,
+            configuration=run_configuration,
+            pipeline_run_id=pipeline_run_id,
+            initiated_by=str(metadata.get("reviewer") or "").strip() or None,
+        )
+        if target_shell is None:
+            raise RuntimeError("Failed to create revision version shell")
+        self.serializer.create_or_update_revision_run(
+            pipeline_run_id=pipeline_run_id,
+            session_id=int(session_id),
+            root_session_id=root_session_id,
+            source_version_id=int(source_version["version_id"]),
+            target_revision_version_id=int(target_shell["version_id"]),
+            revision_mode=revision_mode,
+            revision_kind="llm_assisted_revision",
+            configuration=run_configuration,
+            reviewer_note=str(metadata.get("revision_note") or "").strip() or None,
+            status="running",
+            initiated_by=str(metadata.get("reviewer") or "").strip() or None,
+            actor_source=self._revision_run_actor_source(metadata),
+            actor_confidence="unverified",
+            started_at=datetime.now(UTC),
+            trace_id=pipeline_run_id,
+        )
+        return self._start_revision_background_job(
+            pipeline_run_id=pipeline_run_id,
+            source_version_id=int(source_version["version_id"]),
+            target_revision_version_id=int(target_shell["version_id"]),
+            session_detail=detail,
+            root_session_id=root_session_id,
+            version=version,
+            selected_text=selected_text,
+            revision_instruction=revision_instruction,
+            model_overrides=model_overrides,
+            metadata=metadata,
+        )
+
+    # -------------------------------------------------------------------------
+    def retry_revision_job(self, pipeline_run_id: str) -> dict[str, Any]:
+        if self.jobs.is_job_running(self.REVISION_JOB_TYPE):
+            raise ValueError("Session revision is already running")
+        run = self.serializer.get_revision_run(pipeline_run_id)
+        if run is None:
+            raise ValueError("Revision pipeline run not found")
+        if str(run.get("status") or "").casefold() == "running":
+            raise ValueError("Session revision is already running")
+        target_revision_version_id = run.get("target_revision_version_id")
+        if not isinstance(target_revision_version_id, int):
+            raise ValueError("Revision pipeline run is missing its target version shell")
+        target_detail = self.serializer.get_session_version_detail(
+            int(run["session_id"]),
+            version_id=target_revision_version_id,
+        )
+        if target_detail is None:
+            raise ValueError("Target revision version not found")
+        target_version = target_detail["version"]
+        if target_version["session_id"] is not None:
+            raise ValueError("Completed revision runs cannot be retried")
+        if target_version["version_status"] != "draft_revision":
+            raise ValueError("Only draft revision shells can be retried")
+        source_detail = self.serializer.get_session_version_detail(
+            int(run["session_id"]),
+            version_id=int(run["source_version_id"]),
+        )
+        if source_detail is None or source_detail.get("session") is None:
+            raise ValueError("Source version session could not be loaded")
+        configuration = run.get("configuration")
+        if not isinstance(configuration, dict):
+            configuration = {}
+        metadata = configuration.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        selected_text_value = configuration.get("selected_text")
+        selected_text = (
+            str(selected_text_value).strip()
+            if isinstance(selected_text_value, str)
+            else None
+        ) or None
+        revision_instruction_value = configuration.get("revision_instruction")
+        revision_instruction = (
+            str(revision_instruction_value).strip()
+            if isinstance(revision_instruction_value, str)
+            else None
+        ) or None
+        model_overrides = configuration.get("model_overrides")
+        if not isinstance(model_overrides, dict):
+            model_overrides = {}
+        revision_mode = (
+            "instruction_guided" if revision_instruction else "default"
+        )
+        self.serializer.create_or_update_revision_run(
+            pipeline_run_id=pipeline_run_id,
+            session_id=int(run["session_id"]),
+            root_session_id=int(run["root_session_id"]),
+            source_version_id=int(run["source_version_id"]),
+            target_revision_version_id=target_revision_version_id,
+            revision_mode=revision_mode,
+            revision_kind="llm_assisted_revision",
+            configuration=configuration,
+            reviewer_note=str(metadata.get("revision_note") or "").strip() or None,
+            status="running",
+            initiated_by=str(metadata.get("reviewer") or "").strip() or None,
+            actor_source=self._revision_run_actor_source(metadata),
+            actor_confidence="unverified",
+            started_at=datetime.now(UTC),
+            completed_at=None,
+            error=None,
+            trace_id=pipeline_run_id,
+            latency_ms=None,
+        )
+        return self._start_revision_background_job(
+            pipeline_run_id=pipeline_run_id,
+            source_version_id=int(run["source_version_id"]),
+            target_revision_version_id=target_revision_version_id,
+            session_detail=source_detail["session"],
+            root_session_id=int(run["root_session_id"]),
+            version=int(target_version["version_number"]),
+            selected_text=selected_text,
+            revision_instruction=revision_instruction,
+            model_overrides=model_overrides,
+            metadata=metadata,
+        )
 
     # -------------------------------------------------------------------------
     def run_revision_job(
         self,
         *,
         job_id: str | None,
+        pipeline_run_id: str,
+        source_version_id: int,
+        target_revision_version_id: int,
         session_detail: dict[str, Any],
         root_session_id: int,
         version: int,
@@ -470,6 +868,7 @@ class DataInspectionService:
         model_overrides: dict[str, Any],
         metadata: dict[str, Any],
     ) -> dict[str, Any]:
+        run_started_at = datetime.now(UTC)
         source_text = str(session_detail.get("session_text") or "").strip()
         if not source_text:
             raise ValueError("Session text is empty")
@@ -480,101 +879,182 @@ class DataInspectionService:
             revision_instruction=focus_instruction,
         )
         clinical_service = build_clinical_session_service(self.jobs)
-        config_serializer = ModelConfigSerializer()
-        previous_snapshot = config_serializer.load_snapshot()
         effective_overrides = {
             key: value
             for key, value in (model_overrides or {}).items()
             if value is not None
         }
+        runtime_overrides = self._build_revision_runtime_overrides(
+            effective_overrides=effective_overrides
+        )
+        revision_mode = "instruction_guided" if focus_instruction else "default"
+        run_configuration = self._build_revision_run_configuration(
+            selected_text=selected_focus_text,
+            revision_instruction=focus_instruction,
+            model_overrides=effective_overrides,
+            metadata=metadata,
+        )
+        actor_source = self._revision_run_actor_source(metadata)
 
         try:
-            if effective_overrides:
-                config_serializer.save_snapshot(
-                    clinical_model=self._resolve_override_value(
-                        effective_overrides,
-                        "clinical_model",
-                        previous_snapshot.clinical_model,
-                    ),
-                    text_extraction_model=self._resolve_override_value(
-                        effective_overrides,
-                        "text_extraction_model",
-                        previous_snapshot.text_extraction_model,
-                    ),
-                    use_cloud_models=self._resolve_override_value(
-                        effective_overrides,
-                        "use_cloud_services",
-                        previous_snapshot.use_cloud_models,
-                    ),
-                    cloud_provider=self._resolve_override_value(
-                        effective_overrides,
-                        "provider",
-                        previous_snapshot.cloud_provider,
-                    ),
-                    cloud_model=self._resolve_override_value(
-                        effective_overrides,
-                        "cloud_model",
-                        previous_snapshot.cloud_model,
-                    ),
-                    ollama_temperature=self._resolve_override_value(
-                        effective_overrides,
-                        "ollama_temperature",
-                        previous_snapshot.ollama_temperature,
-                    ),
-                    cloud_temperature=self._resolve_override_value(
-                        effective_overrides,
-                        "cloud_temperature",
-                        previous_snapshot.cloud_temperature,
-                    ),
-                    ollama_reasoning=self._resolve_override_value(
-                        effective_overrides,
-                        "ollama_reasoning",
-                        previous_snapshot.ollama_reasoning,
-                    ),
-                )
-            clinical_service.apply_persisted_runtime_configuration()
-            revision_use_rag = bool(metadata.get("use_rag"))
-            request = ClinicalSessionRequest(
-                name=session_detail.get("patient_name"),
-                visit_date=session_detail.get("visit_date"),
-                clinical_input=source_text,
-                use_rag=revision_use_rag,
+            prepare_step_started_at = datetime.now(UTC)
+            prepare_step = self._record_revision_step_start(
+                pipeline_run_id=pipeline_run_id,
+                step_name="prepare_runtime",
+                input_summary={
+                    "has_model_overrides": bool(effective_overrides),
+                    "override_keys": sorted(str(key) for key in effective_overrides),
+                },
+                input_payload=run_configuration,
+                model_name=str(
+                    effective_overrides.get("clinical_model")
+                    or session_detail.get("clinical_model")
+                    or ""
+                ).strip()
+                or None,
             )
-            preprocessed_request, section_extraction = asyncio.run(
-                clinical_service.preprocess_unified_input(request)
-            )
-            patient_payload = clinical_service.build_patient_payload(
-                preprocessed_request
-            )
-            result_payload = asyncio.run(
-                clinical_service.process_single_patient(
-                    patient_payload,
-                    section_extraction=section_extraction,
-                    session_version=version,
-                    original_session_id=root_session_id,
-                    session_metadata={
-                        **metadata,
-                        "use_rag": revision_use_rag,
-                        "revision_mode": True,
-                        "focused_selection": bool(selected_focus_text),
-                        "revision_instruction": focus_instruction,
-                        "model_overrides": effective_overrides,
-                        "revised_from_session_id": session_detail.get("session_id"),
+            with LLMRuntimeConfig.override_for_run(runtime_overrides):
+                clinical_service.apply_persisted_runtime_configuration()
+                self._record_revision_step_success(
+                    pipeline_run_id=pipeline_run_id,
+                    step_name="prepare_runtime",
+                    attempt_number=int(prepare_step["attempt_number"]),
+                    started_at=prepare_step_started_at,
+                    output_summary={
+                        "runtime_configuration_applied": True,
+                        "runtime_override_active": bool(runtime_overrides),
                     },
-                    original_session_text=source_text,
-                    revision_focus_context=revision_focus_context,
-                    progress_callback=lambda stage, progress: (
-                        self.report_job_progress(
-                            job_id=job_id or "",
-                            progress=progress,
-                            message=f"Revision: {stage}",
-                        )
-                        if job_id
-                        else None
-                    ),
-                    stop_check=None,
                 )
-            )
+                revision_use_rag = bool(metadata.get("use_rag"))
+                request = ClinicalSessionRequest(
+                    name=session_detail.get("patient_name"),
+                    visit_date=session_detail.get("visit_date"),
+                    clinical_input=source_text,
+                    use_rag=revision_use_rag,
+                )
+                preprocess_started_at = datetime.now(UTC)
+                preprocess_step = self._record_revision_step_start(
+                    pipeline_run_id=pipeline_run_id,
+                    step_name="preprocess_input",
+                    input_summary={
+                        "session_id": int(session_detail["session_id"]),
+                        "source_text_length": len(source_text),
+                        "selected_text_length": len(selected_focus_text or ""),
+                        "use_rag": revision_use_rag,
+                    },
+                    input_payload={
+                        "source_text": source_text,
+                        "selected_text": selected_focus_text,
+                        "revision_instruction": focus_instruction,
+                    },
+                )
+                try:
+                    preprocessed_request, section_extraction = asyncio.run(
+                        clinical_service.preprocess_unified_input(request)
+                    )
+                except Exception as exc:
+                    self._record_revision_step_failure(
+                        pipeline_run_id=pipeline_run_id,
+                        step_name="preprocess_input",
+                        attempt_number=int(preprocess_step["attempt_number"]),
+                        started_at=preprocess_started_at,
+                        exc=exc,
+                    )
+                    raise
+                self._record_revision_step_success(
+                    pipeline_run_id=pipeline_run_id,
+                    step_name="preprocess_input",
+                    attempt_number=int(preprocess_step["attempt_number"]),
+                    started_at=preprocess_started_at,
+                    output_summary={
+                        "section_extraction_available": bool(section_extraction),
+                        "patient_name_present": bool(
+                            str(getattr(preprocessed_request, "name", "") or "").strip()
+                        ),
+                    },
+                )
+                patient_payload = clinical_service.build_patient_payload(
+                    preprocessed_request
+                )
+                generation_started_at = datetime.now(UTC)
+                generation_step = self._record_revision_step_start(
+                    pipeline_run_id=pipeline_run_id,
+                    step_name="generate_revision",
+                    input_summary={
+                        "session_version": int(version),
+                        "focused_selection": bool(selected_focus_text),
+                        "revision_mode": revision_mode,
+                        "patient_payload_keys": sorted(
+                            patient_payload.keys()
+                            if isinstance(patient_payload, dict)
+                            else []
+                        ),
+                    },
+                    input_payload={
+                        "patient_payload": patient_payload,
+                        "section_extraction": section_extraction,
+                    },
+                    model_name=str(
+                        effective_overrides.get("clinical_model")
+                        or session_detail.get("clinical_model")
+                        or ""
+                    ).strip()
+                    or None,
+                )
+                try:
+                    result_payload = asyncio.run(
+                        clinical_service.process_revision_patient(
+                            patient_payload,
+                            section_extraction=section_extraction,
+                            session_version=version,
+                            original_session_id=root_session_id,
+                            session_metadata={
+                                **metadata,
+                                "use_rag": revision_use_rag,
+                                "revision_mode": True,
+                                "focused_selection": bool(selected_focus_text),
+                                "revision_instruction": focus_instruction,
+                                "model_overrides": effective_overrides,
+                                "revised_from_session_id": session_detail.get("session_id"),
+                            },
+                            original_session_text=source_text,
+                            revision_focus_context=revision_focus_context,
+                            progress_callback=lambda stage, progress: (
+                                self.report_job_progress(
+                                    job_id=job_id or "",
+                                    progress=progress,
+                                    message=f"Revision: {stage}",
+                                )
+                                if job_id
+                                else None
+                            ),
+                            stop_check=None,
+                        )
+                    )
+                except Exception as exc:
+                    self._record_revision_step_failure(
+                        pipeline_run_id=pipeline_run_id,
+                        step_name="generate_revision",
+                        attempt_number=int(generation_step["attempt_number"]),
+                        started_at=generation_started_at,
+                        exc=exc,
+                    )
+                    raise
+                self._record_revision_step_success(
+                    pipeline_run_id=pipeline_run_id,
+                    step_name="generate_revision",
+                    attempt_number=int(generation_step["attempt_number"]),
+                    started_at=generation_started_at,
+                    output_summary={
+                        "persisted_session_id": result_payload.get("session_id"),
+                        "has_report": bool(
+                            str(result_payload.get("report") or "").strip()
+                        ),
+                        "matched_drug_count": len(
+                            result_payload.get("matched_drugs") or []
+                        ),
+                    },
+                )
             revision_audit = self.build_revision_audit(
                 source_detail=session_detail,
                 result_payload=result_payload,
@@ -584,27 +1064,130 @@ class DataInspectionService:
             )
             result_payload["revision_audit"] = revision_audit
             persisted_session_id = result_payload.get("session_id")
+            persist_started_at = datetime.now(UTC)
+            persist_step = self._record_revision_step_start(
+                pipeline_run_id=pipeline_run_id,
+                step_name="persist_revision",
+                input_summary={
+                    "pipeline_run_id": pipeline_run_id,
+                    "persisted_session_id": persisted_session_id,
+                    "target_revision_version_id": int(target_revision_version_id),
+                },
+                input_payload={
+                    "persisted_session_id": persisted_session_id,
+                    "target_revision_version_id": int(target_revision_version_id),
+                },
+            )
             if isinstance(persisted_session_id, int):
+                version_status, llm_qa_status = self._derive_revision_qa_outcome(
+                    result_payload
+                )
                 self.serializer.upsert_session_result_payload(
                     persisted_session_id,
                     result_payload,
                 )
-        finally:
-            if effective_overrides:
-                config_serializer.save_snapshot(
-                    clinical_model=previous_snapshot.clinical_model,
-                    text_extraction_model=previous_snapshot.text_extraction_model,
-                    use_cloud_models=previous_snapshot.use_cloud_models,
-                    cloud_provider=previous_snapshot.cloud_provider,
-                    cloud_model=previous_snapshot.cloud_model,
-                    ollama_temperature=previous_snapshot.ollama_temperature,
-                    cloud_temperature=previous_snapshot.cloud_temperature,
-                    ollama_reasoning=previous_snapshot.ollama_reasoning,
+                self.serializer.finalize_revision_version(
+                    pipeline_run_id=pipeline_run_id,
+                    persisted_session_id=persisted_session_id,
+                    model_configuration=run_configuration,
+                    version_status=version_status,
+                    llm_qa_status=llm_qa_status,
+                    clinical_review_status="not_reviewed",
                 )
+                self.serializer.persist_revision_artifacts(
+                    pipeline_run_id=pipeline_run_id,
+                    revision_version_id=int(target_revision_version_id),
+                    result_payload=result_payload,
+                )
+            elapsed_ms = int((datetime.now(UTC) - run_started_at).total_seconds() * 1000)
+            if isinstance(persisted_session_id, int):
+                self.serializer.create_or_update_revision_run(
+                    pipeline_run_id=pipeline_run_id,
+                    session_id=int(session_detail["session_id"]),
+                    root_session_id=root_session_id,
+                    source_version_id=int(source_version_id),
+                    target_revision_version_id=int(target_revision_version_id),
+                    revision_mode=revision_mode,
+                    revision_kind="llm_assisted_revision",
+                    configuration=run_configuration,
+                    reviewer_note=str(metadata.get("revision_note") or "").strip() or None,
+                    status="completed",
+                    initiated_by=str(metadata.get("reviewer") or "").strip() or None,
+                    actor_source=actor_source,
+                    actor_confidence="unverified",
+                    completed_at=datetime.now(UTC),
+                    trace_id=pipeline_run_id,
+                    latency_ms=elapsed_ms,
+                )
+                self._record_revision_step_success(
+                    pipeline_run_id=pipeline_run_id,
+                    step_name="persist_revision",
+                    attempt_number=int(persist_step["attempt_number"]),
+                    started_at=persist_started_at,
+                    output_summary={
+                        "persisted_session_id": persisted_session_id,
+                        "revision_version_finalized": True,
+                    },
+                    output_payload={
+                        "persisted_session_id": persisted_session_id,
+                        "target_revision_version_id": int(target_revision_version_id),
+                    },
+                )
+            else:
+                self.serializer.create_or_update_revision_run(
+                    pipeline_run_id=pipeline_run_id,
+                    session_id=int(session_detail["session_id"]),
+                    root_session_id=root_session_id,
+                    source_version_id=int(source_version_id),
+                    target_revision_version_id=int(target_revision_version_id),
+                    revision_mode=revision_mode,
+                    revision_kind="llm_assisted_revision",
+                    configuration=run_configuration,
+                    reviewer_note=str(metadata.get("revision_note") or "").strip() or None,
+                    status="failed",
+                    initiated_by=str(metadata.get("reviewer") or "").strip() or None,
+                    actor_source=actor_source,
+                    actor_confidence="unverified",
+                    completed_at=datetime.now(UTC),
+                    error={"message": "Revision completed without a persisted session record."},
+                    trace_id=pipeline_run_id,
+                    latency_ms=elapsed_ms,
+                )
+                self.serializer.fail_revision_step(
+                    pipeline_run_id=pipeline_run_id,
+                    step_name="persist_revision",
+                    attempt_number=int(persist_step["attempt_number"]),
+                    error={"message": "Revision completed without a persisted session record."},
+                    latency_ms=int(
+                        (datetime.now(UTC) - persist_started_at).total_seconds() * 1000
+                    ),
+                )
+        except Exception as exc:
+            self.serializer.create_or_update_revision_run(
+                pipeline_run_id=pipeline_run_id,
+                session_id=int(session_detail["session_id"]),
+                root_session_id=root_session_id,
+                source_version_id=int(source_version_id),
+                target_revision_version_id=int(target_revision_version_id),
+                revision_mode=revision_mode,
+                revision_kind="llm_assisted_revision",
+                configuration=run_configuration,
+                reviewer_note=str(metadata.get("revision_note") or "").strip() or None,
+                status="failed",
+                initiated_by=str(metadata.get("reviewer") or "").strip() or None,
+                actor_source=actor_source,
+                actor_confidence="unverified",
+                completed_at=datetime.now(UTC),
+                error={"message": str(exc)[:500]},
+                trace_id=pipeline_run_id,
+                latency_ms=int((datetime.now(UTC) - run_started_at).total_seconds() * 1000),
+            )
+            raise
         return {
             "session_id": result_payload.get("session_id"),
             "version": version,
             "original_session_id": root_session_id,
+            "pipeline_run_id": pipeline_run_id,
             "result_payload": result_payload,
         }
 

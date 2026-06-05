@@ -20,7 +20,6 @@ from services.llm.ollama_runtime import OllamaError
 
 ###############################################################################
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
 
 
 def get_residency_targets() -> dict[str, str]:
