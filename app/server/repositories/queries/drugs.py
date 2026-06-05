@@ -24,11 +24,6 @@ class DrugRepositoryQueries:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def drug_by_rxnorm_rxcui(rxcui: str) -> Select[tuple[Drug]]:
-        return select(Drug).where(Drug.rxnorm_rxcui == rxcui)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
     def drug_by_canonical_name_norm(canonical_name_norm: str) -> Select[tuple[Drug]]:
         return select(Drug).where(Drug.canonical_name_norm == canonical_name_norm)
 

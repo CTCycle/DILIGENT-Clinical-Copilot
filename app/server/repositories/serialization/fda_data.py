@@ -25,7 +25,6 @@ def upsert_drugs_catalog_records(
     commit_interval: int | None = None,
     curated_aliases_by_canonical: dict[str, list[tuple[str, str]]] | None = None,
 ) -> None:
-    self.ensure_session_result_table()
     prepared_rows = self.prepare_rxnav_rows(records)
     if not prepared_rows:
         return

@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 ## Relational Database
 - SQLAlchemy-backed storage
@@ -23,6 +23,7 @@ Last updated: 2026-06-03
 ## Reference Catalog Persistence
 - Canonical manifests live in `app/resources/catalogs/*.json`.
 - Catalogs are seeded into database tables.
+- RxNorm code persistence uses `drug_rxnorm_codes` as the canonical RxCUI mapping table.
 - Startup performs hash-based seed checks and only reseeds manifests that are missing or changed.
 - Full reseed or reset is explicit through:
 
