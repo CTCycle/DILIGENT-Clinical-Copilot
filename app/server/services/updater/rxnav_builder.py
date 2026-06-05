@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 import pandas as pd
 
-from common.constants import RXNAV_CURATED_ALIASES_PATH
+from common.paths import RXNAV_CURATED_ALIASES_PATH
 from common.utils.logger import logger
 from repositories.serialization.data import DataSerializer
 from services.text.normalization import normalize_drug_name
@@ -61,8 +61,12 @@ class RxNavDrugCatalogBuilder:
         self.total_records: int | None = None
         self.last_logged_count = 0
         self.serializer = serializer or DataSerializer()
-        resolved_path = curated_aliases_path or RXNAV_CURATED_ALIASES_PATH
-        self.curated_aliases_path = Path(resolved_path).resolve()
+        resolved_path = (
+            Path(curated_aliases_path)
+            if curated_aliases_path is not None
+            else RXNAV_CURATED_ALIASES_PATH
+        )
+        self.curated_aliases_path = resolved_path.resolve()
         self.curated_aliases_by_canonical = self.load_curated_aliases()
 
     # -------------------------------------------------------------------------

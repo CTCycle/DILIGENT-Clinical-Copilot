@@ -1,30 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from common.utils.catalog_loader import CatalogLoader
-
-# [PATHS]
-###############################################################################
-APP_DIR = str(Path(__file__).resolve().parents[2])
-ROOT_DIR = str(Path(__file__).resolve().parents[3])
-SETTING_PATH = str(Path(ROOT_DIR) / "settings")
-RESOURCES_PATH = str(Path(APP_DIR) / "resources")
-MODELS_PATH = str(Path(RESOURCES_PATH) / "models")
-SOURCES_PATH = str(Path(RESOURCES_PATH) / "sources")
-ARCHIVES_PATH = str(Path(SOURCES_PATH) / "archives")
-DOCS_PATH = str(Path(SOURCES_PATH) / "documents")
-LOGS_PATH = str(Path(RESOURCES_PATH) / "logs")
-VECTOR_DB_PATH = str(Path(SOURCES_PATH) / "vectors")
-RXNAV_CURATED_ALIASES_PATH = str(Path(SOURCES_PATH) / "rxnav_curated_aliases.json")
-ENV_FILE_PATH = str(Path(SETTING_PATH) / ".env")
-DATABASE_FILENAME = "database.db"
-CLIENT_DIST_PATH = str(Path(APP_DIR) / "client" / "dist" / "browser")
-CLIENT_ASSETS_PATH = str(Path(CLIENT_DIST_PATH) / "assets")
-CLIENT_INDEX_FILE_PATH = str(Path(CLIENT_DIST_PATH) / "index.html")
-
-###############################################################################
-CONFIGURATIONS_FILE = str(Path(SETTING_PATH) / "configurations.json")
 
 # [APP DEFAULTS]
 ###############################################################################

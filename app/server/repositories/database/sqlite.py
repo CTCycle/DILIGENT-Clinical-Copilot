@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import sqlalchemy
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from common.constants import DATABASE_FILENAME, RESOURCES_PATH
+from common.paths import DATABASE_FILE_PATH
 from common.utils.logger import logger
 from domain.settings.configuration import DatabaseSettings
 from repositories.schemas.models import Base
@@ -20,7 +18,7 @@ from repositories.serialization.catalogs import ReferenceCatalogSerializer
 ###############################################################################
 class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
-        self.db_path = Path(RESOURCES_PATH) / DATABASE_FILENAME
+        self.db_path = DATABASE_FILE_PATH
         should_initialize_schema = bool(self.db_path and not self.db_path.exists())
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.engine: Engine = sqlalchemy.create_engine(

@@ -5,6 +5,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from common.paths import CATALOGS_PATH
+
 
 ###############################################################################
 class CatalogLoader:
@@ -13,7 +15,7 @@ class CatalogLoader:
     # -------------------------------------------------------------------------
     @staticmethod
     def _catalogs_dir() -> Path:
-        return Path(__file__).resolve().parents[3] / "resources" / "catalogs"
+        return CATALOGS_PATH
 
     # -------------------------------------------------------------------------
     @classmethod
