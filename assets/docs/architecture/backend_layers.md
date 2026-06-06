@@ -5,6 +5,7 @@ Last updated: 2026-06-06
 - Endpoint layer: `app/server/api/*`
   - Owns HTTP contracts, request parsing, status codes, and safe exception translation.
   - Endpoint classes are wired inline during router setup and do not retain named module-level service globals.
+  - `app/server/api/data_inspection.py` is the aggregate inspection router, and focused inspection endpoint modules live under `app/server/api/inspection/`.
 - Service layer: `app/server/services/*`
   - Owns clinical orchestration, model orchestration, inspection workflows, and job control.
   - Inspection update orchestration is implemented in `app/server/services/inspection/update_jobs.py` through `DataInspectionUpdateJobRunner`, while `DataInspectionService` remains the endpoint-facing service entrypoint.
