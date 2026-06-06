@@ -185,39 +185,11 @@ def build_chat_payload(
     )
 
 
-def build_generate_payload(
-    self,
-    *,
-    model: str,
-    prompt: str,
-    stream: bool,
-    format: str | None,
-    temperature: float,
-    think: bool,
-    options: dict[str, Any] | None,
-    keep_alive: str | None,
-) -> dict[str, Any]:
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "stream": stream,
-        "temperature": temperature,
-        "think": think,
-    }
-    return self.compose_payload(
-        payload,
-        format=format,
-        options=options,
-        keep_alive=keep_alive,
-    )
-
-
 async def ensure_context_option(
     self,
     *,
     model: str,
     messages: list[dict[str, str]] | None,
-    prompt: str | None,
     options: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
     if options and "num_ctx" in options:
@@ -225,7 +197,6 @@ async def ensure_context_option(
     context_window = await self.calculate_context_window(
         model=model,
         messages=messages,
-        prompt=prompt,
     )
     if not context_window:
         return options
@@ -233,7 +204,7 @@ async def ensure_context_option(
     merged.setdefault("num_ctx", context_window)
     return merged
 
-
+###############################################################################
 async def prepare_common_options(
     self,
     *,
@@ -242,7 +213,6 @@ async def prepare_common_options(
     think: bool | None,
     options: dict[str, Any] | None,
     messages: list[dict[str, str]] | None = None,
-    prompt: str | None = None,
 ) -> tuple[str, float, bool, dict[str, Any] | None]:
     resolved_model = self.resolve_model_name(model)
     await self.ensure_model_ready(resolved_model)
@@ -254,12 +224,11 @@ async def prepare_common_options(
     enriched = await self.ensure_context_option(
         model=resolved_model,
         messages=messages,
-        prompt=prompt,
         options=options_payload,
     )
     return resolved_model, temp_value, think_value, enriched
 
-
+###############################################################################
 async def ensure_model_ready(self, name: str) -> None:
     model = self.resolve_model_name(name)
     logger.debug("Verifying cached availability for Ollama model '%s'", model)
@@ -279,7 +248,7 @@ async def ensure_model_ready(self, name: str) -> None:
         if model not in available:
             raise OllamaError(f"Model '{model}' was not found after pull completed")
 
-
+###############################################################################
 def extract_chat_content(payload: dict[str, Any]) -> Any:
     if not isinstance(payload, dict):
         return ""
@@ -290,7 +259,7 @@ def extract_chat_content(payload: dict[str, Any]) -> Any:
         return payload.get("response", "")
     return ""
 
-
+###############################################################################
 def normalize_embedding_payload(
     payload: dict[str, Any],
     expected: int,
@@ -314,7 +283,7 @@ def normalize_embedding_payload(
         raise OllamaError("Mismatch between Ollama embeddings and inputs")
     return normalized
 
-
+###############################################################################
 async def embed(
     self,
     *,
@@ -345,7 +314,7 @@ async def embed(
 
     return normalize_embedding_payload(payload, expected=len(input_texts))
 
-
+###############################################################################
 def raise_for_status(resp: httpx.Response) -> None:
     try:
         resp.raise_for_status()
@@ -353,7 +322,7 @@ def raise_for_status(resp: httpx.Response) -> None:
         detail = resp.text
         raise OllamaError(f"Ollama HTTP {resp.status_code}: {detail}") from e
 
-
+###############################################################################
 async def maybe_await(cb: ProgressCb | None, evt: dict[str, Any]) -> None:
     if cb is None:
         return
@@ -365,7 +334,7 @@ async def maybe_await(cb: ProgressCb | None, evt: dict[str, Any]) -> None:
         # attach minimal context; callers can log externally
         raise OllamaError(f"Progress callback failed: {e!r}") from e
 
-
+###############################################################################
 def decode_response_content(content: Any) -> Any:
     if isinstance(content, dict):
         return content
@@ -376,7 +345,7 @@ def decode_response_content(content: Any) -> Any:
             return content
     return str(content)
 
-
+###############################################################################
 async def iter_json_stream_events(
     response: httpx.Response,
 ) -> AsyncGenerator[dict[str, Any], None]:
@@ -389,30 +358,13 @@ async def iter_json_stream_events(
             continue
         yield evt
 
-
+###############################################################################
 async def list_models(self) -> list[str]:
     await self.get_cached_models(force_refresh=True)
     async with self.model_cache_lock:
         return list(self.model_cache_list)
 
-
-def messages_to_prompt(messages: list[dict[str, str]]) -> str:
-    role_map = {
-        "system": "System",
-        "user": "User",
-        "assistant": "Assistant",
-    }
-    parts: list[str] = []
-    for message in messages:
-        role = str(message.get("role", "user")).strip().lower()
-        label = role_map.get(role, role.title() if role else "User")
-        content = str(message.get("content", ""))
-        if content:
-            parts.append(f"{label}: {content}")
-    parts.append("Assistant:")
-    return "\n".join(parts)
-
-
+###############################################################################
 async def pull(
     self,
     name: str,
@@ -440,7 +392,7 @@ async def pull(
         raise OllamaTimeout(f"Timed out pulling model '{name}'") from e
     await self.refresh_cache_after_pull(completed)
 
-
+###############################################################################
 async def pull_stream(
     self,
     *,
@@ -458,13 +410,13 @@ async def pull_stream(
                 await asyncio.sleep(poll_sleep_s)
     return False
 
-
+###############################################################################
 async def pull_once(self, *, payload: dict[str, Any]) -> bool:
     resp = await self.client.post("/api/pull", json=payload)
     self.raise_for_status(resp)
     return True
 
-
+###############################################################################
 async def refresh_cache_after_pull(self, completed: bool) -> None:
     if not completed:
         return
@@ -473,7 +425,7 @@ async def refresh_cache_after_pull(self, completed: bool) -> None:
     except OllamaError as exc:
         logger.debug("Failed to refresh Ollama model cache after pull: %s", exc)
 
-
+###############################################################################
 async def show_model(self, name: str) -> dict[str, Any]:
     payload = {"name": name}
     try:
@@ -495,7 +447,7 @@ async def show_model(self, name: str) -> dict[str, Any]:
 
     return data
 
-
+###############################################################################
 async def is_server_online(self) -> bool:
     try:
         resp = await self.client.get("/api/tags")
@@ -504,7 +456,7 @@ async def is_server_online(self) -> bool:
         return False
     return True
 
-
+###############################################################################
 async def start_server(
     self,
     *,
@@ -551,7 +503,7 @@ async def start_server(
 
     raise OllamaTimeout("Timed out waiting for Ollama server to start")
 
-
+###############################################################################
 async def check_model_availability(self, name: str, *, auto_pull: bool = True) -> None:
     model = self.resolve_model_name(name)
     if auto_pull:
@@ -561,7 +513,7 @@ async def check_model_availability(self, name: str, *, auto_pull: bool = True) -
     if model not in names:
         raise OllamaError(f"Model '{model}' not found and auto_pull=False")
 
-
+###############################################################################
 async def chat(
     self,
     *,
@@ -622,7 +574,7 @@ async def chat(
     await self.maybe_prefetch_target_model(active_model=resolved_model)
     return normalized
 
-
+###############################################################################
 async def chat_stream(
     self,
     *,
@@ -707,7 +659,7 @@ async def chat_stream(
     yield {"message": {"role": "assistant", "content": final_content}, "done": True}
     await self.maybe_prefetch_target_model(active_model=resolved_model)
 
-
+###############################################################################
 def extract_context_limit(cls, metadata: dict[str, Any]) -> int | None:
     if not isinstance(metadata, dict):
         return None
@@ -724,7 +676,7 @@ def extract_context_limit(cls, metadata: dict[str, Any]) -> int | None:
                     return candidate
     return None
 
-
+###############################################################################
 async def get_model_context_limit(self, name: str) -> int | None:
     cached = self.model_context_limits.get(name)
     if cached is not None:
@@ -738,7 +690,7 @@ async def get_model_context_limit(self, name: str) -> int | None:
     self.model_context_limits[name] = limit
     return limit or None
 
-
+###############################################################################
 def estimate_tokens(text: str) -> int:
     if not text:
         return 0
@@ -749,13 +701,12 @@ def estimate_tokens(text: str) -> int:
     approximate = max(len(pieces), math.ceil(len(normalized) / 4))
     return max(approximate, 1)
 
-
+###############################################################################
 async def calculate_context_window(
     self,
     *,
     model: str,
     messages: list[dict[str, str]] | None = None,
-    prompt: str | None = None,
     min_ctx: int = 512,
     padding_tokens: int = 32,
     slack_ratio: float = 0.2,
@@ -766,8 +717,6 @@ async def calculate_context_window(
             content = message.get("content") if isinstance(message, dict) else None
             if content:
                 contents.append(str(content))
-    if prompt:
-        contents.append(prompt)
     if not contents:
         return None
     total_tokens = sum(self.estimate_tokens(chunk) for chunk in contents)
