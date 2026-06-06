@@ -16,7 +16,6 @@ from common.paths import DOCS_PATH, VECTOR_DB_PATH
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import get_server_settings
-from domain.clinical.entities import ClinicalSessionRequest
 from domain.inspection import (
     InspectionJobPhase,
     ReviewerInstructionProfile,
@@ -30,11 +29,9 @@ from repositories.serialization.data import (
 from repositories.vectors import LanceVectorDatabase
 from services.clinical.timeline import PatientTimelineExtractor
 from services.clinical.revision.qa import (
-    RevisionQaValidationPayload,
     build_revision_qa_validation_payload,
 )
 from services.clinical.revision.report_builder import (
-    RevisionFinalReportPayload,
     build_revision_final_report_payload,
 )
 from services.retrieval.settings import build_effective_rag_settings
@@ -469,7 +466,6 @@ class DataInspectionService:
         self,
         session_id: int,
         *,
-        session_text: str | None,
         report_text: str | None = None,
         edited_fields: list[str] | None = None,
         reviewer_note: str | None = None,
@@ -477,9 +473,6 @@ class DataInspectionService:
         metadata: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
         resolved_report_text = str(report_text or "").strip() or None
-        if resolved_report_text is None:
-            legacy_report_text = str(session_text or "").strip()
-            resolved_report_text = legacy_report_text or None
         if resolved_report_text is not None:
             updated = self.serializer.update_current_report_text_with_manual_audit(
                 session_id,
@@ -714,7 +707,9 @@ class DataInspectionService:
     ) -> list[dict[str, Any]]:
         session_detail = detail.get("session")
         version_summary = detail.get("version")
-        if not isinstance(session_detail, dict) or not isinstance(version_summary, dict):
+        if not isinstance(session_detail, dict) or not isinstance(
+            version_summary, dict
+        ):
             return []
         result_payload = session_detail.get("result_payload")
         if not isinstance(result_payload, dict):
@@ -737,9 +732,10 @@ class DataInspectionService:
                 for index, entry in enumerate(entries):
                     if not isinstance(entry, dict):
                         continue
-                    revised_name = str(
-                        entry.get("name") or entry.get("drug_name") or ""
-                    ).strip() or None
+                    revised_name = (
+                        str(entry.get("name") or entry.get("drug_name") or "").strip()
+                        or None
+                    )
                     _append_derived_revision_entity(
                         derived=derived,
                         session_detail=session_detail,
@@ -801,9 +797,14 @@ class DataInspectionService:
             for index, entry in enumerate(matched_drugs):
                 if not isinstance(entry, dict):
                     continue
-                revised_name = str(
-                    entry.get("matched_drug_name") or entry.get("raw_drug_name") or ""
-                ).strip() or None
+                revised_name = (
+                    str(
+                        entry.get("matched_drug_name")
+                        or entry.get("raw_drug_name")
+                        or ""
+                    ).strip()
+                    or None
+                )
                 _append_derived_revision_entity(
                     derived=derived,
                     session_detail=session_detail,
@@ -869,7 +870,9 @@ class DataInspectionService:
         entity_type = str(reference.get("entity_type") or "").strip()
         normalized_name = str(reference.get("normalized_name") or "").strip() or None
         source_section = str(reference.get("source_section") or "").strip() or None
-        revised_name = str(reference.get("revised_name") or normalized_name or "").strip()
+        revised_name = str(
+            reference.get("revised_name") or normalized_name or ""
+        ).strip()
         if not revised_name:
             revised_name = entity_type or "entity"
         summary = f"{revised_name} ({entity_type or 'entity'})"
@@ -926,10 +929,16 @@ class DataInspectionService:
             if left_entity is None or right_entity is None:
                 continue
 
-            left_payload = left_entity.get("payload") if isinstance(left_entity, dict) else None
-            right_payload = right_entity.get("payload") if isinstance(right_entity, dict) else None
+            left_payload = (
+                left_entity.get("payload") if isinstance(left_entity, dict) else None
+            )
+            right_payload = (
+                right_entity.get("payload") if isinstance(right_entity, dict) else None
+            )
             payload_changed = left_payload != right_payload
-            right_status = str(right_entity.get("entity_revision_status") or "").strip().casefold()
+            right_status = (
+                str(right_entity.get("entity_revision_status") or "").strip().casefold()
+            )
             if right_entity.get("requires_human_review"):
                 unresolved_entities.append(
                     cls._build_entity_diff_item(
@@ -1011,7 +1020,10 @@ class DataInspectionService:
             return {}
         version_id = int(version.get("version_id") or 0)
         for artifact in self.list_revision_artifacts(revision_version_id=version_id):
-            if str(artifact.get("artifact_key") or "").strip() == "revision_qa_validation":
+            if (
+                str(artifact.get("artifact_key") or "").strip()
+                == "revision_qa_validation"
+            ):
                 payload = artifact.get("payload")
                 if isinstance(payload, dict):
                     return payload
@@ -1060,8 +1072,7 @@ class DataInspectionService:
             if str(item).strip()
         ]
         left_finding_count = int(
-            left_payload.get("finding_count")
-            or len(left_warnings) + len(left_blocking)
+            left_payload.get("finding_count") or len(left_warnings) + len(left_blocking)
         )
         right_finding_count = int(
             right_payload.get("finding_count")
@@ -1069,9 +1080,7 @@ class DataInspectionService:
         )
         return {
             "left_llm_qa_status": str(left_version.get("llm_qa_status") or "not_run"),
-            "right_llm_qa_status": str(
-                right_version.get("llm_qa_status") or "not_run"
-            ),
+            "right_llm_qa_status": str(right_version.get("llm_qa_status") or "not_run"),
             "left_clinical_review_status": str(
                 left_version.get("clinical_review_status") or "not_reviewed"
             ),
@@ -1104,7 +1113,9 @@ class DataInspectionService:
         selected_focus_text = str(selected_text or "").strip() or None
         focus_instruction = str(revision_instruction or "").strip() or None
         effective_overrides = {
-            key: value for key, value in (model_overrides or {}).items() if value is not None
+            key: value
+            for key, value in (model_overrides or {}).items()
+            if value is not None
         }
         return {
             "selected_text": selected_focus_text,
@@ -1239,16 +1250,15 @@ class DataInspectionService:
         if not target_entities:
             target_entities.append("other")
 
-        if any(section in target_sections for section in {"anamnesis", "therapy", "labs"}):
+        if any(
+            section in target_sections for section in {"anamnesis", "therapy", "labs"}
+        ):
             routed_steps.append("preprocess_input")
         if "qa" in target_sections or "source_evidence" in target_entities:
             routed_steps.append("qa_validate_revision")
 
         mentioned_dates = cls._unique_preserve_order(
-            [
-                match.group(0)
-                for match in re.finditer(r"\b\d{4}-\d{2}-\d{2}\b", summary)
-            ]
+            [match.group(0) for match in re.finditer(r"\b\d{4}-\d{2}-\d{2}\b", summary)]
         )
         mentioned_lab_values = cls._unique_preserve_order(
             [
@@ -1265,17 +1275,23 @@ class DataInspectionService:
         )
         ambiguities = (
             ["Reviewer instruction contains ambiguity markers."]
-            if any(token in lowered for token in ("maybe", "unclear", "check", "verify"))
+            if any(
+                token in lowered for token in ("maybe", "unclear", "check", "verify")
+            )
             else []
         )
         constraints = (
             ["Limit changes to the explicitly targeted scope."]
-            if any(token in lowered for token in ("only", "do not", "don't", "must not"))
+            if any(
+                token in lowered for token in ("only", "do not", "don't", "must not")
+            )
             else []
         )
         safety_or_quality_concerns = (
             ["Reviewer requested evidence or consistency validation."]
-            if any(token in lowered for token in ("evidence", "source", "consistent", "qa"))
+            if any(
+                token in lowered for token in ("evidence", "source", "consistent", "qa")
+            )
             else []
         )
         prompt_injection_flags = cls.detect_prompt_injection_flags(
@@ -1344,7 +1360,9 @@ class DataInspectionService:
     ) -> str | None:
         chunks: list[str] = []
         if str(selected_text or "").strip():
-            chunks.append(f"Reviewer-selected source excerpt:\n{str(selected_text).strip()}")
+            chunks.append(
+                f"Reviewer-selected source excerpt:\n{str(selected_text).strip()}"
+            )
         if instruction_profile is not None:
             chunks.append(
                 "Reviewer instruction summary:\n"
@@ -1422,7 +1440,7 @@ class DataInspectionService:
                 match_confidence = (
                     float(raw_confidence) if raw_confidence is not None else None
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 match_confidence = None
             normalized_drug_name = normalize_drug_query_name(drug_name)
             previous_match = (
@@ -1446,7 +1464,7 @@ class DataInspectionService:
                         if previous_confidence_raw is not None
                         else None
                     )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 previous_match_confidence = None
             same_match_name = bool(
                 previous_match_name
@@ -1454,7 +1472,9 @@ class DataInspectionService:
             )
             if challenged_matching and previous_match_found:
                 decision = "llm_assisted_resolved_match"
-                reason = "Reviewer instruction challenged the previous source-version match."
+                reason = (
+                    "Reviewer instruction challenged the previous source-version match."
+                )
                 requires_human_review = False
                 decision_source = "llm_fallback"
             elif (
@@ -1471,7 +1491,9 @@ class DataInspectionService:
                 match_confidence is not None and match_confidence >= 0.95
             ):
                 decision = "deterministic_new_match"
-                reason = "Revision produced a high-confidence structured LiverTox match."
+                reason = (
+                    "Revision produced a high-confidence structured LiverTox match."
+                )
                 requires_human_review = False
                 decision_source = "deterministic"
             elif match_status in {"missing_match", "ambiguous_match", "missing"}:
@@ -1559,7 +1581,10 @@ class DataInspectionService:
                 unresolved_questions.append(
                     "No reliable LiverTox match is available for this revised drug."
                 )
-            if instruction_profile and "causality_reasoning" in instruction_profile.target_entities:
+            if (
+                instruction_profile
+                and "causality_reasoning" in instruction_profile.target_entities
+            ):
                 unresolved_questions.append(
                     "Reviewer explicitly requested reassessment of causality reasoning."
                 )
@@ -1899,9 +1924,7 @@ class DataInspectionService:
             return {
                 "status": payload.get("status"),
                 "therapy_drug_count": len(payload.get("therapy_drug_names") or []),
-                "anamnesis_drug_count": len(
-                    payload.get("anamnesis_drug_names") or []
-                ),
+                "anamnesis_drug_count": len(payload.get("anamnesis_drug_names") or []),
                 "analysis_drug_count": len(payload.get("analysis_drug_names") or []),
                 "rucam_assessment_count": int(
                     payload.get("rucam_assessment_count") or 0
@@ -1935,7 +1958,6 @@ class DataInspectionService:
             model_overrides=model_overrides,
             metadata=metadata,
         )
-        effective_overrides = run_configuration["model_overrides"]
         revision_mode = (
             "instruction_guided"
             if str(revision_instruction or "").strip()
@@ -1992,7 +2014,9 @@ class DataInspectionService:
             raise ValueError("Session revision is already running")
         target_revision_version_id = run.get("target_revision_version_id")
         if not isinstance(target_revision_version_id, int):
-            raise ValueError("Revision pipeline run is missing its target version shell")
+            raise ValueError(
+                "Revision pipeline run is missing its target version shell"
+            )
         target_detail = self.serializer.get_session_version_detail(
             int(run["session_id"]),
             version_id=target_revision_version_id,
@@ -2031,9 +2055,7 @@ class DataInspectionService:
         model_overrides = configuration.get("model_overrides")
         if not isinstance(model_overrides, dict):
             model_overrides = {}
-        revision_mode = (
-            "instruction_guided" if revision_instruction else "default"
-        )
+        revision_mode = "instruction_guided" if revision_instruction else "default"
         self.serializer.create_or_update_revision_run(
             pipeline_run_id=pipeline_run_id,
             session_id=int(run["session_id"]),
@@ -2170,9 +2192,7 @@ class DataInspectionService:
                     "has_official_report_text": bool(
                         str(session_detail.get("official_report_text") or "").strip()
                     ),
-                    "has_section_extraction": bool(
-                        session_detail.get("sections")
-                    ),
+                    "has_section_extraction": bool(session_detail.get("sections")),
                     "has_deterministic_extraction": bool(
                         source_deterministic_extraction
                     ),
@@ -2230,9 +2250,7 @@ class DataInspectionService:
                         "target_section_count": len(
                             instruction_profile.target_sections
                         ),
-                        "target_entity_count": len(
-                            instruction_profile.target_entities
-                        ),
+                        "target_entity_count": len(instruction_profile.target_entities),
                         "prompt_injection_detected": bool(
                             instruction_trace.prompt_injection_detected
                         ),
@@ -2445,7 +2463,9 @@ class DataInspectionService:
                                 ),
                                 "pipeline_run_id": pipeline_run_id,
                                 "model_overrides": effective_overrides,
-                                "revised_from_session_id": session_detail.get("session_id"),
+                                "revised_from_session_id": session_detail.get(
+                                    "session_id"
+                                ),
                             },
                             original_session_text=source_text,
                             revision_focus_context=revision_focus_context,
@@ -2485,7 +2505,9 @@ class DataInspectionService:
                         ),
                     },
                 )
-            revision_entity_pipeline = self._get_revision_entity_pipeline(result_payload)
+            revision_entity_pipeline = self._get_revision_entity_pipeline(
+                result_payload
+            )
             for entity_stage_name in (
                 "resolve_revision_extraction",
                 "validate_anamnesis_drugs",
@@ -2631,22 +2653,30 @@ class DataInspectionService:
                 revision_payload = {}
                 result_payload["revision"] = revision_payload
             if instruction_profile is not None:
-                revision_payload["instruction_profile"] = instruction_profile.model_dump()
+                revision_payload["instruction_profile"] = (
+                    instruction_profile.model_dump()
+                )
             if instruction_trace is not None:
                 revision_payload["instruction_trace"] = instruction_trace.model_dump()
-            revision_payload["livertox_revision_decisions"] = livertox_revision_decisions
+            revision_payload["livertox_revision_decisions"] = (
+                livertox_revision_decisions
+            )
             revision_payload["revised_dili_assessments"] = revised_dili_assessments
             rebuild_report_started_at = datetime.now(UTC)
             rebuild_report_step = self._record_revision_step_start(
                 pipeline_run_id=pipeline_run_id,
                 step_name="rebuild_final_report",
                 input_summary={
-                    "report_present": bool(str(result_payload.get("report") or "").strip()),
+                    "report_present": bool(
+                        str(result_payload.get("report") or "").strip()
+                    ),
                     "selected_text_present": bool(selected_focus_text),
                     "instruction_profile_present": instruction_profile is not None,
                 },
                 input_payload={
-                    "report_present": bool(str(result_payload.get("report") or "").strip()),
+                    "report_present": bool(
+                        str(result_payload.get("report") or "").strip()
+                    ),
                     "selected_text": selected_focus_text,
                 },
             )
@@ -2673,7 +2703,9 @@ class DataInspectionService:
                 pipeline_run_id=pipeline_run_id,
                 step_name="qa_validate_revision",
                 input_summary={
-                    "blocking_issue_count": len(result_payload.get("blocking_issues") or []),
+                    "blocking_issue_count": len(
+                        result_payload.get("blocking_issues") or []
+                    ),
                     "manual_review_required": bool(
                         result_payload.get("manual_review_required")
                     ),
@@ -2751,7 +2783,9 @@ class DataInspectionService:
                         exc=exc,
                     )
                     raise
-            elapsed_ms = int((datetime.now(UTC) - run_started_at).total_seconds() * 1000)
+            elapsed_ms = int(
+                (datetime.now(UTC) - run_started_at).total_seconds() * 1000
+            )
             if isinstance(persisted_session_id, int):
                 self._record_revision_step_success(
                     pipeline_run_id=pipeline_run_id,
@@ -2801,9 +2835,11 @@ class DataInspectionService:
                         revision_mode=revision_mode,
                         revision_kind="llm_assisted_revision",
                         configuration=run_configuration,
-                        reviewer_note=str(metadata.get("revision_note") or "").strip() or None,
+                        reviewer_note=str(metadata.get("revision_note") or "").strip()
+                        or None,
                         status="completed",
-                        initiated_by=str(metadata.get("reviewer") or "").strip() or None,
+                        initiated_by=str(metadata.get("reviewer") or "").strip()
+                        or None,
                         actor_source=actor_source,
                         actor_confidence="unverified",
                         completed_at=datetime.now(UTC),
@@ -2846,13 +2882,16 @@ class DataInspectionService:
                     revision_mode=revision_mode,
                     revision_kind="llm_assisted_revision",
                     configuration=run_configuration,
-                    reviewer_note=str(metadata.get("revision_note") or "").strip() or None,
+                    reviewer_note=str(metadata.get("revision_note") or "").strip()
+                    or None,
                     status="failed",
                     initiated_by=str(metadata.get("reviewer") or "").strip() or None,
                     actor_source=actor_source,
                     actor_confidence="unverified",
                     completed_at=datetime.now(UTC),
-                    error={"message": "Revision completed without a persisted session record."},
+                    error={
+                        "message": "Revision completed without a persisted session record."
+                    },
                     trace_id=pipeline_run_id,
                     latency_ms=elapsed_ms,
                 )
@@ -2860,7 +2899,9 @@ class DataInspectionService:
                     pipeline_run_id=pipeline_run_id,
                     step_name="persist_revision",
                     attempt_number=int(persist_step["attempt_number"]),
-                    error={"message": "Revision completed without a persisted session record."},
+                    error={
+                        "message": "Revision completed without a persisted session record."
+                    },
                     latency_ms=int(
                         (datetime.now(UTC) - persist_started_at).total_seconds() * 1000
                     ),
@@ -2883,7 +2924,9 @@ class DataInspectionService:
                 completed_at=datetime.now(UTC),
                 error={"message": str(exc)[:500]},
                 trace_id=pipeline_run_id,
-                latency_ms=int((datetime.now(UTC) - run_started_at).total_seconds() * 1000),
+                latency_ms=int(
+                    (datetime.now(UTC) - run_started_at).total_seconds() * 1000
+                ),
             )
             raise
         return {

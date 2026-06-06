@@ -24,6 +24,19 @@ EXCLUDED_DIRS = {
     "node_modules",
     "dist",
 }
+ALLOWED_OVERSIZED_BACKEND_FILES = {
+    (SERVER_ROOT / "repositories" / "schemas" / "models.py").resolve(),
+    (SERVER_ROOT / "repositories" / "serialization" / "data.py").resolve(),
+    (
+        SERVER_ROOT / "repositories" / "serialization" / "session_revision_data.py"
+    ).resolve(),
+    (SERVER_ROOT / "services" / "clinical" / "hepatox_assessment.py").resolve(),
+    (SERVER_ROOT / "services" / "clinical" / "hepatox_core.py").resolve(),
+    (SERVER_ROOT / "services" / "clinical" / "parser.py").resolve(),
+    (SERVER_ROOT / "services" / "inspection" / "service.py").resolve(),
+    (SERVER_ROOT / "services" / "session" / "session_service.py").resolve(),
+    (SERVER_ROOT / "services" / "session" / "session_workflow.py").resolve(),
+}
 
 
 def _iter_python_files(root: Path) -> list[Path]:
@@ -37,6 +50,20 @@ def _iter_python_files(root: Path) -> list[Path]:
 def test_backend_structure_scan_scope_is_not_empty() -> None:
     assert _iter_python_files(SERVER_ROOT), (
         f"Backend structure tests scanned no files under {SERVER_ROOT}"
+    )
+
+
+def test_backend_python_files_do_not_exceed_1000_lines() -> None:
+    violations: list[str] = []
+    for path in _iter_python_files(SERVER_ROOT):
+        if path.resolve() in ALLOWED_OVERSIZED_BACKEND_FILES:
+            continue
+        line_count = sum(1 for _ in path.open(encoding="utf-8"))
+        if line_count > 1000:
+            violations.append(f"{path.as_posix()}:{line_count}")
+    assert not violations, (
+        "Backend Python files must stay at or below 1000 physical lines:\n"
+        + "\n".join(violations)
     )
 
 
