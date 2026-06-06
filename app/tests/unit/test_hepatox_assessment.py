@@ -5,6 +5,14 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from common.prompts.clinical_assessment import (
+    LIVERTOX_CLINICAL_SYSTEM_PROMPT,
+    LIVERTOX_CLINICAL_USER_PROMPT,
+    LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
+    LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT,
+    LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
+    LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
+)
 from domain.clinical import (
     ClinicalLabEntry,
     DrugClinicalAssessment,
@@ -17,14 +25,6 @@ from domain.clinical import (
 from services.clinical.hepatox_core import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
-)
-from common.prompts import (
-    LIVERTOX_CLINICAL_SYSTEM_PROMPT,
-    LIVERTOX_CLINICAL_USER_PROMPT,
-    LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
-    LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT,
-    LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
-    LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
 )
 
 

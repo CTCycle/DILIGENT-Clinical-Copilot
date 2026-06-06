@@ -17,20 +17,25 @@ from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.clinical.entities import ClinicalSessionRequest
-from domain.inspection import InspectionJobPhase
+from domain.inspection import (
+    InspectionJobPhase,
+    ReviewerInstructionProfile,
+    ReviewerInstructionTrace,
+)
 from domain.patient_timeline import PatientTimeline
-from pydantic import BaseModel, Field
 from repositories.serialization.data import (
     DataSerializer,
     DocumentSerializer,
 )
 from repositories.vectors import LanceVectorDatabase
 from services.clinical.timeline import PatientTimelineExtractor
-from services.clinical.revision import (
-    RevisionFinalReportPayload,
+from services.clinical.revision.qa import (
     RevisionQaValidationPayload,
-    build_revision_final_report_payload,
     build_revision_qa_validation_payload,
+)
+from services.clinical.revision.report_builder import (
+    RevisionFinalReportPayload,
+    build_revision_final_report_payload,
 )
 from services.retrieval.settings import build_effective_rag_settings
 from services.inspection.normalization import (
@@ -72,62 +77,57 @@ PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
 
 
-class ReviewerInstructionProfile(BaseModel):
-    user_intent: str | None = None
-    main_goal: str | None = None
-    instruction_summary: str
-    target_sections: list[
-        Literal[
-            "anamnesis",
-            "therapy",
-            "labs",
-            "livertox_matching",
-            "dili_assessment",
-            "final_report",
-            "qa",
-            "unknown",
-        ]
-    ] = Field(default_factory=list)
-    target_entities: list[
-        Literal[
-            "drugs",
-            "diseases",
-            "labs",
-            "report_wording",
-            "source_evidence",
-            "matching_errors",
-            "causality_reasoning",
-            "missing_data",
-            "ambiguity_resolution",
-            "other",
-        ]
-    ] = Field(default_factory=list)
-    mentioned_drugs: list[str] = Field(default_factory=list)
-    mentioned_diseases: list[str] = Field(default_factory=list)
-    mentioned_lab_values: list[str] = Field(default_factory=list)
-    mentioned_dates: list[str] = Field(default_factory=list)
-    extra_data: list[str] = Field(default_factory=list)
-    ambiguities: list[str] = Field(default_factory=list)
-    constraints: list[str] = Field(default_factory=list)
-    reviewer_assumptions: list[str] = Field(default_factory=list)
-    safety_or_quality_concerns: list[str] = Field(default_factory=list)
-    prompt_injection_flags: list[str] = Field(default_factory=list)
-    pipeline_routing_decision: dict[str, list[str]] = Field(default_factory=dict)
-
-
-class ReviewerInstructionTrace(BaseModel):
-    instruction_id: str
-    raw_instruction_text: str
-    normalized_instruction_summary: str
-    routed_pipeline_steps: list[str]
-    affected_entities: list[str] = Field(default_factory=list)
-    applied: bool
-    ignored: bool
-    reason_if_ignored: str | None = None
-    prompt_injection_detected: bool = False
-    prompt_injection_flags: list[str] = Field(default_factory=list)
-    evidence_addressed: list[str] = Field(default_factory=list)
-    qa_validation_result: str | None = None
+def _append_derived_revision_entity(
+    *,
+    derived: list[dict[str, Any]],
+    session_detail: dict[str, Any],
+    version_summary: dict[str, Any],
+    revision_version_id: int,
+    source_version_id: Any,
+    pipeline_run_id: str,
+    entity_type: str,
+    source_section: str,
+    original_entity_id: str,
+    revised_name: str | None,
+    payload: dict[str, Any],
+    entity_revision_status: str = "active",
+    requires_human_review: bool = False,
+    step_name: str = "persisted_session_result",
+) -> None:
+    normalized_name = normalize_text_value(revised_name)
+    derived.append(
+        {
+            "revision_version_id": revision_version_id,
+            "source_version_id": int(source_version_id)
+            if source_version_id is not None
+            else None,
+            "pipeline_run_id": pipeline_run_id,
+            "step_name": step_name,
+            "entity_type": entity_type,
+            "entity_revision_status": entity_revision_status,
+            "source_section": source_section,
+            "original_entity_id": original_entity_id,
+            "original_name": revised_name,
+            "revised_name": revised_name,
+            "normalized_name": normalized_name or None,
+            "requires_human_review": requires_human_review,
+            "human_review_status": (
+                "required" if requires_human_review else "not_required"
+            ),
+            "payload": payload,
+            "schema_name": "revision_entity",
+            "schema_version": "1",
+            "prompt_version": None,
+            "parser_version": None,
+            "model_provider": None,
+            "model_name": None,
+            "input_hash": None,
+            "output_hash": None,
+            "created_at": session_detail.get("session_timestamp")
+            or version_summary.get("updated_at"),
+            "superseded_at": None,
+        }
+    )
 
 
 class DataInspectionService:
@@ -725,52 +725,6 @@ class DataInspectionService:
         pipeline_run_id = str(version_summary.get("pipeline_run_id") or "")
         derived: list[dict[str, Any]] = []
 
-        def append_entity(
-            *,
-            entity_type: str,
-            source_section: str,
-            original_entity_id: str,
-            revised_name: str | None,
-            payload: dict[str, Any],
-            entity_revision_status: str = "active",
-            requires_human_review: bool = False,
-            step_name: str = "persisted_session_result",
-        ) -> None:
-            normalized_name = normalize_text_value(revised_name)
-            derived.append(
-                {
-                    "revision_version_id": revision_version_id,
-                    "source_version_id": int(source_version_id)
-                    if source_version_id is not None
-                    else None,
-                    "pipeline_run_id": pipeline_run_id,
-                    "step_name": step_name,
-                    "entity_type": entity_type,
-                    "entity_revision_status": entity_revision_status,
-                    "source_section": source_section,
-                    "original_entity_id": original_entity_id,
-                    "original_name": revised_name,
-                    "revised_name": revised_name,
-                    "normalized_name": normalized_name or None,
-                    "requires_human_review": requires_human_review,
-                    "human_review_status": (
-                        "required" if requires_human_review else "not_required"
-                    ),
-                    "payload": payload,
-                    "schema_name": "revision_entity",
-                    "schema_version": "1",
-                    "prompt_version": None,
-                    "parser_version": None,
-                    "model_provider": None,
-                    "model_name": None,
-                    "input_hash": None,
-                    "output_hash": None,
-                    "created_at": session_detail.get("session_timestamp")
-                    or version_summary.get("updated_at"),
-                    "superseded_at": None,
-                }
-            )
-
         structured_case = result_payload.get("structured_case")
         if isinstance(structured_case, dict):
             for section_name, source_section in (
@@ -786,7 +740,13 @@ class DataInspectionService:
                     revised_name = str(
                         entry.get("name") or entry.get("drug_name") or ""
                     ).strip() or None
-                    append_entity(
+                    _append_derived_revision_entity(
+                        derived=derived,
+                        session_detail=session_detail,
+                        version_summary=version_summary,
+                        revision_version_id=revision_version_id,
+                        source_version_id=source_version_id,
+                        pipeline_run_id=pipeline_run_id,
                         entity_type="drug",
                         source_section=source_section,
                         original_entity_id=f"{section_name}:{index}",
@@ -800,7 +760,13 @@ class DataInspectionService:
                     if not isinstance(entry, dict):
                         continue
                     revised_name = str(entry.get("name") or "").strip() or None
-                    append_entity(
+                    _append_derived_revision_entity(
+                        derived=derived,
+                        session_detail=session_detail,
+                        version_summary=version_summary,
+                        revision_version_id=revision_version_id,
+                        source_version_id=source_version_id,
+                        pipeline_run_id=pipeline_run_id,
                         entity_type="disease",
                         source_section="anamnesis",
                         original_entity_id=f"anamnesis_diseases:{index}",
@@ -815,7 +781,13 @@ class DataInspectionService:
                 if not isinstance(entry, dict):
                     continue
                 revised_name = str(entry.get("marker_name") or "").strip() or None
-                append_entity(
+                _append_derived_revision_entity(
+                    derived=derived,
+                    session_detail=session_detail,
+                    version_summary=version_summary,
+                    revision_version_id=revision_version_id,
+                    source_version_id=source_version_id,
+                    pipeline_run_id=pipeline_run_id,
                     entity_type="lab_timeline_entry",
                     source_section="laboratory_analysis",
                     original_entity_id=f"lab_timeline:{index}",
@@ -832,7 +804,13 @@ class DataInspectionService:
                 revised_name = str(
                     entry.get("matched_drug_name") or entry.get("raw_drug_name") or ""
                 ).strip() or None
-                append_entity(
+                _append_derived_revision_entity(
+                    derived=derived,
+                    session_detail=session_detail,
+                    version_summary=version_summary,
+                    revision_version_id=revision_version_id,
+                    source_version_id=source_version_id,
+                    pipeline_run_id=pipeline_run_id,
                     entity_type="livertox_match",
                     source_section="therapy",
                     original_entity_id=f"matched_drug:{index}",
@@ -848,7 +826,13 @@ class DataInspectionService:
                 if not isinstance(entry, dict):
                     continue
                 revised_name = str(entry.get("drug_name") or "").strip() or None
-                append_entity(
+                _append_derived_revision_entity(
+                    derived=derived,
+                    session_detail=session_detail,
+                    version_summary=version_summary,
+                    revision_version_id=revision_version_id,
+                    source_version_id=source_version_id,
+                    pipeline_run_id=pipeline_run_id,
                     entity_type="dili_assessment",
                     source_section="therapy",
                     original_entity_id=f"rucam_assessment:{index}",

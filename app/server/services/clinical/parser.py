@@ -19,6 +19,10 @@ from domain.clinical.entities import (
     DrugEntry,
     PatientDrugs,
 )
+from common.prompts.extraction import (
+    ANAMNESIS_DRUG_EXTRACTION_PROMPT,
+    DRUG_EXTRACTION_PROMPT,
+)
 from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.deterministic_extraction import (
     DeterministicDrugExtractionResult,
@@ -50,10 +54,6 @@ from services.clinical.parser_validation import (
     WEEKDAY_TOKENS,
 )
 from services.llm.client_runtime import ensure_runtime_client
-from common.prompts import (
-    ANAMNESIS_DRUG_EXTRACTION_PROMPT,
-    DRUG_EXTRACTION_PROMPT,
-)
 from services.llm.provider_factory import select_llm_provider
 from services.text.normalization import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
