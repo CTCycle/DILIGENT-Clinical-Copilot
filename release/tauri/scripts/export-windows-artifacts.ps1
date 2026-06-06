@@ -6,9 +6,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..\.."))
-$clientDir = Join-Path $repoRoot "app\client"
-$tauriDir = Join-Path $clientDir "src-tauri"
-$releaseDir = Join-Path $clientDir "src-tauri\target\release"
+$appDir = Join-Path $repoRoot "app"
+$tauriDir = Join-Path $appDir "src-tauri"
+$releaseDir = Join-Path $appDir "src-tauri\target\release"
 $bundleDir = Join-Path $releaseDir "bundle"
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {

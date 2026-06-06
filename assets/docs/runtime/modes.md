@@ -1,5 +1,5 @@
 # Runtime Modes
-Last updated: 2026-06-03
+Last updated: 2026-06-06
 
 ## Supported Modes
 ### Local Development
@@ -11,7 +11,7 @@ Last updated: 2026-06-03
 - Template ports from `settings/.env.local.example` use the same defaults.
 
 ### Desktop Runtime
-- Tauri wrapper in `app/client/src-tauri`
+- Tauri wrapper in `app/src-tauri`
 - Bundles:
   - backend code
   - built frontend dist
