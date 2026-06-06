@@ -13,8 +13,8 @@ from services.llm.ollama_runtime import (
     OllamaError,
     OllamaTimeout,
     ProgressCb,
-    env_float as _env_float,
-    env_str as _env_str,
+    env_float,
+    env_str
 )
 from services.llm.structured import (
     StructuredOutputParser,
@@ -23,7 +23,7 @@ from services.llm.structured import (
 
 __all__ = ["OllamaClient", "OllamaError", "OllamaTimeout"]
 
-
+###############################################################################
 class OllamaClient:
     """
     Async wrapper around the Ollama REST API.
@@ -81,29 +81,29 @@ class OllamaClient:
         self.residency_plan_cache: dict[str, Any] | None = None
         self.residency_plan_cache_expiry = 0.0
         self.residency_usage_window_s = max(
-            _env_float("OLLAMA_PREFETCH_USAGE_WINDOW_S", 120.0),
+            env_float("OLLAMA_PREFETCH_USAGE_WINDOW_S", 120.0),
             30.0,
         )
         self.residency_transition_window_s = max(
-            _env_float("OLLAMA_PREFETCH_TRANSITION_WINDOW_S", 60.0),
+            env_float("OLLAMA_PREFETCH_TRANSITION_WINDOW_S", 60.0),
             5.0,
         )
         self.residency_prefetch_cooldown_s = max(
-            _env_float("OLLAMA_PREFETCH_COOLDOWN_S", 20.0),
+            env_float("OLLAMA_PREFETCH_COOLDOWN_S", 20.0),
             1.0,
         )
         self.residency_ram_safety_ratio = max(
-            _env_float("OLLAMA_RAM_SAFETY_RATIO", 0.75),
+            env_float("OLLAMA_RAM_SAFETY_RATIO", 0.75),
             0.1,
         )
         self.residency_vram_safety_ratio = max(
-            _env_float("OLLAMA_VRAM_SAFETY_RATIO", 0.85),
+            env_float("OLLAMA_VRAM_SAFETY_RATIO", 0.85),
             0.1,
         )
-        self.residency_dual_keep_alive = _env_str(
+        self.residency_dual_keep_alive = env_str(
             "OLLAMA_DUAL_RESIDENT_KEEP_ALIVE", "4h"
         )
-        self.residency_single_keep_alive = _env_str(
+        self.residency_single_keep_alive = env_str(
             "OLLAMA_SINGLE_RESIDENT_KEEP_ALIVE", "30m"
         )
         self.residency_usage_history: deque[tuple[float, str]] = deque(maxlen=256)
@@ -345,41 +345,15 @@ class OllamaClient:
         )
 
     # -------------------------------------------------------------------------
-    def build_generate_payload(
-        self,
-        *,
-        model: str,
-        prompt: str,
-        stream: bool,
-        format: str | None,
-        temperature: float,
-        think: bool,
-        options: dict[str, Any] | None,
-        keep_alive: str | None,
-    ) -> dict[str, Any]:
-        return ollama_chat.build_generate_payload(
-            self,
-            model=model,
-            prompt=prompt,
-            stream=stream,
-            format=format,
-            temperature=temperature,
-            think=think,
-            options=options,
-            keep_alive=keep_alive,
-        )
-
-    # -------------------------------------------------------------------------
     async def ensure_context_option(
         self,
         *,
         model: str,
         messages: list[dict[str, str]] | None,
-        prompt: str | None,
         options: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
         return await ollama_chat.ensure_context_option(
-            self, model=model, messages=messages, prompt=prompt, options=options
+            self, model=model, messages=messages, options=options
         )
 
     # -------------------------------------------------------------------------
@@ -391,7 +365,6 @@ class OllamaClient:
         think: bool | None,
         options: dict[str, Any] | None,
         messages: list[dict[str, str]] | None = None,
-        prompt: str | None = None,
     ) -> tuple[str, float, bool, dict[str, Any] | None]:
         return await ollama_chat.prepare_common_options(
             self,
@@ -400,7 +373,6 @@ class OllamaClient:
             think=think,
             options=options,
             messages=messages,
-            prompt=prompt,
         )
 
     # -------------------------------------------------------------------------
@@ -443,11 +415,6 @@ class OllamaClient:
         return await ollama_chat.list_models(self)
 
     # -----------------------------------------------------------------------------
-    @staticmethod
-    def messages_to_prompt(messages: list[dict[str, str]]) -> str:
-        return ollama_chat.messages_to_prompt(messages)
-
-    # -------------------------------------------------------------------------
     async def pull(
         self,
         name: str,
@@ -621,7 +588,6 @@ class OllamaClient:
         *,
         model: str,
         messages: list[dict[str, str]] | None = None,
-        prompt: str | None = None,
         min_ctx: int = 512,
         padding_tokens: int = 32,
         slack_ratio: float = 0.2,
@@ -630,7 +596,6 @@ class OllamaClient:
             self,
             model=model,
             messages=messages,
-            prompt=prompt,
             min_ctx=min_ctx,
             padding_tokens=padding_tokens,
             slack_ratio=slack_ratio,
