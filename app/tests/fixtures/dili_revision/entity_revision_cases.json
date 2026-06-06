@@ -1,0 +1,46 @@
+[
+  {
+    "case_id": "supplemented-anamnesis-drug-and-lab-revision",
+    "visit_date": "2025-05-20",
+    "extraction_bundle": {
+      "status": "resolved",
+      "therapy_source": "persisted_source_version",
+      "anamnesis_source": "persisted_source_version",
+      "disease_source": "persisted_source_version"
+    },
+    "therapy_drugs": [
+      {"name": "Drug A", "source": "therapy"}
+    ],
+    "anamnesis_deterministic": {
+      "entries": [
+        {"name": "Drug A", "source": "anamnesis", "historical_flag": true}
+      ],
+      "regimen_lines": [],
+      "unresolved_lines": []
+    },
+    "anamnesis_drugs": [
+      {"name": "Drug A", "source": "anamnesis", "historical_flag": true},
+      {"name": "Drug B", "source": "anamnesis", "historical_flag": true}
+    ],
+    "disease_entries": [
+      {"name": "Autoimmune hepatitis", "hepatic_related": true}
+    ],
+    "lab_timeline": [
+      {"marker_name": "ALT", "value": 180, "source": "anamnesis"},
+      {"marker_name": "ALP", "value": 100, "source": "anamnesis"}
+    ],
+    "pattern_classification": "hepatocellular",
+    "rucam_assessments": [
+      {"drug_name": "Drug B", "total_score": 7, "causality_category": "probable"}
+    ],
+    "expected": {
+      "validate_status": "supplemented",
+      "supplemental_drug_names": ["Drug B"],
+      "analysis_drug_names": ["Drug B"],
+      "relevant_drug_names": ["Drug A", "Drug B"],
+      "lab_marker_names": ["ALT", "ALP"],
+      "disease_names": ["Autoimmune hepatitis"],
+      "rucam_assessment_count": 1
+    }
+  }
+]

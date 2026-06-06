@@ -13,13 +13,18 @@ import {
   LucideTrash2,
 } from '@lucide/angular';
 
+import { RevisionPipelineStatusComponent } from '../../components/revision-pipeline-status/revision-pipeline-status.component';
+import { RevisionQaBadgeComponent } from '../../components/revision-qa-badge/revision-qa-badge.component';
 import {
   deleteInspectionSession,
   fetchClinicalSessionDetail,
   fetchClinicalSessionRevisionArtifacts,
+  fetchClinicalSessionRevisionEntities,
+  fetchClinicalSessionRevisionReviews,
   fetchClinicalSessionRevisionJobStatus,
   fetchClinicalSessionRevisionPipelineRun,
   fetchClinicalSessionRevisionPipelineSteps,
+  fetchClinicalSessionVersionComparison,
   fetchClinicalSessionVersions,
   fetchInspectionLiverToxCatalog,
   fetchInspectionRxNavCatalog,
@@ -29,6 +34,7 @@ import {
   retryClinicalSessionRevisionPipelineRun,
   startClinicalSessionRevisionJob,
   updateClinicalSession,
+  updateClinicalSessionRevisionClinicalReview,
 } from '../../core/services/inspection-api';
 import { fetchModelConfigState } from '../../core/services/model-config-api';
 import {
@@ -39,8 +45,13 @@ import {
   JobStatus,
   LocalModelCard,
   RevisionArtifact,
+  RevisionClinicalReviewAction,
+  RevisionClinicalReviewStatus,
+  RevisionEntityDiff,
+  RevisionEntity,
   RevisionPipelineRun,
   RevisionPipelineStep,
+  SessionVersionComparisonResponse,
   SessionVersionSummary,
 } from '../../core/models/types';
 import { resolveCloudChoices } from '../../core/model-config';
@@ -78,6 +89,8 @@ type RevisionProvider = 'ollama' | CloudProvider;
   imports: [
     CommonModule,
     FormsModule,
+    RevisionPipelineStatusComponent,
+    RevisionQaBadgeComponent,
     LucideBookOpen,
     LucideBraces,
     LucideFileText,
@@ -165,6 +178,15 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly selectedRevisionPipelineRun = signal<RevisionPipelineRun | null>(null);
   readonly selectedRevisionPipelineSteps = signal<RevisionPipelineStep[]>([]);
   readonly selectedRevisionArtifacts = signal<RevisionArtifact[]>([]);
+  readonly selectedRevisionEntities = signal<RevisionEntity[]>([]);
+  readonly selectedRevisionReviews = signal<RevisionClinicalReviewAction[]>([]);
+  readonly revisionComparisonBaseVersionId = signal<number | null>(null);
+  readonly revisionComparisonLoading = signal(false);
+  readonly revisionComparisonError = signal<string | null>(null);
+  readonly revisionComparison = signal<SessionVersionComparisonResponse | null>(null);
+  readonly revisionReviewEditedBy = signal('');
+  readonly revisionReviewNote = signal('');
+  readonly revisionReviewSaving = signal(false);
   readonly retryRevisionLoading = signal(false);
   readonly selectedRevisionVersion = computed(() =>
     this.sessionVersions().find((version) => version.version_id === this.selectedRevisionVersionId()) || null,
@@ -175,12 +197,37 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly selectedRevisionReportComparisonArtifact = computed(() =>
     this.selectedRevisionArtifacts().find((artifact) => artifact.artifact_kind === 'report_comparison') || null,
   );
+  readonly selectedRevisionConsultationExecutionArtifact = computed(() =>
+    this.selectedRevisionPipelineArtifacts().find((artifact) => artifact.artifact_key === 'revision_consultation_execution') || null,
+  );
+  readonly selectedRevisionFinalizationExecutionArtifact = computed(() =>
+    this.selectedRevisionPipelineArtifacts().find((artifact) => artifact.artifact_key === 'revision_finalization_execution') || null,
+  );
   readonly selectedRevisionStructuredCaseArtifacts = computed(() =>
     this.selectedRevisionArtifacts().filter((artifact) => artifact.artifact_kind === 'structured_case_entity'),
+  );
+  readonly selectedRevisionDrugEntities = computed(() =>
+    this.selectedRevisionEntities().filter((entity) => entity.entity_type === 'drug'),
+  );
+  readonly selectedRevisionDiseaseEntities = computed(() =>
+    this.selectedRevisionEntities().filter((entity) => entity.entity_type === 'disease'),
+  );
+  readonly selectedRevisionLabEntities = computed(() =>
+    this.selectedRevisionEntities().filter((entity) => entity.entity_type === 'lab_timeline_entry'),
+  );
+  readonly selectedRevisionLiverToxEntities = computed(() =>
+    this.selectedRevisionEntities().filter((entity) => entity.entity_type === 'livertox_match'),
+  );
+  readonly selectedRevisionDiliAssessmentEntities = computed(() =>
+    this.selectedRevisionEntities().filter((entity) => entity.entity_type === 'dili_assessment'),
   );
   readonly selectedRevisionPipelineArtifacts = computed(() =>
     this.selectedRevisionArtifacts().filter((artifact) => artifact.artifact_kind === 'pipeline_artifact'),
   );
+  readonly selectedRevisionCanReview = computed(() => {
+    const version = this.selectedRevisionVersion();
+    return Boolean(version && version.revision_kind === 'llm_assisted_revision' && version.session_id !== null);
+  });
   readonly revisionBusy = computed(() => {
     const status = this.revisionJobStatus();
     return status === 'pending' || status === 'running';
@@ -196,6 +243,10 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       && !this.revisionBusy()
       && !this.retryRevisionLoading(),
     );
+  });
+  readonly revisionComparisonBaseOptions = computed(() => {
+    const selectedVersionId = this.selectedRevisionVersionId();
+    return this.sessionVersions().filter((version) => version.version_id !== selectedVersionId);
   });
   readonly detectedDrugEvidence = signal<DetectedDrugEvidence[]>([]);
   readonly detectedDiseases = signal<string[]>([]);
@@ -240,6 +291,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.editorViewMode.set('source');
       this.manualEditReviewerNote.set('');
       this.manualEditEditedBy.set(this.defaultReviewerLabel(detail));
+      this.revisionReviewEditedBy.set(this.defaultReviewerLabel(detail));
+      this.revisionReviewNote.set('');
       this.metadataText.set(JSON.stringify(this.normalizeMetadata(detail.metadata || {}), null, 2));
       this.revisionSelection.set('');
       this.revisionInstruction.set('');
@@ -325,6 +378,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.editorText.set('');
     this.manualEditReviewerNote.set('');
     this.manualEditEditedBy.set('');
+    this.revisionReviewEditedBy.set('');
+    this.revisionReviewNote.set('');
     this.metadataText.set('{\n  "documents": [],\n  "images": []\n}');
     this.revisionSelection.set('');
     this.revisionInstruction.set('');
@@ -495,6 +550,20 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.manualEditEditedBy.set(value);
   }
 
+  updateRevisionReviewNote(value: string): void {
+    this.revisionReviewNote.set(value);
+  }
+
+  updateRevisionReviewEditedBy(value: string): void {
+    this.revisionReviewEditedBy.set(value);
+  }
+
+  updateRevisionComparisonBaseVersion(value: string): void {
+    const parsed = Number.parseInt(value, 10);
+    this.revisionComparisonBaseVersionId.set(Number.isFinite(parsed) ? parsed : null);
+    void this.loadRevisionComparison();
+  }
+
   setSection(section: 'preview' | 'editor' | 'metadata' | 'revision' | 'timeline'): void {
     this.activeSection.set(section);
   }
@@ -502,17 +571,27 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   async selectRevisionVersion(versionId: number): Promise<void> {
     const version = this.sessionVersions().find((item) => item.version_id === versionId) || null;
     this.selectedRevisionVersionId.set(version?.version_id ?? null);
+    this.revisionComparisonBaseVersionId.set(
+      version ? this.resolveRevisionComparisonBaseVersionId(this.sessionVersions(), version) : null,
+    );
     if (version) {
-      await this.loadRevisionArtifacts(version.version_id);
+      await Promise.all([
+        this.loadRevisionArtifacts(version.version_id),
+        this.loadRevisionEntities(version.version_id),
+        this.loadRevisionReviews(version.version_id),
+      ]);
     } else {
       this.selectedRevisionArtifacts.set([]);
+      this.selectedRevisionEntities.set([]);
+      this.selectedRevisionReviews.set([]);
     }
     if (version?.pipeline_run_id) {
       await this.loadRevisionPipeline(version.pipeline_run_id);
-      return;
+    } else {
+      this.selectedRevisionPipelineRun.set(null);
+      this.selectedRevisionPipelineSteps.set([]);
     }
-    this.selectedRevisionPipelineRun.set(null);
-    this.selectedRevisionPipelineSteps.set([]);
+    await this.loadRevisionComparison();
   }
 
   async openVersionFromHistory(version: SessionVersionSummary): Promise<void> {
@@ -594,7 +673,15 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.selectedRevisionPipelineRun.set(null);
     this.selectedRevisionPipelineSteps.set([]);
     this.selectedRevisionArtifacts.set([]);
+    this.selectedRevisionEntities.set([]);
+    this.selectedRevisionReviews.set([]);
+    this.revisionComparisonBaseVersionId.set(null);
+    this.revisionComparisonLoading.set(false);
+    this.revisionComparisonError.set(null);
+    this.revisionComparison.set(null);
+    this.revisionReviewNote.set('');
     this.retryRevisionLoading.set(false);
+    this.revisionReviewSaving.set(false);
   }
 
   private async loadRevisionHistory(
@@ -614,10 +701,19 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
           preferredVersionId: options.preferredVersionId ?? this.selectedRevisionVersionId(),
         });
       this.selectedRevisionVersionId.set(resolvedVersion?.version_id ?? null);
+      this.revisionComparisonBaseVersionId.set(
+        resolvedVersion ? this.resolveRevisionComparisonBaseVersionId(items, resolvedVersion) : null,
+      );
       if (resolvedVersion) {
-        await this.loadRevisionArtifacts(resolvedVersion.version_id);
+        await Promise.all([
+          this.loadRevisionArtifacts(resolvedVersion.version_id),
+          this.loadRevisionEntities(resolvedVersion.version_id),
+          this.loadRevisionReviews(resolvedVersion.version_id),
+        ]);
       } else {
         this.selectedRevisionArtifacts.set([]);
+        this.selectedRevisionEntities.set([]);
+        this.selectedRevisionReviews.set([]);
       }
       const pipelineRunId = options.preferredPipelineRunId || resolvedVersion?.pipeline_run_id || null;
       if (pipelineRunId) {
@@ -626,6 +722,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         this.selectedRevisionPipelineRun.set(null);
         this.selectedRevisionPipelineSteps.set([]);
       }
+      await this.loadRevisionComparison();
     } catch (error) {
       this.revisionHistoryError.set(formatUnknownError(error, 'Failed to load revision history.'));
     } finally {
@@ -647,6 +744,21 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     return versions[versions.length - 1] || null;
   }
 
+  private resolveRevisionComparisonBaseVersionId(
+    versions: SessionVersionSummary[],
+    selectedVersion: SessionVersionSummary,
+  ): number | null {
+    const sourceVersionId = selectedVersion.source_version_id;
+    if (sourceVersionId !== null && versions.some((version) => version.version_id === sourceVersionId)) {
+      return sourceVersionId;
+    }
+    const previousVersion = [...versions]
+      .filter((version) => version.version_id !== selectedVersion.version_id)
+      .sort((left, right) => right.version_number - left.version_number)
+      .find((version) => version.version_number < selectedVersion.version_number);
+    return previousVersion?.version_id ?? null;
+  }
+
   private async loadRevisionArtifacts(versionId: number): Promise<void> {
     const detail = this.selected();
     if (!detail) return;
@@ -657,6 +769,65 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     } catch (error) {
       this.selectedRevisionArtifacts.set([]);
       this.revisionHistoryError.set(formatUnknownError(error, 'Failed to load revision artifacts.'));
+    }
+  }
+
+  private async loadRevisionEntities(versionId: number): Promise<void> {
+    const detail = this.selected();
+    if (!detail) return;
+    try {
+      const payload = await fetchClinicalSessionRevisionEntities(detail.session_id, versionId);
+      if (this.selected()?.session_id !== detail.session_id || this.selectedRevisionVersionId() !== versionId) return;
+      this.selectedRevisionEntities.set(payload.items || []);
+    } catch (error) {
+      this.selectedRevisionEntities.set([]);
+      this.revisionHistoryError.set(formatUnknownError(error, 'Failed to load revision entities.'));
+    }
+  }
+
+  private async loadRevisionReviews(versionId: number): Promise<void> {
+    const detail = this.selected();
+    if (!detail) return;
+    try {
+      const payload = await fetchClinicalSessionRevisionReviews(detail.session_id, versionId);
+      if (this.selected()?.session_id !== detail.session_id || this.selectedRevisionVersionId() !== versionId) return;
+      this.selectedRevisionReviews.set(payload.items || []);
+    } catch (error) {
+      this.selectedRevisionReviews.set([]);
+      this.revisionHistoryError.set(formatUnknownError(error, 'Failed to load revision review history.'));
+    }
+  }
+
+  private async loadRevisionComparison(): Promise<void> {
+    const detail = this.selected();
+    const selectedVersion = this.selectedRevisionVersion();
+    const leftVersionId = this.revisionComparisonBaseVersionId();
+    if (!detail || !selectedVersion || leftVersionId === null) {
+      this.revisionComparison.set(null);
+      this.revisionComparisonError.set(null);
+      return;
+    }
+    this.revisionComparisonLoading.set(true);
+    this.revisionComparisonError.set(null);
+    try {
+      const payload = await fetchClinicalSessionVersionComparison(
+        detail.session_id,
+        leftVersionId,
+        selectedVersion.version_id,
+      );
+      if (
+        this.selected()?.session_id !== detail.session_id
+        || this.selectedRevisionVersionId() !== selectedVersion.version_id
+        || this.revisionComparisonBaseVersionId() !== leftVersionId
+      ) {
+        return;
+      }
+      this.revisionComparison.set(payload);
+    } catch (error) {
+      this.revisionComparison.set(null);
+      this.revisionComparisonError.set(formatUnknownError(error, 'Failed to load revision comparison.'));
+    } finally {
+      this.revisionComparisonLoading.set(false);
     }
   }
 
@@ -731,6 +902,31 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.revisionStatus.set(formatUnknownError(error, 'Failed to retry revision.'));
     } finally {
       this.retryRevisionLoading.set(false);
+    }
+  }
+
+  async updateRevisionClinicalReview(status: RevisionClinicalReviewStatus): Promise<void> {
+    const detail = this.selected();
+    const version = this.selectedRevisionVersion();
+    if (!detail || !version || !this.selectedRevisionCanReview() || this.revisionReviewSaving()) return;
+    this.revisionReviewSaving.set(true);
+    this.revisionHistoryError.set(null);
+    try {
+      const response = await updateClinicalSessionRevisionClinicalReview(detail.session_id, version.version_id, {
+        clinical_review_status: status,
+        reviewer_note: this.revisionReviewNote().trim() || null,
+        reviewed_by: this.revisionReviewEditedBy().trim() || null,
+        metadata: {},
+      });
+      this.sessionVersions.update((items) =>
+        items.map((item) => (item.version_id === response.version.version_id ? response.version : item)),
+      );
+      this.selectedRevisionReviews.update((items) => [response.review_action, ...items]);
+      this.revisionReviewNote.set('');
+    } catch (error) {
+      this.revisionHistoryError.set(formatUnknownError(error, 'Failed to update human review status.'));
+    } finally {
+      this.revisionReviewSaving.set(false);
     }
   }
 
@@ -1455,58 +1651,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       .replace(/\b\w/g, (char) => char.toUpperCase());
   }
 
-  revisionTone(value: string | null | undefined): 'good' | 'warn' | 'bad' | 'neutral' | 'info' {
-    switch (value) {
-      case 'current':
-      case 'completed':
-      case 'llm_qa_passed':
-      case 'passed':
-      case 'approved_by_human':
-      case 'human_approved':
-        return 'good';
-      case 'requires_human_review':
-      case 'pending':
-      case 'pending_qa':
-      case 'under_review':
-      case 'draft_revision':
-      case 'running':
-        return 'warn';
-      case 'failed':
-      case 'qa_failed':
-      case 'human_rejected':
-      case 'rejected_by_human':
-      case 'cancelled':
-        return 'bad';
-      case 'llm_assisted_revision':
-      case 'manual_edit':
-      case 'original':
-      case 'not_run':
-      case 'not_reviewed':
-      case 'superseded':
-        return 'neutral';
-      default:
-        return 'info';
-    }
-  }
-
-  revisionStepSummary(step: RevisionPipelineStep): string {
-    const outputSummary = step.output_summary;
-    if (outputSummary && Object.keys(outputSummary).length > 0) {
-      return Object.entries(outputSummary)
-        .slice(0, 3)
-        .map(([key, value]) => `${this.revisionStatusLabel(key)}: ${String(value)}`)
-        .join(' · ');
-    }
-    const inputSummary = step.input_summary;
-    if (inputSummary && Object.keys(inputSummary).length > 0) {
-      return Object.entries(inputSummary)
-        .slice(0, 3)
-        .map(([key, value]) => `${this.revisionStatusLabel(key)}: ${String(value)}`)
-        .join(' · ');
-    }
-    return 'No structured summary saved.';
-  }
-
   revisionArtifactSummary(artifact: RevisionArtifact): string {
     const payload = artifact.payload || {};
     if (artifact.artifact_kind === 'llm_qa_output') {
@@ -1532,11 +1676,53 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       : 'No structured payload summary saved.';
   }
 
+  revisionComparisonEntitySummary(items: RevisionEntityDiff[]): string {
+    if (!items.length) return 'None';
+    return items.map((item) => item.summary).join(', ');
+  }
+
   revisionArtifactPrimaryLabel(artifact: RevisionArtifact): string {
     if (artifact.artifact_kind === 'structured_case_entity') {
       return artifact.entity_name || artifact.artifact_key || 'Structured entity';
     }
     return artifact.artifact_key || this.revisionStatusLabel(artifact.artifact_kind);
+  }
+
+  revisionArtifactPayloadScalar(
+    artifact: RevisionArtifact | null | undefined,
+    key: string,
+    fallback = 'Not recorded',
+  ): string {
+    const payload = this.recordValue(artifact?.payload);
+    return this.stringValue(payload?.[key]) || fallback;
+  }
+
+  revisionArtifactPayloadFlag(
+    artifact: RevisionArtifact | null | undefined,
+    key: string,
+    trueLabel = 'Yes',
+    falseLabel = 'No',
+    fallback = 'Not recorded',
+  ): string {
+    const payload = this.recordValue(artifact?.payload);
+    const value = payload?.[key];
+    if (typeof value === 'boolean') return value ? trueLabel : falseLabel;
+    return fallback;
+  }
+
+  revisionEntityPrimaryLabel(entity: RevisionEntity): string {
+    return entity.revised_name || entity.original_name || entity.original_entity_id || 'Unnamed entity';
+  }
+
+  revisionEntitySummary(entity: RevisionEntity): string {
+    const parts = [
+      this.revisionStatusLabel(entity.source_section),
+      this.revisionStatusLabel(entity.entity_revision_status),
+    ];
+    if (entity.requires_human_review) {
+      parts.push('Requires human review');
+    }
+    return parts.filter((part): part is string => Boolean(part)).join(' · ');
   }
 
   private stopPoller(): void {

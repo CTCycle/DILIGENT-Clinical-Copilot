@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-06-04
+Last updated: 2026-06-05
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
@@ -38,10 +38,22 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 ## Inspection Routes
 - `GET /api/inspection/sessions`
 - `GET /api/inspection/sessions/{session_id}`
+- `GET /api/inspection/sessions/{session_id}/versions`
+- `GET /api/inspection/sessions/{session_id}/versions/{version_id}`
+- `GET /api/inspection/sessions/{session_id}/versions/{left_version_id}/compare/{right_version_id}`
 - `PUT /api/inspection/sessions/{session_id}`
+- `PUT /api/inspection/sessions/{session_id}/report`
+- `GET /api/inspection/sessions/{session_id}/manual-edits`
 - `POST /api/inspection/sessions/{session_id}/revision/jobs`
+- `GET /api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}`
+- `POST /api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/retry`
+- `GET /api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/steps`
+- `PUT /api/inspection/sessions/{session_id}/versions/{version_id}/clinical-review`
 - `GET /api/inspection/sessions/revision/jobs/{job_id}`
 - `DELETE /api/inspection/sessions/revision/jobs/{job_id}`
+- `GET /api/inspection/sessions/{session_id}/versions/{version_id}/entities`
+- `GET /api/inspection/sessions/{session_id}/versions/{version_id}/reviews`
+- `GET /api/inspection/sessions/{session_id}/versions/{version_id}/artifacts`
 - `GET /api/inspection/sessions/{session_id}/timeline`
 - `POST /api/inspection/sessions/{session_id}/timeline`
 - `DELETE /api/inspection/sessions/{session_id}`

@@ -381,6 +381,27 @@ class HepatoxConsultation:
         )
 
     # -------------------------------------------------------------------------
+    async def run_revision_analysis(
+        self,
+        *,
+        prepared_inputs: HepatoxPreparedInputs | None,
+        visit_date: date | None = None,
+        report_language: str = "en",
+        rag_query: dict[str, str] | None = None,
+        rucam_bundle: PatientRucamAssessmentBundle | None = None,
+        progress_callback: Callable[[str, float], None] | None = None,
+    ) -> dict[str, Any] | None:
+        return await hepatox_assessment.run_revision_analysis(
+            self,
+            prepared_inputs=prepared_inputs,
+            visit_date=visit_date,
+            report_language=report_language,
+            rag_query=rag_query,
+            rucam_bundle=rucam_bundle,
+            progress_callback=progress_callback,
+        )
+
+    # -------------------------------------------------------------------------
     async def compile_clinical_assessment(
         self,
         resolved_drugs: dict[str, dict[str, Any]],
@@ -394,6 +415,31 @@ class HepatoxConsultation:
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> PatientDrugClinicalReport:
         return await hepatox_assessment.compile_clinical_assessment(
+            self,
+            resolved_drugs,
+            clinical_context=clinical_context,
+            visit_date=visit_date,
+            report_language=report_language,
+            pattern_prompt=pattern_prompt,
+            rag_query=rag_query,
+            rucam_bundle=rucam_bundle,
+            progress_callback=progress_callback,
+        )
+
+    # -------------------------------------------------------------------------
+    async def compile_revision_clinical_assessment(
+        self,
+        resolved_drugs: dict[str, dict[str, Any]],
+        *,
+        clinical_context: str | None,
+        visit_date: date | None,
+        report_language: str,
+        pattern_prompt: str,
+        rag_query: dict[str, str] | None = None,
+        rucam_bundle: PatientRucamAssessmentBundle | None = None,
+        progress_callback: Callable[[str, float], None] | None = None,
+    ) -> PatientDrugClinicalReport:
+        return await hepatox_assessment.compile_revision_clinical_assessment(
             self,
             resolved_drugs,
             clinical_context=clinical_context,
@@ -809,6 +855,45 @@ class HepatoxConsultation:
         )
 
     # -------------------------------------------------------------------------
+    async def request_revision_drug_analysis(
+        self,
+        *,
+        drug_name: str,
+        canonical_name: str,
+        origins: list[str],
+        extraction_metadata: list[dict[str, Any]],
+        livertox_status: str,
+        excerpt: str,
+        rag_documents: str | None,
+        clinical_context: str,
+        suspension: DrugSuspensionContext,
+        visit_date: date | None,
+        pattern_summary: str,
+        metadata: dict[str, Any] | None,
+        rucam: DrugRucamAssessment | None,
+        knowledge_prompt: str = "No supplemental knowledge prompt available.",
+        report_language: str = "en",
+    ) -> str:
+        return await hepatox_assessment.request_revision_drug_analysis(
+            self,
+            drug_name=drug_name,
+            canonical_name=canonical_name,
+            origins=origins,
+            extraction_metadata=extraction_metadata,
+            livertox_status=livertox_status,
+            excerpt=excerpt,
+            rag_documents=rag_documents,
+            clinical_context=clinical_context,
+            suspension=suspension,
+            visit_date=visit_date,
+            pattern_summary=pattern_summary,
+            metadata=metadata,
+            rucam=rucam,
+            knowledge_prompt=knowledge_prompt,
+            report_language=report_language,
+        )
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def escape_braces(value: str) -> str:
         return hepatox_prompts.escape_braces(value)
@@ -843,6 +928,21 @@ class HepatoxConsultation:
         report_language: str,
     ) -> str | None:
         return await hepatox_assessment.finalize_patient_report(
+            self,
+            entries,
+            clinical_context=clinical_context,
+            report_language=report_language,
+        )
+
+    # -------------------------------------------------------------------------
+    async def finalize_revision_patient_report(
+        self,
+        entries: list[DrugClinicalAssessment],
+        *,
+        clinical_context: str | None,
+        report_language: str,
+    ) -> str | None:
+        return await hepatox_assessment.finalize_revision_patient_report(
             self,
             entries,
             clinical_context=clinical_context,
@@ -922,6 +1022,21 @@ class HepatoxConsultation:
         report_language: str,
     ) -> str | None:
         return await hepatox_assessment.generate_conclusion(
+            self,
+            clinical_context=clinical_context,
+            multi_drug_report=multi_drug_report,
+            report_language=report_language,
+        )
+
+    # -------------------------------------------------------------------------
+    async def generate_revision_conclusion(
+        self,
+        *,
+        clinical_context: str,
+        multi_drug_report: str,
+        report_language: str,
+    ) -> str | None:
+        return await hepatox_assessment.generate_revision_conclusion(
             self,
             clinical_context=clinical_context,
             multi_drug_report=multi_drug_report,

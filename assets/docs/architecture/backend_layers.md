@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-06-03
+Last updated: 2026-06-06
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -10,6 +10,7 @@ Last updated: 2026-06-03
   - Inspection update orchestration is implemented in `app/server/services/inspection/update_jobs.py` through `DataInspectionUpdateJobRunner`, while `DataInspectionService` remains the endpoint-facing facade.
   - `app/server/services/text/vocabulary.py` provides cache-facing text normalization business access and does not manage SQLAlchemy sessions directly.
   - `app/server/services/llm/ollama_runtime.py` owns canonical Ollama runtime aliases, errors, environment helpers, message normalization, and exception mapping. Ollama service modules must import these definitions instead of duplicating or monkey-patching them.
+  - `app/server/services/llm/structured.py` owns strict JSON object extraction, schema validation, and bounded one-repair structured-output adaptation helpers for provider responses.
 - Domain layer: `app/server/domain/*`
   - Owns Pydantic and domain request-response schemas and typed contracts.
   - Clinical extraction schemas used by orchestration live under `app/server/domain/clinical/`.
@@ -60,7 +61,11 @@ Last updated: 2026-06-03
 - `app/server/api/data_inspection.py`
 - `app/server/services/inspection/service.py`
 - `app/server/services/session/session_service.py`
+- `app/server/services/clinical/revision/report_builder.py`
+- `app/server/services/clinical/revision/qa.py`
 - `app/server/repositories/serialization/data.py`
+- Revision jobs persist source-loading, reviewer-instruction analysis, runtime preparation, source preprocessing that prefers persisted source-version sections before reparsing raw text, deterministic source-artifact reuse for therapy/anamnesis/disease extraction when the selected source version already stores those artifacts, source-version structured artifact reuse for disease context, lab timeline, and onset context when those artifacts already exist, generation, revision-stage entity checkpoints (`resolve_revision_extraction`, `validate_anamnesis_drugs`, `extract_missing_anamnesis_drugs`, `revise_labs_timeline`, `reconcile_revision_candidates`, `merge_revision_snapshot`), revision-specific analysis and lookup drug inputs derived from the staged anamnesis additions, a dedicated `ClinicalSessionService.run_revision_consultation(...)` execution path with consultation metadata and selected-drug inputs derived from the merged revision snapshot, a dedicated consultation-engine entrypoint (`HepatoxConsultation.run_revision_analysis(...)`) underneath that service boundary, revision-specific drug-analysis/conclusion composition entrypoints (`request_revision_drug_analysis(...)`, `finalize_revision_patient_report(...)`, `generate_revision_conclusion(...)`) with comparison-aware synthesis guidance and dedicated revision prompt templates, revision-aware candidate classification reconciliation for promoted drugs, a dedicated revision finalization stage that owns post-consultation report shaping and audit summaries, source-version LiverTox match reuse or refresh decisions with provenance, revised DILI reassessment handling that can reference prior source-version per-drug assessments, final-report rebuild through `services/clinical/revision/report_builder.py`, revision QA validation through `services/clinical/revision/qa.py`, artifact/entity persistence, and final version-state transitions through revision run and step tables.
+- First-class revision entities are strict domain schemas under `app/server/domain/clinical/revision.py`; repository persistence validates revised drugs, diseases, lab entries, LiverTox decisions, and revised DILI assessments against those schemas before writing `clinical_session_revision_entities`.
 
 ## Async And Sync Behavior
 - FastAPI handlers are mixed:
