@@ -1,11 +1,11 @@
 # System Overview
-Last updated: 2026-06-03
+Last updated: 2026-06-06
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
 - FastAPI backend in `app/server`
 - Angular standalone frontend in `app/client`
-- Optional Tauri desktop shell in `app/client/src-tauri`
+- Optional Tauri desktop shell in `app/src-tauri`
 
 Primary flow:
 1. The user submits clinical data in the Angular UI.
@@ -48,9 +48,9 @@ Maintained source-level structure, with build and cache artifacts omitted:
 |   |   |       |-- core/
 |   |   |       |-- components/
 |   |   |       `-- pages/
-|   |   `-- src-tauri/
-|   |       |-- tauri.conf.json
-|   |       `-- src/main.rs
+|   |-- src-tauri/
+|   |   |-- tauri.conf.json
+|   |   `-- src/main.rs
 |   `-- tests/
 |       |-- run_tests.bat
 |       |-- conftest.py
@@ -68,5 +68,5 @@ Maintained source-level structure, with build and cache artifacts omitted:
   - Bootstraps Angular `App` with `appConfig`.
 - Frontend routing: `app/client/src/app/app.routes.ts`
   - Current routes: `/`, `/clinical-sessions`, `/data`, `/model-config`, `/sessions/:sessionId/timetable`.
-- Desktop runtime: `app/client/src-tauri/src/main.rs` plus `tauri.conf.json`.
+- Desktop runtime: `app/src-tauri/src/main.rs` plus `tauri.conf.json`.
 - Windows launcher: `start_on_windows.bat`.

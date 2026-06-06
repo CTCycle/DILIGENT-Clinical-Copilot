@@ -88,6 +88,8 @@ _Runtime source, local model catalog, and active reasoning pipeline settings._
 _Catalog inspection view for curated drug records, update status, and maintenance actions._
 
 ## 5. Desktop Packaging (Tauri)
+The desktop shell lives in `app/src-tauri`, while the frontend stays in `app/client`.
+
 Build Windows desktop artifacts:
 ```cmd
 release\tauri\build_with_tauri.bat
