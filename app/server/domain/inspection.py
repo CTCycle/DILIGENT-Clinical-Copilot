@@ -323,6 +323,68 @@ class RevisionPipelineStepListResponse(BaseModel):
 
 
 ###############################################################################
+class ReviewerInstructionProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    user_intent: str | None = None
+    main_goal: str | None = None
+    instruction_summary: str
+    target_sections: list[
+        Literal[
+            "anamnesis",
+            "therapy",
+            "labs",
+            "livertox_matching",
+            "dili_assessment",
+            "final_report",
+            "qa",
+            "unknown",
+        ]
+    ] = Field(default_factory=list)
+    target_entities: list[
+        Literal[
+            "drugs",
+            "diseases",
+            "labs",
+            "report_wording",
+            "source_evidence",
+            "matching_errors",
+            "causality_reasoning",
+            "missing_data",
+            "ambiguity_resolution",
+            "other",
+        ]
+    ] = Field(default_factory=list)
+    mentioned_drugs: list[str] = Field(default_factory=list)
+    mentioned_diseases: list[str] = Field(default_factory=list)
+    mentioned_lab_values: list[str] = Field(default_factory=list)
+    mentioned_dates: list[str] = Field(default_factory=list)
+    extra_data: list[str] = Field(default_factory=list)
+    ambiguities: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    reviewer_assumptions: list[str] = Field(default_factory=list)
+    safety_or_quality_concerns: list[str] = Field(default_factory=list)
+    prompt_injection_flags: list[str] = Field(default_factory=list)
+    pipeline_routing_decision: dict[str, list[str]] = Field(default_factory=dict)
+
+
+###############################################################################
+class ReviewerInstructionTrace(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    instruction_id: str
+    raw_instruction_text: str
+    normalized_instruction_summary: str
+    routed_pipeline_steps: list[str]
+    affected_entities: list[str] = Field(default_factory=list)
+    applied: bool
+    ignored: bool
+    reason_if_ignored: str | None = None
+    prompt_injection_detected: bool = False
+    prompt_injection_flags: list[str] = Field(default_factory=list)
+    evidence_addressed: list[str] = Field(default_factory=list)
+    qa_validation_result: str | None = None
+
+
+###############################################################################
 class RevisionArtifactResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     revision_version_id: int

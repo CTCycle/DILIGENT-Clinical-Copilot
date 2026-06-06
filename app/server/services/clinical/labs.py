@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any, Literal
 
+from common.prompts.extraction import CLINICAL_LAB_EXTRACTION_PROMPT
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import get_server_settings
@@ -19,7 +20,6 @@ from domain.clinical.entities import (
 from domain.clinical.extras import LabExtractionPayload
 from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.llm.client_runtime import ensure_runtime_client
-from common.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
 from services.llm.provider_factory import select_llm_provider
 from services.text.vocabulary import get_text_normalization_snapshot
 

@@ -12,6 +12,16 @@ from common.constants import (
     R_SCORE_CHOLESTATIC_THRESHOLD,
     R_SCORE_HEPATOCELLULAR_THRESHOLD,
 )
+from common.prompts.clinical_assessment import (
+    LIVERTOX_CLINICAL_SYSTEM_PROMPT,
+    LIVERTOX_CLINICAL_USER_PROMPT,
+    LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
+    LIVERTOX_CONCLUSION_USER_PROMPT,
+    LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT,
+    LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
+    LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
+    LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
+)
 from common.utils.logger import logger
 from domain.clinical.entities import (
     ClinicalLabEntry,
@@ -30,16 +40,6 @@ from services.clinical.match_quality import classify_match_evidence
 from services.clinical.preparation import HepatoxPreparedInputs
 from services.clinical.report_language import (
     report_heading,
-)
-from common.prompts import (
-    LIVERTOX_CLINICAL_SYSTEM_PROMPT,
-    LIVERTOX_CLINICAL_USER_PROMPT,
-    LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
-    LIVERTOX_CONCLUSION_USER_PROMPT,
-    LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT,
-    LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
-    LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
-    LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
 )
 from services.retrieval.embeddings import (
     EmbeddingModelMismatchError,

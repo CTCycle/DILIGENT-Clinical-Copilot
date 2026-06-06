@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, Field
+from domain.clinical.revision import RevisionFinalReportPayload
 
 
 class ReviewerInstructionProfileLike(Protocol):
@@ -19,17 +19,6 @@ class ReviewerInstructionProfileLike(Protocol):
             "unknown",
         ]
     ]
-
-
-class RevisionFinalReportPayload(BaseModel):
-    report_text: str
-    report_present: bool
-    report_character_count: int
-    source_excerpt_present: bool
-    reviewer_instruction_summary: str | None = None
-    comparison_outcome: str | None = None
-    changed_focus_areas: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
 
 
 def _unique_preserve_order(values: list[str]) -> list[str]:

@@ -13,3 +13,18 @@ describe('RevisionPipelineStatusComponent template', () => {
     expect(template).toContain('Persisted run configuration');
   });
 });
+
+describe('RevisionPipelineStatusComponent source', () => {
+  it('counts completed steps and summarizes persisted structured output before input', () => {
+    const sourcePath = resolve(__dirname, './revision-pipeline-status.component.ts');
+    const source = readFileSync(sourcePath, 'utf-8');
+
+    expect(source).toContain(
+      "return this.steps.filter((step) => step.status === 'completed').length;",
+    );
+    expect(source).toContain('const outputSummary = step.output_summary;');
+    expect(source).toContain('const inputSummary = step.input_summary;');
+    expect(source).toContain(".slice(0, 3)");
+    expect(source).toContain("return 'No structured summary saved.';");
+  });
+});

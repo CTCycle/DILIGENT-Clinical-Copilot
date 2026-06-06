@@ -9,6 +9,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "preview": "node ./scripts/preview-server.mjs",
+    "validate:revision-ui": "node ./scripts/validate-revision-ui.mjs",
     "test": "ng test",
     "tauri:icon": "tauri icon public/favicon.png && powershell -NoProfile -Command \"Remove-Item -Recurse -Force src-tauri/icons/android,src-tauri/icons/ios -ErrorAction SilentlyContinue\"",
     "tauri:dev": "tauri dev --config src-tauri/tauri.conf.json",

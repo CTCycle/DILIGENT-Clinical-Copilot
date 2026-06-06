@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, Field
-
-from .report_builder import RevisionFinalReportPayload
+from domain.clinical.revision import RevisionFinalReportPayload, RevisionQaValidationPayload
 
 
 class ReviewerInstructionProfileLike(Protocol):
@@ -34,21 +32,6 @@ class ReviewerInstructionProfileLike(Protocol):
             "other",
         ]
     ]
-
-
-class RevisionQaValidationPayload(BaseModel):
-    status: Literal["passed", "passed_with_warnings", "failed", "requires_human_review"]
-    version_status: Literal[
-        "llm_qa_passed",
-        "qa_failed",
-        "requires_human_review",
-    ]
-    addressed_items: list[str] = Field(default_factory=list)
-    unaddressed_items: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
-    blocking_issues: list[str] = Field(default_factory=list)
-    manual_review_required: bool = False
-    finding_count: int = 0
 
 
 def _unique_preserve_order(values: list[str]) -> list[str]:

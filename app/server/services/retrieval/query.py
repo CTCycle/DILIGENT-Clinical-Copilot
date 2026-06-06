@@ -7,8 +7,8 @@ from common.constants import (
     NO_CLINICAL_CONTEXT_FALLBACK,
     UNKNOWN_R_SCORE_TOKEN,
 )
+from common.prompts.retrieval import DILI_RAG_QUERY_PROMPT
 from domain.clinical.entities import PatientDrugs
-from common.prompts import DILI_RAG_QUERY_PROMPT
 
 
 ###############################################################################

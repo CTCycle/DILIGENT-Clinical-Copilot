@@ -13,11 +13,9 @@ from domain.clinical.entities import (
     DiseaseContextEntry,
     PatientDiseaseContext,
 )
+from common.prompts.extraction import ANAMNESIS_DISEASE_EXTRACTION_PROMPT
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.llm.client_runtime import ensure_runtime_client
-from common.prompts import (
-    ANAMNESIS_DISEASE_EXTRACTION_PROMPT,
-)
 from services.llm.provider_factory import select_llm_provider
 from services.text.normalization import normalize_token
 
