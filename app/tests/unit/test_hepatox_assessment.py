@@ -22,6 +22,9 @@ from common.prompts import (
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
     LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
+    LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT,
+    LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
+    LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
 )
 
 
@@ -188,6 +191,22 @@ def test_livertox_prompt_removes_per_drug_management_recommendation_directive() 
     assert (
         "Do not mention drugs absent from the supplied report."
         in LIVERTOX_CONCLUSION_SYSTEM_PROMPT
+    )
+    assert (
+        "treat prior report language as comparison-only context"
+        in LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT.lower()
+    )
+    assert (
+        "Write a clinician-facing revision assessment body"
+        in LIVERTOX_REVISION_CLINICAL_USER_PROMPT
+    )
+    assert (
+        "Treat previous report wording as comparison-only context if present."
+        in LIVERTOX_REVISION_CLINICAL_USER_PROMPT
+    )
+    assert (
+        "writing the final integrated revision synthesis"
+        in LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT
     )
 
 

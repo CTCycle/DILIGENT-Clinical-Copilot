@@ -7,12 +7,25 @@ from __future__ import annotations
 
 import asyncio
 import os
+import tempfile
 import threading
+import uuid
 from collections.abc import Coroutine
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+from common import paths as common_paths
+from repositories.database import sqlite as sqlite_module
+
+
+def _configure_test_embedded_database_path() -> None:
+    temp_root = Path(tempfile.gettempdir()) / "diligent-pytest-dbs"
+    temp_root.mkdir(parents=True, exist_ok=True)
+    db_path = temp_root / f"embedded-{uuid.uuid4().hex}.db"
+    common_paths.DATABASE_FILE_PATH = db_path
+    sqlite_module.DATABASE_FILE_PATH = db_path
 
 
 def _configure_playwright_node_runtime() -> None:
@@ -29,6 +42,7 @@ def _configure_playwright_node_runtime() -> None:
 
 
 _configure_playwright_node_runtime()
+_configure_test_embedded_database_path()
 
 
 class CoroutineThreadRunner:
