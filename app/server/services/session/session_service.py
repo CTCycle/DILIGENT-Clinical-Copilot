@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Callable
-from typing import Any
+from dataclasses import replace
+from typing import Any, Literal
 
 from pydantic import ValidationError
 
@@ -245,6 +246,98 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             ),
             extraction,
         )
+
+    # -------------------------------------------------------------------------
+    async def prepare_revision_source_request(
+        self,
+        *,
+        session_detail: dict[str, Any],
+        use_rag: bool,
+    ) -> tuple[
+        ClinicalSessionRequest,
+        ClinicalSectionExtractionResult | None,
+        str,
+    ]:
+        source_text = str(session_detail.get("session_text") or "").strip()
+        if not source_text:
+            raise ServiceValidationError("Clinical source text is required.")
+
+        payload = session_detail.get("result_payload")
+        section_extraction_payload = (
+            payload.get("section_extraction") if isinstance(payload, dict) else None
+        )
+        section_extraction: ClinicalSectionExtractionResult | None = None
+        if isinstance(section_extraction_payload, ClinicalSectionExtractionResult):
+            section_extraction = section_extraction_payload
+        elif isinstance(section_extraction_payload, dict):
+            try:
+                section_extraction = ClinicalSectionExtractionResult.model_validate(
+                    section_extraction_payload
+                )
+            except ValidationError:
+                section_extraction = None
+        if (
+            section_extraction is not None
+            and section_extraction.anamnesis
+            and section_extraction.drugs
+            and section_extraction.laboratory_analysis
+        ):
+            return (
+                ClinicalSessionRequest(
+                    name=session_detail.get("patient_name"),
+                    visit_date=session_detail.get("visit_date"),
+                    clinical_input=source_text,
+                    anamnesis=section_extraction.anamnesis,
+                    drugs=section_extraction.drugs,
+                    laboratory_analysis=section_extraction.laboratory_analysis,
+                    use_rag=use_rag,
+                ),
+                section_extraction,
+                "persisted_section_extraction",
+            )
+
+        sections = session_detail.get("sections")
+        if isinstance(sections, dict):
+            anamnesis = str(sections.get("anamnesis") or "").strip()
+            drugs = str(sections.get("drugs") or sections.get("therapy") or "").strip()
+            laboratory_analysis = str(
+                sections.get("laboratory_analysis")
+                or sections.get("laboratory_history")
+                or ""
+            ).strip()
+            if anamnesis and drugs and laboratory_analysis:
+                section_extraction = ClinicalSectionExtractionResult(
+                    source_text=source_text,
+                    anamnesis=anamnesis,
+                    drugs=drugs,
+                    laboratory_analysis=laboratory_analysis,
+                    confidence=1.0,
+                    metadata={"parser": "persisted_session_sections_v1"},
+                )
+                return (
+                    ClinicalSessionRequest(
+                        name=session_detail.get("patient_name"),
+                        visit_date=session_detail.get("visit_date"),
+                        clinical_input=source_text,
+                        anamnesis=anamnesis,
+                        drugs=drugs,
+                        laboratory_analysis=laboratory_analysis,
+                        use_rag=use_rag,
+                    ),
+                    section_extraction,
+                    "persisted_session_sections",
+                )
+
+        request = ClinicalSessionRequest(
+            name=session_detail.get("patient_name"),
+            visit_date=session_detail.get("visit_date"),
+            clinical_input=source_text,
+            use_rag=use_rag,
+        )
+        preprocessed_request, section_extraction = await self.preprocess_unified_input(
+            request
+        )
+        return preprocessed_request, section_extraction, "reparsed_source_text"
 
     # -------------------------------------------------------------------------
     def validate_assessment_prerequisites_without_llm(
@@ -966,6 +1059,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         payload: PatientData,
         analysis_drugs: PatientDrugs,
         prepared_inputs,
+        consultation_context: str | None = None,
         report_language: str,
         rag_query: dict[str, str] | None,
         rucam_bundle: PatientRucamAssessmentBundle,
@@ -973,20 +1067,167 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
     ) -> tuple[HepatoxConsultation, str | None]:
+        clinical_session, final_report, _ = await self._run_consultation_internal(
+            payload=payload,
+            analysis_drugs=analysis_drugs,
+            prepared_inputs=prepared_inputs,
+            consultation_context=consultation_context,
+            report_language=report_language,
+            rag_query=rag_query,
+            rucam_bundle=rucam_bundle,
+            issues=issues,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+            execution_mode="standard",
+            consultation_context_metadata=None,
+        )
+        return clinical_session, final_report
+
+    async def run_revision_consultation(
+        self,
+        *,
+        payload: PatientData,
+        analysis_drugs: PatientDrugs,
+        prepared_inputs,
+        consultation_context: str | None = None,
+        consultation_context_metadata: dict[str, Any] | None = None,
+        report_language: str,
+        rag_query: dict[str, str] | None,
+        rucam_bundle: PatientRucamAssessmentBundle,
+        issues: list[PipelineIssue],
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
+    ) -> tuple[HepatoxConsultation, str | None, dict[str, Any]]:
+        return await self._run_consultation_internal(
+            payload=payload,
+            analysis_drugs=analysis_drugs,
+            prepared_inputs=prepared_inputs,
+            consultation_context=consultation_context,
+            report_language=report_language,
+            rag_query=rag_query,
+            rucam_bundle=rucam_bundle,
+            issues=issues,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+            execution_mode="revision",
+            consultation_context_metadata=consultation_context_metadata,
+        )
+
+    def _build_consultation_fallback_report(
+        self,
+        *,
+        analysis_drugs: PatientDrugs,
+        report_language: str,
+        execution_mode: Literal["standard", "revision"],
+    ) -> str:
+        drug_names = [
+            (entry.name or "").strip()
+            for entry in analysis_drugs.entries
+            if (entry.name or "").strip()
+        ]
+        unique_drugs: list[str] = []
+        seen_drugs: set[str] = set()
+        for name in drug_names:
+            key = name.casefold()
+            if key in seen_drugs:
+                continue
+            seen_drugs.add(key)
+            unique_drugs.append(name)
+            if len(unique_drugs) >= 8:
+                break
+        is_revision = execution_mode == "revision"
+        if report_language.lower().startswith("it"):
+            if unique_drugs:
+                if is_revision:
+                    return (
+                        "Report di revisione generato in modalità di fallback per indisponibilità della sintesi clinica. "
+                        f"Farmaci selezionati per la revisione: {', '.join(unique_drugs)}. "
+                        "Confrontare manualmente il risultato con il report precedente e con le evidenze strutturate aggiornate."
+                    )
+                return (
+                    "Report finale generato in modalità di fallback per indisponibilità del motore clinico. "
+                    f"Farmaci sospetti identificati nel testo: {', '.join(unique_drugs)}. "
+                    "Rivedere manualmente la valutazione clinica e la conclusione specialistica originale."
+                )
+            if is_revision:
+                return (
+                    "Report di revisione generato in modalità di fallback per indisponibilità della sintesi clinica. "
+                    "Non sono stati identificati farmaci di revisione affidabili; è necessaria revisione specialistica manuale."
+                )
+            return (
+                "Report finale generato in modalità di fallback per indisponibilità del motore clinico. "
+                "Non sono stati identificati farmaci sospetti affidabili; è necessaria revisione manuale."
+            )
+        if unique_drugs:
+            if is_revision:
+                return (
+                    "Revision report generated in fallback mode because revision clinical synthesis was unavailable. "
+                    f"Drugs selected for revision: {', '.join(unique_drugs)}. "
+                    "Manual comparison against the previous report and revised structured evidence is required."
+                )
+            return (
+                "Final report generated in fallback mode because clinical synthesis was unavailable. "
+                f"Suspected drugs detected from source text: {', '.join(unique_drugs)}. "
+                "Manual review against the original specialist assessment is required."
+            )
+        if is_revision:
+            return (
+                "Revision report generated in fallback mode because revision clinical synthesis was unavailable. "
+                "No reliable revision-target drugs were detected; manual specialist review is required."
+            )
+        return (
+            "Final report generated in fallback mode because clinical synthesis was unavailable. "
+            "No reliable suspected drugs were detected; manual specialist review is required."
+        )
+
+    async def _run_consultation_internal(
+        self,
+        *,
+        payload: PatientData,
+        analysis_drugs: PatientDrugs,
+        prepared_inputs,
+        consultation_context: str | None,
+        report_language: str,
+        rag_query: dict[str, str] | None,
+        rucam_bundle: PatientRucamAssessmentBundle,
+        issues: list[PipelineIssue],
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
+        execution_mode: Literal["standard", "revision"],
+        consultation_context_metadata: dict[str, Any] | None,
+    ) -> tuple[HepatoxConsultation, str | None, dict[str, Any]]:
         clinical_session = self.hepatox_consultation_cls(
             analysis_drugs,
             patient_name=payload.name,
         )
+        effective_inputs = prepared_inputs
+        if (
+            prepared_inputs is not None
+            and consultation_context is not None
+            and prepared_inputs.clinical_context != consultation_context
+        ):
+            effective_inputs = replace(
+                prepared_inputs,
+                clinical_context=consultation_context,
+            )
         final_report: str | None = None
         start_time = time.perf_counter()
         consultation_timeout_s = self._resolve_consultation_timeout()
+        analysis_entrypoint = (
+            "run_revision_analysis" if execution_mode == "revision" else "run_analysis"
+        )
         try:
             consultation_progress_callback = ClinicalConsultationProgressCallback(
                 progress_callback=progress_callback,
             )
+            analysis_runner = (
+                clinical_session.run_revision_analysis
+                if execution_mode == "revision"
+                else clinical_session.run_analysis
+            )
             drug_assessment = await asyncio.wait_for(
-                clinical_session.run_analysis(
-                    prepared_inputs=prepared_inputs,
+                analysis_runner(
+                    prepared_inputs=effective_inputs,
                     visit_date=payload.visit_date,
                     report_language=report_language,
                     rag_query=rag_query,
@@ -1006,6 +1247,14 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                     final_report = None
                 else:
                     final_report = str(raw_final_report).strip()
+                revision_consultation_metadata = drug_assessment.get(
+                    "revision_consultation_metadata"
+                )
+                if isinstance(revision_consultation_metadata, dict):
+                    consultation_context_metadata = {
+                        **(consultation_context_metadata or {}),
+                        **revision_consultation_metadata,
+                    }
             issues.extend(getattr(clinical_session, "pipeline_issues", []))
         except TimeoutError as exc:
             self.append_warning_issue(
@@ -1036,47 +1285,46 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 payload.name or "unknown",
                 exc,
             )
-        if not final_report:
-            drug_names = [
-                (entry.name or "").strip()
-                for entry in analysis_drugs.entries
-                if (entry.name or "").strip()
-            ]
-            unique_drugs: list[str] = []
-            seen_drugs: set[str] = set()
-            for name in drug_names:
-                key = name.casefold()
-                if key in seen_drugs:
-                    continue
-                seen_drugs.add(key)
-                unique_drugs.append(name)
-                if len(unique_drugs) >= 8:
-                    break
-            if report_language.lower().startswith("it"):
-                if unique_drugs:
-                    final_report = (
-                        "Report finale generato in modalità di fallback per indisponibilità del motore clinico. "
-                        f"Farmaci sospetti identificati nel testo: {', '.join(unique_drugs)}. "
-                        "Rivedere manualmente la valutazione clinica e la conclusione specialistica originale."
-                    )
-                else:
-                    final_report = (
-                        "Report finale generato in modalità di fallback per indisponibilità del motore clinico. "
-                        "Non sono stati identificati farmaci sospetti affidabili; è necessaria revisione manuale."
-                    )
-            else:
-                if unique_drugs:
-                    final_report = (
-                        "Final report generated in fallback mode because clinical synthesis was unavailable. "
-                        f"Suspected drugs detected from source text: {', '.join(unique_drugs)}. "
-                        "Manual review against the original specialist assessment is required."
-                    )
-                else:
-                    final_report = (
-                        "Final report generated in fallback mode because clinical synthesis was unavailable. "
-                        "No reliable suspected drugs were detected; manual specialist review is required."
-                    )
-        return clinical_session, final_report
+        used_fallback_report = not bool(str(final_report or "").strip())
+        if used_fallback_report:
+            final_report = self._build_consultation_fallback_report(
+                analysis_drugs=analysis_drugs,
+                report_language=report_language,
+                execution_mode=execution_mode,
+            )
+        payload_metadata = {
+            "execution_mode": execution_mode,
+            "analysis_entrypoint": analysis_entrypoint,
+            "used_fallback_report": used_fallback_report,
+            "consultation_model": getattr(clinical_session, "llm_model", None),
+            "analysis_drug_names": [
+                entry.name for entry in analysis_drugs.entries if entry.name
+            ],
+            "consultation_context_length": len(str(consultation_context or "").strip()),
+        }
+        if isinstance(consultation_context_metadata, dict):
+            payload_metadata["source_version_id"] = consultation_context_metadata.get(
+                "source_version_id"
+            )
+            payload_metadata["revision_version_id"] = consultation_context_metadata.get(
+                "revision_version_id"
+            )
+            payload_metadata["pipeline_run_id"] = consultation_context_metadata.get(
+                "pipeline_run_id"
+            )
+            payload_metadata["drug_analysis_entrypoint"] = (
+                consultation_context_metadata.get("drug_analysis_entrypoint")
+            )
+            payload_metadata["report_finalization_entrypoint"] = (
+                consultation_context_metadata.get("report_finalization_entrypoint")
+            )
+            payload_metadata["conclusion_entrypoint"] = (
+                consultation_context_metadata.get("conclusion_entrypoint")
+            )
+            payload_metadata["synthesis_mode"] = consultation_context_metadata.get(
+                "synthesis_mode"
+            )
+        return clinical_session, final_report, payload_metadata
 
     # -------------------------------------------------------------------------
     @staticmethod

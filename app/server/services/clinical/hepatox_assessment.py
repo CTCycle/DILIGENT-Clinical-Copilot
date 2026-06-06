@@ -36,6 +36,10 @@ from common.prompts import (
     LIVERTOX_CLINICAL_USER_PROMPT,
     LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
     LIVERTOX_CONCLUSION_USER_PROMPT,
+    LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT,
+    LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
+    LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
+    LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
 )
 from services.retrieval.embeddings import (
     EmbeddingModelMismatchError,
@@ -314,17 +318,76 @@ async def run_analysis(
     rucam_bundle: PatientRucamAssessmentBundle | None = None,
     progress_callback: Callable[[str, float], None] | None = None,
 ) -> dict[str, Any] | None:
+    return await _run_analysis_internal(
+        self,
+        prepared_inputs=prepared_inputs,
+        visit_date=visit_date,
+        report_language=report_language,
+        rag_query=rag_query,
+        rucam_bundle=rucam_bundle,
+        progress_callback=progress_callback,
+        execution_mode="standard",
+    )
+
+
+async def run_revision_analysis(
+    self,
+    *,
+    prepared_inputs: HepatoxPreparedInputs | None,
+    visit_date: date | None = None,
+    report_language: str = "en",
+    rag_query: dict[str, str] | None = None,
+    rucam_bundle: PatientRucamAssessmentBundle | None = None,
+    progress_callback: Callable[[str, float], None] | None = None,
+) -> dict[str, Any] | None:
+    return await _run_analysis_internal(
+        self,
+        prepared_inputs=prepared_inputs,
+        visit_date=visit_date,
+        report_language=report_language,
+        rag_query=rag_query,
+        rucam_bundle=rucam_bundle,
+        progress_callback=progress_callback,
+        execution_mode="revision",
+    )
+
+
+async def _run_analysis_internal(
+    self,
+    *,
+    prepared_inputs: HepatoxPreparedInputs | None,
+    visit_date: date | None,
+    report_language: str,
+    rag_query: dict[str, str] | None,
+    rucam_bundle: PatientRucamAssessmentBundle | None,
+    progress_callback: Callable[[str, float], None] | None,
+    execution_mode: str,
+) -> dict[str, Any] | None:
     if prepared_inputs is None:
-        logger.info("No prepared inputs provided; skipping hepatotoxicity consultation")
+        logger.info(
+            "No prepared inputs provided; skipping %s hepatotoxicity consultation",
+            execution_mode,
+        )
         return None
 
     resolved_mapping = prepared_inputs.resolved_drugs
     if not resolved_mapping:
-        logger.info("No matched drugs available for hepatotoxicity consultation")
+        logger.info(
+            "No matched drugs available for %s hepatotoxicity consultation",
+            execution_mode,
+        )
         return None
 
-    logger.info("Running clinical hepatotoxicity assessment for matched drugs")
-    report = await self.compile_clinical_assessment(
+    logger.info(
+        "Running %s clinical hepatotoxicity assessment for matched drugs",
+        execution_mode,
+    )
+    compile_consultation = (
+        self.compile_revision_clinical_assessment
+        if execution_mode == "revision"
+        else self.compile_clinical_assessment
+    )
+    report = await compile_consultation(
         resolved_mapping,
         clinical_context=prepared_inputs.clinical_context,
         visit_date=visit_date,
@@ -334,7 +397,15 @@ async def run_analysis(
         rucam_bundle=rucam_bundle,
         progress_callback=progress_callback,
     )
-    return report.model_dump()
+    payload = report.model_dump()
+    if execution_mode == "revision":
+        payload["revision_consultation_metadata"] = {
+            "drug_analysis_entrypoint": "request_revision_drug_analysis",
+            "report_finalization_entrypoint": "finalize_revision_patient_report",
+            "conclusion_entrypoint": "generate_revision_conclusion",
+            "synthesis_mode": "revision_comparison_aware",
+        }
+    return payload
 
 
 async def compile_clinical_assessment(
@@ -349,7 +420,66 @@ async def compile_clinical_assessment(
     rucam_bundle: PatientRucamAssessmentBundle | None = None,
     progress_callback: Callable[[str, float], None] | None = None,
 ) -> PatientDrugClinicalReport:
+    return await _compile_clinical_assessment_internal(
+        self,
+        resolved_drugs,
+        clinical_context=clinical_context,
+        visit_date=visit_date,
+        report_language=report_language,
+        pattern_prompt=pattern_prompt,
+        rag_query=rag_query,
+        rucam_bundle=rucam_bundle,
+        progress_callback=progress_callback,
+        execution_mode="standard",
+    )
+
+
+async def compile_revision_clinical_assessment(
+    self,
+    resolved_drugs: dict[str, dict[str, Any]],
+    *,
+    clinical_context: str | None,
+    visit_date: date | None,
+    report_language: str,
+    pattern_prompt: str,
+    rag_query: dict[str, str] | None = None,
+    rucam_bundle: PatientRucamAssessmentBundle | None = None,
+    progress_callback: Callable[[str, float], None] | None = None,
+) -> PatientDrugClinicalReport:
+    return await _compile_clinical_assessment_internal(
+        self,
+        resolved_drugs,
+        clinical_context=clinical_context,
+        visit_date=visit_date,
+        report_language=report_language,
+        pattern_prompt=pattern_prompt,
+        rag_query=rag_query,
+        rucam_bundle=rucam_bundle,
+        progress_callback=progress_callback,
+        execution_mode="revision",
+    )
+
+
+async def _compile_clinical_assessment_internal(
+    self,
+    resolved_drugs: dict[str, dict[str, Any]],
+    *,
+    clinical_context: str | None,
+    visit_date: date | None,
+    report_language: str,
+    pattern_prompt: str,
+    rag_query: dict[str, str] | None,
+    rucam_bundle: PatientRucamAssessmentBundle | None,
+    progress_callback: Callable[[str, float], None] | None,
+    execution_mode: str,
+) -> PatientDrugClinicalReport:
     normalized_context = clinical_context.strip() if clinical_context else ""
+    if execution_mode == "revision" and normalized_context:
+        normalized_context = (
+            normalized_context
+            + "\n\nRevision synthesis mode:\n"
+            + "Prior report content is comparison-only context. Prefer revised structured evidence and current source evidence."
+        )
     pattern_summary = (
         pattern_prompt.strip()
         or "Hepatotoxicity pattern classification was unavailable; weigh pattern matches qualitatively."
@@ -375,6 +505,7 @@ async def compile_clinical_assessment(
             pattern_summary=pattern_summary,
             rag_query=rag_query,
             rucam_by_key=rucam_by_key,
+            execution_mode=execution_mode,
         )
         entries.append(entry)
         if job:
@@ -424,7 +555,12 @@ async def compile_clinical_assessment(
 
     logger.info("Composing final clinical report for current patient")
     self.emit_progress(progress_callback, stage="report_composition", fraction=0.0)
-    final_report = await self.finalize_patient_report(
+    finalize_report = (
+        self.finalize_revision_patient_report
+        if execution_mode == "revision"
+        else self.finalize_patient_report
+    )
+    final_report = await finalize_report(
         entries,
         clinical_context=normalized_context,
         report_language=report_language,
@@ -463,6 +599,7 @@ async def prepare_drug_assessment(
     pattern_summary: str,
     rag_query: dict[str, str] | None,
     rucam_by_key: dict[str, DrugRucamAssessment],
+    execution_mode: str,
 ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
     raw_name = drug_entry.name or ""
     normalized_drug_key = normalize_drug_query_name(raw_name)
@@ -577,7 +714,12 @@ async def prepare_drug_assessment(
         return entry, None
 
     rag_documents = await self.fetch_rag_documents(rag_query, raw_name)
-    job = self.request_drug_analysis(
+    request_analysis = (
+        self.request_revision_drug_analysis
+        if execution_mode == "revision"
+        else self.request_drug_analysis
+    )
+    job = request_analysis(
         drug_name=drug_entry.name,
         canonical_name=entry.canonical_name or drug_entry.name,
         origins=entry.origins,
@@ -812,6 +954,87 @@ async def request_drug_analysis(
     knowledge_prompt: str = "No supplemental knowledge prompt available.",
     report_language: str = "en",
 ) -> str:
+    return await _request_drug_analysis_internal(
+        self,
+        drug_name=drug_name,
+        canonical_name=canonical_name,
+        origins=origins,
+        extraction_metadata=extraction_metadata,
+        livertox_status=livertox_status,
+        excerpt=excerpt,
+        rag_documents=rag_documents,
+        clinical_context=clinical_context,
+        suspension=suspension,
+        visit_date=visit_date,
+        pattern_summary=pattern_summary,
+        metadata=metadata,
+        rucam=rucam,
+        knowledge_prompt=knowledge_prompt,
+        report_language=report_language,
+        execution_mode="standard",
+    )
+
+
+async def request_revision_drug_analysis(
+    self,
+    *,
+    drug_name: str,
+    canonical_name: str,
+    origins: list[str],
+    extraction_metadata: list[dict[str, Any]],
+    livertox_status: str,
+    excerpt: str,
+    rag_documents: str | None,
+    clinical_context: str,
+    suspension: DrugSuspensionContext,
+    visit_date: date | None,
+    pattern_summary: str,
+    metadata: dict[str, Any] | None,
+    rucam: DrugRucamAssessment | None,
+    knowledge_prompt: str = "No supplemental knowledge prompt available.",
+    report_language: str = "en",
+) -> str:
+    return await _request_drug_analysis_internal(
+        self,
+        drug_name=drug_name,
+        canonical_name=canonical_name,
+        origins=origins,
+        extraction_metadata=extraction_metadata,
+        livertox_status=livertox_status,
+        excerpt=excerpt,
+        rag_documents=rag_documents,
+        clinical_context=clinical_context,
+        suspension=suspension,
+        visit_date=visit_date,
+        pattern_summary=pattern_summary,
+        metadata=metadata,
+        rucam=rucam,
+        knowledge_prompt=knowledge_prompt,
+        report_language=report_language,
+        execution_mode="revision",
+    )
+
+
+async def _request_drug_analysis_internal(
+    self,
+    *,
+    drug_name: str,
+    canonical_name: str,
+    origins: list[str],
+    extraction_metadata: list[dict[str, Any]],
+    livertox_status: str,
+    excerpt: str,
+    rag_documents: str | None,
+    clinical_context: str,
+    suspension: DrugSuspensionContext,
+    visit_date: date | None,
+    pattern_summary: str,
+    metadata: dict[str, Any] | None,
+    rucam: DrugRucamAssessment | None,
+    knowledge_prompt: str,
+    report_language: str,
+    execution_mode: str,
+) -> str:
     start_details = self.format_start_prompt(suspension)
     suspension_details = self.format_suspension_prompt(suspension)
     timeline_note = (
@@ -835,7 +1058,17 @@ async def request_drug_analysis(
         "\n".join(metadata_items) if metadata_items else "- Not available"
     )
     rucam_block = self.format_rucam_prompt_block(rucam)
-    user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
+    user_template = (
+        LIVERTOX_REVISION_CLINICAL_USER_PROMPT
+        if execution_mode == "revision"
+        else LIVERTOX_CLINICAL_USER_PROMPT
+    )
+    system_template = (
+        LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT
+        if execution_mode == "revision"
+        else LIVERTOX_CLINICAL_SYSTEM_PROMPT
+    )
+    user_prompt = user_template.format(
         drug_name=self.escape_braces(drug_name.strip() or drug_name),
         report_language=self.escape_braces(report_language),
         canonical_name=self.escape_braces(canonical_name.strip() or canonical_name),
@@ -856,7 +1089,7 @@ async def request_drug_analysis(
         livertox_score=self.escape_braces(score),
     )
     messages = [
-        {"role": "system", "content": LIVERTOX_CLINICAL_SYSTEM_PROMPT.strip()},
+        {"role": "system", "content": system_template.strip()},
         {"role": "user", "content": user_prompt},
     ]
     chat_kwargs: dict[str, Any] = {
@@ -947,6 +1180,39 @@ async def finalize_patient_report(
     clinical_context: str | None,
     report_language: str,
 ) -> str | None:
+    return await _finalize_patient_report_internal(
+        self,
+        entries,
+        clinical_context=clinical_context,
+        report_language=report_language,
+        execution_mode="standard",
+    )
+
+
+async def finalize_revision_patient_report(
+    self,
+    entries: list[DrugClinicalAssessment],
+    *,
+    clinical_context: str | None,
+    report_language: str,
+) -> str | None:
+    return await _finalize_patient_report_internal(
+        self,
+        entries,
+        clinical_context=clinical_context,
+        report_language=report_language,
+        execution_mode="revision",
+    )
+
+
+async def _finalize_patient_report_internal(
+    self,
+    entries: list[DrugClinicalAssessment],
+    *,
+    clinical_context: str | None,
+    report_language: str,
+    execution_mode: str,
+) -> str | None:
     matched_entries: list[DrugClinicalAssessment] = []
     unresolved_entries: list[DrugClinicalAssessment] = []
     for entry in entries:
@@ -979,7 +1245,12 @@ async def finalize_patient_report(
 
     combined_report = "\n\n---\n\n".join(sections)
     if matched_sections:
-        conclusion = await self.generate_conclusion(
+        generate_conclusion = (
+            self.generate_revision_conclusion
+            if execution_mode == "revision"
+            else self.generate_conclusion
+        )
+        conclusion = await generate_conclusion(
             clinical_context=clinical_context or "",
             multi_drug_report="\n\n---\n\n".join(matched_sections),
             report_language=report_language,
@@ -1002,19 +1273,62 @@ async def generate_conclusion(
     multi_drug_report: str,
     report_language: str,
 ) -> str | None:
+    return await _generate_conclusion_internal(
+        self,
+        clinical_context=clinical_context,
+        multi_drug_report=multi_drug_report,
+        report_language=report_language,
+        execution_mode="standard",
+    )
+
+
+async def generate_revision_conclusion(
+    self,
+    *,
+    clinical_context: str,
+    multi_drug_report: str,
+    report_language: str,
+) -> str | None:
+    return await _generate_conclusion_internal(
+        self,
+        clinical_context=clinical_context,
+        multi_drug_report=multi_drug_report,
+        report_language=report_language,
+        execution_mode="revision",
+    )
+
+
+async def _generate_conclusion_internal(
+    self,
+    *,
+    clinical_context: str,
+    multi_drug_report: str,
+    report_language: str,
+    execution_mode: str,
+) -> str | None:
     report_body = multi_drug_report.strip()
     if not report_body:
         return None
     context_body = clinical_context.strip()
     if not context_body:
         context_body = "No clinical context was provided."
-    user_prompt = LIVERTOX_CONCLUSION_USER_PROMPT.format(
+    user_template = (
+        LIVERTOX_REVISION_CONCLUSION_USER_PROMPT
+        if execution_mode == "revision"
+        else LIVERTOX_CONCLUSION_USER_PROMPT
+    )
+    system_template = (
+        LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT
+        if execution_mode == "revision"
+        else LIVERTOX_CONCLUSION_SYSTEM_PROMPT
+    )
+    user_prompt = user_template.format(
         report_language=self.escape_braces(report_language),
         clinical_context=self.escape_braces(context_body),
         multi_drug_report=self.escape_braces(report_body),
     )
     messages = [
-        {"role": "system", "content": LIVERTOX_CONCLUSION_SYSTEM_PROMPT.strip()},
+        {"role": "system", "content": system_template.strip()},
         {"role": "user", "content": user_prompt},
     ]
     chat_kwargs: dict[str, Any] = {

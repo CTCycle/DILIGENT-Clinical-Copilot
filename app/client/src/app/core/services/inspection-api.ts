@@ -26,8 +26,13 @@ import {
   ClinicalSessionRevisionRequest,
   ClinicalSessionUpdateRequest,
   RevisionArtifactListResponse,
+  RevisionEntityListResponse,
+  RevisionClinicalReviewActionListResponse,
+  RevisionClinicalReviewUpdateRequest,
+  RevisionClinicalReviewUpdateResponse,
   RevisionPipelineRun,
   RevisionPipelineStepListResponse,
+  SessionVersionComparisonResponse,
   SessionVersionDetailResponse,
   SessionVersionListResponse,
 } from "../models/types";
@@ -89,6 +94,17 @@ export async function fetchClinicalSessionVersionDetail(
   );
 }
 
+export async function fetchClinicalSessionVersionComparison(
+  sessionId: number,
+  leftVersionId: number,
+  rightVersionId: number,
+): Promise<SessionVersionComparisonResponse> {
+  return requestJson<SessionVersionComparisonResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(leftVersionId))}/compare/${encodeURIComponent(String(rightVersionId))}`,
+    { method: "GET" },
+  );
+}
+
 export async function fetchClinicalSessionRevisionArtifacts(
   sessionId: number,
   versionId: number,
@@ -96,6 +112,43 @@ export async function fetchClinicalSessionRevisionArtifacts(
   return requestJson<RevisionArtifactListResponse>(
     `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/artifacts`,
     { method: "GET" },
+  );
+}
+
+export async function fetchClinicalSessionRevisionEntities(
+  sessionId: number,
+  versionId: number,
+): Promise<RevisionEntityListResponse> {
+  return requestJson<RevisionEntityListResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/entities`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchClinicalSessionRevisionReviews(
+  sessionId: number,
+  versionId: number,
+): Promise<RevisionClinicalReviewActionListResponse> {
+  return requestJson<RevisionClinicalReviewActionListResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/reviews`,
+    { method: "GET" },
+  );
+}
+
+export async function updateClinicalSessionRevisionClinicalReview(
+  sessionId: number,
+  versionId: number,
+  payload: RevisionClinicalReviewUpdateRequest,
+): Promise<RevisionClinicalReviewUpdateResponse> {
+  return requestJson<RevisionClinicalReviewUpdateResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/clinical-review`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
   );
 }
 

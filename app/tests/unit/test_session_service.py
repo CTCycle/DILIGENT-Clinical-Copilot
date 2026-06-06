@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 from common.exceptions import ServiceValidationError
 from domain.clinical.entities import ClinicalSessionRequest
+from domain.clinical.extras import HepatoxPreparedInputs
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 from services.session.session_service import ClinicalSessionService
@@ -138,3 +139,76 @@ def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) ->
     resolved = ClinicalSessionService._resolve_consultation_timeout()
 
     assert resolved == 5400.0
+
+
+def test_run_revision_consultation_uses_revision_analysis_entrypoint(
+    monkeypatch,
+) -> None:
+    service = _build_service()
+    payload = SimpleNamespace(name="Revision Patient", visit_date=date(2025, 1, 15))
+    analysis_drugs = SimpleNamespace(entries=[SimpleNamespace(name="Drug X")])
+    prepared_inputs = HepatoxPreparedInputs(
+        resolved_drugs={"drug-x": {"canonical_name": "Drug X"}},
+        pattern_prompt="Pattern prompt",
+        clinical_context="Revision context",
+    )
+
+    class FakeConsultation:
+        def __init__(self, drugs, *, patient_name=None):
+            self.drugs = drugs
+            self.patient_name = patient_name
+            self.llm_model = "revision-model"
+            self.pipeline_issues = []
+
+        async def run_analysis(self, **kwargs):
+            raise AssertionError(
+                "Revision consultation should not call run_analysis"
+            )
+
+        async def run_revision_analysis(self, **kwargs):
+            assert kwargs["prepared_inputs"].clinical_context == "Revision context"
+            return {
+                "final_report": "Revision synthesis report",
+                "revision_consultation_metadata": {
+                    "drug_analysis_entrypoint": "request_revision_drug_analysis",
+                    "report_finalization_entrypoint": "finalize_revision_patient_report",
+                    "conclusion_entrypoint": "generate_revision_conclusion",
+                    "synthesis_mode": "revision_comparison_aware",
+                },
+            }
+
+    monkeypatch.setattr(service, "hepatox_consultation_cls", FakeConsultation)
+
+    clinical_session, final_report, payload_metadata = asyncio.run(
+        service.run_revision_consultation(
+            payload=payload,
+            analysis_drugs=analysis_drugs,
+            prepared_inputs=prepared_inputs,
+            consultation_context="Revision context",
+            consultation_context_metadata={
+                "source_version_id": 11,
+                "revision_version_id": 12,
+                "pipeline_run_id": "pipe-123",
+            },
+            report_language="en",
+            rag_query=None,
+            rucam_bundle=None,
+            issues=[],
+            progress_callback=None,
+            stop_check=None,
+        )
+    )
+
+    assert clinical_session.llm_model == "revision-model"
+    assert final_report == "Revision synthesis report"
+    assert payload_metadata["execution_mode"] == "revision"
+    assert payload_metadata["analysis_entrypoint"] == "run_revision_analysis"
+    assert payload_metadata["consultation_model"] == "revision-model"
+    assert payload_metadata["drug_analysis_entrypoint"] == "request_revision_drug_analysis"
+    assert (
+        payload_metadata["report_finalization_entrypoint"]
+        == "finalize_revision_patient_report"
+    )
+    assert payload_metadata["conclusion_entrypoint"] == "generate_revision_conclusion"
+    assert payload_metadata["synthesis_mode"] == "revision_comparison_aware"
+    assert payload_metadata["pipeline_run_id"] == "pipe-123"

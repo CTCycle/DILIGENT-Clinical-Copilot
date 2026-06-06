@@ -425,6 +425,64 @@ class DataSerializer:
         )
 
     # -----------------------------------------------------------------------------
+    def persist_revision_entities(
+        self,
+        *,
+        pipeline_run_id: str,
+        revision_version_id: int,
+        source_version_id: int | None,
+        result_payload: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        return session_revision_data.persist_revision_entities(
+            self,
+            pipeline_run_id=pipeline_run_id,
+            revision_version_id=revision_version_id,
+            source_version_id=source_version_id,
+            result_payload=result_payload,
+        )
+
+    # -----------------------------------------------------------------------------
+    def list_revision_entities_for_version(
+        self,
+        *,
+        revision_version_id: int,
+    ) -> list[dict[str, Any]]:
+        return session_revision_data.list_revision_entities_for_version(
+            self,
+            revision_version_id=revision_version_id,
+        )
+
+    # -----------------------------------------------------------------------------
+    def record_revision_review_action(
+        self,
+        *,
+        revision_version_id: int,
+        clinical_review_status: str,
+        reviewer_note: str | None,
+        reviewed_by: str | None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        return session_revision_data.record_revision_review_action(
+            self,
+            revision_version_id=revision_version_id,
+            clinical_review_status=clinical_review_status,
+            reviewer_note=reviewer_note,
+            reviewed_by=reviewed_by,
+            metadata=metadata,
+        )
+
+    # -----------------------------------------------------------------------------
+    def list_revision_reviews_for_version(
+        self,
+        *,
+        revision_version_id: int,
+    ) -> list[dict[str, Any]]:
+        return session_revision_data.list_revision_reviews_for_version(
+            self,
+            revision_version_id=revision_version_id,
+        )
+
+    # -----------------------------------------------------------------------------
     def start_revision_step(
         self,
         *,

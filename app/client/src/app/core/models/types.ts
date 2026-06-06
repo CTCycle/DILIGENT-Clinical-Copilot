@@ -325,6 +325,56 @@ export type SessionVersionDetailResponse = {
   session: ClinicalSessionDetail | null;
 };
 
+export type RevisionEntityDiff = {
+  entity_type: string;
+  normalized_name: string | null;
+  source_section: string | null;
+  change_type: "added" | "removed" | "corrected" | "replaced" | "unresolved" | "unchanged";
+  summary: string;
+  requires_human_review: boolean;
+  left_entity: Record<string, unknown> | null;
+  right_entity: Record<string, unknown> | null;
+};
+
+export type ReportTextDiff = {
+  changed: boolean;
+  left_character_count: number;
+  right_character_count: number;
+  left_line_count: number;
+  right_line_count: number;
+  similarity_ratio: number;
+  diff_lines: string[];
+};
+
+export type RevisionQaSummary = {
+  left_llm_qa_status: string;
+  right_llm_qa_status: string;
+  left_clinical_review_status: string;
+  right_clinical_review_status: string;
+  left_version_status: string;
+  right_version_status: string;
+  left_warning_count: number;
+  right_warning_count: number;
+  left_blocking_issue_count: number;
+  right_blocking_issue_count: number;
+  left_finding_count: number;
+  right_finding_count: number;
+  manual_review_required: boolean;
+};
+
+export type SessionVersionComparisonResponse = {
+  left_version: SessionVersionSummary;
+  right_version: SessionVersionSummary;
+  added_entities: RevisionEntityDiff[];
+  removed_entities: RevisionEntityDiff[];
+  corrected_entities: RevisionEntityDiff[];
+  replaced_entities: RevisionEntityDiff[];
+  unresolved_entities: RevisionEntityDiff[];
+  unchanged_entities: RevisionEntityDiff[];
+  report_text_diff: ReportTextDiff;
+  qa_summary: RevisionQaSummary;
+};
+
 export type RevisionPipelineRun = {
   pipeline_run_id: string;
   session_id: number;
@@ -407,6 +457,74 @@ export type RevisionArtifact = {
 
 export type RevisionArtifactListResponse = {
   items: RevisionArtifact[];
+};
+
+export type RevisionEntity = {
+  revision_version_id: number;
+  source_version_id: number | null;
+  pipeline_run_id: string;
+  step_name: string;
+  entity_type: "drug" | "disease" | "lab_timeline_entry" | "livertox_match" | "dili_assessment";
+  entity_revision_status: string;
+  source_section: string | null;
+  original_entity_id: string | null;
+  original_name: string | null;
+  revised_name: string | null;
+  normalized_name: string | null;
+  requires_human_review: boolean;
+  human_review_status: string | null;
+  payload: Record<string, unknown> | null;
+  schema_name: string | null;
+  schema_version: string | null;
+  prompt_version: string | null;
+  parser_version: string | null;
+  model_provider: string | null;
+  model_name: string | null;
+  input_hash: string | null;
+  output_hash: string | null;
+  created_at: string;
+  superseded_at: string | null;
+};
+
+export type RevisionEntityListResponse = {
+  items: RevisionEntity[];
+};
+
+export type RevisionClinicalReviewStatus =
+  | "under_review"
+  | "approved_by_human"
+  | "rejected_by_human";
+
+export type RevisionClinicalReviewAction = {
+  revision_version_id: number;
+  session_id: number | null;
+  clinical_review_status: RevisionClinicalReviewStatus;
+  reviewer_note: string | null;
+  reviewed_by: string | null;
+  actor_id: string | null;
+  actor_display_name: string | null;
+  actor_source: "authenticated_user" | "local_profile" | "manual_entry" | "system" | "unknown";
+  actor_confidence: "verified" | "unverified" | "system";
+  metadata: Record<string, unknown>;
+  reviewed_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RevisionClinicalReviewActionListResponse = {
+  items: RevisionClinicalReviewAction[];
+};
+
+export type RevisionClinicalReviewUpdateRequest = {
+  clinical_review_status: RevisionClinicalReviewStatus;
+  reviewer_note?: string | null;
+  reviewed_by?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type RevisionClinicalReviewUpdateResponse = {
+  version: SessionVersionSummary;
+  review_action: RevisionClinicalReviewAction;
 };
 
 export type ClinicalSessionRevisionRequest = {

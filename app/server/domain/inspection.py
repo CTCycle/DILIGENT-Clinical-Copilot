@@ -190,6 +190,71 @@ class SessionVersionDetailResponse(BaseModel):
 
 
 ###############################################################################
+class RevisionEntityDiff(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    entity_type: str
+    normalized_name: str | None = None
+    source_section: str | None = None
+    change_type: Literal[
+        "added",
+        "removed",
+        "corrected",
+        "replaced",
+        "unresolved",
+        "unchanged",
+    ]
+    summary: str
+    requires_human_review: bool = False
+    left_entity: dict[str, Any] | None = None
+    right_entity: dict[str, Any] | None = None
+
+
+###############################################################################
+class ReportTextDiff(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    changed: bool
+    left_character_count: int
+    right_character_count: int
+    left_line_count: int
+    right_line_count: int
+    similarity_ratio: float
+    diff_lines: list[str] = Field(default_factory=list)
+
+
+###############################################################################
+class RevisionQaSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    left_llm_qa_status: str
+    right_llm_qa_status: str
+    left_clinical_review_status: str
+    right_clinical_review_status: str
+    left_version_status: str
+    right_version_status: str
+    left_warning_count: int = 0
+    right_warning_count: int = 0
+    left_blocking_issue_count: int = 0
+    right_blocking_issue_count: int = 0
+    left_finding_count: int = 0
+    right_finding_count: int = 0
+    manual_review_required: bool = False
+
+
+###############################################################################
+class SessionVersionComparisonResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    left_version: SessionVersionSummary
+    right_version: SessionVersionSummary
+    added_entities: list[RevisionEntityDiff] = Field(default_factory=list)
+    removed_entities: list[RevisionEntityDiff] = Field(default_factory=list)
+    corrected_entities: list[RevisionEntityDiff] = Field(default_factory=list)
+    replaced_entities: list[RevisionEntityDiff] = Field(default_factory=list)
+    unresolved_entities: list[RevisionEntityDiff] = Field(default_factory=list)
+    unchanged_entities: list[RevisionEntityDiff] = Field(default_factory=list)
+    report_text_diff: ReportTextDiff
+    qa_summary: RevisionQaSummary
+
+
+###############################################################################
 class RevisionPipelineRunResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     pipeline_run_id: str
@@ -282,6 +347,97 @@ class RevisionArtifactResponse(BaseModel):
 class RevisionArtifactListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[RevisionArtifactResponse] = Field(default_factory=list)
+
+
+###############################################################################
+class RevisionEntityResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision_version_id: int
+    source_version_id: int | None = None
+    pipeline_run_id: str
+    step_name: str
+    entity_type: Literal[
+        "drug",
+        "disease",
+        "lab_timeline_entry",
+        "livertox_match",
+        "dili_assessment",
+    ]
+    entity_revision_status: str
+    source_section: str | None = None
+    original_entity_id: str | None = None
+    original_name: str | None = None
+    revised_name: str | None = None
+    normalized_name: str | None = None
+    requires_human_review: bool
+    human_review_status: str | None = None
+    payload: dict[str, Any] | None = None
+    schema_name: str | None = None
+    schema_version: str | None = None
+    prompt_version: str | None = None
+    parser_version: str | None = None
+    model_provider: str | None = None
+    model_name: str | None = None
+    input_hash: str | None = None
+    output_hash: str | None = None
+    created_at: datetime
+    superseded_at: datetime | None = None
+
+
+###############################################################################
+class RevisionEntityListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[RevisionEntityResponse] = Field(default_factory=list)
+
+
+###############################################################################
+class RevisionClinicalReviewActionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision_version_id: int
+    session_id: int | None = None
+    clinical_review_status: Literal[
+        "under_review",
+        "approved_by_human",
+        "rejected_by_human",
+    ]
+    reviewer_note: str | None = None
+    reviewed_by: str | None = None
+    actor_id: str | None = None
+    actor_display_name: str | None = None
+    actor_source: Literal[
+        "authenticated_user", "local_profile", "manual_entry", "system", "unknown"
+    ]
+    actor_confidence: Literal["verified", "unverified", "system"]
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    reviewed_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+###############################################################################
+class RevisionClinicalReviewActionListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[RevisionClinicalReviewActionResponse] = Field(default_factory=list)
+
+
+###############################################################################
+class RevisionClinicalReviewUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    clinical_review_status: Literal[
+        "under_review",
+        "approved_by_human",
+        "rejected_by_human",
+    ]
+    reviewer_note: str | None = Field(default=None, max_length=2000)
+    reviewed_by: str | None = Field(default=None, max_length=200)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+###############################################################################
+class RevisionClinicalReviewUpdateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: SessionVersionSummary
+    review_action: RevisionClinicalReviewActionResponse
 
 
 ###############################################################################

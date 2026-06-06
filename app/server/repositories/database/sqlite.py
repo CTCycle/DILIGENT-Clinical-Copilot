@@ -19,7 +19,7 @@ from repositories.serialization.catalogs import ReferenceCatalogSerializer
 class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
         self.db_path = DATABASE_FILE_PATH
-        should_initialize_schema = bool(self.db_path and not self.db_path.exists())
+        db_file_missing = bool(self.db_path and not self.db_path.exists())
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.engine: Engine = sqlalchemy.create_engine(
             f"sqlite:///{self.db_path}",
@@ -32,14 +32,19 @@ class SQLiteRepository:
             future=True,
             expire_on_commit=False,
         )
-        if should_initialize_schema:
-            Base.metadata.create_all(self.engine)
-            AccessKeyEncryptionMaterialSerializer(
-                engine=self.engine,
-                session_factory=seed_session_factory,
-            ).ensure_seeded("provider_access_keys")
+        Base.metadata.create_all(self.engine)
+        AccessKeyEncryptionMaterialSerializer(
+            engine=self.engine,
+            session_factory=seed_session_factory,
+        ).ensure_seeded("provider_access_keys")
+        if db_file_missing:
             logger.info(
                 "SQLite DB file was missing; created and initialized schema at %s",
+                str(self.db_path),
+            )
+        else:
+            logger.info(
+                "SQLite DB file already existed; ensured additive schema and encryption material at %s",
                 str(self.db_path),
             )
         self.session_factory = sessionmaker(bind=self.engine, future=True)

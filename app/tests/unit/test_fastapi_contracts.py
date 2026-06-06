@@ -42,3 +42,22 @@ def test_stable_json_routes_declare_response_models() -> None:
             violations.append(f"{methods} {route.path}")
 
     assert not violations, "Routes missing response_model:\n" + "\n".join(violations)
+
+
+def test_inspection_revision_routes_are_present_in_openapi() -> None:
+    schema = app.openapi()
+    expected_paths = [
+        "/api/inspection/sessions/{session_id}/versions",
+        "/api/inspection/sessions/{session_id}/versions/{version_id}",
+        "/api/inspection/sessions/{session_id}/versions/{left_version_id}/compare/{right_version_id}",
+        "/api/inspection/sessions/{session_id}/report",
+        "/api/inspection/sessions/{session_id}/manual-edits",
+        "/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}",
+        "/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/retry",
+        "/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/steps",
+    ]
+
+    missing_paths = [path for path in expected_paths if path not in schema["paths"]]
+    assert not missing_paths, "OpenAPI missing inspection paths:\n" + "\n".join(
+        missing_paths
+    )

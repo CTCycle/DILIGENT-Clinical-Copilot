@@ -23,9 +23,14 @@ from domain.inspection import (
     RagDocumentListResponse,
     ReferenceCatalogRuntimeObservationResponse,
     ReferenceCatalogRuntimeObservationUpsertRequest,
+    RevisionEntityListResponse,
+    RevisionClinicalReviewActionListResponse,
+    RevisionClinicalReviewUpdateRequest,
+    RevisionClinicalReviewUpdateResponse,
+    RevisionArtifactListResponse,
+    SessionVersionComparisonResponse,
     RevisionPipelineRunResponse,
     RevisionPipelineStepListResponse,
-    RevisionArtifactListResponse,
     RxNavCatalogResponse,
     SessionCatalogResponse,
     SessionDetailResponse,
@@ -358,6 +363,99 @@ class DataInspectionEndpoint:
             revision_version_id=version_id,
         )
         return RevisionArtifactListResponse(items=payload)
+
+    # -------------------------------------------------------------------------
+    def compare_session_versions(
+        self,
+        session_id: int,
+        left_version_id: int,
+        right_version_id: int,
+    ) -> SessionVersionComparisonResponse:
+        try:
+            payload = self.service.compare_session_versions(
+                session_id,
+                left_version_id=left_version_id,
+                right_version_id=right_version_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+        if payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session version comparison target not found.",
+            )
+        return SessionVersionComparisonResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def list_session_revision_entities(
+        self,
+        session_id: int,
+        version_id: int,
+    ) -> RevisionEntityListResponse:
+        detail = self.service.get_session_version_detail(
+            session_id,
+            version_id=version_id,
+        )
+        if detail is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session version not found.",
+            )
+        payload = self.service.list_revision_entities(
+            revision_version_id=version_id,
+        )
+        return RevisionEntityListResponse(items=payload)
+
+    # -------------------------------------------------------------------------
+    def list_session_revision_reviews(
+        self,
+        session_id: int,
+        version_id: int,
+    ) -> RevisionClinicalReviewActionListResponse:
+        detail = self.service.get_session_version_detail(
+            session_id,
+            version_id=version_id,
+        )
+        if detail is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session version not found.",
+            )
+        payload = self.service.list_revision_reviews(
+            revision_version_id=version_id,
+        )
+        return RevisionClinicalReviewActionListResponse(items=payload)
+
+    # -------------------------------------------------------------------------
+    def update_session_revision_clinical_review(
+        self,
+        session_id: int,
+        version_id: int,
+        request: RevisionClinicalReviewUpdateRequest,
+    ) -> RevisionClinicalReviewUpdateResponse:
+        try:
+            payload = self.service.update_revision_clinical_review(
+                session_id,
+                version_id=version_id,
+                clinical_review_status=request.clinical_review_status,
+                reviewer_note=request.reviewer_note,
+                reviewed_by=request.reviewed_by,
+                metadata=request.metadata,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+        if payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session version not found.",
+            )
+        return RevisionClinicalReviewUpdateResponse(**payload)
 
     # -------------------------------------------------------------------------
     def get_session_timeline(self, session_id: int) -> PatientTimeline:
@@ -751,6 +849,34 @@ class DataInspectionEndpoint:
             self.list_session_revision_artifacts,
             methods=["GET"],
             response_model=RevisionArtifactListResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/versions/{left_version_id}/compare/{right_version_id}",
+            self.compare_session_versions,
+            methods=["GET"],
+            response_model=SessionVersionComparisonResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/versions/{version_id}/entities",
+            self.list_session_revision_entities,
+            methods=["GET"],
+            response_model=RevisionEntityListResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/versions/{version_id}/reviews",
+            self.list_session_revision_reviews,
+            methods=["GET"],
+            response_model=RevisionClinicalReviewActionListResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/versions/{version_id}/clinical-review",
+            self.update_session_revision_clinical_review,
+            methods=["PUT"],
+            response_model=RevisionClinicalReviewUpdateResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

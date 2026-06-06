@@ -15,10 +15,19 @@ Recommended workflow:
 1. Open **Clinical Sessions**.
 2. Locate the target session by identifier, date, or metadata.
 3. Select the session.
-4. Review saved input and output.
-5. Use copy or inspection controls if needed.
+4. Use **Text Editor** for direct in-place manual report edits.
+5. Use **LLM Revision** to create a new draft revision version when a model-assisted rewrite is needed.
+6. Use **Official Version History** to inspect version lineage separately from **Manual Edit History**.
+7. Use **Version Comparison** to compare the selected official version against its source or another persisted official version using backend-computed entity and report diffs.
+8. Use **Human Clinical Review** to mark a revision version `under_review`, `approved_by_human`, or `rejected_by_human`.
+9. Review **Revision QA And Artifacts**, **Revision Consultation Provenance**, **Revision Finalization Provenance**, **Persisted Revision Entities**, and persisted pipeline steps before approving an LLM-assisted revision.
 
 If a session is missing, confirm that the assessment completed successfully and that local persistence is initialized.
+
+Important distinctions:
+- Manual report edits do not create a new official version.
+- LLM-assisted revision creates a new versioned draft and keeps the previous version unchanged.
+- Human clinical review status is separate from LLM QA status.
 
 ## Use Patient Timeline
 Open **Patient Timeline** from the sidebar.
