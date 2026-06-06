@@ -233,6 +233,77 @@ def serialize_revision_review_row(
     }
 
 
+def _create_revision_artifact_row(
+    self,
+    *,
+    revision_version_id: int,
+    pipeline_run_id: str,
+    artifact_kind: str,
+    artifact_key: str | None = None,
+    entity_type: str | None = None,
+    entity_name: str | None = None,
+    status: str | None = None,
+    schema_version: str | None = "1",
+    payload: dict[str, Any] | None = None,
+) -> ClinicalSessionRevisionArtifact:
+    return ClinicalSessionRevisionArtifact(
+        revision_version_id=revision_version_id,
+        pipeline_run_id=pipeline_run_id,
+        artifact_kind=artifact_kind,
+        artifact_key=self.normalize_string(artifact_key),
+        entity_type=self.normalize_string(entity_type),
+        entity_name=self.normalize_string(entity_name),
+        status=self.normalize_string(status),
+        schema_version=self.normalize_string(schema_version),
+        payload_json=self.serialize_json_payload(payload),
+    )
+
+
+def _create_revision_entity_row(
+    self,
+    *,
+    revision_version_id: int,
+    source_version_id: int | None,
+    pipeline_run_id: str,
+    step_name: str,
+    entity_type: str,
+    entity_revision_status: str = "active",
+    source_section: str,
+    original_entity_id: str | None,
+    original_name: str | None,
+    revised_name: str | None,
+    normalized_name: str | None,
+    requires_human_review: bool,
+    payload: dict[str, Any],
+    schema_name: str,
+) -> ClinicalSessionRevisionEntity:
+    return ClinicalSessionRevisionEntity(
+        revision_version_id=revision_version_id,
+        source_version_id=source_version_id,
+        pipeline_run_id=pipeline_run_id,
+        step_name=step_name,
+        entity_type=entity_type,
+        entity_revision_status=entity_revision_status,
+        source_section=self.normalize_string(source_section),
+        original_entity_id=self.normalize_string(original_entity_id),
+        original_name=self.normalize_string(original_name),
+        revised_name=self.normalize_string(revised_name),
+        normalized_name=self.normalize_string(normalized_name),
+        requires_human_review=bool(requires_human_review),
+        human_review_status=("required" if requires_human_review else "not_required"),
+        payload_json=self.serialize_json_payload(payload),
+        schema_name=schema_name,
+        schema_version=REVISION_ENTITY_SCHEMA_VERSION,
+        prompt_version=None,
+        parser_version=None,
+        model_provider=None,
+        model_name=None,
+        input_hash=None,
+        output_hash=build_payload_hash(payload),
+        superseded_at=None,
+    )
+
+
 def serialize_revision_entity_row(
     self,
     row: ClinicalSessionRevisionEntity,
@@ -676,30 +747,6 @@ def persist_revision_artifacts(
 
         created_rows: list[ClinicalSessionRevisionArtifact] = []
 
-        def add_artifact(
-            *,
-            artifact_kind: str,
-            artifact_key: str | None = None,
-            entity_type: str | None = None,
-            entity_name: str | None = None,
-            status: str | None = None,
-            schema_version: str | None = "1",
-            payload: dict[str, Any] | None = None,
-        ) -> None:
-            row = ClinicalSessionRevisionArtifact(
-                revision_version_id=safe_revision_version_id,
-                pipeline_run_id=safe_pipeline_run_id,
-                artifact_kind=artifact_kind,
-                artifact_key=self.normalize_string(artifact_key),
-                entity_type=self.normalize_string(entity_type),
-                entity_name=self.normalize_string(entity_name),
-                status=self.normalize_string(status),
-                schema_version=self.normalize_string(schema_version),
-                payload_json=self.serialize_json_payload(payload),
-            )
-            db_session.add(row)
-            created_rows.append(row)
-
         structured_case = result_payload.get("structured_case")
         if isinstance(structured_case, dict):
             for entity_type in ("therapy_drugs", "anamnesis_drugs", "anamnesis_diseases"):
@@ -710,7 +757,10 @@ def persist_revision_artifacts(
                     if not isinstance(entry, dict):
                         continue
                     entity_name = entry.get("name") or entry.get("drug_name")
-                    add_artifact(
+                    row = _create_revision_artifact_row(
+                        self,
+                        revision_version_id=safe_revision_version_id,
+                        pipeline_run_id=safe_pipeline_run_id,
                         artifact_kind="structured_case_entity",
                         artifact_key=f"{entity_type}:{index}",
                         entity_type=entity_type,
@@ -718,6 +768,8 @@ def persist_revision_artifacts(
                         status="derived",
                         payload=entry,
                     )
+                    db_session.add(row)
+                    created_rows.append(row)
 
         faithfulness_audit = None
         pipeline_artifacts = result_payload.get("pipeline_artifacts")
@@ -725,7 +777,10 @@ def persist_revision_artifacts(
             raw_faithfulness_audit = pipeline_artifacts.get("faithfulness_audit")
             if isinstance(raw_faithfulness_audit, dict):
                 faithfulness_audit = raw_faithfulness_audit
-                add_artifact(
+                row = _create_revision_artifact_row(
+                    self,
+                    revision_version_id=safe_revision_version_id,
+                    pipeline_run_id=safe_pipeline_run_id,
                     artifact_kind="llm_qa_output",
                     artifact_key="faithfulness_audit",
                     status=(
@@ -743,45 +798,70 @@ def persist_revision_artifacts(
                         "blocking_issues": result_payload.get("blocking_issues") or [],
                     },
                 )
+                db_session.add(row)
+                created_rows.append(row)
             fact_graph_validation = pipeline_artifacts.get("fact_graph_validation")
             if isinstance(fact_graph_validation, dict):
-                add_artifact(
+                row = _create_revision_artifact_row(
+                    self,
+                    revision_version_id=safe_revision_version_id,
+                    pipeline_run_id=safe_pipeline_run_id,
                     artifact_kind="pipeline_artifact",
                     artifact_key="fact_graph_validation",
                     status="derived",
                     payload=fact_graph_validation,
                 )
+                db_session.add(row)
+                created_rows.append(row)
 
         report_comparison = result_payload.get("report_comparison")
         if isinstance(report_comparison, dict):
-            add_artifact(
+            row = _create_revision_artifact_row(
+                self,
+                revision_version_id=safe_revision_version_id,
+                pipeline_run_id=safe_pipeline_run_id,
                 artifact_kind="report_comparison",
                 artifact_key="report_comparison",
                 status=self.normalize_string(str(report_comparison.get("outcome") or "")),
                 payload=report_comparison,
             )
+            db_session.add(row)
+            created_rows.append(row)
 
         revision_payload = result_payload.get("revision")
         if isinstance(revision_payload, dict):
             instruction_profile = revision_payload.get("instruction_profile")
             if isinstance(instruction_profile, dict):
-                add_artifact(
+                row = _create_revision_artifact_row(
+                    self,
+                    revision_version_id=safe_revision_version_id,
+                    pipeline_run_id=safe_pipeline_run_id,
                     artifact_kind="pipeline_artifact",
                     artifact_key="reviewer_instruction_profile",
                     status="derived",
                     payload=instruction_profile,
                 )
+                db_session.add(row)
+                created_rows.append(row)
             instruction_trace = revision_payload.get("instruction_trace")
             if isinstance(instruction_trace, dict):
-                add_artifact(
+                row = _create_revision_artifact_row(
+                    self,
+                    revision_version_id=safe_revision_version_id,
+                    pipeline_run_id=safe_pipeline_run_id,
                     artifact_kind="pipeline_artifact",
                     artifact_key="reviewer_instruction_trace",
                     status="derived",
                     payload=instruction_trace,
                 )
+                db_session.add(row)
+                created_rows.append(row)
             final_report_rebuild = revision_payload.get("final_report_rebuild")
             if isinstance(final_report_rebuild, dict):
-                add_artifact(
+                row = _create_revision_artifact_row(
+                    self,
+                    revision_version_id=safe_revision_version_id,
+                    pipeline_run_id=safe_pipeline_run_id,
                     artifact_kind="pipeline_artifact",
                     artifact_key="final_report_rebuild",
                     status=(
@@ -791,46 +871,73 @@ def persist_revision_artifacts(
                     ),
                     payload=final_report_rebuild,
                 )
+                db_session.add(row)
+                created_rows.append(row)
             qa_validation = revision_payload.get("qa_validation")
             if isinstance(qa_validation, dict):
-                add_artifact(
+                row = _create_revision_artifact_row(
+                    self,
+                    revision_version_id=safe_revision_version_id,
+                    pipeline_run_id=safe_pipeline_run_id,
                     artifact_kind="llm_qa_output",
                     artifact_key="revision_qa_validation",
                     status=self.normalize_string(str(qa_validation.get("status") or "")),
                     payload=qa_validation,
                 )
+                db_session.add(row)
+                created_rows.append(row)
             entity_pipeline = revision_payload.get("entity_pipeline")
             if isinstance(entity_pipeline, dict):
-                add_artifact(
+                row = _create_revision_artifact_row(
+                    self,
+                    revision_version_id=safe_revision_version_id,
+                    pipeline_run_id=safe_pipeline_run_id,
                     artifact_kind="pipeline_artifact",
                     artifact_key="revision_entity_pipeline",
                     status="derived",
                     payload=entity_pipeline,
                 )
+                db_session.add(row)
+                created_rows.append(row)
             entity_snapshot_context = revision_payload.get("entity_snapshot_context")
             if isinstance(entity_snapshot_context, str) and entity_snapshot_context.strip():
-                add_artifact(
+                row = _create_revision_artifact_row(
+                    self,
+                    revision_version_id=safe_revision_version_id,
+                    pipeline_run_id=safe_pipeline_run_id,
                     artifact_kind="pipeline_artifact",
                     artifact_key="revision_entity_snapshot_context",
                     status="derived",
                     payload={"text": entity_snapshot_context.strip()},
                 )
+                db_session.add(row)
+                created_rows.append(row)
             consultation_execution = revision_payload.get("consultation_execution")
             if isinstance(consultation_execution, dict):
-                add_artifact(
+                row = _create_revision_artifact_row(
+                    self,
+                    revision_version_id=safe_revision_version_id,
+                    pipeline_run_id=safe_pipeline_run_id,
                     artifact_kind="pipeline_artifact",
                     artifact_key="revision_consultation_execution",
                     status="derived",
                     payload=consultation_execution,
                 )
+                db_session.add(row)
+                created_rows.append(row)
             finalization_execution = revision_payload.get("finalization_execution")
             if isinstance(finalization_execution, dict):
-                add_artifact(
+                row = _create_revision_artifact_row(
+                    self,
+                    revision_version_id=safe_revision_version_id,
+                    pipeline_run_id=safe_pipeline_run_id,
                     artifact_kind="pipeline_artifact",
                     artifact_key="revision_finalization_execution",
                     status="derived",
                     payload=finalization_execution,
                 )
+                db_session.add(row)
+                created_rows.append(row)
 
         db_session.flush()
         db_session.commit()
@@ -867,52 +974,6 @@ def persist_revision_entities(
 
         created_rows: list[ClinicalSessionRevisionEntity] = []
 
-        def add_entity(
-            *,
-            step_name: str,
-            entity_type: str,
-            source_section: str,
-            original_entity_id: str | None,
-            original_name: str | None,
-            revised_name: str | None,
-            normalized_name: str | None,
-            payload: dict[str, Any],
-            schema_name: str,
-            entity_revision_status: str = "active",
-            requires_human_review: bool = False,
-        ) -> None:
-            row = ClinicalSessionRevisionEntity(
-                revision_version_id=safe_revision_version_id,
-                source_version_id=int(source_version_id)
-                if source_version_id is not None
-                else None,
-                pipeline_run_id=safe_pipeline_run_id,
-                step_name=step_name,
-                entity_type=entity_type,
-                entity_revision_status=entity_revision_status,
-                source_section=self.normalize_string(source_section),
-                original_entity_id=self.normalize_string(original_entity_id),
-                original_name=self.normalize_string(original_name),
-                revised_name=self.normalize_string(revised_name),
-                normalized_name=self.normalize_string(normalized_name),
-                requires_human_review=bool(requires_human_review),
-                human_review_status=(
-                    "required" if requires_human_review else "not_required"
-                ),
-                payload_json=self.serialize_json_payload(payload),
-                schema_name=schema_name,
-                schema_version=REVISION_ENTITY_SCHEMA_VERSION,
-                prompt_version=None,
-                parser_version=None,
-                model_provider=None,
-                model_name=None,
-                input_hash=None,
-                output_hash=build_payload_hash(payload),
-                superseded_at=None,
-            )
-            db_session.add(row)
-            created_rows.append(row)
-
         structured_case = result_payload.get("structured_case")
         if isinstance(structured_case, dict):
             for section_name, source_section in (
@@ -928,7 +989,15 @@ def persist_revision_entities(
                     validated_entry = validate_revised_drug_payload(entry)
                     serialized_entry = validated_entry.model_dump(exclude_none=True)
                     revised_name = validated_entry.name
-                    add_entity(
+                    row = _create_revision_entity_row(
+                        self,
+                        revision_version_id=safe_revision_version_id,
+                        source_version_id=(
+                            int(source_version_id)
+                            if source_version_id is not None
+                            else None
+                        ),
+                        pipeline_run_id=safe_pipeline_run_id,
                         step_name="generate_revision",
                         entity_type="drug",
                         source_section=source_section,
@@ -940,6 +1009,8 @@ def persist_revision_entities(
                         schema_name=REVISION_DRUG_SCHEMA_NAME,
                         requires_human_review=not bool(revised_name),
                     )
+                    db_session.add(row)
+                    created_rows.append(row)
             disease_entries = structured_case.get("anamnesis_diseases")
             if isinstance(disease_entries, list):
                 for index, entry in enumerate(disease_entries):
@@ -948,7 +1019,15 @@ def persist_revision_entities(
                     validated_entry = validate_revised_disease_payload(entry)
                     serialized_entry = validated_entry.model_dump(exclude_none=True)
                     revised_name = validated_entry.name
-                    add_entity(
+                    row = _create_revision_entity_row(
+                        self,
+                        revision_version_id=safe_revision_version_id,
+                        source_version_id=(
+                            int(source_version_id)
+                            if source_version_id is not None
+                            else None
+                        ),
+                        pipeline_run_id=safe_pipeline_run_id,
                         step_name="generate_revision",
                         entity_type="disease",
                         source_section="anamnesis",
@@ -960,6 +1039,8 @@ def persist_revision_entities(
                         schema_name=REVISION_DISEASE_SCHEMA_NAME,
                         requires_human_review=not bool(revised_name),
                     )
+                    db_session.add(row)
+                    created_rows.append(row)
 
         lab_entries = result_payload.get("lab_timeline")
         if isinstance(lab_entries, list):
@@ -969,7 +1050,13 @@ def persist_revision_entities(
                 validated_entry = validate_revised_lab_payload(entry)
                 serialized_entry = validated_entry.model_dump(exclude_none=True)
                 revised_name = validated_entry.marker_name
-                add_entity(
+                row = _create_revision_entity_row(
+                    self,
+                    revision_version_id=safe_revision_version_id,
+                    source_version_id=(
+                        int(source_version_id) if source_version_id is not None else None
+                    ),
+                    pipeline_run_id=safe_pipeline_run_id,
                     step_name="generate_revision",
                     entity_type="lab_timeline_entry",
                     source_section="laboratory_analysis",
@@ -981,6 +1068,8 @@ def persist_revision_entities(
                     schema_name=REVISION_LAB_SCHEMA_NAME,
                     requires_human_review=not bool(revised_name),
                 )
+                db_session.add(row)
+                created_rows.append(row)
 
         revision_payload = result_payload.get("revision")
         if isinstance(revision_payload, dict):
@@ -992,7 +1081,15 @@ def persist_revision_entities(
                     validated_entry = validate_revision_livertox_decision(entry)
                     serialized_entry = validated_entry.model_dump(exclude_none=True)
                     revised_name = validated_entry.drug_name
-                    add_entity(
+                    row = _create_revision_entity_row(
+                        self,
+                        revision_version_id=safe_revision_version_id,
+                        source_version_id=(
+                            int(source_version_id)
+                            if source_version_id is not None
+                            else None
+                        ),
+                        pipeline_run_id=safe_pipeline_run_id,
                         step_name="resolve_livertox_matches",
                         entity_type="livertox_match",
                         source_section="therapy",
@@ -1006,6 +1103,8 @@ def persist_revision_entities(
                         entity_revision_status=validated_entry.decision,
                         requires_human_review=validated_entry.requires_human_review,
                     )
+                    db_session.add(row)
+                    created_rows.append(row)
             revised_dili_assessments = revision_payload.get("revised_dili_assessments")
             if isinstance(revised_dili_assessments, list):
                 for index, entry in enumerate(revised_dili_assessments):
@@ -1014,7 +1113,15 @@ def persist_revision_entities(
                     validated_entry = validate_revised_dili_assessment(entry)
                     serialized_entry = validated_entry.model_dump(exclude_none=True)
                     revised_name = validated_entry.drug_name
-                    add_entity(
+                    row = _create_revision_entity_row(
+                        self,
+                        revision_version_id=safe_revision_version_id,
+                        source_version_id=(
+                            int(source_version_id)
+                            if source_version_id is not None
+                            else None
+                        ),
+                        pipeline_run_id=safe_pipeline_run_id,
                         step_name="rerun_dili_assessments",
                         entity_type="dili_assessment",
                         source_section="therapy",
@@ -1028,6 +1135,8 @@ def persist_revision_entities(
                         entity_revision_status="active",
                         requires_human_review=validated_entry.requires_human_review,
                     )
+                    db_session.add(row)
+                    created_rows.append(row)
 
         db_session.flush()
         db_session.commit()

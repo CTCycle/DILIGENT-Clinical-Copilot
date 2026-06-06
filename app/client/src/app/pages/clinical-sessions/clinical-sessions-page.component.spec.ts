@@ -18,6 +18,13 @@ describe('ClinicalSessionsPage revision template', () => {
     expect(template).toContain('Compare against');
     expect(template).toContain('app-revision-pipeline-status');
     expect(template).toContain('app-revision-qa-badge');
+    expect(template).toContain('Save manual report edit');
+    expect(template).toContain(
+      'Manual report edits stay separate and in-place; this workflow creates versioned artifacts, persisted run checkpoints, and a new reviewable draft shell.',
+    );
+    expect(template).toContain(
+      'LLM-assisted version lineage stays separate from manual in-place report edits.',
+    );
     expect(template).toContain('Revision QA And Artifacts');
     expect(template).toContain('Revision Consultation Provenance');
     expect(template).toContain('Revision Finalization Provenance');

@@ -7,7 +7,7 @@ Last updated: 2026-06-06
   - Endpoint classes are wired inline during router setup and do not retain named module-level service globals.
 - Service layer: `app/server/services/*`
   - Owns clinical orchestration, model orchestration, inspection workflows, and job control.
-  - Inspection update orchestration is implemented in `app/server/services/inspection/update_jobs.py` through `DataInspectionUpdateJobRunner`, while `DataInspectionService` remains the endpoint-facing facade.
+  - Inspection update orchestration is implemented in `app/server/services/inspection/update_jobs.py` through `DataInspectionUpdateJobRunner`, while `DataInspectionService` remains the endpoint-facing service entrypoint.
   - `app/server/services/text/vocabulary.py` provides cache-facing text normalization business access and does not manage SQLAlchemy sessions directly.
   - `app/server/services/llm/ollama_runtime.py` owns canonical Ollama runtime aliases, errors, environment helpers, message normalization, and exception mapping. Ollama service modules must import these definitions instead of duplicating or monkey-patching them.
   - `app/server/services/llm/structured.py` owns strict JSON object extraction, schema validation, and bounded one-repair structured-output adaptation helpers for provider responses.

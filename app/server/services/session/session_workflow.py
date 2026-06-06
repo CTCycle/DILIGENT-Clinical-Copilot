@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal, cast
 
@@ -39,6 +38,13 @@ from domain.clinical.entities import (
 )
 from domain.clinical.robustness import NormalizedDocument
 from domain.clinical.extras import CandidateSelectionResult
+from domain.clinical.revision import (
+    RevisionCandidateSelectionResolution,
+    RevisionConsultationExecution,
+    RevisionConsultationInputs,
+    RevisionExtractionResolution,
+    RevisionFinalizationOutputs,
+)
 from domain.jobs import JobStartResponse
 from services.clinical.candidate_selection import select_relevant_candidates
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
@@ -97,49 +103,6 @@ class _DeterministicDrugExtractionFallback:
         self.entries: list[Any] = []
         self.unresolved_lines: list[str] = []
         self.regimen_lines: list[str] = []
-
-
-@dataclass(frozen=True)
-class RevisionConsultationInputs:
-    analysis_drugs: PatientDrugs
-    snapshot_context: str | None
-    consultation_context: str
-    context_metadata: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class RevisionConsultationExecution:
-    inputs: RevisionConsultationInputs
-    clinical_session: Any
-    final_report: str
-    payload: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class RevisionCandidateSelectionResolution:
-    analysis_drugs: PatientDrugs
-    candidate_selection: CandidateSelectionResult
-    entity_pipeline: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class RevisionExtractionResolution:
-    therapy_deterministic: Any
-    anamnesis_deterministic: Any
-    disease_deterministic: Any
-    therapy_drugs: PatientDrugs
-    anamnesis_drugs: PatientDrugs
-    extraction_bundle: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class RevisionFinalizationOutputs:
-    final_report: str
-    generated_report: str
-    report_metadata: Any
-    faithfulness_audit: Any
-    report_comparison_payload: dict[str, Any]
-    payload: dict[str, Any]
 
 
 def _extract_deterministic_drugs(
