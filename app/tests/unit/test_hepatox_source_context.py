@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from domain.clinical.entities import DrugEntry
-from services.clinical.hepatox_assessment import (
+from services.clinical.analysis_runner import (
     assess_pattern_compatibility,
     assess_temporal_plausibility,
     summarize_drug_source_context,

@@ -11,6 +11,7 @@ ALLOWED_DATACLASS_OUTSIDE_DOMAIN = {
     (SERVER_ROOT / "services" / "clinical" / "match_resolution.py").resolve(),
     (SERVER_ROOT / "services" / "session" / "clinical_section_parsers.py").resolve(),
     (SERVER_ROOT / "services" / "session" / "preflight.py").resolve(),
+    (SERVER_ROOT / "services" / "session" / "session_workflow.py").resolve(),
     (SERVER_ROOT / "services" / "runtime" / "state.py").resolve(),
 }
 ALLOWED_FASTAPI_IMPORTS_IN_SERVICES = {
@@ -30,7 +31,6 @@ ALLOWED_OVERSIZED_BACKEND_FILES = {
     (
         SERVER_ROOT / "repositories" / "serialization" / "session_revision_data.py"
     ).resolve(),
-    (SERVER_ROOT / "services" / "clinical" / "hepatox_assessment.py").resolve(),
     (SERVER_ROOT / "services" / "clinical" / "hepatox_core.py").resolve(),
     (SERVER_ROOT / "services" / "clinical" / "parser.py").resolve(),
     (SERVER_ROOT / "services" / "inspection" / "service.py").resolve(),
