@@ -1404,9 +1404,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             report_mode=report_mode,
             session_version=session_version,
             original_session_id=original_session_id,
-            session_metadata=session_metadata,
-            original_session_text=original_session_text,
-            revision_focus_context=revision_focus_context,
             progress_callback=progress_callback,
             stop_check=stop_check,
         )
