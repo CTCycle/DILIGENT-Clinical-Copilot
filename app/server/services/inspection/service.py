@@ -38,10 +38,10 @@ from services.retrieval.settings import build_effective_rag_settings
 from services.inspection.normalization import (
     extract_lab_marker as extract_lab_marker_value,
 )
-from services.inspection.revision_helpers import (
+from services.clinical.revision.helpers import (
     build_revision_section_validation as build_revision_section_validation_value,
 )
-from services.inspection.revision_helpers import (
+from services.clinical.revision.helpers import (
     extract_revision_drug_names as extract_revision_drug_names_value,
 )
 from services.inspection.normalization import (
