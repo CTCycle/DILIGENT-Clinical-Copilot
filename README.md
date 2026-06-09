@@ -135,7 +135,7 @@ Equivalent PowerShell runners:
 - Ollama must support the chat-capable `/api/chat` API; `/api/generate` fallback behavior has been removed.
 
 ## 8. Documentation Map
-- `assets/docs/project_overview.md`: entry point for the documentation tree.
+- `assets/docs/project_index.md`: entry point for the documentation tree.
 - `assets/docs/architecture/system_overview.md`: repository layout and system boundaries.
 - `assets/docs/architecture/background_jobs.md`: job lifecycle and semantics.
 - `assets/docs/runtime/modes.md`: runtime profiles and packaging.

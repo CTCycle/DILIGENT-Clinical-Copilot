@@ -51,4 +51,4 @@ Last updated: 2026-06-03
 
 ## Where To Go Next
 - Installation and developer setup: `README.md`
-- Architecture, runtime, coding, and UI reference: `assets/docs/project_overview.md`
+- Architecture, runtime, coding, and UI reference: `assets/docs/project_index.md`
