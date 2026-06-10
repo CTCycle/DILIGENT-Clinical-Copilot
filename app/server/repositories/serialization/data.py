@@ -1,24 +1,12 @@
 from __future__ import annotations
 
-import hashlib
-import re
-import zipfile
-from datetime import date, datetime
-from pathlib import Path
+from datetime import date
 from typing import Any, Iterator
-from xml.etree import ElementTree
 
 import pandas as pd
-from pypdf import PdfReader
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from common.constants import (
-    DOCUMENT_SUPPORTED_EXTENSIONS,
-    TEXT_FILE_FALLBACK_ENCODINGS,
-)
-from common.utils.logger import logger
-from domain.documents import Document
 from repositories.database.session import (
     resolve_engine,
     resolve_session_factory,
@@ -34,9 +22,10 @@ from repositories.serialization import (
     evidence_data,
     fda_data,
     session_revision_data,
+    session_revision_artifacts,
+    session_revision_steps,
     session_result_data,
 )
-from common.utils.chunking import SmartDocumentChunker
 
 ###############################################################################
 class DataSerializer:
@@ -406,7 +395,7 @@ class DataSerializer:
         revision_version_id: int,
         result_payload: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        return session_revision_data.persist_revision_artifacts(
+        return session_revision_artifacts.persist_revision_artifacts(
             self,
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
@@ -419,7 +408,7 @@ class DataSerializer:
         *,
         revision_version_id: int,
     ) -> list[dict[str, Any]]:
-        return session_revision_data.list_revision_artifacts_for_version(
+        return session_revision_artifacts.list_revision_artifacts_for_version(
             self,
             revision_version_id=revision_version_id,
         )
@@ -433,7 +422,7 @@ class DataSerializer:
         source_version_id: int | None,
         result_payload: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        return session_revision_data.persist_revision_entities(
+        return session_revision_artifacts.persist_revision_entities(
             self,
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
@@ -447,7 +436,7 @@ class DataSerializer:
         *,
         revision_version_id: int,
     ) -> list[dict[str, Any]]:
-        return session_revision_data.list_revision_entities_for_version(
+        return session_revision_artifacts.list_revision_entities_for_version(
             self,
             revision_version_id=revision_version_id,
         )
@@ -462,7 +451,7 @@ class DataSerializer:
         reviewed_by: str | None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
-        return session_revision_data.record_revision_review_action(
+        return session_revision_steps.record_revision_review_action(
             self,
             revision_version_id=revision_version_id,
             clinical_review_status=clinical_review_status,
@@ -477,7 +466,7 @@ class DataSerializer:
         *,
         revision_version_id: int,
     ) -> list[dict[str, Any]]:
-        return session_revision_data.list_revision_reviews_for_version(
+        return session_revision_steps.list_revision_reviews_for_version(
             self,
             revision_version_id=revision_version_id,
         )
@@ -500,7 +489,7 @@ class DataSerializer:
         model_name: str | None = None,
         started_at: Any | None = None,
     ) -> dict[str, Any]:
-        return session_revision_data.start_revision_step(
+        return session_revision_steps.start_revision_step(
             self,
             pipeline_run_id=pipeline_run_id,
             step_name=step_name,
@@ -531,7 +520,7 @@ class DataSerializer:
         latency_ms: int | None = None,
         completed_at: Any | None = None,
     ) -> dict[str, Any] | None:
-        return session_revision_data.complete_revision_step(
+        return session_revision_steps.complete_revision_step(
             self,
             pipeline_run_id=pipeline_run_id,
             step_name=step_name,
@@ -555,7 +544,7 @@ class DataSerializer:
         latency_ms: int | None = None,
         completed_at: Any | None = None,
     ) -> dict[str, Any] | None:
-        return session_revision_data.fail_revision_step(
+        return session_revision_steps.fail_revision_step(
             self,
             pipeline_run_id=pipeline_run_id,
             step_name=step_name,
@@ -913,413 +902,3 @@ class DataSerializer:
     def first_alias_model_term_type(self, aliases: list[DrugAlias]) -> str | None:
         return evidence_aliases.first_alias_model_term_type(self, aliases)
 
-###############################################################################
-class DocumentSerializer:
-    SUPPORTED_EXTENSIONS = DOCUMENT_SUPPORTED_EXTENSIONS
-
-    def __init__(self, documents_path: str | Path) -> None:
-        self.documents_path = Path(documents_path)
-
-    # -------------------------------------------------------------------------
-    def collect_document_paths(self) -> list[str]:
-        collected: list[str] = []
-        for candidate in self.documents_path.rglob("*"):
-            if not candidate.is_file():
-                continue
-            if candidate.suffix.lower() in self.SUPPORTED_EXTENSIONS:
-                collected.append(str(candidate))
-            else:
-                logger.debug("Skipping unsupported document '%s'", candidate.name)
-        collected.sort()
-        return collected
-
-    # -------------------------------------------------------------------------
-    def load_documents(self) -> list[Document]:
-        documents: list[Document] = []
-        for file_path in self.collect_document_paths():
-            extension = Path(file_path).suffix.lower()
-            if extension == ".pdf":
-                documents.extend(self.load_pdf(file_path))
-            elif extension == ".docx":
-                documents.extend(self.load_docx(file_path))
-            elif extension == ".doc":
-                logger.warning(
-                    "Unsupported .doc Word document '%s' is not supported; skipping",
-                    file_path,
-                )
-            elif extension in {".txt", ".xml"}:
-                documents.extend(self.load_textual_file(file_path, extension))
-        return documents
-
-    # -------------------------------------------------------------------------
-    def load_pdf(self, file_path: str) -> list[Document]:
-        try:
-            reader = PdfReader(file_path)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed to load PDF '%s': %s", file_path, exc)
-            return []
-
-        metadata = self.build_metadata(
-            file_path,
-            content_type="pdf",
-            document_title=self.resolve_pdf_title(reader, file_path),
-        )
-        metadata["total_pages"] = len(reader.pages)
-        pages: list[Document] = []
-        for index, page in enumerate(reader.pages, start=1):
-            try:
-                text = page.extract_text() or ""
-            except Exception as exc:  # noqa: BLE001
-                logger.error(
-                    "Failed to extract text from '%s' page %d: %s",
-                    file_path,
-                    index,
-                    exc,
-                )
-                continue
-            content = text.strip()
-            if not content:
-                continue
-            page_metadata = dict(metadata)
-            page_metadata["page_number"] = index
-            pages.append(Document(page_content=content, metadata=page_metadata))
-        return pages
-
-    # -------------------------------------------------------------------------
-    def load_docx(self, file_path: str) -> list[Document]:
-        try:
-            with zipfile.ZipFile(file_path) as archive:
-                xml_content = archive.read("word/document.xml")
-                title = self.resolve_docx_title(archive, file_path)
-        except (KeyError, zipfile.BadZipFile, OSError) as exc:
-            logger.error("Unable to read DOCX '%s': %s", file_path, exc)
-            return []
-        try:
-            tree = ElementTree.fromstring(xml_content)
-        except ElementTree.ParseError as exc:
-            logger.error("Failed to parse DOCX '%s': %s", file_path, exc)
-            return []
-        namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-        paragraphs: list[str] = []
-        for paragraph in tree.iter(f"{namespace}p"):
-            texts = [
-                node.text
-                for node in paragraph.iter(f"{namespace}t")
-                if node.text and node.text.strip()
-            ]
-            if texts:
-                paragraphs.append("".join(texts))
-        content = "\n".join(paragraphs).strip()
-        if not content:
-            return []
-        metadata = self.build_metadata(
-            file_path,
-            content_type="docx",
-            document_title=title or self.extract_first_heading(content),
-        )
-        document = Document(page_content=content, metadata=metadata)
-        return [document]
-
-    # -------------------------------------------------------------------------
-    def load_textual_file(self, file_path: str, extension: str) -> list[Document]:
-        text = self.read_text_content(file_path, extension)
-        if not text:
-            return []
-        document = Document(
-            page_content=text,
-            metadata=self.build_metadata(
-                file_path,
-                content_type=extension.lstrip("."),
-                document_title=self.extract_first_heading(text),
-            ),
-        )
-        return [document]
-
-    # -------------------------------------------------------------------------
-    def read_text_content(self, file_path: str, extension: str) -> str:
-        if extension == ".xml":
-            return self.read_xml_content(file_path)
-        path = Path(file_path)
-        for encoding in TEXT_FILE_FALLBACK_ENCODINGS:
-            try:
-                with path.open("r", encoding=encoding) as handle:
-                    text = handle.read()
-            except (OSError, UnicodeDecodeError):
-                continue
-            return text.strip()
-        logger.error("Failed to read text file '%s'", file_path)
-        return ""
-
-    # -------------------------------------------------------------------------
-    def read_xml_content(self, file_path: str) -> str:
-        try:
-            tree = ElementTree.parse(file_path)
-            root = tree.getroot()
-            text = " ".join(segment.strip() for segment in root.itertext())
-            return text.strip()
-        except (OSError, ElementTree.ParseError) as exc:
-            logger.error("Failed to parse XML '%s': %s", file_path, exc)
-        return ""
-
-    # -------------------------------------------------------------------------
-    def build_metadata(
-        self,
-        file_path: str | Path,
-        *,
-        content_type: str,
-        document_title: str | None = None,
-    ) -> dict[str, Any]:
-        path = Path(file_path)
-        document_id = self.compute_document_id(file_path)
-        resolved_title = self.normalize_title(document_title) or path.stem
-        return {
-            "document_id": document_id,
-            "source": str(path),
-            "file_name": path.name,
-            "document_title": resolved_title,
-            "content_type": content_type,
-            "source_relative_path": str(
-                path.resolve().relative_to(self.documents_path.resolve())
-            ).replace("\\", "/"),
-            "source_file_size": path.stat().st_size if path.exists() else 0,
-            "source_last_modified": (
-                datetime.fromtimestamp(path.stat().st_mtime).isoformat()
-                if path.exists()
-                else None
-            ),
-            "total_pages": 1,
-        }
-
-    # -------------------------------------------------------------------------
-    def compute_document_id(self, file_path: str | Path) -> str:
-        relative_path = (
-            Path(file_path).resolve().relative_to(self.documents_path.resolve())
-        )
-        return hashlib.sha256(str(relative_path).encode("utf-8")).hexdigest()
-
-    # -------------------------------------------------------------------------
-    def resolve_pdf_title(self, reader: PdfReader, file_path: str) -> str:
-        raw_title = getattr(getattr(reader, "metadata", None), "title", None)
-        normalized = self.normalize_title(raw_title)
-        if normalized:
-            return normalized
-        for page in reader.pages[:2]:
-            try:
-                candidate = self.extract_first_heading(page.extract_text() or "")
-            except Exception:  # noqa: BLE001
-                candidate = None
-            if candidate:
-                return candidate
-        return Path(file_path).stem
-
-    # -------------------------------------------------------------------------
-    def resolve_docx_title(self, archive: zipfile.ZipFile, file_path: str) -> str:
-        try:
-            core_xml = archive.read("docProps/core.xml")
-            tree = ElementTree.fromstring(core_xml)
-        except (KeyError, ElementTree.ParseError):
-            return Path(file_path).stem
-        namespaces = {"dc": "http://purl.org/dc/elements/1.1/"}
-        node = tree.find("dc:title", namespaces)
-        return (
-            self.normalize_title(node.text if node is not None else None)
-            or Path(file_path).stem
-        )
-
-    # -------------------------------------------------------------------------
-    def extract_first_heading(self, text: str) -> str | None:
-        for raw_line in text.splitlines():
-            line = raw_line.strip()
-            if not line:
-                continue
-            if self.is_heading_line(line):
-                return self.normalize_title(line)
-        return None
-
-    # -------------------------------------------------------------------------
-    def is_heading_line(self, line: str) -> bool:
-        if len(line) > 120:
-            return False
-        if line.startswith("#"):
-            return True
-        if re.match(r"^\d+(\.\d+)*\s+\S+", line):
-            return True
-        words = line.split()
-        return 1 <= len(words) <= 12 and line == line.upper()
-
-    # -------------------------------------------------------------------------
-    def normalize_title(self, value: Any) -> str | None:
-        if value is None:
-            return None
-        text = str(value).strip()
-        if not text:
-            return None
-        return re.sub(r"\s+", " ", text)
-
-
-###############################################################################
-class DocumentChunker:
-    def __init__(self, chunk_size: int, chunk_overlap: int) -> None:
-        self.chunk_size = max(chunk_size, 1)
-        self.chunk_overlap = max(chunk_overlap, 0)
-
-    # -------------------------------------------------------------------------
-    def split_text(self, content: str) -> list[tuple[str, int, str | None, str | None]]:
-        text = content.strip()
-        if not text:
-            return []
-        sections = self.split_sections(text)
-        chunks: list[tuple[str, int, str | None, str | None]] = []
-        for section_text, section_start, section_title, heading_path in sections:
-            for chunk_text, relative_start in self.split_section(section_text):
-                chunks.append(
-                    (
-                        chunk_text,
-                        section_start + relative_start,
-                        section_title,
-                        heading_path,
-                    )
-                )
-        return chunks
-
-    # -------------------------------------------------------------------------
-    def split_sections(
-        self, text: str
-    ) -> list[tuple[str, int, str | None, str | None]]:
-        sections: list[tuple[str, int, str | None, str | None]] = []
-        heading_stack: list[str] = []
-        current_lines: list[str] = []
-        current_start = 0
-        current_title: str | None = None
-        offset = 0
-        for raw_line in text.splitlines(keepends=True):
-            line = raw_line.strip()
-            if self.is_heading_line(line):
-                if current_lines:
-                    sections.append(
-                        (
-                            "".join(current_lines).strip(),
-                            current_start,
-                            current_title,
-                            " > ".join(heading_stack) or None,
-                        )
-                    )
-                    current_lines = []
-                heading = self.normalize_heading(line)
-                heading_stack = [heading]
-                current_title = heading
-                current_start = offset
-            current_lines.append(raw_line)
-            offset += len(raw_line)
-        if current_lines:
-            sections.append(
-                (
-                    "".join(current_lines).strip(),
-                    current_start,
-                    current_title,
-                    " > ".join(heading_stack) or None,
-                )
-            )
-        return sections
-
-    # -------------------------------------------------------------------------
-    def split_section(self, section_text: str) -> list[tuple[str, int]]:
-        if len(section_text) <= self.chunk_size:
-            return [(section_text, 0)]
-        paragraphs = re.split(r"(\n\s*\n)", section_text)
-        chunks: list[tuple[str, int]] = []
-        buffer = ""
-        buffer_start = 0
-        cursor = 0
-        for part in paragraphs:
-            if not part:
-                continue
-            candidate = f"{buffer}{part}"
-            if buffer and len(candidate) > self.chunk_size:
-                chunks.extend(self.split_oversized_text(buffer, buffer_start))
-                buffer = part.lstrip()
-                buffer_start = cursor + (len(part) - len(part.lstrip()))
-            else:
-                if not buffer:
-                    buffer_start = cursor
-                buffer = candidate
-            cursor += len(part)
-        if buffer.strip():
-            chunks.extend(self.split_oversized_text(buffer, buffer_start))
-        return chunks
-
-    # -------------------------------------------------------------------------
-    def split_oversized_text(
-        self, text: str, start_offset: int
-    ) -> list[tuple[str, int]]:
-        normalized = text.strip()
-        if len(normalized) <= self.chunk_size:
-            return [(normalized, start_offset)]
-        step = max(self.chunk_size - self.chunk_overlap, 1)
-        chunks: list[tuple[str, int]] = []
-        start = 0
-        while start < len(normalized):
-            end = min(start + self.chunk_size, len(normalized))
-            chunk_text = normalized[start:end].strip()
-            if chunk_text:
-                chunks.append((chunk_text, start_offset + start))
-            if end >= len(normalized):
-                break
-            start += step
-        return chunks
-
-    # -------------------------------------------------------------------------
-    def is_heading_line(self, line: str) -> bool:
-        if not line or len(line) > 120:
-            return False
-        if line.startswith("#"):
-            return True
-        if re.match(r"^\d+(\.\d+)*\s+\S+", line):
-            return True
-        words = line.split()
-        return 1 <= len(words) <= 12 and line == line.upper()
-
-    # -------------------------------------------------------------------------
-    def normalize_heading(self, line: str) -> str:
-        stripped = line.lstrip("#").strip()
-        return re.sub(r"\s+", " ", stripped)
-
-    # -------------------------------------------------------------------------
-    def chunk_documents(self, documents: list[Document]) -> list[Document]:
-        if not documents:
-            return []
-        smart_chunker = SmartDocumentChunker(
-            target_chars=self.chunk_size,
-            max_chars=max(self.chunk_size, self.chunk_size + self.chunk_overlap),
-            overlap_chars=self.chunk_overlap,
-        )
-        chunks: list[Document] = []
-        for document in documents:
-            metadata = dict(document.metadata)
-            source = str(metadata.get("source") or "")
-            file_name = str(metadata.get("file_name") or "")
-            relative_path = file_name
-            if source and file_name and source.endswith(file_name):
-                relative_path = source.replace("\\", "/")
-            smart_chunks = smart_chunker.chunk_document(
-                text=document.page_content,
-                file_name=file_name or "document",
-                relative_path=relative_path or "document",
-                content_type=str(metadata.get("content_type") or ""),
-                page_texts=[document.page_content],
-            )
-            for chunk in smart_chunks:
-                chunk_metadata = dict(metadata)
-                chunk_metadata.update(chunk.metadata)
-                char_start = chunk.metadata.get("char_start", 0)
-                chunk_metadata["start_index"] = (
-                    int(char_start) if isinstance(char_start, int | float | str) else 0
-                )
-                chunk_metadata["section_title"] = chunk.metadata.get("section_heading")
-                chunk_metadata["heading_path"] = chunk.metadata.get("section_heading")
-                chunks.append(
-                    Document(page_content=chunk.text, metadata=chunk_metadata)
-                )
-        for index, chunk in enumerate(chunks):
-            chunk.metadata["chunk_index"] = index
-        return chunks
