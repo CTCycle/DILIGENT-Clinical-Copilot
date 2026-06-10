@@ -12,11 +12,11 @@ from common.constants import (
     LIVERTOX_REQUIRED_COLUMNS,
     RXNORM_CATALOG_COLUMNS,
 )
-from configurations.startup import get_server_settings
 from common.utils.text_utils import coerce_text, normalize_drug_name
+from configurations.startup import get_server_settings
 
 
-
+###############################################################################
 def upsert_drugs_catalog_records(
     self,
     records: pd.DataFrame | list[dict[str, Any]],
@@ -118,13 +118,13 @@ def upsert_drugs_catalog_records(
     finally:
         db_session.close()
 
-
+###############################################################################
 def resolve_commit_interval(self, override: int | None) -> int:
     if override is not None:
         return max(int(override), 1)
     return max(int(get_server_settings().database.insert_commit_interval), 1)
 
-
+###############################################################################
 def prepare_rxnav_rows(
     self,
     records: pd.DataFrame | list[dict[str, Any]],
@@ -155,7 +155,7 @@ def prepare_rxnav_rows(
     prepared_rows.sort(key=self.rxnav_row_sort_key)
     return prepared_rows
 
-
+###############################################################################
 def prepare_rxnav_row(self, row: dict[str, Any]) -> dict[str, Any] | None:
     rxcui = self.normalize_string(row.get("rxcui"))
     if rxcui is None:
@@ -178,7 +178,7 @@ def prepare_rxnav_row(self, row: dict[str, Any]) -> dict[str, Any] | None:
         "_term_type": self.normalize_string(row.get("term_type")),
     }
 
-
+###############################################################################
 def rxnav_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
     return (
         self.to_sortable_text(row.get("_rxcui")),
@@ -189,7 +189,7 @@ def rxnav_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
         self.to_sortable_text(row.get("_term_type")),
     )
 
-
+###############################################################################
 def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
     df = pd.DataFrame(records)
     if df.empty:
@@ -220,7 +220,7 @@ def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFra
     )
     return df.reset_index(drop=True)
 
-
+###############################################################################
 def is_valid_drug_name(self, value: str) -> bool:
     normalized = value.strip()
     min_length = get_server_settings().ingestion.drug_name_min_length

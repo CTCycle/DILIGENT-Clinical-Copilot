@@ -20,12 +20,13 @@ from repositories.schemas.models import (
 from repositories.serialization import (
     evidence_aliases,
     evidence_data,
-    fda_data,
-    session_revision_data,
-    session_revision_artifacts,
-    session_revision_steps,
+    rxnav_data,
     session_result_data,
+    session_revision_artifacts,
+    session_revision_data,
+    session_revision_steps,
 )
+
 
 ###############################################################################
 class DataSerializer:
@@ -110,7 +111,7 @@ class DataSerializer:
         commit_interval: int | None = None,
         curated_aliases_by_canonical: dict[str, list[tuple[str, str]]] | None = None,
     ) -> None:
-        return fda_data.upsert_drugs_catalog_records(
+        return rxnav_data.upsert_drugs_catalog_records(
             self,
             records,
             commit_interval=commit_interval,
@@ -119,30 +120,30 @@ class DataSerializer:
 
     # -----------------------------------------------------------------------------
     def resolve_commit_interval(self, override: int | None) -> int:
-        return fda_data.resolve_commit_interval(self, override)
+        return rxnav_data.resolve_commit_interval(self, override)
 
     # -----------------------------------------------------------------------------
     def prepare_rxnav_rows(
         self,
         records: pd.DataFrame | list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        return fda_data.prepare_rxnav_rows(self, records)
+        return rxnav_data.prepare_rxnav_rows(self, records)
 
     # -----------------------------------------------------------------------------
     def prepare_rxnav_row(self, row: dict[str, Any]) -> dict[str, Any] | None:
-        return fda_data.prepare_rxnav_row(self, row)
+        return rxnav_data.prepare_rxnav_row(self, row)
 
     # -----------------------------------------------------------------------------
     def rxnav_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
-        return fda_data.rxnav_row_sort_key(self, row)
+        return rxnav_data.rxnav_row_sort_key(self, row)
 
     # -----------------------------------------------------------------------------
     def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
-        return fda_data.sanitize_livertox_records(self, records)
+        return rxnav_data.sanitize_livertox_records(self, records)
 
     # -----------------------------------------------------------------------------
     def is_valid_drug_name(self, value: str) -> bool:
-        return fda_data.is_valid_drug_name(self, value)
+        return rxnav_data.is_valid_drug_name(self, value)
 
     # -----------------------------------------------------------------------------
     def get_livertox_records(self) -> pd.DataFrame:
