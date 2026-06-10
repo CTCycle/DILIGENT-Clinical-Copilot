@@ -299,6 +299,9 @@ class InspectionRevisionRunnerMixin:
         detail = self.get_session_detail(session_id)
         if detail is None:
             raise ValueError("Session not found")
+        source_text = str(detail.get("session_text") or "").strip()
+        if not source_text:
+            raise ValueError("Session text is empty")
         root_session_id = int(detail.get("original_session_id") or session_id)
         version = self.serializer.get_next_session_version(root_session_id)
         source_version = self.serializer.get_version_record_for_session(session_id)
@@ -739,6 +742,9 @@ class InspectionRevisionRunnerMixin:
             return result_payload
         except Exception:
             self.serializer.fail_revision_run(
+                pipeline_run_id=pipeline_run_id,
+            )
+            self.serializer.delete_revision_version_shell(
                 pipeline_run_id=pipeline_run_id,
             )
             raise
