@@ -164,7 +164,9 @@ class JobManager:
         with self.lock:
             state = self.jobs.get(job_id)
         if state:
-            state.update(progress=min(100.0, max(0.0, progress)))
+            clamped = min(100.0, max(0.0, progress))
+            non_decreasing = max(state.progress, clamped)
+            state.update(progress=non_decreasing, last_activity_at=monotonic())
 
     # -------------------------------------------------------------------------
     def update_result(
@@ -174,6 +176,7 @@ class JobManager:
             state = self.jobs.get(job_id)
         if state is None:
             return None
+        state.update(last_activity_at=monotonic())
         return state.merge_result(patch).model_dump()
 
     # -------------------------------------------------------------------------
