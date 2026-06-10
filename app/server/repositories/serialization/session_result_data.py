@@ -27,7 +27,7 @@ from repositories.schemas.models import (
     Patient,
 )
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
-from services.text.normalization import normalize_drug_name
+from common.utils.text_utils import normalize_drug_name
 from services.text.vocabulary import (
     invalidate_text_normalization_snapshot,
 )
@@ -111,7 +111,7 @@ def decode_patient_image(self, value: Any) -> bytes | None:
         payload = payload.split(",", maxsplit=1)[1].strip()
     try:
         return base64.b64decode(payload, validate=True)
-    except binascii.Error, ValueError:
+    except (binascii.Error, ValueError):
         logger.warning("Skipping invalid patient image payload during session save")
         return None
 
@@ -640,7 +640,7 @@ def normalize_flag(self, value: Any) -> int | None:
         return 0
     try:
         numeric = int(normalized)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     return 1 if numeric != 0 else 0
 
@@ -698,7 +698,7 @@ def to_int(self, value: Any) -> int | None:
         return None
     try:
         return int(float(normalized))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -708,7 +708,7 @@ def to_float(self, value: Any) -> float | None:
         return None
     try:
         return float(normalized)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -947,5 +947,5 @@ def serialize_json_payload(self, payload: Any) -> str | None:
         return self.normalize_string(payload)
     try:
         return json.dumps(payload, ensure_ascii=False, default=str)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return self.normalize_string(payload)

@@ -12,10 +12,10 @@ from configurations.startup import get_server_settings
 from domain.documents import Document
 from repositories.serialization.data import DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
-from services.retrieval.chunking import SmartDocumentChunker
-from services.retrieval.embedding_model import EmbeddingModelSpec
+from common.utils.chunking import SmartDocumentChunker
+from common.utils.embedding_model import EmbeddingModelSpec
+from common.utils.seed_terms import load_seed_term_catalog
 from services.retrieval.embeddings import EmbeddingGenerator
-from services.retrieval.seed_terms import load_seed_term_catalog
 
 
 ###############################################################################

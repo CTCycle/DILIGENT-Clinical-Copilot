@@ -16,7 +16,7 @@ import pandas as pd
 from common.paths import RXNAV_CURATED_ALIASES_PATH
 from common.utils.logger import logger
 from repositories.serialization.data import DataSerializer
-from services.text.normalization import normalize_drug_name
+from common.utils.text_utils import normalize_drug_name
 from services.text.vocabulary import get_text_normalization_snapshot
 from services.updater.rxnav_client import (
     RxNavClient,
@@ -251,7 +251,7 @@ class RxNavDrugCatalogBuilder:
         headers = response.headers
         try:
             content_length = int(headers.get("Content-Length", 0) or 0)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             content_length = 0
         payload = {
             "source_url": str(response.request.url)

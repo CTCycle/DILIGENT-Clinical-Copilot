@@ -6,7 +6,7 @@ from typing import Any, cast
 
 import pandas as pd
 
-from services.text.normalization import coerce_text
+from common.utils.text_utils import coerce_text
 
 
 ###############################################################################
@@ -432,7 +432,7 @@ class LiverToxData:
             return -1
         try:
             return int(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return -1
 
     # -------------------------------------------------------------------------

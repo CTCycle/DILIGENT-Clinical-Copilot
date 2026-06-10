@@ -13,7 +13,7 @@ from common.constants import (
     RXNORM_CATALOG_COLUMNS,
 )
 from configurations.startup import get_server_settings
-from services.text.normalization import coerce_text, normalize_drug_name
+from common.utils.text_utils import coerce_text, normalize_drug_name
 
 
 

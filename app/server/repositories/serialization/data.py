@@ -36,7 +36,7 @@ from repositories.serialization import (
     session_revision_data,
     session_result_data,
 )
-from services.retrieval.chunking import SmartDocumentChunker
+from common.utils.chunking import SmartDocumentChunker
 
 ###############################################################################
 class DataSerializer:
@@ -1044,7 +1044,7 @@ class DocumentSerializer:
             try:
                 with path.open("r", encoding=encoding) as handle:
                     text = handle.read()
-            except OSError, UnicodeDecodeError:
+            except (OSError, UnicodeDecodeError):
                 continue
             return text.strip()
         logger.error("Failed to read text file '%s'", file_path)
@@ -1117,7 +1117,7 @@ class DocumentSerializer:
         try:
             core_xml = archive.read("docProps/core.xml")
             tree = ElementTree.fromstring(core_xml)
-        except KeyError, ElementTree.ParseError:
+        except (KeyError, ElementTree.ParseError):
             return Path(file_path).stem
         namespaces = {"dc": "http://purl.org/dc/elements/1.1/"}
         node = tree.find("dc:title", namespaces)

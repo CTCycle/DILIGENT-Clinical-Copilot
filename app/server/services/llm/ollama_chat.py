@@ -128,13 +128,13 @@ def resolve_temperature(
     if temperature is not None:
         try:
             temp_value = float(temperature)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             temp_value = default_temp
     if options_payload and "temperature" in options_payload:
         if temperature is None:
             try:
                 temp_value = float(options_payload["temperature"])
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 temp_value = default_temp
         options_payload.pop("temperature", None)
         if not options_payload:
@@ -452,7 +452,7 @@ async def is_server_online(self) -> bool:
     try:
         resp = await self.client.get("/api/tags")
         resp.raise_for_status()
-    except httpx.RequestError, httpx.HTTPStatusError:
+    except (httpx.RequestError, httpx.HTTPStatusError):
         return False
     return True
 

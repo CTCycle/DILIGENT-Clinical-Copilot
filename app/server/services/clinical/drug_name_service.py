@@ -5,11 +5,10 @@ from typing import Any
 
 from domain.clinical.matching import AliasCacheEntry, MonographRecord
 from services.clinical.livertox import LiverToxData
+from common.utils.text_utils import coerce_text, normalize_whitespace
 from services.text.normalization import (
     canonicalize_drug_query,
-    coerce_text,
     normalize_drug_query_name,
-    normalize_whitespace,
 )
 from services.text.synonyms import (
     extract_synonym_strings,

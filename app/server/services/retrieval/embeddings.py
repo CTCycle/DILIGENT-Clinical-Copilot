@@ -17,7 +17,7 @@ from repositories.serialization.access_keys import AccessKeySerializer
 from repositories.vectors import LanceVectorDatabase
 from services.llm.cloud import CloudLLMClient, LLMError, LLMTimeout
 from services.llm.ollama_client import OllamaClient, OllamaError, OllamaTimeout
-from services.retrieval.embedding_model import (
+from common.utils.embedding_model import (
     EmbeddingModelSpec,
     build_embedding_model_signature,
 )
