@@ -84,6 +84,7 @@ class ClinicalSession(Base):
     clinical_model: Mapped[str | None] = mapped_column(String)
     total_duration: Mapped[float | None] = mapped_column(Float)
     session_status: Mapped[str | None] = mapped_column(String, nullable=True)
+    session_kind: Mapped[str | None] = mapped_column(String, nullable=True)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     patient: Mapped["Patient"] = relationship(

@@ -22,44 +22,13 @@ class ReportFinalizer:
     def __init__(self, consultation: Any) -> None:
         self.consultation = consultation
 
-    # -------------------------------------------------------------------------
-    async def finalize_patient_report(
+    async def _build_and_finalize_report(
         self,
         entries: list[DrugClinicalAssessment],
         *,
         clinical_context: str | None,
         report_language: str,
-    ) -> str | None:
-        return await self._finalize_patient_report_internal(
-            entries,
-            clinical_context=clinical_context,
-            report_language=report_language,
-            execution_mode="standard",
-        )
-
-    # -------------------------------------------------------------------------
-    async def finalize_revision_patient_report(
-        self,
-        entries: list[DrugClinicalAssessment],
-        *,
-        clinical_context: str | None,
-        report_language: str,
-    ) -> str | None:
-        return await self._finalize_patient_report_internal(
-            entries,
-            clinical_context=clinical_context,
-            report_language=report_language,
-            execution_mode="revision",
-        )
-
-    # -------------------------------------------------------------------------
-    async def _finalize_patient_report_internal(
-        self,
-        entries: list[DrugClinicalAssessment],
-        *,
-        clinical_context: str | None,
-        report_language: str,
-        execution_mode: str,
+        generate_conclusion_fn,
     ) -> str | None:
         consultation = self.consultation
         matched_entries: list[DrugClinicalAssessment] = []
@@ -96,12 +65,7 @@ class ReportFinalizer:
 
         combined_report = "\n\n---\n\n".join(sections)
         if matched_sections:
-            generate_conclusion = (
-                self.generate_revision_conclusion
-                if execution_mode == "revision"
-                else self.generate_conclusion
-            )
-            conclusion = await generate_conclusion(
+            conclusion = await generate_conclusion_fn(
                 clinical_context=clinical_context or "",
                 multi_drug_report="\n\n---\n\n".join(matched_sections),
                 report_language=report_language,
@@ -112,43 +76,14 @@ class ReportFinalizer:
         return combined_report
 
     # -------------------------------------------------------------------------
-    async def generate_conclusion(
+    async def _run_conclusion(
         self,
         *,
         clinical_context: str,
         multi_drug_report: str,
         report_language: str,
-    ) -> str | None:
-        return await self._generate_conclusion_internal(
-            clinical_context=clinical_context,
-            multi_drug_report=multi_drug_report,
-            report_language=report_language,
-            execution_mode="standard",
-        )
-
-    # -------------------------------------------------------------------------
-    async def generate_revision_conclusion(
-        self,
-        *,
-        clinical_context: str,
-        multi_drug_report: str,
-        report_language: str,
-    ) -> str | None:
-        return await self._generate_conclusion_internal(
-            clinical_context=clinical_context,
-            multi_drug_report=multi_drug_report,
-            report_language=report_language,
-            execution_mode="revision",
-        )
-
-    # -------------------------------------------------------------------------
-    async def _generate_conclusion_internal(
-        self,
-        *,
-        clinical_context: str,
-        multi_drug_report: str,
-        report_language: str,
-        execution_mode: str,
+        system_template: str,
+        user_template: str,
     ) -> str | None:
         consultation = self.consultation
         report_body = multi_drug_report.strip()
@@ -157,16 +92,6 @@ class ReportFinalizer:
         context_body = clinical_context.strip()
         if not context_body:
             context_body = "No clinical context was provided."
-        user_template = (
-            LIVERTOX_REVISION_CONCLUSION_USER_PROMPT
-            if execution_mode == "revision"
-            else LIVERTOX_CONCLUSION_USER_PROMPT
-        )
-        system_template = (
-            LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT
-            if execution_mode == "revision"
-            else LIVERTOX_CONCLUSION_SYSTEM_PROMPT
-        )
         user_prompt = user_template.format(
             report_language=consultation.escape_braces(report_language),
             clinical_context=consultation.escape_braces(context_body),
@@ -219,6 +144,68 @@ class ReportFinalizer:
             if repaired:
                 conclusion = repaired
         return conclusion or None
+
+    # -------------------------------------------------------------------------
+    async def finalize_patient_report(
+        self,
+        entries: list[DrugClinicalAssessment],
+        *,
+        clinical_context: str | None,
+        report_language: str,
+    ) -> str | None:
+        return await self._build_and_finalize_report(
+            entries,
+            clinical_context=clinical_context,
+            report_language=report_language,
+            generate_conclusion_fn=self.generate_conclusion,
+        )
+
+    # -------------------------------------------------------------------------
+    async def finalize_revision_patient_report(
+        self,
+        entries: list[DrugClinicalAssessment],
+        *,
+        clinical_context: str | None,
+        report_language: str,
+    ) -> str | None:
+        return await self._build_and_finalize_report(
+            entries,
+            clinical_context=clinical_context,
+            report_language=report_language,
+            generate_conclusion_fn=self.generate_revision_conclusion,
+        )
+
+    # -------------------------------------------------------------------------
+    async def generate_conclusion(
+        self,
+        *,
+        clinical_context: str,
+        multi_drug_report: str,
+        report_language: str,
+    ) -> str | None:
+        return await self._run_conclusion(
+            clinical_context=clinical_context,
+            multi_drug_report=multi_drug_report,
+            report_language=report_language,
+            system_template=LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
+            user_template=LIVERTOX_CONCLUSION_USER_PROMPT,
+        )
+
+    # -------------------------------------------------------------------------
+    async def generate_revision_conclusion(
+        self,
+        *,
+        clinical_context: str,
+        multi_drug_report: str,
+        report_language: str,
+    ) -> str | None:
+        return await self._run_conclusion(
+            clinical_context=clinical_context,
+            multi_drug_report=multi_drug_report,
+            report_language=report_language,
+            system_template=LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
+            user_template=LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

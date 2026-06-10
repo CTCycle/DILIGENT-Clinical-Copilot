@@ -36,6 +36,7 @@ ALLOWED_OVERSIZED_BACKEND_FILES = {
     (SERVER_ROOT / "services" / "inspection" / "service.py").resolve(),
     (SERVER_ROOT / "services" / "session" / "session_service.py").resolve(),
     (SERVER_ROOT / "services" / "session" / "session_workflow.py").resolve(),
+    (SERVER_ROOT / "services" / "session" / "revision_workflow.py").resolve(),
 }
 
 
