@@ -127,10 +127,17 @@ def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) ->
 
 
 def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "services.session.session_service.get_server_settings",
-        lambda: SimpleNamespace(runtime=SimpleNamespace(clinical_llm_timeout=5400.0)),
+    fake_settings = SimpleNamespace(
+        runtime=SimpleNamespace(clinical_llm_timeout=5400.0),
     )
+    for module in (
+        "services.session.session_service",
+        "services.session.consultation",
+    ):
+        monkeypatch.setattr(
+            f"{module}.get_server_settings",
+            lambda: fake_settings,
+        )
     monkeypatch.setattr(
         "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
         lambda: True,
