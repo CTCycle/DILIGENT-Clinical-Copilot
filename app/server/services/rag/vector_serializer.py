@@ -10,7 +10,7 @@ from common.constants import DEFAULT_EMBEDDING_BATCH_SIZE
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.documents import Document
-from repositories.serialization.data import DocumentSerializer
+from repositories.serialization.document_serializer import DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
 from common.utils.chunking import SmartDocumentChunker
 from common.utils.embedding_model import EmbeddingModelSpec

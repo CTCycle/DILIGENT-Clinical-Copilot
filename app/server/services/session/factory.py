@@ -3,9 +3,9 @@ from __future__ import annotations
 from configurations.startup import get_server_settings
 from repositories.serialization.data import DataSerializer
 from services.clinical.disease import DiseaseExtractor
-from services.clinical.hepatox_core import (
+from services.clinical.hepatox_core import HepatoxConsultation
+from services.clinical.pattern_analyzer import (
     HepatotoxicityPatternAnalyzer,
-    HepatoxConsultation,
 )
 from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.parser import DrugsParser
