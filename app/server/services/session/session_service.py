@@ -93,6 +93,7 @@ from services.session.consultation import ClinicalSessionConsultationMixin
 from services.session.extraction_pipeline import ClinicalSessionExtractionPipelineMixin
 
 
+###############################################################################
 class ClinicalSessionService(
     ClinicalSessionFormattingMixin,
     ClinicalSessionConsultationMixin,
@@ -100,6 +101,7 @@ class ClinicalSessionService(
 ):
     JOB_TYPE = "clinical"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -185,6 +187,7 @@ class ClinicalSessionService(
             return base
         return max(base, max(float(requested), minimum_timeout_s))
 
+    # -------------------------------------------------------------------------
     def apply_persisted_runtime_configuration(self) -> None:
         self.model_config_service.ensure_defaults()
         parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model(
@@ -527,6 +530,7 @@ class ClinicalSessionService(
             rucam_bundle=rucam_bundle,
         )
 
+    # -------------------------------------------------------------------------
     async def process_single_patient(
         self,
         payload: PatientData,
@@ -556,6 +560,7 @@ class ClinicalSessionService(
             stop_check=stop_check,
         )
 
+    # -------------------------------------------------------------------------
     async def process_revision_patient(
         self,
         payload: PatientData,
@@ -588,18 +593,21 @@ class ClinicalSessionService(
             stop_check=stop_check,
         )
 
+    # -------------------------------------------------------------------------
     def start_clinical_job(
         self,
         request_payload: ClinicalSessionRequest,
     ) -> JobStartResponse:
         return start_clinical_job_workflow(self, request_payload)
 
+    # -------------------------------------------------------------------------
     def validate_clinical_input(
         self,
         request_payload: ClinicalSessionRequest,
     ) -> ClinicalInputPreflightResult:
         return validate_clinical_input_preflight(self, request_payload)
 
+    # -------------------------------------------------------------------------
     def get_clinical_job_status(self, job_id: str) -> JobStatusResponse:
         job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:

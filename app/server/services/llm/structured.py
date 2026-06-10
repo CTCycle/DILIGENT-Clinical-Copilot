@@ -9,7 +9,6 @@ from pydantic import BaseModel, ValidationError
 
 T = TypeVar("T", bound=BaseModel)
 
-
 ###############################################################################
 def extract_first_json_dict(text: str) -> dict[str, Any] | None:
     decoder = json.JSONDecoder()
@@ -23,7 +22,6 @@ def extract_first_json_dict(text: str) -> dict[str, Any] | None:
             return parsed
     return None
 
-
 ###############################################################################
 def parse_json_dict(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
     if isinstance(obj_or_text, dict):
@@ -36,12 +34,14 @@ def parse_json_dict(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return extract_first_json_dict(obj_or_text)
 
-
 ###############################################################################
 class StructuredOutputParser(Generic[T]):
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, schema: type[T]) -> None:
         self.schema = schema
 
+    # -------------------------------------------------------------------------
     def get_format_instructions(self) -> str:
         schema_json = json.dumps(
             self.schema.model_json_schema(),
@@ -54,6 +54,7 @@ class StructuredOutputParser(Generic[T]):
             f"JSON schema:\n{schema_json}"
         )
 
+    # -------------------------------------------------------------------------
     def parse(self, text: str) -> T:
         payload = parse_json_dict(text)
         if payload is None:
@@ -61,6 +62,7 @@ class StructuredOutputParser(Generic[T]):
         return self.schema.model_validate(payload)
 
 
+###############################################################################
 def parse_json_object_strict(raw: str) -> dict[str, Any]:
     text = (raw or "").strip()
     if not text:
@@ -84,9 +86,10 @@ def parse_json_object_strict(raw: str) -> dict[str, Any]:
         raise ValueError("trailing_prose_not_allowed")
     return parsed
 
-
 ###############################################################################
 class StructuredOutputAdapter:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -104,6 +107,7 @@ class StructuredOutputAdapter:
         self.supports_tool_schema = bool(supports_tool_schema)
         self.supports_json_mode = bool(supports_json_mode)
 
+    # -------------------------------------------------------------------------
     def validate_or_fail(self, raw_output: dict[str, Any] | str, schema: type[T]) -> T:
         if isinstance(raw_output, dict):
             payload = raw_output
@@ -113,6 +117,7 @@ class StructuredOutputAdapter:
             raise ValueError("unsupported_output_type")
         return schema.model_validate(payload)
 
+    # -------------------------------------------------------------------------
     def repair_once_if_allowed(
         self,
         *,
@@ -137,6 +142,7 @@ class StructuredOutputAdapter:
             )
             return self.validate_or_fail(repaired_output, schema)
 
+    # -------------------------------------------------------------------------
     def complete_with_schema(
         self,
         *,

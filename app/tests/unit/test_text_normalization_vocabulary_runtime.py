@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
+###############################################################################
 def test_runtime_upsert_list_and_deactivate_term() -> None:
     engine = create_engine("sqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
@@ -40,6 +41,7 @@ def test_runtime_upsert_list_and_deactivate_term() -> None:
     assert rows[0]["is_active"] is False
 
 
+###############################################################################
 def test_seed_mapping_categories_are_loaded() -> None:
     # Smoke check: default snapshot exposes the new mapping fields.
     snapshot = vocabulary_module.get_text_normalization_snapshot()

@@ -9,42 +9,45 @@ import services.llm.ollama_client as providers_module
 from pydantic import BaseModel
 from services.llm.structured import StructuredOutputParser
 
-
 ###############################################################################
 @dataclass
 class FakeResponse:
     payload: dict[str, Any]
 
+    # -------------------------------------------------------------------------
     def json(self) -> dict[str, Any]:
         return self.payload
-
 
 ###############################################################################
 class FakeSchema(BaseModel):
     status: str
 
-
 ###############################################################################
 class FakeStreamResponse:
+
+    # -------------------------------------------------------------------------
     def __init__(self, lines: list[str]) -> None:
         self._lines = lines
 
+    # -------------------------------------------------------------------------
     async def aiter_lines(self):
         for line in self._lines:
             yield line
 
-
 ###############################################################################
 class FakeStreamContext:
+
+    # -------------------------------------------------------------------------
     def __init__(self, response: FakeStreamResponse) -> None:
         self.response = response
 
+    # -------------------------------------------------------------------------
     async def __aenter__(self) -> FakeStreamResponse:
         return self.response
 
+    # -------------------------------------------------------------------------
     async def __aexit__(self, exc_type, exc, tb) -> None:
         return None
-
 
 ###############################################################################
 def _patch_generation_prep(monkeypatch, client: providers_module.OllamaClient) -> None:
@@ -70,7 +73,6 @@ def _patch_generation_prep(monkeypatch, client: providers_module.OllamaClient) -
     monkeypatch.setattr(client, "resolve_policy_keep_alive", fake_keep_alive)
     monkeypatch.setattr(client, "ensure_model_ready", fake_ready)
     monkeypatch.setattr(client, "maybe_prefetch_target_model", fake_prefetch)
-
 
 ###############################################################################
 def test_chat_uses_native_ollama_chat_endpoint(monkeypatch) -> None:
@@ -101,7 +103,6 @@ def test_chat_uses_native_ollama_chat_endpoint(monkeypatch) -> None:
     assert captured["json"]["temperature"] == 0.4
     assert captured["json"]["think"] is True
     asyncio.run(client.close())
-
 
 ###############################################################################
 def test_chat_stream_preserves_stream_behavior(monkeypatch) -> None:
@@ -136,7 +137,6 @@ def test_chat_stream_preserves_stream_behavior(monkeypatch) -> None:
     assert events[-1]["message"]["content"] == "chunk-1chunk-2"
     asyncio.run(client.close())
 
-
 ###############################################################################
 def test_embed_uses_native_ollama_embed_endpoint(monkeypatch) -> None:
     client = providers_module.OllamaClient(base_url="http://127.0.0.1:11434")
@@ -162,7 +162,6 @@ def test_embed_uses_native_ollama_embed_endpoint(monkeypatch) -> None:
     assert captured["json"] == {"model": "llama3.1:8b", "input": ["a", "bb"]}
     asyncio.run(client.close())
 
-
 ###############################################################################
 def test_structured_output_repair_loop_still_works(monkeypatch) -> None:
     client = providers_module.OllamaClient(base_url="http://127.0.0.1:11434")
@@ -187,7 +186,6 @@ def test_structured_output_repair_loop_still_works(monkeypatch) -> None:
     )
     assert parsed.status == "ok"
     asyncio.run(client.close())
-
 
 ###############################################################################
 def test_ollama_native_timeout_maps_to_existing_error_type(monkeypatch) -> None:

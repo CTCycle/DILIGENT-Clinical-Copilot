@@ -26,9 +26,10 @@ from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
 
-
 ###############################################################################
 class AccessKeySerializer:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

@@ -5,6 +5,7 @@ from fastapi.routing import APIRoute
 from app import app
 
 
+###############################################################################
 def test_schema_exposed_api_routes_define_response_model() -> None:
     missing_response_models: list[str] = []
     for route in app.routes:

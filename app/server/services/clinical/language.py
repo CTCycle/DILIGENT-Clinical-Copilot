@@ -18,7 +18,6 @@ from common.utils.languages import (
 from domain.clinical.entities import PatientData
 from domain.clinical.language import LanguageDetectionResult
 
-
 ###############################################################################
 class ClinicalLanguageDetector:
     DEFAULT_THRESHOLDS: dict[str, float] = {
@@ -29,10 +28,12 @@ class ClinicalLanguageDetector:
         "moderate_confidence_min_margin": 1.0,
     }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def tokenize(value: str) -> list[str]:
         return [match.group(0).casefold() for match in TOKEN_PATTERN.finditer(value)]
 
+    # -------------------------------------------------------------------------
     @classmethod
     def score_text_by_language(cls, text: str) -> dict[str, float]:
         scores: dict[str, float] = dict.fromkeys(SUPPORTED_REPORT_LANGUAGES, 0.0)
@@ -74,6 +75,7 @@ class ClinicalLanguageDetector:
             scores[lang_code] = raw_score / length_norm
         return scores
 
+    # -------------------------------------------------------------------------
     @classmethod
     @lru_cache(maxsize=1)
     def load_thresholds(cls) -> dict[str, float]:
@@ -94,6 +96,7 @@ class ClinicalLanguageDetector:
             )
         return thresholds
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def coerce_non_negative_float(value: Any, *, default: float) -> float:
         if isinstance(value, bool):
@@ -109,6 +112,7 @@ class ClinicalLanguageDetector:
             return parsed if parsed >= 0.0 else default
         return default
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def default_result() -> LanguageDetectionResult:
         return LanguageDetectionResult(
@@ -117,6 +121,7 @@ class ClinicalLanguageDetector:
             confidence="low",
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def detect(cls, payload: PatientData) -> LanguageDetectionResult:
         full_text = " ".join(

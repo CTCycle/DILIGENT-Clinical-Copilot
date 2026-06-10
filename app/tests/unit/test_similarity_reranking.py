@@ -4,9 +4,10 @@ from typing import Any
 
 from services.retrieval.embeddings import SimilaritySearch
 
-
 ###############################################################################
 class SearchTableStub:
+
+    # -------------------------------------------------------------------------
     def __init__(self, rows: list[dict[str, Any]]) -> None:
         self.rows = rows
         self.limit_value: int | None = None
@@ -34,9 +35,10 @@ class SearchTableStub:
             return list(self.rows)
         return list(self.rows[: self.limit_value])
 
-
 ###############################################################################
 class VectorDatabaseStub:
+
+    # -------------------------------------------------------------------------
     def __init__(self, rows: list[dict[str, Any]]) -> None:
         self.table = SearchTableStub(rows)
 
@@ -48,13 +50,15 @@ class VectorDatabaseStub:
     def get_table(self) -> SearchTableStub:
         return self.table
 
+    # -------------------------------------------------------------------------
     def assert_query_model_matches_index(self, active_signature: str) -> None:
         _ = active_signature
         return None
 
-
 ###############################################################################
 class EmbeddingGeneratorStub:
+
+    # -------------------------------------------------------------------------
     def __init__(self, vectors: dict[str, list[float]]) -> None:
         self.vectors = vectors
 
@@ -62,6 +66,7 @@ class EmbeddingGeneratorStub:
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         return [self.vectors[text] for text in texts]
 
+    # -------------------------------------------------------------------------
     def resolve_active_embedding_model_spec(self) -> Any:
         return type(
             "Spec",
@@ -75,21 +80,21 @@ class EmbeddingGeneratorStub:
             },
         )()
 
-
-###############################################################################
 ###############################################################################
 class CrossEncoderStub:
+
+    # -------------------------------------------------------------------------
     def predict(self, pairs: list[tuple[str, str]]) -> list[float]:
         lookup = {"alpha": 0.1, "beta": 0.8, "gamma": 0.9}
         return [lookup[text] for _, text in pairs]
 
-
 ###############################################################################
 class FailingCrossEncoderStub:
+
+    # -------------------------------------------------------------------------
     def predict(self, pairs: list[tuple[str, str]]) -> list[float]:
         _ = pairs
         raise RuntimeError("synthetic rerank failure")
-
 
 ###############################################################################
 def sample_rows() -> list[dict[str, Any]]:
@@ -120,7 +125,6 @@ def sample_rows() -> list[dict[str, Any]]:
         },
     ]
 
-
 ###############################################################################
 def sample_vectors() -> dict[str, list[float]]:
     return {
@@ -129,7 +133,6 @@ def sample_vectors() -> dict[str, list[float]]:
         "beta": [0.98, 0.2],
         "gamma": [0.8, 0.1],
     }
-
 
 ###############################################################################
 def test_search_with_reranking_reorders_and_trims_results() -> None:
@@ -151,7 +154,6 @@ def test_search_with_reranking_reorders_and_trims_results() -> None:
     assert len(results) == 2
     assert all("rerank_score" in item for item in results)
 
-
 ###############################################################################
 def test_search_with_reranking_skips_reorder_when_disabled() -> None:
     search = SimilaritySearch(
@@ -169,7 +171,6 @@ def test_search_with_reranking_skips_reorder_when_disabled() -> None:
 
     assert [item.get("text") for item in results] == ["alpha", "beta"]
     assert all("rerank_score" not in item for item in results)
-
 
 ###############################################################################
 def test_search_with_reranking_enforces_candidate_floor_against_top_n() -> None:
@@ -189,7 +190,6 @@ def test_search_with_reranking_enforces_candidate_floor_against_top_n() -> None:
 
     assert len(results) == 3
     assert vector_db.table.limit_value == 3
-
 
 ###############################################################################
 def test_search_with_reranking_falls_back_when_reranker_fails() -> None:

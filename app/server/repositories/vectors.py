@@ -47,9 +47,10 @@ VECTOR_TABLE_SCHEMA = pa.schema(
 DistanceType = Literal["l2", "cosine", "dot"]
 IndexType = Literal["IVF_FLAT", "IVF_PQ", "IVF_HNSW_SQ", "IVF_HNSW_PQ"]
 
-
 ###############################################################################
 class LanceVectorDatabase:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         database_path: str,
@@ -337,6 +338,7 @@ class LanceVectorDatabase:
             return int(embedding_field.type.list_size)
         return None
 
+    # -------------------------------------------------------------------------
     def _schema_with_embedding_size(self, embedding_size: int) -> pa.Schema:
         desired_type = pa.list_(pa.float32(), embedding_size)
         fields: list[pa.Field] = []
@@ -347,6 +349,7 @@ class LanceVectorDatabase:
                 fields.append(field)
         return pa.schema(fields)
 
+    # -------------------------------------------------------------------------
     def _filter_records_by_embedding_size(
         self, records: list[dict[str, Any]], embedding_size: int
     ) -> tuple[list[dict[str, Any]], int]:
@@ -360,6 +363,7 @@ class LanceVectorDatabase:
                 discarded += 1
         return valid_records, discarded
 
+    # -------------------------------------------------------------------------
     def _index_has_embedding_column(self, index: Any) -> bool:
         column = (
             self._index_value(index, "column")
@@ -373,6 +377,7 @@ class LanceVectorDatabase:
                 return True
         return False
 
+    # -------------------------------------------------------------------------
     def _iter_column_entries(self, column: Any) -> Iterator[Any]:
         if column is None:
             return iter(())
@@ -380,6 +385,7 @@ class LanceVectorDatabase:
             return iter(column)
         return iter((column,))
 
+    # -------------------------------------------------------------------------
     def _column_entry_name(self, entry: Any) -> str | None:
         if isinstance(entry, str):
             return entry
@@ -390,6 +396,7 @@ class LanceVectorDatabase:
             or self._index_value(entry, "vector_column_name")
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _index_value(index: Any, key: str) -> Any:
         if isinstance(index, dict):

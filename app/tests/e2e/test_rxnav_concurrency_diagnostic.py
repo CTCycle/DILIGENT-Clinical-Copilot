@@ -21,14 +21,12 @@ DRUG_QUERIES = [
 ]
 RXCUI_QUERIES = ["161", "857004", "860975", "617320", "308192", "197361"]
 
-
 ###############################################################################
 @dataclass(slots=True)
 class RequestMetric:
     status_code: int
     elapsed_seconds: float
     error: str | None
-
 
 ###############################################################################
 async def perform_request(
@@ -63,7 +61,6 @@ async def perform_request(
             error=str(exc),
         )
 
-
 ###############################################################################
 def make_workload(total_requests: int) -> list[tuple[str, str]]:
     payload: list[tuple[str, str]] = []
@@ -77,7 +74,6 @@ def make_workload(total_requests: int) -> list[tuple[str, str]]:
             if len(payload) >= total_requests:
                 return payload
     return payload
-
 
 ###############################################################################
 async def run_probe(
@@ -111,7 +107,6 @@ async def run_probe(
         )
     return metrics
 
-
 ###############################################################################
 def summarize(metrics: list[RequestMetric]) -> dict[str, object]:
     status_counts: dict[int, int] = {}
@@ -135,11 +130,9 @@ def summarize(metrics: list[RequestMetric]) -> dict[str, object]:
         "avg_ms": statistics.fmean(latencies) * 1000 if latencies else 0.0,
     }
 
-
 ###############################################################################
 def enabled() -> bool:
     return os.environ.get("RUN_RXNAV_CONCURRENCY_DIAGNOSTIC", "").strip() == "1"
-
 
 ###############################################################################
 @pytest.mark.skipif(

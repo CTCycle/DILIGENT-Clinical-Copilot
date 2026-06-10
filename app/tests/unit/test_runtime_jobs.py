@@ -7,7 +7,10 @@ from services.runtime.jobs import JobManager
 from services.session.session_service import ClinicalSessionService
 
 
+###############################################################################
 class _SnapshotCancelManager:
+
+    # -------------------------------------------------------------------------
     def get_job_status(self, job_id: str) -> dict[str, object]:
         return {
             "job_id": job_id,
@@ -16,6 +19,7 @@ class _SnapshotCancelManager:
             "progress": 0.5,
         }
 
+    # -------------------------------------------------------------------------
     def cancel_job(self, job_id: str) -> dict[str, object]:
         return {
             "job_id": job_id,
@@ -25,6 +29,7 @@ class _SnapshotCancelManager:
         }
 
 
+###############################################################################
 def test_clinical_cancel_response_converts_job_snapshot_to_success_bool() -> None:
     service = ClinicalSessionService.__new__(ClinicalSessionService)
     service.job_manager = _SnapshotCancelManager()
@@ -35,6 +40,7 @@ def test_clinical_cancel_response_converts_job_snapshot_to_success_bool() -> Non
     assert response.job_id == "job-123"
 
 
+###############################################################################
 def test_running_cancel_transitions_to_cancelled_immediately() -> None:
     manager = JobManager()
     started = threading.Event()
@@ -61,6 +67,7 @@ def test_running_cancel_transitions_to_cancelled_immediately() -> None:
     assert terminal["status"] == "cancelled"
 
 
+###############################################################################
 def test_running_cancel_allows_duplicate_job_submission_immediately() -> None:
     manager = JobManager()
     started = threading.Event()
@@ -78,6 +85,7 @@ def test_running_cancel_allows_duplicate_job_submission_immediately() -> None:
     release.set()
 
 
+###############################################################################
 def test_job_result_merge_is_single_source_of_truth() -> None:
     manager = JobManager()
     release = threading.Event()

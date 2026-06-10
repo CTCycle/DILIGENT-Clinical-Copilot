@@ -5,7 +5,6 @@ from datetime import datetime
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ModelConfigSnapshot:
@@ -20,14 +19,12 @@ class ModelConfigSnapshot:
     rag_settings: dict[str, object] | None = None
     updated_at: datetime | None = None
 
-
 ###############################################################################
 class LocalModelCard(BaseModel):
     name: str
     family: str
     description: str
     available_in_ollama: bool
-
 
 ###############################################################################
 class ModelConfigUpdateRequest(BaseModel):
@@ -44,7 +41,6 @@ class ModelConfigUpdateRequest(BaseModel):
     cloud_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     ollama_reasoning: bool | None = None
     rag_settings: dict[str, object] | None = None
-
 
 ###############################################################################
 class ModelConfigStateResponse(BaseModel):

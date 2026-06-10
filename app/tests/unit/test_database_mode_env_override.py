@@ -9,10 +9,12 @@ from configurations.management import (
 )
 
 
+###############################################################################
 def _write_config(path, payload) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+###############################################################################
 def _base_payload() -> dict:
     return {
         "database": {
@@ -33,6 +35,7 @@ def _base_payload() -> dict:
     }
 
 
+###############################################################################
 def test_database_settings_are_loaded_from_json_without_env_overlap(
     tmp_path, monkeypatch
 ) -> None:

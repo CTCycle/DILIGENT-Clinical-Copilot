@@ -5,9 +5,10 @@ import re
 from common.utils.chunking import SmartDocumentChunker
 from domain.documents import Document
 
-
 ###############################################################################
 class DocumentChunker:
+
+    # -------------------------------------------------------------------------
     def __init__(self, chunk_size: int, chunk_overlap: int) -> None:
         self.chunk_size = max(chunk_size, 1)
         self.chunk_overlap = max(chunk_overlap, 0)

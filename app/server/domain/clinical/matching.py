@@ -4,12 +4,14 @@ from dataclasses import dataclass
 from typing import Literal
 
 
+###############################################################################
 @dataclass(slots=True)
 class AliasCacheEntry:
     entries: list[tuple[str, bool]]
     seen: set[str]
 
 
+###############################################################################
 @dataclass(slots=True)
 class MonographRecord:
     stable_key: str
@@ -22,6 +24,7 @@ class MonographRecord:
     tokens: set[str]
 
 
+###############################################################################
 @dataclass(slots=True)
 class LiverToxMatch:
     status: Literal["matched", "missing", "ambiguous"]

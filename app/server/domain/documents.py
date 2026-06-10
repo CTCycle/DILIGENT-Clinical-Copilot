@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+###############################################################################
 @dataclass
 class Document:
     page_content: str

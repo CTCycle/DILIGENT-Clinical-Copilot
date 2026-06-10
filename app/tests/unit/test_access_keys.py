@@ -11,7 +11,6 @@ from repositories.serialization.access_keys import AccessKeySerializer
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 def build_serializer() -> tuple[AccessKeySerializer, sessionmaker]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
@@ -23,7 +22,6 @@ def build_serializer() -> tuple[AccessKeySerializer, sessionmaker]:
     ).ensure_seeded()
     serializer = AccessKeySerializer(engine=engine, session_factory=factory)
     return serializer, factory
-
 
 ###############################################################################
 def test_stored_encrypted_value_never_contains_plaintext() -> None:
@@ -41,7 +39,6 @@ def test_stored_encrypted_value_never_contains_plaintext() -> None:
     assert plaintext not in stored.encrypted_value
     assert stored.fingerprint
     assert stored.encryption_key_version == 1
-
 
 ###############################################################################
 def test_activation_keeps_only_one_active_key_per_provider() -> None:
@@ -62,7 +59,6 @@ def test_activation_keeps_only_one_active_key_per_provider() -> None:
     assert len(active_rows) == 1
     assert active_rows[0].id == second.id
     assert any(row.id == first.id for row in rows)
-
 
 ###############################################################################
 def test_provider_scoped_activate_and_delete_for_brave() -> None:
@@ -89,7 +85,6 @@ def test_provider_scoped_activate_and_delete_for_brave() -> None:
     assert deleted is True
     assert serializer.get_active_key("brave") is None
 
-
 ###############################################################################
 def test_decrypt_key_row_uses_db_seeded_material() -> None:
     serializer, _factory = build_serializer()
@@ -99,7 +94,6 @@ def test_decrypt_key_row_uses_db_seeded_material() -> None:
     restored = serializer.decrypt_key_row(created)
 
     assert restored == plaintext
-
 
 ###############################################################################
 def test_rejects_too_short_access_key() -> None:

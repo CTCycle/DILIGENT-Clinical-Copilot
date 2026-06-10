@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 
+###############################################################################
 class DatabaseEnvironmentSnapshot(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -22,6 +23,7 @@ class DatabaseEnvironmentSnapshot(BaseModel):
     select_page_size: str | None = None
 
 
+###############################################################################
 class EnvironmentSnapshot(BaseModel):
     model_config = ConfigDict(frozen=True)
 

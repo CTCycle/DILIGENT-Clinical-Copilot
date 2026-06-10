@@ -6,12 +6,14 @@ from fastapi.routing import APIRoute
 from app import app
 
 
+###############################################################################
 def test_openapi_schema_generation_succeeds() -> None:
     schema = app.openapi()
     assert "paths" in schema
     assert "/api/health" in schema["paths"]
 
 
+###############################################################################
 def test_health_route_uses_response_model() -> None:
     schema = app.openapi()
     response = schema["paths"]["/api/health"]["get"]["responses"]["200"]
@@ -19,12 +21,14 @@ def test_health_route_uses_response_model() -> None:
     assert content["schema"]["$ref"].endswith("/HealthResponse")
 
 
+###############################################################################
 def test_clinical_job_route_advertises_response_model() -> None:
     schema = app.openapi()
     response = schema["paths"]["/api/clinical/jobs"]["post"]["responses"]["202"]
     assert "application/json" in response["content"]
 
 
+###############################################################################
 def test_stable_json_routes_declare_response_models() -> None:
     violations: list[str] = []
 
@@ -44,6 +48,7 @@ def test_stable_json_routes_declare_response_models() -> None:
     assert not violations, "Routes missing response_model:\n" + "\n".join(violations)
 
 
+###############################################################################
 def test_inspection_revision_routes_are_present_in_openapi() -> None:
     schema = app.openapi()
     expected_paths = [

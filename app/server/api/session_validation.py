@@ -9,10 +9,12 @@ from domain.clinical.entities import ClinicalSessionRequest
 WORD_PATTERN = re.compile(r"\b[\wÀ-ÖØ-öø-ÿ']+\b", re.UNICODE)
 
 
+###############################################################################
 def count_words(text: str) -> int:
     return len(WORD_PATTERN.findall(text or ""))
 
 
+###############################################################################
 def validate_clinical_session_request(request: ClinicalSessionRequest) -> None:
     details: list[dict[str, str]] = []
 

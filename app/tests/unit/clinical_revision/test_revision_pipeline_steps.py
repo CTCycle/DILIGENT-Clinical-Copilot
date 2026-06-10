@@ -12,6 +12,7 @@ from sqlalchemy import create_engine
 import services.inspection.service as inspection_service_module
 
 
+###############################################################################
 def build_service() -> tuple[DataInspectionService, DataSerializer]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
@@ -19,6 +20,7 @@ def build_service() -> tuple[DataInspectionService, DataSerializer]:
     return DataInspectionService(serializer=serializer, jobs=JobManager()), serializer
 
 
+###############################################################################
 def seed_session(serializer: DataSerializer) -> int:
     session_id = serializer.save_clinical_session(
         {
@@ -53,6 +55,7 @@ def seed_session(serializer: DataSerializer) -> int:
     return session_id
 
 
+###############################################################################
 def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
     service, serializer = build_service()
     session_id = seed_session(serializer)
@@ -96,6 +99,7 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
     captured_entrypoint: dict[str, object] = {}
     captured_revision_context: dict[str, object] = {}
 
+    ###############################################################################
     class FakeSnapshot:
         clinical_model = "baseline-clinical"
         text_extraction_model = "baseline-extraction"
@@ -108,23 +112,31 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
         rag_settings = {}
         updated_at = None
 
+    ###############################################################################
     class FakeModelConfigSerializer:
         save_calls = 0
 
+        # -------------------------------------------------------------------------
         def load_snapshot(self) -> FakeSnapshot:
             return FakeSnapshot()
 
+        # -------------------------------------------------------------------------
         def save_snapshot(self, **kwargs) -> None:
             type(self).save_calls += 1
             return None
 
+    ###############################################################################
     class FakeClinicalService:
+
+        # -------------------------------------------------------------------------
         def apply_persisted_runtime_configuration(self) -> None:
             return None
 
+        # -------------------------------------------------------------------------
         async def preprocess_unified_input(self, request):
             return request, {"history_of_present_illness": "Extracted HPI"}
 
+        # -------------------------------------------------------------------------
         async def prepare_revision_source_request(self, *, session_detail, use_rag):
             request = inspection_service_module.ClinicalSessionRequest(
                 name=session_detail.get("patient_name"),
@@ -137,12 +149,14 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
             )
             return preprocessed_request, section_extraction, "reparsed_source_text"
 
+        # -------------------------------------------------------------------------
         def build_patient_payload(self, preprocessed_request):
             return {
                 "name": preprocessed_request.name,
                 "clinical_input": preprocessed_request.clinical_input,
             }
 
+        # -------------------------------------------------------------------------
         async def process_single_patient(
             self,
             *args,
@@ -150,6 +164,7 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
         ):
             raise AssertionError("Revision runner should not call process_single_patient")
 
+        # -------------------------------------------------------------------------
         async def process_revision_patient(
             self,
             patient_payload,
@@ -582,6 +597,7 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
     assert version_detail["version"]["llm_qa_status"] == "passed"
 
 
+###############################################################################
 def test_run_revision_job_reuses_persisted_source_sections(monkeypatch) -> None:
     service, serializer = build_service()
     session_id = serializer.save_clinical_session(
@@ -653,15 +669,20 @@ def test_run_revision_job_reuses_persisted_source_sections(monkeypatch) -> None:
 
     captured_section_extraction: dict[str, object] = {}
 
+    ###############################################################################
     class FakeClinicalService:
+
+        # -------------------------------------------------------------------------
         def apply_persisted_runtime_configuration(self) -> None:
             return None
 
+        # -------------------------------------------------------------------------
         async def preprocess_unified_input(self, request):
             raise AssertionError(
                 "Revision runner should reuse persisted source sections before reparsing"
             )
 
+        # -------------------------------------------------------------------------
         async def prepare_revision_source_request(self, *, session_detail, use_rag):
             return await inspection_service_module.build_clinical_session_service(
                 JobManager()
@@ -670,6 +691,7 @@ def test_run_revision_job_reuses_persisted_source_sections(monkeypatch) -> None:
                 use_rag=use_rag,
             )
 
+        # -------------------------------------------------------------------------
         def build_patient_payload(self, preprocessed_request):
             return {
                 "name": preprocessed_request.name,
@@ -679,9 +701,11 @@ def test_run_revision_job_reuses_persisted_source_sections(monkeypatch) -> None:
                 "laboratory_analysis": preprocessed_request.laboratory_analysis,
             }
 
+        # -------------------------------------------------------------------------
         async def process_single_patient(self, *args, **kwargs):
             raise AssertionError("Revision runner should not call process_single_patient")
 
+        # -------------------------------------------------------------------------
         async def process_revision_patient(
             self,
             patient_payload,

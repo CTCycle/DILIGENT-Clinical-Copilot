@@ -7,6 +7,7 @@ from domain.documents import Document
 from repositories.serialization.data import DocumentChunker, DocumentSerializer
 
 
+###############################################################################
 def test_textual_document_metadata_uses_heading_title_fallback(tmp_path: Path) -> None:
     file_path = tmp_path / "study.txt"
     file_path.write_text("HEPATOTOXICITY OVERVIEW\n\nBody text.", encoding="utf-8")
@@ -21,6 +22,7 @@ def test_textual_document_metadata_uses_heading_title_fallback(tmp_path: Path) -
     assert metadata["content_type"] == "txt"
 
 
+###############################################################################
 def test_document_serializer_accepts_path_objects_and_collects_relative_ids(
     tmp_path: Path,
 ) -> None:
@@ -37,6 +39,7 @@ def test_document_serializer_accepts_path_objects_and_collects_relative_ids(
     assert serializer.compute_document_id(file_path) == expected_id
 
 
+###############################################################################
 def test_structure_aware_chunking_preserves_heading_metadata() -> None:
     chunker = DocumentChunker(chunk_size=40, chunk_overlap=5)
     document = Document(

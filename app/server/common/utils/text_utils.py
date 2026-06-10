@@ -7,7 +7,6 @@ from typing import Any
 
 import pandas as pd
 
-
 ###############################################################################
 def coerce_text(value: Any) -> str | None:
     if value is None:
@@ -109,6 +108,7 @@ def extract_synonym_strings(value: Any, seen_refs: set[int] | None = None) -> li
         return []
     return extract_synonym_strings(text, seen_refs)
 
+###############################################################################
 def try_parse_json(value: str) -> Any:
     if not value:
         return None

@@ -18,9 +18,11 @@ from domain.clinical.entities import DrugRucamAssessment, DrugSuspensionContext
 class DrugAnalysisService:
     """Handles per-drug LLM consultation — building prompts, calling the LLM, parsing responses."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, consultation: Any) -> None:
         self.consultation = consultation
 
+    # -------------------------------------------------------------------------
     async def _build_and_run_drug_analysis(
         self,
         *,

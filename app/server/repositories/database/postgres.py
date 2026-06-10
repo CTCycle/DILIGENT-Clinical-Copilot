@@ -14,9 +14,10 @@ from repositories.database.utils import (
 )
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
-
 ###############################################################################
 class PostgresRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self, settings: DatabaseSettings) -> None:
         if not settings.host:
             raise ValueError("Database host must be provided for external database.")

@@ -17,6 +17,7 @@ MAX_DRUGS_TEXT_LENGTH = 20000
 
 
 # HELPERS
+
 ###############################################################################
 def sanitize_field(value: str | None) -> str | None:
     if value is None:
@@ -24,14 +25,12 @@ def sanitize_field(value: str | None) -> str | None:
     stripped = value.strip()
     return stripped or None
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def strip_html(value: str) -> str:
     unescaped = html.unescape(value)
     return HTML_TAG_RE.sub(" ", unescaped)
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def sanitize_drug_line(value: str) -> str:
     stripped_html = strip_html(value)
     without_bullet = DRUG_BULLET_PREFIX_RE.sub("", stripped_html)
@@ -40,8 +39,7 @@ def sanitize_drug_line(value: str) -> str:
     compact = MULTISPACE_RE.sub(" ", without_symbols).strip(" \t,;:-")
     return compact
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def sanitize_drugs_text(value: str | None) -> str | None:
     if value is None:
         return None
@@ -65,8 +63,7 @@ def sanitize_drugs_text(value: str | None) -> str | None:
     clipped = clipped.strip()
     return clipped or joined[:MAX_DRUGS_TEXT_LENGTH].strip() or None
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def sanitize_anamnesis_text(value: str | None) -> str | None:
     if value is None:
         return None
@@ -84,8 +81,7 @@ def sanitize_anamnesis_text(value: str | None) -> str | None:
         return None
     return "\n".join(cleaned_lines)
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def sanitize_laboratory_text(value: str | None) -> str | None:
     if value is None:
         return None
@@ -101,8 +97,7 @@ def sanitize_laboratory_text(value: str | None) -> str | None:
         return None
     return "\n".join(cleaned_lines)
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def normalize_visit_date(
     value: datetime | date | dict[str, Any] | str | None,
 ) -> date | None:
@@ -156,8 +151,7 @@ def normalize_visit_date(
         return today
     return normalized
 
-
-##############################################################################
+###############################################################################
 def sanitize_dili_payload(
     *,
     patient_name: str | None,
@@ -186,9 +180,9 @@ def sanitize_dili_payload(
         "use_rag": bool(use_rag),
     }
 
-
-##############################################################################
+###############################################################################
 class PayloadSanitizationService:
+
     # -------------------------------------------------------------------------
     @staticmethod
     def sanitize_dili_payload(

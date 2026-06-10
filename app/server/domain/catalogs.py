@@ -7,6 +7,7 @@ from types import MappingProxyType
 from typing import Any
 
 
+###############################################################################
 def normalize_catalog_value(value: str) -> str:
     normalized = (
         unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
@@ -16,6 +17,7 @@ def normalize_catalog_value(value: str) -> str:
     return re.sub(r"\s+", " ", normalized).strip()
 
 
+###############################################################################
 @dataclass(frozen=True)
 class CatalogEntry:
     manifest: str
@@ -33,6 +35,7 @@ class CatalogEntry:
     active: bool = True
 
 
+###############################################################################
 @dataclass(frozen=True)
 class CatalogManifest:
     manifest: str
@@ -41,6 +44,7 @@ class CatalogManifest:
     entries: tuple[CatalogEntry, ...]
 
 
+###############################################################################
 @dataclass(frozen=True)
 class CatalogSeedResult:
     manifests_seen: int
@@ -48,12 +52,14 @@ class CatalogSeedResult:
     entries_written: int
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ReferenceCatalogSnapshot:
     entries_by_scope: MappingProxyType[
         tuple[str, str, str, str], tuple[CatalogEntry, ...]
     ]
 
+    # -------------------------------------------------------------------------
     def entries(
         self,
         domain: str,
@@ -64,6 +70,7 @@ class ReferenceCatalogSnapshot:
         scope_key = key or "*"
         return self.entries_by_scope.get((domain, category, scope_key, locale), ())
 
+    # -------------------------------------------------------------------------
     def values(
         self,
         domain: str,
@@ -76,6 +83,7 @@ class ReferenceCatalogSnapshot:
             for entry in self.entries(domain, category, key=key, locale=locale)
         )
 
+    # -------------------------------------------------------------------------
     def metadata(
         self,
         domain: str,

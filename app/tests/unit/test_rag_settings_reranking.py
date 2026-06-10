@@ -6,6 +6,7 @@ from configurations.management import (
 )
 
 
+###############################################################################
 def _env() -> EnvironmentSnapshot:
     return EnvironmentSnapshot(
         ollama_url="http://localhost:11434",
@@ -14,6 +15,7 @@ def _env() -> EnvironmentSnapshot:
     )
 
 
+###############################################################################
 def test_build_rag_settings_reads_retrieval_counts() -> None:
     payload = build_settings_payload_from_json(
         {
@@ -46,6 +48,7 @@ def test_build_rag_settings_reads_retrieval_counts() -> None:
     assert settings["ollama_embedding_model"] == "nomic-embed-text:latest"
 
 
+###############################################################################
 def test_build_rag_settings_enforces_candidate_floor() -> None:
     payload = build_settings_payload_from_json(
         {"rag": {"retrieval_candidate_count": 3, "retrieval_selected_count": 10}},

@@ -18,7 +18,10 @@ from services.updater import (
 from services.updater.sanitizer import LiverToxExcerptSanitizer
 
 
+###############################################################################
 class LiverToxUpdater:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         sources_path: str,
@@ -59,6 +62,7 @@ class LiverToxUpdater:
             archives_path / "livertox_archive.metadata.json"
         )
 
+    # -------------------------------------------------------------------------
     def update_from_livertox(
         self,
         *,

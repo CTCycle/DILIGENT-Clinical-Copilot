@@ -14,7 +14,10 @@ from domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from services.inspection.service import DataInspectionService
 
 
+###############################################################################
 class InspectionRagEndpoint(InspectionJobEndpointMixin):
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -23,10 +26,12 @@ class InspectionRagEndpoint(InspectionJobEndpointMixin):
     ) -> None:
         super().__init__(router=router, service=service)
 
+    # -------------------------------------------------------------------------
     def get_rag_update_config(self) -> InspectionUpdateConfigResponse:
         payload = self.service.build_update_config_response("rag")
         return InspectionUpdateConfigResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def list_rag_documents(
         self,
         search: str | None = Query(default=None),
@@ -42,11 +47,13 @@ class InspectionRagEndpoint(InspectionJobEndpointMixin):
             )
         )
 
+    # -------------------------------------------------------------------------
     def get_rag_vector_store(self) -> LanceVectorStoreSummaryResponse:
         return LanceVectorStoreSummaryResponse(
             **self.service.get_rag_vector_store_summary()
         )
 
+    # -------------------------------------------------------------------------
     def start_rag_update_job(
         self,
         request: InspectionRagUpdateRequest | None = Body(default=None),
@@ -58,18 +65,21 @@ class InspectionRagEndpoint(InspectionJobEndpointMixin):
             overrides=request.model_dump(exclude_none=True),
         )
 
+    # -------------------------------------------------------------------------
     def get_rag_update_job_status(self, job_id: str) -> JobStatusResponse:
         return self.get_update_job_status(
             job_id=job_id,
             job_type=self.service.RAG_JOB_TYPE,
         )
 
+    # -------------------------------------------------------------------------
     def cancel_rag_update_job(self, job_id: str) -> JobCancelResponse:
         return self.cancel_update_job(
             job_id=job_id,
             job_type=self.service.RAG_JOB_TYPE,
         )
 
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "/rag/update-config",
