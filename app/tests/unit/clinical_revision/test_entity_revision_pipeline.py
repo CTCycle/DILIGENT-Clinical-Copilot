@@ -14,7 +14,7 @@ from domain.clinical.entities import (
     PatientLabTimeline,
     PatientRucamAssessmentBundle,
 )
-from services.session import session_workflow as session_workflow_module
+from services.session import revision_workflow as revision_workflow_module
 
 
 FIXTURE_PATH = (
@@ -53,7 +53,7 @@ def test_entity_revision_pipeline_fixture_case_produces_expected_stages() -> Non
     )
     pattern_score = SimpleNamespace(classification=case["pattern_classification"])
 
-    resolution = session_workflow_module._select_revision_candidates(
+    resolution = revision_workflow_module._select_revision_candidates(
         extraction_bundle=dict(case["extraction_bundle"]),
         anamnesis_deterministic=anamnesis_deterministic,
         anamnesis_drugs=anamnesis_drugs,
@@ -63,7 +63,7 @@ def test_entity_revision_pipeline_fixture_case_produces_expected_stages() -> Non
         pattern_score=pattern_score,
         visit_date=None,
     )
-    merge_stage = session_workflow_module._build_revision_snapshot_merge_stage(
+    merge_stage = revision_workflow_module._build_revision_snapshot_merge_stage(
         therapy_drugs=therapy_drugs,
         anamnesis_drugs=anamnesis_drugs,
         disease_context=disease_context,

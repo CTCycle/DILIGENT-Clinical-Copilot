@@ -201,7 +201,6 @@ def test_run_revision_consultation_uses_revision_analysis_entrypoint(
 
     assert clinical_session.llm_model == "revision-model"
     assert final_report == "Revision synthesis report"
-    assert payload_metadata["execution_mode"] == "revision"
     assert payload_metadata["analysis_entrypoint"] == "run_revision_analysis"
     assert payload_metadata["consultation_model"] == "revision-model"
     assert payload_metadata["drug_analysis_entrypoint"] == "request_revision_drug_analysis"

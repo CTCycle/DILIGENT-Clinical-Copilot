@@ -21,86 +21,7 @@ class DrugAnalysisService:
     def __init__(self, consultation: Any) -> None:
         self.consultation = consultation
 
-    # -------------------------------------------------------------------------
-    async def request_drug_analysis(
-        self,
-        *,
-        drug_name: str,
-        canonical_name: str,
-        origins: list[str],
-        extraction_metadata: list[dict[str, Any]],
-        livertox_status: str,
-        excerpt: str,
-        rag_documents: str | None,
-        clinical_context: str,
-        suspension: DrugSuspensionContext,
-        visit_date: date | None,
-        pattern_summary: str,
-        metadata: dict[str, Any] | None,
-        rucam: DrugRucamAssessment | None,
-        knowledge_prompt: str = "No supplemental knowledge prompt available.",
-        report_language: str = "en",
-    ) -> str:
-        return await self._request_drug_analysis_internal(
-            drug_name=drug_name,
-            canonical_name=canonical_name,
-            origins=origins,
-            extraction_metadata=extraction_metadata,
-            livertox_status=livertox_status,
-            excerpt=excerpt,
-            rag_documents=rag_documents,
-            clinical_context=clinical_context,
-            suspension=suspension,
-            visit_date=visit_date,
-            pattern_summary=pattern_summary,
-            metadata=metadata,
-            rucam=rucam,
-            knowledge_prompt=knowledge_prompt,
-            report_language=report_language,
-            execution_mode="standard",
-        )
-
-    # -------------------------------------------------------------------------
-    async def request_revision_drug_analysis(
-        self,
-        *,
-        drug_name: str,
-        canonical_name: str,
-        origins: list[str],
-        extraction_metadata: list[dict[str, Any]],
-        livertox_status: str,
-        excerpt: str,
-        rag_documents: str | None,
-        clinical_context: str,
-        suspension: DrugSuspensionContext,
-        visit_date: date | None,
-        pattern_summary: str,
-        metadata: dict[str, Any] | None,
-        rucam: DrugRucamAssessment | None,
-        knowledge_prompt: str = "No supplemental knowledge prompt available.",
-        report_language: str = "en",
-    ) -> str:
-        return await self._request_drug_analysis_internal(
-            drug_name=drug_name,
-            canonical_name=canonical_name,
-            origins=origins,
-            extraction_metadata=extraction_metadata,
-            livertox_status=livertox_status,
-            excerpt=excerpt,
-            rag_documents=rag_documents,
-            clinical_context=clinical_context,
-            suspension=suspension,
-            visit_date=visit_date,
-            pattern_summary=pattern_summary,
-            metadata=metadata,
-            rucam=rucam,
-            knowledge_prompt=knowledge_prompt,
-            report_language=report_language,
-            execution_mode="revision",
-        )
-
-    # -------------------------------------------------------------------------
-    async def _request_drug_analysis_internal(
+    async def _build_and_run_drug_analysis(
         self,
         *,
         drug_name: str,
@@ -118,7 +39,8 @@ class DrugAnalysisService:
         rucam: DrugRucamAssessment | None,
         knowledge_prompt: str,
         report_language: str,
-        execution_mode: str,
+        system_template: str,
+        user_template: str,
     ) -> str:
         consultation = self.consultation
         start_details = consultation.format_start_prompt(suspension)
@@ -144,16 +66,6 @@ class DrugAnalysisService:
             "\n".join(metadata_items) if metadata_items else "- Not available"
         )
         rucam_block = consultation.format_rucam_prompt_block(rucam)
-        user_template = (
-            LIVERTOX_REVISION_CLINICAL_USER_PROMPT
-            if execution_mode == "revision"
-            else LIVERTOX_CLINICAL_USER_PROMPT
-        )
-        system_template = (
-            LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT
-            if execution_mode == "revision"
-            else LIVERTOX_CLINICAL_SYSTEM_PROMPT
-        )
         user_prompt = user_template.format(
             drug_name=consultation.escape_braces(drug_name.strip() or drug_name),
             report_language=consultation.escape_braces(report_language),
@@ -228,6 +140,86 @@ class DrugAnalysisService:
             if repaired_text:
                 response_text = repaired_text
         return response_text
+
+    # -------------------------------------------------------------------------
+    async def request_drug_analysis(
+        self,
+        *,
+        drug_name: str,
+        canonical_name: str,
+        origins: list[str],
+        extraction_metadata: list[dict[str, Any]],
+        livertox_status: str,
+        excerpt: str,
+        rag_documents: str | None,
+        clinical_context: str,
+        suspension: DrugSuspensionContext,
+        visit_date: date | None,
+        pattern_summary: str,
+        metadata: dict[str, Any] | None,
+        rucam: DrugRucamAssessment | None,
+        knowledge_prompt: str = "No supplemental knowledge prompt available.",
+        report_language: str = "en",
+    ) -> str:
+        return await self._build_and_run_drug_analysis(
+            drug_name=drug_name,
+            canonical_name=canonical_name,
+            origins=origins,
+            extraction_metadata=extraction_metadata,
+            livertox_status=livertox_status,
+            excerpt=excerpt,
+            rag_documents=rag_documents,
+            clinical_context=clinical_context,
+            suspension=suspension,
+            visit_date=visit_date,
+            pattern_summary=pattern_summary,
+            metadata=metadata,
+            rucam=rucam,
+            knowledge_prompt=knowledge_prompt,
+            report_language=report_language,
+            system_template=LIVERTOX_CLINICAL_SYSTEM_PROMPT,
+            user_template=LIVERTOX_CLINICAL_USER_PROMPT,
+        )
+
+    # -------------------------------------------------------------------------
+    async def request_revision_drug_analysis(
+        self,
+        *,
+        drug_name: str,
+        canonical_name: str,
+        origins: list[str],
+        extraction_metadata: list[dict[str, Any]],
+        livertox_status: str,
+        excerpt: str,
+        rag_documents: str | None,
+        clinical_context: str,
+        suspension: DrugSuspensionContext,
+        visit_date: date | None,
+        pattern_summary: str,
+        metadata: dict[str, Any] | None,
+        rucam: DrugRucamAssessment | None,
+        knowledge_prompt: str = "No supplemental knowledge prompt available.",
+        report_language: str = "en",
+    ) -> str:
+        return await self._build_and_run_drug_analysis(
+            drug_name=drug_name,
+            canonical_name=canonical_name,
+            origins=origins,
+            extraction_metadata=extraction_metadata,
+            livertox_status=livertox_status,
+            excerpt=excerpt,
+            rag_documents=rag_documents,
+            clinical_context=clinical_context,
+            suspension=suspension,
+            visit_date=visit_date,
+            pattern_summary=pattern_summary,
+            metadata=metadata,
+            rucam=rucam,
+            knowledge_prompt=knowledge_prompt,
+            report_language=report_language,
+            system_template=LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT,
+            user_template=LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

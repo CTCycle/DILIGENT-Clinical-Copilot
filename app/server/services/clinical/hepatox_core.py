@@ -510,6 +510,32 @@ class HepatoxConsultation:
         )
 
     # -------------------------------------------------------------------------
+    async def prepare_revision_drug_assessment(
+        self,
+        *,
+        idx: int,
+        drug_entry: DrugEntry,
+        resolved_drugs: dict[str, dict[str, Any]],
+        visit_date: date | None,
+        report_language: str,
+        normalized_context: str,
+        pattern_summary: str,
+        rag_query: dict[str, str] | None,
+        rucam_by_key: dict[str, DrugRucamAssessment],
+    ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
+        return await self.analysis_runner.prepare_revision_drug_assessment(
+            idx=idx,
+            drug_entry=drug_entry,
+            resolved_drugs=resolved_drugs,
+            visit_date=visit_date,
+            report_language=report_language,
+            normalized_context=normalized_context,
+            pattern_summary=pattern_summary,
+            rag_query=rag_query,
+            rucam_by_key=rucam_by_key,
+        )
+
+    # -------------------------------------------------------------------------
     def resolve_livertox_data_for_entry(
         self,
         *,

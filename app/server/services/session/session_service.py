@@ -4,7 +4,7 @@ import asyncio
 import time
 from collections.abc import Callable
 from dataclasses import replace
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -19,7 +19,6 @@ from domain.clinical.entities import (
     ClinicalPipelineValidationError,
     ClinicalSectionExtractionResult,
     ClinicalSessionRequest,
-    DrugRucamAssessment,
     HepatotoxicityPatternAssessment,
     LiverInjuryOnsetContext,
     PatientData,
@@ -81,14 +80,12 @@ from services.session.text_section_parser import (
     build_section_extraction_from_initial_text,
     parse_initial_text_sections,
 )
+from services.session.revision_workflow import process_revision_patient_workflow
 from services.session.session_workflow import (
     build_matched_drugs_payload_workflow,
-    build_single_matched_drug_row_workflow,
-    process_revision_patient_workflow,
     process_single_patient_workflow,
     start_clinical_job_workflow,
 )
-from services.text.normalization import normalize_drug_query_name
 
 
 ###############################################################################
@@ -1078,8 +1075,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             issues=issues,
             progress_callback=progress_callback,
             stop_check=stop_check,
-            execution_mode="standard",
-            consultation_context_metadata=None,
         )
         return clinical_session, final_report
 
@@ -1098,7 +1093,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
     ) -> tuple[HepatoxConsultation, str | None, dict[str, Any]]:
-        return await self._run_consultation_internal(
+        return await self._run_revision_consultation_internal(
             payload=payload,
             analysis_drugs=analysis_drugs,
             prepared_inputs=prepared_inputs,
@@ -1109,16 +1104,15 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             issues=issues,
             progress_callback=progress_callback,
             stop_check=stop_check,
-            execution_mode="revision",
             consultation_context_metadata=consultation_context_metadata,
         )
 
+    @staticmethod
     def _build_consultation_fallback_report(
-        self,
         *,
         analysis_drugs: PatientDrugs,
         report_language: str,
-        execution_mode: Literal["standard", "revision"],
+        is_revision: bool = False,
     ) -> str:
         drug_names = [
             (entry.name or "").strip()
@@ -1135,7 +1129,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             unique_drugs.append(name)
             if len(unique_drugs) >= 8:
                 break
-        is_revision = execution_mode == "revision"
         if report_language.lower().startswith("it"):
             if unique_drugs:
                 if is_revision:
@@ -1193,7 +1186,112 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         issues: list[PipelineIssue],
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
-        execution_mode: Literal["standard", "revision"],
+    ) -> tuple[HepatoxConsultation, str | None, dict[str, Any]]:
+        clinical_session = self.hepatox_consultation_cls(
+            analysis_drugs,
+            patient_name=payload.name,
+        )
+        effective_inputs = prepared_inputs
+        if (
+            prepared_inputs is not None
+            and consultation_context is not None
+            and prepared_inputs.clinical_context != consultation_context
+        ):
+            effective_inputs = replace(
+                prepared_inputs,
+                clinical_context=consultation_context,
+            )
+        final_report: str | None = None
+        start_time = time.perf_counter()
+        consultation_timeout_s = self._resolve_consultation_timeout()
+        try:
+            consultation_progress_callback = ClinicalConsultationProgressCallback(
+                progress_callback=progress_callback,
+            )
+            drug_assessment = await asyncio.wait_for(
+                clinical_session.run_analysis(
+                    prepared_inputs=effective_inputs,
+                    visit_date=payload.visit_date,
+                    report_language=report_language,
+                    rag_query=rag_query,
+                    rucam_bundle=rucam_bundle,
+                    progress_callback=consultation_progress_callback,
+                ),
+                timeout=consultation_timeout_s,
+            )
+            self.run_stop_check(stop_check)
+            elapsed = time.perf_counter() - start_time
+            logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
+            if isinstance(drug_assessment, dict):
+                raw_final_report = drug_assessment.get("final_report")
+                if isinstance(raw_final_report, str):
+                    final_report = raw_final_report.strip()
+                elif raw_final_report is None:
+                    final_report = None
+                else:
+                    final_report = str(raw_final_report).strip()
+            issues.extend(getattr(clinical_session, "pipeline_issues", []))
+        except TimeoutError as exc:
+            self.append_warning_issue(
+                issues,
+                code="clinical_llm_timeout",
+                message=(
+                    "Clinical LLM analysis timed out; report generated without "
+                    "per-drug synthesis."
+                ),
+            )
+            logger.warning(
+                "Clinical LLM timeout for patient '%s' after %.1fs: %s",
+                payload.name or "unknown",
+                consultation_timeout_s,
+                exc,
+            )
+        except LLMError as exc:
+            self.append_warning_issue(
+                issues,
+                code="clinical_llm_unavailable",
+                message=(
+                    "Clinical LLM analysis is unavailable; report generated without "
+                    "per-drug synthesis."
+                ),
+            )
+            logger.warning(
+                "Clinical LLM unavailable for patient '%s': %s",
+                payload.name or "unknown",
+                exc,
+            )
+        used_fallback_report = not bool(str(final_report or "").strip())
+        if used_fallback_report:
+            final_report = self._build_consultation_fallback_report(
+                analysis_drugs=analysis_drugs,
+                report_language=report_language,
+                is_revision=False,
+            )
+        payload_metadata = {
+            "analysis_entrypoint": "run_analysis",
+            "used_fallback_report": used_fallback_report,
+            "consultation_model": getattr(clinical_session, "llm_model", None),
+            "analysis_drug_names": [
+                entry.name for entry in analysis_drugs.entries if entry.name
+            ],
+            "consultation_context_length": len(str(consultation_context or "").strip()),
+        }
+        return clinical_session, final_report, payload_metadata
+
+    # -------------------------------------------------------------------------
+    async def _run_revision_consultation_internal(
+        self,
+        *,
+        payload: PatientData,
+        analysis_drugs: PatientDrugs,
+        prepared_inputs,
+        consultation_context: str | None,
+        report_language: str,
+        rag_query: dict[str, str] | None,
+        rucam_bundle: PatientRucamAssessmentBundle,
+        issues: list[PipelineIssue],
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
         consultation_context_metadata: dict[str, Any] | None,
     ) -> tuple[HepatoxConsultation, str | None, dict[str, Any]]:
         clinical_session = self.hepatox_consultation_cls(
@@ -1213,20 +1311,12 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         final_report: str | None = None
         start_time = time.perf_counter()
         consultation_timeout_s = self._resolve_consultation_timeout()
-        analysis_entrypoint = (
-            "run_revision_analysis" if execution_mode == "revision" else "run_analysis"
-        )
         try:
             consultation_progress_callback = ClinicalConsultationProgressCallback(
                 progress_callback=progress_callback,
             )
-            analysis_runner = (
-                clinical_session.run_revision_analysis
-                if execution_mode == "revision"
-                else clinical_session.run_analysis
-            )
             drug_assessment = await asyncio.wait_for(
-                analysis_runner(
+                clinical_session.run_revision_analysis(
                     prepared_inputs=effective_inputs,
                     visit_date=payload.visit_date,
                     report_language=report_language,
@@ -1238,7 +1328,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             )
             self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
-            logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
+            logger.info("Hepato-toxicity revision consultation required %.4f seconds", elapsed)
             if isinstance(drug_assessment, dict):
                 raw_final_report = drug_assessment.get("final_report")
                 if isinstance(raw_final_report, str):
@@ -1290,11 +1380,10 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             final_report = self._build_consultation_fallback_report(
                 analysis_drugs=analysis_drugs,
                 report_language=report_language,
-                execution_mode=execution_mode,
+                is_revision=True,
             )
         payload_metadata = {
-            "execution_mode": execution_mode,
-            "analysis_entrypoint": analysis_entrypoint,
+            "analysis_entrypoint": "run_revision_analysis",
             "used_fallback_report": used_fallback_report,
             "consultation_model": getattr(clinical_session, "llm_model", None),
             "analysis_drug_names": [
@@ -1328,44 +1417,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _normalized_resolved_drug_map(prepared_inputs) -> dict[str, dict[str, Any]]:
-        if prepared_inputs is None:
-            return {}
-        resolved_drug_map: dict[str, dict[str, Any]] = {}
-        for key, value in prepared_inputs.resolved_drugs.items():
-            normalized_key = normalize_drug_query_name(key)
-            if normalized_key and isinstance(value, dict):
-                resolved_drug_map[normalized_key] = value
-        return resolved_drug_map
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _normalized_rucam_map(
-        rucam_bundle: PatientRucamAssessmentBundle,
-    ) -> dict[str, DrugRucamAssessment]:
-        rucam_by_name: dict[str, DrugRucamAssessment] = {}
-        for item in rucam_bundle.entries:
-            normalized_key = normalize_drug_query_name(item.drug_name)
-            if normalized_key:
-                rucam_by_name[normalized_key] = item
-        return rucam_by_name
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    @staticmethod
-    def _build_single_matched_drug_row(
-        *,
-        detected_name: str,
-        resolved: dict[str, Any],
-        rucam_entry: DrugRucamAssessment | None,
-    ) -> dict[str, Any]:
-        return build_single_matched_drug_row_workflow(
-            detected_name=detected_name,
-            resolved=resolved,
-            rucam_entry=rucam_entry,
-        )
-
-    @staticmethod
     def build_matched_drugs_payload(
         *,
         detected_drugs: list[str],
@@ -1373,7 +1424,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         rucam_bundle: PatientRucamAssessmentBundle,
     ) -> list[dict[str, Any]]:
         return build_matched_drugs_payload_workflow(
-            service=ClinicalSessionService,
             detected_drugs=detected_drugs,
             prepared_inputs=prepared_inputs,
             rucam_bundle=rucam_bundle,

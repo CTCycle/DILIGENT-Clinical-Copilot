@@ -18,7 +18,7 @@ from domain.clinical.extras import HepatoxPreparedInputs
 from domain.clinical.robustness import NormalizedDocument
 from services.session.document_normalizer import DocumentNormalizer
 import services.session.session_workflow as session_workflow_module
-from services.session.session_workflow import process_revision_patient_workflow
+from services.session.revision_workflow import process_revision_patient_workflow
 
 
 class FakePatternAnalyzer:
