@@ -2,58 +2,39 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from services.runtime.jobs import get_job_manager
-
-ClinicalProgressEvent = str
-
 CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
-    "preflight.validated": "Step 1/16: Validating required local data and visit metadata...",
-    "sections.loaded": "Step 2/16: Loading parsed ANAMNESIS, DRUGS, and LABORATORY ANALYSIS sections...",
-    "assessment.bundle": "Step 3/16: Building the structured assessment bundle...",
-    "therapy.extracting": "Step 4/16: Parsing DRUGS section for current medication exposures...",
-    "anamnesis.extracting": "Step 5/16: Parsing ANAMNESIS section for historical drug exposures...",
-    "drugs.resolving": "Step 6/16: Resolving extracted drug names against local catalogs...",
-    "diseases.extracting": "Step 7/16: Extracting disease and competing-cause context...",
-    "labs.extracting": "Step 8/16: Extracting laboratory timeline and onset dates...",
-    "pattern.assessing": "Step 9/16: Calculating biochemical liver injury pattern...",
-    "candidates.selecting": "Step 10/16: Selecting temporally relevant suspect drug candidates...",
-    "rucam.initial": "Step 11/16: Estimating preliminary RUCAM scores...",
-    "retrieval.query": "Step 12/16: Building retrieval query from structured case facts...",
-    "retrieval.evidence": "Step 13/16: Retrieving LiverTox and RAG evidence...",
-    "rucam.refined": "Step 14/16: Re-estimating RUCAM scores with retrieved evidence...",
-    "report.generating": "Step 15/16: Generating clinical consultation report...",
-    "session.saving": "Step 16/16: Auditing artifacts and saving session results...",
-    "session_initialization": "Step 1/16: Validating required local data and visit metadata...",
-    "therapy_extraction": "Step 4/16: Parsing DRUGS section for current medication exposures...",
-    "anamnesis_extraction": "Step 5/16: Parsing ANAMNESIS section for historical drug exposures...",
-    "anamnesis_disease_extraction": "Step 7/16: Extracting disease and competing-cause context...",
-    "anamnesis_lab_extraction": "Step 8/16: Extracting laboratory timeline and onset dates...",
-    "hepatotoxicity_pattern": "Step 9/16: Calculating biochemical liver injury pattern...",
-    "rucam_estimation": "Step 11/16: Estimating preliminary RUCAM scores...",
-    "rag_query_building": "Step 12/16: Building retrieval query from structured case facts...",
-    "livertox_lookup": "Step 13/16: Retrieving LiverTox and RAG evidence...",
-    "report_composition": "Step 15/16: Generating clinical consultation report...",
-    "finalization": "Step 16/16: Auditing artifacts and saving session results...",
+    "preflight.validated": "Step 1/15: Validating required local data and visit metadata...",
+    "sections.loaded": "Step 2/15: Loading parsed ANAMNESIS, DRUGS, and LABORATORY ANALYSIS sections...",
+    "assessment.bundle": "Step 3/15: Building the structured assessment bundle...",
+    "drugs.extracting": "Step 4/15: Parsing DRUGS and ANAMNESIS sections for current and historical medication exposures...",
+    "drugs.resolving": "Step 5/15: Resolving extracted drug names against local catalogs...",
+    "diseases.extracting": "Step 6/15: Extracting disease and competing-cause context...",
+    "labs.extracting": "Step 7/15: Extracting laboratory timeline and onset dates...",
+    "pattern.assessing": "Step 8/15: Calculating biochemical liver injury pattern...",
+    "candidates.selecting": "Step 9/15: Selecting temporally relevant suspect drug candidates...",
+    "rucam.initial": "Step 10/15: Estimating preliminary RUCAM scores...",
+    "retrieval.query": "Step 11/15: Building retrieval query from structured case facts...",
+    "retrieval.evidence": "Step 12/15: Retrieving LiverTox and RAG evidence...",
+    "rucam.refined": "Step 13/15: Re-estimating RUCAM scores with retrieved evidence...",
+    "report.generating": "Step 14/15: Generating clinical consultation report...",
+    "session.saving": "Step 15/15: Auditing artifacts and saving session results...",
+    "session_initialization": "Step 1/15: Validating required local data and visit metadata...",
+    "therapy_extraction": "Step 4/15: Parsing DRUGS and ANAMNESIS sections for current and historical medication exposures...",
+    "anamnesis_extraction": "Step 4/15: Parsing DRUGS and ANAMNESIS sections for current and historical medication exposures...",
+    "anamnesis_disease_extraction": "Step 6/15: Extracting disease and competing-cause context...",
+    "anamnesis_lab_extraction": "Step 7/15: Extracting laboratory timeline and onset dates...",
+    "hepatotoxicity_pattern": "Step 8/15: Calculating biochemical liver injury pattern...",
+    "rucam_estimation": "Step 10/15: Estimating preliminary RUCAM scores...",
+    "rag_query_building": "Step 11/15: Building retrieval query from structured case facts...",
+    "livertox_lookup": "Step 12/15: Retrieving LiverTox and RAG evidence...",
+    "report_composition": "Step 14/15: Generating clinical consultation report...",
+    "finalization": "Step 15/15: Auditing artifacts and saving session results...",
 }
 
 
 ###############################################################################
 class ClinicalJobCancelled(Exception):
     pass
-
-
-###############################################################################
-class ClinicalJobProgressCallback:
-
-    # -------------------------------------------------------------------------
-    def __init__(self, *, job_id: str) -> None:
-        self.job_id = job_id
-
-    # -------------------------------------------------------------------------
-    def __call__(self, stage: str, progress: float, detail: str | None = None) -> None:
-        report_clinical_job_progress(
-            self.job_id, stage=stage, progress=progress, detail=detail
-        )
 
 
 ###############################################################################
@@ -107,45 +88,4 @@ class StageProgressFractionCallback:
         )
 
 
-###############################################################################
-def build_clinical_progress_message(
-    stage: str,
-    progress: float,
-    detail: str | None = None,
-) -> str:
-    _ = progress
-    if detail and detail in CLINICAL_PROGRESS_MESSAGES:
-        return CLINICAL_PROGRESS_MESSAGES[detail]
-    if stage in CLINICAL_PROGRESS_MESSAGES:
-        return CLINICAL_PROGRESS_MESSAGES[stage]
-    return stage.replace("_", " ").replace(".", " ").strip()
 
-
-###############################################################################
-def ensure_clinical_job_not_cancelled(job_id: str) -> None:
-    if get_job_manager().should_stop(job_id):
-        raise ClinicalJobCancelled("Clinical job stop requested.")
-
-
-###############################################################################
-def report_clinical_job_progress(
-    job_id: str,
-    *,
-    stage: str,
-    progress: float,
-    detail: str | None = None,
-) -> None:
-    ensure_clinical_job_not_cancelled(job_id)
-    bounded = min(100.0, max(0.0, float(progress)))
-    message = build_clinical_progress_message(
-        stage=stage, progress=bounded, detail=detail
-    )
-    jobs = get_job_manager()
-    jobs.update_progress(job_id, bounded)
-    jobs.update_result(
-        job_id,
-        {
-            "progress_stage": stage,
-            "progress_message": message,
-        },
-    )

@@ -55,8 +55,7 @@ _PROGRESS_SEQUENCE: list[tuple[str, float]] = [
     ("preflight.validated", 2.0),
     ("sections.loaded", 6.0),
     ("assessment.bundle", 10.0),
-    ("therapy.extracting", 16.0),
-    ("anamnesis.extracting", 23.0),
+    ("drugs.extracting", 16.0),
     ("drugs.resolving", 30.0),
     ("diseases.extracting", 38.0),
     ("labs.extracting", 46.0),
@@ -328,7 +327,6 @@ async def _process_standard_patient_workflow_internal(
     disease_deterministic = extract_deterministic_diseases(cleaned_anamnesis_text)
 
     _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[3][1], _PROGRESS_SEQUENCE[3][0])
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[4][1], _PROGRESS_SEQUENCE[4][0])
 
     preflight = await check_parser_batch_capacity(task_count=2)
     if preflight.concurrency_allowed:
@@ -370,20 +368,20 @@ async def _process_standard_patient_workflow_internal(
             stop_check=stop_check,
         )
 
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[5][1], _PROGRESS_SEQUENCE[5][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[4][1], _PROGRESS_SEQUENCE[4][0])
 
     anamnesis_text = payload.anamnesis or ""
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[6][1], _PROGRESS_SEQUENCE[6][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[5][1], _PROGRESS_SEQUENCE[5][0])
     disease_context = await service.extract_disease_context(
         anamnesis_text=anamnesis_text, issues=issues, progress_callback=None, stop_check=stop_check,
     )
 
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[7][1], _PROGRESS_SEQUENCE[7][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[6][1], _PROGRESS_SEQUENCE[6][0])
     lab_timeline, onset_context = await service.extract_lab_timeline(
         payload=payload, issues=issues, progress_callback=None, stop_check=stop_check,
     )
 
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[8][1], _PROGRESS_SEQUENCE[8][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[7][1], _PROGRESS_SEQUENCE[7][0])
     pattern_assessment = service.assess_pattern(
         lab_timeline=lab_timeline, validation_bundle=validation_bundle, issues=issues,
         progress_callback=None, stop_check=stop_check,
@@ -413,12 +411,12 @@ async def _process_standard_patient_workflow_internal(
             field="drugs",
         )
 
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[9][1], _PROGRESS_SEQUENCE[9][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[8][1], _PROGRESS_SEQUENCE[8][0])
     candidate_selection = select_relevant_candidates(
         therapy_drugs=therapy_drugs, anamnesis_drugs=anamnesis_drugs, visit_date=payload.visit_date,
     )
 
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[10][1], _PROGRESS_SEQUENCE[10][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[9][1], _PROGRESS_SEQUENCE[9][0])
     analysis_drugs = candidate_selection.ordered_analysis_drugs
     effective_candidate_selection = candidate_selection
 
@@ -433,25 +431,25 @@ async def _process_standard_patient_workflow_internal(
         disease_context=disease_context, lab_timeline=lab_timeline, onset_context=onset_context,
         pattern_score=pattern_score,
     )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[11][1], _PROGRESS_SEQUENCE[11][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[10][1], _PROGRESS_SEQUENCE[10][0])
     rag_query = service.build_rag_query(
         payload=payload, analysis_drugs=analysis_drugs, structured_context=structured_context,
         pattern_score=pattern_score, progress_callback=None, stop_check=stop_check,
     )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[12][1], _PROGRESS_SEQUENCE[12][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[11][1], _PROGRESS_SEQUENCE[11][0])
     prepared_inputs = await service.run_livertox_lookup(
         all_detected_drugs=analysis_drugs,
         structured_context=structured_context, pattern_score=pattern_score,
         issues=issues, progress_callback=None, stop_check=stop_check,
     )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[13][1], _PROGRESS_SEQUENCE[13][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[12][1], _PROGRESS_SEQUENCE[12][0])
     rucam_bundle = service.reestimate_rucam_with_livertox(
         payload=payload, analysis_drugs=analysis_drugs, anamnesis_drugs=anamnesis_drugs,
         disease_context=disease_context, lab_timeline=lab_timeline, onset_context=onset_context,
         pattern_score=pattern_score, report_language=report_language,
         prepared_inputs=prepared_inputs, rucam_bundle=rucam_bundle, issues=issues,
     )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[14][1], _PROGRESS_SEQUENCE[14][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[13][1], _PROGRESS_SEQUENCE[13][0])
 
     clinical_session, final_report = await service.run_consultation(
         payload=payload, analysis_drugs=analysis_drugs,
@@ -592,7 +590,7 @@ async def _process_standard_patient_workflow_internal(
         },
     }
     result_payload["run_bundle_index"] = build_run_bundle_index(run_id="pending", session_id=None).model_dump()
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[15][1], _PROGRESS_SEQUENCE[15][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[14][1], _PROGRESS_SEQUENCE[14][0])
 
     persisted_session_id = None
     try:
