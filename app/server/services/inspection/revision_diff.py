@@ -6,6 +6,7 @@ from typing import Any
 from services.inspection.normalization import normalize_text as _normalize_text_value
 
 
+###############################################################################
 def _append_derived_revision_entity(
     *,
     derived: list[dict[str, Any]],
@@ -59,7 +60,10 @@ def _append_derived_revision_entity(
     )
 
 
+###############################################################################
 class InspectionRevisionDiffMixin:
+
+    # -------------------------------------------------------------------------
     def compare_session_versions(
         self,
         session_id: int,
@@ -111,6 +115,7 @@ class InspectionRevisionDiffMixin:
             ),
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _extract_version_report_text(detail: dict[str, Any]) -> str:
         session_detail = detail.get("session")
@@ -124,6 +129,7 @@ class InspectionRevisionDiffMixin:
         )
         return str(report_text).strip()
 
+    # -------------------------------------------------------------------------
     def _resolve_version_comparison_entities(
         self,
         *,
@@ -137,6 +143,7 @@ class InspectionRevisionDiffMixin:
             return persisted_entities
         return self._derive_entities_from_version_detail(detail)
 
+    # -------------------------------------------------------------------------
     def _derive_entities_from_version_detail(
         self,
         detail: dict[str, Any],
@@ -279,6 +286,7 @@ class InspectionRevisionDiffMixin:
                 )
         return derived
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _comparison_entity_key(entity: dict[str, Any]) -> tuple[str, str, str]:
         entity_type = str(entity.get("entity_type") or "").strip()
@@ -292,6 +300,7 @@ class InspectionRevisionDiffMixin:
         source_section = str(entity.get("source_section") or "").strip()
         return entity_type, normalized_name, source_section
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _build_entity_diff_item(
         cls,
@@ -321,6 +330,7 @@ class InspectionRevisionDiffMixin:
             "right_entity": right_entity,
         }
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _build_version_entity_diff(
         cls,
@@ -414,6 +424,7 @@ class InspectionRevisionDiffMixin:
             "unchanged_entities": unchanged_entities,
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_report_text_diff(
         *,
@@ -445,6 +456,7 @@ class InspectionRevisionDiffMixin:
             "diff_lines": diff_lines[:80],
         }
 
+    # -------------------------------------------------------------------------
     def _resolve_qa_payload(self, detail: dict[str, Any]) -> dict[str, Any]:
         version = detail.get("version")
         if not isinstance(version, dict):
@@ -471,6 +483,7 @@ class InspectionRevisionDiffMixin:
                 return qa_validation
         return {}
 
+    # -------------------------------------------------------------------------
     def _build_revision_qa_summary(
         self,
         *,

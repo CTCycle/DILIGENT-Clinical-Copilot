@@ -11,6 +11,7 @@ from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
 
 
+###############################################################################
 def build_service() -> tuple[DataInspectionService, DataSerializer]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
@@ -19,6 +20,7 @@ def build_service() -> tuple[DataInspectionService, DataSerializer]:
     return service, serializer
 
 
+###############################################################################
 def seed_session(serializer: DataSerializer) -> int:
     session_id = serializer.save_clinical_session(
         {
@@ -38,6 +40,7 @@ def seed_session(serializer: DataSerializer) -> int:
     return session_id
 
 
+###############################################################################
 def test_legacy_update_session_route_now_performs_safe_manual_report_edit() -> None:
     service, serializer = build_service()
     session_id = seed_session(serializer)
@@ -57,6 +60,7 @@ def test_legacy_update_session_route_now_performs_safe_manual_report_edit() -> N
     assert updated["manual_edit_history"][0]["edited_fields"] == ["report_text"]
 
 
+###############################################################################
 def test_metadata_only_update_does_not_create_manual_edit_audit() -> None:
     service, serializer = build_service()
     session_id = seed_session(serializer)
@@ -74,6 +78,7 @@ def test_metadata_only_update_does_not_create_manual_edit_audit() -> None:
     assert updated["manual_edit_history"] == []
 
 
+###############################################################################
 def test_revision_review_actions_are_persisted_and_update_version_state() -> None:
     service, serializer = build_service()
     session_id = seed_session(serializer)
@@ -138,6 +143,7 @@ def test_revision_review_actions_are_persisted_and_update_version_state() -> Non
     assert history[0]["metadata"]["decision_source"] == "clinical_review"
 
 
+###############################################################################
 def test_compare_session_versions_returns_backend_diff_payload() -> None:
     service, serializer = build_service()
     root_session_id = serializer.save_clinical_session(
@@ -238,6 +244,7 @@ def test_compare_session_versions_returns_backend_diff_payload() -> None:
     assert comparison["qa_summary"]["right_warning_count"] == 1
 
 
+###############################################################################
 def test_persist_revision_entities_records_schema_names_per_entity_type() -> None:
     _, serializer = build_service()
     session_id = seed_session(serializer)
@@ -319,6 +326,7 @@ def test_persist_revision_entities_records_schema_names_per_entity_type() -> Non
     assert ("dili_assessment", "revised_dili_assessment") in schema_names
 
 
+###############################################################################
 def test_persist_revision_entities_rejects_invalid_revision_payloads() -> None:
     _, serializer = build_service()
     session_id = seed_session(serializer)

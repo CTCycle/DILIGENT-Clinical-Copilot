@@ -7,11 +7,13 @@ from services.clinical.job_progress import (
 )
 
 
+###############################################################################
 def test_progress_message_for_anamnesis_detail() -> None:
     message = build_clinical_progress_message("x", 30.0, "anamnesis.extracting")
     assert message == CLINICAL_PROGRESS_MESSAGES["anamnesis.extracting"]
 
 
+###############################################################################
 def test_progress_messages_cover_ordered_events() -> None:
     ordered = [
         "preflight.validated",
@@ -35,6 +37,7 @@ def test_progress_messages_cover_ordered_events() -> None:
         assert event in CLINICAL_PROGRESS_MESSAGES
 
 
+###############################################################################
 def test_old_two_argument_progress_callback_usage_still_works(monkeypatch) -> None:
     calls = []
 

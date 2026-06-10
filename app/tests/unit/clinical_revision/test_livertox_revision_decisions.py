@@ -6,6 +6,7 @@ from services.inspection.service import (
 )
 
 
+###############################################################################
 def test_livertox_revision_decisions_reuse_high_confidence_previous_match() -> None:
     decisions = DataInspectionService.build_revision_livertox_decisions(
         matched_drugs=[
@@ -31,6 +32,7 @@ def test_livertox_revision_decisions_reuse_high_confidence_previous_match() -> N
     assert decisions[0]["requires_human_review"] is False
 
 
+###############################################################################
 def test_livertox_revision_decisions_force_refresh_when_reviewer_challenges_matching() -> None:
     profile = ReviewerInstructionProfile(
         instruction_summary="Recheck whether the match is wrong.",
@@ -62,6 +64,7 @@ def test_livertox_revision_decisions_force_refresh_when_reviewer_challenges_matc
     assert decisions[0]["source"] == "llm_fallback"
 
 
+###############################################################################
 def test_livertox_revision_decisions_require_human_review_for_missing_match() -> None:
     decisions = DataInspectionService.build_revision_livertox_decisions(
         matched_drugs=[

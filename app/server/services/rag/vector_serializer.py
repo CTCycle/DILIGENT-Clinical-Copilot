@@ -17,9 +17,10 @@ from common.utils.embedding_model import EmbeddingModelSpec
 from common.utils.seed_terms import load_seed_term_catalog
 from services.retrieval.embeddings import EmbeddingGenerator
 
-
 ###############################################################################
 class VectorSerializer:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         documents_path: str,

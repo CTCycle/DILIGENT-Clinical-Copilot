@@ -28,6 +28,7 @@ from repositories.serialization.session_revision_data import (
 )
 
 
+###############################################################################
 def persist_revision_artifacts(
     self,
     *,
@@ -248,6 +249,7 @@ def persist_revision_artifacts(
         db_session.close()
 
 
+###############################################################################
 def persist_revision_entities(
     self,
     *,
@@ -447,6 +449,7 @@ def persist_revision_entities(
         db_session.close()
 
 
+###############################################################################
 def list_revision_artifacts_for_version(
     self,
     *,
@@ -472,6 +475,7 @@ def list_revision_artifacts_for_version(
         db_session.close()
 
 
+###############################################################################
 def list_revision_entities_for_version(
     self,
     *,

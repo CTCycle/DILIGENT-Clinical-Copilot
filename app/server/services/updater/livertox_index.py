@@ -8,6 +8,7 @@ from common.utils.logger import logger
 from services.updater import livertox_parse
 
 
+###############################################################################
 def build_unified_dataset(
     self,
     monographs: pd.DataFrame,
@@ -101,6 +102,7 @@ def build_unified_dataset(
     return sanitize_unified_dataset(self, dataset)
 
 
+###############################################################################
 def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame.copy()
@@ -139,6 +141,7 @@ def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
     return sanitized.reset_index(drop=True)
 
 
+###############################################################################
 def finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame.copy()

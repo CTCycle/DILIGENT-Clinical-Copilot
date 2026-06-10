@@ -16,6 +16,7 @@ from services.inspection.normalization import (
 from services.inspection.runtime import coerce_optional_str
 
 
+###############################################################################
 def get_session_timeline(service: Any, session_id: int) -> PatientTimeline | None:
     payload = service.serializer.get_session_result_payload(session_id)
     if not isinstance(payload, dict):
@@ -34,6 +35,7 @@ def get_session_timeline(service: Any, session_id: int) -> PatientTimeline | Non
         return None
 
 
+###############################################################################
 def build_fallback_timeline(
     service: Any,
     *,
@@ -116,6 +118,7 @@ def build_fallback_timeline(
     )
 
 
+###############################################################################
 def generate_session_timeline(
     service: Any,
     session_id: int,

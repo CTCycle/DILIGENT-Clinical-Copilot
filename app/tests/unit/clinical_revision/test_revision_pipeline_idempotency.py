@@ -11,6 +11,7 @@ from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
 
 
+###############################################################################
 def build_service() -> tuple[DataInspectionService, DataSerializer]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
@@ -18,6 +19,7 @@ def build_service() -> tuple[DataInspectionService, DataSerializer]:
     return DataInspectionService(serializer=serializer, jobs=JobManager()), serializer
 
 
+###############################################################################
 def seed_session(serializer: DataSerializer) -> int:
     session_id = serializer.save_clinical_session(
         {
@@ -37,6 +39,7 @@ def seed_session(serializer: DataSerializer) -> int:
     return session_id
 
 
+###############################################################################
 def test_start_revision_job_persists_run_and_single_draft_shell() -> None:
     service, serializer = build_service()
     session_id = seed_session(serializer)
@@ -83,6 +86,7 @@ def test_start_revision_job_persists_run_and_single_draft_shell() -> None:
     assert draft_versions[0]["version_status"] == "draft_revision"
 
 
+###############################################################################
 def test_retry_revision_job_reuses_existing_draft_shell() -> None:
     service, serializer = build_service()
     session_id = seed_session(serializer)

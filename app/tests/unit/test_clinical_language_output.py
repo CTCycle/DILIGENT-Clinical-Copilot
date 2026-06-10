@@ -11,6 +11,7 @@ from services.clinical.validation import build_validation_bundle
 from services.session.session_shared import NarrativeBuilder
 
 
+###############################################################################
 def test_italian_input_yields_italian_language_detection_and_messages() -> None:
     payload = PatientData(
         anamnesis="Paziente con ittero e dolore addominale.",
@@ -23,6 +24,7 @@ def test_italian_input_yields_italian_language_detection_and_messages() -> None:
     assert bundle.missing_anamnesis.startswith("Fornire")
 
 
+###############################################################################
 def test_english_input_yields_english_output_bundle() -> None:
     payload = PatientData(
         anamnesis="Patient with jaundice and dark urine.",
@@ -35,6 +37,7 @@ def test_english_input_yields_english_output_bundle() -> None:
     assert bundle.missing_visit_date.startswith("Provide")
 
 
+###############################################################################
 def test_mixed_input_prefers_dominant_section() -> None:
     payload = PatientData(
         anamnesis="Paziente con anamnesi positiva per steatosi epatica e ittero.",
@@ -45,6 +48,7 @@ def test_mixed_input_prefers_dominant_section() -> None:
     assert detected.report_language == "it"
 
 
+###############################################################################
 def test_narrative_builder_does_not_force_english_for_italian() -> None:
     report = NarrativeBuilder.build_patient_narrative(
         patient_label="Mario Rossi",
@@ -63,6 +67,7 @@ def test_narrative_builder_does_not_force_english_for_italian() -> None:
     assert "## Report Clinico" in report
 
 
+###############################################################################
 def test_italian_clinician_report_wrappers_do_not_use_english_labels() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     rendered = consultation.render_matched_drug_section(

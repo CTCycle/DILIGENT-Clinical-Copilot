@@ -4,6 +4,7 @@ from domain.settings.configuration import DatabaseSettings
 from repositories.database import initializer
 
 
+###############################################################################
 def _sqlite_settings() -> DatabaseSettings:
     return DatabaseSettings(
         embedded_database=True,
@@ -22,6 +23,7 @@ def _sqlite_settings() -> DatabaseSettings:
     )
 
 
+###############################################################################
 def _postgres_settings() -> DatabaseSettings:
     return DatabaseSettings(
         embedded_database=False,
@@ -40,6 +42,7 @@ def _postgres_settings() -> DatabaseSettings:
     )
 
 
+###############################################################################
 def test_run_database_initialization_uses_sqlite_path_when_embedded(
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
@@ -67,6 +70,7 @@ def test_run_database_initialization_uses_sqlite_path_when_embedded(
     assert calls == ["sqlite"]
 
 
+###############################################################################
 def test_run_database_initialization_uses_postgres_path_when_external(
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]

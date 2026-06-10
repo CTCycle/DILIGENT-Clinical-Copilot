@@ -6,6 +6,7 @@ from services.inspection.normalization import normalize_text as normalize_text_v
 from services.text.normalization import normalize_drug_query_name
 
 
+###############################################################################
 def extract_revision_drug_names(payload: dict[str, Any]) -> list[str]:
     names: list[str] = []
     for value in payload.get("detected_drugs", []):
@@ -29,6 +30,7 @@ def extract_revision_drug_names(payload: dict[str, Any]) -> list[str]:
     return unique
 
 
+###############################################################################
 def build_revision_section_validation(
     *,
     source_sections: dict[str, Any],

@@ -459,6 +459,7 @@ export class ModelConfigPageComponent implements OnInit {
       ...previous,
       clinicalModel: role === 'clinical' ? modelName : previous.clinicalModel,
       textExtractionModel: role === 'text_extraction' ? modelName : previous.textExtractionModel,
+      cloudModel: previous.useCloudServices ? modelName : previous.cloudModel,
     }));
   }
 

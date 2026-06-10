@@ -27,6 +27,7 @@ from services.clinical.report_language import phrase, resolve_report_language
 from services.text.normalization import normalize_drug_query_name
 
 
+###############################################################################
 def _compile_terms_regex(category: str) -> re.Pattern[str]:
     values = get_reference_catalog_snapshot().values(
         "dili_assessment",
@@ -68,7 +69,10 @@ RucamCausalityCategory = Literal[
 ]
 
 
+###############################################################################
 class RucamScoreEstimator:
+
+    # -------------------------------------------------------------------------
     def resolve_provided_rucam_score(
         self,
         laboratory_history_text: str,
@@ -98,6 +102,7 @@ class RucamScoreEstimator:
             evidence=match.group(0),
         )
 
+    # -------------------------------------------------------------------------
     def has_sufficient_rucam_inputs(
         self,
         *,
@@ -118,6 +123,7 @@ class RucamScoreEstimator:
         )
         return sufficiency.sufficient
 
+    # -------------------------------------------------------------------------
     def estimate(
         self,
         *,
@@ -165,6 +171,7 @@ class RucamScoreEstimator:
             )
         return PatientRucamAssessmentBundle(entries=entries)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def try_parse_date(value: str | None) -> date | None:
         if value is None:
@@ -184,6 +191,7 @@ class RucamScoreEstimator:
                 continue
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def marker_multiple(entry: ClinicalLabEntry | None) -> float | None:
         if entry is None or entry.value is None:
@@ -192,6 +200,7 @@ class RucamScoreEstimator:
             return entry.value / entry.upper_limit_normal
         return None
 
+    # -------------------------------------------------------------------------
     def collect_trusted_source_text(
         self, resolved_item: dict[str, Any] | None
     ) -> list[str]:
@@ -208,6 +217,7 @@ class RucamScoreEstimator:
                 texts.append(raw)
         return [item.strip() for item in texts if item and item.strip()]
 
+    # -------------------------------------------------------------------------
     def extract_source_reported_rucam(
         self, resolved_item: dict[str, Any] | None
     ) -> RucamSourceReportedScore | None:
@@ -236,6 +246,7 @@ class RucamScoreEstimator:
             )
         return None
 
+    # -------------------------------------------------------------------------
     def select_pattern_anchor(
         self, *, payload: PatientData, lab_timeline: PatientLabTimeline
     ) -> RucamAnchor:
@@ -297,6 +308,7 @@ class RucamScoreEstimator:
             is_score_eligible=False,
         )
 
+    # -------------------------------------------------------------------------
     def resolve_injury_type(
         self, *, pattern_score: HepatotoxicityPatternScore, anchor: RucamAnchor
     ) -> RucamInjuryType:
@@ -309,6 +321,7 @@ class RucamScoreEstimator:
             return cast(RucamInjuryType, classification)
         return "indeterminate"
 
+    # -------------------------------------------------------------------------
     def evaluate_data_sufficiency(
         self,
         *,
@@ -334,6 +347,7 @@ class RucamScoreEstimator:
             reasons.append("alternative-cause assessment evidence unavailable")
         return RucamDataSufficiency(sufficient=not reasons, blocking_reasons=reasons)
 
+    # -------------------------------------------------------------------------
     def build_not_calculated_assessment(
         self,
         *,
@@ -366,6 +380,7 @@ class RucamScoreEstimator:
             data_sufficient=False,
         )
 
+    # -------------------------------------------------------------------------
     def build_source_reported_assessment(
         self,
         *,
@@ -401,6 +416,7 @@ class RucamScoreEstimator:
             data_sufficient=True,
         )
 
+    # -------------------------------------------------------------------------
     def estimate_for_drug(
         self,
         *,
@@ -520,6 +536,7 @@ class RucamScoreEstimator:
             data_sufficient=not limitations,
         )
 
+    # -------------------------------------------------------------------------
     def score_time_to_onset(
         self,
         *,
@@ -560,6 +577,7 @@ class RucamScoreEstimator:
             rationale=f"Latency: {delta_days} days.",
         ), onset_date
 
+    # -------------------------------------------------------------------------
     def score_course(
         self,
         *,
@@ -598,6 +616,7 @@ class RucamScoreEstimator:
             rationale="Follow-up labs available after withdrawal context.",
         )
 
+    # -------------------------------------------------------------------------
     def score_risk_factors(
         self, *, payload: PatientData, injury_type: str
     ) -> RucamComponentAssessment:
@@ -611,6 +630,7 @@ class RucamScoreEstimator:
             status="scored",
         )
 
+    # -------------------------------------------------------------------------
     def score_concomitant_drugs(
         self, *, target_drug: DrugEntry, all_drugs: list[DrugEntry]
     ) -> RucamComponentAssessment:
@@ -627,6 +647,7 @@ class RucamScoreEstimator:
             status="scored",
         )
 
+    # -------------------------------------------------------------------------
     def score_non_drug_causes(
         self, *, payload: PatientData, disease_context: PatientDiseaseContext
     ) -> RucamComponentAssessment:
@@ -659,6 +680,7 @@ class RucamScoreEstimator:
             status="scored",
         )
 
+    # -------------------------------------------------------------------------
     def score_previous_hepatotoxicity(
         self, *, resolved_item: dict[str, Any]
     ) -> RucamComponentAssessment:
@@ -678,6 +700,7 @@ class RucamScoreEstimator:
             status="scored",
         )
 
+    # -------------------------------------------------------------------------
     def score_rechallenge(
         self, *, payload: PatientData, drug: DrugEntry
     ) -> RucamComponentAssessment:
@@ -690,6 +713,7 @@ class RucamScoreEstimator:
             status="not_assessable",
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def resolve_causality_bucket(total_score: int) -> str:
         if total_score <= 0:

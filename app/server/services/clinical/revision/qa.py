@@ -5,6 +5,7 @@ from typing import Literal, Protocol
 from domain.clinical.revision import RevisionFinalReportPayload, RevisionQaValidationPayload
 
 
+###############################################################################
 class ReviewerInstructionProfileLike(Protocol):
     target_sections: list[
         Literal[
@@ -34,6 +35,7 @@ class ReviewerInstructionProfileLike(Protocol):
     ]
 
 
+###############################################################################
 def _unique_preserve_order(values: list[str]) -> list[str]:
     seen: set[str] = set()
     unique: list[str] = []
@@ -46,6 +48,7 @@ def _unique_preserve_order(values: list[str]) -> list[str]:
     return unique
 
 
+###############################################################################
 def build_revision_qa_validation_payload(
     *,
     result_payload: dict[str, object],

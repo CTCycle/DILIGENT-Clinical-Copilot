@@ -27,9 +27,10 @@ from repositories.serialization import (
     session_revision_steps,
 )
 
-
 ###############################################################################
 class DataSerializer:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -46,36 +47,37 @@ class DataSerializer:
     def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         return session_result_data.save_clinical_session(self, session_data)
 
+    # -------------------------------------------------------------------------
     def normalize_session_status(self, value: Any) -> str:
         return session_result_data.normalize_session_status(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def persist_patient(
         self, db_session: Session, session_data: dict[str, Any]
     ) -> Patient:
         return session_result_data.persist_patient(self, db_session, session_data)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def decode_patient_image(self, value: Any) -> bytes | None:
         return session_result_data.decode_patient_image(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:
         return evidence_data.save_livertox_records(self, records)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def prepare_livertox_rows(self, records: pd.DataFrame) -> list[dict[str, Any]]:
         return evidence_data.prepare_livertox_rows(self, records)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def livertox_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
         return evidence_data.livertox_row_sort_key(self, row)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def to_sortable_text(self, value: Any) -> str:
         return evidence_data.to_sortable_text(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def upsert_livertox_monograph(
         self,
         *,
@@ -87,7 +89,7 @@ class DataSerializer:
             self, db_session=db_session, drug_id=drug_id, row=row
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def try_assign_livertox_nbk_id(
         self,
         db_session: Session,
@@ -99,11 +101,11 @@ class DataSerializer:
             self, db_session, drug=drug, livertox_nbk_id=livertox_nbk_id
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def build_livertox_monograph_key(self, row: dict[str, Any]) -> str:
         return evidence_data.build_livertox_monograph_key(self, row)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def upsert_drugs_catalog_records(
         self,
         records: pd.DataFrame | list[dict[str, Any]],
@@ -118,56 +120,56 @@ class DataSerializer:
             curated_aliases_by_canonical=curated_aliases_by_canonical,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def resolve_commit_interval(self, override: int | None) -> int:
         return rxnav_data.resolve_commit_interval(self, override)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def prepare_rxnav_rows(
         self,
         records: pd.DataFrame | list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         return rxnav_data.prepare_rxnav_rows(self, records)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def prepare_rxnav_row(self, row: dict[str, Any]) -> dict[str, Any] | None:
         return rxnav_data.prepare_rxnav_row(self, row)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def rxnav_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
         return rxnav_data.rxnav_row_sort_key(self, row)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
         return rxnav_data.sanitize_livertox_records(self, records)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def is_valid_drug_name(self, value: str) -> bool:
         return rxnav_data.is_valid_drug_name(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_livertox_records(self) -> pd.DataFrame:
         return evidence_data.get_livertox_records(self)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_livertox_master_list(self) -> pd.DataFrame:
         return evidence_data.get_livertox_master_list(self)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_drugs_catalog(self) -> pd.DataFrame:
         return evidence_data.get_drugs_catalog(self)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def stream_drugs_catalog(
         self, page_size: int | None = None
     ) -> Iterator[pd.DataFrame]:
         return evidence_data.stream_drugs_catalog(self, page_size)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def build_search_pattern(self, search: str | None) -> str | None:
         return evidence_data.build_search_pattern(self, search)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def list_sessions(
         self,
         *,
@@ -188,20 +190,21 @@ class DataSerializer:
             limit=limit,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def parse_session_result_payload(
         self, payload_json: str | None
     ) -> dict[str, Any] | None:
         return session_result_data.parse_session_result_payload(self, payload_json)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
         return session_result_data.get_session_result_payload(self, session_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         return session_result_data.get_session_detail(self, session_id)
 
+    # -------------------------------------------------------------------------
     def upsert_session_result_payload(
         self, session_id: int, payload: dict[str, Any]
     ) -> bool:
@@ -209,7 +212,7 @@ class DataSerializer:
             self, session_id, payload
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def update_session_text_and_metadata(
         self,
         session_id: int,
@@ -224,7 +227,7 @@ class DataSerializer:
             metadata=metadata,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def update_current_report_text_with_manual_audit(
         self,
         session_id: int,
@@ -245,11 +248,11 @@ class DataSerializer:
             metadata=metadata,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
         return session_revision_data.list_manual_report_edits(self, session_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def update_session_metadata(
         self,
         session_id: int,
@@ -262,11 +265,11 @@ class DataSerializer:
             metadata=metadata,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
         return session_revision_data.list_session_versions(self, session_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_session_version_detail(
         self,
         session_id: int,
@@ -279,7 +282,7 @@ class DataSerializer:
             version_id=version_id,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_latest_version_record_for_session(
         self,
         session_id: int,
@@ -288,14 +291,14 @@ class DataSerializer:
             self, session_id
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_version_record_for_session(
         self,
         session_id: int,
     ) -> dict[str, Any] | None:
         return session_revision_data.get_version_record_for_session(self, session_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def create_revision_version_shell(
         self,
         session_id: int,
@@ -314,7 +317,7 @@ class DataSerializer:
             initiated_by=initiated_by,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def finalize_revision_version(
         self,
         *,
@@ -335,7 +338,7 @@ class DataSerializer:
             clinical_review_status=clinical_review_status,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def create_or_update_revision_run(
         self,
         *,
@@ -380,15 +383,15 @@ class DataSerializer:
             latency_ms=latency_ms,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
         return session_revision_data.get_revision_run(self, pipeline_run_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
         return session_revision_data.list_revision_steps(self, pipeline_run_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def persist_revision_artifacts(
         self,
         *,
@@ -403,7 +406,7 @@ class DataSerializer:
             result_payload=result_payload,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def list_revision_artifacts_for_version(
         self,
         *,
@@ -414,7 +417,7 @@ class DataSerializer:
             revision_version_id=revision_version_id,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def persist_revision_entities(
         self,
         *,
@@ -431,7 +434,7 @@ class DataSerializer:
             result_payload=result_payload,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def list_revision_entities_for_version(
         self,
         *,
@@ -442,7 +445,7 @@ class DataSerializer:
             revision_version_id=revision_version_id,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def record_revision_review_action(
         self,
         *,
@@ -461,7 +464,7 @@ class DataSerializer:
             metadata=metadata,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def list_revision_reviews_for_version(
         self,
         *,
@@ -472,7 +475,7 @@ class DataSerializer:
             revision_version_id=revision_version_id,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def start_revision_step(
         self,
         *,
@@ -507,7 +510,7 @@ class DataSerializer:
             started_at=started_at,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def complete_revision_step(
         self,
         *,
@@ -534,7 +537,7 @@ class DataSerializer:
             completed_at=completed_at,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def fail_revision_step(
         self,
         *,
@@ -555,19 +558,19 @@ class DataSerializer:
             completed_at=completed_at,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_next_session_version(self, original_session_id: int) -> int:
         return session_result_data.get_next_session_version(self, original_session_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
         return session_result_data.get_session_timeline_source(self, session_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
         return session_result_data.delete_session(self, session_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def list_rxnav_catalog(
         self,
         *,
@@ -579,11 +582,11 @@ class DataSerializer:
             self, search=search, offset=offset, limit=limit
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_rxnav_alias_groups(self, drug_id: int) -> dict[str, Any] | None:
         return evidence_data.get_rxnav_alias_groups(self, drug_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def list_livertox_catalog(
         self,
         *,
@@ -595,51 +598,51 @@ class DataSerializer:
             self, search=search, offset=offset, limit=limit
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
         return evidence_data.get_livertox_excerpt(self, drug_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
         return evidence_data.get_drug_knowledge_bundle(self, drug_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def delete_drug_with_cleanup(self, drug_id: int) -> bool:
         return evidence_data.delete_drug_with_cleanup(self, drug_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def normalize_string(self, value: Any) -> str | None:
         return session_result_data.normalize_string(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def normalize_flag(self, value: Any) -> int | None:
         return session_result_data.normalize_flag(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def normalize_date(self, value: Any) -> str | None:
         return session_result_data.normalize_date(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def normalize_date_value(self, value: Any) -> date | None:
         return session_result_data.normalize_date_value(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def join_values(self, values: set[str]) -> str | None:
         return session_result_data.join_values(self, values)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def to_int(self, value: Any) -> int | None:
         return session_result_data.to_int(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def to_float(self, value: Any) -> float | None:
         return session_result_data.to_float(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def parse_datetime(self, value: Any) -> Any:
         return session_result_data.parse_datetime(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def persist_session_sections(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
@@ -647,7 +650,7 @@ class DataSerializer:
             self, db_session, session_id, session_data
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def persist_session_labs(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
@@ -655,7 +658,7 @@ class DataSerializer:
             self, db_session, session_id, session_data
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def persist_session_drugs(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
@@ -663,7 +666,7 @@ class DataSerializer:
             self, db_session, session_id, session_data
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def resolve_drug_id_from_match_cache(
         self,
         db_session: Session,
@@ -674,7 +677,7 @@ class DataSerializer:
             self, db_session, normalized_drug_key=normalized_drug_key
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def upsert_high_confidence_kb_match_cache(
         self,
         db_session: Session,
@@ -705,7 +708,7 @@ class DataSerializer:
             ambiguous=ambiguous,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def persist_session_result_payload(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
@@ -713,11 +716,11 @@ class DataSerializer:
             self, db_session, session_id, session_data
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def serialize_json_payload(self, payload: Any) -> str | None:
         return session_result_data.serialize_json_payload(self, payload)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def resolve_drug_id(
         self,
         db_session: Session,
@@ -734,7 +737,7 @@ class DataSerializer:
             nbk_id=nbk_id,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def ensure_drug(
         self,
         db_session: Session,
@@ -757,6 +760,7 @@ class DataSerializer:
             use_livertox_nbk_lookup=use_livertox_nbk_lookup,
         )
 
+    # -------------------------------------------------------------------------
     def assign_identifier_if_consistent(
         self,
         *,
@@ -768,7 +772,7 @@ class DataSerializer:
             self, drug=drug, field_name=field_name, incoming_value=incoming_value
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def upsert_drug_rxcui(
         self,
         db_session: Session,
@@ -780,7 +784,7 @@ class DataSerializer:
             self, db_session, drug_id=drug_id, rxcui=rxcui
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_drug_by_rxcui(
         self,
         db_session: Session,
@@ -788,7 +792,7 @@ class DataSerializer:
     ) -> Drug | None:
         return evidence_aliases.get_drug_by_rxcui(self, db_session, rxcui)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_drug_by_canonical_name_norm(
         self,
         db_session: Session,
@@ -798,7 +802,7 @@ class DataSerializer:
             self, db_session, canonical_name_norm
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_drug_alias_by_norm(
         self,
         db_session: Session,
@@ -806,7 +810,7 @@ class DataSerializer:
     ) -> DrugAlias | None:
         return evidence_aliases.get_drug_alias_by_norm(self, db_session, alias_norm)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_monograph_by_drug_id(
         self,
         db_session: Session,
@@ -814,7 +818,7 @@ class DataSerializer:
     ) -> LiverToxMonograph | None:
         return evidence_aliases.get_monograph_by_drug_id(self, db_session, drug_id)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_monograph_by_key(
         self,
         db_session: Session,
@@ -822,7 +826,7 @@ class DataSerializer:
     ) -> LiverToxMonograph | None:
         return evidence_aliases.get_monograph_by_key(self, db_session, monograph_key)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def upsert_drug_alias(
         self,
         db_session: Session,
@@ -843,39 +847,39 @@ class DataSerializer:
             term_type=term_type,
         )
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def persist_livertox_aliases(
         self, db_session: Session, drug_id: int, row: dict[str, Any]
     ) -> None:
         return evidence_aliases.persist_livertox_aliases(self, db_session, drug_id, row)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def extract_text_candidates(self, value: Any) -> list[str]:
         return evidence_aliases.extract_text_candidates(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def extract_synonym_candidates(self, value: Any) -> list[str]:
         return evidence_aliases.extract_synonym_candidates(self, value)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def unique_text(self, values: list[str]) -> list[str]:
         return evidence_aliases.unique_text(self, values)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def build_alias_lookup_by_kind(
         self, aliases_frame: pd.DataFrame
     ) -> dict[int, dict[str, set[str]]]:
         return evidence_aliases.build_alias_lookup_by_kind(self, aliases_frame)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def group_aliases_by_kind(self, aliases: list[DrugAlias]) -> dict[str, set[str]]:
         return evidence_aliases.group_aliases_by_kind(self, aliases)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def alias_values_for_kind(self, aliases: pd.DataFrame, alias_kind: str) -> set[str]:
         return evidence_aliases.alias_values_for_kind(self, aliases, alias_kind)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def alias_model_values_for_kind(
         self,
         aliases: list[DrugAlias],
@@ -883,15 +887,15 @@ class DataSerializer:
     ) -> set[str]:
         return evidence_aliases.alias_model_values_for_kind(self, aliases, alias_kind)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def first_alias_value(self, aliases: pd.DataFrame, alias_kind: str) -> str | None:
         return evidence_aliases.first_alias_value(self, aliases, alias_kind)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def first_alias_term_type(self, aliases: pd.DataFrame) -> str | None:
         return evidence_aliases.first_alias_term_type(self, aliases)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def first_alias_model_value(
         self,
         aliases: list[DrugAlias],
@@ -899,7 +903,7 @@ class DataSerializer:
     ) -> str | None:
         return evidence_aliases.first_alias_model_value(self, aliases, alias_kind)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def first_alias_model_term_type(self, aliases: list[DrugAlias]) -> str | None:
         return evidence_aliases.first_alias_model_term_type(self, aliases)
 

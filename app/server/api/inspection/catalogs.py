@@ -20,7 +20,10 @@ from domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from services.inspection.service import DataInspectionService
 
 
+###############################################################################
 class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -29,6 +32,7 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
     ) -> None:
         super().__init__(router=router, service=service)
 
+    # -------------------------------------------------------------------------
     def list_rxnav_catalog(
         self,
         search: str | None = Query(default=None),
@@ -43,6 +47,7 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
         )
         return RxNavCatalogResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def get_rxnav_aliases(self, drug_id: int) -> DrugAliasesResponse:
         payload = self.service.get_rxnav_alias_groups(drug_id)
         if payload is None:
@@ -52,6 +57,7 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
             )
         return DrugAliasesResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def delete_rxnav_drug(self, drug_id: int) -> DeleteEntityResponse:
         deleted = self.service.delete_drug(drug_id)
         if not deleted:
@@ -61,10 +67,12 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
             )
         return DeleteEntityResponse(deleted=True)
 
+    # -------------------------------------------------------------------------
     def get_rxnav_update_config(self) -> InspectionUpdateConfigResponse:
         payload = self.service.build_update_config_response("rxnav")
         return InspectionUpdateConfigResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def start_rxnav_update_job(
         self,
         overrides: InspectionRxNavOverrideRequest | None = Body(default=None),
@@ -76,18 +84,21 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
             overrides=overrides.model_dump(exclude_none=True),
         )
 
+    # -------------------------------------------------------------------------
     def get_rxnav_update_job_status(self, job_id: str) -> JobStatusResponse:
         return self.get_update_job_status(
             job_id=job_id,
             job_type=self.service.RXNAV_JOB_TYPE,
         )
 
+    # -------------------------------------------------------------------------
     def cancel_rxnav_update_job(self, job_id: str) -> JobCancelResponse:
         return self.cancel_update_job(
             job_id=job_id,
             job_type=self.service.RXNAV_JOB_TYPE,
         )
 
+    # -------------------------------------------------------------------------
     def list_livertox_catalog(
         self,
         search: str | None = Query(default=None),
@@ -102,6 +113,7 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
         )
         return LiverToxCatalogResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def get_livertox_excerpt(self, drug_id: int) -> LiverToxExcerptResponse:
         payload = self.service.get_livertox_excerpt(drug_id)
         if payload is None:
@@ -111,6 +123,7 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
             )
         return LiverToxExcerptResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def delete_livertox_drug(self, drug_id: int) -> DeleteEntityResponse:
         deleted = self.service.delete_drug(drug_id)
         if not deleted:
@@ -120,10 +133,12 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
             )
         return DeleteEntityResponse(deleted=True)
 
+    # -------------------------------------------------------------------------
     def get_livertox_update_config(self) -> InspectionUpdateConfigResponse:
         payload = self.service.build_update_config_response("livertox")
         return InspectionUpdateConfigResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def start_livertox_update_job(
         self,
         overrides: InspectionLiverToxOverrideRequest | None = Body(default=None),
@@ -135,18 +150,21 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
             overrides=overrides.model_dump(exclude_none=True),
         )
 
+    # -------------------------------------------------------------------------
     def get_livertox_update_job_status(self, job_id: str) -> JobStatusResponse:
         return self.get_update_job_status(
             job_id=job_id,
             job_type=self.service.LIVERTOX_JOB_TYPE,
         )
 
+    # -------------------------------------------------------------------------
     def cancel_livertox_update_job(self, job_id: str) -> JobCancelResponse:
         return self.cancel_update_job(
             job_id=job_id,
             job_type=self.service.LIVERTOX_JOB_TYPE,
         )
 
+    # -------------------------------------------------------------------------
     def list_reference_catalog_runtime_observations(
         self,
     ) -> list[ReferenceCatalogRuntimeObservationResponse]:
@@ -155,6 +173,7 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
             for row in self.service.list_reference_catalog_runtime_observations()
         ]
 
+    # -------------------------------------------------------------------------
     def list_reference_catalog_runtime_observations_by_category(
         self, category: str
     ) -> list[ReferenceCatalogRuntimeObservationResponse]:
@@ -165,6 +184,7 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
             )
         ]
 
+    # -------------------------------------------------------------------------
     def upsert_reference_catalog_runtime_observation(
         self,
         category: str,
@@ -183,6 +203,7 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
             )
         )
 
+    # -------------------------------------------------------------------------
     def delete_reference_catalog_runtime_observation(
         self, category: str, term: str
     ) -> DeleteEntityResponse:
@@ -192,6 +213,7 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
         )
         return DeleteEntityResponse(deleted=deleted)
 
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "/rxnav",

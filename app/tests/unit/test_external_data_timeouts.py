@@ -6,6 +6,7 @@ from configurations.management import (
 )
 
 
+###############################################################################
 def _env() -> EnvironmentSnapshot:
     return EnvironmentSnapshot(
         ollama_url=None,
@@ -14,6 +15,7 @@ def _env() -> EnvironmentSnapshot:
     )
 
 
+###############################################################################
 def test_runtime_timeouts_respect_values_and_minimums() -> None:
     payload = build_settings_payload_from_json(
         {
@@ -46,6 +48,7 @@ def test_runtime_timeouts_respect_values_and_minimums() -> None:
     assert settings["livertox_download_timeout"] == 44.0
 
 
+###############################################################################
 def test_runtime_timeouts_floor_to_positive_values() -> None:
     payload = build_settings_payload_from_json(
         {
@@ -78,6 +81,7 @@ def test_runtime_timeouts_floor_to_positive_values() -> None:
     assert settings["livertox_download_timeout"] == 1.0
 
 
+###############################################################################
 def test_runtime_timeouts_allow_long_clinical_budget_without_legacy_cap() -> None:
     payload = build_settings_payload_from_json(
         {
@@ -94,6 +98,7 @@ def test_runtime_timeouts_allow_long_clinical_budget_without_legacy_cap() -> Non
     assert settings["clinical_llm_timeout"] == 9000.0
 
 
+###############################################################################
 def test_runtime_timeout_caps_floor_to_minimum_llm_timeout() -> None:
     payload = build_settings_payload_from_json(
         {

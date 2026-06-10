@@ -23,16 +23,13 @@ from services.llm.structured import (
 
 ProviderName = Literal["openai", "gemini"]
 
-
 ###############################################################################
 class LLMError(RuntimeError):
     pass
 
-
 ###############################################################################
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
-
 
 ###############################################################################
 class CloudLLMClient:
@@ -42,6 +39,7 @@ class CloudLLMClient:
 
     """
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -100,7 +98,7 @@ class CloudLLMClient:
             headers=headers,
         )
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def resolve_provider_access_key(self, provider: ProviderName) -> str | None:
         if provider not in {"openai", "gemini"}:
             return None
@@ -114,21 +112,21 @@ class CloudLLMClient:
                 f"Failed to load active {provider_label} access key"
             ) from exc
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def close(self) -> None:
         if self.openai_client is not None:
             await self.openai_client.close()
         await self.client.aclose()
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def __aenter__(self) -> CloudLLMClient:
         return self
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.close()
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def list_models(self) -> list[str]:
         if self.provider == "openai":
             try:
@@ -140,19 +138,19 @@ class CloudLLMClient:
             return [m["id"] for m in data.get("data", []) if "id" in m]
         return []
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def check_model_availability(self, name: str) -> None:
         models = set(await self.list_models())
         if models and name not in models:
             raise LLMError(f"Model '{name}' not found for provider {self.provider}")
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def is_gpt5_family_model(model: str | None) -> bool:
         normalized = (model or "").strip().lower()
         return normalized.startswith("gpt-5")
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def raise_for_status(resp: httpx.Response) -> None:
         try:
@@ -161,7 +159,7 @@ class CloudLLMClient:
             detail = resp.text
             raise LLMError(f"HTTP {resp.status_code}: {detail}") from e
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def chat(
         self,
         *,
@@ -197,7 +195,7 @@ class CloudLLMClient:
             raise self._map_provider_exception(exc) from exc
         raise LLMError(f"Provider '{self.provider}' does not support chat yet")
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def _chat_openai(
         self,
         *,
@@ -222,7 +220,7 @@ class CloudLLMClient:
         response = await self.openai_client.responses.create(**kwargs)
         return self._normalize_content(self._extract_openai_output_text(response))
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def _chat_gemini(
         self,
         *,
@@ -255,7 +253,7 @@ class CloudLLMClient:
         )
         return self._normalize_content(getattr(response, "text", response))
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def resolve_gemini_model_resource(model: str | None) -> str:
         model_name = (model or "").strip()
@@ -265,7 +263,7 @@ class CloudLLMClient:
             return model_name
         return f"models/{model_name}"
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_openai_responses_input(
         messages: list[dict[str, str]],
@@ -286,7 +284,7 @@ class CloudLLMClient:
             input_messages.append({"role": "user", "content": ""})
         return "\n\n".join(instructions) or None, input_messages
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_gemini_contents(
         messages: list[dict[str, str]],
@@ -306,14 +304,14 @@ class CloudLLMClient:
             contents.append({"role": "user", "parts": [{"text": ""}]})
         return "\n\n".join(system_instruction) or None, contents
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_gemini_config(config_kwargs: dict[str, Any]) -> Any | None:
         if not config_kwargs:
             return None
         return genai_types.GenerateContentConfig(**config_kwargs)
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def _extract_openai_output_text(response: Any) -> str:
         output_text = getattr(response, "output_text", None)
@@ -334,7 +332,7 @@ class CloudLLMClient:
                 return "".join(chunks)
         return str(response)
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def _normalize_content(content: Any) -> dict[str, Any] | str:
         if isinstance(content, dict):
@@ -360,7 +358,7 @@ class CloudLLMClient:
             return loaded if isinstance(loaded, dict) else content
         return str(content)
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def _map_provider_exception(exc: Exception) -> LLMError:
         if isinstance(exc, LLMError):
@@ -379,7 +377,7 @@ class CloudLLMClient:
             return LLMTimeout("Timed out waiting for cloud chat response")
         return LLMError(f"Cloud LLM call failed: {exc}")
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def llm_text_call(
         self,
         *,
@@ -403,7 +401,7 @@ class CloudLLMClient:
         )
         return json.dumps(raw) if isinstance(raw, dict) else str(raw)
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def embed(
         self,
         *,
@@ -419,7 +417,7 @@ class CloudLLMClient:
             return await self.embed_gemini(model=model, input_texts=input_texts)
         raise LLMError(f"Provider '{self.provider}' does not support embeddings yet")
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def embed_openai(
         self,
         *,
@@ -449,7 +447,7 @@ class CloudLLMClient:
             raise LLMError("Mismatch between OpenAI embeddings and inputs")
         return embeddings
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def embed_gemini(
         self,
         *,
@@ -488,7 +486,7 @@ class CloudLLMClient:
             raise LLMError("Mismatch between Gemini embeddings and inputs")
         return embeddings
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def llm_structured_call(
         self,
         *,
@@ -566,7 +564,7 @@ class CloudLLMClient:
             max_repair_attempts=max_repair_attempts,
         )
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def _structured_openai(
         self,
         *,
@@ -601,7 +599,7 @@ class CloudLLMClient:
         text = self._extract_openai_output_text(response)
         return StructuredOutputParser(schema=schema).parse(text)
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_structured_messages(
         *,
@@ -617,7 +615,7 @@ class CloudLLMClient:
             {"role": "user", "content": user_prompt},
         ]
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_repair_messages(
         *,
@@ -638,7 +636,7 @@ class CloudLLMClient:
             },
         ]
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def parse_with_repairs(
         self,
         *,
@@ -680,7 +678,7 @@ class CloudLLMClient:
 
         raise RuntimeError("No structured output produced by the model")
 
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
         return parse_json_dict(obj_or_text)

@@ -13,6 +13,7 @@ from domain.clinical.entities import (
 from domain.clinical.extras import CandidateSelectionResult
 
 
+###############################################################################
 class RevisedDrugPayload(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -34,6 +35,7 @@ class RevisedDrugPayload(BaseModel):
     ) = None
     historical_flag: bool | None = None
 
+    # -------------------------------------------------------------------------
     @field_validator(
         "name",
         "role",
@@ -53,6 +55,7 @@ class RevisedDrugPayload(BaseModel):
         return stripped or None
 
 
+###############################################################################
 class RevisedDiseasePayload(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -67,6 +70,7 @@ class RevisedDiseasePayload(BaseModel):
     hepatic_related: bool | None = None
     evidence: str | None = Field(default=None, max_length=500)
 
+    # -------------------------------------------------------------------------
     @field_validator(
         "name",
         "occurrence_time",
@@ -86,6 +90,7 @@ class RevisedDiseasePayload(BaseModel):
         return stripped or None
 
 
+###############################################################################
 class RevisedLabPayload(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -100,6 +105,7 @@ class RevisedLabPayload(BaseModel):
     evidence: str | None = Field(default=None, max_length=500)
     source: Literal["laboratory_analysis", "anamnesis", "merged"] = "anamnesis"
 
+    # -------------------------------------------------------------------------
     @field_validator(
         "marker_name",
         "value_text",
@@ -118,6 +124,7 @@ class RevisedLabPayload(BaseModel):
         return stripped or None
 
 
+###############################################################################
 class RevisionLiverToxDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -136,6 +143,7 @@ class RevisionLiverToxDecision(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
     provenance: dict[str, Any] = Field(default_factory=dict)
 
+    # -------------------------------------------------------------------------
     @field_validator(
         "decision_id",
         "drug_name",
@@ -154,6 +162,7 @@ class RevisionLiverToxDecision(BaseModel):
         return stripped or None
 
 
+###############################################################################
 class RevisedDiliAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -177,6 +186,7 @@ class RevisedDiliAssessment(BaseModel):
     previous_assessment_present: bool = False
     provenance: dict[str, Any] = Field(default_factory=dict)
 
+    # -------------------------------------------------------------------------
     @field_validator(
         "drug_id",
         "revised_drug_entry_id",
@@ -194,6 +204,7 @@ class RevisedDiliAssessment(BaseModel):
         return stripped or None
 
 
+###############################################################################
 class RevisionFinalReportPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -207,6 +218,7 @@ class RevisionFinalReportPayload(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+###############################################################################
 class RevisionQaValidationPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -224,6 +236,7 @@ class RevisionQaValidationPayload(BaseModel):
     finding_count: int = 0
 
 
+###############################################################################
 @dataclass(frozen=True)
 class RevisionConsultationInputs:
     analysis_drugs: PatientDrugs
@@ -232,6 +245,7 @@ class RevisionConsultationInputs:
     context_metadata: dict[str, Any]
 
 
+###############################################################################
 @dataclass(frozen=True)
 class RevisionConsultationExecution:
     inputs: RevisionConsultationInputs
@@ -240,6 +254,7 @@ class RevisionConsultationExecution:
     payload: dict[str, Any]
 
 
+###############################################################################
 @dataclass(frozen=True)
 class RevisionCandidateSelectionResolution:
     analysis_drugs: PatientDrugs
@@ -247,6 +262,7 @@ class RevisionCandidateSelectionResolution:
     entity_pipeline: dict[str, Any]
 
 
+###############################################################################
 @dataclass(frozen=True)
 class RevisionExtractionResolution:
     therapy_deterministic: DeterministicDrugExtractionResult | Any
@@ -257,6 +273,7 @@ class RevisionExtractionResolution:
     extraction_bundle: dict[str, Any]
 
 
+###############################################################################
 @dataclass(frozen=True)
 class RevisionFinalizationOutputs:
     final_report: str

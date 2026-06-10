@@ -17,6 +17,7 @@ from repositories.serialization.session_revision_data import (
 )
 
 
+###############################################################################
 def _version_status_for_human_review_transition(
     *,
     current_version_status: str,
@@ -31,6 +32,7 @@ def _version_status_for_human_review_transition(
     return current_version_status
 
 
+###############################################################################
 def record_revision_review_action(
     self,
     *,
@@ -90,6 +92,7 @@ def record_revision_review_action(
         db_session.close()
 
 
+###############################################################################
 def list_revision_reviews_for_version(
     self,
     *,
@@ -113,6 +116,7 @@ def list_revision_reviews_for_version(
         db_session.close()
 
 
+###############################################################################
 def start_revision_step(
     self,
     *,
@@ -186,6 +190,7 @@ def start_revision_step(
         db_session.close()
 
 
+###############################################################################
 def complete_revision_step(
     self,
     *,
@@ -233,6 +238,7 @@ def complete_revision_step(
         db_session.close()
 
 
+###############################################################################
 def fail_revision_step(
     self,
     *,

@@ -4,6 +4,7 @@ from services.clinical.deterministic_extraction import extract_deterministic_dis
 from services.clinical.parser import DrugsParser
 
 
+###############################################################################
 def test_deterministic_anamnesis_regimen_extraction_captures_oncology_history() -> None:
     parser = DrugsParser(client=object())
     text = (
@@ -25,6 +26,7 @@ def test_deterministic_anamnesis_regimen_extraction_captures_oncology_history() 
     assert result.regimen_lines
 
 
+###############################################################################
 def test_deterministic_disease_extraction_captures_hepatic_and_oncologic_context() -> (
     None
 ):

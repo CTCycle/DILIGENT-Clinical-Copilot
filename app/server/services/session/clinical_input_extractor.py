@@ -19,10 +19,12 @@ from services.session.clinical_section_parsers import (
 )
 
 
+###############################################################################
 class ClinicalInputExtractionError(RuntimeError):
     pass
 
 
+###############################################################################
 def validate_extracted_sections_against_source(
     source_text: str,
     anamnesis: str,
@@ -35,7 +37,10 @@ def validate_extracted_sections_against_source(
     )
 
 
+###############################################################################
 class ClinicalInputExtractor:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -56,6 +61,7 @@ class ClinicalInputExtractor:
             self.client_provider = "injected"
             self.runtime_revision = LLMRuntimeConfig.get_revision()
 
+    # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
         revision = LLMRuntimeConfig.get_revision()
         resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model(
@@ -78,6 +84,7 @@ class ClinicalInputExtractor:
             ),
         )
 
+    # -------------------------------------------------------------------------
     def _deterministic_extract(
         self, clinical_input: str
     ) -> ClinicalSectionExtractionResult:
@@ -150,12 +157,14 @@ class ClinicalInputExtractor:
             },
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _raise_extraction_failed(reason: str) -> None:
         raise ClinicalInputExtractionError(
             f"Unable to extract clinical sections: {reason}"
         )
 
+    # -------------------------------------------------------------------------
     async def extract(
         self,
         *,

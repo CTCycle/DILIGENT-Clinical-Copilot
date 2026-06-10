@@ -4,6 +4,7 @@ import hashlib
 from typing import NamedTuple
 
 
+###############################################################################
 class EmbeddingModelSpec(NamedTuple):
     provider: str
     model_name: str
@@ -12,6 +13,7 @@ class EmbeddingModelSpec(NamedTuple):
     signature: str
 
 
+###############################################################################
 def build_embedding_model_signature(
     provider: str,
     model_name: str,

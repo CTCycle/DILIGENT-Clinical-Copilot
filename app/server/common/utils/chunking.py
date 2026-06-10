@@ -8,14 +8,17 @@ from typing import NamedTuple
 from common.utils.seed_terms import SeedTermCatalog, detect_seed_matches
 
 
+###############################################################################
 class TextLineIndex(NamedTuple):
     text: str
 
+    # -------------------------------------------------------------------------
     def line_for_offset(self, offset: int) -> int:
         bounded = max(0, min(offset, len(self.text)))
         return self.text.count("\n", 0, bounded) + 1
 
 
+###############################################################################
 class ChunkSourceSpan(NamedTuple):
     page_start: int
     page_end: int
@@ -25,6 +28,7 @@ class ChunkSourceSpan(NamedTuple):
     char_end: int
 
 
+###############################################################################
 class SmartChunk(NamedTuple):
     text: str
     chunk_uid: str
@@ -33,7 +37,10 @@ class SmartChunk(NamedTuple):
     metadata: dict[str, object]
 
 
+###############################################################################
 class SmartDocumentChunker:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -49,6 +56,7 @@ class SmartDocumentChunker:
         self.min_chars = min_chars
         self.seed_catalog = seed_catalog
 
+    # -------------------------------------------------------------------------
     def chunk_document(
         self,
         text: str,
@@ -141,6 +149,7 @@ class SmartDocumentChunker:
             cursor += len(page_text)
         return chunks
 
+    # -------------------------------------------------------------------------
     def _extract_heading(self, text: str) -> str | None:
         first = (text.splitlines()[0] if text.splitlines() else "").strip()
         if not first:
@@ -149,6 +158,7 @@ class SmartDocumentChunker:
             return re.sub(r"^[#\s]+", "", first)
         return None
 
+    # -------------------------------------------------------------------------
     def _split_piece(self, text: str) -> list[tuple[str, str | None, str | None]]:
         cleaned = text.strip()
         if not cleaned:
@@ -160,6 +170,7 @@ class SmartDocumentChunker:
                 chunks.append((chunk, heading, heading_path))
         return self._merge_small_chunks(chunks)
 
+    # -------------------------------------------------------------------------
     def _split_sections(self, text: str) -> list[tuple[str, str | None, str | None]]:
         sections: list[tuple[str, str | None, str | None]] = []
         heading_stack: list[str] = []
@@ -190,6 +201,7 @@ class SmartDocumentChunker:
             )
         return sections
 
+    # -------------------------------------------------------------------------
     def _recursive_split(self, text: str) -> list[str]:
         normalized = text.strip()
         if len(normalized) <= self.max_chars:
@@ -199,6 +211,7 @@ class SmartDocumentChunker:
             separators=("\n\n", "\n- ", "\n* ", "\n", ". ", "; ", ", ", " "),
         )
 
+    # -------------------------------------------------------------------------
     def _split_by_separators(self, text: str, separators: tuple[str, ...]) -> list[str]:
         if len(text) <= self.max_chars:
             return [text.strip()]
@@ -229,6 +242,7 @@ class SmartDocumentChunker:
             chunks.extend(self._split_by_separators(buffer.strip(), separators[1:]))
         return chunks
 
+    # -------------------------------------------------------------------------
     def _merge_small_chunks(
         self, chunks: list[tuple[str, str | None, str | None]]
     ) -> list[tuple[str, str | None, str | None]]:
@@ -246,6 +260,7 @@ class SmartDocumentChunker:
                 merged.append((text, heading, heading_path))
         return merged
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _is_heading_line(line: str) -> bool:
         if not line or len(line) > 140:
@@ -257,10 +272,12 @@ class SmartDocumentChunker:
         words = line.split()
         return 1 <= len(words) <= 12 and line == line.upper()
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _normalize_heading(line: str) -> str:
         return re.sub(r"\s+", " ", line.lstrip("#").strip())
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _slug(value: str) -> str:
         slug = re.sub(r"[^a-z0-9]+", "-", value.casefold()).strip("-")

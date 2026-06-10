@@ -12,6 +12,7 @@ from domain.catalogs import CatalogEntry, CatalogManifest, normalize_catalog_val
 CATALOG_MANIFEST_DIR = CATALOGS_PATH
 
 
+###############################################################################
 def iter_catalog_manifest_paths() -> list[Path]:
     if not CATALOG_MANIFEST_DIR.exists():
         return []
@@ -22,10 +23,12 @@ def iter_catalog_manifest_paths() -> list[Path]:
     )
 
 
+###############################################################################
 def compute_manifest_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+###############################################################################
 def load_catalog_manifest(path: Path) -> CatalogManifest:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -68,6 +71,7 @@ def load_catalog_manifest(path: Path) -> CatalogManifest:
     )
 
 
+###############################################################################
 def validate_manifest(manifest: Mapping[str, Any]) -> None:
     manifest_name = str(manifest.get("manifest") or "").strip()
     if not manifest_name:

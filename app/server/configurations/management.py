@@ -55,12 +55,14 @@ from domain.settings.environment import (
 )
 
 
+###############################################################################
 def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
 
 
+###############################################################################
 def load_configuration_data(path: str | Path) -> dict[str, Any]:
     config_path = Path(path)
     if not config_path.exists():
@@ -74,9 +76,10 @@ def load_configuration_data(path: str | Path) -> dict[str, Any]:
         raise RuntimeError("Configuration must be a JSON object.")
     return data
 
-
 ###############################################################################
 class ConfigurationManager:
+
+    # -------------------------------------------------------------------------
     def __init__(self, config_path: str | None = None) -> None:
         self._config_path = Path(config_path or CONFIGURATIONS_FILE)
         self._lock = RLock()
@@ -84,10 +87,12 @@ class ConfigurationManager:
         self._settings: ServerSettings | None = None
         self.reload()
 
+    # -------------------------------------------------------------------------
     @property
     def config_path(self) -> Path:
         return self._config_path
 
+    # -------------------------------------------------------------------------
     @property
     def server_settings(self) -> ServerSettings:
         with self._lock:
@@ -97,6 +102,7 @@ class ConfigurationManager:
                 raise RuntimeError("Settings are not available.")
             return self._settings
 
+    # -------------------------------------------------------------------------
     def reload(self) -> ServerSettings:
         with self._lock:
             loaded = load_configuration_data(self._config_path)
@@ -112,15 +118,18 @@ class ConfigurationManager:
             self._settings = settings
             return settings
 
+    # -------------------------------------------------------------------------
     def get_block(self, block_name: str) -> dict[str, Any]:
         with self._lock:
             return ensure_mapping(self._raw_data.get(block_name)).copy()
 
+    # -------------------------------------------------------------------------
     def get_value(self, block_name: str, key: str, default: Any = None) -> Any:
         block = self.get_block(block_name)
         return block.get(key, default)
 
 
+###############################################################################
 def _resolve_ollama_url_with_scheme(
     normalized_host: str,
     *,
@@ -141,6 +150,7 @@ def _resolve_ollama_url_with_scheme(
     return f"{scheme}://{host_port}:{resolved_port}"
 
 
+###############################################################################
 def _normalize_ollama_host(host: str) -> str:
     normalized = host.strip()
     if normalized.lower() in {"localhost", "::1", "[::1]"}:
@@ -148,6 +158,7 @@ def _normalize_ollama_host(host: str) -> str:
     return normalized
 
 
+###############################################################################
 def resolve_ollama_base_url(
     *,
     ollama_url: str | None,
@@ -174,6 +185,7 @@ def resolve_ollama_base_url(
     return fallback.rstrip("/")
 
 
+###############################################################################
 def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
     raw_port = os.getenv("OLLAMA_PORT")
     port = (
@@ -208,6 +220,7 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
     )
 
 
+###############################################################################
 def _default_llm_runtime_defaults(
     environment: EnvironmentSnapshot,
 ) -> LLMRuntimeDefaults:
@@ -235,6 +248,7 @@ def _default_llm_runtime_defaults(
     )
 
 
+###############################################################################
 def _build_fastapi_settings() -> FastAPISettings:
     return FastAPISettings(
         title=FASTAPI_TITLE,
@@ -243,6 +257,7 @@ def _build_fastapi_settings() -> FastAPISettings:
     )
 
 
+###############################################################################
 def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     payload = ensure_mapping(data)
     polling_interval = coerce_float(payload.get("polling_interval"), 1.0)
@@ -251,6 +266,7 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     return JobsSettings(polling_interval=polling_interval)
 
 
+###############################################################################
 def _parse_database_url(url: str | None) -> dict[str, Any]:
     if not url:
         return {}
@@ -266,6 +282,7 @@ def _parse_database_url(url: str | None) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _build_database_settings(
     environment: DatabaseEnvironmentSnapshot,
 ) -> DatabaseSettings:
@@ -330,6 +347,7 @@ def _build_database_settings(
     )
 
 
+###############################################################################
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     return DrugsMatcherSettings(
         direct_confidence=coerce_float(data.get("direct_confidence"), 1.0),
@@ -372,6 +390,7 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     )
 
 
+###############################################################################
 def _build_rag_settings(
     data: dict[str, Any], defaults: LLMRuntimeDefaults
 ) -> RagSettings:
@@ -420,6 +439,7 @@ def _build_rag_settings(
     )
 
 
+###############################################################################
 def _build_runtime_settings(
     data: dict[str, Any], *, fallback_timeout: float
 ) -> RuntimeSettings:
@@ -490,6 +510,7 @@ def _build_runtime_settings(
     )
 
 
+###############################################################################
 def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
     min_length = coerce_positive_int(data.get("drug_name_min_length"), 3)
     max_length = coerce_positive_int(data.get("drug_name_max_length"), 200)
@@ -502,6 +523,7 @@ def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
     )
 
 
+###############################################################################
 def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSettings:
     payload = ensure_mapping(data)
     return SessionPipelineSettings(
@@ -529,6 +551,7 @@ def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSet
     )
 
 
+###############################################################################
 def build_settings_payload_from_json(
     config: dict[str, Any], env: EnvironmentSnapshot
 ) -> dict[str, Any]:

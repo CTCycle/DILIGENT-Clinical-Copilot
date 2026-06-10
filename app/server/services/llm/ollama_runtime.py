@@ -10,11 +10,9 @@ import httpx
 ProviderName = Literal["openai", "gemini"]
 RuntimePurpose = Literal["clinical", "parser"]
 
-
 ###############################################################################
 class OllamaError(RuntimeError):
     pass
-
 
 ###############################################################################
 class OllamaTimeout(OllamaError):
@@ -22,7 +20,6 @@ class OllamaTimeout(OllamaError):
 
 
 ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
-
 
 ###############################################################################
 def env_float(name: str, default: float) -> float:
@@ -34,7 +31,6 @@ def env_float(name: str, default: float) -> float:
     except (TypeError, ValueError):
         return default
 
-
 ###############################################################################
 def env_str(name: str, default: str) -> str:
     raw = os.getenv(name)
@@ -42,7 +38,6 @@ def env_str(name: str, default: str) -> str:
         return default
     value = raw.strip()
     return value or default
-
 
 ###############################################################################
 def normalize_ollama_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -59,7 +54,6 @@ def normalize_ollama_messages(messages: list[dict[str, str]]) -> list[dict[str, 
     if not normalized:
         return [{"role": "user", "content": ""}]
     return normalized
-
 
 ###############################################################################
 def normalize_model_content(content: Any) -> dict[str, Any] | str:
@@ -85,7 +79,6 @@ def normalize_model_content(content: Any) -> dict[str, Any] | str:
             return content
         return loaded if isinstance(loaded, dict) else content
     return str(content)
-
 
 ###############################################################################
 def map_ollama_exception(exc: Exception) -> OllamaError:

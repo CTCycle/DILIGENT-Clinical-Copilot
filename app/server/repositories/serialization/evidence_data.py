@@ -28,6 +28,7 @@ from common.utils.text_utils import normalize_drug_name
 
 
 
+###############################################################################
 def save_livertox_records(self, records: pd.DataFrame) -> None:
     prepared_rows = self.prepare_livertox_rows(records)
     if not prepared_rows:
@@ -73,6 +74,7 @@ def save_livertox_records(self, records: pd.DataFrame) -> None:
         db_session.close()
 
 
+###############################################################################
 def prepare_livertox_rows(self, records: pd.DataFrame) -> list[dict[str, Any]]:
     frame = records.copy()
     if frame.empty:
@@ -103,6 +105,7 @@ def prepare_livertox_rows(self, records: pd.DataFrame) -> list[dict[str, Any]]:
     return prepared_rows
 
 
+###############################################################################
 def livertox_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
     return (
         self.to_sortable_text(row.get("_canonical_name_norm")),
@@ -113,12 +116,14 @@ def livertox_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
     )
 
 
+###############################################################################
 def to_sortable_text(self, value: Any) -> str:
     if value is None:
         return ""
     return str(value).casefold()
 
 
+###############################################################################
 def upsert_livertox_monograph(
     self,
     *,
@@ -160,6 +165,7 @@ def upsert_livertox_monograph(
     )
 
 
+###############################################################################
 def try_assign_livertox_nbk_id(
     self,
     db_session: Session,
@@ -183,6 +189,7 @@ def try_assign_livertox_nbk_id(
         )
 
 
+###############################################################################
 def build_livertox_monograph_key(self, row: dict[str, Any]) -> str:
     identity_payload = {
         "drug_name_norm": self.normalize_string(row.get("_canonical_name_norm")) or "",
@@ -195,6 +202,7 @@ def build_livertox_monograph_key(self, row: dict[str, Any]) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+###############################################################################
 def get_livertox_records(self) -> pd.DataFrame:
     db_session = self.session_factory()
     try:
@@ -269,6 +277,7 @@ def get_livertox_records(self) -> pd.DataFrame:
     return frame.reindex(columns=LIVERTOX_COLUMNS)
 
 
+###############################################################################
 def get_livertox_master_list(self) -> pd.DataFrame:
     frame = self.get_livertox_records()
     if frame.empty:
@@ -285,6 +294,7 @@ def get_livertox_master_list(self) -> pd.DataFrame:
     )
 
 
+###############################################################################
 def get_drugs_catalog(self) -> pd.DataFrame:
     db_session = self.session_factory()
     try:
@@ -347,6 +357,7 @@ def get_drugs_catalog(self) -> pd.DataFrame:
     return frame.reindex(columns=RXNORM_CATALOG_COLUMNS)
 
 
+###############################################################################
 def stream_drugs_catalog(self, page_size: int | None = None) -> Iterator[pd.DataFrame]:
     chunk_size = (
         get_server_settings().database.select_page_size
@@ -362,6 +373,7 @@ def stream_drugs_catalog(self, page_size: int | None = None) -> Iterator[pd.Data
             yield chunk.reset_index(drop=True)
 
 
+###############################################################################
 def build_search_pattern(self, search: str | None) -> str | None:
     normalized = self.normalize_string(search)
     if normalized is None:
@@ -375,6 +387,7 @@ def build_search_pattern(self, search: str | None) -> str | None:
     return f"%{escaped}%"
 
 
+###############################################################################
 def list_rxnav_catalog(
     self,
     *,
@@ -446,6 +459,7 @@ def list_rxnav_catalog(
         db_session.close()
 
 
+###############################################################################
 def get_rxnav_alias_groups(self, drug_id: int) -> dict[str, Any] | None:
     safe_drug_id = int(drug_id)
     db_session = self.session_factory()
@@ -487,6 +501,7 @@ def get_rxnav_alias_groups(self, drug_id: int) -> dict[str, Any] | None:
         db_session.close()
 
 
+###############################################################################
 def list_livertox_catalog(
     self,
     *,
@@ -560,6 +575,7 @@ def list_livertox_catalog(
         db_session.close()
 
 
+###############################################################################
 def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
     safe_drug_id = int(drug_id)
     db_session = self.session_factory()
@@ -589,6 +605,7 @@ def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
         db_session.close()
 
 
+###############################################################################
 def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
     safe_drug_id = int(drug_id)
     db_session = self.session_factory()
@@ -641,6 +658,7 @@ def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
         db_session.close()
 
 
+###############################################################################
 def delete_drug_with_cleanup(self, drug_id: int) -> bool:
     safe_drug_id = int(drug_id)
     db_session = self.session_factory()
@@ -673,6 +691,7 @@ def delete_drug_with_cleanup(self, drug_id: int) -> bool:
         db_session.close()
 
 
+###############################################################################
 def resolve_drug_id_from_match_cache(
     self,
     db_session: Session,
@@ -720,6 +739,7 @@ def resolve_drug_id_from_match_cache(
     return int(cache.drug_id)
 
 
+###############################################################################
 def upsert_high_confidence_kb_match_cache(
     self,
     db_session: Session,

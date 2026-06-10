@@ -16,11 +16,7 @@ from services.llm.structured import (
     parse_json_dict,
 )
 
-
 ###############################################################################
-
-
-
 async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
     available: set[str] = set()
     try:
@@ -42,6 +38,7 @@ async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
     return fallbacks
 
 
+###############################################################################
 async def llm_structured_call(
     self,
     *,
@@ -85,6 +82,7 @@ async def llm_structured_call(
     )
 
 
+###############################################################################
 def build_structured_messages(
     *,
     system_prompt: str,
@@ -100,6 +98,7 @@ def build_structured_messages(
     ]
 
 
+###############################################################################
 async def resolve_text_extraction_models(self, model: str) -> list[str]:
     preferred: list[str] = []
     for candidate in (
@@ -114,11 +113,13 @@ async def resolve_text_extraction_models(self, model: str) -> list[str]:
     return preferred
 
 
+###############################################################################
 def is_missing_model_error(err: OllamaError) -> bool:
     message = str(err).lower()
     return "not found" in message or "404" in message
 
 
+###############################################################################
 async def _chat_structured_model(
     self,
     *,
@@ -140,6 +141,7 @@ async def _chat_structured_model(
         raise RuntimeError(f"LLM call failed: {err}") from err
 
 
+###############################################################################
 async def _extend_structured_model_queue(
     self,
     *,
@@ -159,10 +161,12 @@ async def _extend_structured_model_queue(
     return computed_fallbacks
 
 
+###############################################################################
 def _coerce_llm_text(raw: dict[str, Any] | str) -> str:
     return json.dumps(raw) if isinstance(raw, dict) else str(raw)
 
 
+###############################################################################
 def _raise_structured_models_exhausted(
     *,
     last_missing_error: Exception | None,
@@ -177,6 +181,7 @@ def _raise_structured_models_exhausted(
     raise RuntimeError("LLM call failed: no text extraction model candidates available")
 
 
+###############################################################################
 def build_repair_messages(
     *,
     system_prompt: str,
@@ -197,6 +202,7 @@ def build_repair_messages(
     ]
 
 
+###############################################################################
 async def call_with_structured_models(
     self,
     *,
@@ -256,6 +262,7 @@ async def call_with_structured_models(
     raise AssertionError("unreachable")
 
 
+###############################################################################
 async def parse_with_repairs(
     self,
     *,
@@ -298,6 +305,7 @@ async def parse_with_repairs(
     raise RuntimeError("No structured output produced by the model")
 
 
+###############################################################################
 def extract_first_json_object(text: str) -> str | None:
     decoder = json.JSONDecoder()
     for match in re.finditer(r"\{", text):
@@ -311,5 +319,6 @@ def extract_first_json_object(text: str) -> str | None:
     return None
 
 
+###############################################################################
 def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
     return parse_json_dict(obj_or_text)

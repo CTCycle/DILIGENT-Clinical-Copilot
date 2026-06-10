@@ -6,6 +6,7 @@ from services.inspection.service import (
 )
 
 
+###############################################################################
 def test_revised_dili_assessment_tracks_previous_version_changes() -> None:
     assessments = DataInspectionService.build_revised_dili_assessments(
         rucam_assessments=[
@@ -42,6 +43,7 @@ def test_revised_dili_assessment_tracks_previous_version_changes() -> None:
     assert assessments[0]["requires_human_review"] is False
 
 
+###############################################################################
 def test_revised_dili_assessment_requires_human_review_without_match_and_when_challenged() -> None:
     profile = ReviewerInstructionProfile(
         instruction_summary="Reassess the causality reasoning carefully.",
@@ -72,6 +74,7 @@ def test_revised_dili_assessment_requires_human_review_without_match_and_when_ch
     assert "Reviewer explicitly requested reassessment of causality reasoning." in assessments[0]["unresolved_questions"]
 
 
+###############################################################################
 def test_revised_dili_assessment_notes_retained_previous_assessment_when_unchanged() -> None:
     assessments = DataInspectionService.build_revised_dili_assessments(
         rucam_assessments=[

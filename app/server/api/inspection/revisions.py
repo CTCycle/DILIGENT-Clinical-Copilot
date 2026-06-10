@@ -17,7 +17,10 @@ from domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from services.inspection.service import DataInspectionService
 
 
+###############################################################################
 class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -26,6 +29,7 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
     ) -> None:
         super().__init__(router=router, service=service)
 
+    # -------------------------------------------------------------------------
     def start_session_revision(
         self,
         session_id: int,
@@ -55,18 +59,21 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
             message="Session revision job started",
         )
 
+    # -------------------------------------------------------------------------
     def get_session_revision_status(self, job_id: str) -> JobStatusResponse:
         return self.get_update_job_status(
             job_id=job_id,
             job_type=self.service.REVISION_JOB_TYPE,
         )
 
+    # -------------------------------------------------------------------------
     def cancel_session_revision(self, job_id: str) -> JobCancelResponse:
         return self.cancel_update_job(
             job_id=job_id,
             job_type=self.service.REVISION_JOB_TYPE,
         )
 
+    # -------------------------------------------------------------------------
     def get_revision_pipeline_run(
         self,
         pipeline_run_id: str,
@@ -79,6 +86,7 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
             )
         return RevisionPipelineRunResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def retry_revision_pipeline_run(
         self,
         pipeline_run_id: str,
@@ -100,6 +108,7 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
             message="Session revision retry job started",
         )
 
+    # -------------------------------------------------------------------------
     def list_revision_pipeline_steps(
         self,
         pipeline_run_id: str,
@@ -107,6 +116,7 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
         payload = self.service.list_revision_steps(pipeline_run_id)
         return RevisionPipelineStepListResponse(items=payload)
 
+    # -------------------------------------------------------------------------
     def list_session_revision_artifacts(
         self,
         session_id: int,
@@ -126,6 +136,7 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
         )
         return RevisionArtifactListResponse(items=payload)
 
+    # -------------------------------------------------------------------------
     def list_session_revision_entities(
         self,
         session_id: int,
@@ -145,6 +156,7 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
         )
         return RevisionEntityListResponse(items=payload)
 
+    # -------------------------------------------------------------------------
     def list_session_revision_reviews(
         self,
         session_id: int,
@@ -164,6 +176,7 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
         )
         return RevisionClinicalReviewActionListResponse(items=payload)
 
+    # -------------------------------------------------------------------------
     def update_session_revision_clinical_review(
         self,
         session_id: int,
@@ -191,6 +204,7 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
             )
         return RevisionClinicalReviewUpdateResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "/sessions/{session_id}/revision/jobs",

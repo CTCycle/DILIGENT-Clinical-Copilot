@@ -122,6 +122,7 @@ class DataInspectionService(
         ],
     }
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -741,6 +742,7 @@ class DataInspectionService(
         context = "\n\n".join(chunk for chunk in chunks if chunk.strip())
         return context or None
 
+    # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
         return self.serializer.delete_session(session_id)
 

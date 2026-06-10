@@ -7,12 +7,14 @@ from repositories.serialization.data import DataSerializer
 from sqlalchemy import create_engine
 
 
+###############################################################################
 def build_serializer() -> DataSerializer:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     return DataSerializer(engine=engine)
 
 
+###############################################################################
 def test_list_session_versions_includes_official_versions_and_draft_shells() -> None:
     serializer = build_serializer()
     root_session_id = serializer.save_clinical_session(

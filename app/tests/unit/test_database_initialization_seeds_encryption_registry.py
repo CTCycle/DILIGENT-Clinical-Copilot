@@ -12,7 +12,6 @@ from repositories.schemas.models import AccessKeyEncryptionMaterial
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 def make_sqlite_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -31,13 +30,11 @@ def make_sqlite_settings() -> DatabaseSettings:
         select_page_size=1000,
     )
 
-
 ###############################################################################
 def _make_temp_db_root(prefix: str) -> Path:
     temp_root = Path(tempfile.gettempdir()) / f"{prefix}-{uuid.uuid4().hex}"
     temp_root.mkdir(parents=True, exist_ok=True)
     return temp_root
-
 
 ###############################################################################
 def test_sqlite_fresh_creation_seeds_registry_once(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -68,7 +65,6 @@ def test_sqlite_fresh_creation_seeds_registry_once(monkeypatch) -> None:  # type
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 
-
 ###############################################################################
 def test_sqlite_reopen_with_existing_db_does_not_reseed(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     temp_root = _make_temp_db_root("sqlite-seed-reopen")
@@ -91,7 +87,6 @@ def test_sqlite_reopen_with_existing_db_does_not_reseed(monkeypatch) -> None:  #
         assert first.db_path == second.db_path
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
-
 
 ###############################################################################
 def test_postgresql_initialization_path_seeds_after_schema_creation(
@@ -116,27 +111,42 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     order: list[str] = []
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
 
+    ###############################################################################
     class FakeConnection:
+
+        # -------------------------------------------------------------------------
         def __enter__(self):
             return self
 
+        # -------------------------------------------------------------------------
         def __exit__(self, exc_type, exc, tb):
             return False
 
+        # -------------------------------------------------------------------------
         def execute(self, _stmt):
+
+            ###############################################################################
             class ScalarResult:
+
+                # -------------------------------------------------------------------------
                 @staticmethod
                 def scalar():
                     return 1
 
             return ScalarResult()
 
+    ###############################################################################
     class FakeAdminEngine:
+
+        # -------------------------------------------------------------------------
         @staticmethod
         def connect():
             return FakeConnection()
 
+    ###############################################################################
     class FakePostgresRepository:
+
+        # -------------------------------------------------------------------------
         def __init__(self, _settings) -> None:
             self.engine = engine
             self.session_factory = sessionmaker(bind=engine, future=True)
@@ -144,27 +154,39 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     def fake_create_all(_engine):
         order.append("create_all")
 
+    ###############################################################################
     class FakeMaterialSerializer:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **_kwargs) -> None:
             pass
 
+        # -------------------------------------------------------------------------
         def ensure_seeded(self, purpose: str):
             assert purpose == "provider_access_keys"
             order.append("seeded")
 
+    ###############################################################################
     class FakeCatalogSerializer:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **_kwargs) -> None:
             pass
 
+    ###############################################################################
     class FakeCatalogSeedResult:
         manifests_seen = 1
         manifests_seeded = 1
         entries_written = 1
 
+    ###############################################################################
     class FakeCatalogSeeder:
+
+        # -------------------------------------------------------------------------
         def __init__(self, _serializer) -> None:
             pass
 
+        # -------------------------------------------------------------------------
         def seed_missing_or_changed_manifests(self, *, force: bool = False):
             assert force is False
             order.append("catalog_seeded")
@@ -191,7 +213,6 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
 
     assert db_name == "diligent"
     assert order == ["create_all", "seeded", "catalog_seeded"]
-
 
 ###############################################################################
 def test_seeding_does_not_create_duplicate_active_rows(monkeypatch) -> None:  # type: ignore[no-untyped-def]

@@ -13,6 +13,7 @@ from services.runtime.jobs import get_job_manager
 router = APIRouter(prefix="/inspection", tags=["inspection"])
 
 
+###############################################################################
 def register_inspection_routes(router: APIRouter) -> None:
     service = DataInspectionService(jobs=get_job_manager())
     InspectionSessionEndpoint(router=router, service=service).add_routes()

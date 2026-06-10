@@ -13,6 +13,7 @@ from domain.settings.configuration import RagSettings
 from repositories.serialization.model_configs import ModelConfigSerializer
 
 
+###############################################################################
 def _runtime_rag_settings() -> dict[str, object]:
     try:
         snapshot = ModelConfigSerializer().load_snapshot()
@@ -21,6 +22,7 @@ def _runtime_rag_settings() -> dict[str, object]:
     return dict(snapshot.rag_settings or {})
 
 
+###############################################################################
 def build_effective_rag_settings(
     overrides: dict[str, object] | None = None,
 ) -> RagSettings:
@@ -95,6 +97,7 @@ def build_effective_rag_settings(
     )
 
 
+###############################################################################
 def rag_settings_payload(settings: RagSettings | None = None) -> dict[str, Any]:
     resolved = settings or build_effective_rag_settings()
     return {

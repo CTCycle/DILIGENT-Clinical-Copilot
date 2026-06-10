@@ -12,6 +12,7 @@ from configurations.startup import (
 )
 
 
+###############################################################################
 def test_initialize_environment_loads_dotenv_with_override_precedence(
     tmp_path, monkeypatch
 ) -> None:
@@ -30,6 +31,7 @@ def test_initialize_environment_loads_dotenv_with_override_precedence(
     assert os.environ.get("FASTAPI_HOST") == "0.0.0.0"
 
 
+###############################################################################
 def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(
     monkeypatch, tmp_path
 ) -> None:
@@ -46,6 +48,7 @@ def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(
     reset_app_settings_cache()
 
 
+###############################################################################
 def test_ui_owned_json_keys_are_ignored(monkeypatch, tmp_path) -> None:
     config_path = tmp_path / "configurations.json"
     config_path.write_text(

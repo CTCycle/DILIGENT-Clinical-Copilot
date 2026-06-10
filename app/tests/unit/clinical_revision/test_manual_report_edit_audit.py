@@ -8,12 +8,14 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 
+###############################################################################
 def build_serializer() -> tuple[DataSerializer, sessionmaker]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     return DataSerializer(engine=engine), sessionmaker(bind=engine, future=True)
 
 
+###############################################################################
 def seed_session(serializer: DataSerializer) -> int:
     session_id = serializer.save_clinical_session(
         {
@@ -34,6 +36,7 @@ def seed_session(serializer: DataSerializer) -> int:
     return session_id
 
 
+###############################################################################
 def test_manual_edit_updates_report_without_mutating_source_text_or_version() -> None:
     serializer, session_factory = build_serializer()
     session_id = seed_session(serializer)

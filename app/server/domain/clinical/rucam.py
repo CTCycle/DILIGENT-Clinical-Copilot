@@ -6,7 +6,6 @@ from typing import Literal
 
 from domain.clinical.entities import RucamComponentAssessment
 
-
 ###############################################################################
 @dataclass(slots=True)
 class RucamAnchor:
@@ -20,6 +19,7 @@ class RucamAnchor:
     is_score_eligible: bool = False
 
 
+###############################################################################
 @dataclass(slots=True)
 class RucamSourceReportedScore:
     score: int
@@ -28,12 +28,14 @@ class RucamSourceReportedScore:
     evidence: str
 
 
+###############################################################################
 @dataclass(slots=True)
 class RucamDataSufficiency:
     sufficient: bool
     blocking_reasons: list[str]
 
 
+###############################################################################
 @dataclass(slots=True)
 class RucamStructuredCalculation:
     total_score: int

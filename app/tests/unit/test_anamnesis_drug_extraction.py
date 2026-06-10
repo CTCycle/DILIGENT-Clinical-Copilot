@@ -8,35 +8,47 @@ from domain.clinical import DrugEntry, PatientDrugs
 from services.clinical.parser import DrugsParser
 
 
+###############################################################################
 class RecordingStructuredClient:
+
+    # -------------------------------------------------------------------------
     def __init__(self, response: PatientDrugs) -> None:
         self.response = response
         self.user_prompts: list[str] = []
         self.call_count = 0
 
+    # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
         self.call_count += 1
         self.user_prompts.append(str(kwargs.get("user_prompt", "")))
         return self.response
 
 
+###############################################################################
 class RecordingStructuredClient:
+
+    # -------------------------------------------------------------------------
     def __init__(self, response: PatientDrugs) -> None:
         self.response = response
         self.user_prompts: list[str] = []
         self.call_count = 0
 
+    # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
         self.call_count += 1
         self.user_prompts.append(str(kwargs.get("user_prompt", "")))
         return self.response
 
 
+###############################################################################
 class FakeStructuredClient:
+
+    # -------------------------------------------------------------------------
     def __init__(self, responses: Sequence[PatientDrugs]) -> None:
         self.responses = list(responses)
         self.call_count = 0
 
+    # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
         self.call_count += 1
         schema = kwargs.get("schema", PatientDrugs)
@@ -45,11 +57,15 @@ class FakeStructuredClient:
         return schema(entries=[])
 
 
+###############################################################################
 class AlwaysFailingStructuredClient:
+
+    # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
         raise RuntimeError("simulated llm failure")
 
 
+###############################################################################
 def test_extract_drugs_from_anamnesis_sends_full_context_to_llm() -> None:
     client = RecordingStructuredClient(
         PatientDrugs(entries=[DrugEntry(name="Co-Amoxicillina")])
@@ -76,6 +92,7 @@ def test_extract_drugs_from_anamnesis_sends_full_context_to_llm() -> None:
     assert [entry.name for entry in parsed.entries if entry.name == "Co-Amoxicillina"]
 
 
+###############################################################################
 def test_extract_drugs_from_anamnesis_sends_complete_anamnesis_to_llm() -> None:
     client = RecordingStructuredClient(
         PatientDrugs(entries=[DrugEntry(name="Co-Amoxicillina")])
@@ -102,6 +119,7 @@ def test_extract_drugs_from_anamnesis_sends_complete_anamnesis_to_llm() -> None:
     assert [entry.name for entry in parsed.entries if entry.name == "Co-Amoxicillina"]
 
 
+###############################################################################
 def test_extract_drugs_from_anamnesis_sets_historical_tags() -> None:
     fake_client = FakeStructuredClient(
         [
@@ -127,6 +145,7 @@ def test_extract_drugs_from_anamnesis_sets_historical_tags() -> None:
     assert entry.temporal_classification == "temporal_uncertain"
 
 
+###############################################################################
 def test_extract_drugs_from_anamnesis_empty_result_is_allowed() -> None:
     parser = DrugsParser(client=FakeStructuredClient([PatientDrugs(entries=[])]))
 
@@ -137,6 +156,7 @@ def test_extract_drugs_from_anamnesis_empty_result_is_allowed() -> None:
     assert parsed.entries == []
 
 
+###############################################################################
 def test_extract_drugs_from_anamnesis_rule_fallback_recovers_drug_lines() -> None:
     parser = DrugsParser(client=FakeStructuredClient([PatientDrugs(entries=[])]))
     anamnesis = "Xanax 0,5 mg cpr sospesa dal 10/02/2024"
@@ -153,6 +173,7 @@ def test_extract_drugs_from_anamnesis_rule_fallback_recovers_drug_lines() -> Non
     assert entry.historical_flag is True
 
 
+###############################################################################
 def test_extract_drugs_from_anamnesis_sends_long_input_as_single_chunk() -> None:
     client = FakeStructuredClient(
         [
@@ -170,6 +191,7 @@ def test_extract_drugs_from_anamnesis_sends_long_input_as_single_chunk() -> None
     assert [entry.name for entry in parsed.entries] == ["Aspirin"]
 
 
+###############################################################################
 def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
     fake_client = FakeStructuredClient(
         [
@@ -205,6 +227,7 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
     ]
 
 
+###############################################################################
 def test_extract_drugs_from_anamnesis_llm_failure_uses_rule_fallback() -> None:
     parser = DrugsParser(client=AlwaysFailingStructuredClient())
     anamnesis = "Xanax 0,5 mg cpr sospesa dal 10/02/2024"

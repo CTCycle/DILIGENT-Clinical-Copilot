@@ -19,6 +19,7 @@ from services.clinical.validation import (
 )
 
 
+###############################################################################
 def test_missing_anamnesis_raises_localized_error() -> None:
     payload = PatientData(visit_date=date(2025, 1, 1), drugs="Drug A")
     bundle = build_validation_bundle("en")
@@ -27,6 +28,7 @@ def test_missing_anamnesis_raises_localized_error() -> None:
     assert any(issue.code == "missing_anamnesis" for issue in exc_info.value.issues)
 
 
+###############################################################################
 def test_missing_visit_date_raises_localized_error() -> None:
     payload = PatientData(anamnesis="History", drugs="Drug A")
     bundle = build_validation_bundle("en")
@@ -35,6 +37,7 @@ def test_missing_visit_date_raises_localized_error() -> None:
     assert any(issue.code == "missing_visit_date" for issue in exc_info.value.issues)
 
 
+###############################################################################
 def test_missing_timed_drug_raises_error() -> None:
     drugs = PatientDrugs(entries=[DrugEntry(name="Drug A", source="therapy")])
     bundle = build_validation_bundle("en")
@@ -43,6 +46,7 @@ def test_missing_timed_drug_raises_error() -> None:
     assert any(issue.code == "missing_timed_drug" for issue in exc_info.value.issues)
 
 
+###############################################################################
 def test_drug_schedule_counts_as_timing_information() -> None:
     drugs = PatientDrugs(
         entries=[
@@ -58,6 +62,7 @@ def test_drug_schedule_counts_as_timing_information() -> None:
     ensure_timed_therapy_drug(drugs, bundle=bundle)
 
 
+###############################################################################
 def test_insufficient_pattern_labs_raise_blocker() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
     assessment = analyzer.assess_payload(PatientLabTimeline(entries=[]))
@@ -68,6 +73,7 @@ def test_insufficient_pattern_labs_raise_blocker() -> None:
     )
 
 
+###############################################################################
 def test_non_critical_missing_data_does_not_block() -> None:
     payload = PatientData(
         visit_date=date(2025, 1, 1),

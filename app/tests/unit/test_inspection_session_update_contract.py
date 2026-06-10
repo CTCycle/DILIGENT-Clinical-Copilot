@@ -4,11 +4,15 @@ from api.inspection.sessions import InspectionSessionEndpoint
 from services.inspection.service import DataInspectionService
 
 
+###############################################################################
 class FakeSerializer:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.report_calls: list[dict[str, object]] = []
         self.metadata_calls: list[dict[str, object]] = []
 
+    # -------------------------------------------------------------------------
     def update_current_report_text_with_manual_audit(
         self,
         session_id: int,
@@ -30,6 +34,7 @@ class FakeSerializer:
         self.report_calls.append(call)
         return {"session": {"session_id": session_id, "path": "report"}}
 
+    # -------------------------------------------------------------------------
     def update_session_metadata(
         self,
         session_id: int,
@@ -44,15 +49,22 @@ class FakeSerializer:
         return {"session_id": session_id, "path": "metadata"}
 
 
+###############################################################################
 class FakeRouter:
+
+    # -------------------------------------------------------------------------
     def add_api_route(self, *args: object, **kwargs: object) -> None:
         _ = (args, kwargs)
 
 
+###############################################################################
 class FakeEndpointService:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
 
+    # -------------------------------------------------------------------------
     def update_session(
         self,
         session_id: int,
@@ -80,7 +92,10 @@ class FakeEndpointService:
         }
 
 
+###############################################################################
 class FakeRequest:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -96,6 +111,7 @@ class FakeRequest:
         self.metadata = metadata
 
 
+###############################################################################
 def build_service(serializer: FakeSerializer) -> DataInspectionService:
     return DataInspectionService(
         serializer=serializer,
@@ -104,6 +120,7 @@ def build_service(serializer: FakeSerializer) -> DataInspectionService:
     )
 
 
+###############################################################################
 def test_update_session_without_report_text_updates_metadata_only() -> None:
     serializer = FakeSerializer()
     service = build_service(serializer)
@@ -121,6 +138,7 @@ def test_update_session_without_report_text_updates_metadata_only() -> None:
     ]
 
 
+###############################################################################
 def test_update_session_with_report_text_updates_report_only() -> None:
     serializer = FakeSerializer()
     service = build_service(serializer)
@@ -145,6 +163,7 @@ def test_update_session_with_report_text_updates_report_only() -> None:
     assert serializer.metadata_calls == []
 
 
+###############################################################################
 def test_session_endpoint_does_not_treat_session_text_as_report_text() -> None:
     service = FakeEndpointService()
     endpoint = InspectionSessionEndpoint(router=FakeRouter(), service=service)  # type: ignore[arg-type]

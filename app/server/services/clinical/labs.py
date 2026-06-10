@@ -34,6 +34,7 @@ DATE_RE = re.compile(
 )
 
 
+###############################################################################
 def _load_marker_aliases() -> dict[str, tuple[str, ...]]:
     snapshot = get_reference_catalog_snapshot()
     entries = snapshot.entries("clinical_extraction", "laboratory_markers")
@@ -65,13 +66,15 @@ RUCAM_SCORE_TEXT_RE = re.compile(
 )
 
 
+###############################################################################
 def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
     normalized = (marker_name or "").strip().casefold()
     return aliases.get(normalized, marker_name)
 
-
 ###############################################################################
 class ClinicalLabExtractor:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

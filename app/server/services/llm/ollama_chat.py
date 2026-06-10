@@ -25,11 +25,7 @@ from services.llm.ollama_runtime import (
     normalize_ollama_messages,
 )
 
-
 ###############################################################################
-
-
-
 def resolve_model_name(self, name: str | None) -> str:
     candidate = (name or "").strip()
     if candidate:
@@ -39,12 +35,14 @@ def resolve_model_name(self, name: str | None) -> str:
     raise OllamaError("Model name must be provided.")
 
 
+###############################################################################
 def get_pull_guard(cls) -> asyncio.Lock:
     if cls.pull_locks_guard is None:
         cls.pull_locks_guard = asyncio.Lock()
     return cls.pull_locks_guard
 
 
+###############################################################################
 async def get_model_lock(cls, name: str) -> asyncio.Lock:
     async with cls.get_pull_guard():
         lock = cls.pull_locks.get(name)
@@ -54,6 +52,7 @@ async def get_model_lock(cls, name: str) -> asyncio.Lock:
         return lock
 
 
+###############################################################################
 async def refresh_model_cache(self) -> set[str]:
     try:
         resp = await self.client.get("/api/tags")
@@ -90,6 +89,7 @@ async def refresh_model_cache(self) -> set[str]:
     return set(names)
 
 
+###############################################################################
 async def get_cached_models(self, *, force_refresh: bool = False) -> set[str]:
     loop = asyncio.get_running_loop()
     async with self.model_cache_lock:
@@ -103,6 +103,7 @@ async def get_cached_models(self, *, force_refresh: bool = False) -> set[str]:
     return await self.refresh_model_cache()
 
 
+###############################################################################
 def prepare_generation_parameters(
     self,
     *,
@@ -119,6 +120,7 @@ def prepare_generation_parameters(
     return round(temp_value, 2), think_value, options_payload
 
 
+###############################################################################
 def resolve_temperature(
     temperature: float | None, options: dict[str, Any] | None
 ) -> tuple[float, dict[str, Any] | None]:
@@ -142,6 +144,7 @@ def resolve_temperature(
     return temp_value, options_payload
 
 
+###############################################################################
 def compose_payload(
     payload: dict[str, Any],
     *,
@@ -158,6 +161,7 @@ def compose_payload(
     return payload
 
 
+###############################################################################
 def build_chat_payload(
     self,
     *,
@@ -185,6 +189,7 @@ def build_chat_payload(
     )
 
 
+###############################################################################
 async def ensure_context_option(
     self,
     *,

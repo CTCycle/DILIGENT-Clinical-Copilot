@@ -27,7 +27,6 @@ from repositories.serialization.catalogs import (
 from services.catalogs.runtime import reload_reference_catalog_snapshot
 from services.catalogs.seeder import ReferenceCatalogSeeder
 
-
 ###############################################################################
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
     connect_args: dict[str, str | int] = {
@@ -40,7 +39,6 @@ def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | i
             connect_args["sslrootcert"] = settings.ssl_ca
     return connect_args
 
-
 ###############################################################################
 def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
     port = settings.port or 5432
@@ -52,7 +50,6 @@ def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
         f"{engine_name}://{safe_username}:{safe_password}"
         f"@{settings.host}:{port}/{safe_database_name}"
     )
-
 
 ###############################################################################
 def clone_settings_with_database(
@@ -75,7 +72,6 @@ def clone_settings_with_database(
         select_page_size=settings.select_page_size,
     )
 
-
 ###############################################################################
 def build_postgres_create_database_sql(
     database_name: str,
@@ -84,7 +80,6 @@ def build_postgres_create_database_sql(
     return sqlalchemy.text(
         f"CREATE DATABASE \"{safe_database_name}\" WITH ENCODING 'UTF8' TEMPLATE template0"
     )
-
 
 ###############################################################################
 def initialize_sqlite_database(
@@ -123,7 +118,6 @@ def initialize_sqlite_database(
         )
         reload_reference_catalog_snapshot(repository)
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
-
 
 ###############################################################################
 def ensure_postgres_database(
@@ -202,7 +196,6 @@ def ensure_postgres_database(
 
     return target_database
 
-
 ###############################################################################
 def run_database_initialization(
     *,
@@ -240,7 +233,6 @@ def run_database_initialization(
         ensure_postgres_database(settings)
     else:
         ensure_postgres_database(settings, **init_kwargs)
-
 
 ###############################################################################
 def initialize_database(

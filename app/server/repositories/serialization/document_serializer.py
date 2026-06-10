@@ -17,9 +17,11 @@ from common.constants import (
 from common.utils.logger import logger
 from domain.documents import Document
 
+###############################################################################
 class DocumentSerializer:
     SUPPORTED_EXTENSIONS = DOCUMENT_SUPPORTED_EXTENSIONS
 
+    # -------------------------------------------------------------------------
     def __init__(self, documents_path: str | Path) -> None:
         self.documents_path = Path(documents_path)
 

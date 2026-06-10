@@ -15,6 +15,7 @@ from domain.clinical.entities import (
 )
 
 
+###############################################################################
 @dataclass(frozen=True)
 class SessionStructuredInputs:
     patient_name: str | None
@@ -29,6 +30,7 @@ class SessionStructuredInputs:
     rucam: PatientRucamAssessmentBundle
 
 
+###############################################################################
 @dataclass(frozen=True)
 class SessionKnowledgeBundle:
     matched_drugs: list[DrugClinicalAssessment]

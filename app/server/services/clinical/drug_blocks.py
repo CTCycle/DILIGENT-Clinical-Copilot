@@ -7,6 +7,7 @@ from functools import lru_cache
 from services.catalogs.runtime import get_reference_catalog_snapshot
 
 
+###############################################################################
 @dataclass(frozen=True)
 class DrugBlock:
     text: str
@@ -18,6 +19,7 @@ BULLET_RE = re.compile(r"(?m)^[ \t]*(?:[-*•]|\d+[.)])[ \t]+")
 UPPER_TOKEN_RE = re.compile(r"^[A-ZÀ-ÖØ-Þ][\wÀ-ÖØ-öø-ÿ'/-]+")
 
 
+###############################################################################
 @lru_cache(maxsize=1)
 def _metadata_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
@@ -34,6 +36,7 @@ def _metadata_re() -> re.Pattern[str]:
     )
 
 
+###############################################################################
 @lru_cache(maxsize=1)
 def _continuation_prefix_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
@@ -46,6 +49,7 @@ def _continuation_prefix_re() -> re.Pattern[str]:
     )
 
 
+###############################################################################
 @lru_cache(maxsize=1)
 def _regimen_split_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
@@ -65,6 +69,7 @@ def _regimen_split_re() -> re.Pattern[str]:
     return re.compile(r"(?:%s)" % "|".join(escaped), re.IGNORECASE)
 
 
+###############################################################################
 def _likely_drug_start(value: str) -> bool:
     text = value.strip()
     if not text:
@@ -76,6 +81,7 @@ def _likely_drug_start(value: str) -> bool:
     return bool(_metadata_re().search(text))
 
 
+###############################################################################
 def isolate_drug_blocks(text: str) -> list[DrugBlock]:
     source = text or ""
     if not source.strip():

@@ -29,24 +29,29 @@ from repositories.schemas.models import (
 )
 
 
+###############################################################################
 def build_text_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+###############################################################################
 def build_payload_hash(payload: Any) -> str:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+###############################################################################
 def normalize_text_key(value: str | None) -> str | None:
     cleaned = str(value or "").strip().casefold()
     return cleaned or None
 
 
+###############################################################################
 def default_version_status(*, is_latest: bool) -> str:
     return "current" if is_latest else "superseded"
 
 
+###############################################################################
 def sync_preserved_version_status(
     existing_status: str | None,
     *,
@@ -58,6 +63,7 @@ def sync_preserved_version_status(
     return normalized
 
 
+###############################################################################
 def derive_revision_kind(session_row: ClinicalSession, root_session_id: int) -> str:
     if int(session_row.id) == int(root_session_id) and int(session_row.version or 1) == 1:
         return "original"
@@ -72,26 +78,32 @@ REVISION_DILI_ASSESSMENT_SCHEMA_NAME = "revised_dili_assessment"
 REVISION_ENTITY_SCHEMA_VERSION = "1"
 
 
+###############################################################################
 def validate_revised_drug_payload(payload: Any) -> RevisedDrugPayload:
     return RevisedDrugPayload.model_validate(payload)
 
 
+###############################################################################
 def validate_revised_disease_payload(payload: Any) -> RevisedDiseasePayload:
     return RevisedDiseasePayload.model_validate(payload)
 
 
+###############################################################################
 def validate_revised_lab_payload(payload: Any) -> RevisedLabPayload:
     return RevisedLabPayload.model_validate(payload)
 
 
+###############################################################################
 def validate_revision_livertox_decision(payload: Any) -> RevisionLiverToxDecision:
     return RevisionLiverToxDecision.model_validate(payload)
 
 
+###############################################################################
 def validate_revised_dili_assessment(payload: Any) -> RevisedDiliAssessment:
     return RevisedDiliAssessment.model_validate(payload)
 
 
+###############################################################################
 def serialize_version_row(
     self,
     row: ClinicalSessionVersion,
@@ -120,6 +132,7 @@ def serialize_version_row(
     }
 
 
+###############################################################################
 def serialize_revision_run_row(
     self,
     row: ClinicalSessionRevisionRun,
@@ -158,6 +171,7 @@ def serialize_revision_run_row(
     }
 
 
+###############################################################################
 def serialize_revision_step_row(
     self,
     row: ClinicalSessionRevisionStep,
@@ -192,6 +206,7 @@ def serialize_revision_step_row(
     }
 
 
+###############################################################################
 def serialize_revision_artifact_row(
     self,
     row: ClinicalSessionRevisionArtifact,
@@ -211,6 +226,7 @@ def serialize_revision_artifact_row(
     }
 
 
+###############################################################################
 def serialize_revision_review_row(
     self,
     row: ClinicalSessionRevisionReview,
@@ -232,6 +248,7 @@ def serialize_revision_review_row(
     }
 
 
+###############################################################################
 def _create_revision_artifact_row(
     self,
     *,
@@ -258,6 +275,7 @@ def _create_revision_artifact_row(
     )
 
 
+###############################################################################
 def _create_revision_entity_row(
     self,
     *,
@@ -303,6 +321,7 @@ def _create_revision_entity_row(
     )
 
 
+###############################################################################
 def serialize_revision_entity_row(
     self,
     row: ClinicalSessionRevisionEntity,
@@ -337,6 +356,7 @@ def serialize_revision_entity_row(
     }
 
 
+###############################################################################
 def get_root_session_id_for_session(
     db_session: Session,
     session_id: int,
@@ -347,6 +367,7 @@ def get_root_session_id_for_session(
     return int(session_row.original_session_id or session_row.id)
 
 
+###############################################################################
 def ensure_version_record_for_session(
     self,
     db_session: Session,
@@ -398,6 +419,7 @@ def ensure_version_record_for_session(
     return version_row
 
 
+###############################################################################
 def sync_version_records_for_root(
     self,
     db_session: Session,
@@ -432,6 +454,7 @@ def sync_version_records_for_root(
     return synced
 
 
+###############################################################################
 def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
     safe_session_id = int(session_id)
     db_session = self.session_factory()
@@ -459,6 +482,7 @@ def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
         db_session.close()
 
 
+###############################################################################
 def get_session_version_detail(
     self,
     session_id: int,
@@ -492,6 +516,7 @@ def get_session_version_detail(
         db_session.close()
 
 
+###############################################################################
 def get_latest_version_record_for_session(
     self,
     session_id: int,
@@ -502,6 +527,7 @@ def get_latest_version_record_for_session(
     return versions[-1]
 
 
+###############################################################################
 def get_version_record_for_session(
     self,
     session_id: int,
@@ -527,6 +553,7 @@ def get_version_record_for_session(
         db_session.close()
 
 
+###############################################################################
 def create_revision_version_shell(
     self,
     session_id: int,
@@ -584,6 +611,7 @@ def create_revision_version_shell(
         db_session.close()
 
 
+###############################################################################
 def finalize_revision_version(
     self,
     *,
@@ -621,6 +649,7 @@ def finalize_revision_version(
         db_session.close()
 
 
+###############################################################################
 def create_or_update_revision_run(
     self,
     *,
@@ -698,6 +727,7 @@ def create_or_update_revision_run(
         db_session.close()
 
 
+###############################################################################
 def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
     db_session = self.session_factory()
     try:
@@ -711,6 +741,7 @@ def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
         db_session.close()
 
 
+###############################################################################
 def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
     db_session = self.session_factory()
     try:
@@ -729,6 +760,7 @@ def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
 
 
 
+###############################################################################
 def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
     safe_session_id = int(session_id)
     db_session = self.session_factory()
@@ -746,6 +778,7 @@ def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
         db_session.close()
 
 
+###############################################################################
 def serialize_manual_edit_row(
     self, row: ClinicalSessionManualEdit
 ) -> dict[str, Any]:
@@ -775,6 +808,7 @@ def serialize_manual_edit_row(
     }
 
 
+###############################################################################
 def update_current_report_text_with_manual_audit(
     self,
     session_id: int,
@@ -870,6 +904,7 @@ def update_current_report_text_with_manual_audit(
         db_session.close()
 
 
+###############################################################################
 def update_session_metadata(
     self,
     session_id: int,

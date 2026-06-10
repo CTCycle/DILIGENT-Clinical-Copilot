@@ -10,6 +10,7 @@ import app as server_app_module
 from api import data_inspection as data_inspection_api
 
 
+###############################################################################
 def _get_route_service(route_path_fragment: str) -> Any:
     for route in data_inspection_api.router.routes:
         if route_path_fragment in getattr(route, "path", ""):
@@ -19,6 +20,7 @@ def _get_route_service(route_path_fragment: str) -> Any:
     raise AssertionError(f"Route not found for fragment {route_path_fragment}")
 
 
+###############################################################################
 def _wait_for_terminal_job_status(
     client: TestClient,
     job_id: str,
@@ -36,6 +38,7 @@ def _wait_for_terminal_job_status(
     raise AssertionError("Timed out waiting for terminal revision job state.")
 
 
+###############################################################################
 def _seed_source_session(service: Any) -> int:
     session_id = service.serializer.save_clinical_session(
         {
@@ -99,6 +102,7 @@ def _seed_source_session(service: Any) -> int:
     return session_id
 
 
+###############################################################################
 def test_revision_api_routes_preserve_manual_edits_and_persist_revision_lineage(
     monkeypatch,
 ) -> None:

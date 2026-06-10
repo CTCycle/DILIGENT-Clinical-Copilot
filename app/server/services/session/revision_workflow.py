@@ -64,6 +64,7 @@ from services.session.session_workflow import (
 
 
 
+###############################################################################
 def _unique_non_empty_names(values: list[str | None]) -> list[str]:
     seen: set[str] = set()
     normalized: list[str] = []
@@ -79,6 +80,7 @@ def _unique_non_empty_names(values: list[str | None]) -> list[str]:
     return normalized
 
 
+###############################################################################
 def _normalize_candidate_selection_names(values: list[Any]) -> list[str]:
     normalized_values: list[str | None] = []
     for value in values:
@@ -89,6 +91,7 @@ def _normalize_candidate_selection_names(values: list[Any]) -> list[str]:
     return _unique_non_empty_names(normalized_values)
 
 
+###############################################################################
 def _candidate_selection_index(
     values: list[dict[str, str]],
 ) -> dict[str, dict[str, str]]:
@@ -106,6 +109,7 @@ def _candidate_selection_index(
     return indexed
 
 
+###############################################################################
 def _rebuild_drug_entries(payload: Any) -> list[DrugEntry]:
     if not isinstance(payload, list):
         return []
@@ -120,6 +124,7 @@ def _rebuild_drug_entries(payload: Any) -> list[DrugEntry]:
     return entries
 
 
+###############################################################################
 def _rebuild_disease_entries(payload: Any) -> list[DiseaseContextEntry]:
     if not isinstance(payload, list):
         return []
@@ -134,6 +139,7 @@ def _rebuild_disease_entries(payload: Any) -> list[DiseaseContextEntry]:
     return entries
 
 
+###############################################################################
 def _load_persisted_deterministic_drug_extraction(
     payload: Any,
 ) -> DeterministicDrugExtractionResult | None:
@@ -159,6 +165,7 @@ def _load_persisted_deterministic_drug_extraction(
     )
 
 
+###############################################################################
 def _load_persisted_deterministic_disease_extraction(
     payload: Any,
 ) -> DeterministicDiseaseExtractionResult | None:
@@ -184,6 +191,7 @@ def _load_persisted_deterministic_disease_extraction(
     )
 
 
+###############################################################################
 def _load_revision_source_deterministic_extraction(
     session_metadata: dict[str, Any] | None,
 ) -> tuple[dict[str, Any], dict[str, str]]:
@@ -233,6 +241,7 @@ def _load_revision_source_deterministic_extraction(
     }
 
 
+###############################################################################
 def _load_revision_source_disease_context(
     session_metadata: dict[str, Any] | None,
 ) -> tuple[PatientDiseaseContext | None, str]:
@@ -251,6 +260,7 @@ def _load_revision_source_disease_context(
     return PatientDiseaseContext(entries=entries), "persisted_source_version"
 
 
+###############################################################################
 def _load_revision_source_lab_timeline(
     session_metadata: dict[str, Any] | None,
 ) -> tuple[PatientLabTimeline | None, LiverInjuryOnsetContext | None, dict[str, str]]:
@@ -297,6 +307,7 @@ def _load_revision_source_lab_timeline(
     )
 
 
+###############################################################################
 def _build_revision_anamnesis_validation_stage(
     *,
     anamnesis_deterministic: Any,
@@ -340,6 +351,7 @@ def _build_revision_anamnesis_validation_stage(
     }
 
 
+###############################################################################
 def _build_revision_extraction_bundle(
     *,
     therapy_deterministic: Any,
@@ -394,6 +406,7 @@ def _build_revision_extraction_bundle(
     }
 
 
+###############################################################################
 def _resolve_revision_extraction(
     *,
     therapy_deterministic: Any,
@@ -421,6 +434,7 @@ def _resolve_revision_extraction(
     )
 
 
+###############################################################################
 def _build_revision_missing_anamnesis_drugs_stage(
     *,
     anamnesis_drugs: PatientDrugs,
@@ -443,6 +457,7 @@ def _build_revision_missing_anamnesis_drugs_stage(
     }
 
 
+###############################################################################
 def _build_revision_analysis_drugs(
     *,
     base_analysis_drugs: PatientDrugs,
@@ -477,6 +492,7 @@ def _build_revision_analysis_drugs(
     return PatientDrugs(entries=collected_entries or base_analysis_drugs.entries)
 
 
+###############################################################################
 def _reconcile_revision_candidate_selection(
     *,
     candidate_selection: CandidateSelectionResult,
@@ -512,6 +528,7 @@ def _reconcile_revision_candidate_selection(
     )
 
 
+###############################################################################
 def _build_revision_candidate_selection_stage(
     *,
     candidate_selection: CandidateSelectionResult,
@@ -536,6 +553,7 @@ def _build_revision_candidate_selection_stage(
     }
 
 
+###############################################################################
 def _select_revision_candidates(
     *,
     extraction_bundle: dict[str, Any],
@@ -591,6 +609,7 @@ def _select_revision_candidates(
     )
 
 
+###############################################################################
 def _build_revision_lab_revision_stage(
     *,
     lab_timeline: Any,
@@ -615,6 +634,7 @@ def _build_revision_lab_revision_stage(
     }
 
 
+###############################################################################
 def _build_revision_snapshot_merge_stage(
     *,
     therapy_drugs: PatientDrugs,
@@ -655,6 +675,7 @@ def _build_revision_snapshot_merge_stage(
     }
 
 
+###############################################################################
 def _build_revision_snapshot_context(
     entity_pipeline: dict[str, Any] | None,
 ) -> str | None:
@@ -706,6 +727,7 @@ def _build_revision_snapshot_context(
     return "\n\n".join(chunks)
 
 
+###############################################################################
 def _build_revision_consultation_drugs(
     *,
     entity_pipeline: dict[str, Any] | None,
@@ -741,6 +763,7 @@ def _build_revision_consultation_drugs(
     return PatientDrugs(entries=collected_entries or analysis_drugs.entries)
 
 
+###############################################################################
 def _build_revision_consultation_context(
     *,
     structured_context: str,
@@ -816,6 +839,7 @@ def _build_revision_consultation_context(
     return "\n\n".join(chunks), context_metadata
 
 
+###############################################################################
 def _build_revision_consultation_inputs(
     *,
     structured_context: str,
@@ -847,6 +871,7 @@ def _build_revision_consultation_inputs(
     )
 
 
+###############################################################################
 def _build_revision_consultation_execution_payload(
     consultation_inputs: RevisionConsultationInputs,
     service_payload: dict[str, Any] | None = None,
@@ -882,6 +907,7 @@ def _build_revision_consultation_execution_payload(
     return payload
 
 
+###############################################################################
 async def _run_revision_consultation(
     service: Any,
     *,
@@ -941,6 +967,7 @@ async def _run_revision_consultation(
     )
 
 
+###############################################################################
 def _build_revision_finalization_payload(
     *,
     final_report: str,
@@ -966,6 +993,7 @@ def _build_revision_finalization_payload(
     }
 
 
+###############################################################################
 def _finalize_revision_report_outputs(
     *,
     report_metadata: Any,
@@ -995,6 +1023,7 @@ def _finalize_revision_report_outputs(
     )
 
 
+###############################################################################
 async def process_revision_patient_workflow(
     service: Any,
     payload: PatientData,

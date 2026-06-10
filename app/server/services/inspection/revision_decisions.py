@@ -5,7 +5,10 @@ from typing import Any
 from services.text.normalization import normalize_drug_query_name
 
 
+###############################################################################
 class InspectionRevisionDecisionsMixin:
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_revision_livertox_decisions(
         *,
@@ -149,6 +152,7 @@ class InspectionRevisionDecisionsMixin:
             )
         return decisions
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_revised_dili_assessments(
         *,
@@ -270,6 +274,7 @@ class InspectionRevisionDecisionsMixin:
             )
         return assessments
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_revision_runtime_overrides(
         *,

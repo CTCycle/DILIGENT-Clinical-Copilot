@@ -19,11 +19,11 @@ from domain.clinical.entities import (
 )
 from services.text.normalization import normalize_drug_query_name
 
-
 ###############################################################################
 class ClinicalSessionFormattingMixin:
     NOT_AVAILABLE_TOKEN = "n/a"
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def serialize_validation_errors(
         errors: Sequence[ErrorDetails],
@@ -40,12 +40,14 @@ class ClinicalSessionFormattingMixin:
             serialized.append(error_dict)
         return serialized
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def serialize_pipeline_issues(
         issues: Sequence[PipelineIssue],
     ) -> list[dict[str, Any]]:
         return [issue.model_dump() for issue in issues]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def merge_drugs_for_analysis(
         therapy_drugs: PatientDrugs,
@@ -65,6 +67,7 @@ class ClinicalSessionFormattingMixin:
             merged_entries.append(entry)
         return PatientDrugs(entries=merged_entries)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_fallback_therapy_drugs(raw_text: str | None) -> PatientDrugs:
         if not raw_text:
@@ -98,6 +101,7 @@ class ClinicalSessionFormattingMixin:
             )
         return PatientDrugs(entries=entries)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def format_structured_diseases(disease_context: PatientDiseaseContext) -> list[str]:
         if not disease_context.entries:
@@ -117,6 +121,7 @@ class ClinicalSessionFormattingMixin:
             )
         return lines or ["- n/a"]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def format_lab_timeline(lab_timeline: PatientLabTimeline) -> list[str]:
         if not lab_timeline.entries:
@@ -147,6 +152,7 @@ class ClinicalSessionFormattingMixin:
             )
         return lines or ["- n/a"]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def format_onset_context(
         onset_context: LiverInjuryOnsetContext | None,
@@ -162,6 +168,7 @@ class ClinicalSessionFormattingMixin:
             ),
         ]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_structured_clinical_context(
         payload: PatientData,

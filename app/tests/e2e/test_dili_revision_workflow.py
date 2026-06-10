@@ -8,12 +8,14 @@ import httpx
 import pytest
 
 
+###############################################################################
 def _normalize_host_for_url(host: str) -> str:
     if host in {"0.0.0.0", "::", "[::]"}:
         return "127.0.0.1"
     return host
 
 
+###############################################################################
 def _build_base_url(
     host_env: str,
     port_env: str,
@@ -32,6 +34,7 @@ API_BASE_URL = (
 )
 
 
+###############################################################################
 @pytest.fixture
 def api_client() -> httpx.Client:
     try:
@@ -44,6 +47,7 @@ def api_client() -> httpx.Client:
         pytest.skip(f"Backend API is unavailable at {API_BASE_URL}: {exc}")
 
 
+###############################################################################
 def _list_sessions(api_client: httpx.Client) -> list[dict[str, Any]]:
     response = api_client.get("/api/inspection/sessions", params={"offset": 0, "limit": 20})
     assert response.status_code == 200
@@ -52,6 +56,7 @@ def _list_sessions(api_client: httpx.Client) -> list[dict[str, Any]]:
     return items if isinstance(items, list) else []
 
 
+###############################################################################
 def _get_session_detail(
     api_client: httpx.Client,
     session_id: int,
@@ -63,6 +68,7 @@ def _get_session_detail(
     return payload
 
 
+###############################################################################
 def _get_session_versions(
     api_client: httpx.Client,
     session_id: int,
@@ -74,6 +80,7 @@ def _get_session_versions(
     return items if isinstance(items, list) else []
 
 
+###############################################################################
 def _wait_for_revision_job(
     api_client: httpx.Client,
     job_id: str,
@@ -96,6 +103,7 @@ def _wait_for_revision_job(
     return last_payload
 
 
+###############################################################################
 def _find_editable_session(api_client: httpx.Client) -> tuple[int, dict[str, Any]]:
     for item in _list_sessions(api_client):
         session_id = item.get("session_id") if isinstance(item, dict) else None
@@ -108,6 +116,7 @@ def _find_editable_session(api_client: httpx.Client) -> tuple[int, dict[str, Any
     pytest.skip("No persisted clinical session with an editable report is available.")
 
 
+###############################################################################
 def test_manual_report_edit_flow_preserves_version_and_audits_change(
     api_client: httpx.Client,
 ) -> None:
@@ -150,6 +159,7 @@ def test_manual_report_edit_flow_preserves_version_and_audits_change(
     assert versions[-1]["version_number"] == original_version
 
 
+###############################################################################
 def test_revision_workflow_start_persists_draft_shell_and_pipeline_run(
     api_client: httpx.Client,
 ) -> None:

@@ -71,6 +71,7 @@ _PROGRESS_SEQUENCE: list[tuple[str, float]] = [
 ]
 
 
+###############################################################################
 def _emit_progress(
     progress_callback, stage: str, progress: float, detail: str | None = None
 ) -> None:
@@ -82,6 +83,7 @@ def _emit_progress(
         progress_callback(stage, progress)
 
 
+###############################################################################
 def _extract_deterministic_drugs(
     service: Any,
     *,
@@ -97,6 +99,7 @@ def _extract_deterministic_drugs(
     return type("_Fallback", (), {"entries": [], "unresolved_lines": [], "regimen_lines": []})()
 
 
+###############################################################################
 def _append_warning_issue(
     service: Any,
     issues: list[PipelineIssue],
@@ -123,6 +126,7 @@ def _append_warning_issue(
     )
 
 
+###############################################################################
 def _has_temporal_information(service: Any, entry: Any) -> bool:
     parser = getattr(service, "drugs_parser", None)
     checker = getattr(parser, "drug_entry_has_temporal_information", None)
@@ -131,6 +135,7 @@ def _has_temporal_information(service: Any, entry: Any) -> bool:
     return True
 
 
+###############################################################################
 def _resolve_rucam_source(entries: list[DrugRucamAssessment]) -> str:
     if not entries:
         return "not_calculated_insufficient_data"
@@ -145,6 +150,7 @@ def _resolve_rucam_source(entries: list[DrugRucamAssessment]) -> str:
     return "not_calculated_insufficient_data"
 
 
+###############################################################################
 def build_single_matched_drug_row_workflow(
     *,
     detected_name: str,
@@ -193,6 +199,7 @@ def build_single_matched_drug_row_workflow(
     }
 
 
+###############################################################################
 def _normalized_resolved_drug_map(prepared_inputs) -> dict[str, dict[str, Any]]:
     if prepared_inputs is None:
         return {}
@@ -204,6 +211,7 @@ def _normalized_resolved_drug_map(prepared_inputs) -> dict[str, dict[str, Any]]:
     return resolved_drug_map
 
 
+###############################################################################
 def _normalized_rucam_map(
     rucam_bundle: PatientRucamAssessmentBundle,
 ) -> dict[str, DrugRucamAssessment]:
@@ -215,6 +223,7 @@ def _normalized_rucam_map(
     return rucam_by_name
 
 
+###############################################################################
 def build_matched_drugs_payload_workflow(
     *,
     detected_drugs: list[str],
@@ -244,6 +253,7 @@ def build_matched_drugs_payload_workflow(
     return matched_drugs_payload
 
 
+###############################################################################
 async def process_single_patient_workflow(
     service: Any,
     payload: PatientData,
@@ -271,6 +281,7 @@ async def process_single_patient_workflow(
     )
 
 
+###############################################################################
 async def _process_standard_patient_workflow_internal(
     service: Any,
     payload: PatientData,
@@ -625,6 +636,7 @@ async def _process_standard_patient_workflow_internal(
     return result_payload
 
 
+###############################################################################
 def start_clinical_job_workflow(
     service: Any,
     request_payload: ClinicalSessionRequest,

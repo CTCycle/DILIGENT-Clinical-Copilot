@@ -8,9 +8,11 @@ from domain.clinical.matching import LiverToxMatch, MonographRecord
 CACHE_MISS = object()
 
 
+###############################################################################
 class DrugMatcher:
     """Drug matching workflow — multi-stage pipeline, result creation, diagnostics."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, lookup: Any) -> None:
         self.lookup = lookup
 

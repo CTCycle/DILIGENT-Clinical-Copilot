@@ -15,7 +15,6 @@ from common.constants import (
 from common.utils.text_utils import coerce_text, normalize_drug_name
 from configurations.startup import get_server_settings
 
-
 ###############################################################################
 def upsert_drugs_catalog_records(
     self,

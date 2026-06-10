@@ -25,6 +25,7 @@ AuditOutcome = Literal[
 GateSeverity = Literal["blocking", "non_blocking"]
 
 
+###############################################################################
 class SourceSpan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -38,6 +39,7 @@ class SourceSpan(BaseModel):
     text: str = Field(default="", max_length=5000)
 
 
+###############################################################################
 class SpanMapping(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -47,6 +49,7 @@ class SpanMapping(BaseModel):
     clean_end: int = Field(..., ge=0)
 
 
+###############################################################################
 class NormalizedDocumentBlock(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -57,6 +60,7 @@ class NormalizedDocumentBlock(BaseModel):
     source_spans: list[SourceSpan] = Field(default_factory=list)
 
 
+###############################################################################
 class NormalizedDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -67,6 +71,7 @@ class NormalizedDocument(BaseModel):
     blocks: list[NormalizedDocumentBlock] = Field(default_factory=list)
 
 
+###############################################################################
 class ExtractedSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -78,6 +83,7 @@ class ExtractedSection(BaseModel):
     issues: list[str] = Field(default_factory=list)
 
 
+###############################################################################
 class ContaminationFlags(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -86,6 +92,7 @@ class ContaminationFlags(BaseModel):
     labs_embedded_without_dedicated_lab_section: bool = False
 
 
+###############################################################################
 class TimedDrugMention(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -96,6 +103,7 @@ class TimedDrugMention(BaseModel):
     source_span: SourceSpan | None = None
 
 
+###############################################################################
 class ExtractionArtifact(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -107,6 +115,7 @@ class ExtractionArtifact(BaseModel):
     extraction_issues: list[dict[str, Any]] = Field(default_factory=list)
 
 
+###############################################################################
 class FactGraphNode(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -119,6 +128,7 @@ class FactGraphNode(BaseModel):
     supports: list[str] = Field(default_factory=list)
 
 
+###############################################################################
 class FactGraph(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -126,6 +136,7 @@ class FactGraph(BaseModel):
     nodes: list[FactGraphNode] = Field(default_factory=list)
 
 
+###############################################################################
 class FactGraphValidation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -134,6 +145,7 @@ class FactGraphValidation(BaseModel):
     soft_issues: list[dict[str, Any]] = Field(default_factory=list)
 
 
+###############################################################################
 class ReportMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -144,6 +156,7 @@ class ReportMetadata(BaseModel):
     claim_references: dict[str, list[str]] = Field(default_factory=dict)
 
 
+###############################################################################
 class FaithfulnessAudit(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -156,6 +169,7 @@ class FaithfulnessAudit(BaseModel):
     discrepancy_report: str = ""
 
 
+###############################################################################
 class RunBundleIndex(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -168,6 +182,7 @@ class RunBundleIndex(BaseModel):
     artifacts: dict[str, str] = Field(default_factory=dict)
 
 
+###############################################################################
 class ClinicalInputPreflightIssue(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -177,6 +192,7 @@ class ClinicalInputPreflightIssue(BaseModel):
     field: str | None = None
 
 
+###############################################################################
 class ClinicalInputPreflightResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -24,6 +24,7 @@ from services.updater.rxnav_client import (
 )
 
 
+###############################################################################
 class RxNavDrugCatalogBuilder:
     TERMS_URL = "https://rxnav.nlm.nih.gov/REST/RxTerms/allconcepts.json"
     CHUNK_SIZE = 131_072
@@ -39,6 +40,7 @@ class RxNavDrugCatalogBuilder:
     SINGLE_TOKEN_DIGIT_PATTERN = re.compile(r"^\d+(?:\.\d+)?$")
     SHORT_TOKEN_EXCEPTIONS = {"id"}
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         rx_client: RxNavClient | None = None,
@@ -764,7 +766,7 @@ class RxNavDrugCatalogBuilder:
                 fragments.append(base)
         return fragments
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def register_alias_candidate(
         self,
         candidate: str,

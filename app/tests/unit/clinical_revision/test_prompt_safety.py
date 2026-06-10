@@ -3,6 +3,7 @@ from __future__ import annotations
 from services.inspection.service import DataInspectionService
 
 
+###############################################################################
 def test_detect_prompt_injection_flags_in_reviewer_selected_excerpt() -> None:
     flags = DataInspectionService.detect_prompt_injection_flags(
         instruction_text="Please verify chronology only.",
@@ -18,6 +19,7 @@ def test_detect_prompt_injection_flags_in_reviewer_selected_excerpt() -> None:
     assert "routing_override_attempt" in flags
 
 
+###############################################################################
 def test_instruction_analysis_flags_untrusted_excerpt_without_expanding_routing_scope() -> None:
     profile, trace = DataInspectionService.analyze_reviewer_instructions(
         raw_instruction_text="Review only the lab chronology wording.",

@@ -62,10 +62,10 @@ class HepatotoxicityPatternCalculator:
             return None
         return value / reference
 
-
 ###############################################################################
 class HepatotoxicityPatternAnalyzer:
     
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.r_score: float | None = None
         self.calculator = HepatotoxicityPatternCalculator()

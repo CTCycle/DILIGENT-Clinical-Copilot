@@ -7,30 +7,27 @@ from typing import Any
 from pydantic import BaseModel
 from services.llm import cloud as cloud_module
 
-
 ###############################################################################
 @dataclass
 class FakeOpenAIResponse:
     output_text: str
     output_parsed: Any | None = None
 
-
 ###############################################################################
 @dataclass
 class FakeGeminiResponse:
     text: str
 
-
 ###############################################################################
 class ParsedPayload(BaseModel):
     value: int
 
-
 ###############################################################################
 class FakeGenerateContentConfig:
+
+    # -------------------------------------------------------------------------
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
-
 
 ###############################################################################
 def patch_access_key(monkeypatch, key: str = "provider-key") -> None:
@@ -40,23 +37,29 @@ def patch_access_key(monkeypatch, key: str = "provider-key") -> None:
         lambda self, provider: key,
     )
 
-
 ###############################################################################
 def test_cloud_llm_native_openai_chat_uses_responses_api_and_normalizes_text(
     monkeypatch,
 ) -> None:
     captured: dict[str, Any] = {}
 
+    ###############################################################################
     class FakeResponses:
+
+        # -------------------------------------------------------------------------
         async def create(self, **kwargs: Any) -> FakeOpenAIResponse:
             captured.update(kwargs)
             return FakeOpenAIResponse(output_text="plain text response")
 
+    ###############################################################################
     class FakeAsyncOpenAI:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             captured["client"] = kwargs
             self.responses = FakeResponses()
 
+        # -------------------------------------------------------------------------
         async def close(self) -> None:
             captured["closed"] = True
 
@@ -88,20 +91,26 @@ def test_cloud_llm_native_openai_chat_uses_responses_api_and_normalizes_text(
     assert captured["temperature"] == 0.35
     assert captured["top_p"] == 0.8
 
-
 ###############################################################################
 def test_cloud_llm_native_openai_gpt5_chat_omits_sampling_options(monkeypatch) -> None:
     captured: dict[str, Any] = {}
 
+    ###############################################################################
     class FakeResponses:
+
+        # -------------------------------------------------------------------------
         async def create(self, **kwargs: Any) -> FakeOpenAIResponse:
             captured.update(kwargs)
             return FakeOpenAIResponse(output_text="ok")
 
+    ###############################################################################
     class FakeAsyncOpenAI:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             self.responses = FakeResponses()
 
+        # -------------------------------------------------------------------------
         async def close(self) -> None:
             pass
 
@@ -121,26 +130,33 @@ def test_cloud_llm_native_openai_gpt5_chat_omits_sampling_options(monkeypatch) -
     assert "temperature" not in captured
     assert "top_p" not in captured
 
-
 ###############################################################################
 def test_cloud_llm_native_gemini_chat_uses_generate_content_and_normalizes_json(
     monkeypatch,
 ) -> None:
     captured: dict[str, Any] = {}
 
+    ###############################################################################
     class FakeModels:
+
+        # -------------------------------------------------------------------------
         def generate_content(self, **kwargs: Any) -> FakeGeminiResponse:
             captured.update(kwargs)
             return FakeGeminiResponse(text='{"value": 7}')
 
+    ###############################################################################
     class FakeGeminiClient:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             captured["client"] = kwargs
             self.models = FakeModels()
 
+    ###############################################################################
     class FakeGenAI:
         Client = FakeGeminiClient
 
+    ###############################################################################
     class FakeTypes:
         GenerateContentConfig = FakeGenerateContentConfig
 
@@ -171,18 +187,25 @@ def test_cloud_llm_native_gemini_chat_uses_generate_content_and_normalizes_json(
     assert captured["config"].kwargs["system_instruction"] == "System rule."
     assert captured["config"].kwargs["temperature"] == 2.0
 
-
 ###############################################################################
 def test_cloud_llm_native_llm_text_call_uses_openai_responses_api(monkeypatch) -> None:
+
+    ###############################################################################
     class FakeResponses:
+
+        # -------------------------------------------------------------------------
         async def create(self, **kwargs: Any) -> FakeOpenAIResponse:
             _ = kwargs
             return FakeOpenAIResponse(output_text="wrapped text")
 
+    ###############################################################################
     class FakeAsyncOpenAI:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             self.responses = FakeResponses()
 
+        # -------------------------------------------------------------------------
         async def close(self) -> None:
             pass
 
@@ -202,14 +225,16 @@ def test_cloud_llm_native_llm_text_call_uses_openai_responses_api(monkeypatch) -
     )
     assert text == "wrapped text"
 
-
 ###############################################################################
 def test_cloud_llm_native_openai_structured_call_uses_responses_parse(
     monkeypatch,
 ) -> None:
     captured: dict[str, Any] = {}
 
+    ###############################################################################
     class FakeResponses:
+
+        # -------------------------------------------------------------------------
         async def parse(self, **kwargs: Any) -> FakeOpenAIResponse:
             captured.update(kwargs)
             return FakeOpenAIResponse(
@@ -217,15 +242,20 @@ def test_cloud_llm_native_openai_structured_call_uses_responses_parse(
                 output_parsed=ParsedPayload(value=9),
             )
 
+        # -------------------------------------------------------------------------
         async def create(self, **kwargs: Any) -> FakeOpenAIResponse:
             raise AssertionError(
                 "structured OpenAI calls should prefer responses.parse"
             )
 
+    ###############################################################################
     class FakeAsyncOpenAI:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             self.responses = FakeResponses()
 
+        # -------------------------------------------------------------------------
         async def close(self) -> None:
             pass
 
@@ -251,25 +281,32 @@ def test_cloud_llm_native_openai_structured_call_uses_responses_parse(
     assert captured["input"] == [{"role": "user", "content": "Value is 9."}]
     assert captured["instructions"] == "Return strict JSON."
 
-
 ###############################################################################
 def test_cloud_llm_native_gemini_structured_call_passes_response_schema(
     monkeypatch,
 ) -> None:
     captured: dict[str, Any] = {}
 
+    ###############################################################################
     class FakeModels:
+
+        # -------------------------------------------------------------------------
         def generate_content(self, **kwargs: Any) -> FakeGeminiResponse:
             captured.update(kwargs)
             return FakeGeminiResponse(text='{"value": 11}')
 
+    ###############################################################################
     class FakeGeminiClient:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             self.models = FakeModels()
 
+    ###############################################################################
     class FakeGenAI:
         Client = FakeGeminiClient
 
+    ###############################################################################
     class FakeTypes:
         GenerateContentConfig = FakeGenerateContentConfig
 
@@ -295,20 +332,27 @@ def test_cloud_llm_native_gemini_structured_call_passes_response_schema(
     assert captured["config"].kwargs["response_mime_type"] == "application/json"
     assert captured["config"].kwargs["response_json_schema"]["title"] == "ParsedPayload"
 
-
 ###############################################################################
 def test_cloud_llm_native_provider_exception_maps_to_existing_error_types(
     monkeypatch,
 ) -> None:
+
+    ###############################################################################
     class FakeResponses:
+
+        # -------------------------------------------------------------------------
         async def create(self, **kwargs: Any) -> FakeOpenAIResponse:
             _ = kwargs
             raise TimeoutError("timed out")
 
+    ###############################################################################
     class FakeAsyncOpenAI:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             self.responses = FakeResponses()
 
+        # -------------------------------------------------------------------------
         async def close(self) -> None:
             pass
 

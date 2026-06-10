@@ -23,7 +23,10 @@ from domain.inspection import (
 from services.inspection.service import DataInspectionService
 
 
+###############################################################################
 class InspectionSessionEndpoint(InspectionJobEndpointMixin):
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -32,6 +35,7 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
     ) -> None:
         super().__init__(router=router, service=service)
 
+    # -------------------------------------------------------------------------
     def list_sessions(
         self,
         search: str | None = Query(default=None),
@@ -59,6 +63,7 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
         )
         return SessionCatalogResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def get_session_detail(self, session_id: int) -> SessionDetailResponse:
         detail = self.service.get_session_detail(session_id)
         if detail is None:
@@ -68,6 +73,7 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
             )
         return SessionDetailResponse(**detail)
 
+    # -------------------------------------------------------------------------
     def update_session(
         self,
         session_id: int,
@@ -89,10 +95,12 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
             )
         return SessionDetailResponse(**detail)
 
+    # -------------------------------------------------------------------------
     def list_session_versions(self, session_id: int) -> SessionVersionListResponse:
         items = self.service.list_session_versions(session_id)
         return SessionVersionListResponse(items=items)
 
+    # -------------------------------------------------------------------------
     def get_session_version(
         self,
         session_id: int,
@@ -109,6 +117,7 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
             )
         return SessionVersionDetailResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def compare_session_versions(
         self,
         session_id: int,
@@ -133,10 +142,12 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
             )
         return SessionVersionComparisonResponse(**payload)
 
+    # -------------------------------------------------------------------------
     def list_manual_edits(self, session_id: int) -> list[ManualReportEditAudit]:
         payload = self.service.list_manual_report_edits(session_id)
         return [ManualReportEditAudit(**row) for row in payload]
 
+    # -------------------------------------------------------------------------
     def manual_edit_session_report(
         self,
         session_id: int,
@@ -157,6 +168,7 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
             )
         return ManualReportEditResponse(**response)
 
+    # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> DeleteEntityResponse:
         deleted = self.service.delete_session(session_id)
         if not deleted:
@@ -166,6 +178,7 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
             )
         return DeleteEntityResponse(deleted=True)
 
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "/sessions",

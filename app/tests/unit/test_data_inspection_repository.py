@@ -25,14 +25,12 @@ from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 def build_serializer() -> tuple[DataSerializer, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     serializer = DataSerializer(engine=engine)
     return serializer, engine
-
 
 ###############################################################################
 def save_session(
@@ -59,7 +57,6 @@ def save_session(
             },
         }
     )
-
 
 ###############################################################################
 def test_session_list_filters_and_search() -> None:
@@ -159,7 +156,6 @@ def test_session_list_filters_and_search() -> None:
     assert total == 1
     assert items[0]["patient_name"] == "Carol Archive"
 
-
 ###############################################################################
 def test_session_report_and_text_use_result_payload_only() -> None:
     serializer, _ = build_serializer()
@@ -212,7 +208,6 @@ def test_session_report_and_text_use_result_payload_only() -> None:
     assert legacy_detail is not None
     assert legacy_detail["report"] is None
     assert legacy_detail["session_text"] == ""
-
 
 ###############################################################################
 def test_catalog_search_and_drug_delete_cleanup() -> None:
@@ -302,7 +297,6 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
         assert len(session_drugs) == 1
         assert session_drugs[0].drug_id is None
 
-
 ###############################################################################
 def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     serializer, _ = build_serializer()
@@ -368,11 +362,15 @@ def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     assert final_livertox["status"] == "cancelled"
 
 
+###############################################################################
 class FakeTimelineExtractor:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.call_count = 0
         self.last_runtime_settings: dict[str, Any] | None = None
 
+    # -------------------------------------------------------------------------
     async def extract_timeline(
         self,
         *,
@@ -396,7 +394,6 @@ class FakeTimelineExtractor:
                 )
             ],
         )
-
 
 ###############################################################################
 def test_timeline_generation_persists_and_reuses_payload() -> None:

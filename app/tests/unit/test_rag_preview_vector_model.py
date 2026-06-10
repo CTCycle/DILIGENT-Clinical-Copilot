@@ -4,6 +4,7 @@ from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
 
 
+###############################################################################
 def test_rag_preview_includes_vector_model(monkeypatch) -> None:
     service = DataInspectionService(jobs=JobManager())
 
@@ -17,13 +18,18 @@ def test_rag_preview_includes_vector_model(monkeypatch) -> None:
         lambda: r"C:\docs",
     )
 
+    ###############################################################################
     class FakeVectorDb:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **kwargs):
             _ = kwargs
 
+        # -------------------------------------------------------------------------
         def has_collection(self) -> bool:
             return True
 
+        # -------------------------------------------------------------------------
         def load_embeddings(self):
             return [
                 {

@@ -12,6 +12,7 @@ from repositories.serialization.catalogs import ReferenceCatalogSerializer
 from services.catalogs.runtime import get_reference_catalog_snapshot
 
 
+###############################################################################
 @lru_cache(maxsize=1)
 def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
     try:
@@ -85,10 +86,12 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
         return empty_text_normalization_snapshot()
 
 
+###############################################################################
 def invalidate_text_normalization_snapshot() -> None:
     get_text_normalization_snapshot.cache_clear()
 
 
+###############################################################################
 def record_text_normalization_observation(term: str, *, category: str) -> None:
     clean_category = category.strip()
     if not clean_category:
@@ -112,6 +115,7 @@ def record_text_normalization_observation(term: str, *, category: str) -> None:
         logger.debug("Failed recording text normalization observation.", exc_info=True)
 
 
+###############################################################################
 def list_text_normalization_term_payloads(
     *, category: str | None = None
 ) -> list[dict[str, Any]]:
@@ -148,6 +152,7 @@ def list_text_normalization_term_payloads(
         return []
 
 
+###############################################################################
 def upsert_text_normalization_term_payload(
     *,
     category: str,
@@ -179,6 +184,7 @@ def upsert_text_normalization_term_payload(
     }
 
 
+###############################################################################
 def deactivate_text_normalization_term_payload(*, category: str, term: str) -> bool:
     repository = get_default_repository()
     catalogs = ReferenceCatalogSerializer(repository.session_factory)
