@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import json
 import re
 import uuid
 from datetime import UTC, date, datetime
@@ -20,9 +18,10 @@ from domain.inspection import (
     ReviewerInstructionTrace,
 )
 from domain.patient_timeline import PatientTimeline
-from repositories.serialization.data import (
-    DataSerializer,
-)
+from repositories.serialization.data import DataSerializer
+from repositories.serialization.document_serializer import DocumentSerializer
+from repositories.vectors import LanceVectorDatabase
+from services.retrieval.settings import build_effective_rag_settings
 from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection.normalization import (
     extract_lab_marker as extract_lab_marker_value,
@@ -59,7 +58,7 @@ from services.text.normalization import normalize_drug_query_name
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
 
-
+###############################################################################
 class DataInspectionService(
     InspectionUpdateConfigMixin,
     InspectionRevisionDiffMixin,

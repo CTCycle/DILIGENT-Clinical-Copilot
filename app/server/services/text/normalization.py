@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Any
 
-import pandas as pd
 
 from common.utils.text_utils import (
     coerce_text,
