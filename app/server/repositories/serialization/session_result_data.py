@@ -57,6 +57,7 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
             session_status=self.normalize_session_status(
                 session_data.get("session_status")
             ),
+            session_kind=self.normalize_string(session_data.get("session_kind")),
             metadata_json=self.serialize_json_payload(session_data.get("metadata")),
         )
         db_session.add(persisted_session)
