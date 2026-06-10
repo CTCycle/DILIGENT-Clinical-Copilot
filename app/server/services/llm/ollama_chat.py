@@ -16,6 +16,12 @@ from common.utils.logger import logger
 from common.utils.types import extract_positive_int
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import get_server_settings
+from services.llm.ollama_residency import (
+    extract_bytes_from_fields,
+    extract_footprint_from_payload,
+    get_available_memory_bytes,
+    get_available_vram_bytes,
+)
 from services.llm.ollama_runtime import (
     OllamaError,
     OllamaTimeout,
@@ -24,6 +30,29 @@ from services.llm.ollama_runtime import (
     normalize_model_content,
     normalize_ollama_messages,
 )
+
+# KV cache: FP16 K+V = 2+2 = 4 bytes per element per layer
+KV_CACHE_BYTES_PER_ELEMENT = 4
+
+# Fallback heuristic: (min_params_lower_bound, bytes_per_token)
+KV_CACHE_HEURISTIC: list[tuple[int, int]] = [
+    (0, 60_000),
+    (4_000_000_000, 130_000),
+    (9_000_000_000, 130_000),
+    (14_000_000_000, 260_000),
+    (21_000_000_000, 350_000),
+    (41_000_000_000, 700_000),
+]
+
+# Known GGUF architecture prefixes for model_info
+GGUF_ARCH_PREFIXES = frozenset({
+    "llama", "mistral", "mixtral", "gemma", "gemma2",
+    "phi", "phi3", "qwen", "qwen2", "command_r",
+    "deepseek", "deepseek2",
+})
+
+VRAM_SAFETY_RATIO = 0.85
+RAM_SAFETY_RATIO = 0.75
 
 ###############################################################################
 def resolve_model_name(self, name: str | None) -> str:
@@ -707,6 +736,116 @@ def estimate_tokens(text: str) -> int:
     return max(approximate, 1)
 
 ###############################################################################
+def _parse_param_count_text(text: str) -> int | None:
+    if not text:
+        return None
+    cleaned = text.strip().lower().replace(",", "").replace(" ", "")
+    match = re.match(r"(\d+(?:\.\d+)?)([bmtk]?)", cleaned)
+    if not match:
+        return None
+    num = float(match.group(1))
+    unit = match.group(2)
+    multipliers = {"b": 1_000_000_000, "t": 1_000_000_000_000, "m": 1_000_000, "k": 1_000, "": 1}
+    return int(num * multipliers.get(unit, 1))
+
+
+###############################################################################
+def _infer_param_count(metadata: dict[str, Any], model_name: str) -> int | None:
+    details = metadata.get("details")
+    if isinstance(details, dict):
+        raw = details.get("parameter_size")
+        if raw:
+            result = _parse_param_count_text(str(raw))
+            if result:
+                return result
+    match = re.search(r"(?:^|[/:])(\d+(?:\.\d+)?)([bB])\b", model_name)
+    if match:
+        return _parse_param_count_text(match.group(0))
+    return None
+
+
+###############################################################################
+def extract_model_architecture(metadata: dict[str, Any]) -> dict[str, int] | None:
+    if not isinstance(metadata, dict):
+        return None
+    model_info = metadata.get("model_info")
+    if not isinstance(model_info, dict):
+        return None
+    for prefix in GGUF_ARCH_PREFIXES:
+        block_count = model_info.get(f"{prefix}.block_count")
+        embedding_length = model_info.get(f"{prefix}.embedding_length")
+        head_count = model_info.get(f"{prefix}.attention.head_count")
+        if block_count and embedding_length and head_count:
+            head_count_kv = model_info.get(
+                f"{prefix}.attention.head_count_kv", head_count
+            )
+            return {
+                "n_layers": int(block_count),
+                "n_embd": int(embedding_length),
+                "n_heads": int(head_count),
+                "n_kv_heads": int(head_count_kv),
+            }
+    return None
+
+
+###############################################################################
+def estimate_kv_cache_bytes_per_token(
+    metadata: dict[str, Any],
+    model_name: str = "",
+) -> int | None:
+    arch = extract_model_architecture(metadata)
+    if arch:
+        kv = (
+            KV_CACHE_BYTES_PER_ELEMENT
+            * arch["n_layers"]
+            * arch["n_embd"]
+            * arch["n_kv_heads"]
+            // arch["n_heads"]
+        )
+        return kv
+    param_count = _infer_param_count(metadata, model_name)
+    if param_count:
+        for lower_bound, per_token in sorted(KV_CACHE_HEURISTIC, reverse=True):
+            if param_count >= lower_bound:
+                return per_token
+    return None
+
+
+###############################################################################
+async def estimate_max_feasible_context(
+    self,
+    model: str,
+    metadata: dict[str, Any] | None = None,
+) -> int | None:
+    if metadata is None:
+        try:
+            metadata = await self.show_model(model)
+        except (OllamaError, OllamaTimeout):
+            return None
+    native_limit = self.extract_context_limit(metadata)
+    if not native_limit:
+        return None
+    kv_per_token = estimate_kv_cache_bytes_per_token(metadata, model)
+    if not kv_per_token:
+        return None
+    ram_footprint, vram_footprint = self.extract_footprint_from_payload(metadata)
+    available_vram = get_available_vram_bytes()
+    available_ram = get_available_memory_bytes()
+    feasible = 0
+    if available_vram > 0 and vram_footprint > 0:
+        vram_budget = int(available_vram * VRAM_SAFETY_RATIO)
+        vram_for_kv = max(0, vram_budget - vram_footprint)
+        feasible = max(feasible, vram_for_kv // kv_per_token)
+    if available_ram > 0 and ram_footprint > 0:
+        ram_budget = int(available_ram * RAM_SAFETY_RATIO)
+        ram_for_kv = max(0, ram_budget - ram_footprint)
+        feasible = max(feasible, ram_for_kv // kv_per_token)
+    if feasible == 0:
+        return None
+    return min(native_limit, feasible)
+
+
+###############################################################################
 async def calculate_context_window(
     self,
     *,
@@ -715,8 +854,12 @@ async def calculate_context_window(
     min_ctx: int = 2048,
     padding_tokens: int = 128,
     slack_ratio: float = 0.75,
-    output_headroom: int = 800,
+    output_headroom: int = 4096,
 ) -> int | None:
+    feasible = await self.estimate_max_feasible_context(model)
+    if feasible and feasible >= min_ctx:
+        return feasible
+
     contents: list[str] = []
     if messages:
         for message in messages:
