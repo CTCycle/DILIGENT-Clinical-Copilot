@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
+from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.clinical.entities import PatientDrugs, PipelineIssue
 from domain.clinical.entities import PatientRucamAssessmentBundle
@@ -381,77 +382,13 @@ class ClinicalSessionConsultationMixin:
             return clinical_session, final_report, payload_metadata
 
 
-        def _resolve_consultation_timeout() -> float:
+        @classmethod
+        def _resolve_consultation_timeout(cls) -> float:
             configured = float(get_server_settings().runtime.clinical_llm_timeout)
-            return ClinicalSessionService._resolve_runtime_timeout(
+            return cls._resolve_runtime_timeout(
                 base_timeout_s=configured
             )
 
         def apply_persisted_runtime_configuration(self) -> None:
             self.model_config_service.ensure_defaults()
-
-        def _build_consultation_fallback_report(
-            *,
-            analysis_drugs: PatientDrugs,
-            report_language: str,
-            is_revision: bool = False,
-        ) -> str:
-            drug_names = [
-                (entry.name or "").strip()
-                for entry in analysis_drugs.entries
-                if (entry.name or "").strip()
-            ]
-            unique_drugs: list[str] = []
-            seen_drugs: set[str] = set()
-            for name in drug_names:
-                key = name.casefold()
-                if key in seen_drugs:
-                    continue
-                seen_drugs.add(key)
-                unique_drugs.append(name)
-                if len(unique_drugs) >= 8:
-                    break
-            if report_language.lower().startswith("it"):
-                if unique_drugs:
-                    if is_revision:
-                        return (
-                            "Report di revisione generato in modalità di fallback per indisponibilità della sintesi clinica. "
-                            f"Farmaci selezionati per la revisione: {', '.join(unique_drugs)}. "
-                            "Confrontare manualmente il risultato con il report precedente e con le evidenze strutturate aggiornate."
-                        )
-                    return (
-                        "Report finale generato in modalità di fallback per indisponibilità del motore clinico. "
-                        f"Farmaci sospetti identificati nel testo: {', '.join(unique_drugs)}. "
-                        "Rivedere manualmente la valutazione clinica e la conclusione specialistica originale."
-                    )
-                if is_revision:
-                    return (
-                        "Report di revisione generato in modalità di fallback per indisponibilità della sintesi clinica. "
-                        "Non sono stati identificati farmaci di revisione affidabili; è necessaria revisione specialistica manuale."
-                    )
-                return (
-                    "Report finale generato in modalità di fallback per indisponibilità del motore clinico. "
-                    "Non sono stati identificati farmaci sospetti affidabili; è necessaria revisione manuale."
-                )
-            if unique_drugs:
-                if is_revision:
-                    return (
-                        "Revision report generated in fallback mode because revision clinical synthesis was unavailable. "
-                        f"Drugs selected for revision: {', '.join(unique_drugs)}. "
-                        "Manual comparison against the previous report and revised structured evidence is required."
-                    )
-                return (
-                    "Final report generated in fallback mode because clinical synthesis was unavailable. "
-                    f"Suspected drugs detected from source text: {', '.join(unique_drugs)}. "
-                    "Manual review against the original specialist assessment is required."
-                )
-            if is_revision:
-                return (
-                    "Revision report generated in fallback mode because revision clinical synthesis was unavailable. "
-                    "No reliable revision-target drugs were detected; manual specialist review is required."
-                )
-            return (
-                "Final report generated in fallback mode because clinical synthesis was unavailable. "
-                "No reliable suspected drugs were detected; manual specialist review is required."
-            )
 
