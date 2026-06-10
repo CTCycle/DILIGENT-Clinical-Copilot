@@ -13,6 +13,7 @@ from domain.inspection import (
 from services.session.factory import build_clinical_session_service
 
 
+###############################################################################
 class InspectionRevisionRunnerMixin:
     REVISION_STEP_SEQUENCE: list[tuple[str, str]] = [
         ("load_source_version", "Loading selected source version"),
@@ -37,6 +38,7 @@ class InspectionRevisionRunnerMixin:
         ("finalize_revision_version", "Finalizing revision version state"),
     ]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _revision_run_actor_source(metadata: dict[str, Any]) -> str:
         return (
@@ -45,6 +47,7 @@ class InspectionRevisionRunnerMixin:
             else "unknown"
         )
 
+    # -------------------------------------------------------------------------
     def _start_revision_background_job(
         self,
         *,
@@ -88,6 +91,7 @@ class InspectionRevisionRunnerMixin:
         )
         return status_payload
 
+    # -------------------------------------------------------------------------
     def _record_revision_step_start(
         self,
         *,
@@ -119,6 +123,7 @@ class InspectionRevisionRunnerMixin:
             model_name=model_name,
         )
 
+    # -------------------------------------------------------------------------
     def _record_revision_step_success(
         self,
         *,
@@ -139,6 +144,7 @@ class InspectionRevisionRunnerMixin:
             latency_ms=latency_ms,
         )
 
+    # -------------------------------------------------------------------------
     def _record_revision_step_failure(
         self,
         *,
@@ -157,6 +163,7 @@ class InspectionRevisionRunnerMixin:
             latency_ms=latency_ms,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _derive_revision_qa_outcome(
         result_payload: dict[str, Any],
@@ -191,6 +198,7 @@ class InspectionRevisionRunnerMixin:
             return "llm_qa_passed", "passed"
         return "requires_human_review", "not_run"
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _get_revision_entity_pipeline(
         result_payload: dict[str, Any],
@@ -207,6 +215,7 @@ class InspectionRevisionRunnerMixin:
             if isinstance(step_name, str) and isinstance(payload, dict)
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _summarize_revision_entity_stage_payload(
         step_name: str,
@@ -275,6 +284,7 @@ class InspectionRevisionRunnerMixin:
             }
         return {"status": payload.get("status")}
 
+    # -------------------------------------------------------------------------
     def start_revision_job(
         self,
         session_id: int,
@@ -345,6 +355,7 @@ class InspectionRevisionRunnerMixin:
             metadata=metadata,
         )
 
+    # -------------------------------------------------------------------------
     def retry_revision_job(self, pipeline_run_id: str) -> dict[str, Any]:
         if self.jobs.is_job_running(self.REVISION_JOB_TYPE):
             raise ValueError("Session revision is already running")
@@ -430,6 +441,7 @@ class InspectionRevisionRunnerMixin:
             metadata=metadata,
         )
 
+    # -------------------------------------------------------------------------
     def run_revision_job(
         self,
         *,

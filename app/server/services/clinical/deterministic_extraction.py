@@ -133,6 +133,7 @@ NON_DRUG_TOKENS = frozenset(
 )
 
 
+###############################################################################
 def line_has_regimen_signal(line: str) -> bool:
     stripped = (line or "").strip()
     if not stripped:
@@ -144,6 +145,7 @@ def line_has_regimen_signal(line: str) -> bool:
     return "+" in stripped and bool(CAPITALIZED_DRUG_TOKEN_RE.search(stripped))
 
 
+###############################################################################
 def extract_regimen_drug_candidates(
     line: str,
     *,
@@ -202,6 +204,7 @@ def extract_regimen_drug_candidates(
     return entries
 
 
+###############################################################################
 def extract_deterministic_diseases(
     anamnesis: str,
 ) -> DeterministicDiseaseExtractionResult:

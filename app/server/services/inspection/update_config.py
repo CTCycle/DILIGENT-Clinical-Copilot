@@ -16,15 +16,19 @@ from services.text.vocabulary import (
 )
 
 
+###############################################################################
 class InspectionUpdateConfigMixin:
     RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"
 
+    # -------------------------------------------------------------------------
     def load_runtime_config(self) -> dict[str, Any]:
         return get_server_settings().model_dump()
 
+    # -------------------------------------------------------------------------
     def rag_manifest_path(self) -> Path:
         return VECTOR_DB_PATH / self.RAG_MANIFEST_FILE_NAME
 
+    # -------------------------------------------------------------------------
     def read_rag_manifest(self) -> dict[str, Any]:
         manifest_path = self.rag_manifest_path()
         try:
@@ -33,6 +37,7 @@ class InspectionUpdateConfigMixin:
             return {}
         return payload if isinstance(payload, dict) else {}
 
+    # -------------------------------------------------------------------------
     def write_rag_manifest(
         self,
         *,
@@ -54,6 +59,7 @@ class InspectionUpdateConfigMixin:
             encoding="utf-8",
         )
 
+    # -------------------------------------------------------------------------
     def get_effective_rag_documents_path(self) -> str:
         manifest = self.read_rag_manifest()
         manifest_path = str(manifest.get("documents_path") or "").strip()
@@ -63,11 +69,13 @@ class InspectionUpdateConfigMixin:
         rag_cfg = config.get("rag", {}) if isinstance(config, dict) else {}
         return str(rag_cfg.get("documents_path", DOCS_PATH))
 
+    # -------------------------------------------------------------------------
     def list_reference_catalog_runtime_observations(
         self, category: str | None = None
     ) -> list[dict[str, Any]]:
         return list_text_normalization_term_payloads(category=category)
 
+    # -------------------------------------------------------------------------
     def upsert_reference_catalog_runtime_observation(
         self,
         *,
@@ -87,6 +95,7 @@ class InspectionUpdateConfigMixin:
         invalidate_text_normalization_snapshot()
         return payload
 
+    # -------------------------------------------------------------------------
     def deactivate_reference_catalog_runtime_observation(
         self, *, category: str, term: str
     ) -> bool:
@@ -98,6 +107,7 @@ class InspectionUpdateConfigMixin:
             invalidate_text_normalization_snapshot()
         return updated
 
+    # -------------------------------------------------------------------------
     def build_update_config_response(self, target: str) -> dict[str, Any]:
         config = self.load_runtime_config()
         settings = get_server_settings()

@@ -8,6 +8,7 @@ from repositories.schemas.models import ModelSelection
 from sqlalchemy import select
 
 
+###############################################################################
 def _build_settings() -> DatabaseSettings:
     return DatabaseSettings(
         embedded_database=True,
@@ -26,6 +27,7 @@ def _build_settings() -> DatabaseSettings:
     )
 
 
+###############################################################################
 def test_sqlite_repository_exposes_orm_session_factory(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]

@@ -37,21 +37,29 @@ CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
 }
 
 
+###############################################################################
 class ClinicalJobCancelled(Exception):
     pass
 
 
+###############################################################################
 class ClinicalJobProgressCallback:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, job_id: str) -> None:
         self.job_id = job_id
 
+    # -------------------------------------------------------------------------
     def __call__(self, stage: str, progress: float, detail: str | None = None) -> None:
         report_clinical_job_progress(
             self.job_id, stage=stage, progress=progress, detail=detail
         )
 
 
+###############################################################################
 class ClinicalConsultationProgressCallback:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -59,6 +67,7 @@ class ClinicalConsultationProgressCallback:
     ) -> None:
         self.progress_callback = progress_callback
 
+    # -------------------------------------------------------------------------
     def __call__(self, stage: str, fraction: float) -> None:
         if self.progress_callback is None:
             return
@@ -73,7 +82,10 @@ class ClinicalConsultationProgressCallback:
             )
 
 
+###############################################################################
 class StageProgressFractionCallback:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -87,6 +99,7 @@ class StageProgressFractionCallback:
         self.lower = min(start_value, end_value)
         self.span = max(0.0, end_value - self.lower)
 
+    # -------------------------------------------------------------------------
     def __call__(self, fraction: float) -> None:
         bounded_fraction = min(1.0, max(0.0, float(fraction)))
         self.progress_callback(
@@ -94,6 +107,7 @@ class StageProgressFractionCallback:
         )
 
 
+###############################################################################
 def build_clinical_progress_message(
     stage: str,
     progress: float,
@@ -107,11 +121,13 @@ def build_clinical_progress_message(
     return stage.replace("_", " ").replace(".", " ").strip()
 
 
+###############################################################################
 def ensure_clinical_job_not_cancelled(job_id: str) -> None:
     if get_job_manager().should_stop(job_id):
         raise ClinicalJobCancelled("Clinical job stop requested.")
 
 
+###############################################################################
 def report_clinical_job_progress(
     job_id: str,
     *,

@@ -72,7 +72,10 @@ from services.clinical.rag_support import RagSupportService
 from services.clinical.report_finalizer import ReportFinalizer
 
 
+###############################################################################
 class HepatoxConsultation:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         drugs: PatientDrugs,
@@ -1158,5 +1161,6 @@ class HepatoxConsultation:
             lines.append(phrase("not_available", language))
         return "\n".join(lines).strip()
 
+    # -------------------------------------------------------------------------
     def bibliography_source_label(self) -> str:
         return ReportFinalizer.bibliography_source_label()

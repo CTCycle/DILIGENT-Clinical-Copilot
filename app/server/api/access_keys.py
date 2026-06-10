@@ -13,9 +13,10 @@ from services.security.access_keys import AccessKeyService
 
 router = APIRouter(prefix="/access-keys", tags=["access-keys"])
 
-
 ###############################################################################
 class AccessKeyEndpoint:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, router: APIRouter, service: AccessKeyService) -> None:
         self.router = router
         self.service = service

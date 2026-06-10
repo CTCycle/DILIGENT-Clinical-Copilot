@@ -16,27 +16,34 @@ from services.updater.rxnav_client import RxNavClient
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
 
 
+###############################################################################
 def _override_float(values: Mapping[str, object], key: str) -> float | None:
     value = values.get(key)
     return float(value) if isinstance(value, int | float) else None
 
 
+###############################################################################
 def _override_int(values: Mapping[str, object], key: str) -> int | None:
     value = values.get(key)
     return int(value) if isinstance(value, int | float) else None
 
 
+###############################################################################
 def _override_str(values: Mapping[str, object], key: str) -> str | None:
     value = values.get(key)
     return value if isinstance(value, str) else None
 
 
+###############################################################################
 def _override_bool(values: Mapping[str, object], key: str) -> bool | None:
     value = values.get(key)
     return value if isinstance(value, bool) else None
 
 
+###############################################################################
 class DataInspectionProgressReporter:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         jobs: JobManager,
@@ -49,9 +56,11 @@ class DataInspectionProgressReporter:
         self.base_progress = float(base_progress)
         self.scale = float(scale)
 
+    # -------------------------------------------------------------------------
     def __call__(self, progress: float, message: str) -> None:
         self.emit(progress, message)
 
+    # -------------------------------------------------------------------------
     def emit(self, progress: float, message: str) -> None:
         bounded = min(
             100.0, max(0.0, self.base_progress + float(progress) * self.scale)
@@ -63,7 +72,10 @@ class DataInspectionProgressReporter:
         self.jobs.update_result(self.job_id, result)
 
 
+###############################################################################
 class DataInspectionUpdateJobRunner:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -81,6 +93,7 @@ class DataInspectionUpdateJobRunner:
         self.report_job_progress = report_job_progress
         self.write_rag_manifest = write_rag_manifest
 
+    # -------------------------------------------------------------------------
     def run_rxnav_update_job(
         self, job_id: str, overrides: Mapping[str, object] | None = None
     ) -> dict[str, Any]:
@@ -114,6 +127,7 @@ class DataInspectionUpdateJobRunner:
         self.report_phase_by_target(job_id, "rxnav", 100, "Completed")
         return {"summary": result}
 
+    # -------------------------------------------------------------------------
     def run_livertox_update_job(
         self, job_id: str, overrides: Mapping[str, object] | None = None
     ) -> dict[str, Any]:
@@ -144,6 +158,7 @@ class DataInspectionUpdateJobRunner:
         self.report_phase_by_target(job_id, "livertox", 100, "Completed")
         return {"summary": result}
 
+    # -------------------------------------------------------------------------
     def run_rag_update_job(
         self, job_id: str, overrides: Mapping[str, object] | None = None
     ) -> dict[str, Any]:
@@ -236,5 +251,6 @@ class DataInspectionUpdateJobRunner:
             }
         }
 
+    # -------------------------------------------------------------------------
     def _write_rag_manifest(self, report: dict[str, Any], documents_path: str) -> Path:
         return self.write_rag_manifest(report, documents_path)

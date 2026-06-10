@@ -14,12 +14,16 @@ from services.clinical.labs import (
 )
 
 
+###############################################################################
 class FakeLabClient:
+
+    # -------------------------------------------------------------------------
     def __init__(self, responses: list[LabExtractionPayload]) -> None:
         self.responses = list(responses)
         self.call_count = 0
         self.prompts: list[str] = []
 
+    # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> LabExtractionPayload:
         self.call_count += 1
         self.prompts.append(str(kwargs.get("user_prompt", "")))
@@ -28,6 +32,7 @@ class FakeLabClient:
         return LabExtractionPayload(entries=[], onset_context=None)
 
 
+###############################################################################
 def test_extracts_dated_alt_alp_and_bilirubin() -> None:
     extractor = ClinicalLabExtractor(
         client=FakeLabClient(
@@ -74,6 +79,7 @@ def test_extracts_dated_alt_alp_and_bilirubin() -> None:
     assert "TBIL" in markers
 
 
+###############################################################################
 def test_uses_ast_when_alt_absent() -> None:
     extractor = ClinicalLabExtractor(
         client=FakeLabClient(
@@ -101,6 +107,7 @@ def test_uses_ast_when_alt_absent() -> None:
     assert timeline.entries[0].marker_name == "AST"
 
 
+###############################################################################
 def test_merges_manual_labs_with_extracted_entries() -> None:
     extractor = ClinicalLabExtractor(
         client=FakeLabClient([LabExtractionPayload(entries=[], onset_context=None)])
@@ -117,6 +124,7 @@ def test_merges_manual_labs_with_extracted_entries() -> None:
     assert {entry.marker_name for entry in timeline.entries} == {"ALT", "ALP"}
 
 
+###############################################################################
 def test_preserves_relative_timing_without_absolute_dates() -> None:
     extractor = ClinicalLabExtractor(
         client=FakeLabClient(
@@ -148,6 +156,7 @@ def test_preserves_relative_timing_without_absolute_dates() -> None:
     assert timeline.entries[0].relative_time == "2 weeks after starting therapy"
 
 
+###############################################################################
 def test_deduplicates_near_identical_entries() -> None:
     extractor = ClinicalLabExtractor(
         client=FakeLabClient(
@@ -184,6 +193,7 @@ def test_deduplicates_near_identical_entries() -> None:
     assert len(timeline.entries) == 1
 
 
+###############################################################################
 def test_extracts_onset_clue_context() -> None:
     onset = LiverInjuryOnsetContext(
         onset_date="2025-01-11",
@@ -205,6 +215,7 @@ def test_extracts_onset_clue_context() -> None:
     assert onset_context.onset_basis == "first_symptom"
 
 
+###############################################################################
 def test_lab_llm_receives_full_text_without_chunk_markers() -> None:
     client = FakeLabClient([LabExtractionPayload(entries=[], onset_context=None)])
     extractor = ClinicalLabExtractor(client=client)
@@ -220,6 +231,7 @@ def test_lab_llm_receives_full_text_without_chunk_markers() -> None:
     assert all("[Chunk" not in prompt for prompt in client.prompts)
 
 
+###############################################################################
 def test_extracts_explicit_pattern_and_rucam_score() -> None:
     extractor = ClinicalLabExtractor(client=FakeLabClient([]))
     text = "Hepatic pattern: mixed. RUCAM score: 7."
@@ -227,6 +239,7 @@ def test_extracts_explicit_pattern_and_rucam_score() -> None:
     assert extractor.extract_explicit_rucam_score(text) == 7
 
 
+###############################################################################
 def test_calculates_pattern_from_alt_alp_with_uln() -> None:
     extractor = ClinicalLabExtractor(client=FakeLabClient([]))
     timeline = PatientData(

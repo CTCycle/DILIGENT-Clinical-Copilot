@@ -5,6 +5,7 @@ import logging
 from common.utils.logger import LOG_CONFIG
 
 
+###############################################################################
 def test_file_logging_is_utf8_safe(tmp_path) -> None:  # type: ignore[no-untyped-def]
     assert LOG_CONFIG["handlers"]["file"]["encoding"] == "utf-8"
 

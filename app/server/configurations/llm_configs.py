@@ -13,7 +13,6 @@ from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
 
-
 ###############################################################################
 class LLMRuntimeConfig:
     _runtime_override: ContextVar[dict[str, object] | None] = ContextVar(
@@ -21,6 +20,7 @@ class LLMRuntimeConfig:
         default=None,
     )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _get_defaults() -> LLMRuntimeDefaults:
         return get_server_settings().llm_defaults
@@ -236,5 +236,5 @@ class LLMRuntimeConfig:
         if snapshot.use_cloud_models:
             provider = (snapshot.cloud_provider or "").strip()
             cloud_model = (snapshot.cloud_model or "").strip()
-            return provider, cloud_model or local_model
+            return provider, local_model or cloud_model
         return "ollama", local_model

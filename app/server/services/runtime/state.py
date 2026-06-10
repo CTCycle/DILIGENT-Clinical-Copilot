@@ -9,6 +9,7 @@ from typing import Any
 from domain.jobs import JobStatusResponse
 
 
+###############################################################################
 @dataclass
 class JobState:
     job_id: str
@@ -23,6 +24,7 @@ class JobState:
     stop_requested: bool = False
     lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
+    # -------------------------------------------------------------------------
     def update(self, **kwargs: Any) -> None:
         with self.lock:
             changed = False
@@ -33,6 +35,7 @@ class JobState:
             if changed:
                 self.version += 1
 
+    # -------------------------------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
         with self.lock:
             return {
@@ -47,6 +50,7 @@ class JobState:
                 "version": self.version,
             }
 
+    # -------------------------------------------------------------------------
     def merge_result(self, result_delta: Mapping[str, Any]) -> JobStatusResponse:
         with self.lock:
             existing = dict(self.result or {})

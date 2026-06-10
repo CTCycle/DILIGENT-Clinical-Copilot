@@ -7,6 +7,7 @@ from services.session.clinical_section_parsers import (
 )
 
 
+###############################################################################
 def test_extract_preferred_markdown_headings() -> None:
     text = "## Anamnesis\nA details\n\n## Therapy\nT details\n\n## Laboratory history\nL details"
     sections = extract_required_dili_sections(text)
@@ -16,6 +17,7 @@ def test_extract_preferred_markdown_headings() -> None:
     assert sections["laboratory_history"].text == "L details"
 
 
+###############################################################################
 def test_markdown_sections_ignore_body_subheadings() -> None:
     text = (
         "## Anamnesis / Clinical History\n"
@@ -37,6 +39,7 @@ def test_markdown_sections_ignore_body_subheadings() -> None:
     assert "Terapia farmacologica" in sections["therapy"].text
 
 
+###############################################################################
 def test_final_report_heading_is_not_anamnesis_typo() -> None:
     text = (
         "## Anamnesis / Clinical History\nA\n\n"
@@ -51,6 +54,7 @@ def test_final_report_heading_is_not_anamnesis_typo() -> None:
     assert sections["laboratory_history"].text == "L"
 
 
+###############################################################################
 def test_unclassified_markdown_headings_bound_sections_generically() -> None:
     text = (
         "# Source Document\nmetadata\n\n"
@@ -66,12 +70,14 @@ def test_unclassified_markdown_headings_bound_sections_generically() -> None:
     assert sections["laboratory_history"].text == "L"
 
 
+###############################################################################
 def test_phrase_aware_typo_matching_accepts_heading_typos() -> None:
     text = "## Clinical History\nA\n\n## Medicatons\nT\n\n## Laboratroy tests\nL"
     sections = extract_required_dili_sections(text)
     assert missing_required_section_names(sections) == []
 
 
+###############################################################################
 def test_accepts_common_variants() -> None:
     text = (
         "## Clinical history\nA\n\n## Current medications\nT\n\n## Laboratory tests\nL"
@@ -80,6 +86,7 @@ def test_accepts_common_variants() -> None:
     assert missing_required_section_names(sections) == []
 
 
+###############################################################################
 def test_mixed_language_therapy_heading_is_inferred_from_section_body() -> None:
     text = (
         "## Anamnesis\n"
@@ -95,12 +102,14 @@ def test_mixed_language_therapy_heading_is_inferred_from_section_body() -> None:
     assert "Fortecortin" in sections["therapy"].text
 
 
+###############################################################################
 def test_rejects_missing_required_section() -> None:
     text = "## Anamnesis\nA\n\n## Therapy\nT"
     sections = extract_required_dili_sections(text)
     assert "laboratory_history" in missing_required_section_names(sections)
 
 
+###############################################################################
 def test_rejects_untitled_prose_inference() -> None:
     text = (
         "The patient has history and therapy and ALT/ALP values in one paragraph only."
@@ -113,6 +122,7 @@ def test_rejects_untitled_prose_inference() -> None:
     ]
 
 
+###############################################################################
 def test_duplicate_competing_headings_raise() -> None:
     text = "## Therapy\nT1\n\n## Current medications\nT2\n\n## Anamnesis\nA\n\n## Laboratory history\nL"
     with pytest.raises(ValueError):

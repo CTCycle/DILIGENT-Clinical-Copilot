@@ -22,8 +22,10 @@ from domain.clinical.entities import (
 from domain.clinical.extras import HepatoxPreparedInputs
 from services.retrieval.query import DILIQueryBuilder
 
+###############################################################################
 class ClinicalSessionExtractionPipelineMixin:
 
+    # -------------------------------------------------------------------------
     async def extract_therapy_drugs(
         self,
         *,
@@ -80,7 +82,7 @@ class ClinicalSessionExtractionPipelineMixin:
         self.emit_progress(progress_callback, stage="therapy_extraction", value=30.0)
         self.run_stop_check(stop_check)
         return therapy_drugs
-    
+
     # -------------------------------------------------------------------------
     async def extract_anamnesis_drugs(
         self,
@@ -140,7 +142,7 @@ class ClinicalSessionExtractionPipelineMixin:
         self.emit_progress(progress_callback, stage="anamnesis_extraction", value=42.0)
         self.run_stop_check(stop_check)
         return anamnesis_drugs
-    
+
     # -------------------------------------------------------------------------
     async def extract_disease_context(
         self,
@@ -256,7 +258,7 @@ class ClinicalSessionExtractionPipelineMixin:
                 self.run_stop_check(stop_check)
                 return disease_context
         return PatientDiseaseContext(entries=[])
-    
+
     # -------------------------------------------------------------------------
     async def extract_lab_timeline(
         self,
@@ -356,7 +358,7 @@ class ClinicalSessionExtractionPipelineMixin:
         )
         self.run_stop_check(stop_check)
         return lab_timeline, onset_context
-    
+
     # -------------------------------------------------------------------------
     def assess_pattern(
         self,
@@ -404,7 +406,7 @@ class ClinicalSessionExtractionPipelineMixin:
         )
         self.run_stop_check(stop_check)
         return pattern_assessment
-    
+
     # -------------------------------------------------------------------------
     def estimate_rucam(
         self,
@@ -456,7 +458,7 @@ class ClinicalSessionExtractionPipelineMixin:
         self.emit_progress(progress_callback, stage="rucam_estimation", value=54.0)
         self.run_stop_check(stop_check)
         return rucam_bundle
-    
+
     # -------------------------------------------------------------------------
     def build_rag_query(
         self,
@@ -485,7 +487,7 @@ class ClinicalSessionExtractionPipelineMixin:
         )
         self.run_stop_check(stop_check)
         return rag_query
-    
+
     # -------------------------------------------------------------------------
     async def run_livertox_lookup(
         self,
@@ -515,7 +517,7 @@ class ClinicalSessionExtractionPipelineMixin:
             self.append_knowledge_base_unavailable_issue(issues)
         self.emit_progress(progress_callback, stage="livertox_lookup", value=62.0)
         return prepared_inputs
-    
+
     # -------------------------------------------------------------------------
     def reestimate_rucam_with_livertox(
         self,

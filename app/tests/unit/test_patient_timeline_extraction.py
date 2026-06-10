@@ -11,17 +11,22 @@ from domain.patient_timeline import (
 from services.clinical.timeline import PatientTimelineExtractor
 
 
+###############################################################################
 class FakeTimelineClient:
+
+    # -------------------------------------------------------------------------
     def __init__(self, payload: PatientTimelineExtraction) -> None:
         self.payload = payload
         self.call_count = 0
 
+    # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientTimelineExtraction:
         _ = kwargs
         self.call_count += 1
         return self.payload
 
 
+###############################################################################
 def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(

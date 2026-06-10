@@ -14,7 +14,6 @@ from repositories.serialization.access_key_encryption import (
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 def build_serializer() -> tuple[AccessKeyEncryptionMaterialSerializer, sessionmaker]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
@@ -25,7 +24,6 @@ def build_serializer() -> tuple[AccessKeyEncryptionMaterialSerializer, sessionma
         session_factory=factory,
     )
     return serializer, factory
-
 
 ###############################################################################
 def test_ensure_seeded_creates_initial_version_1_row() -> None:
@@ -39,7 +37,6 @@ def test_ensure_seeded_creates_initial_version_1_row() -> None:
     assert row.seeded_at is not None
     assert row.activated_at is not None
 
-
 ###############################################################################
 def test_ensure_seeded_is_idempotent() -> None:
     serializer, _ = build_serializer()
@@ -49,7 +46,6 @@ def test_ensure_seeded_is_idempotent() -> None:
 
     assert first.id == second.id
     assert first.key_version == second.key_version == 1
-
 
 ###############################################################################
 def test_only_one_active_row_exists_per_purpose() -> None:
@@ -69,7 +65,6 @@ def test_only_one_active_row_exists_per_purpose() -> None:
 
     assert int(count_active) == 1
 
-
 ###############################################################################
 def test_rotate_material_creates_new_active_version() -> None:
     serializer, _ = build_serializer()
@@ -82,7 +77,6 @@ def test_rotate_material_creates_new_active_version() -> None:
     assert rotated.is_active is True
     active = serializer.get_active_material()
     assert active.key_version == 2
-
 
 ###############################################################################
 def test_get_material_by_version_returns_correct_row() -> None:
@@ -97,7 +91,6 @@ def test_get_material_by_version_returns_correct_row() -> None:
     assert v2 is not None
     assert v1.key_version == 1
     assert v2.key_version == 2
-
 
 ###############################################################################
 def test_encrypt_and_decrypt_use_db_seeded_material() -> None:

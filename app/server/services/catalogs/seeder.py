@@ -11,10 +11,14 @@ from services.catalogs.manifest_loader import (
 )
 
 
+###############################################################################
 class ReferenceCatalogSeeder:
+
+    # -------------------------------------------------------------------------
     def __init__(self, serializer: ReferenceCatalogSerializer) -> None:
         self.serializer = serializer
 
+    # -------------------------------------------------------------------------
     def seed_missing_or_changed_manifests(
         self,
         force: bool = False,
@@ -33,6 +37,7 @@ class ReferenceCatalogSeeder:
             entries_written=entries_written,
         )
 
+    # -------------------------------------------------------------------------
     def seed_manifest(self, path: Path, force: bool = False) -> int:
         manifest_hash = compute_manifest_hash(path)
         manifest = load_catalog_manifest(path)

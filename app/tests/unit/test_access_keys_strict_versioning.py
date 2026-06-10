@@ -15,7 +15,6 @@ from sqlalchemy.orm import sessionmaker
 
 VALID_TEST_KEY = "openai-secret-value"
 
-
 ###############################################################################
 def build_serializer() -> tuple[AccessKeySerializer, sessionmaker]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
@@ -26,7 +25,6 @@ def build_serializer() -> tuple[AccessKeySerializer, sessionmaker]:
     ).ensure_seeded()
     serializer = AccessKeySerializer(engine=engine, session_factory=factory)
     return serializer, factory
-
 
 ###############################################################################
 def test_decryption_fails_when_encryption_key_version_is_missing() -> None:
@@ -49,7 +47,6 @@ def test_decryption_fails_when_encryption_key_version_is_missing() -> None:
     except RuntimeError as exc:
         assert "Missing encryption key version metadata" in str(exc)
 
-
 ###############################################################################
 def test_decryption_fails_when_referenced_version_does_not_exist() -> None:
     serializer, factory = build_serializer()
@@ -68,7 +65,6 @@ def test_decryption_fails_when_referenced_version_does_not_exist() -> None:
     except RuntimeError as exc:
         assert "is not available" in str(exc)
 
-
 ###############################################################################
 def test_code_never_reads_access_key_encryption_key_env_var() -> None:
     app_dir = Path(__file__).resolve().parents[2]
@@ -76,7 +72,6 @@ def test_code_never_reads_access_key_encryption_key_env_var() -> None:
         encoding="utf-8"
     )
     assert "ACCESS_KEY_ENCRYPTION_KEY" not in source
-
 
 ###############################################################################
 def test_unavailable_key_material_version_fails_loudly() -> None:

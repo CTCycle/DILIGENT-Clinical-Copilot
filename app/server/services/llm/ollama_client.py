@@ -49,6 +49,7 @@ class OllamaClient:
     RESIDENCY_PLAN_TTL = 20.0
     DEFAULT_MODEL_FOOTPRINT_BYTES = 4 * 1_073_741_824
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         base_url: str | None = None,
@@ -231,11 +232,13 @@ class OllamaClient:
             self, current_model=current_model, target_models=target_models
         )
 
+    # -------------------------------------------------------------------------
     def _recent_residency_history(
         self, candidates: list[str]
     ) -> list[tuple[float, str]]:
         return ollama_residency._recent_residency_history(self, candidates)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _count_residency_frequency(
         history: list[tuple[float, str]],
@@ -243,12 +246,14 @@ class OllamaClient:
     ) -> None:
         return ollama_residency._count_residency_frequency(history, frequency)
 
+    # -------------------------------------------------------------------------
     def _count_residency_transitions(
         self,
         history: list[tuple[float, str]],
     ) -> dict[tuple[str, str], int]:
         return ollama_residency._count_residency_transitions(self, history)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _select_target_model(
         *,
@@ -414,7 +419,7 @@ class OllamaClient:
     async def list_models(self) -> list[str]:
         return await ollama_chat.list_models(self)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def pull(
         self,
         name: str,

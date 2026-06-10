@@ -32,10 +32,13 @@ from services.retrieval.settings import (
     rag_settings_payload,
 )
 
-
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
+
+    # -------------------------------------------------------------------------
     def load_snapshot(self) -> ModelConfigSnapshot: ...
+
+    # -------------------------------------------------------------------------
     def save_snapshot(
         self,
         *,
@@ -50,11 +53,11 @@ class ModelConfigSnapshotStore(Protocol):
         rag_settings: dict[str, object] | object = ...,
     ) -> ModelConfigSnapshot: ...
 
-
 ###############################################################################
 class ModelConfigService:
     _OLLAMA_WARNING_COOLDOWN_SECONDS = 120.0
 
+    # -------------------------------------------------------------------------
     def __init__(self, serializer: ModelConfigSnapshotStore | None = None) -> None:
         self.serializer = serializer or ModelConfigSerializer()
         self.local_model_catalog = cast(

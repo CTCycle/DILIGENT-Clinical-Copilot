@@ -7,6 +7,7 @@ from services.clinical.revision.report_builder import (
 )
 
 
+###############################################################################
 def test_revision_report_builder_marks_manual_review_warning_from_report_comparison() -> None:
     payload = build_revision_final_report_payload(
         result_payload={
@@ -31,6 +32,7 @@ def test_revision_report_builder_marks_manual_review_warning_from_report_compari
     assert "Report comparison still requests manual review." in payload.warnings
 
 
+###############################################################################
 def test_revision_report_builder_warns_when_final_report_is_missing() -> None:
     payload = build_revision_final_report_payload(
         result_payload={},

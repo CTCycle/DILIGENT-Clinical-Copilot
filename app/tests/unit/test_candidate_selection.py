@@ -6,6 +6,7 @@ from domain.clinical.entities import DrugEntry, PatientDrugs
 from services.clinical.candidate_selection import select_relevant_candidates
 
 
+###############################################################################
 def _therapy_entry(name: str, therapy_start_date: str) -> DrugEntry:
     return DrugEntry(
         name=name,
@@ -15,6 +16,7 @@ def _therapy_entry(name: str, therapy_start_date: str) -> DrugEntry:
     )
 
 
+###############################################################################
 def test_candidate_selection_penalizes_future_localized_therapy_dates() -> None:
     selected = select_relevant_candidates(
         PatientDrugs(entries=[_therapy_entry("Futuremab", "20.12.2026")]),
@@ -32,6 +34,7 @@ def test_candidate_selection_penalizes_future_localized_therapy_dates() -> None:
     assert selected.ordered_analysis_drugs.entries == []
 
 
+###############################################################################
 def test_candidate_selection_accepts_past_localized_therapy_dates() -> None:
     selected = select_relevant_candidates(
         PatientDrugs(entries=[_therapy_entry("Pastimab", "20.12.2024")]),

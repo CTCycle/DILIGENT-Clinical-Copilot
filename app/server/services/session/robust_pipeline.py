@@ -95,6 +95,7 @@ FACT_REPORT_LABELS = {
 }
 
 
+###############################################################################
 def build_extraction_artifact(
     *,
     normalized_document: NormalizedDocument,
@@ -187,6 +188,7 @@ def build_extraction_artifact(
     )
 
 
+###############################################################################
 def build_fact_graph(
     *,
     extraction_artifact: ExtractionArtifact,
@@ -266,6 +268,7 @@ def build_fact_graph(
     return FactGraph(nodes=nodes)
 
 
+###############################################################################
 def validate_fact_graph(fact_graph: FactGraph) -> FactGraphValidation:
     hard_issues: list[dict[str, Any]] = []
     soft_issues: list[dict[str, Any]] = []
@@ -289,6 +292,7 @@ def validate_fact_graph(fact_graph: FactGraph) -> FactGraphValidation:
     return FactGraphValidation(hard_issues=hard_issues, soft_issues=soft_issues)
 
 
+###############################################################################
 def render_fact_graph_report(
     *,
     fact_graph: FactGraph,
@@ -365,11 +369,13 @@ def render_fact_graph_report(
     return "\n".join(lines).strip(), metadata
 
 
+###############################################################################
 def _fact_report_labels(report_language: str) -> dict[str, str]:
     language_key = resolve_supported_language_code(report_language)
     return FACT_REPORT_LABELS.get(language_key, FACT_REPORT_LABELS["en"])
 
 
+###############################################################################
 def audit_report(
     *,
     extraction_artifact: ExtractionArtifact,
@@ -443,6 +449,7 @@ def audit_report(
     )
 
 
+###############################################################################
 def build_run_bundle_index(
     *, run_id: str, session_id: int | None = None
 ) -> RunBundleIndex:
@@ -462,6 +469,7 @@ def build_run_bundle_index(
     )
 
 
+###############################################################################
 def _extraction_confidence(
     section_extraction: ClinicalSectionExtractionResult | None,
 ) -> float:
@@ -470,6 +478,7 @@ def _extraction_confidence(
     return max(0.0, min(1.0, float(section_extraction.confidence)))
 
 
+###############################################################################
 def _section_from_text(
     *,
     key: str,
@@ -489,6 +498,7 @@ def _section_from_text(
     )
 
 
+###############################################################################
 def _find_semantic_section(
     *,
     key: str,
@@ -512,6 +522,7 @@ def _find_semantic_section(
     )
 
 
+###############################################################################
 def _span_for_text(*, key: str, text: str, source_text: str) -> SourceSpan | None:
     if not text:
         return None
@@ -540,6 +551,7 @@ def _span_for_text(*, key: str, text: str, source_text: str) -> SourceSpan | Non
     )
 
 
+###############################################################################
 def _extract_timed_drugs(payload: PatientData) -> list[TimedDrugMention]:
     mentions: list[TimedDrugMention] = []
     for key, text in (
@@ -581,6 +593,7 @@ def _extract_timed_drugs(payload: PatientData) -> list[TimedDrugMention]:
     return mentions
 
 
+###############################################################################
 def _guess_drug_name(line: str) -> str | None:
     cleaned = re.sub(r"^[\-*•\d.)\s]+", "", line).strip()
     if not cleaned:
@@ -603,6 +616,7 @@ def _guess_drug_name(line: str) -> str | None:
     return " ".join(words[:4])
 
 
+###############################################################################
 def _drug_node(
     entry: DrugEntry,
     index: int,
@@ -619,6 +633,7 @@ def _drug_node(
     )
 
 
+###############################################################################
 def _section_spans(
     extraction_artifact: ExtractionArtifact,
     section_key: str,
@@ -629,6 +644,7 @@ def _section_spans(
     return section.source_spans
 
 
+###############################################################################
 def _summarize_value(value: dict[str, Any]) -> str:
     for key in ("text", "classification", "outcome", "causality", "drug_name", "name"):
         item = value.get(key)
@@ -637,6 +653,7 @@ def _summarize_value(value: dict[str, Any]) -> str:
     return ", ".join(f"{key}: {item}" for key, item in list(value.items())[:3])
 
 
+###############################################################################
 def _render_discrepancy_report(
     blocking_issues: list[dict[str, Any]],
     non_blocking_issues: list[dict[str, Any]],
@@ -660,6 +677,7 @@ def _render_discrepancy_report(
     return "\n".join(lines).strip()
 
 
+###############################################################################
 def _build_structured_report_comparison(
     *,
     extraction_artifact: ExtractionArtifact,
@@ -735,6 +753,7 @@ def _build_structured_report_comparison(
     return json.dumps(payload, ensure_ascii=False)
 
 
+###############################################################################
 def _is_therapy_contaminated(text: str) -> bool:
     if not text.strip():
         return False

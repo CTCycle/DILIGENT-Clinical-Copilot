@@ -21,6 +21,7 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
 class RagSupportService:
     """RAG document retrieval, similarity search, and language repair utilities."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, consultation: Any) -> None:
         self.consultation = consultation
 

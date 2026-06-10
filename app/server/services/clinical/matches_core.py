@@ -21,6 +21,7 @@ VT = TypeVar("VT")
 CACHE_MISS = object()
 
 
+###############################################################################
 def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
     values = get_reference_catalog_snapshot().values(
         "drug_matching",
@@ -29,16 +30,16 @@ def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
     )
     return tuple(value.strip().upper() for value in values if value.strip())
 
-
 ###############################################################################
 class BoundedCache(Generic[KT, VT]):
     __slots__ = ("limit", "store")
 
+    # -------------------------------------------------------------------------
     def __init__(self, limit: int) -> None:
         self.limit = max(int(limit), 1)
         self.store: OrderedDict[KT, VT] = OrderedDict()
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get(self, key: KT, default: Any = CACHE_MISS) -> Any:
         if key not in self.store:
             return default
@@ -46,7 +47,7 @@ class BoundedCache(Generic[KT, VT]):
         self.store[key] = value
         return value
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def put(self, key: KT, value: VT) -> None:
         if self.limit <= 0:
             return
@@ -56,7 +57,7 @@ class BoundedCache(Generic[KT, VT]):
             self.store.popitem(last=False)
         self.store[key] = value
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def clear(self) -> None:
         self.store.clear()
 
@@ -65,6 +66,7 @@ from services.clinical.drug_matcher import DrugMatcher
 from services.clinical.drug_name_service import DrugNameService
 
 
+###############################################################################
 class DrugsLookup:
     DIRECT_CONFIDENCE = get_server_settings().drugs_matcher.direct_confidence
     MASTER_CONFIDENCE = get_server_settings().drugs_matcher.master_confidence
@@ -511,9 +513,9 @@ class DrugsLookup:
     def require_data(self) -> LiverToxData:
         return self.drug_name_service.require_data()
 
-
 ###############################################################################
 class LiverToxMatcher:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

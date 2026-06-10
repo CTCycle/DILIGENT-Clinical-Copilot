@@ -6,31 +6,38 @@ from pathlib import Path
 from typing import Any
 
 
+###############################################################################
 class SeedTermCatalog(tuple):
     __slots__ = ()
 
+    # -------------------------------------------------------------------------
     def __new__(
         cls, *, keywords: set[str], stopwords: set[str], groups: dict[str, set[str]]
     ):
         return super().__new__(cls, (keywords, stopwords, groups))
 
+    # -------------------------------------------------------------------------
     @property
     def keywords(self) -> set[str]:
         return self[0]
 
+    # -------------------------------------------------------------------------
     @property
     def stopwords(self) -> set[str]:
         return self[1]
 
+    # -------------------------------------------------------------------------
     @property
     def groups(self) -> dict[str, set[str]]:
         return self[2]
 
 
+###############################################################################
 def _normalize(text: str) -> str:
     return unicodedata.normalize("NFKC", text).casefold().strip()
 
 
+###############################################################################
 def load_seed_term_catalog() -> SeedTermCatalog:
     path = (
         Path(__file__).resolve().parents[3]
@@ -57,6 +64,7 @@ def load_seed_term_catalog() -> SeedTermCatalog:
     return SeedTermCatalog(keywords=keywords, stopwords=stopwords, groups=groups)
 
 
+###############################################################################
 def detect_seed_matches(text: str, catalog: SeedTermCatalog) -> dict[str, Any]:
     normalized = f" {_normalize(text)} "
     matched_keywords = sorted(

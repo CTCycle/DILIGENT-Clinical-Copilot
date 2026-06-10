@@ -19,9 +19,11 @@ BIBLIOGRAPHY_RE = re.compile(
 )
 
 
+###############################################################################
 class DocumentNormalizer:
     MAX_BLOCK_TEXT_CHARS = 5000
 
+    # -------------------------------------------------------------------------
     def normalize(self, raw_text: str) -> NormalizedDocument:
         clean_text = self._normalize_whitespace(raw_text)
         blocks = self._build_blocks(raw_text)
@@ -39,11 +41,13 @@ class DocumentNormalizer:
             blocks=blocks,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _normalize_whitespace(text: str) -> str:
         lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.splitlines()]
         return "\n".join(line for line in lines if line)
 
+    # -------------------------------------------------------------------------
     def _build_blocks(self, raw_text: str) -> list[NormalizedDocumentBlock]:
         blocks: list[NormalizedDocumentBlock] = []
         cursor = 0
@@ -95,6 +99,7 @@ class DocumentNormalizer:
             )
         return blocks
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _make_block(
         *,

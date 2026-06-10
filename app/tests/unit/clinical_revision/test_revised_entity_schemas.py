@@ -12,6 +12,7 @@ from domain.clinical.revision import (
 )
 
 
+###############################################################################
 def test_revised_drug_payload_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError):
         RevisedDrugPayload.model_validate(
@@ -23,6 +24,7 @@ def test_revised_drug_payload_rejects_unknown_fields() -> None:
         )
 
 
+###############################################################################
 def test_revised_lab_payload_rejects_string_numeric_coercion() -> None:
     with pytest.raises(ValidationError):
         RevisedLabPayload.model_validate(
@@ -34,6 +36,7 @@ def test_revised_lab_payload_rejects_string_numeric_coercion() -> None:
         )
 
 
+###############################################################################
 def test_revision_livertox_decision_requires_structured_shape() -> None:
     payload = RevisionLiverToxDecision.model_validate(
         {
@@ -58,6 +61,7 @@ def test_revision_livertox_decision_requires_structured_shape() -> None:
     assert payload.match_confidence == 0.99
 
 
+###############################################################################
 def test_revised_dili_assessment_rejects_extra_fields() -> None:
     with pytest.raises(ValidationError):
         RevisedDiliAssessment.model_validate(
@@ -85,6 +89,7 @@ def test_revised_dili_assessment_rejects_extra_fields() -> None:
         )
 
 
+###############################################################################
 def test_revised_disease_payload_accepts_expected_fields() -> None:
     payload = RevisedDiseasePayload.model_validate(
         {

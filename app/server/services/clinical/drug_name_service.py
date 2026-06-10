@@ -20,9 +20,11 @@ from services.text.vocabulary import get_text_normalization_snapshot
 CACHE_MISS = object()
 
 
+###############################################################################
 class DrugNameService:
     """Drug name normalization, alias resolution, synonym parsing, and spelling correction."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, lookup: Any) -> None:
         self.lookup = lookup
 

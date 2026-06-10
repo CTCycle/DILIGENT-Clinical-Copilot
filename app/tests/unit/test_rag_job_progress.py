@@ -9,15 +9,22 @@ from services.runtime.jobs import JobManager
 from repositories.serialization.data import DataSerializer
 
 
+###############################################################################
 def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
+
+    ###############################################################################
     class FakeRagEmbeddingUpdater:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             self.documents_path = r"C:\rag"
             self.progress_callback = kwargs["progress_callback"]
 
+        # -------------------------------------------------------------------------
         def prepare_vector_database(self) -> None:
             return None
 
+        # -------------------------------------------------------------------------
         def refresh_embeddings(self) -> dict[str, int]:
             self.progress_callback(52.0, "Embedded and persisted batch 2/4")
             time.sleep(0.05)

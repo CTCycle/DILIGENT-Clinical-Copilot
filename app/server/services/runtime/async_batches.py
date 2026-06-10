@@ -8,6 +8,7 @@ T = TypeVar("T")
 R = TypeVar("R")
 
 
+###############################################################################
 async def _run_batched_item(
     semaphore: asyncio.Semaphore,
     worker: Callable[[T], Awaitable[R]],
@@ -19,6 +20,7 @@ async def _run_batched_item(
         return index, result
 
 
+###############################################################################
 async def run_batched_in_order(
     items: Sequence[T],
     *,

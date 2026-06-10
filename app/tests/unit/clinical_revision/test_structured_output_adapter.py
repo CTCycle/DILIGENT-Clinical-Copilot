@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from services.llm.structured import StructuredOutputAdapter
 
 
+###############################################################################
 class StrictPayload(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -13,6 +14,7 @@ class StrictPayload(BaseModel):
     status: str
 
 
+###############################################################################
 def build_adapter() -> StructuredOutputAdapter:
     return StructuredOutputAdapter(
         provider="test-provider",
@@ -24,6 +26,7 @@ def build_adapter() -> StructuredOutputAdapter:
     )
 
 
+###############################################################################
 def test_structured_output_adapter_validates_strict_json_object() -> None:
     adapter = build_adapter()
 
@@ -33,6 +36,7 @@ def test_structured_output_adapter_validates_strict_json_object() -> None:
     assert parsed.status == "ok"
 
 
+###############################################################################
 def test_structured_output_adapter_rejects_wrong_schema() -> None:
     adapter = build_adapter()
 
@@ -40,6 +44,7 @@ def test_structured_output_adapter_rejects_wrong_schema() -> None:
         adapter.validate_or_fail('{"value": 7, "status": "ok", "extra": true}', StrictPayload)
 
 
+###############################################################################
 def test_structured_output_adapter_rejects_leading_or_trailing_prose() -> None:
     adapter = build_adapter()
 
@@ -50,6 +55,7 @@ def test_structured_output_adapter_rejects_leading_or_trailing_prose() -> None:
         adapter.validate_or_fail('{"value": 7, "status": "ok"} trailing text', StrictPayload)
 
 
+###############################################################################
 def test_structured_output_adapter_repairs_once_when_allowed() -> None:
     adapter = build_adapter()
     repair_calls: list[dict[str, object]] = []
@@ -69,6 +75,7 @@ def test_structured_output_adapter_repairs_once_when_allowed() -> None:
     assert repair_calls[0]["schema_name"] == "StrictPayload"
 
 
+###############################################################################
 def test_structured_output_adapter_does_not_repair_when_disabled() -> None:
     adapter = build_adapter()
 

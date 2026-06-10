@@ -8,7 +8,10 @@ from domain.patient_timeline import PatientTimeline, SessionTimelineRegenerateRe
 from services.inspection.service import DataInspectionService
 
 
+###############################################################################
 class InspectionTimelineEndpoint(InspectionEndpointBase):
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -17,6 +20,7 @@ class InspectionTimelineEndpoint(InspectionEndpointBase):
     ) -> None:
         super().__init__(router=router, service=service)
 
+    # -------------------------------------------------------------------------
     def get_session_timeline(self, session_id: int) -> PatientTimeline:
         timeline = self.service.get_session_timeline(session_id)
         if timeline is None:
@@ -26,6 +30,7 @@ class InspectionTimelineEndpoint(InspectionEndpointBase):
             )
         return timeline
 
+    # -------------------------------------------------------------------------
     def generate_session_timeline(
         self,
         session_id: int,
@@ -74,6 +79,7 @@ class InspectionTimelineEndpoint(InspectionEndpointBase):
             )
         return timeline
 
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "/sessions/{session_id}/timeline",

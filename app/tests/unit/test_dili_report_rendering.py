@@ -9,6 +9,7 @@ from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.report_language import phrase, report_heading, rucam_summary_text
 
 
+###############################################################################
 def test_report_heading_labels_exist_in_selected_language() -> None:
     assert report_heading("report_section_summary", "it")
     assert report_heading("report_section_per_drug", "it")
@@ -18,6 +19,7 @@ def test_report_heading_labels_exist_in_selected_language() -> None:
     assert phrase("not_calculated_insufficient_data", "en")
 
 
+###############################################################################
 def test_missing_data_labels_are_stable() -> None:
     assert phrase("not_available", "en") == "not available"
     assert phrase("none", "en") == "None"
@@ -30,6 +32,7 @@ def test_missing_data_labels_are_stable() -> None:
     assert "RUCAM" in rucam_summary_text(assessment, "en")
 
 
+###############################################################################
 def test_deterministic_laboratory_section_rendering() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     section = consultation.render_laboratory_section(
@@ -49,6 +52,7 @@ def test_deterministic_laboratory_section_rendering() -> None:
     assert "ALT: 210.0 U/L" in section
 
 
+###############################################################################
 def test_deterministic_bibliography_section_rendering() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     section = consultation.render_bibliography_section(

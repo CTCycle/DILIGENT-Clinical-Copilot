@@ -19,14 +19,12 @@ from services.updater.livertox_core import LiverToxUpdater
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 def build_serializer() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     serializer = DataSerializer(engine=engine)
     return serializer, engine
-
 
 ###############################################################################
 def fetch_counts(engine: Any) -> tuple[int, int, int, int]:
@@ -37,7 +35,6 @@ def fetch_counts(engine: Any) -> tuple[int, int, int, int]:
         aliases = len(db_session.execute(select(DrugAlias)).scalars().all())
         monographs = len(db_session.execute(select(LiverToxMonograph)).scalars().all())
     return drugs, rxcui_codes, aliases, monographs
-
 
 ###############################################################################
 def test_rxnav_upsert_idempotent_twice() -> None:
@@ -67,7 +64,6 @@ def test_rxnav_upsert_idempotent_twice() -> None:
     second_counts = fetch_counts(engine)
 
     assert first_counts == second_counts
-
 
 ###############################################################################
 def test_rxnav_upsert_allows_multiple_rxcui_for_same_canonical() -> None:
@@ -100,7 +96,6 @@ def test_rxnav_upsert_allows_multiple_rxcui_for_same_canonical() -> None:
 
     assert len(drugs) == 1
     assert sorted(code.rxcui for code in rxcui_codes) == ["1098122", "1098124"]
-
 
 ###############################################################################
 def test_rxnav_upsert_persists_curated_aliases_with_separate_provenance() -> None:
@@ -144,7 +139,6 @@ def test_rxnav_upsert_persists_curated_aliases_with_separate_provenance() -> Non
         ("Metformina", "synonym"),
     }
     assert all(row.source == "curated" for row in curated)
-
 
 ###############################################################################
 def test_rxnav_upsert_commits_by_interval() -> None:
@@ -195,7 +189,6 @@ def test_rxnav_upsert_commits_by_interval() -> None:
 
     assert len(drugs) == 3
 
-
 ###############################################################################
 def test_livertox_upsert_idempotent_twice() -> None:
     serializer, engine = build_serializer()
@@ -228,7 +221,6 @@ def test_livertox_upsert_idempotent_twice() -> None:
     second_counts = fetch_counts(engine)
 
     assert first_counts == second_counts
-
 
 ###############################################################################
 def test_livertox_duplicate_nbk_is_nulled() -> None:
@@ -265,7 +257,6 @@ def test_livertox_duplicate_nbk_is_nulled() -> None:
 
     assert finalized["nbk_id"].isna().all()
 
-
 ###############################################################################
 def test_livertox_does_not_match_by_nbk() -> None:
     serializer, engine = build_serializer()
@@ -298,7 +289,6 @@ def test_livertox_does_not_match_by_nbk() -> None:
         assert len(drugs) == 2
         assert drugs[0].livertox_nbk_id == "NBK999999"
         assert drugs[1].livertox_nbk_id is None
-
 
 ###############################################################################
 def test_ensure_drug_conflict_raises() -> None:
@@ -338,6 +328,7 @@ def test_ensure_drug_conflict_raises() -> None:
         assert len(rows) == 2
 
 
+###############################################################################
 def test_text_normalization_runtime_observation_writes_only_runtime_manifest() -> None:
     _, engine = build_serializer()
     factory = sessionmaker(bind=engine, future=True)

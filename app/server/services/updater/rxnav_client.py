@@ -14,7 +14,6 @@ from configurations.startup import get_server_settings
 from domain.rxnav import RxNormCandidate
 from services.text.vocabulary import get_text_normalization_snapshot
 
-
 ###############################################################################
 async def run_with_semaphore(
     semaphore: asyncio.Semaphore,
@@ -22,7 +21,6 @@ async def run_with_semaphore(
 ):
     async with semaphore:
         return await task_factory()
-
 
 ###############################################################################
 class RxNavClient:
@@ -34,6 +32,7 @@ class RxNavClient:
     TERM_PATTERN = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
     BRACKET_PATTERN = re.compile(r"\[([^\]]+)\]")
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

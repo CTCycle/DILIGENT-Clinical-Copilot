@@ -22,6 +22,7 @@ from services.text.normalization import normalize_drug_query_name
 class AnalysisRunner:
     """Orchestrates the top-level analysis workflow — runs the full drug assessment pipeline."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, consultation: Any) -> None:
         self.consultation = consultation
 
@@ -555,7 +556,6 @@ class AnalysisRunner:
                 return hinted_wait
         normalized_attempt = max(int(attempt), 1)
         return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
-
 
 ###############################################################################
 def summarize_drug_source_context(entry: DrugEntry) -> str:

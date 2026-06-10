@@ -15,7 +15,10 @@ from services.clinical.job_progress import ClinicalConsultationProgressCallback
 from services.llm.cloud import LLMError
 
 
+###############################################################################
 class ClinicalSessionConsultationMixin:
+
+        # -------------------------------------------------------------------------
         async def run_consultation(
             self,
             *,
@@ -44,6 +47,7 @@ class ClinicalSessionConsultationMixin:
             )
             return clinical_session, final_report
 
+        # -------------------------------------------------------------------------
         async def run_revision_consultation(
             self,
             *,
@@ -73,6 +77,7 @@ class ClinicalSessionConsultationMixin:
                 consultation_context_metadata=consultation_context_metadata,
             )
 
+        # -------------------------------------------------------------------------
         @staticmethod
         def _build_consultation_fallback_report(
             *,
@@ -139,6 +144,7 @@ class ClinicalSessionConsultationMixin:
                 "No reliable suspected drugs were detected; manual specialist review is required."
             )
 
+        # -------------------------------------------------------------------------
         async def _run_consultation_internal(
             self,
             *,
@@ -382,6 +388,7 @@ class ClinicalSessionConsultationMixin:
             return clinical_session, final_report, payload_metadata
 
 
+        # -------------------------------------------------------------------------
         @classmethod
         def _resolve_consultation_timeout(cls) -> float:
             configured = float(get_server_settings().runtime.clinical_llm_timeout)
@@ -389,6 +396,7 @@ class ClinicalSessionConsultationMixin:
                 base_timeout_s=configured
             )
 
+        # -------------------------------------------------------------------------
         def apply_persisted_runtime_configuration(self) -> None:
             self.model_config_service.ensure_defaults()
 

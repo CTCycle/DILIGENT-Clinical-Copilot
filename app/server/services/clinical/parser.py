@@ -58,7 +58,6 @@ from services.llm.provider_factory import select_llm_provider
 from common.utils.text_utils import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
 
-
 ###############################################################################
 class DrugsParser:
     LLM_CLIENT_NOT_INITIALIZED_ERROR = (
@@ -86,6 +85,7 @@ class DrugsParser:
     LAB_MEASUREMENT_NAME_RE = re.compile(r"\b(?:u/l|ui/l|mg/dl|uln)\b", re.IGNORECASE)
     LAB_MARKER_NAME_RE = re.compile(r"\b(?:alt|ast|alp|bilirubin|inr)\b", re.IGNORECASE)
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -264,6 +264,7 @@ class DrugsParser:
         self.emit_progress(progress_callback, 1.0)
         return PatientDrugs(entries=combined)
 
+    # -------------------------------------------------------------------------
     async def extract_drugs_from_therapy_hybrid(
         self,
         cleaned: str,
@@ -1033,6 +1034,7 @@ class DrugsParser:
             return "temporal_known"
         return "temporal_uncertain"
 
+    # -------------------------------------------------------------------------
     def drug_entry_has_temporal_information(self, entry: DrugEntry) -> bool:
         if entry.temporal_classification == "temporal_known":
             return True

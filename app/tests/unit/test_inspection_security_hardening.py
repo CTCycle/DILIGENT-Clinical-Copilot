@@ -19,6 +19,7 @@ from repositories.serialization.data import _RepositorySerializationService
 from services.inspection import DataInspectionService
 
 
+###############################################################################
 def get_route_owner(router: Any, route_path: str) -> Any:
     for route in router.routes:
         if getattr(route, "path", "").endswith(route_path):
@@ -27,13 +28,11 @@ def get_route_owner(router: Any, route_path: str) -> Any:
                 return owner
     raise AssertionError(f"Route not found: {route_path}")
 
-
 ###############################################################################
 def test_session_search_filter_strips_control_characters() -> None:
     filters = SessionListFilters(search=" \x00  metformin\t\n ")
 
     assert filters.search == "metformin"
-
 
 ###############################################################################
 def test_catalog_search_filter_rejects_oversized_values() -> None:
@@ -42,7 +41,6 @@ def test_catalog_search_filter_rejects_oversized_values() -> None:
     with pytest.raises(ValidationError):
         CatalogListFilters(search=oversized)
 
-
 ###############################################################################
 def test_search_pattern_escapes_like_wildcards() -> None:
     service = object.__new__(_RepositorySerializationService)
@@ -50,7 +48,6 @@ def test_search_pattern_escapes_like_wildcards() -> None:
     pattern = service.build_search_pattern(r"  100%_match\check  ")
 
     assert pattern == r"%100\%\_match\\check%"
-
 
 ###############################################################################
 def test_new_inspection_models_validate_shapes() -> None:
@@ -69,10 +66,13 @@ def test_new_inspection_models_validate_shapes() -> None:
     rag_request = InspectionRagUpdateRequest(documents_path="C:/data/rag")
     assert rag_request.documents_path == "C:/data/rag"
 
-
 ###############################################################################
 def test_livertox_update_config_route_is_not_shadowed() -> None:
+
+    ###############################################################################
     class ServiceStub:
+
+        # -------------------------------------------------------------------------
         @staticmethod
         def build_update_config_response(target: str) -> dict[str, object]:
             assert target == "livertox"
@@ -96,7 +96,6 @@ def test_livertox_update_config_route_is_not_shadowed() -> None:
     assert response.status_code == 200
     assert response.json()["target"] == "livertox"
 
-
 ###############################################################################
 def test_livertox_update_config_exposes_only_supported_overrides() -> None:
     service = object.__new__(DataInspectionService)
@@ -106,7 +105,6 @@ def test_livertox_update_config_exposes_only_supported_overrides() -> None:
     assert payload["target"] == "livertox"
     assert "redownload" in payload["allowed_fields"]
     assert "redownload" in payload["defaults"]
-
 
 ###############################################################################
 def test_rag_update_config_exposes_read_only_vectorization_summary() -> None:
@@ -122,12 +120,14 @@ def test_rag_update_config_exposes_read_only_vectorization_summary() -> None:
     assert "documents_path" not in payload["summary"]
     assert "retrieval_candidate_count" not in payload["summary"]
 
-
 ###############################################################################
 def test_rag_update_job_route_rejects_removed_vectorization_overrides() -> None:
+
+    ###############################################################################
     class ServiceStub:
         RAG_JOB_TYPE = "rag_update"
 
+        # -------------------------------------------------------------------------
         @staticmethod
         def start_update_job(
             job_type: str, overrides: dict[str, object] | None = None
@@ -163,7 +163,6 @@ def test_rag_update_job_route_rejects_removed_vectorization_overrides() -> None:
     assert accepted.status_code == 202
     assert accepted.json()["job_type"] == "rag_update"
 
-
 ###############################################################################
 def test_rag_cancel_route_uses_delete_only() -> None:
     app = FastAPI()
@@ -176,7 +175,6 @@ def test_rag_cancel_route_uses_delete_only() -> None:
 
     assert ("DELETE", "/inspection/rag/jobs/{job_id}") in routes
     assert ("POST", "/inspection/rag/jobs/{job_id}/cancel") not in routes
-
 
 ###############################################################################
 def test_reference_catalog_runtime_observation_routes_are_registered() -> None:
@@ -202,7 +200,6 @@ def test_reference_catalog_runtime_observation_routes_are_registered() -> None:
         "DELETE",
         "/inspection/reference-catalogs/runtime-observations/{category}/{term}",
     ) in routes
-
 
 ###############################################################################
 def test_legacy_text_normalization_routes_are_removed() -> None:

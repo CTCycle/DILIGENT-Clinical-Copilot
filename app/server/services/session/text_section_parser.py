@@ -16,6 +16,7 @@ from services.session.clinical_section_parsers import (
 )
 
 
+###############################################################################
 class ParsedTextSection(NamedTuple):
     key: str
     title: str
@@ -24,6 +25,7 @@ class ParsedTextSection(NamedTuple):
     end_line: int
 
 
+###############################################################################
 class InitialTextSectionParseResult(NamedTuple):
     sections: dict[str, ParsedTextSection]
     missing_required_sections: list[str]
@@ -37,14 +39,17 @@ _CANONICAL_TO_PAYLOAD_KEY: dict[str, ClinicalSectionKey] = {
 }
 
 
+###############################################################################
 def _map_canonical_key(key: str) -> ClinicalSectionKey | None:
     return _CANONICAL_TO_PAYLOAD_KEY.get(key)
 
 
+###############################################################################
 def _map_missing_keys(keys: list[str]) -> list[str]:
     return [mapped for key in keys if (mapped := _map_canonical_key(key)) is not None]
 
 
+###############################################################################
 def _map_malformed_issue(issue: str) -> str:
     prefix, _, canonical_key = issue.partition(":")
     payload_key = _map_canonical_key(canonical_key)
@@ -53,6 +58,7 @@ def _map_malformed_issue(issue: str) -> str:
     return f"{prefix}:{payload_key}"
 
 
+###############################################################################
 def parse_initial_text_sections(raw_text: str) -> InitialTextSectionParseResult:
     source_text = (raw_text or "").replace("\r\n", "\n").replace("\r", "\n")
     parse_result = parse_required_dili_sections(source_text)
@@ -83,6 +89,7 @@ def parse_initial_text_sections(raw_text: str) -> InitialTextSectionParseResult:
     )
 
 
+###############################################################################
 def build_section_extraction_from_initial_text(
     parse_result: InitialTextSectionParseResult,
     source_text: str,

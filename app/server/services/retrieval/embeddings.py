@@ -26,19 +26,20 @@ from services.retrieval.settings import build_effective_rag_settings
 ProviderName = Literal["openai", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]
 
-
 ###############################################################################
 class EmbeddingModelMismatchError(RuntimeError):
     pass
 
-
 ###############################################################################
 class Reranker(Protocol):
-    def predict(self, pairs: list[tuple[str, str]]) -> list[float]: ...
 
+    # -------------------------------------------------------------------------
+    def predict(self, pairs: list[tuple[str, str]]) -> list[float]: ...
 
 ###############################################################################
 class LocalCrossEncoderReranker:
+
+    # -------------------------------------------------------------------------
     def __init__(self, model_name: str) -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
@@ -60,7 +61,6 @@ class LocalCrossEncoderReranker:
             if logits.ndim == 0:
                 logits = logits.unsqueeze(0)
             return [float(value) for value in logits.tolist()]
-
 
 ###############################################################################
 def _map_embedding_exception(
@@ -87,9 +87,10 @@ def _map_embedding_exception(
         return OllamaError(f"Failed to request Ollama embeddings: {exc}")
     return LLMError(f"Failed to request cloud embeddings: {exc}")
 
-
 ###############################################################################
 class CloudEmbeddingGenerator:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -163,9 +164,10 @@ class CloudEmbeddingGenerator:
             raise LLMError("Mismatch between cloud embeddings and inputs")
         return normalized
 
-
 ###############################################################################
 class OllamaEmbeddingGenerator:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -221,7 +223,6 @@ class OllamaEmbeddingGenerator:
             raise OllamaError("Mismatch between Ollama embeddings and inputs")
         return normalized
 
-
 ###############################################################################
 def select_embedding_provider(
     *,
@@ -263,9 +264,10 @@ def select_embedding_provider(
 
     raise ValueError(f"Unsupported embedding backend: {backend}")
 
-
 ###############################################################################
 class EmbeddingGenerator:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -299,6 +301,7 @@ class EmbeddingGenerator:
         embeddings = self.run_async(self.provider.embed_texts(sanitized))
         return [[float(value) for value in vector] for vector in embeddings]
 
+    # -------------------------------------------------------------------------
     def resolve_active_embedding_model_spec(self) -> EmbeddingModelSpec:
         provider = "cloud" if self.backend == "cloud" else "ollama"
         if self.backend == "cloud":
@@ -346,9 +349,10 @@ class EmbeddingGenerator:
                 asyncio.set_event_loop(previous_loop)
         return loop.run_until_complete(coroutine)
 
-
 ###############################################################################
 class SimilaritySearch:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

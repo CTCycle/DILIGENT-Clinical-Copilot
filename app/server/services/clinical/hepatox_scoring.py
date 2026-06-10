@@ -33,6 +33,7 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
 
 
 
+###############################################################################
 def is_materially_in_report_language(text: str, report_language: str) -> bool:
     normalized = (text or "").strip()
     if not normalized:
