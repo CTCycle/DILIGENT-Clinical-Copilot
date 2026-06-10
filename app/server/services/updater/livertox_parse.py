@@ -22,7 +22,7 @@ from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
 
 from common.utils.logger import logger
-from services.text.normalization import normalize_whitespace
+from common.utils.text_utils import normalize_whitespace
 from services.updater import livertox_common
 
 MONOGRAPH_PROGRESS_INTERVAL = 25

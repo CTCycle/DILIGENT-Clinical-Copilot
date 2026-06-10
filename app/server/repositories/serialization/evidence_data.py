@@ -24,7 +24,7 @@ from repositories.schemas.models import (
     KbMatchCache,
     LiverToxMonograph,
 )
-from services.text.normalization import normalize_drug_name
+from common.utils.text_utils import normalize_drug_name
 
 
 

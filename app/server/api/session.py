@@ -17,7 +17,7 @@ from domain.jobs import (
 from services.clinical.template import get_clinical_section_template
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
-from services.session.request_validation import (
+from api.session_validation import (
     validate_clinical_session_request,
 )
 from services.session.session_service import ClinicalSessionService
