@@ -82,7 +82,7 @@ def extract_footprint_from_payload(
 async def list_running_models(self) -> dict[str, dict[str, Any]]:
     try:
         resp = await self.client.get("/api/ps")
-    except httpx.TimeoutException, httpx.RequestError:
+    except (httpx.TimeoutException, httpx.RequestError):
         return {}
     if resp.status_code == 404:
         return {}
@@ -465,7 +465,7 @@ def _get_available_vram_nvidia_smi() -> int:
             text=True,
             timeout=1.5,
         )
-    except OSError, subprocess.SubprocessError:
+    except (OSError, subprocess.SubprocessError):
         return 0
     if result.returncode != 0:
         return 0
@@ -522,7 +522,7 @@ def _get_available_memory_sysconf() -> int:
             pages = sysconf("SC_PHYS_PAGES")
         if isinstance(page_size, int) and isinstance(pages, int):
             return page_size * pages
-    except ValueError, OSError, AttributeError:
+    except (ValueError, OSError, AttributeError):
         pass
     return 0
 
@@ -556,6 +556,6 @@ def _get_available_memory_proc() -> int:
                 parsed = _parse_meminfo_line(line)
                 if parsed is not None:
                     return parsed
-    except FileNotFoundError, PermissionError, ValueError:
+    except (FileNotFoundError, PermissionError, ValueError):
         pass
     return 0

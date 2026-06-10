@@ -55,7 +55,7 @@ from services.clinical.parser_validation import (
 )
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
-from services.text.normalization import normalize_token
+from common.utils.text_utils import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
 
 

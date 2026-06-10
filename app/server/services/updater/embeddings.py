@@ -5,7 +5,7 @@ from pathlib import Path
 
 from common.paths import DOCS_PATH, VECTOR_DB_PATH
 from common.utils.logger import logger
-from repositories.serialization.vectors import VectorSerializer
+from services.rag.vector_serializer import VectorSerializer
 from repositories.vectors import LanceVectorDatabase
 from services.retrieval.settings import build_effective_rag_settings
 

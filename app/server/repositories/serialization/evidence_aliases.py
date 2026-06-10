@@ -13,7 +13,7 @@ from repositories.schemas.models import (
     LiverToxMonograph,
 )
 from repositories.serialization.evidence_data import normalize_drug_name
-from services.text.synonyms import parse_synonym_list, split_synonym_variants
+from common.utils.text_utils import parse_synonym_list, split_synonym_variants
 
 
 

@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-06-06
+Last updated: 2026-06-10
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -8,7 +8,10 @@ Last updated: 2026-06-06
   - `app/server/api/data_inspection.py` is the aggregate inspection router, and focused inspection endpoint modules live under `app/server/api/inspection/`.
 - Service layer: `app/server/services/*`
   - Owns clinical orchestration, model orchestration, inspection workflows, and job control.
-  - Inspection update orchestration is implemented in `app/server/services/inspection/update_jobs.py` through `DataInspectionUpdateJobRunner`, while `DataInspectionService` remains the endpoint-facing service entrypoint.
+  - Inspection update orchestration is implemented in `app/server/services/inspection/update_jobs.py` through `DataInspectionUpdateJobRunner`.
+  - `DataInspectionService` (in `app/server/services/inspection/service.py`) composes behavior from mixins in `update_config.py`, `revision_diff.py`, `revision_decisions.py`, and `revision_runner.py`.
+  - `ClinicalSessionService` (in `app/server/services/session/session_service.py`) composes behavior from mixins in `consultation.py` and `extraction_pipeline.py`.
+  - RAG vector serialization lives in `app/server/services/rag/vector_serializer.py`.
   - `app/server/services/text/vocabulary.py` provides cache-facing text normalization business access and does not manage SQLAlchemy sessions directly.
   - `app/server/services/llm/ollama_runtime.py` owns canonical Ollama runtime aliases, errors, environment helpers, message normalization, and exception mapping. Ollama service modules must import these definitions instead of duplicating or monkey-patching them.
   - `app/server/services/llm/structured.py` owns strict JSON object extraction, schema validation, and bounded one-repair structured-output adaptation helpers for provider responses.
@@ -24,6 +27,8 @@ Last updated: 2026-06-06
 - Config and common layers: `app/server/configurations/*`, `app/server/common/*`
   - Own runtime settings, constants, environment bootstrap, logging, and shared security helpers.
   - Provider-key cryptography lives under `app/server/common/security/cryptography.py`.
+  - Shared pure-utility modules (text normalization, chunking, seed terms, embedding model specs) live under `app/server/common/utils/` (`text_utils.py`, `chunking.py`, `seed_terms.py`, `embedding_model.py`) and are the canonical single source of truth — service modules import from here rather than duplicating logic.
+  - Endpoint-layer request validation lives in `app/server/api/session_validation.py`.
 
 ## Frontend Boundaries
 - `app/client/src/app/pages/*`
