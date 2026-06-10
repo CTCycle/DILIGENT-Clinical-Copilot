@@ -945,7 +945,7 @@ class DataInspectionService(
                 logger.warning("Unable to load LanceDB inspection summary: %s", exc)
         return {
             "source_documents_path": documents_path,
-            "vector_db_path": VECTOR_DB_PATH,
+            "vector_db_path": str(VECTOR_DB_PATH),
             "collection_name": collection_name,
             "collection_exists": exists,
             "embedding_count": embedding_count,
