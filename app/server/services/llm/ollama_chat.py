@@ -707,9 +707,10 @@ async def calculate_context_window(
     *,
     model: str,
     messages: list[dict[str, str]] | None = None,
-    min_ctx: int = 512,
-    padding_tokens: int = 32,
-    slack_ratio: float = 0.2,
+    min_ctx: int = 2048,
+    padding_tokens: int = 128,
+    slack_ratio: float = 0.75,
+    output_headroom: int = 800,
 ) -> int | None:
     contents: list[str] = []
     if messages:
@@ -722,7 +723,7 @@ async def calculate_context_window(
     total_tokens = sum(self.estimate_tokens(chunk) for chunk in contents)
     if total_tokens <= 0:
         return None
-    expanded = int(math.ceil(total_tokens * (1 + slack_ratio))) + padding_tokens
+    expanded = int(math.ceil(total_tokens * (1 + slack_ratio))) + padding_tokens + output_headroom
     target = max(min_ctx, expanded)
     limit = await self.get_model_context_limit(model)
     if limit and limit > 0:
