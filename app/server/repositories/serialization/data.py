@@ -384,6 +384,28 @@ class DataSerializer:
         )
 
     # -------------------------------------------------------------------------
+    def fail_revision_run(
+        self,
+        *,
+        pipeline_run_id: str,
+    ) -> None:
+        return session_revision_data.fail_revision_run(
+            self,
+            pipeline_run_id=pipeline_run_id,
+        )
+
+    # -------------------------------------------------------------------------
+    def delete_revision_version_shell(
+        self,
+        *,
+        pipeline_run_id: str,
+    ) -> None:
+        return session_revision_data.delete_revision_version_shell(
+            self,
+            pipeline_run_id=pipeline_run_id,
+        )
+
+    # -------------------------------------------------------------------------
     def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
         return session_revision_data.get_revision_run(self, pipeline_run_id)
 

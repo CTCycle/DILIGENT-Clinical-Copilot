@@ -13,7 +13,7 @@ from domain.clinical.revision import (
     RevisedLabPayload,
     RevisionLiverToxDecision,
 )
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from repositories.schemas.models import (
@@ -578,7 +578,15 @@ def create_revision_version_shell(
         )
         if source_version is None:
             return None
-        next_version_number = max(int(row.version_number) for row in synced) + 1
+        existing_max_version = db_session.execute(
+            select(func.max(ClinicalSessionVersion.version_number)).where(
+                ClinicalSessionVersion.root_session_id == int(root_session_id)
+            )
+        ).scalar_one_or_none()
+        next_version_number = max(
+            max((int(row.version_number) for row in synced), default=0),
+            existing_max_version or 0,
+        ) + 1
         run_id = pipeline_run_id or uuid.uuid4().hex
         existing = db_session.execute(
             select(ClinicalSessionVersion).where(
@@ -921,6 +929,53 @@ def update_session_metadata(
             existing.metadata_json = self.serialize_json_payload(metadata or {})
         db_session.commit()
         return self.get_session_detail(safe_session_id)
+    except Exception:
+        db_session.rollback()
+        raise
+    finally:
+        db_session.close()
+
+
+###############################################################################
+def fail_revision_run(
+    self,
+    *,
+    pipeline_run_id: str,
+) -> None:
+    db_session = self.session_factory()
+    try:
+        existing = db_session.execute(
+            select(ClinicalSessionRevisionRun).where(
+                ClinicalSessionRevisionRun.pipeline_run_id == str(pipeline_run_id)
+            )
+        ).scalar_one_or_none()
+        if existing is not None and existing.status != "failed":
+            existing.status = "failed"
+            existing.completed_at = datetime.now(UTC)
+        db_session.commit()
+    except Exception:
+        db_session.rollback()
+        raise
+    finally:
+        db_session.close()
+
+
+###############################################################################
+def delete_revision_version_shell(
+    self,
+    *,
+    pipeline_run_id: str,
+) -> None:
+    db_session = self.session_factory()
+    try:
+        row = db_session.execute(
+            select(ClinicalSessionVersion).where(
+                ClinicalSessionVersion.pipeline_run_id == str(pipeline_run_id)
+            )
+        ).scalar_one_or_none()
+        if row is not None:
+            db_session.delete(row)
+        db_session.commit()
     except Exception:
         db_session.rollback()
         raise
