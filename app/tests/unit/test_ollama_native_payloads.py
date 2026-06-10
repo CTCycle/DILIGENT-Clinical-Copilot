@@ -91,6 +91,9 @@ def test_ensure_context_option_preserves_explicit_num_ctx_and_computes_when_abse
 def test_calculate_context_window_respects_model_context_limit(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
     monkeypatch.setattr(client, "estimate_tokens", lambda text: 5_000)
+    async def fake_feasible(*a, **kw):
+        return None
+    monkeypatch.setattr(client, "estimate_max_feasible_context", fake_feasible)
 
     async def fake_limit(name: str) -> int | None:
         _ = name
@@ -121,3 +124,118 @@ def test_ollama_chat_module_has_no_generate_fallback_helpers() -> None:
     assert "build_generate_payload" not in source
     assert "messages_to_prompt" not in source
     assert "/api/generate" not in source
+
+
+###############################################################################
+def test_hardware_aware_context_uses_full(monkeypatch) -> None:
+    client = OllamaClient(base_url="http://127.0.0.1:11434")
+
+    llama_metadata = {
+        "model_info": {
+            "llama.block_count": 32,
+            "llama.embedding_length": 4096,
+            "llama.attention.head_count": 32,
+            "llama.attention.head_count_kv": 8,
+        },
+        "details": {"parameter_size": "8B"},
+    }
+
+    native_limit = 32768
+    monkeypatch.setattr(
+        client, "extract_footprint_from_payload", lambda m: (8_000_000_000, 6_000_000_000)
+    )
+    monkeypatch.setattr(
+        ollama_chat, "get_available_vram_bytes", lambda: 24_000_000_000
+    )
+    monkeypatch.setattr(
+        ollama_chat, "get_available_memory_bytes", lambda: 0
+    )
+
+    async def fake_show(name: str) -> dict:
+        return {**llama_metadata, "context_length": native_limit}
+
+    monkeypatch.setattr(client, "show_model", fake_show)
+    monkeypatch.setattr(client, "get_model_context_limit", lambda n: native_limit)
+
+    value = asyncio.run(
+        client.calculate_context_window(
+            model="llama3.1:8b",
+            messages=[{"role": "user", "content": "hi"}],
+        )
+    )
+    assert value == native_limit
+    asyncio.run(client.close())
+
+
+###############################################################################
+def test_hardware_aware_context_scales_down(monkeypatch) -> None:
+    client = OllamaClient(base_url="http://127.0.0.1:11434")
+
+    llama_metadata = {
+        "model_info": {
+            "llama.block_count": 32,
+            "llama.embedding_length": 4096,
+            "llama.attention.head_count": 32,
+            "llama.attention.head_count_kv": 8,
+        },
+        "details": {"parameter_size": "8B"},
+    }
+
+    kv_per_token = ollama_chat.estimate_kv_cache_bytes_per_token(llama_metadata)
+    native_limit = 32768
+    vram_footprint = 6_000_000_000
+    available_vram = 8_000_000_000
+    monkeypatch.setattr(
+        client, "extract_footprint_from_payload", lambda m: (8_000_000_000, vram_footprint)
+    )
+    monkeypatch.setattr(
+        ollama_chat, "get_available_vram_bytes", lambda: available_vram
+    )
+    monkeypatch.setattr(
+        ollama_chat, "get_available_memory_bytes", lambda: 0
+    )
+
+    async def fake_show(name: str) -> dict:
+        return {**llama_metadata, "context_length": native_limit}
+
+    monkeypatch.setattr(client, "show_model", fake_show)
+    monkeypatch.setattr(client, "get_model_context_limit", lambda n: native_limit)
+
+    vram_budget = int(available_vram * ollama_chat.VRAM_SAFETY_RATIO)
+    vram_for_kv = max(0, vram_budget - vram_footprint)
+    max_by_vram = vram_for_kv // kv_per_token
+    expected = min(native_limit, max_by_vram)
+    assert expected < native_limit
+
+    value = asyncio.run(
+        client.calculate_context_window(
+            model="llama3.1:8b",
+            messages=[{"role": "user", "content": "hi"}],
+        )
+    )
+    assert value == expected
+    asyncio.run(client.close())
+
+
+###############################################################################
+def test_hardware_aware_context_fallback(monkeypatch) -> None:
+    client = OllamaClient(base_url="http://127.0.0.1:11434")
+    monkeypatch.setattr(client, "estimate_tokens", lambda text: 50)
+
+    async def fake_show(name: str) -> dict:
+        return {"model_info": {}}
+
+    monkeypatch.setattr(client, "show_model", fake_show)
+
+    async def fake_limit(name):
+        return None
+    monkeypatch.setattr(client, "get_model_context_limit", fake_limit)
+
+    value = asyncio.run(
+        client.calculate_context_window(
+            model="unknown:latest",
+            messages=[{"role": "user", "content": "short query"}],
+        )
+    )
+    assert value == 4312
+    asyncio.run(client.close())

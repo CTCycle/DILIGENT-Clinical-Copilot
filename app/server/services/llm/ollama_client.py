@@ -593,9 +593,9 @@ class OllamaClient:
         *,
         model: str,
         messages: list[dict[str, str]] | None = None,
-        min_ctx: int = 512,
-        padding_tokens: int = 32,
-        slack_ratio: float = 0.2,
+        min_ctx: int = 2048,
+        padding_tokens: int = 128,
+        slack_ratio: float = 0.75,
     ) -> int | None:
         return await ollama_chat.calculate_context_window(
             self,
@@ -605,6 +605,27 @@ class OllamaClient:
             padding_tokens=padding_tokens,
             slack_ratio=slack_ratio,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def extract_model_architecture(metadata: dict[str, Any]) -> dict[str, int] | None:
+        return ollama_chat.extract_model_architecture(metadata)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def estimate_kv_cache_bytes_per_token(
+        metadata: dict[str, Any],
+        model_name: str = "",
+    ) -> int | None:
+        return ollama_chat.estimate_kv_cache_bytes_per_token(metadata, model_name)
+
+    # -------------------------------------------------------------------------
+    async def estimate_max_feasible_context(
+        self,
+        model: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> int | None:
+        return await ollama_chat.estimate_max_feasible_context(self, model, metadata)
 
     # -------------------------------------------------------------------------
     async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
