@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from repositories.serialization.vectors import VectorSerializer
+from services.rag.vector_serializer import VectorSerializer
 
 
 ###############################################################################
