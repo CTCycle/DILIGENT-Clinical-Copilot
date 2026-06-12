@@ -21,6 +21,7 @@ SUSPENSION_DATE_RE = DRUG_SUSPENSION_DATE_RE
 START_DATE_RE = DRUG_START_DATE_RE
 
 
+###############################################################################
 def _phrase_pattern(values: list[str], *, anchor_word: bool = True) -> re.Pattern[str]:
     escaped = [re.escape(value.strip()) for value in values if value and value.strip()]
     if not escaped:
@@ -31,6 +32,7 @@ def _phrase_pattern(values: list[str], *, anchor_word: bool = True) -> re.Patter
     return re.compile(r"(?:" + body + r")", re.IGNORECASE)
 
 
+###############################################################################
 def _build_timing_terms() -> list[str]:
     snapshot = get_reference_catalog_snapshot()
     values: list[str] = []
@@ -40,6 +42,7 @@ def _build_timing_terms() -> list[str]:
     return [value for value in values if value]
 
 
+###############################################################################
 def build_route_patterns() -> tuple[tuple[str, re.Pattern[str]], ...]:
     snapshot = get_reference_catalog_snapshot()
     entries = snapshot.entries("clinical_extraction", "drug_route_terms")
@@ -54,6 +57,7 @@ def build_route_patterns() -> tuple[tuple[str, re.Pattern[str]], ...]:
     return tuple(patterns)
 
 
+###############################################################################
 def build_dose_cue_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
     units = list(snapshot.values("clinical_extraction", "drug_dosage_units"))
@@ -66,6 +70,7 @@ def build_dose_cue_re() -> re.Pattern[str]:
     )
 
 
+###############################################################################
 def build_dosage_temporal_split_re() -> re.Pattern[str]:
     terms = _build_timing_terms()
     cue = _phrase_pattern(terms).pattern.replace(r"\b(?:", "(?:").replace(r")\b", ")")
@@ -77,6 +82,7 @@ def build_dosage_temporal_split_re() -> re.Pattern[str]:
     )
 
 
+###############################################################################
 def build_name_temporal_split_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
     terms = _build_timing_terms()
@@ -90,6 +96,7 @@ def build_name_temporal_split_re() -> re.Pattern[str]:
     )
 
 
+###############################################################################
 def build_trailing_route_token_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
     terms = list(snapshot.values("clinical_extraction", "drug_route_terms"))
@@ -101,6 +108,7 @@ def build_trailing_route_token_re() -> re.Pattern[str]:
     )
 
 
+###############################################################################
 def build_start_event_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
     terms = list(snapshot.values("clinical_extraction", "drug_start_terms"))
@@ -113,6 +121,7 @@ def build_start_event_re() -> re.Pattern[str]:
     )
 
 
+###############################################################################
 def build_suspension_event_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
     terms = list(snapshot.values("clinical_extraction", "drug_suspension_terms"))

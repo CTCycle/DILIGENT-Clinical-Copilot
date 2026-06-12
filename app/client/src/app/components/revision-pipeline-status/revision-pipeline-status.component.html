@@ -1,0 +1,86 @@
+@if (run) {
+  <div class="clinical-session-revision-run-card revision-pipeline-status-card">
+    <div class="clinical-session-version-card-header">
+      <strong>Run {{ run.pipeline_run_id }}</strong>
+      <app-revision-qa-badge [status]="run.status"></app-revision-qa-badge>
+    </div>
+    <dl class="clinical-session-audit-list clinical-session-compact-list">
+      <div>
+        <dt>Mode</dt>
+        <dd>{{ statusLabel(run.revision_mode) }}</dd>
+      </div>
+      <div>
+        <dt>Initiated by</dt>
+        <dd>{{ run.actor_display_name || run.initiated_by || 'Unknown reviewer' }}</dd>
+      </div>
+      <div>
+        <dt>Started</dt>
+        <dd>{{ run.started_at | date:'medium' }}</dd>
+      </div>
+      <div>
+        <dt>Completed</dt>
+        <dd>{{ run.completed_at ? (run.completed_at | date:'medium') : 'In progress or pending retry' }}</dd>
+      </div>
+      <div>
+        <dt>Latency</dt>
+        <dd>{{ run.latency_ms !== null ? (run.latency_ms + ' ms') : 'Not recorded' }}</dd>
+      </div>
+      <div>
+        <dt>Checkpoint progress</dt>
+        <dd>{{ completedStepCount }} / {{ steps.length || '0' }}</dd>
+      </div>
+      <div>
+        <dt>Reviewer note</dt>
+        <dd>{{ run.reviewer_note || 'None provided' }}</dd>
+      </div>
+    </dl>
+    @if (run.error?.['message']) {
+      <p class="clinical-sessions-status is-error">{{ run.error?.['message'] }}</p>
+    }
+    <details class="clinical-session-json-template">
+      <summary>Persisted run configuration</summary>
+      <pre>{{ run.configuration | json }}</pre>
+    </details>
+    <div class="clinical-session-revision-run-actions">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        [disabled]="!canRetry"
+        (click)="retry.emit()"
+      >
+        {{ retryLoading ? 'Retrying draft revision...' : 'Retry draft revision' }}
+      </button>
+    </div>
+  </div>
+
+  <section class="clinical-session-revision-steps" aria-label="Persisted pipeline steps">
+    <div class="clinical-session-manual-edit-history-header">
+      <strong>Checkpoint Steps</strong>
+      <span>Each attempt is persisted separately so failed draft revisions remain inspectable.</span>
+    </div>
+    @if (steps.length) {
+      <div class="clinical-session-step-list">
+        @for (step of steps; track step.step_name + ':' + step.attempt_number) {
+          <article class="clinical-session-step-card">
+            <div class="clinical-session-version-card-header">
+              <strong>{{ step.step_index }} / {{ step.step_count }} · {{ statusLabel(step.step_name) }}</strong>
+              <app-revision-qa-badge [status]="step.status"></app-revision-qa-badge>
+            </div>
+            <p>
+              Attempt {{ step.attempt_number }} · Retry count {{ step.retry_count }} ·
+              {{ step.latency_ms !== null ? (step.latency_ms + ' ms') : 'Latency not recorded' }}
+            </p>
+            <p>{{ stepSummary(step) }}</p>
+            @if (step.error?.['message']) {
+              <p class="clinical-sessions-status is-error">{{ step.error?.['message'] }}</p>
+            }
+          </article>
+        }
+      </div>
+    } @else {
+      <p class="clinical-session-panel-note">No persisted checkpoint steps were recorded for this run.</p>
+    }
+  </section>
+} @else {
+  <p class="clinical-session-panel-note">The selected version has no persisted pipeline run.</p>
+}

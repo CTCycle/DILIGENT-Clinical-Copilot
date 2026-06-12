@@ -7,6 +7,7 @@ from services.session.clinical_section_parsers import (
 from services.session.text_section_parser import parse_initial_text_sections
 
 
+###############################################################################
 def test_parses_required_sections_with_line_ranges() -> None:
     text = "ANAMNESIS\nhistory text\nDRUGS:\ndrug row\nLABORATORY ANALYSIS\nlab row\n"
     result = parse_initial_text_sections(text)
@@ -17,24 +18,28 @@ def test_parses_required_sections_with_line_ranges() -> None:
     assert result.sections["laboratory_analysis"].start_line == 5
 
 
+###############################################################################
 def test_rejects_missing_anamnesis() -> None:
     text = "DRUGS\nx\nLABORATORY ANALYSIS\ny\n"
     result = parse_initial_text_sections(text)
     assert "anamnesis" in result.missing_required_sections
 
 
+###############################################################################
 def test_rejects_empty_required_section() -> None:
     text = "ANAMNESIS\na\nDRUGS\n\nLABORATORY ANALYSIS\nx\n"
     result = parse_initial_text_sections(text)
     assert "empty:drugs" in result.malformed_sections
 
 
+###############################################################################
 def test_rejects_duplicate_section_heading() -> None:
     text = "ANAMNESIS\na\nANAMNESIS\nb\nDRUGS\nd\nLABORATORY ANALYSIS\nl\n"
     result = parse_initial_text_sections(text)
     assert "duplicate:anamnesis" in result.malformed_sections
 
 
+###############################################################################
 def test_reports_ambiguous_heading_collisions() -> None:
     resolved, diagnostics = resolve_heading_collisions_with_diagnostics(
         [
@@ -62,6 +67,7 @@ def test_reports_ambiguous_heading_collisions() -> None:
     assert diagnostics == ["ambiguous_heading:4:clinical therapy"]
 
 
+###############################################################################
 def test_parses_mixed_language_therapy_heading_from_live_preflight_path() -> None:
     text = (
         "## Anamnesis\n"

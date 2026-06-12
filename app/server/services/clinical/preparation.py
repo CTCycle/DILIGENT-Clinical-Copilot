@@ -26,18 +26,19 @@ from services.text.normalization import (
     normalize_drug_query_name,
 )
 
-
 ###############################################################################
 class ClinicalKnowledgePreparation:
     REGIMEN_SEPARATOR_RE = re.compile(
         r"(?:\s*\+\s*|\s*/\s*|\s+\bplus\b\s+|\s+\band\b\s+)", re.IGNORECASE
     )
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.serializer = DataSerializer()
         self.knowledge_composer = ClinicalKnowledgeComposer(serializer=self.serializer)
         self.livertox_matcher: LiverToxMatcher | None = None
 
+    # -------------------------------------------------------------------------
     def build_drug_alias_candidates(
         self,
         entry: DrugEntry,
@@ -61,6 +62,7 @@ class ClinicalKnowledgePreparation:
             unique.append(value)
         return unique
 
+    # -------------------------------------------------------------------------
     async def resolve_livertox_match_for_drug(
         self,
         entry: DrugEntry,

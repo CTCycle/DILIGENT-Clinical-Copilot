@@ -21,6 +21,7 @@ import {
   JobStatus,
   ModelConfigStateResponse,
   ModelConfigUpdateRequest,
+  RagSettings,
   RuntimeSettings,
 } from '../../core/models/types';
 import {
@@ -40,9 +41,11 @@ import {
 } from './model-catalog';
 import {
   DraftRuntimeConfig,
+  DraftRagSettings,
   ModelFilterKey,
   ModelPullProgressState,
   ModelRole,
+  RagSettingsSectionKey,
 } from './model-config.types';
 
 const DEFAULT_CLOUD_PROVIDERS: readonly CloudProvider[] = ['openai', 'gemini'];
@@ -55,6 +58,29 @@ const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
 };
 
 const TERMINAL_JOB_STATUSES: readonly JobStatus[] = ['completed', 'failed', 'cancelled'];
+const DEFAULT_RAG_SETTINGS_SECTION: RagSettingsSectionKey = 'general';
+
+const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
+  chunk_size: 1024,
+  chunk_overlap: 128,
+  embedding_batch_size: 64,
+  use_hybrid_search: true,
+  use_reranking: true,
+  retrieval_candidate_count: 40,
+  retrieval_selected_count: 6,
+  reranker_model: 'cross-encoder/ms-marco-MiniLM-L-6-v2',
+  hybrid_vector_weight: 0.7,
+  hybrid_text_weight: 0.3,
+  embedding_backend: 'ollama',
+  ollama_embedding_model: 'nomic-embed-text:latest',
+  hf_embedding_model: '',
+  cloud_provider: 'openai',
+  cloud_embedding_model: 'text-embedding-3-small',
+  use_cloud_embeddings: false,
+  reset_vector_collection: false,
+  vector_stream_batch_size: 250,
+  embedding_max_workers: 4,
+};
 
 function isCloudProvider(provider: string): provider is CloudProvider {
   return provider === 'openai' || provider === 'gemini';
@@ -100,6 +126,11 @@ export class ModelConfigPageComponent implements OnInit {
   readonly previewReasoningEnabled = signal(true);
   readonly previewTemperatureOverride = signal<number | null>(null);
   readonly previewCloudModelOverrides = signal<Partial<Record<CloudProvider, string>>>({});
+  readonly ragSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
+  readonly draftRagSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
+  readonly ragSettingsModalOpen = signal(false);
+  readonly activeRagSettingsSection = signal<RagSettingsSectionKey>(DEFAULT_RAG_SETTINGS_SECTION);
+  readonly ragModel = signal<string | null>(null);
   readonly activeFilters = signal<Record<ModelFilterKey, boolean>>({
     installed: false,
     missing: false,
@@ -174,6 +205,27 @@ export class ModelConfigPageComponent implements OnInit {
 
   readonly ragPipelineEnabled = computed(() => this.previewRagPipelineEnabled());
   readonly reasoningEnabled = computed(() => this.previewReasoningEnabled());
+  readonly currentRagModelLabel = computed(() => this.ragModel() || 'Not vectorized');
+  readonly ragSettingsValidationMessage = computed(() => {
+    const draft = this.draftRagSettings();
+    if (draft.retrieval_candidate_count < 1) {
+      return 'Retrieved documents must be at least 1.';
+    }
+    if (draft.retrieval_selected_count < 1) {
+      return 'Selected documents must be at least 1.';
+    }
+    if (draft.retrieval_selected_count > draft.retrieval_candidate_count) {
+      return 'Selected documents cannot exceed retrieved documents.';
+    }
+    if (draft.chunk_overlap >= draft.chunk_size) {
+      return 'Chunk overlap must be smaller than chunk size.';
+    }
+    return '';
+  });
+
+  readonly ragSettingsSaveDisabled = computed(
+    () => this.isSaving() || this.isLoading() || !!this.ragSettingsValidationMessage(),
+  );
 
   readonly lastSavedLabel = computed(() => {
     const updatedAt = this.lastUpdatedAt();
@@ -285,6 +337,12 @@ export class ModelConfigPageComponent implements OnInit {
   private applyConfigToState(payload: ModelConfigStateResponse, syncDraft: boolean): void {
     this.localModels.set(payload.local_models || []);
     this.lastUpdatedAt.set(payload.updated_at);
+    this.ragModel.set(payload.rag_model || null);
+    const nextRagSettings = this.normalizeRagSettings(payload.rag_settings);
+    this.ragSettings.set(nextRagSettings);
+    if (!this.ragSettingsModalOpen()) {
+      this.draftRagSettings.set({ ...nextRagSettings });
+    }
     const choices = resolveCloudChoices(payload.cloud_model_choices);
     this.cloudChoices.set(choices);
 
@@ -319,6 +377,41 @@ export class ModelConfigPageComponent implements OnInit {
     } finally {
       this.isSaving.set(false);
     }
+  }
+
+  private normalizeRagSettings(settings: Partial<RagSettings> | null | undefined): DraftRagSettings {
+    return {
+      ...DEFAULT_RAG_SETTINGS,
+      ...(settings || {}),
+      retrieval_candidate_count: this.coercePositiveInteger(
+        settings?.retrieval_candidate_count,
+        DEFAULT_RAG_SETTINGS.retrieval_candidate_count,
+      ),
+      retrieval_selected_count: this.coercePositiveInteger(
+        settings?.retrieval_selected_count,
+        DEFAULT_RAG_SETTINGS.retrieval_selected_count,
+      ),
+      chunk_size: this.coercePositiveInteger(settings?.chunk_size, DEFAULT_RAG_SETTINGS.chunk_size),
+      chunk_overlap: this.coercePositiveInteger(settings?.chunk_overlap, DEFAULT_RAG_SETTINGS.chunk_overlap),
+      embedding_batch_size: this.coercePositiveInteger(
+        settings?.embedding_batch_size,
+        DEFAULT_RAG_SETTINGS.embedding_batch_size,
+      ),
+      vector_stream_batch_size: this.coercePositiveInteger(
+        settings?.vector_stream_batch_size,
+        DEFAULT_RAG_SETTINGS.vector_stream_batch_size,
+      ),
+      embedding_max_workers: this.coercePositiveInteger(
+        settings?.embedding_max_workers,
+        DEFAULT_RAG_SETTINGS.embedding_max_workers,
+      ),
+    };
+  }
+
+  private coercePositiveInteger(value: number | null | undefined, fallback: number): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(1, Math.trunc(parsed));
   }
 
   toggleFilter(key: ModelFilterKey): void {
@@ -366,6 +459,7 @@ export class ModelConfigPageComponent implements OnInit {
       ...previous,
       clinicalModel: role === 'clinical' ? modelName : previous.clinicalModel,
       textExtractionModel: role === 'text_extraction' ? modelName : previous.textExtractionModel,
+      cloudModel: previous.useCloudServices ? modelName : previous.cloudModel,
     }));
   }
 
@@ -385,6 +479,83 @@ export class ModelConfigPageComponent implements OnInit {
         useRag: enabled,
       },
     });
+  }
+
+  openRagSettingsPanel(): void {
+    this.draftRagSettings.set({ ...this.ragSettings() });
+    this.activeRagSettingsSection.set(DEFAULT_RAG_SETTINGS_SECTION);
+    this.ragSettingsModalOpen.set(true);
+  }
+
+  closeRagSettingsPanel(): void {
+    this.ragSettingsModalOpen.set(false);
+    this.activeRagSettingsSection.set(DEFAULT_RAG_SETTINGS_SECTION);
+    this.draftRagSettings.set({ ...this.ragSettings() });
+  }
+
+  setActiveRagSettingsSection(section: RagSettingsSectionKey): void {
+    this.activeRagSettingsSection.set(section);
+  }
+
+  setDraftRagNumber(
+    key: keyof Pick<
+      DraftRagSettings,
+      | 'chunk_size'
+      | 'chunk_overlap'
+      | 'embedding_batch_size'
+      | 'retrieval_candidate_count'
+      | 'retrieval_selected_count'
+      | 'vector_stream_batch_size'
+      | 'embedding_max_workers'
+    >,
+    value: string,
+  ): void {
+    const parsed = Number.parseInt(value, 10);
+    this.draftRagSettings.update((previous) => ({
+      ...previous,
+      [key]: Number.isFinite(parsed) ? Math.max(0, parsed) : 0,
+    }));
+  }
+
+  setDraftRagText(
+    key: keyof Pick<
+      DraftRagSettings,
+      | 'reranker_model'
+      | 'embedding_backend'
+      | 'ollama_embedding_model'
+      | 'hf_embedding_model'
+      | 'cloud_provider'
+      | 'cloud_embedding_model'
+    >,
+    value: string,
+  ): void {
+    this.draftRagSettings.update((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
+  }
+
+  setDraftRagBoolean(
+    key: keyof Pick<
+      DraftRagSettings,
+      'use_hybrid_search' | 'use_reranking' | 'use_cloud_embeddings' | 'reset_vector_collection'
+    >,
+    value: boolean,
+  ): void {
+    this.draftRagSettings.update((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
+  }
+
+  async saveRagSettings(): Promise<void> {
+    if (this.ragSettingsValidationMessage()) return;
+    await this.persistConfigPatch(
+      { rag_settings: { ...this.draftRagSettings() } },
+      'RAG settings saved.',
+      false,
+    );
+    this.ragSettingsModalOpen.set(false);
   }
 
   handleProviderChange(provider: CloudProvider): void {

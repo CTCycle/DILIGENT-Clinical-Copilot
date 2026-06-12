@@ -13,13 +13,11 @@ from domain.clinical.entities import (
     DiseaseContextEntry,
     PatientDiseaseContext,
 )
+from common.prompts.extraction import ANAMNESIS_DISEASE_EXTRACTION_PROMPT
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.llm.client_runtime import ensure_runtime_client
-from services.llm.prompts import (
-    ANAMNESIS_DISEASE_EXTRACTION_PROMPT,
-)
 from services.llm.provider_factory import select_llm_provider
-from services.text.normalization import normalize_token
+from common.utils.text_utils import normalize_token
 
 ###############################################################################
 RATE_LIMIT_WAIT_HINT_RE = re.compile(
@@ -27,9 +25,10 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 ###############################################################################
 class DiseaseExtractor:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -194,7 +193,7 @@ class DiseaseExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         if parsed <= 0:
             return None

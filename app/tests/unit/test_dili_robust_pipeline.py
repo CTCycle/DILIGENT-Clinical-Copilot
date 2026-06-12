@@ -22,6 +22,7 @@ from services.session.robust_pipeline import (
 )
 
 
+###############################################################################
 def test_document_normalizer_keeps_raw_text_and_labels_bibliography() -> None:
     raw_text = (
         "Patient: UI metadata\n\nClinical note text\n\nReferences\nDoe et al. doi:123"
@@ -35,6 +36,7 @@ def test_document_normalizer_keeps_raw_text_and_labels_bibliography() -> None:
     assert normalized.span_mappings[0].raw_end == len(raw_text)
 
 
+###############################################################################
 def test_extraction_artifact_uses_ui_metadata_outside_document_sections() -> None:
     raw_text = (
         "## Anamnesis\nPatient reports jaundice.\n\n"
@@ -62,6 +64,7 @@ def test_extraction_artifact_uses_ui_metadata_outside_document_sections() -> Non
     assert artifact.timed_drugs[0].drug == "Zetamycin 10 mg 1-0-0-0"
 
 
+###############################################################################
 def test_fact_graph_validation_blocks_source_verbatim_nodes_without_spans() -> None:
     graph = FactGraph(
         nodes=[
@@ -81,6 +84,7 @@ def test_fact_graph_validation_blocks_source_verbatim_nodes_without_spans() -> N
     assert validation.hard_issues[0]["code"] == "source_span_missing"
 
 
+###############################################################################
 def test_report_metadata_links_claims_to_fact_nodes() -> None:
     payload = PatientData(
         name="UI Patient",
@@ -125,6 +129,7 @@ def test_report_metadata_links_claims_to_fact_nodes() -> None:
     )
 
 
+###############################################################################
 def test_fact_graph_report_localizes_italian_audit_labels() -> None:
     payload = PatientData(
         name="Mario Rossi",
@@ -173,6 +178,7 @@ def test_fact_graph_report_localizes_italian_audit_labels() -> None:
     assert metadata.claim_references
 
 
+###############################################################################
 def test_audit_blocks_report_without_claim_references() -> None:
     audit = audit_report(
         extraction_artifact=build_extraction_artifact(

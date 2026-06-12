@@ -1,129 +1,29 @@
 from __future__ import annotations
-# ruff: noqa: E402
 
 import asyncio
-import json
-import os
 from collections import deque
-from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Any, Literal, NoReturn, TypeAlias
+from collections.abc import AsyncGenerator
+from typing import Any, Literal, NoReturn
 
 import httpx
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
-    HumanMessage,
-    SystemMessage,
-)
-from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 from configurations.startup import get_server_settings
+from services.llm import ollama_chat, ollama_residency, ollama_structured
+from services.llm.ollama_runtime import (
+    OllamaError,
+    OllamaTimeout,
+    ProgressCb,
+    env_float,
+    env_str
+)
 from services.llm.structured import (
     StructuredOutputParser,
     T,
 )
 
-ProviderName = Literal["openai", "gemini"]
-RuntimePurpose = Literal["clinical", "parser"]
-
+__all__ = ["OllamaClient", "OllamaError", "OllamaTimeout"]
 
 ###############################################################################
-class OllamaError(RuntimeError):
-    pass
-
-
-###############################################################################
-class OllamaTimeout(OllamaError):
-    """Raised when requests to Ollama exceed the configured timeout."""
-
-
-ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
-
-
-###############################################################################
-def _env_float(name: str, default: float) -> float:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        return float(raw)
-    except TypeError, ValueError:
-        return default
-
-
-###############################################################################
-def _env_str(name: str, default: str) -> str:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    value = raw.strip()
-    return value or default
-
-
-###############################################################################
-def _build_langchain_messages(messages: list[dict[str, str]]) -> list[BaseMessage]:
-    output: list[BaseMessage] = []
-    for message in messages:
-        role = str(message.get("role", "user")).strip().lower()
-        content = str(message.get("content", ""))
-        if role == "system":
-            output.append(SystemMessage(content=content))
-        elif role in {"assistant", "model"}:
-            output.append(AIMessage(content=content))
-        else:
-            output.append(HumanMessage(content=content))
-    return output
-
-
-###############################################################################
-def _normalize_langchain_content(content: Any) -> dict[str, Any] | str:
-    if isinstance(content, dict):
-        return content
-    if isinstance(content, list):
-        chunks: list[str] = []
-        for item in content:
-            if isinstance(item, dict):
-                text = item.get("text")
-                if isinstance(text, str):
-                    chunks.append(text)
-                continue
-            if isinstance(item, str):
-                chunks.append(item)
-                continue
-            chunks.append(str(item))
-        content = "".join(chunks)
-    if isinstance(content, str):
-        try:
-            loaded = json.loads(content)
-        except json.JSONDecodeError:
-            return content
-        return loaded if isinstance(loaded, dict) else content
-    return str(content)
-
-
-###############################################################################
-def _map_ollama_langchain_exception(exc: Exception) -> OllamaError:
-    if isinstance(exc, OllamaError):
-        return exc
-    if isinstance(exc, TimeoutError):
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    if isinstance(exc, httpx.TimeoutException):
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    error_name = exc.__class__.__name__.lower()
-    if "timeout" in error_name:
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    return OllamaError(f"Ollama request failed: {exc}")
-
-
-###############################################################################
-from services.llm import ollama_chat, ollama_residency, ollama_structured
-
-ollama_chat.OllamaError = OllamaError
-ollama_chat.OllamaTimeout = OllamaTimeout
-ollama_chat._map_ollama_langchain_exception = _map_ollama_langchain_exception
-ollama_structured.OllamaError = OllamaError
-
-
 class OllamaClient:
     """
     Async wrapper around the Ollama REST API.
@@ -149,6 +49,7 @@ class OllamaClient:
     RESIDENCY_PLAN_TTL = 20.0
     DEFAULT_MODEL_FOOTPRINT_BYTES = 4 * 1_073_741_824
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         base_url: str | None = None,
@@ -181,29 +82,29 @@ class OllamaClient:
         self.residency_plan_cache: dict[str, Any] | None = None
         self.residency_plan_cache_expiry = 0.0
         self.residency_usage_window_s = max(
-            _env_float("OLLAMA_PREFETCH_USAGE_WINDOW_S", 120.0),
+            env_float("OLLAMA_PREFETCH_USAGE_WINDOW_S", 120.0),
             30.0,
         )
         self.residency_transition_window_s = max(
-            _env_float("OLLAMA_PREFETCH_TRANSITION_WINDOW_S", 60.0),
+            env_float("OLLAMA_PREFETCH_TRANSITION_WINDOW_S", 60.0),
             5.0,
         )
         self.residency_prefetch_cooldown_s = max(
-            _env_float("OLLAMA_PREFETCH_COOLDOWN_S", 20.0),
+            env_float("OLLAMA_PREFETCH_COOLDOWN_S", 20.0),
             1.0,
         )
         self.residency_ram_safety_ratio = max(
-            _env_float("OLLAMA_RAM_SAFETY_RATIO", 0.75),
+            env_float("OLLAMA_RAM_SAFETY_RATIO", 0.75),
             0.1,
         )
         self.residency_vram_safety_ratio = max(
-            _env_float("OLLAMA_VRAM_SAFETY_RATIO", 0.85),
+            env_float("OLLAMA_VRAM_SAFETY_RATIO", 0.85),
             0.1,
         )
-        self.residency_dual_keep_alive = _env_str(
+        self.residency_dual_keep_alive = env_str(
             "OLLAMA_DUAL_RESIDENT_KEEP_ALIVE", "4h"
         )
-        self.residency_single_keep_alive = _env_str(
+        self.residency_single_keep_alive = env_str(
             "OLLAMA_SINGLE_RESIDENT_KEEP_ALIVE", "30m"
         )
         self.residency_usage_history: deque[tuple[float, str]] = deque(maxlen=256)
@@ -331,11 +232,13 @@ class OllamaClient:
             self, current_model=current_model, target_models=target_models
         )
 
+    # -------------------------------------------------------------------------
     def _recent_residency_history(
         self, candidates: list[str]
     ) -> list[tuple[float, str]]:
         return ollama_residency._recent_residency_history(self, candidates)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _count_residency_frequency(
         history: list[tuple[float, str]],
@@ -343,12 +246,14 @@ class OllamaClient:
     ) -> None:
         return ollama_residency._count_residency_frequency(history, frequency)
 
+    # -------------------------------------------------------------------------
     def _count_residency_transitions(
         self,
         history: list[tuple[float, str]],
     ) -> dict[tuple[str, str], int]:
         return ollama_residency._count_residency_transitions(self, history)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _select_target_model(
         *,
@@ -445,41 +350,15 @@ class OllamaClient:
         )
 
     # -------------------------------------------------------------------------
-    def build_generate_payload(
-        self,
-        *,
-        model: str,
-        prompt: str,
-        stream: bool,
-        format: str | None,
-        temperature: float,
-        think: bool,
-        options: dict[str, Any] | None,
-        keep_alive: str | None,
-    ) -> dict[str, Any]:
-        return ollama_chat.build_generate_payload(
-            self,
-            model=model,
-            prompt=prompt,
-            stream=stream,
-            format=format,
-            temperature=temperature,
-            think=think,
-            options=options,
-            keep_alive=keep_alive,
-        )
-
-    # -------------------------------------------------------------------------
     async def ensure_context_option(
         self,
         *,
         model: str,
         messages: list[dict[str, str]] | None,
-        prompt: str | None,
         options: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
         return await ollama_chat.ensure_context_option(
-            self, model=model, messages=messages, prompt=prompt, options=options
+            self, model=model, messages=messages, options=options
         )
 
     # -------------------------------------------------------------------------
@@ -491,7 +370,6 @@ class OllamaClient:
         think: bool | None,
         options: dict[str, Any] | None,
         messages: list[dict[str, str]] | None = None,
-        prompt: str | None = None,
     ) -> tuple[str, float, bool, dict[str, Any] | None]:
         return await ollama_chat.prepare_common_options(
             self,
@@ -500,41 +378,11 @@ class OllamaClient:
             think=think,
             options=options,
             messages=messages,
-            prompt=prompt,
         )
 
     # -------------------------------------------------------------------------
     async def ensure_model_ready(self, name: str) -> None:
         return await ollama_chat.ensure_model_ready(self, name)
-
-    # -------------------------------------------------------------------------
-    def _build_ollama_chat_model(
-        self,
-        *,
-        model: str,
-        format: str | None,
-        temperature: float,
-        think: bool,
-        options: dict[str, Any] | None,
-        keep_alive: str | None,
-    ) -> ChatOllama:
-        return ollama_chat._build_ollama_chat_model(
-            self,
-            model=model,
-            format=format,
-            temperature=temperature,
-            think=think,
-            options=options,
-            keep_alive=keep_alive,
-        )
-
-    # -------------------------------------------------------------------------
-    def _build_ollama_embeddings_model(
-        self,
-        *,
-        model: str,
-    ) -> OllamaEmbeddings:
-        return ollama_chat._build_ollama_embeddings_model(self, model=model)
 
     # -------------------------------------------------------------------------
     async def embed(
@@ -562,19 +410,14 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    async def iter_json_stream_events(
+    def iter_json_stream_events(
         response: httpx.Response,
     ) -> AsyncGenerator[dict[str, Any], None]:
-        return await ollama_chat.iter_json_stream_events(response)
+        return ollama_chat.iter_json_stream_events(response)
 
     # -------------------------------------------------------------------------
     async def list_models(self) -> list[str]:
         return await ollama_chat.list_models(self)
-
-    # -----------------------------------------------------------------------------
-    @staticmethod
-    def messages_to_prompt(messages: list[dict[str, str]]) -> str:
-        return ollama_chat.messages_to_prompt(messages)
 
     # -------------------------------------------------------------------------
     async def pull(
@@ -750,20 +593,39 @@ class OllamaClient:
         *,
         model: str,
         messages: list[dict[str, str]] | None = None,
-        prompt: str | None = None,
-        min_ctx: int = 512,
-        padding_tokens: int = 32,
-        slack_ratio: float = 0.2,
+        min_ctx: int = 2048,
+        padding_tokens: int = 128,
+        slack_ratio: float = 0.75,
     ) -> int | None:
         return await ollama_chat.calculate_context_window(
             self,
             model=model,
             messages=messages,
-            prompt=prompt,
             min_ctx=min_ctx,
             padding_tokens=padding_tokens,
             slack_ratio=slack_ratio,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def extract_model_architecture(metadata: dict[str, Any]) -> dict[str, int] | None:
+        return ollama_chat.extract_model_architecture(metadata)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def estimate_kv_cache_bytes_per_token(
+        metadata: dict[str, Any],
+        model_name: str = "",
+    ) -> int | None:
+        return ollama_chat.estimate_kv_cache_bytes_per_token(metadata, model_name)
+
+    # -------------------------------------------------------------------------
+    async def estimate_max_feasible_context(
+        self,
+        model: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> int | None:
+        return await ollama_chat.estimate_max_feasible_context(self, model, metadata)
 
     # -------------------------------------------------------------------------
     async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:

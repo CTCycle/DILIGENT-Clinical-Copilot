@@ -17,16 +17,17 @@ from domain.jobs import (
 from services.clinical.template import get_clinical_section_template
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
-from services.session.request_validation import (
+from api.session_validation import (
     validate_clinical_session_request,
 )
 from services.session.session_service import ClinicalSessionService
 
 router = APIRouter(tags=["session"])
 
-
 ###############################################################################
 class ClinicalSessionEndpoint:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, router: APIRouter, service: ClinicalSessionService) -> None:
         self.router = router
         self.service = service
@@ -61,7 +62,7 @@ class ClinicalSessionEndpoint:
 
     # -------------------------------------------------------------------------
     def cancel_clinical_job(self, job_id: str) -> JobCancelResponse:
-        return self.service.cancel_clinical_job(job_id)    
+        return self.service.cancel_clinical_job(job_id)
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:

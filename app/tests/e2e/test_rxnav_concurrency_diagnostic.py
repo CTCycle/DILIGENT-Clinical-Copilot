@@ -21,7 +21,6 @@ DRUG_QUERIES = [
 ]
 RXCUI_QUERIES = ["161", "857004", "860975", "617320", "308192", "197361"]
 
-
 ###############################################################################
 @dataclass(slots=True)
 class RequestMetric:
@@ -29,8 +28,7 @@ class RequestMetric:
     elapsed_seconds: float
     error: str | None
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 async def perform_request(
     client: httpx.AsyncClient,
     *,
@@ -63,8 +61,7 @@ async def perform_request(
             error=str(exc),
         )
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def make_workload(total_requests: int) -> list[tuple[str, str]]:
     payload: list[tuple[str, str]] = []
     while len(payload) < total_requests:
@@ -78,8 +75,7 @@ def make_workload(total_requests: int) -> list[tuple[str, str]]:
                 return payload
     return payload
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 async def run_probe(
     *,
     concurrency: int,
@@ -111,8 +107,7 @@ async def run_probe(
         )
     return metrics
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def summarize(metrics: list[RequestMetric]) -> dict[str, object]:
     status_counts: dict[int, int] = {}
     error_counts: dict[str, int] = {}
@@ -135,13 +130,11 @@ def summarize(metrics: list[RequestMetric]) -> dict[str, object]:
         "avg_ms": statistics.fmean(latencies) * 1000 if latencies else 0.0,
     }
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def enabled() -> bool:
     return os.environ.get("RUN_RXNAV_CONCURRENCY_DIAGNOSTIC", "").strip() == "1"
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 @pytest.mark.skipif(
     not enabled(),
     reason="Set RUN_RXNAV_CONCURRENCY_DIAGNOSTIC=1 to run RxNav concurrency diagnostics.",

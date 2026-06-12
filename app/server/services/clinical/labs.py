@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any, Literal
 
+from common.prompts.extraction import CLINICAL_LAB_EXTRACTION_PROMPT
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import get_server_settings
@@ -19,7 +20,6 @@ from domain.clinical.entities import (
 from domain.clinical.extras import LabExtractionPayload
 from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.llm.client_runtime import ensure_runtime_client
-from services.llm.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
 from services.llm.provider_factory import select_llm_provider
 from services.text.vocabulary import get_text_normalization_snapshot
 
@@ -34,6 +34,7 @@ DATE_RE = re.compile(
 )
 
 
+###############################################################################
 def _load_marker_aliases() -> dict[str, tuple[str, ...]]:
     snapshot = get_reference_catalog_snapshot()
     entries = snapshot.entries("clinical_extraction", "laboratory_markers")
@@ -65,13 +66,15 @@ RUCAM_SCORE_TEXT_RE = re.compile(
 )
 
 
+###############################################################################
 def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
     normalized = (marker_name or "").strip().casefold()
     return aliases.get(normalized, marker_name)
 
-
 ###############################################################################
 class ClinicalLabExtractor:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -659,7 +662,9 @@ class ClinicalLabExtractor:
 
                 # If the first LLM pass returns empty despite clear lab cues, retry once
                 # with a reinforced instruction before accepting an empty result.
-                if not parsed.entries and self.has_explicit_lab_signal(merged_source_text):
+                if not parsed.entries and self.has_explicit_lab_signal(
+                    merged_source_text
+                ):
                     try:
                         reinforced = await self.llm_extract_full_text(
                             text=merged_source_text,

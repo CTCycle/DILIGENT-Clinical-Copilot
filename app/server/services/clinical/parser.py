@@ -19,6 +19,10 @@ from domain.clinical.entities import (
     DrugEntry,
     PatientDrugs,
 )
+from common.prompts.extraction import (
+    ANAMNESIS_DRUG_EXTRACTION_PROMPT,
+    DRUG_EXTRACTION_PROMPT,
+)
 from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.deterministic_extraction import (
     DeterministicDrugExtractionResult,
@@ -50,14 +54,9 @@ from services.clinical.parser_validation import (
     WEEKDAY_TOKENS,
 )
 from services.llm.client_runtime import ensure_runtime_client
-from services.llm.prompts import (
-    ANAMNESIS_DRUG_EXTRACTION_PROMPT,
-    DRUG_EXTRACTION_PROMPT,
-)
 from services.llm.provider_factory import select_llm_provider
-from services.text.normalization import normalize_token
+from common.utils.text_utils import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
-
 
 ###############################################################################
 class DrugsParser:
@@ -77,7 +76,7 @@ class DrugsParser:
     NAME_TEMPORAL_SPLIT_RE = re.compile(r"$^")
     TRAILING_ROUTE_TOKEN_RE = re.compile(r"$^")
     START_EVENT_RE = re.compile(r"$^")
-    SUSPENSION_EVENT_RE = re.compile(r"$^") 
+    SUSPENSION_EVENT_RE = re.compile(r"$^")
     NON_DRUG_EXACT_NAMES = NON_DRUG_EXACT_NAMES
     NON_DRUG_PREFIXES = NON_DRUG_PREFIXES
     NON_DRUG_CONTAINS = NON_DRUG_CONTAINS
@@ -86,6 +85,7 @@ class DrugsParser:
     LAB_MEASUREMENT_NAME_RE = re.compile(r"\b(?:u/l|ui/l|mg/dl|uln)\b", re.IGNORECASE)
     LAB_MARKER_NAME_RE = re.compile(r"\b(?:alt|ast|alp|bilirubin|inr)\b", re.IGNORECASE)
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -264,6 +264,7 @@ class DrugsParser:
         self.emit_progress(progress_callback, 1.0)
         return PatientDrugs(entries=combined)
 
+    # -------------------------------------------------------------------------
     async def extract_drugs_from_therapy_hybrid(
         self,
         cleaned: str,
@@ -421,13 +422,13 @@ class DrugsParser:
 
         if source == "anamnesis":
             anamnesis_text = self.clean_text(text)
-            parsed_entries: list[DrugEntry] = []            
+            parsed_entries: list[DrugEntry] = []
             parsed = await asyncio.wait_for(
                 self.client.llm_structured_call(
                     model=self.model,
                     system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
                     user_prompt=(
-                        f"Extract all drugs mentioned in the following patient anamnesis:\n\n{anamnesis_text}"                        
+                        f"Extract all drugs mentioned in the following patient anamnesis:\n\n{anamnesis_text}"
                     ),
                     schema=PatientDrugs,
                     temperature=self.temperature,
@@ -446,7 +447,9 @@ class DrugsParser:
                 )
                 for entry in parsed_entries
             ]
-            filtered_candidates = [entry for entry in normalized_candidates if entry is not None]
+            filtered_candidates = [
+                entry for entry in normalized_candidates if entry is not None
+            ]
             return PatientDrugs(entries=filtered_candidates)
 
         lines = [
@@ -475,8 +478,8 @@ class DrugsParser:
             )
             if post_processed is not None:
                 normalized.append(post_processed)
-        return PatientDrugs(entries=normalized)   
-    
+        return PatientDrugs(entries=normalized)
+
     # -------------------------------------------------------------------------
     def extract_drugs_from_anamnesis_rule_based(
         self, anamnesis: str
@@ -1031,6 +1034,7 @@ class DrugsParser:
             return "temporal_known"
         return "temporal_uncertain"
 
+    # -------------------------------------------------------------------------
     def drug_entry_has_temporal_information(self, entry: DrugEntry) -> bool:
         if entry.temporal_classification == "temporal_known":
             return True

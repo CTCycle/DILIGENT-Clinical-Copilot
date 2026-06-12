@@ -67,6 +67,7 @@ SectionMatchStrategy = Literal[
 ]
 
 
+###############################################################################
 def _section_profiles_from_catalog() -> dict[str, dict[str, set[str]]]:
     snapshot = get_reference_catalog_snapshot()
     profiles: dict[str, dict[str, set[str]]] = {
@@ -116,6 +117,7 @@ def _section_profiles_from_catalog() -> dict[str, dict[str, set[str]]]:
     return profiles
 
 
+###############################################################################
 @dataclass(frozen=True)
 class SectionHeadingMatch:
     canonical_key: str
@@ -129,6 +131,7 @@ class SectionHeadingMatch:
     body_end: int | None = None
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ClinicalRawSection:
     canonical_key: str
@@ -144,12 +147,14 @@ class ClinicalRawSection:
     verbatim_coherent: bool
 
 
+###############################################################################
 @dataclass(frozen=True)
 class HeadingScanResult:
     section_headings: list[SectionHeadingMatch]
     boundary_line_starts: set[int]
 
 
+###############################################################################
 @dataclass(frozen=True)
 class HeadingBoundary:
     raw_heading: str
@@ -158,6 +163,7 @@ class HeadingBoundary:
     is_markdown_heading: bool
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ParsedDiliSectionsResult:
     sections: dict[str, ClinicalRawSection]
@@ -165,6 +171,7 @@ class ParsedDiliSectionsResult:
     malformed_sections: list[str]
 
 
+###############################################################################
 def normalize_heading_text(value: str) -> str:
     text = unicodedata.normalize("NFKC", value or "")
     text = text.strip()
@@ -175,6 +182,7 @@ def normalize_heading_text(value: str) -> str:
     return text.casefold()
 
 
+###############################################################################
 def tokenize_heading(value: str) -> tuple[str, ...]:
     normalized = normalize_heading_text(value)
     if not normalized:
@@ -182,6 +190,7 @@ def tokenize_heading(value: str) -> tuple[str, ...]:
     return tuple(token for token in normalized.split(" ") if token)
 
 
+###############################################################################
 def is_structural_heading_line(line: str) -> bool:
     stripped = (line or "").strip()
     if not stripped:
@@ -205,10 +214,12 @@ def is_structural_heading_line(line: str) -> bool:
     )
 
 
+###############################################################################
 def _token_similarity(left: str, right: str) -> float:
     return SequenceMatcher(None, left, right).ratio()
 
 
+###############################################################################
 def _looks_like_typo(candidate: str, token: str) -> bool:
     prefix_len = min(MIN_TYPO_SHARED_PREFIX_LEN, len(candidate), len(token))
     return (
@@ -217,6 +228,7 @@ def _looks_like_typo(candidate: str, token: str) -> bool:
     )
 
 
+###############################################################################
 def _phrase_matches_with_typo(tokens: set[str], phrase: str) -> bool:
     phrase_tokens = tuple(token for token in phrase.split(" ") if token)
     if not phrase_tokens:
@@ -239,6 +251,7 @@ def _phrase_matches_with_typo(tokens: set[str], phrase: str) -> bool:
     return found_typo
 
 
+###############################################################################
 def _classify_against_profile(
     normalized_heading: str,
     profile: dict[str, set[str]],
@@ -260,6 +273,7 @@ def _classify_against_profile(
     return None
 
 
+###############################################################################
 def _semantic_prefix_score(normalized_heading: str) -> tuple[str, float] | None:
     tokens = set(tokenize_heading(normalized_heading))
     if not tokens:
@@ -284,6 +298,7 @@ def _semantic_prefix_score(normalized_heading: str) -> tuple[str, float] | None:
     return (best_key, best_score)
 
 
+###############################################################################
 @lru_cache(maxsize=1)
 def _semantic_heading_prefixes() -> dict[str, tuple[str, ...]]:
     profiles = _section_profiles_from_catalog()
@@ -300,6 +315,7 @@ def _semantic_heading_prefixes() -> dict[str, tuple[str, ...]]:
     return {key: tuple(sorted(values)) for key, values in prefixes.items()}
 
 
+###############################################################################
 def classify_dili_heading(
     raw_heading: str, *, line_start: int, line_end: int
 ) -> SectionHeadingMatch | None:
@@ -347,10 +363,12 @@ def classify_dili_heading(
     return candidates[0]
 
 
+###############################################################################
 def is_markdown_heading_line(line: str) -> bool:
     return bool(MARKDOWN_HEADING_RE.match(line or ""))
 
 
+###############################################################################
 def _accept_heading_match(
     boundary: HeadingBoundary, match: SectionHeadingMatch
 ) -> bool:
@@ -371,6 +389,7 @@ def _accept_heading_match(
     return is_upper or is_title
 
 
+###############################################################################
 def _iter_heading_boundaries(raw_text: str) -> list[HeadingBoundary]:
     boundaries: list[HeadingBoundary] = []
     for line_number, raw_line in enumerate(raw_text.splitlines(keepends=True), start=1):
@@ -389,6 +408,7 @@ def _iter_heading_boundaries(raw_text: str) -> list[HeadingBoundary]:
     return boundaries
 
 
+###############################################################################
 def _selected_heading_boundaries(raw_text: str) -> list[HeadingBoundary]:
     boundaries = _iter_heading_boundaries(raw_text)
     markdown = [boundary for boundary in boundaries if boundary.is_markdown_heading]
@@ -412,6 +432,7 @@ def _selected_heading_boundaries(raw_text: str) -> list[HeadingBoundary]:
     return selected
 
 
+###############################################################################
 def scan_dili_section_headings(raw_text: str) -> HeadingScanResult:
     boundaries = _iter_heading_boundaries(raw_text)
     matches: list[SectionHeadingMatch] = []
@@ -443,16 +464,19 @@ def scan_dili_section_headings(raw_text: str) -> HeadingScanResult:
     )
 
 
+###############################################################################
 def find_dili_section_headings(raw_text: str) -> list[SectionHeadingMatch]:
     return scan_dili_section_headings(raw_text).section_headings
 
 
+###############################################################################
 def resolve_heading_collisions(
     matches: Sequence[SectionHeadingMatch],
 ) -> list[SectionHeadingMatch]:
     return resolve_heading_collisions_with_diagnostics(matches)[0]
 
 
+###############################################################################
 def resolve_heading_collisions_with_diagnostics(
     matches: Sequence[SectionHeadingMatch],
 ) -> tuple[list[SectionHeadingMatch], list[str]]:
@@ -473,6 +497,7 @@ def resolve_heading_collisions_with_diagnostics(
     return resolved, diagnostics
 
 
+###############################################################################
 def _line_char_offsets(raw_text: str) -> list[tuple[int, int]]:
     offsets: list[tuple[int, int]] = []
     cursor = 0
@@ -485,6 +510,7 @@ def _line_char_offsets(raw_text: str) -> list[tuple[int, int]]:
     return offsets
 
 
+###############################################################################
 @lru_cache(maxsize=1)
 def _therapy_signal_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
@@ -504,6 +530,7 @@ def _therapy_signal_re() -> re.Pattern[str]:
     return re.compile(r"\b(?:" + "|".join(escaped) + r")\b", re.IGNORECASE)
 
 
+###############################################################################
 @lru_cache(maxsize=1)
 def _laboratory_signal_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
@@ -524,6 +551,7 @@ def _laboratory_signal_re() -> re.Pattern[str]:
     return re.compile(r"\b(?:" + "|".join(escaped) + r")\b", re.IGNORECASE)
 
 
+###############################################################################
 def _score_section_content(raw_heading: str, content: str) -> dict[str, float]:
     normalized_heading = normalize_heading_text(raw_heading)
     scores = {
@@ -560,6 +588,7 @@ def _score_section_content(raw_heading: str, content: str) -> dict[str, float]:
     return scores
 
 
+###############################################################################
 def _infer_section_match(
     raw_heading: str,
     content: str,
@@ -593,6 +622,7 @@ def _infer_section_match(
     )
 
 
+###############################################################################
 def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
     scan_result = scan_dili_section_headings(raw_text)
     headings, collision_diagnostics = resolve_heading_collisions_with_diagnostics(
@@ -759,6 +789,7 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
     )
 
 
+###############################################################################
 def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSection]:
     result = parse_required_dili_sections(raw_text)
     duplicate_errors = [
@@ -771,6 +802,7 @@ def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSectio
     return result.sections
 
 
+###############################################################################
 def _next_boundary_line_start(
     current_line_start: int, boundary_line_starts: set[int]
 ) -> int | None:
@@ -780,6 +812,7 @@ def _next_boundary_line_start(
     return None
 
 
+###############################################################################
 def verify_verbatim_section_coherence(
     raw_text: str, section: ClinicalRawSection
 ) -> bool:
@@ -791,6 +824,7 @@ def verify_verbatim_section_coherence(
     return span_text == section.text
 
 
+###############################################################################
 def missing_required_section_names(
     sections: Mapping[str, ClinicalRawSection],
 ) -> list[str]:
@@ -802,10 +836,13 @@ def missing_required_section_names(
 
 
 # Compatibility wrappers for current callers/tests.
+
+###############################################################################
 def find_section_markers(text: str) -> list[SectionHeadingMatch]:
     return find_dili_section_headings(text)
 
 
+###############################################################################
 def extract_sections_from_markers(
     text: str, _markers: list[SectionHeadingMatch]
 ) -> dict[ClinicalSectionKey, str] | None:
@@ -822,6 +859,7 @@ def extract_sections_from_markers(
     }
 
 
+###############################################################################
 def validate_sections_against_source(
     text: str, sections: dict[ClinicalSectionKey, str]
 ) -> bool:

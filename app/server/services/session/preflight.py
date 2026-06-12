@@ -21,6 +21,7 @@ from services.session.robust_pipeline import build_extraction_artifact
 from services.session.text_section_parser import parse_initial_text_sections
 
 
+###############################################################################
 @dataclass(frozen=True)
 class LocalModelBatchPreflightResult:
     concurrency_allowed: bool
@@ -29,6 +30,7 @@ class LocalModelBatchPreflightResult:
     reason: str | None = None
 
 
+###############################################################################
 async def check_parser_batch_capacity(
     task_count: int,
     model: str | None = None,
@@ -142,6 +144,7 @@ async def check_parser_batch_capacity(
                 pass
 
 
+###############################################################################
 def validate_clinical_input_preflight(
     service: Any,
     request_payload: ClinicalSessionRequest,
@@ -362,6 +365,7 @@ def validate_clinical_input_preflight(
     )
 
 
+###############################################################################
 def _validate_ui_metadata(
     request_payload: ClinicalSessionRequest,
     blocking: list[ClinicalInputPreflightIssue],
@@ -377,6 +381,7 @@ def _validate_ui_metadata(
         )
 
 
+###############################################################################
 def _validate_provider_key(blocking: list[ClinicalInputPreflightIssue]) -> None:
     if not LLMRuntimeConfig.is_cloud_enabled():
         return
@@ -399,6 +404,7 @@ def _validate_provider_key(blocking: list[ClinicalInputPreflightIssue]) -> None:
         )
 
 
+###############################################################################
 def _validate_requested_provider(
     request_payload: ClinicalSessionRequest,
     blocking: list[ClinicalInputPreflightIssue],
@@ -436,6 +442,7 @@ def _validate_requested_provider(
         )
 
 
+###############################################################################
 def _validate_persistence(
     service: Any,
     non_blocking: list[ClinicalInputPreflightIssue],
@@ -455,6 +462,7 @@ def _validate_persistence(
         )
 
 
+###############################################################################
 def _runtime_settings() -> dict[str, Any]:
     parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model(
         "parser"
@@ -473,6 +481,7 @@ def _runtime_settings() -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _result(
     blocking: list[ClinicalInputPreflightIssue],
     non_blocking: list[ClinicalInputPreflightIssue],

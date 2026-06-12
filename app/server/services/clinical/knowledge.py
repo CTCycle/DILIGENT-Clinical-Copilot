@@ -4,9 +4,10 @@ from typing import Any
 
 from repositories.serialization.data import DataSerializer
 
-
 ###############################################################################
 class ClinicalKnowledgeComposer:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, serializer: DataSerializer | None = None) -> None:
         self.serializer = serializer or DataSerializer()
 

@@ -294,7 +294,7 @@
         <div class="modal-header">
           <div class="modal-header-content">
             <h2 class="modal-title">Update {{ activeUpdateTarget() }}</h2>
-            <p class="modal-subtitle">Configure overrides, run, monitor progress, and cancel if needed.</p>
+            <p class="modal-subtitle">{{ updateModalSubtitle() }}</p>
           </div>
           <button class="modal-close" type="button" (click)="closeUpdateModal()">Close</button>
         </div>
@@ -302,8 +302,19 @@
           @if (updateLoading()) {
             <p>Loading update configuration...</p>
           } @else {
-            <label class="field-label" for="update-overrides">JSON overrides</label>
-            <textarea id="update-overrides" class="field-textarea" style="width:100%;min-height:220px;" [ngModel]="updateConfigText()" (ngModelChange)="setUpdateConfigText($event)"></textarea>
+            @if (isRagUpdateModal()) {
+              <dl class="inspection-rag-summary" aria-label="Current vectorization settings">
+                @for (entry of ragUpdateSummaryEntries(); track entry.key) {
+                  <div class="inspection-rag-summary-row">
+                    <dt class="inspection-rag-summary-label">{{ entry.label }}</dt>
+                    <dd class="inspection-rag-summary-value">{{ entry.value }}</dd>
+                  </div>
+                }
+              </dl>
+            } @else {
+              <label class="field-label" for="update-overrides">JSON overrides</label>
+              <textarea id="update-overrides" class="field-textarea" style="width:100%;min-height:220px;" [ngModel]="updateConfigText()" (ngModelChange)="setUpdateConfigText($event)"></textarea>
+            }
             <div class="inspection-job-panel">
               <p class="inspection-job-message">Job ID: {{ updateJobId() || 'Not started' }}</p>
               <div class="inspection-job-bar-track"><div class="inspection-job-bar-fill" [style.width.%]="updateProgress()"></div></div>

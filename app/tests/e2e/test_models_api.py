@@ -11,6 +11,7 @@ import pytest
 from playwright.sync_api import APIRequestContext
 
 
+###############################################################################
 def skip_if_ollama_unavailable(response) -> None:
     if response.status in (502, 504):
         detail = ""
@@ -24,6 +25,7 @@ def skip_if_ollama_unavailable(response) -> None:
         pytest.skip(reason)
 
 
+###############################################################################
 def wait_for_pull_job(api_context: APIRequestContext, job_id: str) -> dict:
     for _ in range(120):
         status_response = api_context.get(f"/api/models/jobs/{job_id}")
@@ -35,6 +37,7 @@ def wait_for_pull_job(api_context: APIRequestContext, job_id: str) -> dict:
     raise AssertionError("Model pull job did not finish in time")
 
 
+###############################################################################
 def test_models_list_returns_payload(api_context: APIRequestContext):
     response = api_context.get("/api/models/list")
     skip_if_ollama_unavailable(response)
@@ -47,11 +50,13 @@ def test_models_list_returns_payload(api_context: APIRequestContext):
     assert payload["count"] == len(payload["models"])
 
 
+###############################################################################
 def test_models_pull_job_requires_name(api_context: APIRequestContext):
     response = api_context.post("/api/models/pull/jobs")
     assert response.status == 422
 
 
+###############################################################################
 def test_models_pull_job_noop_when_model_available(api_context: APIRequestContext):
     list_response = api_context.get("/api/models/list")
     skip_if_ollama_unavailable(list_response)

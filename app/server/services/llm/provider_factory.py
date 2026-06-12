@@ -11,6 +11,7 @@ ProviderName = Literal["openai", "gemini"]
 RuntimePurpose = Literal["clinical", "parser"]
 
 
+###############################################################################
 def select_llm_provider(
     provider: str = "ollama",
     **kwargs: Any,
@@ -41,6 +42,7 @@ def select_llm_provider(
     raise LLMError(f"Unknown or unsupported provider: {provider}")
 
 
+###############################################################################
 def initialize_llm_client(
     *, purpose: RuntimePurpose = "clinical", **kwargs: Any
 ) -> OllamaClient | CloudLLMClient:
@@ -49,9 +51,6 @@ def initialize_llm_client(
     if LLMRuntimeConfig.is_cloud_enabled():
         forced_provider = (LLMRuntimeConfig.get_llm_provider() or "").strip().lower()
         provider = forced_provider or provider
-        forced_model = (LLMRuntimeConfig.get_cloud_model() or "").strip()
-        if forced_model:
-            default_model = forced_model
     selected_model = kwargs.pop("default_model", default_model)
     return select_llm_provider(
         provider=provider,

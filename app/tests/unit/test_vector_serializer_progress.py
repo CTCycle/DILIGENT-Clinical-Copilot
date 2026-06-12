@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from repositories.serialization.vectors import VectorSerializer
+from services.rag.vector_serializer import VectorSerializer
 
 
+###############################################################################
 def test_batch_progress_scales_through_embedding_window() -> None:
     events: list[tuple[float, str]] = []
     serializer = object.__new__(VectorSerializer)
