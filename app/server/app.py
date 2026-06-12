@@ -16,9 +16,6 @@ from api.model_config import router as model_config_router
 from api.ollama import router as ollama_router
 from api.session import router as session_router
 from common.constants import (
-    CLIENT_ASSETS_PATH,
-    CLIENT_DIST_PATH,
-    CLIENT_INDEX_FILE_PATH,
     FASTAPI_API_PREFIX,
     FASTAPI_ASSETS_ENDPOINT,
     FASTAPI_DESCRIPTION,
@@ -30,6 +27,11 @@ from common.constants import (
     FASTAPI_TITLE,
     FASTAPI_VERSION,
 )
+from common.paths import (
+    CLIENT_ASSETS_PATH,
+    CLIENT_DIST_PATH,
+    CLIENT_INDEX_FILE_PATH,
+)
 from configurations.startup import (
     get_server_settings,
     initialize_settings,
@@ -38,14 +40,13 @@ from configurations.startup import (
 from repositories.database.initializer import initialize_database
 from services.startup_validation import run_startup_validations
 
-
 ###############################################################################
 def _client_build_available() -> bool:
-    return tauri_mode_enabled() and Path(CLIENT_INDEX_FILE_PATH).is_file()
+    return tauri_mode_enabled() and CLIENT_INDEX_FILE_PATH.is_file()
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
-    client_root = Path(CLIENT_DIST_PATH).resolve()
+    client_root = CLIENT_DIST_PATH.resolve()
     requested_path = (client_root / full_path).resolve()
 
     if not requested_path.is_relative_to(client_root):
@@ -71,7 +72,6 @@ def serve_client_path(full_path: str) -> FileResponse:
 def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_URL)
 
-
 ###############################################################################
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -86,7 +86,6 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
 
     application.state.server_settings = settings
     yield
-
 
 ###############################################################################
 def create_app() -> FastAPI:
@@ -114,7 +113,7 @@ def create_app() -> FastAPI:
         application.include_router(router, prefix=FASTAPI_API_PREFIX)
 
     if _client_build_available():
-        if Path(CLIENT_ASSETS_PATH).is_dir():
+        if CLIENT_ASSETS_PATH.is_dir():
             application.mount(
                 FASTAPI_ASSETS_ENDPOINT,
                 StaticFiles(directory=CLIENT_ASSETS_PATH),

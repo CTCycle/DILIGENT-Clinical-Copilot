@@ -6,6 +6,7 @@ from configurations.management import (
 )
 
 
+###############################################################################
 def _env() -> EnvironmentSnapshot:
     return EnvironmentSnapshot(
         ollama_url="http://localhost:11434",
@@ -14,13 +15,14 @@ def _env() -> EnvironmentSnapshot:
     )
 
 
-def test_build_rag_settings_reads_reranking_keys() -> None:
+###############################################################################
+def test_build_rag_settings_reads_retrieval_counts() -> None:
     payload = build_settings_payload_from_json(
         {
             "rag": {
                 "use_reranking": True,
-                "rerank_candidate_k": 100,
-                "rerank_top_n": 10,
+                "retrieval_candidate_count": 100,
+                "retrieval_selected_count": 10,
                 "use_hybrid_search": True,
                 "reranker_model": "cross-encoder/test-model",
                 "hybrid_vector_weight": 0.7,
@@ -36,8 +38,8 @@ def test_build_rag_settings_reads_reranking_keys() -> None:
     settings = payload["rag"]
 
     assert settings["use_reranking"] is True
-    assert settings["rerank_candidate_k"] == 100
-    assert settings["rerank_top_n"] == 10
+    assert settings["retrieval_candidate_count"] == 100
+    assert settings["retrieval_selected_count"] == 10
     assert settings["use_hybrid_search"] is True
     assert settings["reranker_model"] == "cross-encoder/test-model"
     assert settings["hybrid_vector_weight"] == 0.7
@@ -46,11 +48,12 @@ def test_build_rag_settings_reads_reranking_keys() -> None:
     assert settings["ollama_embedding_model"] == "nomic-embed-text:latest"
 
 
+###############################################################################
 def test_build_rag_settings_enforces_candidate_floor() -> None:
     payload = build_settings_payload_from_json(
-        {"rag": {"rerank_candidate_k": 3, "rerank_top_n": 10}},
+        {"rag": {"retrieval_candidate_count": 3, "retrieval_selected_count": 10}},
         _env(),
     )
     settings = payload["rag"]
-    assert settings["rerank_top_n"] == 10
-    assert settings["rerank_candidate_k"] == 10
+    assert settings["retrieval_selected_count"] == 10
+    assert settings["retrieval_candidate_count"] == 10

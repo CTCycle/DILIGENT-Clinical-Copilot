@@ -19,9 +19,9 @@ from services.updater.livertox_core import LiverToxUpdater
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 class LookupStub:
+
     # -------------------------------------------------------------------------
     def normalize_name(self, value: str) -> str:
         return value.strip().lower()
@@ -38,24 +38,21 @@ class LookupStub:
     def iter_alias_variants(self, value: str):
         yield value
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_serializer() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     serializer = DataSerializer(engine=engine)
     return serializer, engine
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_normalize_date_uses_explicit_units_for_numeric_timestamps() -> None:
     serializer, _ = build_serializer()
     assert serializer.normalize_date("1735689600") == "2025-01-01"
     assert serializer.normalize_date("1735689600000") == "2025-01-01"
     assert serializer.normalize_date("20250101") == "2025-01-01"
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_save_clinical_session_preserves_row_append_order() -> None:
     serializer, engine = build_serializer()
     serializer.save_clinical_session(
@@ -89,8 +86,7 @@ def test_save_clinical_session_preserves_row_append_order() -> None:
     ]
     assert [row.name for row in patients] == ["existing", "incoming"]
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_save_clinical_session_persists_raw_result_payload() -> None:
     serializer, engine = build_serializer()
     raw_payload = {
@@ -129,8 +125,7 @@ def test_save_clinical_session_persists_raw_result_payload() -> None:
     assert result_row.session_id == session_row.id
     assert json.loads(result_row.payload_json) == raw_payload
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_save_clinical_session_deduplicates_labs_per_marker() -> None:
     serializer, engine = build_serializer()
     serializer.save_clinical_session(
@@ -175,8 +170,7 @@ def test_save_clinical_session_deduplicates_labs_per_marker() -> None:
     assert len(labs) == 2
     assert [row.lab_code for row in labs] == ["alt", "ast"]
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_livertox_data_keeps_internal_dataframe_copies_isolated() -> None:
     livertox_df = pd.DataFrame()
     master_list_df = pd.DataFrame(
@@ -206,8 +200,7 @@ def test_livertox_data_keeps_internal_dataframe_copies_isolated() -> None:
     data.drugs_catalog_df.loc[0, "drug_name"] = "Updated"
     assert catalog_df.loc[0, "drug_name"] == "Acetaminophen"
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_master_list_sanitization_handles_string_dtype_inputs() -> None:
     updater = LiverToxUpdater(sources_path=".", redownload=False)
     raw = pd.DataFrame(

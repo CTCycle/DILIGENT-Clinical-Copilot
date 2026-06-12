@@ -7,14 +7,29 @@ from __future__ import annotations
 
 import asyncio
 import os
+import tempfile
 import threading
+import uuid
 from collections.abc import Coroutine
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from common import paths as common_paths
+from repositories.database import sqlite as sqlite_module
 
+
+###############################################################################
+def _configure_test_embedded_database_path() -> None:
+    temp_root = Path(tempfile.gettempdir()) / "diligent-pytest-dbs"
+    temp_root.mkdir(parents=True, exist_ok=True)
+    db_path = temp_root / f"embedded-{uuid.uuid4().hex}.db"
+    common_paths.DATABASE_FILE_PATH = db_path
+    sqlite_module.DATABASE_FILE_PATH = db_path
+
+
+###############################################################################
 def _configure_playwright_node_runtime() -> None:
     """
     Ensure pytest-playwright uses the bundled Node runtime instead of ambient PATH.
@@ -29,9 +44,13 @@ def _configure_playwright_node_runtime() -> None:
 
 
 _configure_playwright_node_runtime()
+_configure_test_embedded_database_path()
 
 
+###############################################################################
 class CoroutineThreadRunner:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         run_callable: Any,
@@ -45,6 +64,7 @@ class CoroutineThreadRunner:
         self.kwargs = kwargs
         self.box: dict[str, Any] = {}
 
+    # -------------------------------------------------------------------------
     def __call__(self) -> None:
         try:
             self.box["result"] = self.run_callable(
@@ -56,12 +76,14 @@ class CoroutineThreadRunner:
             self.box["error"] = exc
 
 
+###############################################################################
 def _normalize_host_for_url(host: str) -> str:
     if host in {"0.0.0.0", "::", "[::]"}:
         return "127.0.0.1"
     return host
 
 
+###############################################################################
 def _build_base_url(
     host_env: str,
     port_env: str,
@@ -73,6 +95,7 @@ def _build_base_url(
     return f"http://{host}:{port}"
 
 
+###############################################################################
 def run_coroutine_in_thread(
     run_callable: Any,
     coro: Coroutine[Any, Any, Any],
@@ -88,10 +111,14 @@ def run_coroutine_in_thread(
     return runner.box.get("result")
 
 
+###############################################################################
 class AsyncioRunPatch:
+
+    # -------------------------------------------------------------------------
     def __init__(self, original_run: Any) -> None:
         self.original_run = original_run
 
+    # -------------------------------------------------------------------------
     def __call__(
         self,
         coro: Coroutine[Any, Any, Any],
@@ -118,18 +145,21 @@ API_BASE_URL = (
 )
 
 
+###############################################################################
 @pytest.fixture(scope="session")
 def base_url() -> str:
     """Returns the base URL of the UI."""
     return UI_BASE_URL
 
 
+###############################################################################
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
     """Returns the base URL of the API."""
     return API_BASE_URL
 
 
+###############################################################################
 @pytest.fixture
 def api_context(playwright):
     """
@@ -141,6 +171,7 @@ def api_context(playwright):
     context.dispose()
 
 
+###############################################################################
 @pytest.fixture(autouse=True)
 def patch_asyncio_run(monkeypatch: pytest.MonkeyPatch):
     """

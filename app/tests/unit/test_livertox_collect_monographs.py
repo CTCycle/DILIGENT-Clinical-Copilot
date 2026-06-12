@@ -10,6 +10,7 @@ from services.updater import livertox_parse as livertox_module
 from services.updater.livertox_core import LiverToxUpdater
 
 
+###############################################################################
 def build_archive(path: Path, members: list[tuple[str, str]]) -> None:
     with tarfile.open(path, "w:gz") as archive:
         for name, text in members:
@@ -19,6 +20,7 @@ def build_archive(path: Path, members: list[tuple[str, str]]) -> None:
             archive.addfile(info, io.BytesIO(data))
 
 
+###############################################################################
 def make_html(drug_name: str, nbk_id: str) -> str:
     return (
         f"<html><head><title>{drug_name} - LiverTox - NCBI Bookshelf</title></head>"
@@ -26,6 +28,7 @@ def make_html(drug_name: str, nbk_id: str) -> str:
     )
 
 
+###############################################################################
 def test_collect_monographs_deduplicates_duplicate_basenames(tmp_path: Path) -> None:
     archive_path = tmp_path / "livertox.tar.gz"
     build_archive(
@@ -50,22 +53,29 @@ def test_collect_monographs_deduplicates_duplicate_basenames(tmp_path: Path) -> 
     assert len(records) == 2
 
 
+###############################################################################
 class ThreadedProcessPoolExecutor:
+
+    # -------------------------------------------------------------------------
     def __init__(self, max_workers: int, mp_context=None) -> None:
         _ = mp_context
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
 
+    # -------------------------------------------------------------------------
     def __enter__(self) -> "ThreadedProcessPoolExecutor":
         self._executor.__enter__()
         return self
 
+    # -------------------------------------------------------------------------
     def __exit__(self, exc_type, exc, tb) -> bool | None:
         return self._executor.__exit__(exc_type, exc, tb)
 
+    # -------------------------------------------------------------------------
     def submit(self, *args, **kwargs):
         return self._executor.submit(*args, **kwargs)
 
 
+###############################################################################
 def test_collect_monographs_streams_parallel_batches(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -95,6 +105,7 @@ def test_collect_monographs_streams_parallel_batches(
     assert {item["nbk_id"] for item in records} == {"NBK20001", "NBK20002", "NBK20003"}
 
 
+###############################################################################
 def test_collect_monographs_honors_cancellation(tmp_path: Path) -> None:
     archive_path = tmp_path / "livertox.tar.gz"
     build_archive(

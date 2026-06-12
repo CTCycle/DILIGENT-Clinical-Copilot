@@ -9,10 +9,14 @@ from services.session.clinical_input_extractor import (
 )
 
 
+###############################################################################
 def test_deterministic_success_does_not_call_fallback() -> None:
     text = "# Anamnesis\nA\n# Therapy\nT\n# Laboratory history\nL"
 
+    ###############################################################################
     class FakeClient:
+
+        # -------------------------------------------------------------------------
         async def llm_structured_call(self, **_: object) -> object:
             raise AssertionError("LLM should not be called")
 
@@ -23,11 +27,15 @@ def test_deterministic_success_does_not_call_fallback() -> None:
     assert result.laboratory_analysis == "L"
 
 
+###############################################################################
 def test_deterministic_failure_raises_without_fallback() -> None:
     text = "no explicit sections"
     called = {"value": False}
 
+    ###############################################################################
     class FakeClient:
+
+        # -------------------------------------------------------------------------
         async def llm_structured_call(self, **_: object) -> object:
             called["value"] = True
             return {"anamnesis": "no", "therapy": "sections", "lab_analysis": "here"}
@@ -38,6 +46,7 @@ def test_deterministic_failure_raises_without_fallback() -> None:
     assert called["value"] is False
 
 
+###############################################################################
 def test_untitled_prose_is_rejected() -> None:
     text = "Anamnesis text. Therapy text. Lab text."
     extractor = ClinicalInputExtractor()
@@ -45,10 +54,14 @@ def test_untitled_prose_is_rejected() -> None:
         asyncio.run(extractor.extract(clinical_input=text))
 
 
+###############################################################################
 def test_fallback_summarized_is_rejected() -> None:
     text = "Anamnesis text. Therapy text. Lab text."
 
+    ###############################################################################
     class FakeClient:
+
+        # -------------------------------------------------------------------------
         async def llm_structured_call(self, **_: object) -> object:
             return {
                 "anamnesis": "summary",
@@ -61,10 +74,14 @@ def test_fallback_summarized_is_rejected() -> None:
         asyncio.run(extractor.extract(clinical_input=text))
 
 
+###############################################################################
 def test_fallback_missing_section_is_rejected() -> None:
     text = "Anamnesis text. Therapy text. Lab text."
 
+    ###############################################################################
     class FakeClient:
+
+        # -------------------------------------------------------------------------
         async def llm_structured_call(self, **_: object) -> object:
             return {
                 "anamnesis": "Anamnesis text.",

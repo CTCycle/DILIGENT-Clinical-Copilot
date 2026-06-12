@@ -13,9 +13,9 @@ from common.utils.error_filters import get_sensitive_error_tokens
 from common.utils.logger import logger
 from services.runtime.state import JobState
 
-
 ###############################################################################
 class JobErrorSanitizer:
+
     # -------------------------------------------------------------------------
     @staticmethod
     def can_show_exception_message(message: str) -> bool:
@@ -47,9 +47,10 @@ class JobErrorSanitizer:
             return candidate
         return "Operation failed unexpectedly. Please retry."
 
-
 ###############################################################################
 class JobManager:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.jobs: dict[str, JobState] = {}
         self.threads: dict[str, threading.Thread] = {}
@@ -163,7 +164,9 @@ class JobManager:
         with self.lock:
             state = self.jobs.get(job_id)
         if state:
-            state.update(progress=min(100.0, max(0.0, progress)))
+            clamped = min(100.0, max(0.0, progress))
+            non_decreasing = max(state.progress, clamped)
+            state.update(progress=non_decreasing, last_activity_at=monotonic())
 
     # -------------------------------------------------------------------------
     def update_result(
@@ -173,6 +176,7 @@ class JobManager:
             state = self.jobs.get(job_id)
         if state is None:
             return None
+        state.update(last_activity_at=monotonic())
         return state.merge_result(patch).model_dump()
 
     # -------------------------------------------------------------------------
@@ -226,14 +230,13 @@ class JobManager:
     def runner_accepts_job_id(self, runner: Callable[..., dict[str, Any]]) -> bool:
         try:
             signature = inspect.signature(runner)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return False
         parameters = list(signature.parameters.values())
         for param in parameters:
             if param.kind == inspect.Parameter.VAR_KEYWORD:
                 return True
         return any(param.name == "job_id" for param in parameters)
-
 
 ###############################################################################
 @lru_cache(maxsize=1)

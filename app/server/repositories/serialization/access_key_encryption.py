@@ -11,9 +11,10 @@ from repositories.schemas.models import AccessKeyEncryptionMaterial
 
 DEFAULT_KEY_PURPOSE = "provider_access_keys"
 
-
 ###############################################################################
 class AccessKeyEncryptionMaterialSerializer:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

@@ -10,6 +10,7 @@ from services.clinical.report_language import (
 )
 
 
+###############################################################################
 def test_required_phrase_keys_exist_for_supported_languages() -> None:
     keys = {
         "rucam_source_reported",
@@ -34,6 +35,7 @@ def test_required_phrase_keys_exist_for_supported_languages() -> None:
                 assert phrase(key, lang)
 
 
+###############################################################################
 def test_rucam_summary_text_returns_localized_or_safe_text() -> None:
     assessment = DrugRucamAssessment(
         drug_name="A", total_score=6, causality_category="probable"
@@ -43,10 +45,12 @@ def test_rucam_summary_text_returns_localized_or_safe_text() -> None:
         assert "6" in text
 
 
+###############################################################################
 def test_unsupported_language_code_resolves_to_english() -> None:
     assert resolve_report_language("xx") == "en"
 
 
+###############################################################################
 def test_missing_phrase_key_raises_deterministic_error() -> None:
     with pytest.raises(KeyError):
         phrase("missing_key", "en")

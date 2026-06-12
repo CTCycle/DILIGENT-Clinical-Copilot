@@ -6,7 +6,9 @@ from datetime import datetime
 from functools import partial
 from typing import Any
 
+from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
+from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
     ClinicalSectionExtractionResult,
@@ -24,7 +26,6 @@ from services.runtime.jobs import JobManager
 
 NOT_AVAILABLE = "Not available"
 PATIENT_LINE_TEMPLATE = "- **Patient:** {value}"
-
 
 ###############################################################################
 def build_failed_session_payload(
@@ -90,7 +91,6 @@ def build_failed_session_payload(
             "runtime_settings": runtime_settings,
         },
     }
-
 
 ###############################################################################
 class NarrativeBuilder:
@@ -375,7 +375,6 @@ class NarrativeBuilder:
 
         return NarrativeBuilder.compact_spacing("\n\n".join(sections))
 
-
 ###############################################################################
 async def execute_clinical_job(
     service: Any,
@@ -470,12 +469,10 @@ async def execute_clinical_job(
         raise
     return result
 
-
 ###############################################################################
 def ensure_clinical_job_not_cancelled(*, job_manager: JobManager, job_id: str) -> None:
     if job_manager.should_stop(job_id):
         raise ClinicalJobCancelled("Clinical job stop requested.")
-
 
 ###############################################################################
 def report_clinical_job_progress(
@@ -492,14 +489,25 @@ def report_clinical_job_progress(
         detail or stage, stage.replace("_", " ").strip()
     )
     job_manager.update_progress(job_id, bounded)
+    snapshot = job_manager.get_job_status(job_id)
+    elapsed_seconds = 0.0
+    if snapshot is not None:
+        created_at = snapshot.get("created_at", 0.0)
+        last_activity_at = snapshot.get("last_activity_at", 0.0)
+        if last_activity_at > 0.0:
+            elapsed_seconds = round(last_activity_at - created_at, 1)
     job_manager.update_result(
         job_id,
         {
             "progress_stage": stage,
             "progress_message": message,
+            "progress_elapsed": elapsed_seconds,
         },
     )
-
+    logger.info(
+        "[job=%s] Progress: %.1f%% | %s",
+        job_id, bounded, message,
+    )
 
 ###############################################################################
 def run_clinical_job(

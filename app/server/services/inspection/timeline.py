@@ -16,6 +16,7 @@ from services.inspection.normalization import (
 from services.inspection.runtime import coerce_optional_str
 
 
+###############################################################################
 def get_session_timeline(service: Any, session_id: int) -> PatientTimeline | None:
     payload = service.serializer.get_session_result_payload(session_id)
     if not isinstance(payload, dict):
@@ -34,6 +35,7 @@ def get_session_timeline(service: Any, session_id: int) -> PatientTimeline | Non
         return None
 
 
+###############################################################################
 def build_fallback_timeline(
     service: Any,
     *,
@@ -112,10 +114,16 @@ def build_fallback_timeline(
     return PatientTimeline(
         session_id=session_id,
         generated_at=datetime.now(UTC),
+        generation_status="fallback",
+        generation_note=(
+            "Local model timeline extraction was unavailable; deterministic "
+            "fallback events were built from persisted session fields."
+        ),
         events=events,
     )
 
 
+###############################################################################
 def generate_session_timeline(
     service: Any,
     session_id: int,
@@ -189,6 +197,13 @@ def generate_session_timeline(
                     ),
                     timeout=timeline_timeout_s,
                 )
+            )
+            timeline = PatientTimeline(
+                **{
+                    **timeline.model_dump(),
+                    "generation_status": "llm_generated",
+                    "generation_note": None,
+                }
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(

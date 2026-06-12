@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import shutil
+import tempfile
+import uuid
 from pathlib import Path
 
 from domain.settings.configuration import DatabaseSettings
@@ -9,8 +12,7 @@ from repositories.schemas.models import AccessKeyEncryptionMaterial
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def make_sqlite_settings() -> DatabaseSettings:
     return DatabaseSettings(
         embedded_database=True,
@@ -28,54 +30,65 @@ def make_sqlite_settings() -> DatabaseSettings:
         select_page_size=1000,
     )
 
+###############################################################################
+def _make_temp_db_root(prefix: str) -> Path:
+    temp_root = Path(tempfile.gettempdir()) / f"{prefix}-{uuid.uuid4().hex}"
+    temp_root.mkdir(parents=True, exist_ok=True)
+    return temp_root
 
-# -----------------------------------------------------------------------------
-def test_sqlite_fresh_creation_seeds_registry_once(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    monkeypatch.setattr(
-        "repositories.database.sqlite.RESOURCES_PATH",
-        str(tmp_path),
-    )
+###############################################################################
+def test_sqlite_fresh_creation_seeds_registry_once(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    temp_root = _make_temp_db_root("sqlite-seed-fresh")
+    try:
+        monkeypatch.setattr(
+            "repositories.database.sqlite.DATABASE_FILE_PATH",
+            temp_root / "database.db",
+        )
 
-    repository = SQLiteRepository(make_sqlite_settings())
-    assert repository.db_path is not None
-    assert Path(repository.db_path).exists()
+        repository = SQLiteRepository(make_sqlite_settings())
+        assert repository.db_path is not None
+        assert Path(repository.db_path).exists()
 
-    factory = sessionmaker(bind=repository.engine, future=True)
-    with factory() as db_session:
-        count_rows = db_session.execute(
-            select(func.count()).select_from(AccessKeyEncryptionMaterial)
-        ).scalar_one()
-        active_rows = db_session.execute(
-            select(func.count())
-            .select_from(AccessKeyEncryptionMaterial)
-            .where(AccessKeyEncryptionMaterial.is_active.is_(True))
-        ).scalar_one()
+        factory = sessionmaker(bind=repository.engine, future=True)
+        with factory() as db_session:
+            count_rows = db_session.execute(
+                select(func.count()).select_from(AccessKeyEncryptionMaterial)
+            ).scalar_one()
+            active_rows = db_session.execute(
+                select(func.count())
+                .select_from(AccessKeyEncryptionMaterial)
+                .where(AccessKeyEncryptionMaterial.is_active.is_(True))
+            ).scalar_one()
 
-    assert int(count_rows) == 1
-    assert int(active_rows) == 1
+        assert int(count_rows) == 1
+        assert int(active_rows) == 1
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
 
+###############################################################################
+def test_sqlite_reopen_with_existing_db_does_not_reseed(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    temp_root = _make_temp_db_root("sqlite-seed-reopen")
+    try:
+        monkeypatch.setattr(
+            "repositories.database.sqlite.DATABASE_FILE_PATH",
+            temp_root / "database.db",
+        )
 
-# -----------------------------------------------------------------------------
-def test_sqlite_reopen_with_existing_db_does_not_reseed(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    monkeypatch.setattr(
-        "repositories.database.sqlite.RESOURCES_PATH",
-        str(tmp_path),
-    )
+        first = SQLiteRepository(make_sqlite_settings())
+        second = SQLiteRepository(make_sqlite_settings())
+        factory = sessionmaker(bind=second.engine, future=True)
 
-    first = SQLiteRepository(make_sqlite_settings())
-    second = SQLiteRepository(make_sqlite_settings())
-    factory = sessionmaker(bind=second.engine, future=True)
+        with factory() as db_session:
+            count_rows = db_session.execute(
+                select(func.count()).select_from(AccessKeyEncryptionMaterial)
+            ).scalar_one()
 
-    with factory() as db_session:
-        count_rows = db_session.execute(
-            select(func.count()).select_from(AccessKeyEncryptionMaterial)
-        ).scalar_one()
+        assert int(count_rows) == 1
+        assert first.db_path == second.db_path
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
 
-    assert int(count_rows) == 1
-    assert first.db_path == second.db_path
-
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_postgresql_initialization_path_seeds_after_schema_creation(
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
@@ -98,27 +111,42 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     order: list[str] = []
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
 
+    ###############################################################################
     class FakeConnection:
+
+        # -------------------------------------------------------------------------
         def __enter__(self):
             return self
 
+        # -------------------------------------------------------------------------
         def __exit__(self, exc_type, exc, tb):
             return False
 
+        # -------------------------------------------------------------------------
         def execute(self, _stmt):
+
+            ###############################################################################
             class ScalarResult:
+
+                # -------------------------------------------------------------------------
                 @staticmethod
                 def scalar():
                     return 1
 
             return ScalarResult()
 
+    ###############################################################################
     class FakeAdminEngine:
+
+        # -------------------------------------------------------------------------
         @staticmethod
         def connect():
             return FakeConnection()
 
+    ###############################################################################
     class FakePostgresRepository:
+
+        # -------------------------------------------------------------------------
         def __init__(self, _settings) -> None:
             self.engine = engine
             self.session_factory = sessionmaker(bind=engine, future=True)
@@ -126,27 +154,39 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     def fake_create_all(_engine):
         order.append("create_all")
 
+    ###############################################################################
     class FakeMaterialSerializer:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **_kwargs) -> None:
             pass
 
+        # -------------------------------------------------------------------------
         def ensure_seeded(self, purpose: str):
             assert purpose == "provider_access_keys"
             order.append("seeded")
 
+    ###############################################################################
     class FakeCatalogSerializer:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **_kwargs) -> None:
             pass
 
+    ###############################################################################
     class FakeCatalogSeedResult:
         manifests_seen = 1
         manifests_seeded = 1
         entries_written = 1
 
+    ###############################################################################
     class FakeCatalogSeeder:
+
+        # -------------------------------------------------------------------------
         def __init__(self, _serializer) -> None:
             pass
 
+        # -------------------------------------------------------------------------
         def seed_missing_or_changed_manifests(self, *, force: bool = False):
             assert force is False
             order.append("catalog_seeded")
@@ -174,21 +214,24 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     assert db_name == "diligent"
     assert order == ["create_all", "seeded", "catalog_seeded"]
 
+###############################################################################
+def test_seeding_does_not_create_duplicate_active_rows(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    temp_root = _make_temp_db_root("sqlite-seed-active")
+    try:
+        monkeypatch.setattr(
+            "repositories.database.sqlite.DATABASE_FILE_PATH",
+            temp_root / "database.db",
+        )
 
-# -----------------------------------------------------------------------------
-def test_seeding_does_not_create_duplicate_active_rows(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    monkeypatch.setattr(
-        "repositories.database.sqlite.RESOURCES_PATH",
-        str(tmp_path),
-    )
+        repository = SQLiteRepository(make_sqlite_settings())
+        factory = sessionmaker(bind=repository.engine, future=True)
+        with factory() as db_session:
+            count_rows = db_session.execute(
+                select(func.count())
+                .select_from(AccessKeyEncryptionMaterial)
+                .where(AccessKeyEncryptionMaterial.is_active.is_(True))
+            ).scalar_one()
 
-    repository = SQLiteRepository(make_sqlite_settings())
-    factory = sessionmaker(bind=repository.engine, future=True)
-    with factory() as db_session:
-        count_rows = db_session.execute(
-            select(func.count())
-            .select_from(AccessKeyEncryptionMaterial)
-            .where(AccessKeyEncryptionMaterial.is_active.is_(True))
-        ).scalar_one()
-
-    assert int(count_rows) == 1
+        assert int(count_rows) == 1
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)

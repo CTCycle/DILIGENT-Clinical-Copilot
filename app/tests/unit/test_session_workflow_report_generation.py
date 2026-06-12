@@ -18,7 +18,10 @@ from services.session.document_normalizer import DocumentNormalizer
 from services.session.session_workflow import process_single_patient_workflow
 
 
+###############################################################################
 class FakePatternAnalyzer:
+
+    # -------------------------------------------------------------------------
     def stringify_scores(
         self, pattern_score: HepatotoxicityPatternScore
     ) -> dict[str, str]:
@@ -29,22 +32,29 @@ class FakePatternAnalyzer:
         }
 
 
+###############################################################################
 class FakeDrugsParser:
     model = "test-parser"
 
+    # -------------------------------------------------------------------------
     def clean_text(self, text: str) -> str:
         return text
 
 
+###############################################################################
 class FakeSerializer:
+
+    # -------------------------------------------------------------------------
     def save_clinical_session(self, payload: dict[str, Any]) -> int | None:
         self.saved_payload = payload
         return None
 
 
+###############################################################################
 class FakeClinicalService:
     JOB_TYPE = "clinical"
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.drugs_parser = FakeDrugsParser()
         self.pattern_analyzer = FakePatternAnalyzer()
@@ -57,32 +67,40 @@ class FakeClinicalService:
             )
         )
 
+    # -------------------------------------------------------------------------
     def run_stop_check(self, stop_check: Any) -> None:
         if stop_check is not None:
             stop_check()
 
+    # -------------------------------------------------------------------------
     def emit_progress(self, *args: Any, **kwargs: Any) -> None:
         _ = args, kwargs
 
+    # -------------------------------------------------------------------------
     def build_validation_bundle_for_payload(self, payload: PatientData) -> object:
         _ = payload
         return object()
 
+    # -------------------------------------------------------------------------
     def ensure_submission_requirements(self, payload: PatientData) -> None:
         _ = payload
 
+    # -------------------------------------------------------------------------
     async def extract_therapy_drugs(self, **kwargs: Any) -> PatientDrugs:
         _ = kwargs
         return PatientDrugs(entries=[DrugEntry(name="Paracetamolo", source="therapy")])
 
+    # -------------------------------------------------------------------------
     async def extract_anamnesis_drugs(self, **kwargs: Any) -> PatientDrugs:
         _ = kwargs
         return PatientDrugs(entries=[])
 
+    # -------------------------------------------------------------------------
     async def extract_disease_context(self, **kwargs: Any) -> SimpleNamespace:
         _ = kwargs
         return SimpleNamespace(entries=[])
 
+    # -------------------------------------------------------------------------
     async def extract_lab_timeline(
         self, **kwargs: Any
     ) -> tuple[PatientLabTimeline, None]:
@@ -97,6 +115,7 @@ class FakeClinicalService:
             None,
         )
 
+    # -------------------------------------------------------------------------
     def assess_pattern(self, **kwargs: Any) -> SimpleNamespace:
         _ = kwargs
         return SimpleNamespace(
@@ -107,22 +126,27 @@ class FakeClinicalService:
             ),
         )
 
+    # -------------------------------------------------------------------------
     def estimate_rucam(self, **kwargs: Any) -> PatientRucamAssessmentBundle:
         _ = kwargs
         return PatientRucamAssessmentBundle(entries=[])
 
+    # -------------------------------------------------------------------------
     def build_structured_clinical_context(self, *args: Any, **kwargs: Any) -> str:
         _ = args, kwargs
         return "Contesto clinico strutturato."
 
+    # -------------------------------------------------------------------------
     def build_rag_query(self, **kwargs: Any) -> dict[str, str]:
         _ = kwargs
         return {}
 
+    # -------------------------------------------------------------------------
     async def run_livertox_lookup(self, **kwargs: Any) -> None:
         _ = kwargs
         return None
 
+    # -------------------------------------------------------------------------
     def reestimate_rucam_with_livertox(
         self,
         *,
@@ -132,6 +156,7 @@ class FakeClinicalService:
         _ = kwargs
         return rucam_bundle
 
+    # -------------------------------------------------------------------------
     async def run_consultation(self, **kwargs: Any) -> tuple[SimpleNamespace, str]:
         _ = kwargs
         return (
@@ -139,10 +164,12 @@ class FakeClinicalService:
             "Relazione narrativa con discussione farmacologica e sintesi finale.",
         )
 
+    # -------------------------------------------------------------------------
     def _normalized_resolved_drug_map(self, prepared_inputs: Any) -> dict[str, Any]:
         _ = prepared_inputs
         return {}
 
+    # -------------------------------------------------------------------------
     def _normalized_rucam_map(
         self,
         rucam_bundle: PatientRucamAssessmentBundle,
@@ -150,6 +177,7 @@ class FakeClinicalService:
         _ = rucam_bundle
         return {}
 
+    # -------------------------------------------------------------------------
     def serialize_pipeline_issues(self, issues: list[Any]) -> list[dict[str, Any]]:
         serialized = []
         for issue in issues:
@@ -160,6 +188,7 @@ class FakeClinicalService:
         return serialized
 
 
+###############################################################################
 def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
     payload = PatientData(
         name="Mario Rossi",

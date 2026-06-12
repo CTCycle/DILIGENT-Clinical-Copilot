@@ -7,6 +7,7 @@ from typing import Literal, Sequence
 from services.text.normalization import normalize_drug_query_name
 
 
+###############################################################################
 @dataclass(frozen=True)
 class DrugEvidenceMatchCandidate:
     candidate_name: str
@@ -15,6 +16,7 @@ class DrugEvidenceMatchCandidate:
     rxnav_rxcui: str | None = None
 
 
+###############################################################################
 @dataclass(frozen=True)
 class DrugEvidenceMatchResult:
     extracted_name: str
@@ -33,6 +35,7 @@ class DrugEvidenceMatchResult:
     supplementary_information_available: bool
 
 
+###############################################################################
 def conservative_fuzzy_livertox_match(
     candidate_names: Sequence[str],
     livertox_names: Sequence[str],

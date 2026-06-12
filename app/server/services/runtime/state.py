@@ -9,6 +9,7 @@ from typing import Any
 from domain.jobs import JobStatusResponse
 
 
+###############################################################################
 @dataclass
 class JobState:
     job_id: str
@@ -19,10 +20,12 @@ class JobState:
     error: str | None = None
     created_at: float = field(default_factory=monotonic)
     completed_at: float | None = None
+    last_activity_at: float = field(default_factory=monotonic)
     version: int = 0
     stop_requested: bool = False
     lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
+    # -------------------------------------------------------------------------
     def update(self, **kwargs: Any) -> None:
         with self.lock:
             changed = False
@@ -33,6 +36,7 @@ class JobState:
             if changed:
                 self.version += 1
 
+    # -------------------------------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
         with self.lock:
             return {
@@ -44,9 +48,11 @@ class JobState:
                 "error": self.error,
                 "created_at": self.created_at,
                 "completed_at": self.completed_at,
+                "last_activity_at": self.last_activity_at,
                 "version": self.version,
             }
 
+    # -------------------------------------------------------------------------
     def merge_result(self, result_delta: Mapping[str, Any]) -> JobStatusResponse:
         with self.lock:
             existing = dict(self.result or {})

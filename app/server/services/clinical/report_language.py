@@ -261,6 +261,7 @@ _PHRASES = {
 }
 
 
+###############################################################################
 def resolve_report_language(code: str | None) -> str:
     resolved = resolve_supported_language_code(code)
     if resolved == "en" and (code or "").strip().lower().startswith("pt"):
@@ -268,6 +269,7 @@ def resolve_report_language(code: str | None) -> str:
     return resolved if resolved in SUPPORTED_REPORT_LANGUAGE_CODES else "en"
 
 
+###############################################################################
 def phrase(key: str, language: str, **values: object) -> str:
     lang = resolve_report_language(language)
     table = _PHRASES.get(lang, _PHRASES["en"])
@@ -276,6 +278,7 @@ def phrase(key: str, language: str, **values: object) -> str:
     return table[key].format(**values)
 
 
+###############################################################################
 def rucam_summary_text(assessment: DrugRucamAssessment, language: str) -> str:
     lang = resolve_report_language(language)
     if assessment.calculation_method == "source_reported":
@@ -290,10 +293,12 @@ def rucam_summary_text(assessment: DrugRucamAssessment, language: str) -> str:
     )
 
 
+###############################################################################
 def report_heading(key: str, language: str) -> str:
     return phrase(key, language)
 
 
+###############################################################################
 def requires_language_repair(text: str, expected_language: str) -> bool:
     lang = resolve_report_language(expected_language)
     if lang == "en":

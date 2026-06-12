@@ -1,127 +1,22 @@
 from __future__ import annotations
 
 import json
-import os
 import re
-from collections.abc import Awaitable, Callable
-from typing import Any, Literal, NoReturn, TypeAlias
-
-import httpx
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
-    HumanMessage,
-    SystemMessage,
-)
+from typing import Any, NoReturn
 
 from common.constants import (
     TEXT_EXTRACTION_MODEL_CHOICES,
 )
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.ollama_runtime import OllamaError
 from services.llm.structured import (
     StructuredOutputParser,
     T,
     parse_json_dict,
 )
 
-ProviderName = Literal["openai", "gemini"]
-RuntimePurpose = Literal["clinical", "parser"]
-
-
 ###############################################################################
-class OllamaError(RuntimeError):
-    pass
-
-
-###############################################################################
-class OllamaTimeout(OllamaError):
-    """Raised when requests to Ollama exceed the configured timeout."""
-
-
-ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
-
-
-###############################################################################
-def _env_float(name: str, default: float) -> float:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        return float(raw)
-    except TypeError, ValueError:
-        return default
-
-
-###############################################################################
-def _env_str(name: str, default: str) -> str:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    value = raw.strip()
-    return value or default
-
-
-###############################################################################
-def _build_langchain_messages(messages: list[dict[str, str]]) -> list[BaseMessage]:
-    output: list[BaseMessage] = []
-    for message in messages:
-        role = str(message.get("role", "user")).strip().lower()
-        content = str(message.get("content", ""))
-        if role == "system":
-            output.append(SystemMessage(content=content))
-        elif role in {"assistant", "model"}:
-            output.append(AIMessage(content=content))
-        else:
-            output.append(HumanMessage(content=content))
-    return output
-
-
-###############################################################################
-def _normalize_langchain_content(content: Any) -> dict[str, Any] | str:
-    if isinstance(content, dict):
-        return content
-    if isinstance(content, list):
-        chunks: list[str] = []
-        for item in content:
-            if isinstance(item, dict):
-                text = item.get("text")
-                if isinstance(text, str):
-                    chunks.append(text)
-                continue
-            if isinstance(item, str):
-                chunks.append(item)
-                continue
-            chunks.append(str(item))
-        content = "".join(chunks)
-    if isinstance(content, str):
-        try:
-            loaded = json.loads(content)
-        except json.JSONDecodeError:
-            return content
-        return loaded if isinstance(loaded, dict) else content
-    return str(content)
-
-
-###############################################################################
-def _map_ollama_langchain_exception(exc: Exception) -> OllamaError:
-    if isinstance(exc, OllamaError):
-        return exc
-    if isinstance(exc, TimeoutError):
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    if isinstance(exc, httpx.TimeoutException):
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    error_name = exc.__class__.__name__.lower()
-    if "timeout" in error_name:
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    return OllamaError(f"Ollama request failed: {exc}")
-
-
-###############################################################################
-
-# Extracted from the facade module; functions intentionally accept the facade instance.
-
-
 async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
     available: set[str] = set()
     try:
@@ -143,6 +38,7 @@ async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
     return fallbacks
 
 
+###############################################################################
 async def llm_structured_call(
     self,
     *,
@@ -186,6 +82,7 @@ async def llm_structured_call(
     )
 
 
+###############################################################################
 def build_structured_messages(
     *,
     system_prompt: str,
@@ -201,6 +98,7 @@ def build_structured_messages(
     ]
 
 
+###############################################################################
 async def resolve_text_extraction_models(self, model: str) -> list[str]:
     preferred: list[str] = []
     for candidate in (
@@ -215,11 +113,13 @@ async def resolve_text_extraction_models(self, model: str) -> list[str]:
     return preferred
 
 
+###############################################################################
 def is_missing_model_error(err: OllamaError) -> bool:
     message = str(err).lower()
     return "not found" in message or "404" in message
 
 
+###############################################################################
 async def _chat_structured_model(
     self,
     *,
@@ -241,6 +141,7 @@ async def _chat_structured_model(
         raise RuntimeError(f"LLM call failed: {err}") from err
 
 
+###############################################################################
 async def _extend_structured_model_queue(
     self,
     *,
@@ -249,18 +150,23 @@ async def _extend_structured_model_queue(
     tried: set[str],
     fallbacks: list[str] | None,
 ) -> list[str]:
-    if fallbacks is None:
-        fallbacks = await self.collect_structured_fallbacks(preferred_models)
-    for candidate in fallbacks:
+    computed_fallbacks = (
+        await self.collect_structured_fallbacks(preferred_models)
+        if fallbacks is None
+        else fallbacks
+    )
+    for candidate in computed_fallbacks:
         if candidate and candidate not in tried and candidate not in queue:
             queue.append(candidate)
-    return fallbacks
+    return computed_fallbacks
 
 
+###############################################################################
 def _coerce_llm_text(raw: dict[str, Any] | str) -> str:
     return json.dumps(raw) if isinstance(raw, dict) else str(raw)
 
 
+###############################################################################
 def _raise_structured_models_exhausted(
     *,
     last_missing_error: Exception | None,
@@ -275,6 +181,7 @@ def _raise_structured_models_exhausted(
     raise RuntimeError("LLM call failed: no text extraction model candidates available")
 
 
+###############################################################################
 def build_repair_messages(
     *,
     system_prompt: str,
@@ -295,6 +202,7 @@ def build_repair_messages(
     ]
 
 
+###############################################################################
 async def call_with_structured_models(
     self,
     *,
@@ -351,8 +259,10 @@ async def call_with_structured_models(
         last_missing_error=last_missing_error,
         missing=missing,
     )
+    raise AssertionError("unreachable")
 
 
+###############################################################################
 async def parse_with_repairs(
     self,
     *,
@@ -395,6 +305,7 @@ async def parse_with_repairs(
     raise RuntimeError("No structured output produced by the model")
 
 
+###############################################################################
 def extract_first_json_object(text: str) -> str | None:
     decoder = json.JSONDecoder()
     for match in re.finditer(r"\{", text):
@@ -408,5 +319,6 @@ def extract_first_json_object(text: str) -> str | None:
     return None
 
 
+###############################################################################
 def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
     return parse_json_dict(obj_or_text)

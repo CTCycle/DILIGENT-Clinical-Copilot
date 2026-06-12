@@ -17,6 +17,7 @@ except Exception:  # pragma: no cover
     from PyPDF2 import PdfReader  # type: ignore[no-redef]
 
 
+###############################################################################
 def _extract_pdf_text(path: Path) -> str:
     reader = PdfReader(str(path))
     chunks: list[str] = []
@@ -30,6 +31,7 @@ def _extract_pdf_text(path: Path) -> str:
     return "\n\n".join(chunks).strip()
 
 
+###############################################################################
 @pytest.mark.skipif(
     os.environ.get("RUN_PDF_CORPUS_REGRESSION") != "1",
     reason="Set RUN_PDF_CORPUS_REGRESSION=1 to run corpus-scale PDF preflight regression.",

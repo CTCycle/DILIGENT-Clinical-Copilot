@@ -33,19 +33,26 @@ ITALIAN_THERAPY_TEXT = """
 """
 
 
+###############################################################################
 class FailingLabClient:
+
+    # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> LabExtractionPayload:
         _ = kwargs
         raise RuntimeError("simulated lab extraction failure")
 
 
+###############################################################################
 class SlowLabClient:
+
+    # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> LabExtractionPayload:
         _ = kwargs
         await asyncio.sleep(1.0)
         return LabExtractionPayload(entries=[], onset_context=None)
 
 
+###############################################################################
 def test_clinical_session_factory_uses_configured_parser_timeouts(
     monkeypatch: Any,
 ) -> None:
@@ -64,6 +71,7 @@ def test_clinical_session_factory_uses_configured_parser_timeouts(
     assert service.disease_extractor.timeout_s == 150.0
 
 
+###############################################################################
 def test_italian_therapy_text_parses_multiple_drugs_without_llm() -> None:
     parser = DrugsParser(client=object())
 
@@ -76,6 +84,7 @@ def test_italian_therapy_text_parses_multiple_drugs_without_llm() -> None:
     assert "Aspirin Cardio" in names
 
 
+###############################################################################
 def test_italian_laboratory_text_uses_deterministic_fallback() -> None:
     extractor = ClinicalLabExtractor(client=FailingLabClient())
     payload = PatientData(
@@ -96,6 +105,7 @@ def test_italian_laboratory_text_uses_deterministic_fallback() -> None:
     assert ("ALT", "2025-02-13", 591.0) in observed
 
 
+###############################################################################
 def test_lab_llm_chunk_timeout_uses_deterministic_fallback(monkeypatch: Any) -> None:
     extractor = ClinicalLabExtractor(client=SlowLabClient(), timeout_s=3600.0)
     monkeypatch.setattr(extractor, "LOCAL_LLM_CHUNK_TIMEOUT_CAP_S", 0.01)
@@ -115,6 +125,7 @@ def test_lab_llm_chunk_timeout_uses_deterministic_fallback(monkeypatch: Any) -> 
     assert ("ALP", "2025-01-10", 1055.0) in observed
 
 
+###############################################################################
 def test_runtime_timeout_resolution_does_not_apply_six_second_parser_cap() -> None:
     timeout = ClinicalSessionService._resolve_runtime_timeout(base_timeout_s=120.0)
 

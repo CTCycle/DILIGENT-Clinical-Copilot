@@ -11,14 +11,12 @@ SUPPORTED_PROVIDERS: frozenset[ProviderName] = frozenset(("openai", "gemini", "b
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 MIN_ACCESS_KEY_LENGTH = 16
 
-
 ###############################################################################
 def normalize_provider_name(provider: str) -> ProviderName:
     normalized = str(provider or "").strip().lower()
     if normalized not in SUPPORTED_PROVIDERS:
         raise ValueError("Unsupported provider")
     return cast(ProviderName, normalized)
-
 
 ###############################################################################
 def normalize_access_key(value: str | None) -> str:
@@ -30,7 +28,6 @@ def normalize_access_key(value: str | None) -> str:
     if len(normalized) < MIN_ACCESS_KEY_LENGTH:
         raise ValueError("access_key is too short")
     return normalized
-
 
 ###############################################################################
 class AccessKeyCreateRequest(BaseModel):
@@ -44,7 +41,6 @@ class AccessKeyCreateRequest(BaseModel):
     def strip_access_key(cls, value: str | None) -> str:
         return normalize_access_key(value)
 
-
 ###############################################################################
 class AccessKeyResponse(BaseModel):
     id: int
@@ -55,7 +51,6 @@ class AccessKeyResponse(BaseModel):
     updated_at: datetime | None = None
     last_used_at: datetime | None = None
 
-
 ###############################################################################
 class AccessKeyRecord(BaseModel):
     id: int
@@ -65,7 +60,6 @@ class AccessKeyRecord(BaseModel):
     is_active: bool
     key_fingerprint: str
     last_used_at: datetime | None = None
-
 
 ###############################################################################
 class AccessKeyDeleteResponse(BaseModel):

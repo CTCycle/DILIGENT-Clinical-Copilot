@@ -7,9 +7,10 @@ from typing import Any
 import httpx
 from services.updater.rxnav_builder import RxNavDrugCatalogBuilder
 
-
 ###############################################################################
 class RxClientStub:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.timeout = 2.0
         self.max_concurrency = 8
@@ -43,9 +44,10 @@ class RxClientStub:
         self.synonym_calls.append(rxcui)
         return [f"Synonym-{rxcui}"]
 
-
 ###############################################################################
 class SerializerStub:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
@@ -58,8 +60,7 @@ class SerializerStub:
             }
         )
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_prefetch_concept_queries_fetches_unique_cache_misses() -> None:
     rx_client = RxClientStub()
     builder = RxNavDrugCatalogBuilder(rx_client=rx_client)
@@ -81,8 +82,7 @@ def test_prefetch_concept_queries_fetches_unique_cache_misses() -> None:
     assert "161" in builder.rxcui_cache
     assert "5640" in builder.rxcui_cache
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_persist_catalog_prefetches_by_batch() -> None:
     builder = RxNavDrugCatalogBuilder(rx_client=RxClientStub())
     builder.BATCH_SIZE = 2
@@ -122,8 +122,7 @@ def test_persist_catalog_prefetches_by_batch() -> None:
     assert prefetch_batch_sizes == [2, 1]
     assert persisted_batch_sizes == [2, 1]
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_curated_aliases_are_loaded_and_forwarded_to_serializer(
     tmp_path: Path,
 ) -> None:

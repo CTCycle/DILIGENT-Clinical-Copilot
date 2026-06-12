@@ -18,16 +18,38 @@ from repositories.schemas.models import ModelSelection, RuntimeSetting
 ModelRoleType = Literal["clinical", "text_extraction", "cloud"]
 UNSET = object()
 
-
 ###############################################################################
 class ModelConfigSerializer:
     OLLAMA_TEMPERATURE_KEY = "ollama_temperature"
     CLOUD_TEMPERATURE_KEY = "cloud_temperature"
     OLLAMA_REASONING_KEY = "ollama_reasoning"
+    RAG_SETTING_PREFIX = "rag."
+    RAG_SETTING_KEYS = {
+        "chunk_size",
+        "chunk_overlap",
+        "embedding_batch_size",
+        "use_hybrid_search",
+        "use_reranking",
+        "retrieval_candidate_count",
+        "retrieval_selected_count",
+        "reranker_model",
+        "hybrid_vector_weight",
+        "hybrid_text_weight",
+        "embedding_backend",
+        "ollama_embedding_model",
+        "hf_embedding_model",
+        "cloud_provider",
+        "cloud_embedding_model",
+        "use_cloud_embeddings",
+        "reset_vector_collection",
+        "vector_stream_batch_size",
+        "embedding_max_workers",
+    }
     DEFAULT_OLLAMA_TEMPERATURE = 0.7
     DEFAULT_CLOUD_TEMPERATURE = 0.7
     DEFAULT_OLLAMA_REASONING = False
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -72,6 +94,7 @@ class ModelConfigSerializer:
         ollama_temperature: float | object = UNSET,
         cloud_temperature: float | object = UNSET,
         ollama_reasoning: bool | object = UNSET,
+        rag_settings: dict[str, object] | object = UNSET,
     ) -> ModelConfigSnapshot:
         db_session = self.session_factory()
         now = datetime.now()
@@ -138,6 +161,12 @@ class ModelConfigSerializer:
                     db_session=db_session,
                     key=self.OLLAMA_REASONING_KEY,
                     value=self.normalize_bool_text(ollama_reasoning),
+                    updated_at=now,
+                )
+            if rag_settings is not UNSET:
+                self.upsert_rag_settings(
+                    db_session=db_session,
+                    settings=rag_settings if isinstance(rag_settings, dict) else {},
                     updated_at=now,
                 )
 
@@ -255,6 +284,48 @@ class ModelConfigSerializer:
         return "true" if bool(value) else "false"
 
     # -------------------------------------------------------------------------
+    @classmethod
+    def upsert_rag_settings(
+        cls,
+        *,
+        db_session: Session,
+        settings: dict[str, object],
+        updated_at: datetime,
+    ) -> None:
+        for key, value in settings.items():
+            if key not in cls.RAG_SETTING_KEYS:
+                continue
+            cls.upsert_runtime_setting(
+                db_session=db_session,
+                key=f"{cls.RAG_SETTING_PREFIX}{key}",
+                value=cls.serialize_rag_setting_value(value),
+                updated_at=updated_at,
+            )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def serialize_rag_setting_value(value: object) -> str:
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if value is None:
+            return ""
+        return str(value)
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def read_runtime_rag_settings(cls, rows: list[RuntimeSetting]) -> dict[str, object]:
+        settings: dict[str, object] = {}
+        for row in rows:
+            raw_key = str(row.setting_key)
+            if not raw_key.startswith(cls.RAG_SETTING_PREFIX):
+                continue
+            key = raw_key.removeprefix(cls.RAG_SETTING_PREFIX)
+            if key not in cls.RAG_SETTING_KEYS:
+                continue
+            settings[key] = row.setting_value
+        return settings
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_snapshot(rows: list[ModelSelection]) -> ModelConfigSnapshot:
         return ModelConfigSerializer.build_snapshot_with_runtime(rows, [])
@@ -274,6 +345,7 @@ class ModelConfigSerializer:
             runtime_rows
         )
         ollama_reasoning = cls.read_runtime_reasoning(runtime_rows)
+        rag_settings = cls.read_runtime_rag_settings(runtime_rows)
         updated_values = [
             row.updated_at
             for row in role_map.values()
@@ -302,6 +374,7 @@ class ModelConfigSerializer:
             ollama_temperature=ollama_temperature,
             cloud_temperature=cloud_temperature,
             ollama_reasoning=ollama_reasoning,
+            rag_settings=rag_settings,
             updated_at=updated_at,
         )
 

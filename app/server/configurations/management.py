@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -13,7 +12,6 @@ from pydantic import ValidationError
 from common.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
-    CONFIGURATIONS_FILE,
     DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT,
     DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE,
     DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
@@ -30,6 +28,7 @@ from common.constants import (
     OLLAMA_DEFAULT_SCHEME,
     TEXT_EXTRACTION_MODEL_CHOICES,
 )
+from common.paths import CONFIGURATIONS_FILE
 from common.utils.types import (
     coerce_bool,
     coerce_float,
@@ -50,14 +49,20 @@ from domain.settings.configuration import (
     ServerSettings,
     SessionPipelineSettings,
 )
+from domain.settings.environment import (
+    DatabaseEnvironmentSnapshot,
+    EnvironmentSnapshot,
+)
 
 
+###############################################################################
 def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
 
 
+###############################################################################
 def load_configuration_data(path: str | Path) -> dict[str, Any]:
     config_path = Path(path)
     if not config_path.exists():
@@ -71,44 +76,10 @@ def load_configuration_data(path: str | Path) -> dict[str, Any]:
         raise RuntimeError("Configuration must be a JSON object.")
     return data
 
-
-###############################################################################
-###############################################################################
-class EnvironmentSnapshot:
-    def __init__(
-        self,
-        *,
-        ollama_url: str | None,
-        ollama_host: str | None,
-        ollama_port: int | None,
-        database: "DatabaseEnvironmentSnapshot",
-    ) -> None:
-        self.ollama_url = ollama_url
-        self.ollama_host = ollama_host
-        self.ollama_port = ollama_port
-        self.database = database
-
-
-@dataclass(frozen=True)
-class DatabaseEnvironmentSnapshot:
-    embedded_database: str | None
-    url: str | None
-    engine: str | None
-    host: str | None
-    port: str | None
-    database_name: str | None
-    username: str | None
-    password: str | None
-    ssl: str | None
-    ssl_ca: str | None
-    connect_timeout: str | None
-    insert_batch_size: str | None
-    insert_commit_interval: str | None
-    select_page_size: str | None
-
-
 ###############################################################################
 class ConfigurationManager:
+
+    # -------------------------------------------------------------------------
     def __init__(self, config_path: str | None = None) -> None:
         self._config_path = Path(config_path or CONFIGURATIONS_FILE)
         self._lock = RLock()
@@ -116,10 +87,12 @@ class ConfigurationManager:
         self._settings: ServerSettings | None = None
         self.reload()
 
+    # -------------------------------------------------------------------------
     @property
     def config_path(self) -> Path:
         return self._config_path
 
+    # -------------------------------------------------------------------------
     @property
     def server_settings(self) -> ServerSettings:
         with self._lock:
@@ -129,6 +102,7 @@ class ConfigurationManager:
                 raise RuntimeError("Settings are not available.")
             return self._settings
 
+    # -------------------------------------------------------------------------
     def reload(self) -> ServerSettings:
         with self._lock:
             loaded = load_configuration_data(self._config_path)
@@ -144,15 +118,18 @@ class ConfigurationManager:
             self._settings = settings
             return settings
 
+    # -------------------------------------------------------------------------
     def get_block(self, block_name: str) -> dict[str, Any]:
         with self._lock:
             return ensure_mapping(self._raw_data.get(block_name)).copy()
 
+    # -------------------------------------------------------------------------
     def get_value(self, block_name: str, key: str, default: Any = None) -> Any:
         block = self.get_block(block_name)
         return block.get(key, default)
 
 
+###############################################################################
 def _resolve_ollama_url_with_scheme(
     normalized_host: str,
     *,
@@ -173,6 +150,7 @@ def _resolve_ollama_url_with_scheme(
     return f"{scheme}://{host_port}:{resolved_port}"
 
 
+###############################################################################
 def _normalize_ollama_host(host: str) -> str:
     normalized = host.strip()
     if normalized.lower() in {"localhost", "::1", "[::1]"}:
@@ -180,6 +158,7 @@ def _normalize_ollama_host(host: str) -> str:
     return normalized
 
 
+###############################################################################
 def resolve_ollama_base_url(
     *,
     ollama_url: str | None,
@@ -206,6 +185,7 @@ def resolve_ollama_base_url(
     return fallback.rstrip("/")
 
 
+###############################################################################
 def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
     raw_port = os.getenv("OLLAMA_PORT")
     port = (
@@ -228,22 +208,19 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
             password=coerce_str_or_none(os.getenv("DATABASE_PASSWORD")),
             ssl=coerce_str_or_none(os.getenv("DATABASE_SSL")),
             ssl_ca=coerce_str_or_none(os.getenv("DATABASE_SSL_CA")),
-            connect_timeout=coerce_str_or_none(
-                os.getenv("DATABASE_CONNECT_TIMEOUT")
-            ),
+            connect_timeout=coerce_str_or_none(os.getenv("DATABASE_CONNECT_TIMEOUT")),
             insert_batch_size=coerce_str_or_none(
                 os.getenv("DATABASE_INSERT_BATCH_SIZE")
             ),
             insert_commit_interval=coerce_str_or_none(
                 os.getenv("DATABASE_INSERT_COMMIT_INTERVAL")
             ),
-            select_page_size=coerce_str_or_none(
-                os.getenv("DATABASE_SELECT_PAGE_SIZE")
-            ),
+            select_page_size=coerce_str_or_none(os.getenv("DATABASE_SELECT_PAGE_SIZE")),
         ),
     )
 
 
+###############################################################################
 def _default_llm_runtime_defaults(
     environment: EnvironmentSnapshot,
 ) -> LLMRuntimeDefaults:
@@ -271,6 +248,7 @@ def _default_llm_runtime_defaults(
     )
 
 
+###############################################################################
 def _build_fastapi_settings() -> FastAPISettings:
     return FastAPISettings(
         title=FASTAPI_TITLE,
@@ -279,6 +257,7 @@ def _build_fastapi_settings() -> FastAPISettings:
     )
 
 
+###############################################################################
 def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     payload = ensure_mapping(data)
     polling_interval = coerce_float(payload.get("polling_interval"), 1.0)
@@ -287,6 +266,7 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     return JobsSettings(polling_interval=polling_interval)
 
 
+###############################################################################
 def _parse_database_url(url: str | None) -> dict[str, Any]:
     if not url:
         return {}
@@ -302,7 +282,10 @@ def _parse_database_url(url: str | None) -> dict[str, Any]:
     }
 
 
-def _build_database_settings(environment: DatabaseEnvironmentSnapshot) -> DatabaseSettings:
+###############################################################################
+def _build_database_settings(
+    environment: DatabaseEnvironmentSnapshot,
+) -> DatabaseSettings:
     url_payload = _parse_database_url(environment.url)
     embedded = coerce_bool(environment.embedded_database, True)
     insert_batch_size = coerce_int(environment.insert_batch_size, 1000, minimum=1)
@@ -336,9 +319,9 @@ def _build_database_settings(environment: DatabaseEnvironmentSnapshot) -> Databa
         minimum=1,
         maximum=65535,
     )
-    database_name = coerce_str_or_none(
-        environment.database_name
-    ) or coerce_str_or_none(url_payload.get("database_name"))
+    database_name = coerce_str_or_none(environment.database_name) or coerce_str_or_none(
+        url_payload.get("database_name")
+    )
     username = coerce_str_or_none(environment.username) or coerce_str_or_none(
         url_payload.get("username")
     )
@@ -364,6 +347,7 @@ def _build_database_settings(environment: DatabaseEnvironmentSnapshot) -> Databa
     )
 
 
+###############################################################################
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     return DrugsMatcherSettings(
         direct_confidence=coerce_float(data.get("direct_confidence"), 1.0),
@@ -406,13 +390,14 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     )
 
 
+###############################################################################
 def _build_rag_settings(
     data: dict[str, Any], defaults: LLMRuntimeDefaults
 ) -> RagSettings:
-    rerank_top_n = coerce_positive_int(data.get("rerank_top_n"), 10)
-    rerank_candidate_k = coerce_positive_int(data.get("rerank_candidate_k"), 100)
-    if rerank_candidate_k < rerank_top_n:
-        rerank_candidate_k = rerank_top_n
+    selected_count = coerce_positive_int(data.get("retrieval_selected_count"), 6)
+    candidate_count = coerce_positive_int(data.get("retrieval_candidate_count"), 40)
+    if candidate_count < selected_count:
+        candidate_count = selected_count
     return RagSettings(
         vector_collection_name=coerce_str(
             data.get("vector_collection_name"), "documents"
@@ -425,8 +410,8 @@ def _build_rag_settings(
         ),
         use_hybrid_search=coerce_bool(data.get("use_hybrid_search"), True),
         use_reranking=coerce_bool(data.get("use_reranking"), True),
-        rerank_candidate_k=rerank_candidate_k,
-        rerank_top_n=rerank_top_n,
+        retrieval_candidate_count=candidate_count,
+        retrieval_selected_count=selected_count,
         reranker_model=coerce_str(
             data.get("reranker_model"), "cross-encoder/ms-marco-MiniLM-L-6-v2"
         ),
@@ -454,6 +439,7 @@ def _build_rag_settings(
     )
 
 
+###############################################################################
 def _build_runtime_settings(
     data: dict[str, Any], *, fallback_timeout: float
 ) -> RuntimeSettings:
@@ -524,6 +510,7 @@ def _build_runtime_settings(
     )
 
 
+###############################################################################
 def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
     min_length = coerce_positive_int(data.get("drug_name_min_length"), 3)
     max_length = coerce_positive_int(data.get("drug_name_max_length"), 200)
@@ -536,6 +523,7 @@ def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
     )
 
 
+###############################################################################
 def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSettings:
     payload = ensure_mapping(data)
     return SessionPipelineSettings(
@@ -563,11 +551,18 @@ def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSet
     )
 
 
+###############################################################################
 def build_settings_payload_from_json(
     config: dict[str, Any], env: EnvironmentSnapshot
 ) -> dict[str, Any]:
     payload = ensure_mapping(config)
     llm_defaults = _default_llm_runtime_defaults(env)
+    database_environment = DatabaseEnvironmentSnapshot.model_validate(
+        {
+            key: (None if value is None else str(value))
+            for key, value in env.database.model_dump().items()
+        }
+    )
     jobs_payload = ensure_mapping(payload.get("jobs"))
     drugs_matcher_payload = ensure_mapping(payload.get("drugs_matcher"))
     rag_payload = ensure_mapping(payload.get("rag"))
@@ -577,7 +572,7 @@ def build_settings_payload_from_json(
     return {
         "fastapi": _build_fastapi_settings().model_dump(),
         "jobs": _build_jobs_settings(jobs_payload).model_dump(),
-        "database": _build_database_settings(env.database).model_dump(),
+        "database": _build_database_settings(database_environment).model_dump(),
         "drugs_matcher": _build_drugs_matcher_settings(
             drugs_matcher_payload
         ).model_dump(),

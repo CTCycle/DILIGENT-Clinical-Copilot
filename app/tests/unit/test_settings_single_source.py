@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 
 
+###############################################################################
 def test_no_server_settings_symbol_used_in_backend() -> None:
     root = Path(__file__).resolve().parents[2] / "server"
     offenders: list[str] = []

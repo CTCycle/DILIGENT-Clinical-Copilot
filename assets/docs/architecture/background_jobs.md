@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -46,8 +46,7 @@ Each job tracks:
   - Poll or cancel: `GET|DELETE /api/inspection/livertox/jobs/{job_id}`
 - `rag_update`
   - Start: `POST /api/inspection/rag/jobs`
-  - Poll: `GET /api/inspection/rag/jobs/{job_id}`
-  - Cancel: `POST /api/inspection/rag/jobs/{job_id}/cancel`
+  - Poll or cancel: `GET|DELETE /api/inspection/rag/jobs/{job_id}`
 - `session_revision`
   - Start: `POST /api/inspection/sessions/{session_id}/revision/jobs`
   - Poll or cancel: `GET|DELETE /api/inspection/sessions/revision/jobs/{job_id}`

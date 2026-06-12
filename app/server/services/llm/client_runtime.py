@@ -5,7 +5,6 @@ import contextlib
 from collections.abc import Callable
 from typing import Any, Protocol
 
-
 ###############################################################################
 class LLMClientRuntimeOwner(Protocol):
     client: Any | None
@@ -15,12 +14,10 @@ class LLMClientRuntimeOwner(Protocol):
     client_provider: str | None
     runtime_revision: int
 
-
 ###############################################################################
 def _get_runtime_signature(owner: LLMClientRuntimeOwner) -> tuple[str, str] | None:
     value = getattr(owner, "runtime_signature", None)
     return value if isinstance(value, tuple) else None
-
 
 ###############################################################################
 def _set_runtime_signature(
@@ -30,15 +27,17 @@ def _set_runtime_signature(
     if hasattr(owner, "runtime_signature"):
         setattr(owner, "runtime_signature", signature)
 
-
 ###############################################################################
 def _set_retry_attempts(owner: LLMClientRuntimeOwner, provider: str) -> None:
     if hasattr(owner, "extraction_retry_attempts"):
         default_attempts = 4 if provider in {"openai", "gemini"} else 2
         current = getattr(owner, "extraction_retry_attempts", None)
-        try:
-            current_attempts = int(current)
-        except TypeError, ValueError:
+        if isinstance(current, int | float | str):
+            try:
+                current_attempts = int(current)
+            except ValueError:
+                current_attempts = default_attempts
+        else:
             current_attempts = default_attempts
         if current_attempts <= 0:
             current_attempts = default_attempts
@@ -46,7 +45,6 @@ def _set_retry_attempts(owner: LLMClientRuntimeOwner, provider: str) -> None:
         setattr(
             owner, "extraction_retry_attempts", min(current_attempts, default_attempts)
         )
-
 
 ###############################################################################
 def _needs_refresh(
@@ -68,7 +66,6 @@ def _needs_refresh(
         or signature_changed
         or owner.client_loop_id != current_loop_id
     )
-
 
 ###############################################################################
 async def ensure_runtime_client(

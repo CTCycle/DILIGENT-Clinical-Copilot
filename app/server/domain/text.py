@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class TextNormalizationSnapshot:
@@ -26,10 +25,10 @@ class TextNormalizationSnapshot:
     knowledge_source_references: dict[str, str]
     section_title_aliases: dict[str, frozenset[str]]
 
+    # -------------------------------------------------------------------------
     @property
     def rxnav_synonym_stopwords(self) -> frozenset[str]:
         return self.matching_stopwords | self.clinical_generic_terms
-
 
 ###############################################################################
 def empty_text_normalization_snapshot() -> TextNormalizationSnapshot:

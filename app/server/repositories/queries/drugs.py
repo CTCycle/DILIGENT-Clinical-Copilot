@@ -9,9 +9,9 @@ from repositories.schemas.models import (
     LiverToxMonograph,
 )
 
-
 ###############################################################################
 class DrugRepositoryQueries:
+
     # -------------------------------------------------------------------------
     @staticmethod
     def drug_rxcui_mapping(rxcui: str) -> Select[tuple[DrugRxnormCode]]:
@@ -21,11 +21,6 @@ class DrugRepositoryQueries:
     @staticmethod
     def drug_by_joined_rxcui(rxcui: str) -> Select[tuple[Drug]]:
         return select(Drug).join(DrugRxnormCode).where(DrugRxnormCode.rxcui == rxcui)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def drug_by_rxnorm_rxcui(rxcui: str) -> Select[tuple[Drug]]:
-        return select(Drug).where(Drug.rxnorm_rxcui == rxcui)
 
     # -------------------------------------------------------------------------
     @staticmethod
