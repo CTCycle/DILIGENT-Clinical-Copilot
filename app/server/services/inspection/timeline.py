@@ -114,6 +114,11 @@ def build_fallback_timeline(
     return PatientTimeline(
         session_id=session_id,
         generated_at=datetime.now(UTC),
+        generation_status="fallback",
+        generation_note=(
+            "Local model timeline extraction was unavailable; deterministic "
+            "fallback events were built from persisted session fields."
+        ),
         events=events,
     )
 
@@ -192,6 +197,13 @@ def generate_session_timeline(
                     ),
                     timeout=timeline_timeout_s,
                 )
+            )
+            timeline = PatientTimeline(
+                **{
+                    **timeline.model_dump(),
+                    "generation_status": "llm_generated",
+                    "generation_note": None,
+                }
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(

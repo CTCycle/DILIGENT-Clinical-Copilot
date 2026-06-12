@@ -563,6 +563,8 @@ export type InspectionTimelineEvent = {
 export type InspectionSessionTimeline = {
   session_id: number;
   generated_at: string;
+  generation_status?: "llm_generated" | "fallback";
+  generation_note?: string | null;
   events: InspectionTimelineEvent[];
 };
 
