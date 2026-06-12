@@ -10,6 +10,10 @@ from domain.inspection import (
     ReviewerInstructionProfile,
     ReviewerInstructionTrace,
 )
+from services.clinical.revision.qa import build_revision_qa_validation_payload
+from services.clinical.revision.report_builder import (
+    build_revision_final_report_payload,
+)
 from services.session.factory import build_clinical_session_service
 
 
@@ -521,6 +525,18 @@ class InspectionRevisionRunnerMixin:
         )
         actor_source = self._revision_run_actor_source(metadata)
 
+        def report_revision_progress(
+            _stage: str,
+            progress: float,
+            _detail: str | None = None,
+        ) -> None:
+            if job_id:
+                self.jobs.update_progress(job_id, progress)
+
+        def ensure_revision_not_cancelled() -> None:
+            if job_id and self.jobs.should_stop(job_id):
+                raise RuntimeError("Revision job was cancelled")
+
         try:
             load_step_started_at = datetime.now(UTC)
             load_step = self._record_revision_step_start(
@@ -731,20 +747,291 @@ class InspectionRevisionRunnerMixin:
                 patient_payload = clinical_service.build_patient_payload(
                     preprocessed_request
                 )
-                # The rest of the pipeline continues with patient_payload...
-                result_payload = asyncio.run(
-                    clinical_service.process_revision_patient(
-                        patient_payload,
-                        section_extraction=section_extraction,
-                        revision_focus_context=revision_focus_context,
+                generation_started_at = datetime.now(UTC)
+                generation_step = self._record_revision_step_start(
+                    pipeline_run_id=pipeline_run_id,
+                    step_name="generate_revision",
+                    input_summary={
+                        "patient_name_present": bool(
+                            str(patient_payload.get("name") or "").strip()
+                        ),
+                        "section_extraction_available": bool(section_extraction),
+                        "revision_focus_context_present": bool(
+                            str(revision_focus_context or "").strip()
+                        ),
+                    },
+                    input_payload={
+                        "patient_payload_keys": sorted(
+                            str(key) for key in patient_payload.keys()
+                        ),
+                        "revision_focus_context": revision_focus_context,
+                    },
+                    model_name=str(
+                        effective_overrides.get("clinical_model")
+                        or session_detail.get("clinical_model")
+                        or ""
+                    ).strip()
+                    or None,
+                )
+                try:
+                    result_payload = asyncio.run(
+                        clinical_service.process_revision_patient(
+                            patient_payload,
+                            section_extraction=section_extraction,
+                            session_version=version,
+                            original_session_id=root_session_id,
+                            session_metadata={
+                                **metadata,
+                                "instruction_profile": (
+                                    instruction_profile.model_dump()
+                                    if instruction_profile is not None
+                                    else None
+                                ),
+                                "instruction_trace": (
+                                    instruction_trace.model_dump()
+                                    if instruction_trace is not None
+                                    else None
+                                ),
+                                "model_overrides": effective_overrides,
+                                "pipeline_run_id": pipeline_run_id,
+                                "source_version_id": int(source_version_id),
+                                "target_revision_version_id": int(
+                                    target_revision_version_id
+                                ),
+                            },
+                            original_session_text=source_text,
+                            revision_focus_context=revision_focus_context,
+                            progress_callback=report_revision_progress,
+                            stop_check=ensure_revision_not_cancelled,
+                        )
+                    )
+                except Exception as exc:
+                    self._record_revision_step_failure(
+                        pipeline_run_id=pipeline_run_id,
+                        step_name="generate_revision",
+                        attempt_number=int(generation_step["attempt_number"]),
+                        started_at=generation_started_at,
+                        exc=exc,
+                    )
+                    raise
+                self._record_revision_step_success(
+                    pipeline_run_id=pipeline_run_id,
+                    step_name="generate_revision",
+                    attempt_number=int(generation_step["attempt_number"]),
+                    started_at=generation_started_at,
+                    output_summary={
+                        "result_payload_keys": sorted(
+                            str(key) for key in result_payload.keys()
+                        ),
+                        "revision_present": isinstance(
+                            result_payload.get("revision"), dict
+                        ),
+                        "pipeline_artifacts_present": isinstance(
+                            result_payload.get("pipeline_artifacts"), dict
+                        ),
+                    },
+                )
+                entity_pipeline = self._get_revision_entity_pipeline(result_payload)
+                for step_name in (
+                    "resolve_revision_extraction",
+                    "validate_anamnesis_drugs",
+                    "extract_missing_anamnesis_drugs",
+                    "revise_labs_timeline",
+                    "reconcile_revision_candidates",
+                    "merge_revision_snapshot",
+                ):
+                    step_started_at = datetime.now(UTC)
+                    step = self._record_revision_step_start(
+                        pipeline_run_id=pipeline_run_id,
+                        step_name=step_name,
+                        input_summary={"source": "revision_result_payload"},
+                    )
+                    step_payload = entity_pipeline.get(step_name, {})
+                    self._record_revision_step_success(
+                        pipeline_run_id=pipeline_run_id,
+                        step_name=step_name,
+                        attempt_number=int(step["attempt_number"]),
+                        started_at=step_started_at,
+                        output_summary=self._summarize_revision_entity_stage_payload(
+                            step_name,
+                            step_payload,
+                        ),
+                        output_payload=step_payload,
+                    )
+                derived_steps: tuple[tuple[str, dict[str, Any]], ...] = (
+                    (
+                        "resolve_livertox_matches",
+                        {
+                            "matched_drug_count": len(
+                                result_payload.get("matched_drugs") or []
+                            ),
+                        },
+                    ),
+                    (
+                        "rerun_dili_assessments",
+                        {
+                            "assessment_count": len(
+                                result_payload.get("rucam_assessments") or []
+                            ),
+                        },
+                    ),
+                    (
+                        "rebuild_final_report",
+                        {
+                            "report_present": bool(
+                                str(result_payload.get("report") or "").strip()
+                            ),
+                        },
+                    ),
+                    (
+                        "qa_validate_revision",
+                        {
+                            "manual_review_required": bool(
+                                result_payload.get("manual_review_required")
+                            ),
+                            "blocking_issue_count": len(
+                                result_payload.get("blocking_issues") or []
+                            ),
+                        },
+                    ),
+                    (
+                        "persist_revision",
+                        {
+                            "session_id": result_payload.get("session_id"),
+                            "artifact_sources_present": bool(
+                                result_payload.get("pipeline_artifacts")
+                            ),
+                        },
+                    ),
+                    (
+                        "finalize_revision_version",
+                        {
+                            "session_id": result_payload.get("session_id"),
+                            "target_revision_version_id": int(
+                                target_revision_version_id
+                            ),
+                        },
+                    ),
+                )
+                for step_name, output_summary in derived_steps:
+                    step_started_at = datetime.now(UTC)
+                    step = self._record_revision_step_start(
+                        pipeline_run_id=pipeline_run_id,
+                        step_name=step_name,
+                        input_summary={"source": "revision_result_payload"},
+                    )
+                    self._record_revision_step_success(
+                        pipeline_run_id=pipeline_run_id,
+                        step_name=step_name,
+                        attempt_number=int(step["attempt_number"]),
+                        started_at=step_started_at,
+                        output_summary=output_summary,
+                    )
+                persisted_session_id = int(result_payload.get("session_id") or 0)
+                if persisted_session_id <= 0:
+                    raise ValueError("Revision result did not include a persisted session id")
+                revision_payload = result_payload.get("revision")
+                if not isinstance(revision_payload, dict):
+                    revision_payload = {}
+                    result_payload["revision"] = revision_payload
+                if (
+                    instruction_profile is not None
+                    and not isinstance(revision_payload.get("instruction_profile"), dict)
+                ):
+                    revision_payload["instruction_profile"] = (
+                        instruction_profile.model_dump()
+                    )
+                if (
+                    instruction_trace is not None
+                    and not isinstance(revision_payload.get("instruction_trace"), dict)
+                ):
+                    revision_payload["instruction_trace"] = instruction_trace.model_dump()
+                revision_payload["livertox_revision_decisions"] = (
+                    self.build_revision_livertox_decisions(
+                        matched_drugs=result_payload.get("matched_drugs") or [],
+                        source_matched_drugs=source_matched_drugs,
+                        instruction_profile=instruction_profile,
                     )
                 )
+                revision_payload["revised_dili_assessments"] = (
+                    self.build_revised_dili_assessments(
+                        rucam_assessments=result_payload.get("rucam_assessments")
+                        or [],
+                        matched_drugs=result_payload.get("matched_drugs") or [],
+                        source_rucam_assessments=source_rucam_assessments,
+                        revision_version_id=int(target_revision_version_id),
+                        source_version_id=int(source_version_id),
+                        instruction_profile=instruction_profile,
+                    )
+                )
+                final_report_payload = build_revision_final_report_payload(
+                    result_payload=result_payload,
+                    selected_text=selected_focus_text,
+                    instruction_profile=instruction_profile,
+                )
+                revision_payload["final_report_rebuild"] = (
+                    final_report_payload.model_dump()
+                )
+                qa_validation_payload = build_revision_qa_validation_payload(
+                    result_payload=result_payload,
+                    instruction_profile=instruction_profile,
+                    final_report_payload=final_report_payload,
+                )
+                revision_payload["qa_validation"] = (
+                    qa_validation_payload.model_dump()
+                )
+                version_status, llm_qa_status = self._derive_revision_qa_outcome(
+                    result_payload
+                )
+                self.serializer.upsert_session_result_payload(
+                    persisted_session_id,
+                    result_payload,
+                )
+                self.serializer.persist_revision_artifacts(
+                    pipeline_run_id=pipeline_run_id,
+                    revision_version_id=int(target_revision_version_id),
+                    result_payload=result_payload,
+                )
+                self.serializer.persist_revision_entities(
+                    pipeline_run_id=pipeline_run_id,
+                    revision_version_id=int(target_revision_version_id),
+                    source_version_id=int(source_version_id),
+                    result_payload=result_payload,
+                )
+                self.serializer.finalize_revision_version(
+                    pipeline_run_id=pipeline_run_id,
+                    persisted_session_id=persisted_session_id,
+                    model_configuration=run_configuration,
+                    version_status=version_status,
+                    llm_qa_status=llm_qa_status,
+                    clinical_review_status="not_reviewed",
+                )
+                self.serializer.create_or_update_revision_run(
+                    pipeline_run_id=pipeline_run_id,
+                    session_id=int(session_detail["session_id"]),
+                    root_session_id=int(root_session_id),
+                    source_version_id=int(source_version_id),
+                    target_revision_version_id=int(target_revision_version_id),
+                    revision_mode=revision_mode,
+                    revision_kind="llm_assisted_revision",
+                    configuration=run_configuration,
+                    reviewer_note=str(metadata.get("revision_note") or "").strip()
+                    or None,
+                    status="completed",
+                    initiated_by=str(metadata.get("reviewer") or "").strip() or None,
+                    actor_source=actor_source,
+                    actor_confidence="unverified",
+                    completed_at=datetime.now(UTC),
+                    error=None,
+                    trace_id=pipeline_run_id,
+                    latency_ms=int(
+                        (datetime.now(UTC) - run_started_at).total_seconds() * 1000
+                    ),
+                )
             return result_payload
-        except Exception:
+        except Exception as exc:
             self.serializer.fail_revision_run(
                 pipeline_run_id=pipeline_run_id,
-            )
-            self.serializer.delete_revision_version_shell(
-                pipeline_run_id=pipeline_run_id,
+                error={"message": str(exc)[:500]},
             )
             raise

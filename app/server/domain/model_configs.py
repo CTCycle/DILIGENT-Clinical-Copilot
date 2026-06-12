@@ -57,3 +57,16 @@ class ModelConfigStateResponse(BaseModel):
     rag_settings: dict[str, object]
     rag_model: str | None = None
     updated_at: datetime | None = None
+
+###############################################################################
+class OpenAIConnectivityCheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model: str | None = None
+
+###############################################################################
+class OpenAIConnectivityCheckResponse(BaseModel):
+    provider: str
+    model: str
+    ok: bool
+    response_preview: str | None = None
+    error: str | None = None

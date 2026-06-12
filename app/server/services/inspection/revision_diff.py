@@ -220,7 +220,7 @@ class InspectionRevisionDiffMixin:
                 if not isinstance(entry, dict):
                     continue
                 revised_name = str(entry.get("marker_name") or "").strip() or None
-                self._append_derived_revision_entity(
+                _append_derived_revision_entity(
                     derived=derived,
                     session_detail=session_detail,
                     version_summary=version_summary,
@@ -248,7 +248,7 @@ class InspectionRevisionDiffMixin:
                     ).strip()
                     or None
                 )
-                self._append_derived_revision_entity(
+                _append_derived_revision_entity(
                     derived=derived,
                     session_detail=session_detail,
                     version_summary=version_summary,
@@ -270,7 +270,7 @@ class InspectionRevisionDiffMixin:
                 if not isinstance(entry, dict):
                     continue
                 revised_name = str(entry.get("drug_name") or "").strip() or None
-                self._append_derived_revision_entity(
+                _append_derived_revision_entity(
                     derived=derived,
                     session_detail=session_detail,
                     version_summary=version_summary,
