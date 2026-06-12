@@ -79,6 +79,35 @@ def test_metadata_only_update_does_not_create_manual_edit_audit() -> None:
 
 
 ###############################################################################
+def test_get_session_detail_reconstructs_source_text_from_persisted_sections() -> None:
+    service, serializer = build_service()
+    session_id = serializer.save_clinical_session(
+        {
+            "patient_name": "Section Fallback Patient",
+            "session_timestamp": datetime(2025, 1, 2, 10, 15),
+            "version": 1,
+            "anamnesis": "Section-only anamnesis",
+            "drugs": "Section-only drugs",
+            "laboratory_analysis": "Section-only labs",
+            "session_result_payload": {
+                "report": "Persisted report without original source text",
+            },
+        }
+    )
+    assert session_id is not None
+
+    detail = service.get_session_detail(session_id)
+
+    assert detail is not None
+    assert detail["session_text"] == (
+        "Anamnesis:\nSection-only anamnesis\n\n"
+        "Drugs:\nSection-only drugs\n\n"
+        "Laboratory Analysis:\nSection-only labs"
+    )
+    assert detail["source_clinical_text"] == detail["session_text"]
+
+
+###############################################################################
 def test_revision_review_actions_are_persisted_and_update_version_state() -> None:
     service, serializer = build_service()
     session_id = seed_session(serializer)
@@ -242,6 +271,82 @@ def test_compare_session_versions_returns_backend_diff_payload() -> None:
     assert comparison["qa_summary"]["left_llm_qa_status"] == "not_run"
     assert comparison["qa_summary"]["right_llm_qa_status"] == "not_run"
     assert comparison["qa_summary"]["right_warning_count"] == 1
+
+
+###############################################################################
+def test_compare_session_versions_derives_entities_when_revision_entities_are_missing() -> None:
+    service, serializer = build_service()
+    root_session_id = serializer.save_clinical_session(
+        {
+            "patient_name": "Derived Comparison Patient",
+            "session_timestamp": datetime(2025, 1, 2, 10, 15),
+            "version": 1,
+            "anamnesis": "Baseline source narrative",
+            "drugs": "drug-a",
+            "session_result_payload": {
+                "original_session_text": "Baseline source narrative",
+                "report": "Baseline report",
+                "structured_case": {
+                    "therapy_drugs": [{"name": "drug-a", "role": "suspect"}],
+                    "anamnesis_diseases": [{"name": "hepatitis"}],
+                },
+                "lab_timeline": [{"marker_name": "ALT", "value": 55}],
+                "matched_drugs": [{"matched_drug_name": "drug-a", "match_status": "matched"}],
+                "rucam_assessments": [{"drug_name": "drug-a", "total_score": 4}],
+            },
+        }
+    )
+    assert root_session_id is not None
+
+    revised_session_id = serializer.save_clinical_session(
+        {
+            "patient_name": "Derived Comparison Patient",
+            "session_timestamp": datetime(2025, 1, 3, 10, 15),
+            "version": 2,
+            "original_session_id": root_session_id,
+            "anamnesis": "Revised source narrative",
+            "drugs": "drug-a",
+            "session_result_payload": {
+                "original_session_text": "Revised source narrative",
+                "report": "Revised report",
+                "structured_case": {
+                    "therapy_drugs": [{"name": "drug-a", "role": "suspect"}],
+                    "anamnesis_diseases": [{"name": "hepatitis"}],
+                },
+                "lab_timeline": [{"marker_name": "ALT", "value": 150}],
+                "matched_drugs": [{"matched_drug_name": "drug-a", "match_status": "matched_with_excerpt"}],
+                "rucam_assessments": [{"drug_name": "drug-a", "total_score": 7}],
+            },
+        }
+    )
+    assert revised_session_id is not None
+
+    root_version = serializer.get_version_record_for_session(root_session_id)
+    revised_version = serializer.get_version_record_for_session(revised_session_id)
+    assert root_version is not None
+    assert revised_version is not None
+
+    comparison = service.compare_session_versions(
+        root_session_id,
+        left_version_id=int(root_version["version_id"]),
+        right_version_id=int(revised_version["version_id"]),
+    )
+
+    assert comparison is not None
+    assert any(
+        str(item["normalized_name"]).casefold() == "alt"
+        for item in comparison["corrected_entities"]
+    )
+    assert any(
+        str(item["normalized_name"]).casefold() == "drug-a"
+        and item["entity_type"] == "dili_assessment"
+        for item in comparison["corrected_entities"]
+    )
+    assert any(
+        str(item["normalized_name"]).casefold() == "drug-a"
+        and item["entity_type"] == "livertox_match"
+        for item in comparison["corrected_entities"]
+    )
 
 
 ###############################################################################

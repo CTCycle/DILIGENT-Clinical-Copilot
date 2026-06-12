@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parents[2]
@@ -16,7 +17,9 @@ CATALOGS_PATH = RESOURCES_PATH / "catalogs"
 RXNAV_CURATED_ALIASES_PATH = SOURCES_PATH / "rxnav_curated_aliases.json"
 ENV_FILE_PATH = SETTINGS_PATH / ".env"
 CONFIGURATIONS_FILE = SETTINGS_PATH / "configurations.json"
-DATABASE_FILE_PATH = RESOURCES_PATH / "database.db"
+DATABASE_FILE_PATH = Path(
+    os.getenv("DILIGENT_SQLITE_PATH") or str(RESOURCES_PATH / "database.db")
+)
 CLIENT_DIST_PATH = APP_DIR / "client" / "dist" / "browser"
 CLIENT_ASSETS_PATH = CLIENT_DIST_PATH / "assets"
 CLIENT_INDEX_FILE_PATH = CLIENT_DIST_PATH / "index.html"

@@ -28,6 +28,7 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 ## Model Configuration Routes
 - `GET /api/model-config`
 - `PUT /api/model-config`
+- `POST /api/model-config/openai-connectivity-check`
 
 ## Access Key Routes
 - `GET /api/access-keys`

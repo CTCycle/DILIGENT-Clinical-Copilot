@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 import configurations.llm_configs as llm_configs_module
+from domain.clinical import ClinicalSessionRequest
 from repositories.schemas.models import Base
 from repositories.serialization.data import DataSerializer
 from services.inspection.service import DataInspectionService
@@ -10,6 +11,7 @@ from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
 
 import services.inspection.service as inspection_service_module
+import services.inspection.revision_runner as revision_runner_module
 
 
 ###############################################################################
@@ -138,7 +140,7 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
 
         # -------------------------------------------------------------------------
         async def prepare_revision_source_request(self, *, session_detail, use_rag):
-            request = inspection_service_module.ClinicalSessionRequest(
+            request = ClinicalSessionRequest(
                 name=session_detail.get("patient_name"),
                 visit_date=session_detail.get("visit_date"),
                 clinical_input=session_detail.get("session_text"),
@@ -358,7 +360,7 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
             }
 
     monkeypatch.setattr(
-        inspection_service_module,
+        revision_runner_module,
         "build_clinical_session_service",
         lambda jobs: FakeClinicalService(),
     )
@@ -802,7 +804,7 @@ def test_run_revision_job_reuses_persisted_source_sections(monkeypatch) -> None:
                 },
             }
 
-    original_builder = inspection_service_module.build_clinical_session_service
+    original_builder = revision_runner_module.build_clinical_session_service
 
     def build_fake_service(_jobs):
         fake_service = FakeClinicalService()
@@ -813,7 +815,7 @@ def test_run_revision_job_reuses_persisted_source_sections(monkeypatch) -> None:
         return fake_service
 
     monkeypatch.setattr(
-        inspection_service_module,
+        revision_runner_module,
         "build_clinical_session_service",
         build_fake_service,
     )

@@ -941,6 +941,7 @@ def fail_revision_run(
     self,
     *,
     pipeline_run_id: str,
+    error: dict[str, Any] | None = None,
 ) -> None:
     db_session = self.session_factory()
     try:
@@ -952,29 +953,17 @@ def fail_revision_run(
         if existing is not None and existing.status != "failed":
             existing.status = "failed"
             existing.completed_at = datetime.now(UTC)
-        db_session.commit()
-    except Exception:
-        db_session.rollback()
-        raise
-    finally:
-        db_session.close()
-
-
-###############################################################################
-def delete_revision_version_shell(
-    self,
-    *,
-    pipeline_run_id: str,
-) -> None:
-    db_session = self.session_factory()
-    try:
-        row = db_session.execute(
-            select(ClinicalSessionVersion).where(
-                ClinicalSessionVersion.pipeline_run_id == str(pipeline_run_id)
-            )
-        ).scalar_one_or_none()
-        if row is not None:
-            db_session.delete(row)
+            existing.error_json = self.serialize_json_payload(error)
+            if existing.target_revision_version_id is not None:
+                version_row = db_session.get(
+                    ClinicalSessionVersion,
+                    int(existing.target_revision_version_id),
+                )
+                if version_row is not None and version_row.session_id is None:
+                    version_row.version_status = "qa_failed"
+                    version_row.llm_qa_status = "failed"
+                    version_row.clinical_review_status = "not_reviewed"
+                    version_row.completed_at = datetime.now(UTC)
         db_session.commit()
     except Exception:
         db_session.rollback()

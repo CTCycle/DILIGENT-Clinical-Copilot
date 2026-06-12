@@ -7,7 +7,8 @@ from typing import Any
 from domain.model_configs import ModelConfigUpdateRequest
 import services.llm.model_config as model_config_module
 from configurations.llm_configs import LLMRuntimeConfig
-from domain.model_configs import ModelConfigSnapshot
+from domain.model_configs import ModelConfigSnapshot, OpenAIConnectivityCheckRequest
+from services.llm.cloud import LLMError
 from services.llm.model_config import ModelConfigService
 from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import get_job_manager
@@ -189,3 +190,91 @@ def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) ->
     asyncio.run(service.list_available_ollama_models())
 
     assert len(warnings) == 2
+
+
+###############################################################################
+def test_openai_connectivity_check_uses_configured_cloud_model(monkeypatch) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="gpt-oss:20b",
+            text_extraction_model="qwen3.5:9b",
+            use_cloud_models=False,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
+            updated_at=datetime.now(),
+        )
+    )
+    calls: list[dict[str, Any]] = []
+
+    ###############################################################################
+    class FakeCloudLLMClient:
+
+        # -------------------------------------------------------------------------
+        def __init__(self, **kwargs: Any) -> None:
+            calls.append({"init": kwargs})
+
+        # -------------------------------------------------------------------------
+        async def __aenter__(self):
+            return self
+
+        # -------------------------------------------------------------------------
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        # -------------------------------------------------------------------------
+        async def chat(self, **kwargs: Any) -> str:
+            calls.append({"chat": kwargs})
+            return "OK"
+
+    monkeypatch.setattr(model_config_module, "CloudLLMClient", FakeCloudLLMClient)
+
+    response = asyncio.run(
+        ModelConfigService(serializer=serializer).check_openai_connectivity(
+            OpenAIConnectivityCheckRequest()
+        )
+    )
+
+    assert response.ok is True
+    assert response.provider == "openai"
+    assert response.model == "gpt-4.1-mini"
+    assert response.response_preview == "OK"
+    assert calls[0]["init"]["provider"] == "openai"
+    assert calls[1]["chat"]["model"] == "gpt-4.1-mini"
+
+
+###############################################################################
+def test_openai_connectivity_check_reports_llm_error(monkeypatch) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="gpt-oss:20b",
+            text_extraction_model="qwen3.5:9b",
+            use_cloud_models=False,
+            cloud_provider="openai",
+            cloud_model=None,
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
+            updated_at=datetime.now(),
+        )
+    )
+
+    ###############################################################################
+    class FailingCloudLLMClient:
+
+        # -------------------------------------------------------------------------
+        def __init__(self, **kwargs: Any) -> None:
+            raise LLMError("No active OpenAI access key configured")
+
+    monkeypatch.setattr(model_config_module, "CloudLLMClient", FailingCloudLLMClient)
+
+    response = asyncio.run(
+        ModelConfigService(serializer=serializer).check_openai_connectivity(
+            OpenAIConnectivityCheckRequest(model="gpt-4.1")
+        )
+    )
+
+    assert response.ok is False
+    assert response.provider == "openai"
+    assert response.model == "gpt-4.1"
+    assert response.error == "No active OpenAI access key configured"

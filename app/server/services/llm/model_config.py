@@ -21,10 +21,13 @@ from domain.model_configs import (
     ModelConfigSnapshot,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
+    OpenAIConnectivityCheckRequest,
+    OpenAIConnectivityCheckResponse,
 )
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
+from services.llm.cloud import CloudLLMClient, LLMError
 from services.llm.ollama_client import OllamaClient, OllamaError
 from repositories.vectors import LanceVectorDatabase
 from services.retrieval.settings import (
@@ -56,6 +59,7 @@ class ModelConfigSnapshotStore(Protocol):
 ###############################################################################
 class ModelConfigService:
     _OLLAMA_WARNING_COOLDOWN_SECONDS = 120.0
+    _OPENAI_CONNECTIVITY_FALLBACK_MODEL = "gpt-4.1-mini"
 
     # -------------------------------------------------------------------------
     def __init__(self, serializer: ModelConfigSnapshotStore | None = None) -> None:
@@ -121,9 +125,64 @@ class ModelConfigService:
         return self.build_response(snapshot=snapshot, local_models=local_models)
 
     # -------------------------------------------------------------------------
+    async def check_openai_connectivity(
+        self, payload: OpenAIConnectivityCheckRequest
+    ) -> OpenAIConnectivityCheckResponse:
+        snapshot = self.ensure_defaults()
+        requested_model = self.normalize_optional_text(payload.model)
+        model = (
+            requested_model
+            or self.normalize_optional_text(snapshot.cloud_model)
+            or self._OPENAI_CONNECTIVITY_FALLBACK_MODEL
+        )
+        try:
+            async with CloudLLMClient(
+                provider="openai",
+                default_model=model,
+                timeout_s=20.0,
+                max_retries=0,
+            ) as client:
+                response = await client.chat(
+                    model=model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Reply with exactly: OK",
+                        },
+                        {
+                            "role": "user",
+                            "content": "OpenAI connectivity check.",
+                        },
+                    ],
+                    options={"temperature": 0.0},
+                )
+        except LLMError as exc:
+            return OpenAIConnectivityCheckResponse(
+                provider="openai",
+                model=model,
+                ok=False,
+                error=str(exc),
+            )
+
+        preview = self._normalize_connectivity_preview(response)
+        return OpenAIConnectivityCheckResponse(
+            provider="openai",
+            model=model,
+            ok=True,
+            response_preview=preview,
+        )
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _local_roles_updated(fields_set: set[str]) -> bool:
         return "clinical_model" in fields_set or "text_extraction_model" in fields_set
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_connectivity_preview(response: object) -> str:
+        preview = response if isinstance(response, str) else str(response)
+        preview = " ".join(preview.split())
+        return preview[:200]
 
     # -------------------------------------------------------------------------
     async def _build_local_model_names(
