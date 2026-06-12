@@ -267,9 +267,9 @@
 
 .model-config-rag-card-top {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .model-config-rag-state {
@@ -296,6 +296,36 @@
   background: #ffffff;
   box-shadow: 0 1px 4px rgba(12, 45, 36, 0.24);
   transition: transform 0.18s ease;
+}
+
+.model-config-rag-settings-btn {
+  position: relative;
+  z-index: 2;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid color-mix(in srgb, var(--mc-border-strong) 72%, transparent);
+  border-radius: 5px;
+  background: var(--mc-surface);
+  color: var(--mc-brand);
+  padding: 0;
+  cursor: pointer;
+}
+
+.model-config-rag-settings-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.model-config-rag-settings-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .model-config-rag-card.is-active .model-config-toggle {
@@ -573,14 +603,6 @@
   background: #0c9b6b;
 }
 
-.model-config-status-pill.is-update {
-  color: #0f6fba;
-}
-
-.model-config-status-pill.is-update::before {
-  background: #1677c9;
-}
-
 .model-config-actions {
   display: inline-flex;
   justify-content: flex-start;
@@ -621,10 +643,6 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
-}
-
-.model-config-action-btn.is-update {
-  color: #0f6fba;
 }
 
 .model-config-action-btn.is-disabled {
@@ -669,11 +687,6 @@
   margin-top: 16px;
   color: var(--mc-muted);
   font-size: 12px;
-}
-
-.model-config-scroll-hint {
-  color: var(--mc-brand);
-  font-weight: 700;
 }
 
 .model-config-cloud-options {
@@ -827,18 +840,9 @@
   color: #aac0b8;
 }
 
-:host-context([data-theme="dark"]) .model-config-status-pill.is-update,
-:host-context([data-theme="dark"]) .model-config-action-btn.is-update {
-  color: #73b7ff;
-}
-
 :host-context([data-theme="dark"]) .model-config-summary-badge {
   background: rgba(115, 232, 184, 0.17);
   color: #c8f7e4;
-}
-
-:host-context([data-theme="dark"]) .model-config-model-cell small {
-  color: #a8c6bc;
 }
 
 :host-context([data-theme="dark"]) .model-config-toggle {
@@ -1109,6 +1113,7 @@
     align-items: flex-start;
     flex-direction: column;
   }
+
 }
 
 

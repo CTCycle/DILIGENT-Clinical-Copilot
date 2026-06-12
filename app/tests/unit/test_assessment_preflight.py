@@ -12,10 +12,12 @@ from services.session.preflight import validate_clinical_input_preflight
 from services.session.session_workflow import start_clinical_job_workflow
 
 
+###############################################################################
 def _build_service():
     return build_clinical_session_service(get_job_manager())
 
 
+###############################################################################
 def _valid_input() -> str:
     return (
         "ANAMNESIS\nhistory\n"
@@ -24,6 +26,7 @@ def _valid_input() -> str:
     )
 
 
+###############################################################################
 def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch) -> None:
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
@@ -48,6 +51,7 @@ def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch) -> N
         start_clinical_job_workflow(service, request)
 
 
+###############################################################################
 def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch) -> None:
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
@@ -78,6 +82,7 @@ def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch) 
         start_clinical_job_workflow(service, request)
 
 
+###############################################################################
 def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> None:
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
@@ -104,6 +109,7 @@ def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> 
         start_clinical_job_workflow(service, request)
 
 
+###############################################################################
 def test_malformed_sections_block_job_start(monkeypatch) -> None:
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
@@ -132,6 +138,7 @@ def test_malformed_sections_block_job_start(monkeypatch) -> None:
         start_clinical_job_workflow(service, request)
 
 
+###############################################################################
 def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     monkeypatch,
 ) -> None:

@@ -8,6 +8,7 @@ from services.clinical.match_resolution import conservative_fuzzy_livertox_match
 from services.clinical.preparation import ClinicalKnowledgePreparation
 
 
+###############################################################################
 def _build_livertox_df() -> pd.DataFrame:
     return pd.DataFrame(
         [
@@ -31,6 +32,7 @@ def _build_livertox_df() -> pd.DataFrame:
     )
 
 
+###############################################################################
 def test_conservative_fuzzy_livertox_match_high_threshold() -> None:
     assert (
         conservative_fuzzy_livertox_match(
@@ -48,6 +50,7 @@ def test_conservative_fuzzy_livertox_match_high_threshold() -> None:
     )
 
 
+###############################################################################
 def test_resolve_livertox_match_for_drug_direct() -> None:
     prep = ClinicalKnowledgePreparation()
     from services.clinical.matches_core import LiverToxMatcher

@@ -5,6 +5,14 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from common.prompts.clinical_assessment import (
+    LIVERTOX_CLINICAL_SYSTEM_PROMPT,
+    LIVERTOX_CLINICAL_USER_PROMPT,
+    LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
+    LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT,
+    LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
+    LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
+)
 from domain.clinical import (
     ClinicalLabEntry,
     DrugClinicalAssessment,
@@ -18,15 +26,11 @@ from services.clinical.hepatox_core import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
-from services.llm.prompts import (
-    LIVERTOX_CLINICAL_SYSTEM_PROMPT,
-    LIVERTOX_CLINICAL_USER_PROMPT,
-    LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
-)
-
 
 ###############################################################################
 class FlakyChatClient:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, fail_count: int, response: object) -> None:
         self.fail_count = max(int(fail_count), 0)
         self.response = response
@@ -41,6 +45,7 @@ class FlakyChatClient:
         return self.response
 
 
+###############################################################################
 def test_assess_payload_returns_determined_score_when_labs_present() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
     timeline = PatientLabTimeline(
@@ -70,6 +75,7 @@ def test_assess_payload_returns_determined_score_when_labs_present() -> None:
     assert assessment.score.r_score == pytest.approx(1.0)
 
 
+###############################################################################
 def test_assess_payload_raises_when_labs_missing_and_not_overridden() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
     timeline = PatientLabTimeline(entries=[])
@@ -84,6 +90,7 @@ def test_assess_payload_raises_when_labs_missing_and_not_overridden() -> None:
     assert any(issue.severity == "warning" for issue in assessment.issues)
 
 
+###############################################################################
 def test_evaluate_suspension_marks_anamnesis_mentions_as_uncertain_exposure() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     entry = DrugEntry(
@@ -100,6 +107,7 @@ def test_evaluate_suspension_marks_anamnesis_mentions_as_uncertain_exposure() ->
     assert "Active therapy; no suspension reported." not in suspension.note
 
 
+###############################################################################
 def test_parse_timeline_date_uses_visit_year_for_partial_dates() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
 
@@ -108,6 +116,7 @@ def test_parse_timeline_date_uses_visit_year_for_partial_dates() -> None:
     assert parsed == date(2025, 4, 14)
 
 
+###############################################################################
 def test_format_visit_date_anchor_handles_missing_and_present_values() -> None:
     assert HepatoxConsultation.format_visit_date_anchor(None) == "Not provided."
     assert (
@@ -115,6 +124,7 @@ def test_format_visit_date_anchor_handles_missing_and_present_values() -> None:
     )
 
 
+###############################################################################
 def test_request_drug_analysis_retries_on_transient_failure() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     consultation.llm_client = FlakyChatClient(
@@ -165,9 +175,10 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
     assert consultation.llm_client.calls == 2
 
 
+###############################################################################
 def test_livertox_prompt_removes_per_drug_management_recommendation_directive() -> None:
     assert "Do not speculate, add outside facts" in LIVERTOX_CLINICAL_SYSTEM_PROMPT
-    assert "Use only:" in LIVERTOX_CLINICAL_SYSTEM_PROMPT
+    assert "Use only the provided LiverTox excerpt" in LIVERTOX_CLINICAL_SYSTEM_PROMPT
     assert (
         "Language map: en=English, it=Italian, de=German, fr=French, es=Spanish."
         in LIVERTOX_CLINICAL_SYSTEM_PROMPT
@@ -177,17 +188,37 @@ def test_livertox_prompt_removes_per_drug_management_recommendation_directive() 
         in LIVERTOX_CLINICAL_USER_PROMPT
     )
     assert (
-        "Do not output JSON, YAML, XML, tables, or fenced code blocks"
+        "Do not invent data or output JSON, YAML, XML, tables, or fenced code"
         in LIVERTOX_CLINICAL_USER_PROMPT
     )
     assert "Estimated RUCAM:" in LIVERTOX_CLINICAL_USER_PROMPT
-    assert "Integrate the supplied estimated RUCAM" in LIVERTOX_CLINICAL_USER_PROMPT
     assert (
-        "Do not mention drugs that are not present in the supplied report."
+        "Treat estimated RUCAM as supportive, not definitive"
+        in LIVERTOX_CLINICAL_USER_PROMPT
+    )
+    assert (
+        "Do not mention drugs absent from the supplied report."
         in LIVERTOX_CONCLUSION_SYSTEM_PROMPT
+    )
+    assert (
+        "treat prior report language as comparison-only context"
+        in LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT.lower()
+    )
+    assert (
+        "Write a clinician-facing revision assessment body"
+        in LIVERTOX_REVISION_CLINICAL_USER_PROMPT
+    )
+    assert (
+        "Treat previous report wording as comparison-only context if present."
+        in LIVERTOX_REVISION_CLINICAL_USER_PROMPT
+    )
+    assert (
+        "writing the final integrated revision synthesis"
+        in LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT
     )
 
 
+###############################################################################
 def test_legacy_hepatox_timeline_helper_module_is_removed() -> None:
     workspace_root = Path(__file__).resolve().parents[3]
     timeline_module = (
@@ -202,6 +233,7 @@ def test_legacy_hepatox_timeline_helper_module_is_removed() -> None:
     assert not timeline_module.exists()
 
 
+###############################################################################
 def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     entry = DrugClinicalAssessment(
@@ -239,6 +271,7 @@ def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> N
     assert "Drug match is not a direct canonical match." in rendered
 
 
+###############################################################################
 def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
 
@@ -267,6 +300,7 @@ def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
     assert "## Conclusion" not in report
 
 
+###############################################################################
 def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_sections() -> (
     None
 ):
@@ -322,6 +356,7 @@ def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_se
     assert "No matching drug record found in the local knowledge base." in report
 
 
+###############################################################################
 def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
 
@@ -351,6 +386,7 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
     assert "No matching LiverTox record available." in report
 
 
+###############################################################################
 def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     resolved = {
@@ -380,6 +416,7 @@ def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() 
     assert payload["matched_livertox_row"]["drug_name"] == "Piperacillin"
 
 
+###############################################################################
 def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     section = consultation.render_unresolved_mentions_section(
@@ -408,6 +445,7 @@ def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
     assert "Structured RUCAM score: 3 (possible)." in section
 
 
+###############################################################################
 def test_sanitize_renderable_body_removes_structured_dili_section() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     entry = DrugClinicalAssessment(
@@ -426,6 +464,7 @@ def test_sanitize_renderable_body_removes_structured_dili_section() -> None:
     assert sanitized == "Clinical narrative before appendix."
 
 
+###############################################################################
 def test_remove_redundant_report_sentence_truncates_structured_dili_section() -> None:
     raw = (
         "Clinical narrative before appendix.\n\n"

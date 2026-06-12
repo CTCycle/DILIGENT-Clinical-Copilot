@@ -5,6 +5,7 @@ from services.clinical.parser import DrugsParser
 from services.session.preflight import LocalModelBatchPreflightResult
 
 
+###############################################################################
 def test_anamnesis_and_therapy_source_fields_are_preserved() -> None:
     parser = DrugsParser(client=None)
     anamnesis_entry = parser.normalize_entry(
@@ -25,6 +26,7 @@ def test_anamnesis_and_therapy_source_fields_are_preserved() -> None:
     assert therapy_entry.historical_flag is False
 
 
+###############################################################################
 def test_conservative_preparation_keeps_bullets_and_multiline_entries() -> None:
     parser = DrugsParser(client=None)
     prepared = parser.conservative_prepare_drug_section_text(
@@ -35,6 +37,7 @@ def test_conservative_preparation_keeps_bullets_and_multiline_entries() -> None:
     assert "\n" in prepared
 
 
+###############################################################################
 def test_drug_without_temporal_information_is_filtered() -> None:
     parser = DrugsParser(client=None)
     no_temporal = DrugEntry(name="Drug A")
@@ -43,6 +46,7 @@ def test_drug_without_temporal_information_is_filtered() -> None:
     assert parser.drug_entry_has_temporal_information(with_temporal) is True
 
 
+###############################################################################
 def test_batch_preflight_flags_cover_concurrent_and_sequential_paths() -> None:
     allow = LocalModelBatchPreflightResult(
         concurrency_allowed=True,
@@ -60,6 +64,7 @@ def test_batch_preflight_flags_cover_concurrent_and_sequential_paths() -> None:
     assert deny.reason
 
 
+###############################################################################
 def test_source_differences_prevent_cross_section_collapse() -> None:
     parser = DrugsParser(client=None)
     entries = [

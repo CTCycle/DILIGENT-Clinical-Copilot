@@ -3,6 +3,7 @@ from __future__ import annotations
 from services.retrieval.chunking import SmartDocumentChunker
 
 
+###############################################################################
 def test_chunk_ids_and_uid_are_stable() -> None:
     chunker = SmartDocumentChunker(target_chars=40, max_chars=80)
     text = (
@@ -25,6 +26,7 @@ def test_chunk_ids_and_uid_are_stable() -> None:
     assert [c.chunk_uid for c in chunks_a] == [c.chunk_uid for c in chunks_b]
 
 
+###############################################################################
 def test_page_and_line_metadata_present() -> None:
     chunker = SmartDocumentChunker(target_chars=30, max_chars=60)
     text = "TITLE\nline2\nline3\nline4\n"

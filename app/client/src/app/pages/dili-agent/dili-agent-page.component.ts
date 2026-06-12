@@ -26,20 +26,7 @@ import {
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 
 const todayIso = new Date().toISOString().slice(0, 10);
-const STAGE_FALLBACK_LABELS: Record<string, string> = {
-  session_initialization: 'Step 1/12 - Initializing session context and validating clinical inputs',
-  therapy_extraction: 'Step 2/12 - Parsing THERAPY section to extract active treatment lines',
-  anamnesis_extraction: 'Step 3/12 - Parsing ANAMNESIS section to identify historical drug exposures',
-  anamnesis_disease_extraction: 'Step 4/12 - Parsing ANAMNESIS section to extract comorbidities and risk context',
-  anamnesis_lab_extraction: 'Step 5/12 - Parsing LAB ANALYSIS history to reconstruct longitudinal trends',
-  hepatotoxicity_pattern: 'Step 6/12 - Computing hepatotoxicity pattern from laboratory trajectory',
-  rag_query_building: 'Step 7/12 - Preparing evidence-retrieval query context',
-  livertox_lookup: 'Step 8/12 - Cross-checking candidate drugs against LiverTox evidence',
-  rucam_estimation: 'Step 9/12 - Estimating per-drug RUCAM scores',
-  llm_analysis: 'Step 10/12 - Performing structured LLM causality assessment per candidate drug',
-  report_composition: 'Step 11/12 - Drafting integrated clinical assessment and recommendations',
-  finalization: 'Step 12/12 - Final consistency checks and session persistence',
-};
+const STALL_THRESHOLD_MS = 600_000;
 const CLINICAL_INPUT_TEMPLATE_FALLBACK = `Chief concern:
 History of present illness:
 Current medications (dose/start date):
@@ -72,6 +59,8 @@ export class DiliAgentPageComponent implements OnDestroy {
   readonly renderedReport = computed(() => this.markdownRenderer.render(this.finalReportMarkdown()));
   readonly clinicalInputTemplate = signal('');
 
+  private lastProgressUpdateTimestamp = 0;
+  private jobStartedAt = 0;
   private poller: { stop: () => void } | null = null;
   private runActionLockTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private runControlDebounceTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -187,6 +176,8 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   private resetOutputs(): void {
     this.revokeObjectUrl();
+    this.jobStartedAt = 0;
+    this.lastProgressUpdateTimestamp = 0;
     this.stateService.updateDiliAgent({
       message: '',
       exportUrl: null,
@@ -246,6 +237,12 @@ export class DiliAgentPageComponent implements OnDestroy {
         ? status.result.progress_message
         : null;
     const resolvedProgress = typeof status.progress === 'number' ? status.progress : 0;
+    const now = Date.now();
+
+    if (this.jobStartedAt === 0) {
+      this.jobStartedAt = now;
+    }
+    this.lastProgressUpdateTimestamp = now;
 
     this.stateService.updateDiliAgent({
       jobProgress: terminalStatus ? 100 : resolvedProgress,
@@ -332,7 +329,7 @@ export class DiliAgentPageComponent implements OnDestroy {
         jobProgress: 0,
         jobStatus: startResult.status,
         jobStage: 'session_initialization',
-        jobStageMessage: preflightWarningSummary ?? STAGE_FALLBACK_LABELS['session_initialization'],
+        jobStageMessage: preflightWarningSummary ?? 'Starting clinical analysis',
         isStarting: false,
       });
       const intervalMs = resolvePollIntervalMs(startResult.poll_interval);
@@ -473,13 +470,27 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   get spinnerStatusLabel(): string {
-    const baseLabel = this.vm.jobStageMessage
-      || (this.vm.jobStage ? STAGE_FALLBACK_LABELS[this.vm.jobStage] : null)
-      || 'Starting clinical analysis';
-    const suffix = this.vm.jobProgress > 0
+    const baseLabel = this.vm.jobStageMessage || 'Starting clinical analysis';
+    const progressSuffix = this.vm.jobProgress > 0
       ? `... ${this.vm.jobProgress.toFixed(0)}%`
       : '...';
-    return `${baseLabel}${suffix}`;
+
+    const elapsedMs = this.jobStartedAt > 0 ? Date.now() - this.jobStartedAt : 0;
+    let elapsedSuffix = '';
+    if (elapsedMs >= 1000) {
+      const totalSeconds = Math.floor(elapsedMs / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      elapsedSuffix = minutes > 0
+        ? ` (${minutes}m ${seconds}s)`
+        : ` (${seconds}s)`;
+    }
+
+    const stalledSinceMs = this.lastProgressUpdateTimestamp > 0 ? Date.now() - this.lastProgressUpdateTimestamp : 0;
+    const stalled = this.jobStartedAt > 0 && stalledSinceMs >= STALL_THRESHOLD_MS;
+    const stallSuffix = stalled ? ' — this step is taking longer than expected, analysis is still running' : '';
+
+    return `${baseLabel}${progressSuffix}${elapsedSuffix}${stallSuffix}`;
   }
 
   get runActionDisabled(): boolean {

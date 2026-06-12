@@ -7,12 +7,9 @@ app/client/node_modules/
 app/client/dist/
 app/client/dist-ssr/
 app/client/logs/
-app/client/src-tauri/r/
-app/client/src-tauri/target/
-app/client/src-tauri/gen/
+app/src-tauri/
 release/windows/
 runtimes/**
-QA/**
 
 # Python
 *.py[cod]
@@ -26,6 +23,7 @@ dist/
 build/
 .coverage
 htmlcov/
+__pycache__/
 
 # Node / JS
 **/node_modules/
@@ -46,8 +44,6 @@ yarn.lock
 .DS_Store
 Thumbs.db
 
-
-
 # Misc
 Cargo.toml
 *.lock
@@ -56,7 +52,7 @@ Cargo.toml
 *.sqlite*
 *.exe
 *.gz
-
 !.gitkeep
+
 
 

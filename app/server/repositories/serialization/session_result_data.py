@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import and_, delete, exists, func, inspect, or_, select
+from sqlalchemy import and_, delete, exists, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from common.utils.logger import logger
@@ -16,29 +16,53 @@ from repositories.schemas.models import (
     ClinicalSession,
     ClinicalSessionDrug,
     ClinicalSessionLab,
+    ClinicalSessionManualEdit,
     ClinicalSessionResult,
+    ClinicalSessionRevisionArtifact,
+    ClinicalSessionRevisionEntity,
+    ClinicalSessionRevisionReview,
+    ClinicalSessionRevisionRun,
     ClinicalSessionSection,
-    Drug,
-    DrugAlias,
-    DrugRxnormCode,
-    KbMatchCache,
-    LiverToxMonograph,
+    ClinicalSessionVersion,
     Patient,
 )
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
-from services.text.normalization import normalize_drug_name
+from common.utils.text_utils import normalize_drug_name
 from services.text.vocabulary import (
     invalidate_text_normalization_snapshot,
 )
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
+
+###############################################################################
+def build_session_source_text(
+    self,
+    *,
+    sections: dict[str, str],
+    patient_row: Patient,
+) -> str:
+    ordered_sections = (
+        ("Anamnesis", sections.get("anamnesis") or patient_row.anamnesis),
+        ("Drugs", sections.get("drugs") or sections.get("therapy") or patient_row.drugs),
+        (
+            "Laboratory Analysis",
+            sections.get("laboratory_analysis")
+            or sections.get("laboratory_history")
+            or patient_row.laboratory_analysis,
+        ),
+    )
+    return "\n\n".join(
+        f"{label}:\n{content}"
+        for label, raw_content in ordered_sections
+        if (content := self.normalize_string(raw_content))
+    )
 
 
+
+###############################################################################
 def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
     if not session_data:
         logger.warning("Skipping clinical session save; payload is empty")
         return None
-    self.ensure_session_result_table()
     db_session = self.session_factory()
     try:
         persisted_patient = self.persist_patient(db_session, session_data)
@@ -58,6 +82,7 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
             session_status=self.normalize_session_status(
                 session_data.get("session_status")
             ),
+            session_kind=self.normalize_string(session_data.get("session_kind")),
             metadata_json=self.serialize_json_payload(session_data.get("metadata")),
         )
         db_session.add(persisted_session)
@@ -76,54 +101,7 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         db_session.close()
 
 
-def ensure_session_result_table(self) -> None:
-    inspector = inspect(self.engine)
-    required_tables = (
-        Patient.__tablename__,
-        ClinicalSession.__tablename__,
-        ClinicalSessionSection.__tablename__,
-        ClinicalSessionLab.__tablename__,
-        ClinicalSessionDrug.__tablename__,
-        ClinicalSessionResult.__tablename__,
-        Drug.__tablename__,
-        LiverToxMonograph.__tablename__,
-        DrugRxnormCode.__tablename__,
-        DrugAlias.__tablename__,
-        KbMatchCache.__tablename__,
-    )
-    missing_tables = [
-        table_name
-        for table_name in required_tables
-        if not inspector.has_table(table_name)
-    ]
-    if missing_tables:
-        joined = ", ".join(missing_tables)
-        raise RuntimeError(
-            f"Database schema mismatch: missing required table(s): {joined}"
-        )
-
-    required_columns = {
-        Patient.__tablename__: {"image_blob"},
-        ClinicalSession.__tablename__: {
-            "patient_id",
-            "session_status",
-            "version",
-            "original_session_id",
-            "metadata_json",
-        },
-        Drug.__tablename__: {"rxnav_last_update"},
-    }
-    for table_name, columns in required_columns.items():
-        existing = {str(item.get("name")) for item in inspector.get_columns(table_name)}
-        missing = sorted(columns - existing)
-        if missing:
-            joined = ", ".join(missing)
-            raise RuntimeError(
-                "Database schema mismatch: "
-                f"missing required column(s) in {table_name}: {joined}"
-            )
-
-
+###############################################################################
 def normalize_session_status(self, value: Any) -> str:
     normalized = self.normalize_string(value)
     if normalized is None:
@@ -134,6 +112,7 @@ def normalize_session_status(self, value: Any) -> str:
     return "successful"
 
 
+###############################################################################
 def persist_patient(self, db_session: Session, session_data: dict[str, Any]) -> Patient:
     patient = Patient(
         name=self.normalize_string(session_data.get("patient_name")),
@@ -150,6 +129,7 @@ def persist_patient(self, db_session: Session, session_data: dict[str, Any]) -> 
     return patient
 
 
+###############################################################################
 def decode_patient_image(self, value: Any) -> bytes | None:
     normalized = self.normalize_string(value)
     if normalized is None:
@@ -159,11 +139,12 @@ def decode_patient_image(self, value: Any) -> bytes | None:
         payload = payload.split(",", maxsplit=1)[1].strip()
     try:
         return base64.b64decode(payload, validate=True)
-    except binascii.Error, ValueError:
+    except (binascii.Error, ValueError):
         logger.warning("Skipping invalid patient image payload during session save")
         return None
 
 
+###############################################################################
 def list_sessions(
     self,
     *,
@@ -174,7 +155,6 @@ def list_sessions(
     offset: int,
     limit: int,
 ) -> tuple[list[dict[str, Any]], int]:
-    self.ensure_session_result_table()
     safe_offset = max(int(offset), 0)
     safe_limit = max(int(limit), 1)
     conditions: list[Any] = []
@@ -270,14 +250,6 @@ def list_sessions(
                 parsed_timeline = parsed_payload.get("patient_timeline")
                 if isinstance(parsed_timeline, dict):
                     timeline_session_ids.add(int(result_session_id))
-            section_report_rows = db_session.execute(
-                select(ClinicalSessionSection.session_id).where(
-                    ClinicalSessionSection.session_id.in_(session_ids),
-                    ClinicalSessionSection.section_kind == "final_report",
-                )
-            ).all()
-            for (section_session_id,) in section_report_rows:
-                report_session_ids.add(int(section_session_id))
         items = [
             {
                 "session_id": int(session_row.id),
@@ -302,8 +274,8 @@ def list_sessions(
         db_session.close()
 
 
+###############################################################################
 def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     db_session = self.session_factory()
     try:
@@ -326,9 +298,42 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         }
         payload = self.get_session_result_payload(safe_session_id) or {}
         metadata = self.parse_session_result_payload(session_row.metadata_json) or {}
-        session_text = self.normalize_string(
-            payload.get("original_session_text")
-        ) or self.build_session_text_from_sections(sections)
+        session_text = build_session_source_text(
+            self,
+            sections=sections,
+            patient_row=patient_row,
+        )
+        official_report_text = self.normalize_string(payload.get("report"))
+        manual_edit_rows = db_session.execute(
+            select(ClinicalSessionManualEdit)
+            .where(ClinicalSessionManualEdit.session_id == safe_session_id)
+            .order_by(
+                ClinicalSessionManualEdit.edited_at.desc(),
+                ClinicalSessionManualEdit.id.desc(),
+            )
+        ).scalars()
+        manual_edit_history = [
+            {
+                "session_id": int(edit.session_id),
+                "current_version_id": int(edit.current_version_id),
+                "edited_by": self.normalize_string(edit.edited_by),
+                "actor_id": self.normalize_string(edit.actor_id),
+                "actor_display_name": self.normalize_string(edit.actor_display_name),
+                "actor_source": edit.actor_source,
+                "actor_confidence": edit.actor_confidence,
+                "edited_at": edit.edited_at,
+                "previous_text_hash": edit.previous_text_hash,
+                "new_text_hash": edit.new_text_hash,
+                "edited_fields": (
+                    json.loads(edit.edited_fields_json)
+                    if self.normalize_string(edit.edited_fields_json) is not None
+                    else []
+                ),
+                "reviewer_note": self.normalize_string(edit.reviewer_note),
+                "metadata": self.parse_session_result_payload(edit.metadata_json) or {},
+            }
+            for edit in manual_edit_rows
+        ]
         return {
             "session_id": safe_session_id,
             "patient_name": self.normalize_string(patient_row.name),
@@ -344,27 +349,17 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
             "metadata": metadata,
             "sections": sections,
             "session_text": session_text,
+            "source_clinical_text": session_text,
             "result_payload": payload,
-            "report": self.normalize_string(payload.get("report"))
-            or self.normalize_string(sections.get("final_report")),
+            "report": official_report_text,
+            "official_report_text": official_report_text,
+            "manual_edit_history": manual_edit_history,
         }
     finally:
         db_session.close()
 
 
-def build_session_text_from_sections(self, sections: dict[str, str]) -> str:
-    chunks: list[str] = []
-    for key, label in (
-        ("anamnesis", "ANAMNESIS"),
-        ("drugs", "THERAPY"),
-        ("laboratory_analysis", "LABORATORY ANALYSIS"),
-    ):
-        value = self.normalize_string(sections.get(key))
-        if value:
-            chunks.append(f"{label}\n{value}")
-    return "\n\n".join(chunks)
-
-
+###############################################################################
 def update_session_text_and_metadata(
     self,
     session_id: int,
@@ -372,39 +367,15 @@ def update_session_text_and_metadata(
     session_text: str | None,
     metadata: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     db_session = self.session_factory()
     try:
         existing = db_session.get(ClinicalSession, safe_session_id)
         if existing is None:
             return None
+        _ = session_text
         if metadata is not None:
-            existing.metadata_json = self.serialize_json_payload(metadata)
-        if session_text is not None:
-            result = db_session.execute(
-                select(ClinicalSessionResult).where(
-                    ClinicalSessionResult.session_id == safe_session_id
-                )
-            ).scalar_one_or_none()
-            payload = (
-                self.parse_session_result_payload(result.payload_json)
-                if result is not None
-                else {}
-            ) or {}
-            payload["original_session_text"] = session_text
-            payload["manual_edit_saved_at"] = datetime.now().isoformat()
-            serialized_payload = self.serialize_json_payload(payload)
-            if serialized_payload is not None:
-                if result is None:
-                    db_session.add(
-                        ClinicalSessionResult(
-                            session_id=safe_session_id,
-                            payload_json=serialized_payload,
-                        )
-                    )
-                else:
-                    result.payload_json = serialized_payload
+            existing.metadata_json = self.serialize_json_payload(metadata or {})
         db_session.commit()
         return self.get_session_detail(safe_session_id)
     except Exception:
@@ -414,8 +385,8 @@ def update_session_text_and_metadata(
         db_session.close()
 
 
+###############################################################################
 def get_next_session_version(self, original_session_id: int) -> int:
-    self.ensure_session_result_table()
     safe_original_id = int(original_session_id)
     db_session = self.session_factory()
     try:
@@ -432,6 +403,7 @@ def get_next_session_version(self, original_session_id: int) -> int:
         db_session.close()
 
 
+###############################################################################
 def parse_session_result_payload(
     self, payload_json: str | None
 ) -> dict[str, Any] | None:
@@ -445,8 +417,8 @@ def parse_session_result_payload(
     return parsed if isinstance(parsed, dict) else None
 
 
+###############################################################################
 def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     db_session = self.session_factory()
     try:
@@ -460,10 +432,10 @@ def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
         db_session.close()
 
 
+###############################################################################
 def upsert_session_result_payload(
     self, session_id: int, payload: dict[str, Any]
 ) -> bool:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     serialized_payload = self.serialize_json_payload(payload)
     if serialized_payload is None:
@@ -496,8 +468,8 @@ def upsert_session_result_payload(
         db_session.close()
 
 
+###############################################################################
 def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     db_session = self.session_factory()
     try:
@@ -552,8 +524,8 @@ def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
         db_session.close()
 
 
+###############################################################################
 def delete_session(self, session_id: int) -> bool:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     db_session = self.session_factory()
     try:
@@ -561,6 +533,82 @@ def delete_session(self, session_id: int) -> bool:
         if existing is None:
             return False
         patient_id = int(existing.patient_id)
+
+        # Collect version IDs before deleting, so we can cascade to their children
+        version_ids = [
+            row[0]
+            for row in db_session.execute(
+                select(ClinicalSessionVersion.id).where(
+                    ClinicalSessionVersion.root_session_id == safe_session_id
+                )
+            ).fetchall()
+        ]
+
+        if version_ids:
+            db_session.execute(
+                delete(ClinicalSessionRevisionArtifact).where(
+                    ClinicalSessionRevisionArtifact.revision_version_id.in_(
+                        version_ids
+                    )
+                )
+            )
+            db_session.execute(
+                delete(ClinicalSessionRevisionEntity).where(
+                    ClinicalSessionRevisionEntity.revision_version_id.in_(version_ids)
+                )
+            )
+            db_session.execute(
+                delete(ClinicalSessionRevisionReview).where(
+                    ClinicalSessionRevisionReview.revision_version_id.in_(version_ids)
+                )
+            )
+            # Nullify self-referential source_version_id before deleting versions
+            db_session.execute(
+                update(ClinicalSessionVersion)
+                .where(ClinicalSessionVersion.id.in_(version_ids))
+                .where(ClinicalSessionVersion.source_version_id.isnot(None))
+                .values(source_version_id=None)
+            )
+
+        # Cascade: revision runs, versions, manual edits
+        db_session.execute(
+            delete(ClinicalSessionRevisionRun).where(
+                ClinicalSessionRevisionRun.session_id == safe_session_id
+            )
+        )
+        db_session.execute(
+            delete(ClinicalSessionRevisionRun).where(
+                ClinicalSessionRevisionRun.root_session_id == safe_session_id
+            )
+        )
+        db_session.execute(
+            delete(ClinicalSessionRevisionReview).where(
+                ClinicalSessionRevisionReview.session_id == safe_session_id
+            )
+        )
+        # Nullify nullable session_id FK before deleting by root_session_id
+        db_session.execute(
+            update(ClinicalSessionVersion)
+            .where(ClinicalSessionVersion.session_id == safe_session_id)
+            .values(session_id=None)
+        )
+        db_session.execute(
+            delete(ClinicalSessionVersion).where(
+                ClinicalSessionVersion.root_session_id == safe_session_id
+            )
+        )
+        db_session.execute(
+            delete(ClinicalSessionManualEdit).where(
+                ClinicalSessionManualEdit.session_id == safe_session_id
+            )
+        )
+        # Nullify self-referential original_session_id on other sessions
+        db_session.execute(
+            update(ClinicalSession)
+            .where(ClinicalSession.original_session_id == safe_session_id)
+            .values(original_session_id=None)
+        )
+
         db_session.execute(
             delete(ClinicalSessionResult).where(
                 ClinicalSessionResult.session_id == safe_session_id
@@ -600,6 +648,7 @@ def delete_session(self, session_id: int) -> bool:
         db_session.close()
 
 
+###############################################################################
 def normalize_string(self, value: Any) -> str | None:
     if isinstance(value, str):
         normalized = value.strip()
@@ -620,6 +669,7 @@ def normalize_string(self, value: Any) -> str | None:
     return normalized
 
 
+###############################################################################
 def normalize_flag(self, value: Any) -> int | None:
     normalized = self.normalize_string(value)
     if normalized is None:
@@ -633,11 +683,12 @@ def normalize_flag(self, value: Any) -> int | None:
         return 0
     try:
         numeric = int(normalized)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     return 1 if numeric != 0 else 0
 
 
+###############################################################################
 def normalize_date(self, value: Any) -> str | None:
     normalized_date = self.normalize_date_value(value)
     if normalized_date is None:
@@ -646,6 +697,7 @@ def normalize_date(self, value: Any) -> str | None:
     return normalized_date.isoformat()
 
 
+###############################################################################
 def normalize_date_value(self, value: Any) -> date | None:
     normalized = self.normalize_string(value)
     if not normalized:
@@ -679,32 +731,36 @@ def normalize_date_value(self, value: Any) -> date | None:
     return parsed.date()
 
 
+###############################################################################
 def join_values(self, values: set[str]) -> str | None:
     if not values:
         return None
     return "; ".join(sorted(values))
 
 
+###############################################################################
 def to_int(self, value: Any) -> int | None:
     normalized = self.normalize_string(value)
     if normalized is None:
         return None
     try:
         return int(float(normalized))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
+###############################################################################
 def to_float(self, value: Any) -> float | None:
     normalized = self.normalize_string(value)
     if normalized is None:
         return None
     try:
         return float(normalized)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
+###############################################################################
 def parse_datetime(self, value: Any) -> Any:
     if value is None:
         return None
@@ -718,6 +774,7 @@ def parse_datetime(self, value: Any) -> Any:
     return parsed
 
 
+###############################################################################
 def persist_session_sections(
     self, db_session: Session, session_id: int, session_data: dict[str, Any]
 ) -> None:
@@ -747,6 +804,7 @@ def persist_session_sections(
         )
 
 
+###############################################################################
 def persist_session_labs(
     self, db_session: Session, session_id: int, session_data: dict[str, Any]
 ) -> None:
@@ -803,6 +861,7 @@ def persist_session_labs(
         )
 
 
+###############################################################################
 def persist_session_drugs(
     self, db_session: Session, session_id: int, session_data: dict[str, Any]
 ) -> None:
@@ -918,6 +977,7 @@ def persist_session_drugs(
         invalidate_text_normalization_snapshot()
 
 
+###############################################################################
 def persist_session_result_payload(
     self, db_session: Session, session_id: int, session_data: dict[str, Any]
 ) -> None:
@@ -933,6 +993,7 @@ def persist_session_result_payload(
     )
 
 
+###############################################################################
 def serialize_json_payload(self, payload: Any) -> str | None:
     if payload is None:
         return None
@@ -940,5 +1001,5 @@ def serialize_json_payload(self, payload: Any) -> str | None:
         return self.normalize_string(payload)
     try:
         return json.dumps(payload, ensure_ascii=False, default=str)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return self.normalize_string(payload)

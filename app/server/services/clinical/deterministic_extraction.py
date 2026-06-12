@@ -10,6 +10,14 @@ from domain.clinical.entities import (
     PatientDiseaseContext,
 )
 
+__all__ = [
+    "DATE_SEQUENCE_RE",
+    "DeterministicDrugExtractionResult",
+    "extract_deterministic_diseases",
+    "extract_regimen_drug_candidates",
+    "line_has_regimen_signal",
+]
+
 DATE_TOKEN_RE = r"\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?"
 HISTORICAL_RANGE_RE = re.compile(
     rf"\bdal\s+(?P<start>{DATE_TOKEN_RE})\s+(?:al|-)\s+(?P<end>{DATE_TOKEN_RE})\b",
@@ -125,6 +133,7 @@ NON_DRUG_TOKENS = frozenset(
 )
 
 
+###############################################################################
 def line_has_regimen_signal(line: str) -> bool:
     stripped = (line or "").strip()
     if not stripped:
@@ -136,6 +145,7 @@ def line_has_regimen_signal(line: str) -> bool:
     return "+" in stripped and bool(CAPITALIZED_DRUG_TOKEN_RE.search(stripped))
 
 
+###############################################################################
 def extract_regimen_drug_candidates(
     line: str,
     *,
@@ -194,6 +204,7 @@ def extract_regimen_drug_candidates(
     return entries
 
 
+###############################################################################
 def extract_deterministic_diseases(
     anamnesis: str,
 ) -> DeterministicDiseaseExtractionResult:

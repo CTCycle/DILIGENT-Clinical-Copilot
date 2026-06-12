@@ -7,12 +7,13 @@ from common.constants import (
     NO_CLINICAL_CONTEXT_FALLBACK,
     UNKNOWN_R_SCORE_TOKEN,
 )
+from common.prompts.retrieval import DILI_RAG_QUERY_PROMPT
 from domain.clinical.entities import PatientDrugs
-from services.llm.prompts import DILI_RAG_QUERY_PROMPT
-
 
 ###############################################################################
 class DILIQueryBuilder:
+
+    # -------------------------------------------------------------------------
     def __init__(self, drugs: PatientDrugs) -> None:
         self.drug_names = [x.name for x in drugs.entries if x.name]
 

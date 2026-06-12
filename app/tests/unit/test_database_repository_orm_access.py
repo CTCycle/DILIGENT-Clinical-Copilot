@@ -8,6 +8,7 @@ from repositories.schemas.models import ModelSelection
 from sqlalchemy import select
 
 
+###############################################################################
 def _build_settings() -> DatabaseSettings:
     return DatabaseSettings(
         embedded_database=True,
@@ -26,16 +27,13 @@ def _build_settings() -> DatabaseSettings:
     )
 
 
+###############################################################################
 def test_sqlite_repository_exposes_orm_session_factory(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setattr(
-        "repositories.database.sqlite.RESOURCES_PATH",
-        str(tmp_path),
-    )
-    monkeypatch.setattr(
-        "repositories.database.sqlite.DATABASE_FILENAME",
-        "orm_reads.db",
+        "repositories.database.sqlite.DATABASE_FILE_PATH",
+        tmp_path / "orm_reads.db",
     )
     repository = SQLiteRepository(_build_settings())
 

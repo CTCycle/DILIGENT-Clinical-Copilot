@@ -19,6 +19,7 @@ DOWNLOAD_CHUNK_SIZE = 262_144
 DOWNLOAD_PROGRESS_BYTE_INTERVAL = 5 * 1024 * 1024
 
 
+###############################################################################
 def load_json(path: str | Path) -> dict[str, Any] | None:
     metadata_path = Path(path)
     if not metadata_path.is_file():
@@ -26,21 +27,24 @@ def load_json(path: str | Path) -> dict[str, Any] | None:
     try:
         with metadata_path.open("r", encoding="utf-8") as handle:
             return json.load(handle)
-    except json.JSONDecodeError, OSError:
+    except (json.JSONDecodeError, OSError):
         return None
 
 
+###############################################################################
 def save_masterlist_metadata(path: str | Path, payload: dict[str, Any]) -> None:
     with Path(path).open("w", encoding="utf-8") as handle:
         json.dump(payload, handle)
 
 
+###############################################################################
 def metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
     return stored.get("last_modified") == remote.get("last_modified") and int(
         stored.get("size", 0)
     ) == int(remote.get("size", 0))
 
 
+###############################################################################
 async def download_file(
     client: httpx.AsyncClient,
     url: str,
@@ -74,9 +78,7 @@ async def download_file(
                     if total_size > 0:
                         ratio = min(1.0, max(0.0, downloaded / total_size))
                         progress_value = progress_start + (ratio * progress_span)
-                        message = (
-                            f"Downloaded {downloaded:,}/{total_size:,} bytes for {label}"
-                        )
+                        message = f"Downloaded {downloaded:,}/{total_size:,} bytes for {label}"
                     else:
                         progress_value = progress_start
                         message = f"Downloaded {downloaded:,} bytes for {label}"
@@ -87,6 +89,7 @@ async def download_file(
                     )
 
 
+###############################################################################
 def emit_progress(
     progress_callback: Callable[[float, str], None] | None,
     *,
@@ -99,6 +102,7 @@ def emit_progress(
     progress_callback(bounded_progress, message)
 
 
+###############################################################################
 def should_cancel(should_stop: Callable[[], bool] | None) -> bool:
     if should_stop is None:
         return False

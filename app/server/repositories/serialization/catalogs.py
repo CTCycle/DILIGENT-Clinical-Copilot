@@ -14,10 +14,14 @@ from domain.catalogs import (
 from repositories.schemas.models import ReferenceCatalogEntry, ReferenceCatalogSeedRun
 
 
+###############################################################################
 class ReferenceCatalogSerializer:
+
+    # -------------------------------------------------------------------------
     def __init__(self, session_factory: sessionmaker) -> None:
         self.session_factory = session_factory
 
+    # -------------------------------------------------------------------------
     def list_active_entries(self) -> list[CatalogEntry]:
         session = self.session_factory()
         try:
@@ -34,6 +38,7 @@ class ReferenceCatalogSerializer:
         finally:
             session.close()
 
+    # -------------------------------------------------------------------------
     def replace_manifest_entries(
         self,
         manifest: CatalogManifest,
@@ -78,6 +83,7 @@ class ReferenceCatalogSerializer:
         finally:
             session.close()
 
+    # -------------------------------------------------------------------------
     def has_successful_seed(self, manifest: str, manifest_hash: str) -> bool:
         session = self.session_factory()
         try:
@@ -92,6 +98,7 @@ class ReferenceCatalogSerializer:
         finally:
             session.close()
 
+    # -------------------------------------------------------------------------
     def record_seed_success(
         self,
         manifest: str,
@@ -110,6 +117,7 @@ class ReferenceCatalogSerializer:
             error_message=None,
         )
 
+    # -------------------------------------------------------------------------
     def record_seed_failure(
         self,
         manifest: str,
@@ -128,6 +136,7 @@ class ReferenceCatalogSerializer:
             error_message=error,
         )
 
+    # -------------------------------------------------------------------------
     def clear_all_catalog_entries(self) -> None:
         session = self.session_factory()
         try:
@@ -139,6 +148,7 @@ class ReferenceCatalogSerializer:
         finally:
             session.close()
 
+    # -------------------------------------------------------------------------
     def upsert_runtime_observation(
         self,
         *,
@@ -204,6 +214,7 @@ class ReferenceCatalogSerializer:
             if owns_session:
                 session.close()
 
+    # -------------------------------------------------------------------------
     def list_runtime_observations(
         self,
         *,
@@ -225,6 +236,7 @@ class ReferenceCatalogSerializer:
         finally:
             session.close()
 
+    # -------------------------------------------------------------------------
     def deactivate_runtime_observation(self, *, category: str, term: str) -> bool:
         normalized_value = normalize_catalog_value(term)
         if not normalized_value:
@@ -256,6 +268,7 @@ class ReferenceCatalogSerializer:
         finally:
             session.close()
 
+    # -------------------------------------------------------------------------
     def _record_seed_run(
         self,
         *,
@@ -304,6 +317,7 @@ class ReferenceCatalogSerializer:
         finally:
             session.close()
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _to_domain_entry(row: ReferenceCatalogEntry) -> CatalogEntry:
         metadata = {}

@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from common.constants import CLOUD_MODEL_CHOICES
+from common.prompts.timeline import PATIENT_TIMELINE_EXTRACTION_PROMPT
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import get_server_settings
@@ -15,7 +16,6 @@ from domain.patient_timeline import (
     PatientTimelineExtraction,
 )
 from services.llm.client_runtime import ensure_runtime_client
-from services.llm.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
 from services.llm.provider_factory import (
     initialize_llm_client,
     select_llm_provider,
@@ -24,8 +24,10 @@ from services.llm.provider_factory import (
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATE_SHORT_RE = re.compile(r"^\d{4}-\d{2}$")
 
-################################################################################
+###############################################################################
 class PatientTimelineExtractor:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -236,5 +238,6 @@ class PatientTimelineExtractor:
         return PatientTimeline(
             session_id=int(session_id),
             generated_at=datetime.now(UTC),
+            generation_status="llm_generated",
             events=normalized_events,
         )

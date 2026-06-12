@@ -5,7 +5,6 @@ from datetime import datetime
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ModelConfigSnapshot:
@@ -17,8 +16,8 @@ class ModelConfigSnapshot:
     ollama_temperature: float
     cloud_temperature: float
     ollama_reasoning: bool = False
+    rag_settings: dict[str, object] | None = None
     updated_at: datetime | None = None
-
 
 ###############################################################################
 class LocalModelCard(BaseModel):
@@ -26,7 +25,6 @@ class LocalModelCard(BaseModel):
     family: str
     description: str
     available_in_ollama: bool
-
 
 ###############################################################################
 class ModelConfigUpdateRequest(BaseModel):
@@ -42,7 +40,7 @@ class ModelConfigUpdateRequest(BaseModel):
     ollama_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     cloud_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     ollama_reasoning: bool | None = None
-
+    rag_settings: dict[str, object] | None = None
 
 ###############################################################################
 class ModelConfigStateResponse(BaseModel):
@@ -56,3 +54,19 @@ class ModelConfigStateResponse(BaseModel):
     ollama_temperature: float = Field(ge=0.0, le=2.0)
     cloud_temperature: float = Field(ge=0.0, le=2.0)
     ollama_reasoning: bool
+    rag_settings: dict[str, object]
+    rag_model: str | None = None
+    updated_at: datetime | None = None
+
+###############################################################################
+class OpenAIConnectivityCheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model: str | None = None
+
+###############################################################################
+class OpenAIConnectivityCheckResponse(BaseModel):
+    provider: str
+    model: str
+    ok: bool
+    response_preview: str | None = None
+    error: str | None = None

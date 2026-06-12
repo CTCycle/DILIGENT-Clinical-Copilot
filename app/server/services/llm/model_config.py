@@ -6,24 +6,42 @@ from typing import Any, Protocol, cast
 
 from common.constants import CLOUD_MODEL_CHOICES
 from common.exceptions import ServiceValidationError
+from common.paths import VECTOR_DB_PATH
 from common.utils.catalog_loader import CatalogLoader
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
+from common.utils.types import (
+    coerce_bool,
+    coerce_float,
+    coerce_positive_int,
+    coerce_str,
+)
 from domain.model_configs import (
     LocalModelCard,
     ModelConfigSnapshot,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
+    OpenAIConnectivityCheckRequest,
+    OpenAIConnectivityCheckResponse,
 )
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
+from services.llm.cloud import CloudLLMClient, LLMError
 from services.llm.ollama_client import OllamaClient, OllamaError
-
+from repositories.vectors import LanceVectorDatabase
+from services.retrieval.settings import (
+    build_effective_rag_settings,
+    rag_settings_payload,
+)
 
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
+
+    # -------------------------------------------------------------------------
     def load_snapshot(self) -> ModelConfigSnapshot: ...
+
+    # -------------------------------------------------------------------------
     def save_snapshot(
         self,
         *,
@@ -35,13 +53,15 @@ class ModelConfigSnapshotStore(Protocol):
         ollama_temperature: float | object = ...,
         cloud_temperature: float | object = ...,
         ollama_reasoning: bool | object = ...,
+        rag_settings: dict[str, object] | object = ...,
     ) -> ModelConfigSnapshot: ...
-
 
 ###############################################################################
 class ModelConfigService:
     _OLLAMA_WARNING_COOLDOWN_SECONDS = 120.0
+    _OPENAI_CONNECTIVITY_FALLBACK_MODEL = "gpt-4.1-mini"
 
+    # -------------------------------------------------------------------------
     def __init__(self, serializer: ModelConfigSnapshotStore | None = None) -> None:
         self.serializer = serializer or ModelConfigSerializer()
         self.local_model_catalog = cast(
@@ -105,9 +125,64 @@ class ModelConfigService:
         return self.build_response(snapshot=snapshot, local_models=local_models)
 
     # -------------------------------------------------------------------------
+    async def check_openai_connectivity(
+        self, payload: OpenAIConnectivityCheckRequest
+    ) -> OpenAIConnectivityCheckResponse:
+        snapshot = self.ensure_defaults()
+        requested_model = self.normalize_optional_text(payload.model)
+        model = (
+            requested_model
+            or self.normalize_optional_text(snapshot.cloud_model)
+            or self._OPENAI_CONNECTIVITY_FALLBACK_MODEL
+        )
+        try:
+            async with CloudLLMClient(
+                provider="openai",
+                default_model=model,
+                timeout_s=20.0,
+                max_retries=0,
+            ) as client:
+                response = await client.chat(
+                    model=model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Reply with exactly: OK",
+                        },
+                        {
+                            "role": "user",
+                            "content": "OpenAI connectivity check.",
+                        },
+                    ],
+                    options={"temperature": 0.0},
+                )
+        except LLMError as exc:
+            return OpenAIConnectivityCheckResponse(
+                provider="openai",
+                model=model,
+                ok=False,
+                error=str(exc),
+            )
+
+        preview = self._normalize_connectivity_preview(response)
+        return OpenAIConnectivityCheckResponse(
+            provider="openai",
+            model=model,
+            ok=True,
+            response_preview=preview,
+        )
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _local_roles_updated(fields_set: set[str]) -> bool:
         return "clinical_model" in fields_set or "text_extraction_model" in fields_set
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_connectivity_preview(response: object) -> str:
+        preview = response if isinstance(response, str) else str(response)
+        preview = " ".join(preview.split())
+        return preview[:200]
 
     # -------------------------------------------------------------------------
     async def _build_local_model_names(
@@ -169,6 +244,11 @@ class ModelConfigService:
             updates=updates,
         )
         self._collect_runtime_option_updates(
+            payload=payload,
+            fields_set=fields_set,
+            updates=updates,
+        )
+        self._collect_rag_settings_updates(
             payload=payload,
             fields_set=fields_set,
             updates=updates,
@@ -252,6 +332,99 @@ class ModelConfigService:
 
         if "ollama_reasoning" in fields_set and payload.ollama_reasoning is not None:
             updates["ollama_reasoning"] = payload.ollama_reasoning
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _collect_rag_settings_updates(
+        *,
+        payload: ModelConfigUpdateRequest,
+        fields_set: set[str],
+        updates: dict[str, Any],
+    ) -> None:
+        if "rag_settings" not in fields_set or payload.rag_settings is None:
+            return
+        updates["rag_settings"] = ModelConfigService.normalize_rag_settings_patch(
+            payload.rag_settings
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_rag_settings_patch(payload: dict[str, object]) -> dict[str, object]:
+        current = build_effective_rag_settings()
+        candidate_count = coerce_positive_int(
+            payload.get("retrieval_candidate_count"),
+            current.retrieval_candidate_count,
+        )
+        selected_count = coerce_positive_int(
+            payload.get("retrieval_selected_count"),
+            current.retrieval_selected_count,
+        )
+        if selected_count > candidate_count:
+            raise ServiceValidationError(
+                "Selected RAG documents cannot exceed retrieved RAG documents."
+            )
+        return {
+            "chunk_size": coerce_positive_int(
+                payload.get("chunk_size"), current.chunk_size
+            ),
+            "chunk_overlap": coerce_positive_int(
+                payload.get("chunk_overlap"), current.chunk_overlap
+            ),
+            "embedding_batch_size": coerce_positive_int(
+                payload.get("embedding_batch_size"), current.embedding_batch_size
+            ),
+            "use_hybrid_search": coerce_bool(
+                payload.get("use_hybrid_search"), current.use_hybrid_search
+            ),
+            "use_reranking": coerce_bool(
+                payload.get("use_reranking"), current.use_reranking
+            ),
+            "retrieval_candidate_count": candidate_count,
+            "retrieval_selected_count": selected_count,
+            "reranker_model": coerce_str(
+                payload.get("reranker_model"), current.reranker_model
+            ),
+            "hybrid_vector_weight": max(
+                coerce_float(
+                    payload.get("hybrid_vector_weight"), current.hybrid_vector_weight
+                ),
+                0.0,
+            ),
+            "hybrid_text_weight": max(
+                coerce_float(
+                    payload.get("hybrid_text_weight"), current.hybrid_text_weight
+                ),
+                0.0,
+            ),
+            "embedding_backend": coerce_str(
+                payload.get("embedding_backend"), current.embedding_backend
+            ),
+            "ollama_embedding_model": coerce_str(
+                payload.get("ollama_embedding_model"), current.ollama_embedding_model
+            ),
+            "hf_embedding_model": coerce_str(
+                payload.get("hf_embedding_model"), current.hf_embedding_model
+            ),
+            "cloud_provider": coerce_str(
+                payload.get("cloud_provider"), current.cloud_provider
+            ),
+            "cloud_embedding_model": coerce_str(
+                payload.get("cloud_embedding_model"), current.cloud_embedding_model
+            ),
+            "use_cloud_embeddings": coerce_bool(
+                payload.get("use_cloud_embeddings"), current.use_cloud_embeddings
+            ),
+            "reset_vector_collection": coerce_bool(
+                payload.get("reset_vector_collection"), current.reset_vector_collection
+            ),
+            "vector_stream_batch_size": coerce_positive_int(
+                payload.get("vector_stream_batch_size"),
+                current.vector_stream_batch_size,
+            ),
+            "embedding_max_workers": coerce_positive_int(
+                payload.get("embedding_max_workers"), current.embedding_max_workers
+            ),
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -456,4 +629,33 @@ class ModelConfigService:
             ollama_temperature=snapshot.ollama_temperature,
             cloud_temperature=snapshot.cloud_temperature,
             ollama_reasoning=snapshot.ollama_reasoning,
+            rag_settings=rag_settings_payload(build_effective_rag_settings()),
+            rag_model=self.resolve_current_rag_model_label(),
+            updated_at=snapshot.updated_at,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def resolve_current_rag_model_label() -> str | None:
+        settings = build_effective_rag_settings()
+        vector_db = LanceVectorDatabase(
+            database_path=VECTOR_DB_PATH,
+            collection_name=settings.vector_collection_name,
+            metric=settings.vector_index_metric,
+            index_type=settings.vector_index_type,
+            stream_batch_size=settings.vector_stream_batch_size,
+        )
+        try:
+            if not vector_db.has_collection():
+                return None
+            for batch in vector_db.iter_embeddings(batch_size=1, limit=1):
+                for row in batch:
+                    provider = str(row.get("vector_model_provider") or "").strip()
+                    model_name = str(row.get("vector_model_name") or "").strip()
+                    if provider and model_name:
+                        return f"{provider}:{model_name}"
+                    if model_name:
+                        return model_name
+        except Exception:
+            return None
+        return None

@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 ## Recommended Local Startup
 On Windows, use:
@@ -15,6 +15,8 @@ The launcher:
 - builds frontend dist if missing
 - starts the backend via `uv run ... uvicorn`
 - starts the frontend preview server
+
+Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
 
 ## Manual Backend Startup
 From repository root:

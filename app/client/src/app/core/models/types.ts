@@ -17,6 +17,28 @@ export type LocalModelCard = {
   available_in_ollama: boolean;
 };
 
+export type RagSettings = {
+  chunk_size: number;
+  chunk_overlap: number;
+  embedding_batch_size: number;
+  use_hybrid_search: boolean;
+  use_reranking: boolean;
+  retrieval_candidate_count: number;
+  retrieval_selected_count: number;
+  reranker_model: string;
+  hybrid_vector_weight: number;
+  hybrid_text_weight: number;
+  embedding_backend: string;
+  ollama_embedding_model: string;
+  hf_embedding_model: string;
+  cloud_provider: string;
+  cloud_embedding_model: string;
+  use_cloud_embeddings: boolean;
+  reset_vector_collection: boolean;
+  vector_stream_batch_size: number;
+  embedding_max_workers: number;
+};
+
 export type ModelConfigStateResponse = {
   status: "success";
   local_models: LocalModelCard[];
@@ -29,6 +51,8 @@ export type ModelConfigStateResponse = {
   ollama_temperature: number;
   cloud_temperature: number;
   ollama_reasoning: boolean;
+  rag_settings: RagSettings;
+  rag_model: string | null;
   updated_at: string | null;
 };
 
@@ -41,6 +65,7 @@ export type ModelConfigUpdateRequest = {
   ollama_temperature?: number;
   cloud_temperature?: number;
   ollama_reasoning?: boolean;
+  rag_settings?: Partial<RagSettings>;
 };
 
 export type AccessKeyProvider = "openai" | "gemini" | "openrouter";
@@ -203,13 +228,303 @@ export type ClinicalSessionDetail = {
   metadata: Record<string, unknown>;
   sections: Record<string, string>;
   session_text: string;
+  source_clinical_text: string;
   result_payload: Record<string, unknown>;
   report: string | null;
+  official_report_text: string | null;
+  manual_edit_history: ManualReportEditAudit[];
 };
 
 export type ClinicalSessionUpdateRequest = {
   session_text?: string | null;
+  report_text?: string | null;
+  edited_fields?: string[];
+  reviewer_note?: string | null;
+  edited_by?: string | null;
   metadata?: Record<string, unknown> | null;
+};
+
+export type ManualReportEditAudit = {
+  session_id: number;
+  current_version_id: number;
+  edited_by: string | null;
+  actor_id: string | null;
+  actor_display_name: string | null;
+  actor_source: "authenticated_user" | "local_profile" | "manual_entry" | "system" | "unknown";
+  actor_confidence: "verified" | "unverified" | "system";
+  edited_at: string;
+  previous_text_hash: string;
+  new_text_hash: string;
+  edited_fields: string[];
+  reviewer_note: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type ManualReportEditRequest = {
+  report_text: string;
+  edited_fields?: string[];
+  reviewer_note?: string | null;
+  edited_by?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type ManualReportEditResponse = {
+  session: ClinicalSessionDetail;
+  audit: ManualReportEditAudit;
+};
+
+export type SessionVersionStatus =
+  | "current"
+  | "superseded"
+  | "draft_revision"
+  | "pending_qa"
+  | "qa_failed"
+  | "requires_human_review"
+  | "llm_qa_passed"
+  | "human_approved"
+  | "human_rejected";
+
+export type SessionRevisionKind = "original" | "manual_edit" | "llm_assisted_revision";
+export type SessionLlmQaStatus =
+  | "not_run"
+  | "pending"
+  | "passed"
+  | "passed_with_warnings"
+  | "failed"
+  | "requires_human_review";
+export type SessionClinicalReviewStatus =
+  | "not_reviewed"
+  | "under_review"
+  | "approved_by_human"
+  | "rejected_by_human";
+
+export type SessionVersionSummary = {
+  version_id: number;
+  session_id: number | null;
+  root_session_id: number;
+  source_version_id: number | null;
+  revision_version_id: number;
+  version_number: number;
+  version_status: SessionVersionStatus;
+  revision_kind: SessionRevisionKind;
+  llm_qa_status: SessionLlmQaStatus;
+  clinical_review_status: SessionClinicalReviewStatus;
+  pipeline_run_id: string | null;
+  model_configuration: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
+export type SessionVersionListResponse = {
+  items: SessionVersionSummary[];
+};
+
+export type SessionVersionDetailResponse = {
+  version: SessionVersionSummary;
+  session: ClinicalSessionDetail | null;
+};
+
+export type RevisionEntityDiff = {
+  entity_type: string;
+  normalized_name: string | null;
+  source_section: string | null;
+  change_type: "added" | "removed" | "corrected" | "replaced" | "unresolved" | "unchanged";
+  summary: string;
+  requires_human_review: boolean;
+  left_entity: Record<string, unknown> | null;
+  right_entity: Record<string, unknown> | null;
+};
+
+export type ReportTextDiff = {
+  changed: boolean;
+  left_character_count: number;
+  right_character_count: number;
+  left_line_count: number;
+  right_line_count: number;
+  similarity_ratio: number;
+  diff_lines: string[];
+};
+
+export type RevisionQaSummary = {
+  left_llm_qa_status: string;
+  right_llm_qa_status: string;
+  left_clinical_review_status: string;
+  right_clinical_review_status: string;
+  left_version_status: string;
+  right_version_status: string;
+  left_warning_count: number;
+  right_warning_count: number;
+  left_blocking_issue_count: number;
+  right_blocking_issue_count: number;
+  left_finding_count: number;
+  right_finding_count: number;
+  manual_review_required: boolean;
+};
+
+export type SessionVersionComparisonResponse = {
+  left_version: SessionVersionSummary;
+  right_version: SessionVersionSummary;
+  added_entities: RevisionEntityDiff[];
+  removed_entities: RevisionEntityDiff[];
+  corrected_entities: RevisionEntityDiff[];
+  replaced_entities: RevisionEntityDiff[];
+  unresolved_entities: RevisionEntityDiff[];
+  unchanged_entities: RevisionEntityDiff[];
+  report_text_diff: ReportTextDiff;
+  qa_summary: RevisionQaSummary;
+};
+
+export type RevisionPipelineRun = {
+  pipeline_run_id: string;
+  session_id: number;
+  root_session_id: number;
+  source_version_id: number;
+  target_revision_version_id: number | null;
+  revision_mode: string;
+  revision_kind: SessionRevisionKind;
+  configuration: Record<string, unknown>;
+  reviewer_note: string | null;
+  initiated_by: string | null;
+  actor_id: string | null;
+  actor_display_name: string | null;
+  actor_source: "authenticated_user" | "local_profile" | "manual_entry" | "system" | "unknown";
+  actor_confidence: "verified" | "unverified" | "system";
+  started_at: string;
+  completed_at: string | null;
+  status: string;
+  error: Record<string, unknown> | null;
+  token_usage: Record<string, unknown> | null;
+  latency_ms: number | null;
+  cost_estimate: number | null;
+  trace_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RevisionPipelineStep = {
+  pipeline_run_id: string;
+  step_name: string;
+  step_index: number;
+  step_count: number;
+  attempt_number: number;
+  status: string;
+  input_hash: string | null;
+  output_hash: string | null;
+  input_summary: Record<string, unknown> | null;
+  output_summary: Record<string, unknown> | null;
+  output_payload: Record<string, unknown> | null;
+  schema_name: string | null;
+  schema_version: string | null;
+  prompt_version: string | null;
+  parser_version: string | null;
+  model_provider: string | null;
+  model_name: string | null;
+  token_usage: Record<string, unknown> | null;
+  latency_ms: number | null;
+  retry_count: number;
+  error: Record<string, unknown> | null;
+  started_at: string | null;
+  completed_at: string | null;
+  superseded_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RevisionPipelineStepListResponse = {
+  items: RevisionPipelineStep[];
+};
+
+export type RevisionArtifactKind =
+  | "structured_case_entity"
+  | "llm_qa_output"
+  | "report_comparison"
+  | "pipeline_artifact";
+
+export type RevisionArtifact = {
+  revision_version_id: number;
+  pipeline_run_id: string;
+  artifact_kind: RevisionArtifactKind;
+  artifact_key: string | null;
+  entity_type: string | null;
+  entity_name: string | null;
+  status: string | null;
+  schema_version: string | null;
+  payload: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RevisionArtifactListResponse = {
+  items: RevisionArtifact[];
+};
+
+export type RevisionEntity = {
+  revision_version_id: number;
+  source_version_id: number | null;
+  pipeline_run_id: string;
+  step_name: string;
+  entity_type: "drug" | "disease" | "lab_timeline_entry" | "livertox_match" | "dili_assessment";
+  entity_revision_status: string;
+  source_section: string | null;
+  original_entity_id: string | null;
+  original_name: string | null;
+  revised_name: string | null;
+  normalized_name: string | null;
+  requires_human_review: boolean;
+  human_review_status: string | null;
+  payload: Record<string, unknown> | null;
+  schema_name: string | null;
+  schema_version: string | null;
+  prompt_version: string | null;
+  parser_version: string | null;
+  model_provider: string | null;
+  model_name: string | null;
+  input_hash: string | null;
+  output_hash: string | null;
+  created_at: string;
+  superseded_at: string | null;
+};
+
+export type RevisionEntityListResponse = {
+  items: RevisionEntity[];
+};
+
+export type RevisionClinicalReviewStatus =
+  | "under_review"
+  | "approved_by_human"
+  | "rejected_by_human";
+
+export type RevisionClinicalReviewAction = {
+  revision_version_id: number;
+  session_id: number | null;
+  clinical_review_status: RevisionClinicalReviewStatus;
+  reviewer_note: string | null;
+  reviewed_by: string | null;
+  actor_id: string | null;
+  actor_display_name: string | null;
+  actor_source: "authenticated_user" | "local_profile" | "manual_entry" | "system" | "unknown";
+  actor_confidence: "verified" | "unverified" | "system";
+  metadata: Record<string, unknown>;
+  reviewed_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RevisionClinicalReviewActionListResponse = {
+  items: RevisionClinicalReviewAction[];
+};
+
+export type RevisionClinicalReviewUpdateRequest = {
+  clinical_review_status: RevisionClinicalReviewStatus;
+  reviewer_note?: string | null;
+  reviewed_by?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type RevisionClinicalReviewUpdateResponse = {
+  version: SessionVersionSummary;
+  review_action: RevisionClinicalReviewAction;
 };
 
 export type ClinicalSessionRevisionRequest = {
@@ -248,6 +563,8 @@ export type InspectionTimelineEvent = {
 export type InspectionSessionTimeline = {
   session_id: number;
   generated_at: string;
+  generation_status?: "llm_generated" | "fallback";
+  generation_note?: string | null;
   events: InspectionTimelineEvent[];
 };
 
@@ -326,6 +643,8 @@ export type InspectionUpdateConfigResponse = {
   target: InspectionUpdateTarget;
   defaults: Record<string, unknown>;
   allowed_fields: string[];
+  summary: Record<string, unknown>;
+  read_only: boolean;
 };
 
 export type InspectionRxNavOverrideRequest = {
@@ -339,20 +658,23 @@ export type InspectionLiverToxOverrideRequest = {
   redownload?: boolean;
 };
 
-export type InspectionRagOverrideRequest = {
+export type InspectionRagVectorizationSummary = {
+  chunk_size: number;
+  chunk_overlap: number;
+  embedding_batch_size: number;
+  vector_stream_batch_size: number;
+  embedding_max_workers: number;
+  embedding_backend: string;
+  ollama_embedding_model: string;
+  hf_embedding_model: string;
+  cloud_provider: CloudProvider;
+  cloud_embedding_model: string;
+  use_cloud_embeddings: boolean;
+  reset_vector_collection: boolean;
+};
+
+export type InspectionRagUpdateRequest = {
   documents_path?: string;
-  chunk_size?: number;
-  chunk_overlap?: number;
-  embedding_batch_size?: number;
-  vector_stream_batch_size?: number;
-  embedding_max_workers?: number;
-  embedding_backend?: string;
-  ollama_embedding_model?: string;
-  hf_embedding_model?: string;
-  cloud_provider?: CloudProvider;
-  cloud_embedding_model?: string;
-  use_cloud_embeddings?: boolean;
-  reset_vector_collection?: boolean;
 };
 
 export type InspectionRagDocumentRow = {

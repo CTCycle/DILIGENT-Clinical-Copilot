@@ -5,11 +5,13 @@ set "script_dir=%~dp0"
 for %%I in ("%script_dir%..\..") do set "repo_root=%%~fI"
 set "app_dir=%repo_root%\app"
 set "client_dir=%app_dir%\client"
-set "tauri_dir=%client_dir%\src-tauri"
+set "tauri_dir=%app_dir%\src-tauri"
+set "tauri_cmd=%client_dir%\node_modules\.bin\tauri.cmd"
 set "bundle_source_dir=%tauri_dir%\runtime"
 set "release_dir=%tauri_dir%\target\release"
 set "bundle_dir=%tauri_dir%\target\release\bundle"
 set "release_export_dir=%repo_root%\release\windows"
+set "export_script=%script_dir%scripts\export-windows-artifacts.ps1"
 
 set "runtime_python_exe=%repo_root%\runtimes\python\python.exe"
 set "runtime_uv_exe=%repo_root%\runtimes\uv\uv.exe"
@@ -57,6 +59,11 @@ set "CARGO=%cargo_cmd%"
 if /I not "%node_cmd%"=="node" (
   for %%I in ("%node_cmd%") do set "PATH=%%~dpI;%PATH%"
 )
+if exist "%tauri_cmd%" (
+  for %%I in ("%tauri_cmd%") do set "PATH=%%~dpI;%PATH%"
+) else (
+  set "tauri_cmd=tauri"
+)
 
 for /f "delims=" %%V in ('"%node_cmd%" --version 2^>nul') do set "node_version=%%V"
 for /f "delims=" %%V in ('"%npm_cmd%" --version 2^>nul') do set "npm_version=%%V"
@@ -96,14 +103,23 @@ call :prepare_bundle_sources || (
 call :cleanup_stale_release_payload
 
 echo [STEP 2/2] Building Tauri application
-echo [CMD] "%npm_cmd%" run tauri:build:release
-call "%npm_cmd%" run tauri:build:release
+pushd "%app_dir%" >nul
+echo [CMD] "%tauri_cmd%" build --config src-tauri/tauri.conf.json
+call "%tauri_cmd%" build --config src-tauri/tauri.conf.json
 if errorlevel 1 (
   popd >nul
   echo [FATAL] Tauri build failed.
   goto build_error
 )
 popd >nul
+
+echo [STEP 3/3] Exporting Windows artifacts
+echo [CMD] powershell -NoProfile -ExecutionPolicy Bypass -File "%export_script%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%export_script%"
+if errorlevel 1 (
+  echo [FATAL] Windows artifact export failed.
+  goto build_error
+)
 
 call :cleanup_bundle_sources
 
@@ -259,6 +275,7 @@ if %robocopy_exit% GEQ 8 (
 exit /b 0
 
 :cleanup_bundle_sources
+if exist "%tauri_dir%\r" rd /s /q "%tauri_dir%\r" >nul 2>&1
 if exist "%bundle_source_dir%" rd /s /q "%bundle_source_dir%" >nul 2>&1
 exit /b 0
 

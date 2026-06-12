@@ -1,37 +1,35 @@
 from __future__ import annotations
 
-import asyncio
-import json
+import re
+import uuid
 from datetime import UTC, date, datetime
 from functools import partial
 from pathlib import Path
 from threading import Lock
 from typing import Any, Literal
 
-from common.constants import (
-    DOCS_PATH,
-    DOCUMENT_SUPPORTED_EXTENSIONS,
-    VECTOR_DB_PATH,
-)
+from common.constants import DOCUMENT_SUPPORTED_EXTENSIONS
+from common.paths import VECTOR_DB_PATH
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
-from domain.clinical.entities import ClinicalSessionRequest
-from domain.inspection import InspectionJobPhase
-from domain.patient_timeline import PatientTimeline
-from repositories.serialization.data import (
-    DataSerializer,
-    DocumentSerializer,
+from domain.inspection import (
+    InspectionJobPhase,
+    ReviewerInstructionProfile,
+    ReviewerInstructionTrace,
 )
-from repositories.serialization.model_configs import ModelConfigSerializer
+from domain.patient_timeline import PatientTimeline
+from repositories.serialization.data import DataSerializer
+from repositories.serialization.document_serializer import DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
+from services.retrieval.settings import build_effective_rag_settings
 from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection.normalization import (
     extract_lab_marker as extract_lab_marker_value,
 )
-from services.inspection.revision_helpers import (
+from services.clinical.revision.helpers import (
     build_revision_section_validation as build_revision_section_validation_value,
 )
-from services.inspection.revision_helpers import (
+from services.clinical.revision.helpers import (
     extract_revision_drug_names as extract_revision_drug_names_value,
 )
 from services.inspection.normalization import (
@@ -50,26 +48,50 @@ from services.inspection.timeline import (
 from services.inspection.timeline import (
     get_session_timeline as get_session_timeline_value,
 )
+from services.inspection.update_config import InspectionUpdateConfigMixin
+from services.inspection.revision_diff import InspectionRevisionDiffMixin
+from services.inspection.revision_decisions import InspectionRevisionDecisionsMixin
+from services.inspection.revision_runner import InspectionRevisionRunnerMixin
 from services.runtime.jobs import JobManager
-from services.session.factory import build_clinical_session_service
 from services.text.normalization import normalize_drug_query_name
-from services.text.vocabulary import (
-    deactivate_text_normalization_term_payload,
-    invalidate_text_normalization_snapshot,
-    list_text_normalization_term_payloads,
-    upsert_text_normalization_term_payload,
-)
 
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
 
-
-class DataInspectionService:
+###############################################################################
+class DataInspectionService(
+    InspectionUpdateConfigMixin,
+    InspectionRevisionDiffMixin,
+    InspectionRevisionDecisionsMixin,
+    InspectionRevisionRunnerMixin,
+):
     RXNAV_JOB_TYPE = "rxnav_update"
     LIVERTOX_JOB_TYPE = "livertox_update"
     RAG_JOB_TYPE = "rag_update"
     REVISION_JOB_TYPE = "session_revision"
     RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"
+    REVISION_STEP_SEQUENCE: list[tuple[str, str]] = [
+        ("load_source_version", "Loading selected source version"),
+        ("analyze_reviewer_instructions", "Analyzing reviewer instructions"),
+        ("prepare_runtime", "Preparing revision runtime"),
+        ("preprocess_input", "Preprocessing source clinical text"),
+        ("generate_revision", "Generating revised clinical session"),
+        ("resolve_revision_extraction", "Resolving revision extraction bundle"),
+        ("validate_anamnesis_drugs", "Validating revised anamnesis drugs"),
+        (
+            "extract_missing_anamnesis_drugs",
+            "Extracting missing anamnesis drug candidates",
+        ),
+        ("revise_labs_timeline", "Revising structured laboratory timeline"),
+        ("reconcile_revision_candidates", "Reconciling revision candidate selection"),
+        ("merge_revision_snapshot", "Merging revision entity snapshot"),
+        ("resolve_livertox_matches", "Resolving revision LiverTox matches"),
+        ("rerun_dili_assessments", "Rebuilding revision DILI assessments"),
+        ("rebuild_final_report", "Rebuilding revision final report"),
+        ("qa_validate_revision", "Validating rebuilt revision output"),
+        ("persist_revision", "Persisting revision artifacts"),
+        ("finalize_revision_version", "Finalizing revision version state"),
+    ]
     UPDATE_PHASES: dict[UpdateTarget, list[PhaseStep]] = {
         "rxnav": [
             ("configuration_accepted", 1, 7, "Configuration accepted"),
@@ -100,6 +122,7 @@ class DataInspectionService:
         ],
     }
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -120,191 +143,6 @@ class DataInspectionService:
             report_job_progress=self._report_job_progress_for_runner,
             write_rag_manifest=self._write_rag_manifest_for_runner,
         )
-
-    # -------------------------------------------------------------------------
-    def load_runtime_config(self) -> dict[str, Any]:
-        return get_server_settings().model_dump()
-
-    def rag_manifest_path(self) -> Path:
-        return Path(VECTOR_DB_PATH) / self.RAG_MANIFEST_FILE_NAME
-
-    def read_rag_manifest(self) -> dict[str, Any]:
-        manifest_path = self.rag_manifest_path()
-        try:
-            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except OSError, json.JSONDecodeError:
-            return {}
-        return payload if isinstance(payload, dict) else {}
-
-    def write_rag_manifest(
-        self,
-        *,
-        documents_path: str,
-        summary: dict[str, Any],
-    ) -> None:
-        manifest_path = self.rag_manifest_path()
-        manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "documents_path": documents_path,
-            "documents": int(summary.get("documents", 0) or 0),
-            "chunks": int(summary.get("chunks", 0) or 0),
-            "supported_files": int(summary.get("supported_files", 0) or 0),
-            "loaded_documents": int(summary.get("loaded_documents", 0) or 0),
-            "built_at": datetime.now(UTC).isoformat(),
-        }
-        manifest_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-
-    def get_effective_rag_documents_path(self) -> str:
-        manifest = self.read_rag_manifest()
-        manifest_path = str(manifest.get("documents_path") or "").strip()
-        if manifest_path:
-            return manifest_path
-        config = self.load_runtime_config()
-        rag_cfg = config.get("rag", {}) if isinstance(config, dict) else {}
-        return str(rag_cfg.get("documents_path", DOCS_PATH))
-
-    def list_reference_catalog_runtime_observations(
-        self, category: str | None = None
-    ) -> list[dict[str, Any]]:
-        return list_text_normalization_term_payloads(category=category)
-
-    def upsert_reference_catalog_runtime_observation(
-        self,
-        *,
-        category: str,
-        term: str,
-        replacement: str | None,
-        source: str,
-        is_active: bool,
-    ) -> dict[str, Any]:
-        payload = upsert_text_normalization_term_payload(
-            category=category,
-            term=term,
-            replacement=replacement,
-            source=source,
-            is_active=is_active,
-        )
-        invalidate_text_normalization_snapshot()
-        return payload
-
-    def deactivate_reference_catalog_runtime_observation(
-        self, *, category: str, term: str
-    ) -> bool:
-        updated = deactivate_text_normalization_term_payload(
-            category=category,
-            term=term,
-        )
-        if updated:
-            invalidate_text_normalization_snapshot()
-        return updated
-
-    # -------------------------------------------------------------------------
-    def build_update_config_response(self, target: UpdateTarget) -> dict[str, Any]:
-        config = self.load_runtime_config()
-        settings = get_server_settings()
-        if target == "rxnav":
-            source = config.get("runtime", {})
-            defaults = {
-                "rxnav_request_timeout": float(
-                    source.get(
-                        "rxnav_request_timeout",
-                        settings.runtime.rxnav_request_timeout,
-                    )
-                ),
-                "rxnav_max_concurrency": int(
-                    source.get(
-                        "rxnav_max_concurrency",
-                        settings.runtime.rxnav_max_concurrency,
-                    )
-                ),
-            }
-            allowed_fields = list(defaults.keys())
-        elif target == "livertox":
-            source = config.get("runtime", {})
-            defaults = {
-                "livertox_monograph_max_workers": int(
-                    source.get(
-                        "livertox_monograph_max_workers",
-                        settings.runtime.livertox_monograph_max_workers,
-                    )
-                ),
-                "livertox_archive": str(
-                    source.get(
-                        "livertox_archive",
-                        settings.runtime.livertox_archive,
-                    )
-                ),
-                "redownload": False,
-            }
-            allowed_fields = list(defaults.keys())
-        else:
-            source = config.get("rag", {})
-            defaults = {
-                "documents_path": str(source.get("documents_path", DOCS_PATH)),
-                "chunk_size": int(source.get("chunk_size", settings.rag.chunk_size)),
-                "chunk_overlap": int(
-                    source.get("chunk_overlap", settings.rag.chunk_overlap)
-                ),
-                "embedding_batch_size": int(
-                    source.get(
-                        "embedding_batch_size", settings.rag.embedding_batch_size
-                    )
-                ),
-                "vector_stream_batch_size": int(
-                    source.get(
-                        "vector_stream_batch_size",
-                        settings.rag.vector_stream_batch_size,
-                    )
-                ),
-                "embedding_max_workers": int(
-                    source.get(
-                        "embedding_max_workers",
-                        settings.rag.embedding_max_workers,
-                    )
-                ),
-                "embedding_backend": str(
-                    source.get("embedding_backend", settings.rag.embedding_backend)
-                ),
-                "ollama_embedding_model": str(
-                    source.get(
-                        "ollama_embedding_model",
-                        settings.rag.ollama_embedding_model,
-                    )
-                ),
-                "hf_embedding_model": str(
-                    source.get("hf_embedding_model", settings.rag.hf_embedding_model)
-                ),
-                "cloud_provider": str(
-                    source.get("cloud_provider", settings.rag.cloud_provider)
-                ),
-                "cloud_embedding_model": str(
-                    source.get(
-                        "cloud_embedding_model",
-                        settings.rag.cloud_embedding_model,
-                    )
-                ),
-                "use_cloud_embeddings": bool(
-                    source.get(
-                        "use_cloud_embeddings", settings.rag.use_cloud_embeddings
-                    )
-                ),
-                "reset_vector_collection": bool(
-                    source.get(
-                        "reset_vector_collection",
-                        settings.rag.reset_vector_collection,
-                    )
-                ),
-            }
-            allowed_fields = list(defaults.keys())
-
-        return {
-            "target": target,
-            "defaults": defaults,
-            "allowed_fields": allowed_fields,
-        }
 
     # -------------------------------------------------------------------------
     def list_sessions(
@@ -337,16 +175,121 @@ class DataInspectionService:
         return self.serializer.get_session_detail(session_id)
 
     # -------------------------------------------------------------------------
+    def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
+        return self.serializer.list_session_versions(session_id)
+
+    # -------------------------------------------------------------------------
+    def get_session_version_detail(
+        self,
+        session_id: int,
+        *,
+        version_id: int,
+    ) -> dict[str, Any] | None:
+        return self.serializer.get_session_version_detail(
+            session_id,
+            version_id=version_id,
+        )
+
+    # -------------------------------------------------------------------------
+    def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
+        return self.serializer.list_manual_report_edits(session_id)
+
+    # -------------------------------------------------------------------------
+    def compare_session_versions(
+        self,
+        session_id: int,
+        *,
+        left_version_id: int,
+        right_version_id: int,
+    ) -> dict[str, Any] | None:
+        left_detail = self.get_session_version_detail(
+            session_id,
+            version_id=left_version_id,
+        )
+        right_detail = self.get_session_version_detail(
+            session_id,
+            version_id=right_version_id,
+        )
+        if left_detail is None or right_detail is None:
+            return None
+
+        left_version = left_detail.get("version") or {}
+        right_version = right_detail.get("version") or {}
+        if int(left_version.get("root_session_id") or 0) != int(
+            right_version.get("root_session_id") or 0
+        ):
+            raise ValueError("Versions do not belong to the same session lineage.")
+
+        left_entities = self._resolve_version_comparison_entities(
+            version_id=left_version_id,
+            detail=left_detail,
+        )
+        right_entities = self._resolve_version_comparison_entities(
+            version_id=right_version_id,
+            detail=right_detail,
+        )
+        entity_diff = self._build_version_entity_diff(
+            left_entities=left_entities,
+            right_entities=right_entities,
+        )
+        return {
+            "left_version": left_version,
+            "right_version": right_version,
+            **entity_diff,
+            "report_text_diff": self._build_report_text_diff(
+                left_text=self._extract_version_report_text(left_detail),
+                right_text=self._extract_version_report_text(right_detail),
+            ),
+            "qa_summary": self._build_revision_qa_summary(
+                left_detail=left_detail,
+                right_detail=right_detail,
+            ),
+        }
+
+    # -------------------------------------------------------------------------
     def update_session(
         self,
         session_id: int,
         *,
-        session_text: str | None,
+        report_text: str | None = None,
+        edited_fields: list[str] | None = None,
+        reviewer_note: str | None = None,
+        edited_by: str | None = None,
         metadata: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
-        return self.serializer.update_session_text_and_metadata(
+        resolved_report_text = str(report_text or "").strip() or None
+        if resolved_report_text is not None:
+            updated = self.serializer.update_current_report_text_with_manual_audit(
+                session_id,
+                report_text=resolved_report_text,
+                edited_fields=edited_fields,
+                reviewer_note=reviewer_note,
+                edited_by=edited_by,
+                metadata=metadata,
+            )
+            return updated["session"] if isinstance(updated, dict) else None
+        return self.serializer.update_session_metadata(
             session_id,
-            session_text=session_text,
+            metadata=metadata,
+        )
+
+    # -------------------------------------------------------------------------
+    def manual_edit_report(
+        self,
+        session_id: int,
+        *,
+        report_text: str,
+        edited_fields: list[str] | None,
+        reviewer_note: str | None,
+        edited_by: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        return self.serializer.update_current_report_text_with_manual_audit(
+            session_id,
+            report_text=report_text,
+            edited_fields=edited_fields,
+            reviewer_note=reviewer_note,
+            edited_by=edited_by,
             metadata=metadata,
         )
 
@@ -360,11 +303,12 @@ class DataInspectionService:
         revision_instruction: str | None,
         effective_overrides: dict[str, Any],
     ) -> dict[str, Any]:
-        source_payload = (
-            source_detail.get("result_payload")
-            if isinstance(source_detail.get("result_payload"), dict)
-            else {}
-        )
+        source_payload_value = source_detail.get("result_payload")
+        source_payload: dict[str, Any]
+        if isinstance(source_payload_value, dict):
+            source_payload = source_payload_value
+        else:
+            source_payload = {}
         original_detected = self.extract_revision_drug_names(source_payload)
         revised_detected = self.extract_revision_drug_names(result_payload)
         original_keys = {
@@ -376,14 +320,17 @@ class DataInspectionService:
         new_drug_keys = sorted(key for key in revised_keys - original_keys if key)
         removed_drug_keys = sorted(key for key in original_keys - revised_keys if key)
         section_extraction = result_payload.get("section_extraction")
-        source_sections = (
-            source_detail.get("sections")
-            if isinstance(source_detail.get("sections"), dict)
-            else {}
-        )
-        extracted_sections = (
-            section_extraction if isinstance(section_extraction, dict) else {}
-        )
+        source_sections_value = source_detail.get("sections")
+        source_sections: dict[str, Any]
+        if isinstance(source_sections_value, dict):
+            source_sections = source_sections_value
+        else:
+            source_sections = {}
+        extracted_sections: dict[str, Any]
+        if isinstance(section_extraction, dict):
+            extracted_sections = section_extraction
+        else:
+            extracted_sections = {}
         section_validation = self.build_revision_section_validation(
             source_sections=source_sections,
             extracted_sections=extracted_sections,
@@ -443,215 +390,357 @@ class DataInspectionService:
         return extract_revision_drug_names_value(payload)
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _resolve_override_value(
-        overrides: dict[str, Any],
-        key: str,
-        fallback: Any,
-    ) -> Any:
-        return overrides[key] if key in overrides else fallback
+    def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
+        return self.serializer.get_revision_run(pipeline_run_id)
 
     # -------------------------------------------------------------------------
-    def start_revision_job(
+    def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
+        return self.serializer.list_revision_steps(pipeline_run_id)
+
+    # -------------------------------------------------------------------------
+    def list_revision_artifacts(
+        self,
+        *,
+        revision_version_id: int,
+    ) -> list[dict[str, Any]]:
+        return self.serializer.list_revision_artifacts_for_version(
+            revision_version_id=revision_version_id
+        )
+
+    # -------------------------------------------------------------------------
+    def list_revision_entities(
+        self,
+        *,
+        revision_version_id: int,
+    ) -> list[dict[str, Any]]:
+        return self.serializer.list_revision_entities_for_version(
+            revision_version_id=revision_version_id
+        )
+
+    # -------------------------------------------------------------------------
+    def list_revision_reviews(
+        self,
+        *,
+        revision_version_id: int,
+    ) -> list[dict[str, Any]]:
+        return self.serializer.list_revision_reviews_for_version(
+            revision_version_id=revision_version_id
+        )
+
+    # -------------------------------------------------------------------------
+    def update_revision_clinical_review(
         self,
         session_id: int,
         *,
-        selected_text: str | None,
-        revision_instruction: str | None,
-        model_overrides: dict[str, Any],
-        metadata: dict[str, Any],
-    ) -> dict[str, Any]:
-        if self.jobs.is_job_running(self.REVISION_JOB_TYPE):
-            raise ValueError("Session revision is already running")
-        detail = self.get_session_detail(session_id)
+        version_id: int,
+        clinical_review_status: str,
+        reviewer_note: str | None,
+        reviewed_by: str | None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        detail = self.get_session_version_detail(session_id, version_id=version_id)
         if detail is None:
-            raise ValueError("Session not found")
-        root_session_id = int(detail.get("original_session_id") or session_id)
-        version = self.serializer.get_next_session_version(root_session_id)
-        job_id = self.jobs.start_job(
-            job_type=self.REVISION_JOB_TYPE,
-            runner=self.run_revision_job,
-            kwargs={
-                "job_id": None,
-                "session_detail": detail,
-                "root_session_id": root_session_id,
-                "version": version,
-                "selected_text": selected_text,
-                "revision_instruction": revision_instruction,
-                "model_overrides": model_overrides,
-                "metadata": metadata,
-            },
+            return None
+        review_action = self.serializer.record_revision_review_action(
+            revision_version_id=version_id,
+            clinical_review_status=clinical_review_status,
+            reviewer_note=reviewer_note,
+            reviewed_by=reviewed_by,
+            metadata=metadata or {},
         )
-        status_payload = self.jobs.get_job_status(job_id)
-        if status_payload is None:
-            raise RuntimeError("Failed to initialize revision job")
-        return status_payload
+        if review_action is None:
+            return None
+        refreshed = self.get_session_version_detail(session_id, version_id=version_id)
+        if refreshed is None:
+            return None
+        return {
+            "version": refreshed["version"],
+            "review_action": review_action,
+        }
 
     # -------------------------------------------------------------------------
-    def run_revision_job(
-        self,
+    @staticmethod
+    def _build_revision_run_configuration(
         *,
-        job_id: str | None,
-        session_detail: dict[str, Any],
-        root_session_id: int,
-        version: int,
         selected_text: str | None,
         revision_instruction: str | None,
         model_overrides: dict[str, Any],
         metadata: dict[str, Any],
     ) -> dict[str, Any]:
-        source_text = str(session_detail.get("session_text") or "").strip()
-        if not source_text:
-            raise ValueError("Session text is empty")
         selected_focus_text = str(selected_text or "").strip() or None
         focus_instruction = str(revision_instruction or "").strip() or None
-        revision_focus_context = self.build_revision_focus_context(
-            selected_text=selected_focus_text,
-            revision_instruction=focus_instruction,
-        )
-        clinical_service = build_clinical_session_service(self.jobs)
-        config_serializer = ModelConfigSerializer()
-        previous_snapshot = config_serializer.load_snapshot()
         effective_overrides = {
             key: value
             for key, value in (model_overrides or {}).items()
             if value is not None
         }
-
-        try:
-            if effective_overrides:
-                config_serializer.save_snapshot(
-                    clinical_model=self._resolve_override_value(
-                        effective_overrides,
-                        "clinical_model",
-                        previous_snapshot.clinical_model,
-                    ),
-                    text_extraction_model=self._resolve_override_value(
-                        effective_overrides,
-                        "text_extraction_model",
-                        previous_snapshot.text_extraction_model,
-                    ),
-                    use_cloud_models=self._resolve_override_value(
-                        effective_overrides,
-                        "use_cloud_services",
-                        previous_snapshot.use_cloud_models,
-                    ),
-                    cloud_provider=self._resolve_override_value(
-                        effective_overrides,
-                        "provider",
-                        previous_snapshot.cloud_provider,
-                    ),
-                    cloud_model=self._resolve_override_value(
-                        effective_overrides,
-                        "cloud_model",
-                        previous_snapshot.cloud_model,
-                    ),
-                    ollama_temperature=self._resolve_override_value(
-                        effective_overrides,
-                        "ollama_temperature",
-                        previous_snapshot.ollama_temperature,
-                    ),
-                    cloud_temperature=self._resolve_override_value(
-                        effective_overrides,
-                        "cloud_temperature",
-                        previous_snapshot.cloud_temperature,
-                    ),
-                    ollama_reasoning=self._resolve_override_value(
-                        effective_overrides,
-                        "ollama_reasoning",
-                        previous_snapshot.ollama_reasoning,
-                    ),
-                )
-            clinical_service.apply_persisted_runtime_configuration()
-            request = ClinicalSessionRequest(
-                name=session_detail.get("patient_name"),
-                visit_date=session_detail.get("visit_date"),
-                clinical_input=source_text,
-                use_rag=True,
-            )
-            preprocessed_request, section_extraction = asyncio.run(
-                clinical_service.preprocess_unified_input(request)
-            )
-            patient_payload = clinical_service.build_patient_payload(
-                preprocessed_request
-            )
-            result_payload = asyncio.run(
-                clinical_service.process_single_patient(
-                    patient_payload,
-                    section_extraction=section_extraction,
-                    session_version=version,
-                    original_session_id=root_session_id,
-                    session_metadata={
-                        **metadata,
-                        "revision_mode": True,
-                        "focused_selection": bool(selected_focus_text),
-                        "revision_instruction": focus_instruction,
-                        "model_overrides": effective_overrides,
-                        "revised_from_session_id": session_detail.get("session_id"),
-                    },
-                    original_session_text=source_text,
-                    revision_focus_context=revision_focus_context,
-                    progress_callback=lambda stage, progress: (
-                        self.report_job_progress(
-                            job_id=job_id or "",
-                            progress=progress,
-                            message=f"Revision: {stage}",
-                        )
-                        if job_id
-                        else None
-                    ),
-                    stop_check=None,
-                )
-            )
-            revision_audit = self.build_revision_audit(
-                source_detail=session_detail,
-                result_payload=result_payload,
-                selected_text=selected_focus_text,
-                revision_instruction=focus_instruction,
-                effective_overrides=effective_overrides,
-            )
-            result_payload["revision_audit"] = revision_audit
-            persisted_session_id = result_payload.get("session_id")
-            if isinstance(persisted_session_id, int):
-                self.serializer.upsert_session_result_payload(
-                    persisted_session_id,
-                    result_payload,
-                )
-        finally:
-            if effective_overrides:
-                config_serializer.save_snapshot(
-                    clinical_model=previous_snapshot.clinical_model,
-                    text_extraction_model=previous_snapshot.text_extraction_model,
-                    use_cloud_models=previous_snapshot.use_cloud_models,
-                    cloud_provider=previous_snapshot.cloud_provider,
-                    cloud_model=previous_snapshot.cloud_model,
-                    ollama_temperature=previous_snapshot.ollama_temperature,
-                    cloud_temperature=previous_snapshot.cloud_temperature,
-                    ollama_reasoning=previous_snapshot.ollama_reasoning,
-                )
         return {
-            "session_id": result_payload.get("session_id"),
-            "version": version,
-            "original_session_id": root_session_id,
-            "result_payload": result_payload,
+            "selected_text": selected_focus_text,
+            "selected_text_present": bool(selected_focus_text),
+            "revision_instruction": focus_instruction,
+            "model_overrides": effective_overrides,
+            "metadata": metadata or {},
         }
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def build_revision_focus_context(
+    def _unique_preserve_order(values: list[str]) -> list[str]:
+        seen: set[str] = set()
+        unique: list[str] = []
+        for value in values:
+            cleaned = str(value or "").strip()
+            if not cleaned or cleaned in seen:
+                continue
+            seen.add(cleaned)
+            unique.append(cleaned)
+        return unique
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def detect_prompt_injection_flags(
+        cls,
+        *,
+        instruction_text: str,
+        selected_text: str | None = None,
+    ) -> list[str]:
+        combined_text = "\n".join(
+            part.strip()
+            for part in [instruction_text, str(selected_text or "")]
+            if str(part or "").strip()
+        ).casefold()
+        detections: list[str] = []
+        indicators: list[tuple[str, str]] = [
+            ("ignore previous", "ignore_previous_instructions"),
+            ("ignore all previous", "ignore_previous_instructions"),
+            ("ignore system", "override_system_prompt_attempt"),
+            ("ignore developer", "override_developer_prompt_attempt"),
+            ("system prompt", "system_prompt_reference"),
+            ("developer message", "developer_message_reference"),
+            ("tool instruction", "tool_instruction_reference"),
+            ("change the schema", "schema_override_attempt"),
+            ("override schema", "schema_override_attempt"),
+            ("change the routing", "routing_override_attempt"),
+            ("override routing", "routing_override_attempt"),
+            ("disable qa", "qa_disable_attempt"),
+            ("skip qa", "qa_disable_attempt"),
+            ("change the model", "model_override_attempt"),
+            ("override model", "model_override_attempt"),
+            ("do not follow your instructions", "instruction_bypass_attempt"),
+            ("instead follow", "instruction_redirection_attempt"),
+        ]
+        for needle, flag in indicators:
+            if needle in combined_text:
+                detections.append(flag)
+        return cls._unique_preserve_order(detections)
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def analyze_reviewer_instructions(
+        cls,
+        *,
+        raw_instruction_text: str,
+        selected_text: str | None = None,
+    ) -> tuple[ReviewerInstructionProfile, ReviewerInstructionTrace]:
+        normalized_instruction = normalize_text_value(raw_instruction_text)
+        summary = str(normalized_instruction or "").strip()
+        lowered = summary.casefold()
+
+        target_sections: list[str] = []
+        target_entities: list[str] = []
+        routed_steps: list[str] = [
+            "generate_revision",
+            "resolve_revision_extraction",
+            "validate_anamnesis_drugs",
+            "extract_missing_anamnesis_drugs",
+            "revise_labs_timeline",
+            "reconcile_revision_candidates",
+            "merge_revision_snapshot",
+            "rebuild_final_report",
+            "qa_validate_revision",
+            "persist_revision",
+            "finalize_revision_version",
+        ]
+
+        section_keywords: list[tuple[str, str]] = [
+            ("anamnes", "anamnesis"),
+            ("history", "anamnesis"),
+            ("therap", "therapy"),
+            ("drug", "therapy"),
+            ("medication", "therapy"),
+            ("lab", "labs"),
+            ("timeline", "labs"),
+            ("livertox", "livertox_matching"),
+            ("match", "livertox_matching"),
+            ("rucam", "dili_assessment"),
+            ("causal", "dili_assessment"),
+            ("report", "final_report"),
+            ("wording", "final_report"),
+            ("qa", "qa"),
+            ("consisten", "qa"),
+        ]
+        for keyword, section in section_keywords:
+            if keyword in lowered:
+                target_sections.append(section)
+
+        entity_keywords: list[tuple[str, str]] = [
+            ("drug", "drugs"),
+            ("medication", "drugs"),
+            ("disease", "diseases"),
+            ("diagnos", "diseases"),
+            ("lab", "labs"),
+            ("timeline", "labs"),
+            ("wording", "report_wording"),
+            ("report", "report_wording"),
+            ("source", "source_evidence"),
+            ("evidence", "source_evidence"),
+            ("match", "matching_errors"),
+            ("causal", "causality_reasoning"),
+            ("missing", "missing_data"),
+            ("ambigu", "ambiguity_resolution"),
+        ]
+        for keyword, entity in entity_keywords:
+            if keyword in lowered:
+                target_entities.append(entity)
+
+        if not target_sections:
+            target_sections.append("unknown")
+        if not target_entities:
+            target_entities.append("other")
+
+        if any(
+            section in target_sections for section in {"anamnesis", "therapy", "labs"}
+        ):
+            routed_steps.append("preprocess_input")
+        if "qa" in target_sections or "source_evidence" in target_entities:
+            routed_steps.append("qa_validate_revision")
+
+        mentioned_dates = cls._unique_preserve_order(
+            [match.group(0) for match in re.finditer(r"\b\d{4}-\d{2}-\d{2}\b", summary)]
+        )
+        mentioned_lab_values = cls._unique_preserve_order(
+            [
+                match.group(0)
+                for match in re.finditer(
+                    r"\b(?:ALT|AST|ALP|bilirubin|bilirubina)\b[^.;,\n]{0,20}\d+(?:\.\d+)?",
+                    summary,
+                    re.IGNORECASE,
+                )
+            ]
+        )
+        extra_data = cls._unique_preserve_order(
+            [selected_text.strip()] if str(selected_text or "").strip() else []
+        )
+        ambiguities = (
+            ["Reviewer instruction contains ambiguity markers."]
+            if any(
+                token in lowered for token in ("maybe", "unclear", "check", "verify")
+            )
+            else []
+        )
+        constraints = (
+            ["Limit changes to the explicitly targeted scope."]
+            if any(
+                token in lowered for token in ("only", "do not", "don't", "must not")
+            )
+            else []
+        )
+        safety_or_quality_concerns = (
+            ["Reviewer requested evidence or consistency validation."]
+            if any(
+                token in lowered for token in ("evidence", "source", "consistent", "qa")
+            )
+            else []
+        )
+        prompt_injection_flags = cls.detect_prompt_injection_flags(
+            instruction_text=summary,
+            selected_text=selected_text,
+        )
+        if prompt_injection_flags:
+            safety_or_quality_concerns = cls._unique_preserve_order(
+                safety_or_quality_concerns
+                + [
+                    "Potential prompt-injection or instruction-redirection content detected in untrusted revision inputs."
+                ]
+            )
+
+        profile = ReviewerInstructionProfile(
+            user_intent="revision_request",
+            main_goal=summary[:200] or None,
+            instruction_summary=summary,
+            target_sections=cls._unique_preserve_order(target_sections),  # type: ignore[arg-type]
+            target_entities=cls._unique_preserve_order(target_entities),  # type: ignore[arg-type]
+            mentioned_drugs=[],
+            mentioned_diseases=[],
+            mentioned_lab_values=mentioned_lab_values,
+            mentioned_dates=mentioned_dates,
+            extra_data=extra_data,
+            ambiguities=ambiguities,
+            constraints=constraints,
+            reviewer_assumptions=[],
+            safety_or_quality_concerns=safety_or_quality_concerns,
+            prompt_injection_flags=prompt_injection_flags,
+            pipeline_routing_decision={
+                "generate_revision": cls._unique_preserve_order(target_sections),
+                "resolve_revision_extraction": ["therapy", "anamnesis"],
+                "validate_anamnesis_drugs": ["anamnesis"],
+                "extract_missing_anamnesis_drugs": ["anamnesis"],
+                "revise_labs_timeline": ["labs"],
+                "reconcile_revision_candidates": ["therapy", "anamnesis"],
+                "merge_revision_snapshot": ["therapy", "anamnesis", "labs"],
+                "rebuild_final_report": ["final_report"],
+                "qa_validate_revision": ["qa"],
+                "persist_revision": ["artifacts"],
+                "finalize_revision_version": ["status_transition"],
+            },
+        )
+        trace = ReviewerInstructionTrace(
+            instruction_id=uuid.uuid4().hex,
+            raw_instruction_text=summary,
+            normalized_instruction_summary=summary,
+            routed_pipeline_steps=cls._unique_preserve_order(routed_steps),
+            affected_entities=cls._unique_preserve_order(target_entities),
+            applied=True,
+            ignored=False,
+            prompt_injection_detected=bool(prompt_injection_flags),
+            prompt_injection_flags=prompt_injection_flags,
+            evidence_addressed=extra_data,
+            qa_validation_result="pending",
+        )
+        return profile, trace
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_revision_instruction_context(
         *,
         selected_text: str | None,
-        revision_instruction: str | None,
+        instruction_profile: ReviewerInstructionProfile | None,
     ) -> str | None:
         chunks: list[str] = []
-        if selected_text:
+        if str(selected_text or "").strip():
             chunks.append(
-                "Selected excerpt to scrutinize during this second pass:\n"
-                f"{selected_text}"
+                f"Reviewer-selected source excerpt:\n{str(selected_text).strip()}"
             )
-        if revision_instruction:
-            chunks.append(f"User revision instruction:\n{revision_instruction}")
-        return "\n\n".join(chunks) if chunks else None
+        if instruction_profile is not None:
+            chunks.append(
+                "Reviewer instruction summary:\n"
+                f"{instruction_profile.instruction_summary}"
+            )
+            if instruction_profile.target_sections:
+                chunks.append(
+                    "Target sections:\n"
+                    + ", ".join(instruction_profile.target_sections)
+                )
+            if instruction_profile.target_entities:
+                chunks.append(
+                    "Target entities:\n"
+                    + ", ".join(instruction_profile.target_entities)
+                )
+            if instruction_profile.constraints:
+                chunks.append(
+                    "Constraints:\n" + "; ".join(instruction_profile.constraints)
+                )
+        context = "\n\n".join(chunk for chunk in chunks if chunk.strip())
+        return context or None
 
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
@@ -762,13 +851,13 @@ class DataInspectionService:
         serializer = DocumentSerializer(self.get_effective_rag_documents_path())
         vector_model_by_file: dict[str, str] = {}
         try:
-            settings = get_server_settings()
+            rag_settings = build_effective_rag_settings()
             vector_db = LanceVectorDatabase(
                 database_path=VECTOR_DB_PATH,
-                collection_name=settings.rag.vector_collection_name,
-                metric=settings.rag.vector_index_metric,
-                index_type=settings.rag.vector_index_type,
-                stream_batch_size=settings.rag.vector_stream_batch_size,
+                collection_name=rag_settings.vector_collection_name,
+                metric=rag_settings.vector_index_metric,
+                index_type=rag_settings.vector_index_type,
+                stream_batch_size=rag_settings.vector_stream_batch_size,
             )
             if vector_db.has_collection():
                 for row in vector_db.load_embeddings():
@@ -830,19 +919,15 @@ class DataInspectionService:
 
     # -------------------------------------------------------------------------
     def get_rag_vector_store_summary(self) -> dict[str, Any]:
-        config = self.load_runtime_config()
-        rag_cfg = config.get("rag", {}) if isinstance(config, dict) else {}
         documents_path = self.get_effective_rag_documents_path()
-        settings = get_server_settings()
-        collection_name = str(
-            rag_cfg.get("vector_collection_name", settings.rag.vector_collection_name)
-        )
+        rag_settings = build_effective_rag_settings()
+        collection_name = str(rag_settings.vector_collection_name)
         vector_db = LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
             collection_name=collection_name,
-            metric=settings.rag.vector_index_metric,
-            index_type=settings.rag.vector_index_type,
-            stream_batch_size=settings.rag.vector_stream_batch_size,
+            metric=rag_settings.vector_index_metric,
+            index_type=rag_settings.vector_index_type,
+            stream_batch_size=rag_settings.vector_stream_batch_size,
         )
         exists = vector_db.has_collection()
         embedding_count = 0
@@ -860,15 +945,15 @@ class DataInspectionService:
                 logger.warning("Unable to load LanceDB inspection summary: %s", exc)
         return {
             "source_documents_path": documents_path,
-            "vector_db_path": VECTOR_DB_PATH,
+            "vector_db_path": str(VECTOR_DB_PATH),
             "collection_name": collection_name,
             "collection_exists": exists,
             "embedding_count": embedding_count,
             "distinct_document_count": distinct_document_count,
             "embedding_dimension": embedding_dimension,
             "index_ready": bool(vector_db.index_ready) if exists else False,
-            "configured_metric": settings.rag.vector_index_metric,
-            "configured_index_type": settings.rag.vector_index_type,
+            "configured_metric": rag_settings.vector_index_metric,
+            "configured_index_type": rag_settings.vector_index_type,
         }
 
     # -------------------------------------------------------------------------

@@ -132,7 +132,7 @@
           <button type="button" [class.is-active]="activeSection() === 'preview'" (click)="setSection('preview')">Preview</button>
           <button type="button" [class.is-active]="activeSection() === 'editor'" (click)="setSection('editor')">Text Editor</button>
           <button type="button" [class.is-active]="activeSection() === 'metadata'" (click)="setSection('metadata')">Metadata</button>
-          <button type="button" [class.is-active]="activeSection() === 'revision'" (click)="setSection('revision')">Revision Mode</button>
+          <button type="button" [class.is-active]="activeSection() === 'revision'" (click)="setSection('revision')">Revision</button>
           <button type="button" [class.is-active]="activeSection() === 'timeline'" (click)="setSection('timeline')">Timeline</button>
         </nav>
 
@@ -328,7 +328,15 @@
               <button type="button" (click)="insertLink()" aria-label="Insert link">🔗</button>
               <button type="button" (click)="clearFormatting()" aria-label="Clear formatting">⌫</button>
               <button type="button" (click)="removeSelection()" aria-label="Remove selected text">✖</button>
-              <button type="button" class="btn btn-primary" (click)="saveSession()" aria-label="Save report">Save</button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="revisionBusy()"
+                (click)="saveManualReportEdit()"
+                aria-label="Save manual report edit"
+              >
+                Save manual report edit
+              </button>
             </div>
           </div>
           <div
@@ -342,6 +350,61 @@
             (input)="onEditorInput($event)"
             (keydown)="onEditorKeydown($event)"
           ></div>
+          <div class="clinical-session-manual-edit-panel">
+            <div class="clinical-session-manual-edit-fields">
+              <label>
+                <span>Reviewer name</span>
+                <input
+                  type="text"
+                  [ngModel]="manualEditEditedBy()"
+                  (ngModelChange)="updateManualEditEditedBy($event)"
+                  [disabled]="revisionBusy()"
+                  aria-label="Reviewer name"
+                />
+              </label>
+              <label>
+                <span>Reviewer note</span>
+                <textarea
+                  class="clinical-session-manual-edit-note"
+                  [ngModel]="manualEditReviewerNote()"
+                  (ngModelChange)="updateManualEditReviewerNote($event)"
+                  [disabled]="revisionBusy()"
+                  aria-label="Reviewer note"
+                  placeholder="Summarize why this manual report correction was made."
+                ></textarea>
+              </label>
+            </div>
+            <section class="clinical-session-manual-edit-history" aria-label="Manual edit history">
+              <div class="clinical-session-manual-edit-history-header">
+                <strong>Manual Edit History</strong>
+                <span>Audited in-place report changes for the current official version</span>
+              </div>
+              @if (detail.manual_edit_history.length) {
+                <div class="clinical-session-manual-edit-list">
+                  @for (edit of detail.manual_edit_history; track edit.edited_at + edit.new_text_hash) {
+                    <article class="clinical-session-manual-edit-item">
+                      <div class="clinical-session-manual-edit-item-header">
+                        <strong>{{ edit.actor_display_name || edit.edited_by || 'Unknown reviewer' }}</strong>
+                        <span>{{ edit.edited_at | date:'medium' }}</span>
+                      </div>
+                      <p>
+                        Fields: {{ edit.edited_fields.join(', ') || 'report_text' }} ·
+                        Source: {{ edit.actor_source }} ·
+                        Confidence: {{ edit.actor_confidence }}
+                      </p>
+                      <p>Previous hash: <code>{{ edit.previous_text_hash }}</code></p>
+                      <p>New hash: <code>{{ edit.new_text_hash }}</code></p>
+                      @if (edit.reviewer_note) {
+                        <p>Note: {{ edit.reviewer_note }}</p>
+                      }
+                    </article>
+                  }
+                </div>
+              } @else {
+                <p class="clinical-session-panel-note">No manual report edits have been saved for this version.</p>
+              }
+            </section>
+          </div>
         }
 
         @if (activeSection() === 'metadata') {
@@ -425,7 +488,7 @@
               (ngModelChange)="updateMetadataText($event)"
             ></textarea>
             <div class="clinical-session-metadata-editor-footer">
-              <button type="button" class="btn btn-primary clinical-session-json-save" (click)="saveSession()">Save metadata</button>
+              <button type="button" class="btn btn-primary clinical-session-json-save" (click)="saveMetadata()">Save metadata</button>
             </div>
           </div>
         }
@@ -450,59 +513,615 @@
                 (ngModelChange)="updateRevisionInstruction($event)"
               ></textarea>
             </label>
-            <section class="clinical-session-revision-settings" aria-label="Revision model settings">
-              <div class="clinical-session-settings-row">
+            <div class="clinical-session-revision-layout">
+              <section class="clinical-session-revision-settings" aria-label="Revision model settings">
                 <label>
                   <span>Model provider</span>
                   <select [ngModel]="revisionModelProvider()" (ngModelChange)="updateRevisionModelProvider($event)">
-                    <option value="local">Local</option>
-                    <option value="cloud">Cloud</option>
+                    <option value="ollama">Ollama</option>
+                    <option value="gemini">Gemini</option>
+                    <option value="openai">OpenAI</option>
                   </select>
                 </label>
                 <label>
                   <span>Clinical model</span>
-                  <input
-                    type="text"
-                    placeholder="Default clinical model"
-                    [ngModel]="revisionClinicalModel()"
-                    (ngModelChange)="updateRevisionClinicalModel($event)"
-                  />
+                  <select [ngModel]="revisionClinicalModel()" (ngModelChange)="updateRevisionClinicalModel($event)">
+                    @for (model of revisionClinicalModelOptions(); track model) {
+                      <option [value]="model">{{ model }}</option>
+                    }
+                    @if (!revisionClinicalModelOptions().length) {
+                      <option value="">No models available</option>
+                    }
+                  </select>
                 </label>
                 <label>
                   <span>Text parsing model</span>
-                  <input
-                    type="text"
-                    placeholder="Default parser model"
-                    [ngModel]="revisionTextParsingModel()"
-                    (ngModelChange)="updateRevisionTextParsingModel($event)"
-                  />
+                  <select [ngModel]="revisionTextParsingModel()" (ngModelChange)="updateRevisionTextParsingModel($event)">
+                    @for (model of revisionTextParsingModelOptions(); track model) {
+                      <option [value]="model">{{ model }}</option>
+                    }
+                    @if (!revisionTextParsingModelOptions().length) {
+                      <option value="">No models available</option>
+                    }
+                  </select>
                 </label>
-              </div>
-              <label class="clinical-session-checkbox-setting">
-                <input
-                  type="checkbox"
-                  [ngModel]="revisionRagSearch()"
-                  (ngModelChange)="updateRevisionRagSearch($event)"
-                />
-                <span>Use RAG search during revision</span>
-              </label>
-            </section>
-            <div class="clinical-session-revision-footer">
-              <button class="btn btn-primary" type="button" (click)="startRevision()">Run Revision Pass</button>
+                <label class="clinical-session-checkbox-setting">
+                  <input
+                    type="checkbox"
+                    [ngModel]="revisionRagSearch()"
+                    (ngModelChange)="updateRevisionRagSearch($event)"
+                  />
+                  <span>Use RAG search during revision</span>
+                </label>
+              </section>
+              <section class="clinical-session-revision-actions" aria-label="Revision action controls">
+                <div class="clinical-session-revision-copy">
+                  <strong>Second-pass editorial revision</strong>
+                  <p>Use this pass to create a draft LLM-assisted revision from the selected source version. Manual report edits stay separate and in-place; this workflow creates versioned artifacts, persisted run checkpoints, and a new reviewable draft shell.</p>
+                </div>
+                @if (revisionStatus()) {
+                  <div class="clinical-session-progress" role="status">
+                    <span>{{ revisionStatus() }}</span>
+                    <progress max="100" [value]="revisionProgress()"></progress>
+                  </div>
+                }
+                <div class="clinical-session-revision-footer">
+                  <button class="btn btn-primary" type="button" [disabled]="revisionBusy()" (click)="startRevision()">Run Revision Pass</button>
+                </div>
+              </section>
             </div>
-            @if (revisionStatus()) {
-              <div class="clinical-session-progress" role="status">
-                <span>{{ revisionStatus() }}</span>
-                <progress max="100" [value]="revisionProgress()"></progress>
-              </div>
-            }
+
+            <div class="clinical-session-revision-history-grid">
+              <section class="clinical-session-revision-history-panel" aria-label="Official version history">
+                <div class="clinical-session-manual-edit-history-header">
+                  <strong>Official Version History</strong>
+                  <span>LLM-assisted version lineage stays separate from manual in-place report edits.</span>
+                </div>
+                @if (revisionHistoryLoading()) {
+                  <p class="clinical-session-panel-note">Loading revision history...</p>
+                } @else if (revisionHistoryError()) {
+                  <p class="clinical-sessions-status is-error">{{ revisionHistoryError() }}</p>
+                } @else if (sessionVersions().length) {
+                  <div class="clinical-session-version-list">
+                    @for (version of sessionVersions(); track version.version_id) {
+                      <article
+                        class="clinical-session-version-card"
+                        [class.is-selected]="selectedRevisionVersionId() === version.version_id"
+                      >
+                        <button
+                          type="button"
+                          class="clinical-session-version-button"
+                          (click)="selectRevisionVersion(version.version_id)"
+                        >
+                          <div class="clinical-session-version-card-header">
+                            <strong>Version {{ version.version_number }}</strong>
+                            <app-revision-qa-badge [status]="version.version_status"></app-revision-qa-badge>
+                          </div>
+                          <p>
+                            {{ revisionStatusLabel(version.revision_kind) }} ·
+                            LLM QA {{ revisionStatusLabel(version.llm_qa_status) }} ·
+                            Clinical {{ revisionStatusLabel(version.clinical_review_status) }}
+                          </p>
+                          <p>
+                            Source version ID:
+                            {{ version.source_version_id ?? 'Root' }}
+                            · Completed:
+                            {{ version.completed_at ? (version.completed_at | date:'medium') : 'Draft shell' }}
+                          </p>
+                        </button>
+                        <div class="clinical-session-version-actions">
+                          @if (version.session_id !== null) {
+                            <button type="button" class="btn btn-secondary" (click)="openVersionFromHistory(version)">
+                              Open version
+                            </button>
+                          } @else {
+                            <span class="clinical-session-panel-note">Draft shell only</span>
+                          }
+                        </div>
+                      </article>
+                    }
+                  </div>
+                } @else {
+                  <p class="clinical-session-panel-note">No persisted version lineage is available for this session yet.</p>
+                }
+              </section>
+
+              <section class="clinical-session-revision-history-panel" aria-label="Revision pipeline details">
+                <div class="clinical-session-manual-edit-history-header">
+                  <strong>Revision Pipeline Details</strong>
+                  <span>Inspect the selected version's persisted run metadata, checkpoints, and retry state.</span>
+                </div>
+                @if (selectedRevisionVersion(); as version) {
+                  <div class="clinical-session-revision-run-summary">
+                    <div class="clinical-session-revision-summary-row">
+                      <span>Selected version</span>
+                      <strong>Version {{ version.version_number }}</strong>
+                    </div>
+                    <div class="clinical-session-revision-summary-row">
+                      <span>Kind</span>
+                      <strong>{{ revisionStatusLabel(version.revision_kind) }}</strong>
+                    </div>
+                    <div class="clinical-session-revision-summary-row">
+                      <span>Pipeline run</span>
+                      <strong>{{ version.pipeline_run_id || 'None' }}</strong>
+                    </div>
+                  </div>
+                  <section class="clinical-session-revision-artifacts" aria-label="Version comparison">
+                    <div class="clinical-session-manual-edit-history-header">
+                      <strong>Version Comparison</strong>
+                      <span>Canonical backend comparison between the selected version and another official version.</span>
+                    </div>
+                    @if (revisionComparisonBaseOptions().length) {
+                      <label class="clinical-session-field">
+                        Compare against
+                        <select
+                          [value]="revisionComparisonBaseVersionId() ?? ''"
+                          (change)="updateRevisionComparisonBaseVersion(($any($event.target).value || '').toString())"
+                        >
+                          <option value="">Select a version</option>
+                          @for (candidate of revisionComparisonBaseOptions(); track candidate.version_id) {
+                            <option [value]="candidate.version_id">
+                              Version {{ candidate.version_number }} · {{ revisionStatusLabel(candidate.version_status) }}
+                            </option>
+                          }
+                        </select>
+                      </label>
+                    }
+                    @if (revisionComparisonLoading()) {
+                      <p class="clinical-session-panel-note">Loading canonical version comparison...</p>
+                    } @else if (revisionComparisonError()) {
+                      <p class="clinical-sessions-status is-error">{{ revisionComparisonError() }}</p>
+                    } @else if (revisionComparison(); as comparison) {
+                      <article class="clinical-session-revision-run-card">
+                        <div class="clinical-session-version-card-header">
+                          <strong>Version {{ comparison.left_version.version_number }} vs Version {{ comparison.right_version.version_number }}</strong>
+                          <span class="clinical-session-state-badge is-info">
+                            Similarity {{ comparison.report_text_diff.similarity_ratio }}
+                          </span>
+                        </div>
+                        <div class="clinical-session-revision-summary-row">
+                          <span>Entity changes</span>
+                          <strong>
+                            +{{ comparison.added_entities.length }}
+                            / -{{ comparison.removed_entities.length }}
+                            / ~{{ comparison.corrected_entities.length + comparison.replaced_entities.length }}
+                          </strong>
+                        </div>
+                        <div class="clinical-session-revision-summary-row">
+                          <span>QA findings</span>
+                          <strong>{{ comparison.qa_summary.left_finding_count }} -> {{ comparison.qa_summary.right_finding_count }}</strong>
+                        </div>
+                        <div class="clinical-session-revision-summary-row">
+                          <span>Manual review required</span>
+                          <strong>{{ comparison.qa_summary.manual_review_required ? 'Yes' : 'No' }}</strong>
+                        </div>
+                        <div class="clinical-session-step-list">
+                          <article class="clinical-session-step-card">
+                            <div class="clinical-session-version-card-header">
+                              <strong>Added Entities</strong>
+                              <span class="clinical-session-state-badge is-good">{{ comparison.added_entities.length }}</span>
+                            </div>
+                            <p>{{ revisionComparisonEntitySummary(comparison.added_entities) }}</p>
+                          </article>
+                          <article class="clinical-session-step-card">
+                            <div class="clinical-session-version-card-header">
+                              <strong>Removed Entities</strong>
+                              <span class="clinical-session-state-badge is-bad">{{ comparison.removed_entities.length }}</span>
+                            </div>
+                            <p>{{ revisionComparisonEntitySummary(comparison.removed_entities) }}</p>
+                          </article>
+                          <article class="clinical-session-step-card">
+                            <div class="clinical-session-version-card-header">
+                              <strong>Corrected Or Replaced</strong>
+                              <span class="clinical-session-state-badge is-warn">{{ comparison.corrected_entities.length + comparison.replaced_entities.length }}</span>
+                            </div>
+                            <p>{{ revisionComparisonEntitySummary(comparison.corrected_entities.concat(comparison.replaced_entities)) }}</p>
+                          </article>
+                        </div>
+                        <details class="clinical-session-json-template">
+                          <summary>Report text diff</summary>
+                          <pre>{{ comparison.report_text_diff.diff_lines.join('\n') }}</pre>
+                        </details>
+                      </article>
+                    } @else {
+                      <p class="clinical-session-panel-note">Select another version to compare against the current selection.</p>
+                    }
+                  </section>
+                  <section class="clinical-session-revision-artifacts" aria-label="Human clinical review">
+                    <div class="clinical-session-manual-edit-history-header">
+                      <strong>Human Clinical Review</strong>
+                      <span>Human review status stays separate from LLM QA and only changes through explicit reviewer actions.</span>
+                    </div>
+                    <article class="clinical-session-revision-run-card">
+                      <div class="clinical-session-version-card-header">
+                        <strong>Current review state</strong>
+                        <app-revision-qa-badge [status]="version.clinical_review_status"></app-revision-qa-badge>
+                      </div>
+                      <div class="clinical-session-manual-edit-fields">
+                        <label>
+                          Reviewer
+                          <input
+                            type="text"
+                            [value]="revisionReviewEditedBy()"
+                            placeholder="Reviewer name"
+                            (input)="updateRevisionReviewEditedBy(($any($event.target).value || '').toString())"
+                          />
+                        </label>
+                      </div>
+                      <label class="clinical-session-field">
+                        Review note
+                        <textarea
+                          class="clinical-session-manual-edit-note"
+                          rows="3"
+                          [value]="revisionReviewNote()"
+                          placeholder="Record the human review decision or escalation note"
+                          (input)="updateRevisionReviewNote(($any($event.target).value || '').toString())"
+                        ></textarea>
+                      </label>
+                      <div class="clinical-session-revision-run-actions">
+                        <button
+                          type="button"
+                          class="btn btn-secondary"
+                          [disabled]="!selectedRevisionCanReview() || revisionReviewSaving()"
+                          (click)="updateRevisionClinicalReview('under_review')"
+                        >
+                          Mark Under Review
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-primary"
+                          [disabled]="!selectedRevisionCanReview() || revisionReviewSaving()"
+                          (click)="updateRevisionClinicalReview('approved_by_human')"
+                        >
+                          Approve Revision
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-danger"
+                          [disabled]="!selectedRevisionCanReview() || revisionReviewSaving()"
+                          (click)="updateRevisionClinicalReview('rejected_by_human')"
+                        >
+                          Reject Revision
+                        </button>
+                      </div>
+                      @if (!selectedRevisionCanReview()) {
+                        <p class="clinical-session-panel-note">Only persisted LLM-assisted revision versions can receive human clinical review actions.</p>
+                      }
+                    </article>
+
+                    <article class="clinical-session-revision-run-card">
+                      <div class="clinical-session-version-card-header">
+                        <strong>Review Action History</strong>
+                        <span class="clinical-session-state-badge is-neutral">
+                          {{ selectedRevisionReviews().length }} recorded
+                        </span>
+                      </div>
+                      @if (selectedRevisionReviews().length) {
+                        <div class="clinical-session-step-list">
+                          @for (review of selectedRevisionReviews(); track review.reviewed_at + ':' + review.clinical_review_status) {
+                            <article class="clinical-session-step-card">
+                              <div class="clinical-session-version-card-header">
+                                <strong>{{ review.actor_display_name || review.reviewed_by || 'Unknown reviewer' }}</strong>
+                                <app-revision-qa-badge [status]="review.clinical_review_status"></app-revision-qa-badge>
+                              </div>
+                              <p>
+                                {{ review.reviewed_at | date:'medium' }} ·
+                                {{ revisionStatusLabel(review.actor_source) }} ·
+                                {{ revisionStatusLabel(review.actor_confidence) }}
+                              </p>
+                              <p>{{ review.reviewer_note || 'No review note provided.' }}</p>
+                            </article>
+                          }
+                        </div>
+                      } @else {
+                        <p class="clinical-session-panel-note">No human review actions are recorded for this version yet.</p>
+                      }
+                    </article>
+                  </section>
+                  <section class="clinical-session-revision-artifacts" aria-label="Revision QA and artifacts">
+                    <div class="clinical-session-manual-edit-history-header">
+                      <strong>Revision QA And Artifacts</strong>
+                      <span>Persisted QA evidence and structured revision outputs for the selected version.</span>
+                    </div>
+                    @if (selectedRevisionArtifacts().length) {
+                      @if (selectedRevisionQaArtifact(); as qaArtifact) {
+                        <article class="clinical-session-step-card">
+                          <div class="clinical-session-version-card-header">
+                            <strong>LLM QA Output</strong>
+                            <app-revision-qa-badge [status]="qaArtifact.status || ''"></app-revision-qa-badge>
+                          </div>
+                          <p>{{ revisionArtifactSummary(qaArtifact) }}</p>
+                          <details class="clinical-session-json-template">
+                            <summary>Persisted QA payload</summary>
+                            <pre>{{ qaArtifact.payload | json }}</pre>
+                          </details>
+                        </article>
+                      }
+                      @if (selectedRevisionReportComparisonArtifact(); as reportComparison) {
+                        <article class="clinical-session-step-card">
+                          <div class="clinical-session-version-card-header">
+                            <strong>Report Comparison</strong>
+                            <app-revision-qa-badge [status]="reportComparison.status || ''"></app-revision-qa-badge>
+                          </div>
+                          <p>{{ revisionArtifactSummary(reportComparison) }}</p>
+                          <details class="clinical-session-json-template">
+                            <summary>Persisted comparison payload</summary>
+                            <pre>{{ reportComparison.payload | json }}</pre>
+                          </details>
+                        </article>
+                      }
+                      @if (selectedRevisionConsultationExecutionArtifact(); as consultationExecution) {
+                        <article class="clinical-session-step-card">
+                          <div class="clinical-session-version-card-header">
+                            <strong>Revision Consultation Provenance</strong>
+                            <span class="clinical-session-state-badge is-info">
+                              {{ revisionArtifactPayloadScalar(consultationExecution, 'analysis_entrypoint') }}
+                            </span>
+                          </div>
+                          <p>{{ revisionArtifactSummary(consultationExecution) }}</p>
+                          <dl class="clinical-session-audit-list clinical-session-compact-list">
+                            <div>
+                              <dt>Analysis entrypoint</dt>
+                              <dd>{{ revisionArtifactPayloadScalar(consultationExecution, 'analysis_entrypoint') }}</dd>
+                            </div>
+                            <div>
+                              <dt>Drug analysis path</dt>
+                              <dd>{{ revisionArtifactPayloadScalar(consultationExecution, 'drug_analysis_entrypoint') }}</dd>
+                            </div>
+                            <div>
+                              <dt>Conclusion path</dt>
+                              <dd>{{ revisionArtifactPayloadScalar(consultationExecution, 'conclusion_entrypoint') }}</dd>
+                            </div>
+                            <div>
+                              <dt>Synthesis mode</dt>
+                              <dd>{{ revisionArtifactPayloadScalar(consultationExecution, 'synthesis_mode') }}</dd>
+                            </div>
+                            <div>
+                              <dt>Fallback report</dt>
+                              <dd>{{ revisionArtifactPayloadFlag(consultationExecution, 'used_fallback_report') }}</dd>
+                            </div>
+                            <div>
+                              <dt>Consultation model</dt>
+                              <dd>{{ revisionArtifactPayloadScalar(consultationExecution, 'consultation_model') }}</dd>
+                            </div>
+                          </dl>
+                          <details class="clinical-session-json-template">
+                            <summary>Persisted consultation payload</summary>
+                            <pre>{{ consultationExecution.payload | json }}</pre>
+                          </details>
+                        </article>
+                      }
+                      @if (selectedRevisionFinalizationExecutionArtifact(); as finalizationExecution) {
+                        <article class="clinical-session-step-card">
+                          <div class="clinical-session-version-card-header">
+                            <strong>Revision Finalization Provenance</strong>
+                            <span class="clinical-session-state-badge is-neutral">
+                              {{ revisionArtifactPayloadScalar(finalizationExecution, 'comparison_outcome') }}
+                            </span>
+                          </div>
+                          <p>{{ revisionArtifactSummary(finalizationExecution) }}</p>
+                          <dl class="clinical-session-audit-list clinical-session-compact-list">
+                            <div>
+                              <dt>Report finalization path</dt>
+                              <dd>{{ revisionArtifactPayloadScalar(selectedRevisionConsultationExecutionArtifact(), 'report_finalization_entrypoint') }}</dd>
+                            </div>
+                            <div>
+                              <dt>Final report present</dt>
+                              <dd>{{ revisionArtifactPayloadFlag(finalizationExecution, 'final_report_present') }}</dd>
+                            </div>
+                            <div>
+                              <dt>Generated report present</dt>
+                              <dd>{{ revisionArtifactPayloadFlag(finalizationExecution, 'generated_report_present') }}</dd>
+                            </div>
+                            <div>
+                              <dt>Manual review required</dt>
+                              <dd>{{ revisionArtifactPayloadFlag(finalizationExecution, 'manual_review_required') }}</dd>
+                            </div>
+                            <div>
+                              <dt>Blocking issue count</dt>
+                              <dd>{{ revisionArtifactPayloadScalar(finalizationExecution, 'blocking_issue_count') }}</dd>
+                            </div>
+                            <div>
+                              <dt>Comparison outcome</dt>
+                              <dd>{{ revisionArtifactPayloadScalar(finalizationExecution, 'comparison_outcome') }}</dd>
+                            </div>
+                          </dl>
+                          <details class="clinical-session-json-template">
+                            <summary>Persisted finalization payload</summary>
+                            <pre>{{ finalizationExecution.payload | json }}</pre>
+                          </details>
+                        </article>
+                      }
+                      @if (selectedRevisionStructuredCaseArtifacts().length) {
+                        <article class="clinical-session-revision-run-card">
+                          <div class="clinical-session-version-card-header">
+                            <strong>Structured Case Entities</strong>
+                            <span class="clinical-session-state-badge is-neutral">
+                              {{ selectedRevisionStructuredCaseArtifacts().length }} persisted
+                            </span>
+                          </div>
+                          <div class="clinical-session-step-list">
+                            @for (artifact of selectedRevisionStructuredCaseArtifacts(); track artifact.artifact_key || artifact.entity_name || $index) {
+                              <article class="clinical-session-step-card">
+                                <div class="clinical-session-version-card-header">
+                                  <strong>{{ revisionArtifactPrimaryLabel(artifact) }}</strong>
+                                  <span class="clinical-session-state-badge is-neutral">
+                                    {{ revisionStatusLabel(artifact.status || 'derived') }}
+                                  </span>
+                                </div>
+                                <p>{{ revisionArtifactSummary(artifact) }}</p>
+                              </article>
+                            }
+                          </div>
+                        </article>
+                      }
+                      @if (selectedRevisionPipelineArtifacts().length) {
+                        <article class="clinical-session-revision-run-card">
+                          <div class="clinical-session-version-card-header">
+                            <strong>Additional Pipeline Artifacts</strong>
+                            <span class="clinical-session-state-badge is-info">
+                              {{ selectedRevisionPipelineArtifacts().length }} persisted
+                            </span>
+                          </div>
+                          <div class="clinical-session-step-list">
+                            @for (artifact of selectedRevisionPipelineArtifacts(); track artifact.artifact_key || $index) {
+                              <article class="clinical-session-step-card">
+                                <div class="clinical-session-version-card-header">
+                                  <strong>{{ revisionArtifactPrimaryLabel(artifact) }}</strong>
+                                  <span class="clinical-session-state-badge is-neutral">
+                                    {{ revisionStatusLabel(artifact.status || 'derived') }}
+                                  </span>
+                                </div>
+                                <p>{{ revisionArtifactSummary(artifact) }}</p>
+                                <details class="clinical-session-json-template">
+                                  <summary>Persisted artifact payload</summary>
+                                  <pre>{{ artifact.payload | json }}</pre>
+                                </details>
+                              </article>
+                            }
+                          </div>
+                        </article>
+                      }
+                    } @else {
+                      <p class="clinical-session-panel-note">No persisted revision artifacts were recorded for this version.</p>
+                    }
+                  </section>
+                  <section class="clinical-session-revision-artifacts" aria-label="Persisted revision entities">
+                    <div class="clinical-session-manual-edit-history-header">
+                      <strong>Persisted Revision Entities</strong>
+                      <span>First-class revision records for revised drugs, diseases, and lab timeline entries.</span>
+                    </div>
+                    @if (selectedRevisionEntities().length) {
+                      @if (selectedRevisionDrugEntities().length) {
+                        <article class="clinical-session-revision-run-card">
+                          <div class="clinical-session-version-card-header">
+                            <strong>Revised Drugs</strong>
+                            <span class="clinical-session-state-badge is-neutral">{{ selectedRevisionDrugEntities().length }} persisted</span>
+                          </div>
+                          <div class="clinical-session-step-list">
+                            @for (entity of selectedRevisionDrugEntities(); track entity.original_entity_id || entity.normalized_name || $index) {
+                              <article class="clinical-session-step-card">
+                                <div class="clinical-session-version-card-header">
+                                  <strong>{{ revisionEntityPrimaryLabel(entity) }}</strong>
+                                  <span class="clinical-session-state-badge" [class.is-warn]="entity.requires_human_review" [class.is-neutral]="!entity.requires_human_review">
+                                    {{ revisionStatusLabel(entity.human_review_status || 'not_required') }}
+                                  </span>
+                                </div>
+                                <p>{{ revisionEntitySummary(entity) }}</p>
+                              </article>
+                            }
+                          </div>
+                        </article>
+                      }
+                      @if (selectedRevisionDiseaseEntities().length) {
+                        <article class="clinical-session-revision-run-card">
+                          <div class="clinical-session-version-card-header">
+                            <strong>Revised Diseases</strong>
+                            <span class="clinical-session-state-badge is-neutral">{{ selectedRevisionDiseaseEntities().length }} persisted</span>
+                          </div>
+                          <div class="clinical-session-step-list">
+                            @for (entity of selectedRevisionDiseaseEntities(); track entity.original_entity_id || entity.normalized_name || $index) {
+                              <article class="clinical-session-step-card">
+                                <div class="clinical-session-version-card-header">
+                                  <strong>{{ revisionEntityPrimaryLabel(entity) }}</strong>
+                                  <span class="clinical-session-state-badge" [class.is-warn]="entity.requires_human_review" [class.is-neutral]="!entity.requires_human_review">
+                                    {{ revisionStatusLabel(entity.human_review_status || 'not_required') }}
+                                  </span>
+                                </div>
+                                <p>{{ revisionEntitySummary(entity) }}</p>
+                              </article>
+                            }
+                          </div>
+                        </article>
+                      }
+                      @if (selectedRevisionLabEntities().length) {
+                        <article class="clinical-session-revision-run-card">
+                          <div class="clinical-session-version-card-header">
+                            <strong>Revised Lab Timeline Entries</strong>
+                            <span class="clinical-session-state-badge is-neutral">{{ selectedRevisionLabEntities().length }} persisted</span>
+                          </div>
+                          <div class="clinical-session-step-list">
+                            @for (entity of selectedRevisionLabEntities(); track entity.original_entity_id || entity.normalized_name || $index) {
+                              <article class="clinical-session-step-card">
+                                <div class="clinical-session-version-card-header">
+                                  <strong>{{ revisionEntityPrimaryLabel(entity) }}</strong>
+                                  <span class="clinical-session-state-badge" [class.is-warn]="entity.requires_human_review" [class.is-neutral]="!entity.requires_human_review">
+                                    {{ revisionStatusLabel(entity.human_review_status || 'not_required') }}
+                                  </span>
+                                </div>
+                                <p>{{ revisionEntitySummary(entity) }}</p>
+                              </article>
+                            }
+                          </div>
+                        </article>
+                      }
+                      @if (selectedRevisionLiverToxEntities().length) {
+                        <article class="clinical-session-revision-run-card">
+                          <div class="clinical-session-version-card-header">
+                            <strong>LiverTox Match Decisions</strong>
+                            <span class="clinical-session-state-badge is-neutral">{{ selectedRevisionLiverToxEntities().length }} persisted</span>
+                          </div>
+                          <div class="clinical-session-step-list">
+                            @for (entity of selectedRevisionLiverToxEntities(); track entity.original_entity_id || entity.normalized_name || $index) {
+                              <article class="clinical-session-step-card">
+                                <div class="clinical-session-version-card-header">
+                                  <strong>{{ revisionEntityPrimaryLabel(entity) }}</strong>
+                                  <span class="clinical-session-state-badge" [class.is-warn]="entity.requires_human_review" [class.is-neutral]="!entity.requires_human_review">
+                                    {{ revisionStatusLabel(entity.entity_revision_status) }}
+                                  </span>
+                                </div>
+                                <p>{{ revisionEntitySummary(entity) }}</p>
+                              </article>
+                            }
+                          </div>
+                        </article>
+                      }
+                      @if (selectedRevisionDiliAssessmentEntities().length) {
+                        <article class="clinical-session-revision-run-card">
+                          <div class="clinical-session-version-card-header">
+                            <strong>Revised DILI Assessments</strong>
+                            <span class="clinical-session-state-badge is-neutral">{{ selectedRevisionDiliAssessmentEntities().length }} persisted</span>
+                          </div>
+                          <div class="clinical-session-step-list">
+                            @for (entity of selectedRevisionDiliAssessmentEntities(); track entity.original_entity_id || entity.normalized_name || $index) {
+                              <article class="clinical-session-step-card">
+                                <div class="clinical-session-version-card-header">
+                                  <strong>{{ revisionEntityPrimaryLabel(entity) }}</strong>
+                                  <span class="clinical-session-state-badge" [class.is-warn]="entity.requires_human_review" [class.is-neutral]="!entity.requires_human_review">
+                                    {{ revisionStatusLabel(entity.human_review_status || 'not_required') }}
+                                  </span>
+                                </div>
+                                <p>{{ revisionEntitySummary(entity) }}</p>
+                              </article>
+                            }
+                          </div>
+                        </article>
+                      }
+                    } @else {
+                      <p class="clinical-session-panel-note">No first-class revision entities were persisted for this version.</p>
+                    }
+                  </section>
+                  <app-revision-pipeline-status
+                    [run]="selectedRevisionPipelineRun()"
+                    [steps]="selectedRevisionPipelineSteps()"
+                    [canRetry]="selectedRevisionCanRetry()"
+                    [retryLoading]="retryRevisionLoading()"
+                    (retry)="retrySelectedRevisionRun()"
+                  ></app-revision-pipeline-status>
+                } @else {
+                  <p class="clinical-session-panel-note">Select a version to inspect its revision run and checkpoint history.</p>
+                }
+              </section>
+            </div>
           </div>
         }
 
         @if (activeSection() === 'timeline') {
-          <div class="clinical-session-panel">
+          <div class="clinical-session-panel clinical-session-timeline-panel">
             <p class="clinical-session-panel-note">Generate or regenerate the patient timeline from the current persisted session state.</p>
-            <button class="btn btn-secondary" type="button" (click)="createTimeline()">Create Patient Timeline</button>
+            <div class="clinical-session-timeline-footer">
+              <button class="btn btn-secondary clinical-session-timeline-action" type="button" (click)="createTimeline()">Create Patient Timeline</button>
+            </div>
           </div>
         }
 

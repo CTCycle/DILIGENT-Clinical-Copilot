@@ -20,6 +20,7 @@ from domain.clinical import (
 from services.clinical.preparation import HepatoxPreparedInputs
 
 
+###############################################################################
 def get_session_service() -> Any:
     for route in session_module.router.routes:
         if getattr(route, "path", "") == "/clinical/jobs":
@@ -29,12 +30,18 @@ def get_session_service() -> Any:
     raise AssertionError("Clinical route not found")
 
 
+###############################################################################
 class FakeSerializer:
+
+    # -------------------------------------------------------------------------
     def save_clinical_session(self, payload: dict[str, Any]) -> None:
         _ = payload
 
 
+###############################################################################
 class FakeInputPreparator:
+
+    # -------------------------------------------------------------------------
     async def prepare_inputs(self, *args: Any, **kwargs: Any) -> HepatoxPreparedInputs:
         _ = args
         _ = kwargs
@@ -45,23 +52,30 @@ class FakeInputPreparator:
         )
 
 
+###############################################################################
 class FakeHepatoxConsultation:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         _ = args
         _ = kwargs
         self.llm_model = "fake-model"
 
+    # -------------------------------------------------------------------------
     async def run_analysis(self, **kwargs: Any) -> dict[str, Any]:
         _ = kwargs
         return {"final_report": "ok"}
 
 
+###############################################################################
 class FakeDrugsParser:
     model = "fake-parser"
 
+    # -------------------------------------------------------------------------
     def clean_text(self, text: str) -> str:
         return text
 
+    # -------------------------------------------------------------------------
     def parse_line(self, line: str) -> DrugEntry | None:
         _ = line
         return DrugEntry(
@@ -71,6 +85,7 @@ class FakeDrugsParser:
             source="therapy",
         )
 
+    # -------------------------------------------------------------------------
     async def extract_drugs_from_therapy(
         self, text: str, **kwargs: Any
     ) -> PatientDrugs:
@@ -87,6 +102,7 @@ class FakeDrugsParser:
             ]
         )
 
+    # -------------------------------------------------------------------------
     async def extract_drugs_from_anamnesis(
         self, text: str | None, **kwargs: Any
     ) -> PatientDrugs:
@@ -95,9 +111,11 @@ class FakeDrugsParser:
         return PatientDrugs(entries=[])
 
 
+###############################################################################
 class FakeDiseaseExtractor:
     timeout_s = 1.0
 
+    # -------------------------------------------------------------------------
     async def extract_diseases_from_anamnesis(
         self, text: str | None, **kwargs: Any
     ) -> PatientDiseaseContext:
@@ -106,7 +124,10 @@ class FakeDiseaseExtractor:
         return PatientDiseaseContext(entries=[])
 
 
+###############################################################################
 class FakeLabExtractor:
+
+    # -------------------------------------------------------------------------
     async def extract_from_payload(
         self, payload: PatientData, *, progress_callback: Any | None = None
     ) -> tuple[PatientLabTimeline, LiverInjuryOnsetContext | None]:
@@ -134,10 +155,12 @@ class FakeLabExtractor:
         )
 
 
+###############################################################################
 @dataclass
 class FakeRucamEstimator:
     captured_language: str | None = None
 
+    # -------------------------------------------------------------------------
     def estimate(self, **kwargs: Any) -> PatientRucamAssessmentBundle:
         self.captured_language = kwargs.get("report_language")
         return PatientRucamAssessmentBundle(
@@ -155,6 +178,7 @@ class FakeRucamEstimator:
         )
 
 
+###############################################################################
 def _payload() -> PatientData:
     return PatientData(
         name="Patient",
@@ -165,6 +189,7 @@ def _payload() -> PatientData:
     )
 
 
+###############################################################################
 def test_session_passes_report_language_to_rucam_estimator(monkeypatch) -> None:
     endpoint = get_session_service()
     endpoint.serializer = FakeSerializer()

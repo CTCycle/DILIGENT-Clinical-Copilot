@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 
 import {
   InspectionLiverToxOverrideRequest,
-  InspectionRagOverrideRequest,
+  InspectionRagUpdateRequest,
   InspectionRxNavOverrideRequest,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobStatusResponse,
@@ -14,7 +14,7 @@ import { JobPollingService } from '../services/job-polling.service';
 type InspectionUpdateOverridesByTarget = {
   rxnav: InspectionRxNavOverrideRequest;
   livertox: InspectionLiverToxOverrideRequest;
-  rag: InspectionRagOverrideRequest;
+  rag: InspectionRagUpdateRequest;
 };
 
 type InspectionUpdateTargetActions<TTarget extends InspectionUpdateTarget> = {
@@ -49,16 +49,11 @@ type InspectionUpdateTargetSnapshotMap = Record<
   InspectionUpdateTargetSnapshot
 >;
 
-type InspectionUpdateParseResult<TTarget extends InspectionUpdateTarget> = {
-  value: InspectionUpdateOverridesByTarget[TTarget];
-  error: string | null;
-};
-
 export type InspectionUpdateTargetActionsMap = {
   [TTarget in InspectionUpdateTarget]: InspectionUpdateTargetActions<TTarget>;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
@@ -215,12 +210,11 @@ export class InspectionUpdateJobResource {
     try {
       const payload = await this.actions[target].fetchConfig();
       const defaults = { ...(payload.defaults ?? undefined) };
-      if (target === 'rag' && this.getRagDocumentsPath().trim()) {
-        defaults['documents_path'] = this.getRagDocumentsPath().trim();
-      }
+      const summary = isRecord(payload.summary) ? { ...payload.summary } : {};
+      const config = payload.read_only ? summary : defaults;
       this.patchTargetState(target, {
-        config: defaults,
-        configText: JSON.stringify(defaults, null, 2),
+        config,
+        configText: payload.read_only ? '' : JSON.stringify(defaults, null, 2),
       });
     } catch (error) {
       this.patchTargetState(target, {
@@ -258,17 +252,8 @@ export class InspectionUpdateJobResource {
       message: 'Starting update job...',
     });
 
-    const parsedOverrides = this.parseOverrides(target, this.updateConfigText());
-    if (parsedOverrides.error) {
-      this.patchTargetState(target, {
-        error: parsedOverrides.error,
-        running: false,
-      });
-      return;
-    }
-
     try {
-      const started = await this.actions[target].start(parsedOverrides.value);
+      const started = await this.actions[target].start(this.buildStartPayload(target));
       const startedJobId = resolveStartJobId(started);
       if (!startedJobId) {
         throw new Error('Update job started but no job id was returned.');
@@ -304,40 +289,29 @@ export class InspectionUpdateJobResource {
     }
   }
 
-  private parseOverrides<TTarget extends InspectionUpdateTarget>(
+  private buildStartPayload<TTarget extends InspectionUpdateTarget>(
     target: TTarget,
-    raw: string,
-  ): InspectionUpdateParseResult<TTarget> {
-    const normalized = raw.trim();
+  ): InspectionUpdateOverridesByTarget[TTarget] {
+    if (target === 'rag') {
+      const requestedPath = this.getRagDocumentsPath().trim();
+      return {
+        documents_path: requestedPath || undefined,
+      } as InspectionUpdateOverridesByTarget[TTarget];
+    }
+    const normalized = this.updateConfigText().trim();
     if (!normalized) {
-      return { value: this.applyTargetDefaults(target, {}), error: null };
+      return {} as InspectionUpdateOverridesByTarget[TTarget];
     }
     let parsed: unknown;
     try {
       parsed = JSON.parse(normalized);
     } catch {
-      return { value: this.applyTargetDefaults(target, {}), error: 'Invalid JSON overrides.' };
+      throw new Error('Invalid JSON overrides.');
     }
     if (!isRecord(parsed)) {
-      return { value: this.applyTargetDefaults(target, {}), error: 'Overrides must be a JSON object.' };
+      throw new Error('Overrides must be a JSON object.');
     }
-    return { value: this.applyTargetDefaults(target, parsed), error: null };
-  }
-
-  private applyTargetDefaults<TTarget extends InspectionUpdateTarget>(
-    target: TTarget,
-    overrides: Record<string, unknown>,
-  ): InspectionUpdateOverridesByTarget[TTarget] {
-    if (target === 'rag') {
-      const requestedPath = typeof overrides["documents_path"] === "string"
-        ? overrides["documents_path"].trim()
-        : "";
-      return {
-        ...overrides,
-        documents_path: requestedPath || this.getRagDocumentsPath().trim() || undefined,
-      } as InspectionUpdateOverridesByTarget[TTarget];
-    }
-    return overrides as InspectionUpdateOverridesByTarget[TTarget];
+    return parsed as InspectionUpdateOverridesByTarget[TTarget];
   }
 
   private async pollUpdateJob(

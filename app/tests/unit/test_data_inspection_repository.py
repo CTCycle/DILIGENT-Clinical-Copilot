@@ -25,16 +25,14 @@ from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_serializer() -> tuple[DataSerializer, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     serializer = DataSerializer(engine=engine)
     return serializer, engine
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def save_session(
     serializer: DataSerializer,
     *,
@@ -60,8 +58,7 @@ def save_session(
         }
     )
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_session_list_filters_and_search() -> None:
     serializer, _ = build_serializer()
     save_session(
@@ -159,8 +156,60 @@ def test_session_list_filters_and_search() -> None:
     assert total == 1
     assert items[0]["patient_name"] == "Carol Archive"
 
+###############################################################################
+def test_session_report_and_text_use_result_payload_only() -> None:
+    serializer, _ = build_serializer()
+    serializer.save_clinical_session(
+        {
+            "patient_name": "Payload Only",
+            "session_timestamp": datetime(2025, 1, 1, 8, 30),
+            "anamnesis": "Original anamnesis",
+            "drugs": "acetaminophen",
+            "final_report": "Legacy section report",
+            "session_result_payload": {
+                "report": "Payload report",
+                "original_session_text": "Payload session text",
+            },
+        }
+    )
+    serializer.save_clinical_session(
+        {
+            "patient_name": "Legacy Only",
+            "session_timestamp": datetime(2025, 1, 2, 8, 30),
+            "anamnesis": "Legacy anamnesis",
+            "drugs": "ibuprofen",
+            "final_report": "Section-only report",
+            "session_result_payload": {},
+        }
+    )
 
-# -----------------------------------------------------------------------------
+    items, _ = serializer.list_sessions(
+        search=None,
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    items_by_name = {item["patient_name"]: item for item in items}
+    assert items_by_name["Payload Only"]["has_report"] is True
+    assert items_by_name["Legacy Only"]["has_report"] is False
+
+    payload_detail = serializer.get_session_detail(
+        int(items_by_name["Payload Only"]["session_id"])
+    )
+    assert payload_detail is not None
+    assert payload_detail["report"] == "Payload report"
+    assert payload_detail["session_text"] == "Payload session text"
+
+    legacy_detail = serializer.get_session_detail(
+        int(items_by_name["Legacy Only"]["session_id"])
+    )
+    assert legacy_detail is not None
+    assert legacy_detail["report"] is None
+    assert legacy_detail["session_text"] == ""
+
+###############################################################################
 def test_catalog_search_and_drug_delete_cleanup() -> None:
     serializer, engine = build_serializer()
     session_factory = sessionmaker(bind=engine, future=True)
@@ -248,8 +297,7 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
         assert len(session_drugs) == 1
         assert session_drugs[0].drug_id is None
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     serializer, _ = build_serializer()
     jobs = JobManager()
@@ -314,11 +362,15 @@ def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     assert final_livertox["status"] == "cancelled"
 
 
+###############################################################################
 class FakeTimelineExtractor:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.call_count = 0
         self.last_runtime_settings: dict[str, Any] | None = None
 
+    # -------------------------------------------------------------------------
     async def extract_timeline(
         self,
         *,
@@ -343,8 +395,25 @@ class FakeTimelineExtractor:
             ],
         )
 
+###############################################################################
+class FailingTimelineExtractor:
 
-# -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.timeout_s = 1.0
+
+    # -------------------------------------------------------------------------
+    async def extract_timeline(
+        self,
+        *,
+        session_id: int,
+        source_payload: dict[str, Any],
+        runtime_settings: dict[str, Any] | None = None,
+    ) -> PatientTimeline:
+        _ = session_id, source_payload, runtime_settings
+        raise RuntimeError("structured extraction failed")
+
+###############################################################################
 def test_timeline_generation_persists_and_reuses_payload() -> None:
     serializer, _ = build_serializer()
     save_session(
@@ -387,3 +456,40 @@ def test_timeline_generation_persists_and_reuses_payload() -> None:
     assert reused is not None
     assert reused.events[0].title == "Therapy started"
     assert extractor.call_count == 1
+
+###############################################################################
+def test_timeline_generation_marks_fallback_payload() -> None:
+    serializer, _ = build_serializer()
+    save_session(
+        serializer,
+        patient_name="Fallback Timeline Patient",
+        timestamp=datetime(2025, 1, 1, 8, 30),
+        status="successful",
+        report="Fallback timeline report",
+        anamnesis="Symptoms started in January 2025.",
+    )
+    session_rows, _ = serializer.list_sessions(
+        search="Fallback Timeline Patient",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(session_rows[0]["session_id"])
+    service = DataInspectionService(
+        serializer=serializer,
+        timeline_extractor=FailingTimelineExtractor(),
+        jobs=JobManager(),
+    )
+
+    generated = service.generate_session_timeline(session_id, force_regenerate=True)
+    assert generated is not None
+    assert generated.generation_status == "fallback"
+    assert generated.generation_note is not None
+    assert generated.events
+    assert {event.source for event in generated.events} == {"fallback_parser"}
+
+    cached = service.get_session_timeline(session_id)
+    assert cached is not None
+    assert cached.generation_status == "fallback"

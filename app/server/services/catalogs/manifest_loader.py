@@ -6,12 +6,13 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from common.constants import RESOURCES_PATH
+from common.paths import CATALOGS_PATH
 from domain.catalogs import CatalogEntry, CatalogManifest, normalize_catalog_value
 
-CATALOG_MANIFEST_DIR = Path(RESOURCES_PATH) / "catalogs"
+CATALOG_MANIFEST_DIR = CATALOGS_PATH
 
 
+###############################################################################
 def iter_catalog_manifest_paths() -> list[Path]:
     if not CATALOG_MANIFEST_DIR.exists():
         return []
@@ -22,10 +23,12 @@ def iter_catalog_manifest_paths() -> list[Path]:
     )
 
 
+###############################################################################
 def compute_manifest_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+###############################################################################
 def load_catalog_manifest(path: Path) -> CatalogManifest:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -68,6 +71,7 @@ def load_catalog_manifest(path: Path) -> CatalogManifest:
     )
 
 
+###############################################################################
 def validate_manifest(manifest: Mapping[str, Any]) -> None:
     manifest_name = str(manifest.get("manifest") or "").strip()
     if not manifest_name:
@@ -79,7 +83,7 @@ def validate_manifest(manifest: Mapping[str, Any]) -> None:
     if not isinstance(entries, list) or not entries:
         raise ValueError("entries must be a non-empty list")
 
-    seen: set[tuple[str, str, str, str, str]] = set()
+    seen: set[tuple[str, str, str, str, str, str]] = set()
     for entry in entries:
         if not isinstance(entry, dict):
             raise ValueError("entry must be an object")

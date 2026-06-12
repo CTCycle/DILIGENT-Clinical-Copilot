@@ -12,6 +12,7 @@ from domain.clinical.entities import (
 )
 
 
+###############################################################################
 @dataclass(frozen=True)
 class CandidateSelectionResult:
     relevant: list[dict[str, str]]
@@ -20,6 +21,7 @@ class CandidateSelectionResult:
     ordered_analysis_drugs: PatientDrugs
 
 
+###############################################################################
 @dataclass(slots=True)
 class HepatoxPreparedInputs:
     resolved_drugs: dict[str, dict[str, Any]]
@@ -27,6 +29,7 @@ class HepatoxPreparedInputs:
     clinical_context: str
 
 
+###############################################################################
 class LabExtractionPayload(BaseModel):
     entries: list[ClinicalLabEntry] = Field(default_factory=list)
     onset_context: LiverInjuryOnsetContext | None = Field(default=None)

@@ -7,8 +7,7 @@ from unittest.mock import AsyncMock
 from configurations.llm_configs import LLMRuntimeConfig
 from services.llm.ollama_client import OllamaClient
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_evaluate_dual_residency_plan_checks_ram_and_vram(monkeypatch) -> None:
     gib = 1_073_741_824
     client = OllamaClient(base_url="http://127.0.0.1:11434")
@@ -46,8 +45,7 @@ def test_evaluate_dual_residency_plan_checks_ram_and_vram(monkeypatch) -> None:
     assert plan["required_ram"] == 9 * gib
     assert plan["required_vram"] == 7 * gib
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_predict_next_target_model_prefers_frequent_transition() -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
     now = time.monotonic()
@@ -71,8 +69,7 @@ def test_predict_next_target_model_prefers_frequent_transition() -> None:
 
     assert predicted == "text-model"
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_resolve_policy_keep_alive_uses_dual_setting(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
     client.residency_dual_keep_alive = "8h"

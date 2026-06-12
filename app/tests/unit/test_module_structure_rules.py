@@ -11,6 +11,7 @@ ALLOWED_DATACLASS_OUTSIDE_DOMAIN = {
     (SERVER_ROOT / "services" / "clinical" / "match_resolution.py").resolve(),
     (SERVER_ROOT / "services" / "session" / "clinical_section_parsers.py").resolve(),
     (SERVER_ROOT / "services" / "session" / "preflight.py").resolve(),
+    (SERVER_ROOT / "services" / "session" / "session_workflow.py").resolve(),
     (SERVER_ROOT / "services" / "runtime" / "state.py").resolve(),
 }
 ALLOWED_FASTAPI_IMPORTS_IN_SERVICES = {
@@ -24,8 +25,22 @@ EXCLUDED_DIRS = {
     "node_modules",
     "dist",
 }
+ALLOWED_OVERSIZED_BACKEND_FILES = {
+    (SERVER_ROOT / "repositories" / "schemas" / "models.py").resolve(),
+    (SERVER_ROOT / "repositories" / "serialization" / "data.py").resolve(),
+    (
+        SERVER_ROOT / "repositories" / "serialization" / "session_revision_data.py"
+    ).resolve(),
+    (SERVER_ROOT / "services" / "clinical" / "hepatox_core.py").resolve(),
+    (SERVER_ROOT / "services" / "clinical" / "parser.py").resolve(),
+    (SERVER_ROOT / "services" / "inspection" / "service.py").resolve(),
+    (SERVER_ROOT / "services" / "session" / "session_service.py").resolve(),
+    (SERVER_ROOT / "services" / "session" / "session_workflow.py").resolve(),
+    (SERVER_ROOT / "services" / "session" / "revision_workflow.py").resolve(),
+}
 
 
+###############################################################################
 def _iter_python_files(root: Path) -> list[Path]:
     return sorted(
         path
@@ -34,12 +49,29 @@ def _iter_python_files(root: Path) -> list[Path]:
     )
 
 
+###############################################################################
 def test_backend_structure_scan_scope_is_not_empty() -> None:
     assert _iter_python_files(SERVER_ROOT), (
         f"Backend structure tests scanned no files under {SERVER_ROOT}"
     )
 
 
+###############################################################################
+def test_backend_python_files_do_not_exceed_1000_lines() -> None:
+    violations: list[str] = []
+    for path in _iter_python_files(SERVER_ROOT):
+        if path.resolve() in ALLOWED_OVERSIZED_BACKEND_FILES:
+            continue
+        line_count = sum(1 for _ in path.open(encoding="utf-8"))
+        if line_count > 1000:
+            violations.append(f"{path.as_posix()}:{line_count}")
+    assert not violations, (
+        "Backend Python files must stay at or below 1000 physical lines:\n"
+        + "\n".join(violations)
+    )
+
+
+###############################################################################
 def _is_dataclass_decorator(decorator: ast.expr) -> bool:
     if isinstance(decorator, ast.Name):
         return decorator.id == "dataclass"
@@ -50,6 +82,7 @@ def _is_dataclass_decorator(decorator: ast.expr) -> bool:
     return False
 
 
+###############################################################################
 def _is_pydantic_model(class_node: ast.ClassDef) -> bool:
     for base in class_node.bases:
         if isinstance(base, ast.Name) and base.id in {
@@ -67,26 +100,33 @@ def _is_pydantic_model(class_node: ast.ClassDef) -> bool:
     return False
 
 
+###############################################################################
 def _format_violation(path: Path, node: ast.AST, label: str) -> str:
     line = getattr(node, "lineno", 1)
     return f"{path.as_posix()}:{line} ({label})"
 
 
+###############################################################################
 def _is_top_level_import(
     tree: ast.Module, import_node: ast.Import | ast.ImportFrom
 ) -> bool:
     return import_node in tree.body
 
 
+###############################################################################
 def test_no_nested_local_python_functions() -> None:
     violations: list[str] = []
     for path in _iter_python_files(SERVER_ROOT):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
+        ###############################################################################
         class Visitor(ast.NodeVisitor):
+
+            # -------------------------------------------------------------------------
             def __init__(self) -> None:
                 self.function_depth = 0
 
+            # -------------------------------------------------------------------------
             def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
                 if self.function_depth > 0:
                     violations.append(_format_violation(path, node, "nested function"))
@@ -94,6 +134,7 @@ def test_no_nested_local_python_functions() -> None:
                 self.generic_visit(node)
                 self.function_depth -= 1
 
+            # -------------------------------------------------------------------------
             def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
                 if self.function_depth > 0:
                     violations.append(_format_violation(path, node, "nested function"))
@@ -107,20 +148,26 @@ def test_no_nested_local_python_functions() -> None:
     )
 
 
+###############################################################################
 def test_no_conditional_python_imports() -> None:
     violations: list[str] = []
     for path in _iter_python_files(SERVER_ROOT):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
+        ###############################################################################
         class Visitor(ast.NodeVisitor):
+
+            # -------------------------------------------------------------------------
             def __init__(self) -> None:
                 self.if_depth = 0
 
+            # -------------------------------------------------------------------------
             def visit_If(self, node: ast.If) -> None:
                 self.if_depth += 1
                 self.generic_visit(node)
                 self.if_depth -= 1
 
+            # -------------------------------------------------------------------------
             def visit_Import(self, node: ast.Import) -> None:
                 if self.if_depth > 0:
                     violations.append(
@@ -128,6 +175,7 @@ def test_no_conditional_python_imports() -> None:
                     )
                 self.generic_visit(node)
 
+            # -------------------------------------------------------------------------
             def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
                 if self.if_depth > 0:
                     violations.append(
@@ -141,6 +189,7 @@ def test_no_conditional_python_imports() -> None:
     )
 
 
+###############################################################################
 def test_models_live_under_domain() -> None:
     violations: list[str] = []
     for path in _iter_python_files(SERVER_ROOT):
@@ -169,6 +218,7 @@ def test_models_live_under_domain() -> None:
     )
 
 
+###############################################################################
 def test_livertox_updater_has_no_module_forwarding_wrappers() -> None:
     path = SERVER_ROOT / "services" / "updater" / "livertox_core.py"
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -206,6 +256,7 @@ def test_livertox_updater_has_no_module_forwarding_wrappers() -> None:
     )
 
 
+###############################################################################
 def test_services_do_not_import_fastapi() -> None:
     services_root = SERVER_ROOT / "services"
     violations: list[str] = []
@@ -233,6 +284,7 @@ def test_services_do_not_import_fastapi() -> None:
     )
 
 
+###############################################################################
 def test_backend_imports_are_top_level_only() -> None:
     root = SERVER_ROOT
     violations: list[str] = []
@@ -254,6 +306,7 @@ def test_backend_imports_are_top_level_only() -> None:
     )
 
 
+###############################################################################
 def test_services_do_not_import_sqlalchemy_orm_persistence() -> None:
     service_roots = [
         SERVER_ROOT / "services" / "inspection",

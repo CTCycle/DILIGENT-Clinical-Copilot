@@ -7,6 +7,7 @@ from __future__ import annotations
 from playwright.sync_api import APIRequestContext
 
 
+###############################################################################
 def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext):
     response = api_context.get("/api/model-config")
     assert response.status == 200
@@ -21,6 +22,7 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
     assert "ollama_temperature" in payload
 
 
+###############################################################################
 def test_model_config_put_rejects_out_of_range_temperature(
     api_context: APIRequestContext,
 ):
@@ -35,6 +37,7 @@ def test_model_config_put_rejects_out_of_range_temperature(
     assert any("cloud_temperature" in str(item.get("loc", [])) for item in detail)
 
 
+###############################################################################
 def test_model_config_put_accepts_current_temperature(
     api_context: APIRequestContext,
 ):

@@ -4,8 +4,7 @@ from services.updater.sanitizer import (
     LiverToxExcerptSanitizer,
 )
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_sanitizer_removes_boilerplate_and_preserves_core_content() -> None:
     sanitizer = LiverToxExcerptSanitizer()
     raw_excerpt = (

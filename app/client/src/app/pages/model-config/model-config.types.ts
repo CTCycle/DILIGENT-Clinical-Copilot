@@ -1,4 +1,4 @@
-import { CloudProvider, JobStatus } from '../../core/models/types';
+import { CloudProvider, JobStatus, RagSettings } from '../../core/models/types';
 
 export type ModelFilterKey = 'installed' | 'missing' | 'small' | 'large' | 'quantized';
 
@@ -18,3 +18,14 @@ export type ModelPullProgressState = {
   status: JobStatus;
   message: string;
 };
+
+export type DraftRagSettings = RagSettings;
+
+export type RagSettingsSectionKey =
+  | 'general'
+  | 'chunking'
+  | 'embeddings'
+  | 'models'
+  | 'advanced'
+  | 'providers'
+  | 'storage';

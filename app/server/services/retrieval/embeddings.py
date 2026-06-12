@@ -7,40 +7,39 @@ from typing import Any, Literal, Protocol, cast
 
 import httpx
 import torch
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_ollama import OllamaEmbeddings
-from langchain_openai import OpenAIEmbeddings
-from pydantic import SecretStr
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
+from common.constants import CLOUD_MODEL_CHOICES
+from common.paths import VECTOR_DB_PATH
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from repositories.serialization.access_keys import AccessKeySerializer
 from repositories.vectors import LanceVectorDatabase
-from services.llm.cloud import LLMError, LLMTimeout
-from services.llm.ollama_client import OllamaError, OllamaTimeout
-from services.retrieval.embedding_model import (
+from services.llm.cloud import CloudLLMClient, LLMError, LLMTimeout
+from services.llm.ollama_client import OllamaClient, OllamaError, OllamaTimeout
+from common.utils.embedding_model import (
     EmbeddingModelSpec,
     build_embedding_model_signature,
 )
+from services.retrieval.settings import build_effective_rag_settings
 
 ProviderName = Literal["openai", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]
-
 
 ###############################################################################
 class EmbeddingModelMismatchError(RuntimeError):
     pass
 
-
 ###############################################################################
 class Reranker(Protocol):
-    def predict(self, pairs: list[tuple[str, str]]) -> list[float]: ...
 
+    # -------------------------------------------------------------------------
+    def predict(self, pairs: list[tuple[str, str]]) -> list[float]: ...
 
 ###############################################################################
 class LocalCrossEncoderReranker:
+
+    # -------------------------------------------------------------------------
     def __init__(self, model_name: str) -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
@@ -63,52 +62,8 @@ class LocalCrossEncoderReranker:
                 logits = logits.unsqueeze(0)
             return [float(value) for value in logits.tolist()]
 
-
 ###############################################################################
-def _build_openai_embeddings_model(
-    *,
-    api_key: str,
-    model: str,
-    timeout_s: float,
-) -> OpenAIEmbeddings:
-    return OpenAIEmbeddings(
-        api_key=SecretStr(api_key),
-        model=model,
-        timeout=timeout_s,
-        check_embedding_ctx_length=False,
-    )
-
-
-###############################################################################
-def _build_gemini_embeddings_model(
-    *,
-    api_key: str,
-    model: str,
-    timeout_s: float,
-) -> GoogleGenerativeAIEmbeddings:
-    return GoogleGenerativeAIEmbeddings(
-        google_api_key=SecretStr(api_key),
-        model=model,
-        request_options={"timeout": timeout_s},
-    )
-
-
-###############################################################################
-def _build_ollama_embeddings_model(
-    *,
-    base_url: str,
-    model: str,
-    timeout_s: float,
-) -> OllamaEmbeddings:
-    return OllamaEmbeddings(
-        base_url=base_url,
-        model=model,
-        client_kwargs={"timeout": timeout_s},
-    )
-
-
-###############################################################################
-def _map_langchain_embedding_exception(
+def _map_embedding_exception(
     exc: Exception,
     *,
     provider: str,
@@ -132,9 +87,10 @@ def _map_langchain_embedding_exception(
         return OllamaError(f"Failed to request Ollama embeddings: {exc}")
     return LLMError(f"Failed to request cloud embeddings: {exc}")
 
-
 ###############################################################################
 class CloudEmbeddingGenerator:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -148,7 +104,9 @@ class CloudEmbeddingGenerator:
         resolved_model = (model or "").strip()
         if not resolved_model:
             raise ValueError("Cloud embedding model is required")
-        self.provider = cast(Literal["openai", "gemini"], normalized_provider)
+        self.provider: ProviderName = cast(
+            Literal["openai", "gemini"], normalized_provider
+        )
         self.model = resolved_model
         self.timeout_s = float(timeout_s)
         self.api_key = self.resolve_provider_access_key(self.provider)
@@ -174,23 +132,14 @@ class CloudEmbeddingGenerator:
         if not texts:
             return []
         try:
-            if self.provider == "openai":
-                embeddings_model = _build_openai_embeddings_model(
-                    api_key=self.api_key,
-                    model=self.model,
-                    timeout_s=self.timeout_s,
-                )
-            else:
-                embeddings_model = _build_gemini_embeddings_model(
-                    api_key=self.api_key,
-                    model=self.model,
-                    timeout_s=self.timeout_s,
-                )
-            vectors = await asyncio.to_thread(embeddings_model.embed_documents, texts)
+            async with CloudLLMClient(
+                provider=self.provider,
+                default_model=self.model,
+                timeout_s=self.timeout_s,
+            ) as client:
+                vectors = await client.embed(model=self.model, input_texts=texts)
         except Exception as exc:  # noqa: BLE001
-            raise _map_langchain_embedding_exception(
-                exc, provider=self.provider
-            ) from exc
+            raise _map_embedding_exception(exc, provider=self.provider) from exc
         return self.normalize_embeddings(vectors, expected=len(texts))
 
     # -------------------------------------------------------------------------
@@ -215,9 +164,10 @@ class CloudEmbeddingGenerator:
             raise LLMError("Mismatch between cloud embeddings and inputs")
         return normalized
 
-
 ###############################################################################
 class OllamaEmbeddingGenerator:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -238,15 +188,15 @@ class OllamaEmbeddingGenerator:
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        embeddings_model = _build_ollama_embeddings_model(
-            base_url=self.base_url,
-            model=self.model,
-            timeout_s=self.timeout_s,
-        )
         try:
-            vectors = await asyncio.to_thread(embeddings_model.embed_documents, texts)
+            async with OllamaClient(
+                base_url=self.base_url,
+                timeout_s=self.timeout_s,
+                default_model=self.model,
+            ) as client:
+                vectors = await client.embed(model=self.model, input_texts=texts)
         except Exception as exc:  # noqa: BLE001
-            raise _map_langchain_embedding_exception(exc, provider="ollama") from exc
+            raise _map_embedding_exception(exc, provider="ollama") from exc
         return self.normalize_embeddings(vectors, expected=len(texts))
 
     # -------------------------------------------------------------------------
@@ -272,7 +222,6 @@ class OllamaEmbeddingGenerator:
         if len(normalized) != expected:
             raise OllamaError("Mismatch between Ollama embeddings and inputs")
         return normalized
-
 
 ###############################################################################
 def select_embedding_provider(
@@ -315,9 +264,10 @@ def select_embedding_provider(
 
     raise ValueError(f"Unsupported embedding backend: {backend}")
 
-
 ###############################################################################
 class EmbeddingGenerator:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -351,6 +301,7 @@ class EmbeddingGenerator:
         embeddings = self.run_async(self.provider.embed_texts(sanitized))
         return [[float(value) for value in vector] for vector in embeddings]
 
+    # -------------------------------------------------------------------------
     def resolve_active_embedding_model_spec(self) -> EmbeddingModelSpec:
         provider = "cloud" if self.backend == "cloud" else "ollama"
         if self.backend == "cloud":
@@ -398,32 +349,41 @@ class EmbeddingGenerator:
                 asyncio.set_event_loop(previous_loop)
         return loop.run_until_complete(coroutine)
 
-
 ###############################################################################
 class SimilaritySearch:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
         vector_database: LanceVectorDatabase | None = None,
         embedding_generator: EmbeddingGenerator | None = None,
-        default_top_k: int = get_server_settings().rag.rerank_candidate_k,
+        default_top_k: int | None = None,
     ) -> None:
-        self.default_top_k = max(int(default_top_k), 1)
+        rag_settings = build_effective_rag_settings()
+        self.default_top_k = max(
+            int(
+                rag_settings.retrieval_candidate_count
+                if default_top_k is None
+                else default_top_k
+            ),
+            1,
+        )
         self.reranker: Reranker | None = None
         self.vector_database = vector_database or LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
-            collection_name=get_server_settings().rag.vector_collection_name,
-            metric=get_server_settings().rag.vector_index_metric,
-            index_type=get_server_settings().rag.vector_index_type,
-            stream_batch_size=get_server_settings().rag.vector_stream_batch_size,
+            collection_name=rag_settings.vector_collection_name,
+            metric=rag_settings.vector_index_metric,
+            index_type=rag_settings.vector_index_type,
+            stream_batch_size=rag_settings.vector_stream_batch_size,
         )
         self.embedding_generator = embedding_generator or EmbeddingGenerator(
-            backend=get_server_settings().rag.embedding_backend,
-            ollama_base_url=get_server_settings().rag.ollama_base_url,
-            ollama_model=get_server_settings().rag.ollama_embedding_model,
-            use_cloud_embeddings=get_server_settings().rag.use_cloud_embeddings,
-            cloud_provider=get_server_settings().rag.cloud_provider,
-            cloud_embedding_model=get_server_settings().rag.cloud_embedding_model,
+            backend=rag_settings.embedding_backend,
+            ollama_base_url=rag_settings.ollama_base_url,
+            ollama_model=rag_settings.ollama_embedding_model,
+            use_cloud_embeddings=rag_settings.use_cloud_embeddings,
+            cloud_provider=rag_settings.cloud_provider,
+            cloud_embedding_model=rag_settings.cloud_embedding_model,
         )
         try:
             self.vector_database.initialize()
@@ -454,7 +414,7 @@ class SimilaritySearch:
             logger.error("Failed to access LanceDB table: %s", exc)
             return []
         try:
-            if get_server_settings().rag.use_hybrid_search:
+            if build_effective_rag_settings().use_hybrid_search:
                 results = self.hybrid_search(
                     table=table,
                     query=normalized,
@@ -520,8 +480,9 @@ class SimilaritySearch:
         query: str,
     ) -> list[dict[str, Any]]:
         fused: dict[str, dict[str, Any]] = {}
-        vector_weight = float(get_server_settings().rag.hybrid_vector_weight)
-        text_weight = float(get_server_settings().rag.hybrid_text_weight)
+        rag_settings = build_effective_rag_settings()
+        vector_weight = float(rag_settings.hybrid_vector_weight)
+        text_weight = float(rag_settings.hybrid_text_weight)
         for rank, entry in enumerate(vector_results, start=1):
             self.add_rank_score(
                 fused,
@@ -652,7 +613,7 @@ class SimilaritySearch:
         resolved_top_n = (
             max(int(final_top_n), 1)
             if final_top_n is not None
-            else max(int(get_server_settings().rag.rerank_top_n), 1)
+            else max(int(build_effective_rag_settings().retrieval_selected_count), 1)
         )
         resolved_candidate_k = (
             max(int(candidate_k), 1)
@@ -667,7 +628,7 @@ class SimilaritySearch:
             return []
 
         should_rerank = (
-            get_server_settings().rag.use_reranking
+            build_effective_rag_settings().use_reranking
             if use_reranking is None
             else bool(use_reranking)
         )
@@ -721,7 +682,7 @@ class SimilaritySearch:
     def get_reranker(self) -> Reranker:
         if self.reranker is None:
             self.reranker = LocalCrossEncoderReranker(
-                get_server_settings().rag.reranker_model
+                build_effective_rag_settings().reranker_model
             )
         return self.reranker
 

@@ -3,9 +3,9 @@ from __future__ import annotations
 from configurations.startup import get_server_settings
 from repositories.serialization.data import DataSerializer
 from services.clinical.disease import DiseaseExtractor
-from services.clinical.hepatox_core import (
+from services.clinical.hepatox_core import HepatoxConsultation
+from services.clinical.pattern_analyzer import (
     HepatotoxicityPatternAnalyzer,
-    HepatoxConsultation,
 )
 from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.parser import DrugsParser
@@ -16,6 +16,7 @@ from services.session.payload import PayloadSanitizationService
 from services.session.session_service import ClinicalSessionService
 
 
+###############################################################################
 def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionService:
     parser_timeout_s = float(get_server_settings().runtime.parser_llm_timeout)
     disease_timeout_s = float(get_server_settings().runtime.disease_llm_timeout)

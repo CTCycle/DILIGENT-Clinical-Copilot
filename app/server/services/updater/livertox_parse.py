@@ -22,25 +22,19 @@ from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
 
 from common.utils.logger import logger
-from services.text.normalization import normalize_whitespace
+from common.utils.text_utils import normalize_whitespace
 from services.updater import livertox_common
 
 MONOGRAPH_PROGRESS_INTERVAL = 25
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def process_monograph_payload(
     member_name: str,
     data: bytes,
 ) -> dict[str, str] | None:
     return process_monograph_member(member_name, data)
 
-
 ###############################################################################
-
-# Extracted from the facade module; functions intentionally accept the facade instance.
-
-
 def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | None:
     if data.empty:
         return
@@ -106,12 +100,14 @@ def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | No
     return data.reset_index(drop=True)
 
 
+###############################################################################
 def clean_master_list_column(self, series: pd.Series) -> pd.Series:
     cleaned = series.fillna("").astype(str).str.strip()
     cleaned = cleaned.replace("", pd.NA)
     return cleaned
 
 
+###############################################################################
 def collect_monographs(
     self,
     archive_path: str | None = None,
@@ -259,6 +255,7 @@ def collect_monographs(
     return sort_monograph_records(self, collected)
 
 
+###############################################################################
 def emit_monograph_progress(
     self,
     *,
@@ -286,6 +283,7 @@ def emit_monograph_progress(
     return processed_count
 
 
+###############################################################################
 def drain_monograph_futures(
     self,
     *,
@@ -334,6 +332,7 @@ def drain_monograph_futures(
     return processed_count, last_reported_count
 
 
+###############################################################################
 def sort_monograph_records(self, records: list[dict[str, str]]) -> list[dict[str, str]]:
     return sorted(
         records,
@@ -345,6 +344,7 @@ def sort_monograph_records(self, records: list[dict[str, str]]) -> list[dict[str
     )
 
 
+###############################################################################
 def process_monograph_member(
     member_name: str,
     data: bytes,
@@ -374,6 +374,7 @@ def process_monograph_member(
     }
 
 
+###############################################################################
 def convert_member_bytes(
     member_name: str, data: bytes
 ) -> tuple[str, str | None] | None:
@@ -389,6 +390,7 @@ def convert_member_bytes(
     return text, markup
 
 
+###############################################################################
 def decode_markup(data: bytes) -> str:
     try:
         return data.decode("utf-8")
@@ -396,6 +398,7 @@ def decode_markup(data: bytes) -> str:
         return data.decode("latin-1", errors="ignore")
 
 
+###############################################################################
 def pdf_to_text(data: bytes) -> str:
     buffer = io.BytesIO(data)
     if pdfminer_extract_text is not None:
@@ -425,6 +428,7 @@ def pdf_to_text(data: bytes) -> str:
         return data.decode("latin-1", errors="ignore")
 
 
+###############################################################################
 def extract_nbk(member_name: str, content: str) -> str | None:
     match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
     if match:
@@ -435,6 +439,7 @@ def extract_nbk(member_name: str, content: str) -> str | None:
     return None
 
 
+###############################################################################
 def derive_identifier(member_name: str) -> str:
     base = PurePosixPath(member_name).name
     stem = PurePosixPath(base).stem
@@ -442,6 +447,7 @@ def derive_identifier(member_name: str) -> str:
     return cleaned or base
 
 
+###############################################################################
 def extract_title(html_text: str, plain_text: str, default: str) -> str:
     patterns = (
         r"<title-group[^>]*>\s*<title[^>]*>(.*?)</title>",
@@ -464,10 +470,12 @@ def extract_title(html_text: str, plain_text: str, default: str) -> str:
     return normalize_extracted_title(default) or default
 
 
+###############################################################################
 def clean_fragment(fragment: str) -> str:
     return html_to_text(fragment)
 
 
+###############################################################################
 def normalize_extracted_title(value: str) -> str:
     cleaned = normalize_whitespace(value)
     if not cleaned:
@@ -481,6 +489,7 @@ def normalize_extracted_title(value: str) -> str:
     return normalize_whitespace(cleaned)
 
 
+###############################################################################
 def html_to_text(html_text: str) -> str:
     # Tempered dot avoids runaway backtracking on malformed HTML.
     stripped = re.sub(r"(?is)<(script|style)[^>]*>(?:(?!</\1>).)*</\1>", " ", html_text)
@@ -489,12 +498,14 @@ def html_to_text(html_text: str) -> str:
     return normalize_whitespace(unescaped)
 
 
+###############################################################################
 def strip_punctuation(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value)
     folded = "".join(char for char in normalized if not unicodedata.combining(char))
     return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
 
 
+###############################################################################
 def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
     sanitized = self.serializer.sanitize_livertox_records(entries)
     if sanitized.empty:
@@ -516,6 +527,7 @@ def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
     return sanitized.reset_index(drop=True)
 
 
+###############################################################################
 def sanitize_excerpt(self, value: Any) -> str | Any:
     if value is None or pd.isna(value):
         return pd.NA
@@ -528,6 +540,7 @@ def sanitize_excerpt(self, value: Any) -> str | Any:
     return cleaned
 
 
+###############################################################################
 def normalize_nbk_id(self, value: Any) -> str | None:
     if value is None:
         return None
@@ -541,6 +554,7 @@ def normalize_nbk_id(self, value: Any) -> str | None:
     return normalized
 
 
+###############################################################################
 def contains_symbol(self, value: str) -> bool:
     if not isinstance(value, str):
         return False

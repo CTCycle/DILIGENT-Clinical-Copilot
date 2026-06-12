@@ -19,6 +19,7 @@ from services.session.robust_pipeline import (
 )
 
 
+###############################################################################
 def _load_corpus_payloads() -> list[dict[str, object]]:
     corpus_file = Path("tmp_dili_5run_results.json")
     if not corpus_file.exists():
@@ -29,6 +30,7 @@ def _load_corpus_payloads() -> list[dict[str, object]]:
     return [item for item in content if isinstance(item, dict)]
 
 
+###############################################################################
 def test_preflight_allows_captured_corpus_without_blocking_extraction_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -62,6 +64,7 @@ def test_preflight_allows_captured_corpus_without_blocking_extraction_errors(
     )
 
 
+###############################################################################
 def test_preprocess_unified_input_succeeds_for_all_captured_corpus_cases() -> None:
     payloads = _load_corpus_payloads()
     service = build_clinical_session_service(get_job_manager())

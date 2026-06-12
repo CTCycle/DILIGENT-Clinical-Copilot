@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import codecs
 import json
-import os
 from pathlib import Path
 import re
 import time
@@ -14,10 +13,10 @@ from typing import Any
 import httpx
 import pandas as pd
 
-from common.constants import RXNAV_CURATED_ALIASES_PATH
+from common.paths import RXNAV_CURATED_ALIASES_PATH
 from common.utils.logger import logger
 from repositories.serialization.data import DataSerializer
-from services.text.normalization import normalize_drug_name
+from common.utils.text_utils import normalize_drug_name
 from services.text.vocabulary import get_text_normalization_snapshot
 from services.updater.rxnav_client import (
     RxNavClient,
@@ -25,6 +24,7 @@ from services.updater.rxnav_client import (
 )
 
 
+###############################################################################
 class RxNavDrugCatalogBuilder:
     TERMS_URL = "https://rxnav.nlm.nih.gov/REST/RxTerms/allconcepts.json"
     CHUNK_SIZE = 131_072
@@ -40,6 +40,7 @@ class RxNavDrugCatalogBuilder:
     SINGLE_TOKEN_DIGIT_PATTERN = re.compile(r"^\d+(?:\.\d+)?$")
     SHORT_TOKEN_EXCEPTIONS = {"id"}
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         rx_client: RxNavClient | None = None,
@@ -62,8 +63,12 @@ class RxNavDrugCatalogBuilder:
         self.total_records: int | None = None
         self.last_logged_count = 0
         self.serializer = serializer or DataSerializer()
-        resolved_path = curated_aliases_path or RXNAV_CURATED_ALIASES_PATH
-        self.curated_aliases_path = Path(resolved_path).resolve()
+        resolved_path = (
+            Path(curated_aliases_path)
+            if curated_aliases_path is not None
+            else RXNAV_CURATED_ALIASES_PATH
+        )
+        self.curated_aliases_path = resolved_path.resolve()
         self.curated_aliases_by_canonical = self.load_curated_aliases()
 
     # -------------------------------------------------------------------------
@@ -248,7 +253,7 @@ class RxNavDrugCatalogBuilder:
         headers = response.headers
         try:
             content_length = int(headers.get("Content-Length", 0) or 0)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             content_length = 0
         payload = {
             "source_url": str(response.request.url)
@@ -304,7 +309,10 @@ class RxNavDrugCatalogBuilder:
         count: int,
         force: bool = False,
     ) -> None:
-        if not force and (count - self.last_logged_count) < self.PROGRESS_RECORD_INTERVAL:
+        if (
+            not force
+            and (count - self.last_logged_count) < self.PROGRESS_RECORD_INTERVAL
+        ):
             return
         self.last_logged_count = count
         logger.info("RxNav catalog progress: %d records upserted", count)
@@ -758,7 +766,7 @@ class RxNavDrugCatalogBuilder:
                 fragments.append(base)
         return fragments
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def register_alias_candidate(
         self,
         candidate: str,

@@ -4,18 +4,15 @@ import logging
 import logging.config
 import os
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
-from common.constants import LOGS_PATH
+from common.paths import LOGS_PATH
 
 # Generate timestamp for the log filename
 ###############################################################################
-Path(LOGS_PATH).mkdir(parents=True, exist_ok=True)
+LOGS_PATH.mkdir(parents=True, exist_ok=True)
 current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-log_filename = str(
-    Path(LOGS_PATH) / f"DILIGENT_{current_timestamp}_{os.getpid()}.log"
-)
+log_filename = str(LOGS_PATH / f"DILIGENT_{current_timestamp}_{os.getpid()}.log")
 
 # Define logger configuration
 ###############################################################################

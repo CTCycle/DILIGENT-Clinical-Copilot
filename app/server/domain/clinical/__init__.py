@@ -45,6 +45,13 @@ from domain.clinical.matching import (
     LiverToxMatch,
     MonographRecord,
 )
+from domain.clinical.revision import (
+    RevisedDiliAssessment,
+    RevisedDiseasePayload,
+    RevisedDrugPayload,
+    RevisedLabPayload,
+    RevisionLiverToxDecision,
+)
 from domain.clinical.rucam import RucamAnchor
 from domain.clinical.validation import ValidationMessageBundle
 
@@ -89,5 +96,10 @@ __all__ = [
     "LabExtractionPayload",
     "LlmClinicalSectionTextDraft",
     "MonographRecord",
+    "RevisedDiliAssessment",
+    "RevisedDiseasePayload",
+    "RevisedDrugPayload",
+    "RevisedLabPayload",
+    "RevisionLiverToxDecision",
     "create_drug_suspension_context",
 ]
