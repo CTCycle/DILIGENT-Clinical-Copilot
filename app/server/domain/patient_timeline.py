@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 PatientTimelineEventType = Literal["therapy", "disease", "lab", "other"]
+PatientTimelineGenerationStatus = Literal["llm_generated", "fallback"]
 PatientTimelineTimingType = Literal[
     "explicit_date",
     "relative",
@@ -84,7 +85,18 @@ class PatientTimeline(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_id: int = Field(..., ge=1)
     generated_at: datetime
+    generation_status: PatientTimelineGenerationStatus = "llm_generated"
+    generation_note: str | None = Field(default=None, max_length=500)
     events: list[PatientTimelineEvent] = Field(default_factory=list)
+
+    # -------------------------------------------------------------------------
+    @field_validator("generation_note", mode="before")
+    @classmethod
+    def normalize_generation_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = " ".join(str(value).split()).strip()
+        return normalized or None
 
 ###############################################################################
 class PatientTimelineExtraction(BaseModel):

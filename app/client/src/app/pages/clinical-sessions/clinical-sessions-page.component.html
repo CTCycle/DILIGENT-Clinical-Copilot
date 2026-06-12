@@ -1117,9 +1117,11 @@
         }
 
         @if (activeSection() === 'timeline') {
-          <div class="clinical-session-panel">
+          <div class="clinical-session-panel clinical-session-timeline-panel">
             <p class="clinical-session-panel-note">Generate or regenerate the patient timeline from the current persisted session state.</p>
-            <button class="btn btn-secondary" type="button" (click)="createTimeline()">Create Patient Timeline</button>
+            <div class="clinical-session-timeline-footer">
+              <button class="btn btn-secondary clinical-session-timeline-action" type="button" (click)="createTimeline()">Create Patient Timeline</button>
+            </div>
           </div>
         }
 
