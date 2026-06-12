@@ -26,8 +26,9 @@ class SQLiteRepository:
             f"sqlite:///{self.db_path}",
             echo=False,
             future=True,
+            connect_args={"timeout": 30.0},
         )
-        event.listen(self.engine, "connect", self._enable_foreign_keys)
+        event.listen(self.engine, "connect", self._configure_connection)
         seed_session_factory = sessionmaker(
             bind=self.engine,
             future=True,
@@ -53,9 +54,11 @@ class SQLiteRepository:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _enable_foreign_keys(dbapi_connection, _connection_record) -> None:
+    def _configure_connection(dbapi_connection, _connection_record) -> None:
         cursor = dbapi_connection.cursor()
         try:
             cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.execute("PRAGMA journal_mode=MEMORY")
         finally:
             cursor.close()

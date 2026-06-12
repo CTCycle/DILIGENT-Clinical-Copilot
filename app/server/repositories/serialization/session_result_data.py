@@ -33,6 +33,30 @@ from services.text.vocabulary import (
 )
 
 
+###############################################################################
+def build_session_source_text(
+    self,
+    *,
+    sections: dict[str, str],
+    patient_row: Patient,
+) -> str:
+    ordered_sections = (
+        ("Anamnesis", sections.get("anamnesis") or patient_row.anamnesis),
+        ("Drugs", sections.get("drugs") or sections.get("therapy") or patient_row.drugs),
+        (
+            "Laboratory Analysis",
+            sections.get("laboratory_analysis")
+            or sections.get("laboratory_history")
+            or patient_row.laboratory_analysis,
+        ),
+    )
+    return "\n\n".join(
+        f"{label}:\n{content}"
+        for label, raw_content in ordered_sections
+        if (content := self.normalize_string(raw_content))
+    )
+
+
 
 ###############################################################################
 def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
@@ -274,7 +298,11 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         }
         payload = self.get_session_result_payload(safe_session_id) or {}
         metadata = self.parse_session_result_payload(session_row.metadata_json) or {}
-        session_text = self.normalize_string(payload.get("original_session_text")) or ""
+        session_text = build_session_source_text(
+            self,
+            sections=sections,
+            patient_row=patient_row,
+        )
         official_report_text = self.normalize_string(payload.get("report"))
         manual_edit_rows = db_session.execute(
             select(ClinicalSessionManualEdit)
