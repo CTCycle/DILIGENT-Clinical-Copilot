@@ -396,6 +396,24 @@ class FakeTimelineExtractor:
         )
 
 ###############################################################################
+class FailingTimelineExtractor:
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.timeout_s = 1.0
+
+    # -------------------------------------------------------------------------
+    async def extract_timeline(
+        self,
+        *,
+        session_id: int,
+        source_payload: dict[str, Any],
+        runtime_settings: dict[str, Any] | None = None,
+    ) -> PatientTimeline:
+        _ = session_id, source_payload, runtime_settings
+        raise RuntimeError("structured extraction failed")
+
+###############################################################################
 def test_timeline_generation_persists_and_reuses_payload() -> None:
     serializer, _ = build_serializer()
     save_session(
@@ -438,3 +456,40 @@ def test_timeline_generation_persists_and_reuses_payload() -> None:
     assert reused is not None
     assert reused.events[0].title == "Therapy started"
     assert extractor.call_count == 1
+
+###############################################################################
+def test_timeline_generation_marks_fallback_payload() -> None:
+    serializer, _ = build_serializer()
+    save_session(
+        serializer,
+        patient_name="Fallback Timeline Patient",
+        timestamp=datetime(2025, 1, 1, 8, 30),
+        status="successful",
+        report="Fallback timeline report",
+        anamnesis="Symptoms started in January 2025.",
+    )
+    session_rows, _ = serializer.list_sessions(
+        search="Fallback Timeline Patient",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(session_rows[0]["session_id"])
+    service = DataInspectionService(
+        serializer=serializer,
+        timeline_extractor=FailingTimelineExtractor(),
+        jobs=JobManager(),
+    )
+
+    generated = service.generate_session_timeline(session_id, force_regenerate=True)
+    assert generated is not None
+    assert generated.generation_status == "fallback"
+    assert generated.generation_note is not None
+    assert generated.events
+    assert {event.source for event in generated.events} == {"fallback_parser"}
+
+    cached = service.get_session_timeline(session_id)
+    assert cached is not None
+    assert cached.generation_status == "fallback"

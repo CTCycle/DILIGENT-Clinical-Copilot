@@ -238,5 +238,6 @@ class PatientTimelineExtractor:
         return PatientTimeline(
             session_id=int(session_id),
             generated_at=datetime.now(UTC),
+            generation_status="llm_generated",
             events=normalized_events,
         )

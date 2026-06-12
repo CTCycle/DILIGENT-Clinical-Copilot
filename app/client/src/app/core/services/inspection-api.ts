@@ -38,7 +38,7 @@ import {
 } from "../models/types";
 import { buildQueryString, requestJson } from "./http-api";
 
-const TIMELINE_REQUEST_TIMEOUT_SECONDS = 120;
+const TIMELINE_REQUEST_TIMEOUT_SECONDS = 360;
 
 export async function fetchInspectionSessions(
   query: InspectionSessionQuery,

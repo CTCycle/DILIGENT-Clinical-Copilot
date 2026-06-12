@@ -18,9 +18,12 @@ type TimetableLane = 'clinical' | 'therapy' | 'labs' | 'uncertainty';
 type RenderedTimelineEvent = {
   event: InspectionTimelineEvent;
   lane: TimetableLane;
-  left: number;
-  width: number;
   color: string;
+};
+
+type TimelineDateRange = {
+  start: Date | null;
+  end: Date | null;
 };
 
 const EVENT_COLORS: Record<InspectionTimelineEventType, string> = {
@@ -38,6 +41,15 @@ const TIMING_LABELS: Record<InspectionTimelineTimingType, string> = {
   uncertain: 'Uncertain',
   ordering: 'Ordering',
 };
+
+const TIMETABLE_LANE_LABELS: Record<TimetableLane, string> = {
+  clinical: 'Clinical',
+  therapy: 'Medications',
+  labs: 'Labs',
+  uncertainty: 'Uncertain',
+};
+
+const TIMETABLE_LANES: TimetableLane[] = ['clinical', 'therapy', 'labs', 'uncertainty'];
 
 @Component({
   selector: 'app-patient-timetable-page',
@@ -61,24 +73,70 @@ export class PatientTimetablePageComponent implements OnInit {
 
   readonly renderedEvents = computed<RenderedTimelineEvent[]>(() => {
     const events = this.orderedEvents();
-    const count = Math.max(events.length, 1);
-    return events.map((event, index) => {
+    return events.map((event) => {
       const lane = this.resolveLane(event);
-      const left = count === 1 ? 45 : 8 + (index * 84) / Math.max(count - 1, 1);
-      const width = event.timing_type === 'duration' ? Math.min(34, 12 + count * 2) : 10;
       return {
         event,
         lane,
-        left,
-        width,
         color: EVENT_COLORS[event.event_type] ?? EVENT_COLORS.other,
       };
     });
   });
 
+  readonly lanes = computed(() =>
+    TIMETABLE_LANES.map((lane) => ({
+      id: lane,
+      label: TIMETABLE_LANE_LABELS[lane],
+      items: this.renderedEvents().filter((item) => item.lane === lane),
+    })),
+  );
+
   readonly selectedEvent = computed(() => {
     const selectedId = this.selectedEventId();
     return this.orderedEvents().find((event) => event.event_id === selectedId) ?? null;
+  });
+
+  readonly dateRange = computed<TimelineDateRange>(() => {
+    const dates = this.orderedEvents()
+      .map((event) => this.parseEventDate(event.event_date))
+      .filter((value): value is Date => value !== null)
+      .sort((a, b) => a.getTime() - b.getTime());
+    return {
+      start: dates[0] ?? null,
+      end: dates[dates.length - 1] ?? null,
+    };
+  });
+
+  readonly rangeLabel = computed(() => {
+    const range = this.dateRange();
+    if (!range.start || !range.end) {
+      return 'Timeline events';
+    }
+    if (this.monthLabel(range.start) === this.monthLabel(range.end)) {
+      return this.monthLabel(range.start);
+    }
+    return `${this.monthLabel(range.start)} - ${this.monthLabel(range.end)}`;
+  });
+
+  readonly scaleLabels = computed(() => {
+    const range = this.dateRange();
+    if (!range.start || !range.end) {
+      return ['Start', 'Middle', 'End'];
+    }
+    return this.monthsBetween(range.start, range.end);
+  });
+
+  readonly isFallbackTimeline = computed(() => this.timeline()?.generation_status === 'fallback');
+
+  readonly generationNote = computed(() => {
+    const timeline = this.timeline();
+    if (!timeline) {
+      return null;
+    }
+    if (timeline.generation_status === 'fallback') {
+      return timeline.generation_note || 'This timetable uses deterministic fallback events because local model extraction was unavailable.';
+    }
+    return timeline.generation_note || 'Generated with the configured local timeline extraction model.';
   });
 
   async ngOnInit(): Promise<void> {
@@ -145,6 +203,41 @@ export class PatientTimetablePageComponent implements OnInit {
     if (value >= 0.55) return 'Moderate';
     if (value >= 0.35) return 'Low';
     return 'Very low';
+  }
+
+  generationStatusLabel(): string {
+    return this.isFallbackTimeline() ? 'Fallback' : 'LLM generated';
+  }
+
+  eventTimingText(event: InspectionTimelineEvent): string {
+    return event.extracted_timing_text || event.relative_time || event.event_date || this.timingLabel(event.timing_type);
+  }
+
+  private parseEventDate(value: string | null): Date | null {
+    if (!value) {
+      return null;
+    }
+    const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private monthLabel(value: Date): string {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(value);
+  }
+
+  private monthsBetween(start: Date, end: Date): string[] {
+    const labels: string[] = [];
+    const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+    const final = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+    while (cursor.getTime() <= final.getTime() && labels.length < 12) {
+      labels.push(this.monthLabel(cursor));
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+    return labels.length > 0 ? labels : [this.monthLabel(start)];
   }
 
   private resolveLane(event: InspectionTimelineEvent): TimetableLane {

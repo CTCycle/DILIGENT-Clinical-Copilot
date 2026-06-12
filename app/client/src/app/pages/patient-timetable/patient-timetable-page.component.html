@@ -17,15 +17,19 @@
     </header>
 
     <section class="timetable-toolbar" aria-label="Timetable controls">
-      <span class="toolbar-group">Range <strong>Jan 2024 - May 2025</strong></span>
-      <span class="toolbar-group">Zoom <strong>6m</strong></span>
+      <span class="toolbar-group">Range <strong>{{ rangeLabel() }}</strong></span>
+      <span class="toolbar-group">Events <strong>{{ orderedEvents().length }}</strong></span>
       <span class="toolbar-group">Display <strong>All event types</strong></span>
       <span class="toolbar-group">Group by <strong>None</strong></span>
-      <span class="toolbar-group">Anchor <strong>Today</strong></span>
+      <span class="toolbar-group">Source <strong>{{ generationStatusLabel() }}</strong></span>
+      <span class="toolbar-group">Generated <strong>{{ timeline()?.generated_at | date: 'mediumDate' }}</strong></span>
     </section>
 
     @if (loading()) {
       <p class="status-note">Loading timetable...</p>
+    }
+    @if (generationNote()) {
+      <p class="status-note" [class.is-warning]="isFallbackTimeline()">{{ generationNote() }}</p>
     }
     @if (error()) {
       <p class="error-note">{{ error() }}</p>
@@ -33,51 +37,33 @@
 
     <section class="timetable-content">
       <div class="timeline-area">
-        <div class="timeline-scale">
-          <span>Dec</span><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span>
-        </div>
-        <div class="lane-grid">
-          <div class="lane-label">Clinical Events</div>
-          <div class="lane-track">
-            @for (item of renderedEvents(); track item.event.event_id) {
-              @if (item.lane === 'clinical') {
-                <button type="button" class="event-chip" [attr.aria-pressed]="selectedEventId() === item.event.event_id" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
-                  {{ item.event.title }}
-                </button>
-              }
+        <div class="timeline-card">
+          <div class="timeline-scale" aria-label="Timeline range">
+            @for (label of scaleLabels(); track label) {
+              <span>{{ label }}</span>
             }
           </div>
-
-          <div class="lane-label">Medications</div>
-          <div class="lane-track">
-            @for (item of renderedEvents(); track item.event.event_id) {
-              @if (item.lane === 'therapy') {
-                <button type="button" class="event-bar" [attr.aria-pressed]="selectedEventId() === item.event.event_id" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.width.%]="item.width" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
-                  {{ item.event.title }}
-                </button>
-              }
-            }
-          </div>
-
-          <div class="lane-label">Labs & Measurements</div>
-          <div class="lane-track">
-            @for (item of renderedEvents(); track item.event.event_id) {
-              @if (item.lane === 'labs') {
-                <button type="button" class="event-pin" [attr.aria-pressed]="selectedEventId() === item.event.event_id" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
-                  {{ item.event.title }}
-                </button>
-              }
-            }
-          </div>
-
-          <div class="lane-label">Uncertainty</div>
-          <div class="lane-track">
-            @for (item of renderedEvents(); track item.event.event_id) {
-              @if (item.lane === 'uncertainty') {
-                <button type="button" class="event-uncertain" [attr.aria-pressed]="selectedEventId() === item.event.event_id" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" (click)="selectEvent(item.event)">
-                  {{ item.event.title }}
-                </button>
-              }
+          <div class="lane-grid">
+            @for (lane of lanes(); track lane.id) {
+              <section class="lane-row" [class.is-empty]="lane.items.length === 0">
+                <div class="lane-label">
+                  <strong>{{ lane.label }}</strong>
+                  <span>{{ lane.items.length }} events</span>
+                </div>
+                <div class="lane-events">
+                  @if (lane.items.length > 0) {
+                    @for (item of lane.items; track item.event.event_id) {
+                      <button type="button" class="event-card" [attr.aria-pressed]="selectedEventId() === item.event.event_id" [class.is-selected]="selectedEventId() === item.event.event_id" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
+                        <span class="event-card-type">{{ timingLabel(item.event.timing_type) }}</span>
+                        <strong>{{ item.event.title }}</strong>
+                        <small>{{ eventTimingText(item.event) }}</small>
+                      </button>
+                    }
+                  } @else {
+                    <p>No events in this lane.</p>
+                  }
+                </div>
+              </section>
             }
           </div>
         </div>
@@ -102,7 +88,7 @@
             <dt>Rationale</dt>
             <dd>{{ event.confidence_rationale || 'Not reported' }}</dd>
             <dt>Source evidence</dt>
-            <dd>{{ event.source_evidence || 'Not reported' }}</dd>
+            <dd class="source-evidence">{{ event.source_evidence || 'Not reported' }}</dd>
           </dl>
           @if (event.linked_patient_event_ids.length > 0) {
             <div class="linked-events">
