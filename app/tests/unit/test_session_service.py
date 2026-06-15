@@ -6,7 +6,10 @@ from types import SimpleNamespace
 
 import pytest
 from common.exceptions import ServiceValidationError
-from domain.clinical.entities import ClinicalSessionRequest
+from domain.clinical.entities import (
+    ClinicalSectionExtractionResult,
+    ClinicalSessionRequest,
+)
 from domain.clinical.extras import HepatoxPreparedInputs
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service

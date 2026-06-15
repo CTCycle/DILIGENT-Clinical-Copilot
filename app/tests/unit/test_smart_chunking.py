@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from services.retrieval.chunking import SmartDocumentChunker
+from common.utils.chunking import SmartDocumentChunker
 
 
 ###############################################################################
@@ -22,7 +22,7 @@ def test_chunk_ids_and_uid_are_stable() -> None:
         content_type="txt",
     )
     assert chunks_a
-    assert chunks_a[0].chunk_index.startswith("doc.txt::p1-1::l")
+    assert chunks_a[0].chunk_index == "doc.txt::p1-1::section::c1"
     assert [c.chunk_uid for c in chunks_a] == [c.chunk_uid for c in chunks_b]
 
 

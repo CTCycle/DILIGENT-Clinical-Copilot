@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from services.retrieval.embedding_model import build_embedding_model_signature
+from common.utils.embedding_model import build_embedding_model_signature
 from services.retrieval.embeddings import EmbeddingModelMismatchError, SimilaritySearch
 
 

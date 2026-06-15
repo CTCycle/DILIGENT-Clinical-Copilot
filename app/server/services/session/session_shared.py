@@ -8,7 +8,6 @@ from typing import Any
 
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
-from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
     ClinicalSectionExtractionResult,
