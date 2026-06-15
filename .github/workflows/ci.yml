@@ -31,8 +31,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: app/client/package-lock.json
 
       - name: Install backend test dependencies
         working-directory: app/server
@@ -40,7 +38,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: app/client
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
 
       - name: Build frontend
         working-directory: app/client

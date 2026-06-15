@@ -17,8 +17,6 @@ from common.utils.types import extract_positive_int
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from services.llm.ollama_residency import (
-    extract_bytes_from_fields,
-    extract_footprint_from_payload,
     get_available_memory_bytes,
     get_available_vram_bytes,
 )

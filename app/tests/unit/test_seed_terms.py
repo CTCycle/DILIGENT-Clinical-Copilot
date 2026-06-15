@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from services.retrieval.seed_terms import detect_seed_matches, load_seed_term_catalog
+from common.utils.seed_terms import detect_seed_matches, load_seed_term_catalog
 
 
 ###############################################################################

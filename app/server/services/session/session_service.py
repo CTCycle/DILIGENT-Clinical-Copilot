@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import asyncio
-import time
 from collections.abc import Callable
-from dataclasses import replace
 from typing import Any
 
 from pydantic import ValidationError
@@ -16,19 +13,12 @@ from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
-    ClinicalPipelineValidationError,
     ClinicalSectionExtractionResult,
     ClinicalSessionRequest,
-    HepatotoxicityPatternAssessment,
-    LiverInjuryOnsetContext,
     PatientData,
-    PatientDiseaseContext,
-    PatientDrugs,
-    PatientLabTimeline,
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
-from domain.clinical.extras import HepatoxPreparedInputs
 from domain.clinical.robustness import ClinicalInputPreflightResult
 from domain.clinical.validation import ValidationMessageBundle
 from domain.jobs import (
@@ -47,7 +37,6 @@ from services.clinical.hepatox_core import (
     HepatoxConsultation,
 )
 from services.clinical.job_progress import (
-    ClinicalConsultationProgressCallback,
     StageProgressFractionCallback,
 )
 from services.clinical.labs import ClinicalLabExtractor
@@ -60,9 +49,7 @@ from services.clinical.validation import (
     ensure_required_sections,
     has_timing_information,
 )
-from services.llm.cloud import LLMError
 from services.llm.model_config import ModelConfigService
-from services.retrieval.query import DILIQueryBuilder
 from services.runtime.jobs import (
     JobManager,
 )

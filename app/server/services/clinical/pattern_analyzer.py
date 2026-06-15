@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 
 from common.constants import (
     DEFAULT_DILI_CLASSIFICATION,    

@@ -31,6 +31,14 @@ from services.clinical.report_language import (
 from services.llm.provider_factory import initialize_llm_client
 from services.retrieval.embeddings import SimilaritySearch
 from services.retrieval.settings import build_effective_rag_settings
+from services.clinical.analysis_runner import AnalysisRunner
+from services.clinical.drug_analysis import DrugAnalysisService
+from services.clinical import hepatox_scoring
+from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
+from services.clinical.rag_support import RagSupportService
+from services.clinical.report_finalizer import ReportFinalizer
+
+__all__ = ["HepatotoxicityPatternAnalyzer", "HepatoxConsultation"]
 
 ###############################################################################
 NOT_AVAILABLE_TEXT = "Not available"
@@ -58,18 +66,6 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
     re.IGNORECASE,
 )
-
-
-###############################################################################
-
-from services.clinical.analysis_runner import AnalysisRunner
-from services.clinical.drug_analysis import DrugAnalysisService
-from services.clinical.pattern_analyzer import (
-    HepatotoxicityPatternAnalyzer,
-)
-from services.clinical import hepatox_scoring
-from services.clinical.rag_support import RagSupportService
-from services.clinical.report_finalizer import ReportFinalizer
 
 
 ###############################################################################
