@@ -48,6 +48,12 @@ from services.inspection.timeline import (
 from services.inspection.timeline import (
     get_session_timeline as get_session_timeline_value,
 )
+from services.inspection.timeline import (
+    get_session_timeline_by_id as get_session_timeline_by_id_value,
+)
+from services.inspection.timeline import (
+    list_session_timelines as list_session_timelines_value,
+)
 from services.inspection.update_config import InspectionUpdateConfigMixin
 from services.inspection.revision_diff import InspectionRevisionDiffMixin
 from services.inspection.revision_decisions import InspectionRevisionDecisionsMixin
@@ -749,6 +755,16 @@ class DataInspectionService(
     # -------------------------------------------------------------------------
     def get_session_timeline(self, session_id: int) -> PatientTimeline | None:
         return get_session_timeline_value(self, session_id)
+
+    # -------------------------------------------------------------------------
+    def get_session_timeline_by_id(
+        self, session_id: int, timeline_id: int
+    ) -> PatientTimeline | None:
+        return get_session_timeline_by_id_value(self, session_id, timeline_id)
+
+    # -------------------------------------------------------------------------
+    def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
+        return list_session_timelines_value(self, session_id)
 
     # -------------------------------------------------------------------------
     def generate_session_timeline(

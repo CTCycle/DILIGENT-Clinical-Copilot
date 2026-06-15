@@ -26,6 +26,7 @@ import {
   fetchClinicalSessionRevisionPipelineSteps,
   fetchClinicalSessionVersionComparison,
   fetchClinicalSessionVersions,
+  fetchInspectionSessionTimelineList,
   fetchInspectionLiverToxCatalog,
   fetchInspectionRxNavCatalog,
   fetchInspectionSessions,
@@ -42,6 +43,7 @@ import {
   CloudProvider,
   InspectionSessionItem,
   InspectionSessionStatus,
+  InspectionSessionTimelinePreview,
   JobStatus,
   LocalModelCard,
   RevisionArtifact,
@@ -253,6 +255,11 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly labSummary = signal<Array<{ label: string; value: string }>>([]);
   readonly labTimeline = signal<LabTimelineRow[]>([]);
   readonly hepatotoxicityPattern = signal<string>('N/A');
+  readonly timelinePreviews = signal<InspectionSessionTimelinePreview[]>([]);
+  readonly timelineListLoading = signal(false);
+  readonly timelineListError = signal<string | null>(null);
+  readonly timelineModelName = signal('');
+  readonly timelineModelSource = signal<'local' | 'cloud'>('local');
 
   ngOnInit(): void {
     void this.loadRevisionModelCatalog();
@@ -301,14 +308,17 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.revisionTextParsingModel.set(detail.text_extraction_model || '');
       this.revisionRagSearch.set(this.resolvePersistedRagPreference(detail));
       this.syncRevisionModelSelections();
+      this.syncTimelineModelSelection(detail);
       this.activeSection.set('preview');
       this.detectedDiseases.set(this.previewDetectedDiseases(detail));
       this.labSummary.set(this.previewLaboratorySummary(detail));
       this.labTimeline.set(this.previewLabTimeline(detail));
       this.hepatotoxicityPattern.set(this.previewHepatotoxicityPattern(detail));
       this.resetRevisionHistoryState();
+      this.resetTimelineHistoryState();
       void this.loadDetectedDrugEvidence(detail);
       void this.loadRevisionHistory(detail.session_id);
+      void this.loadTimelineHistory(detail.session_id);
     } catch (error) {
       this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
     } finally {
@@ -389,6 +399,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.labTimeline.set([]);
     this.hepatotoxicityPattern.set('N/A');
     this.resetRevisionHistoryState();
+    this.resetTimelineHistoryState();
     this.detailError.set(null);
   }
 
@@ -682,6 +693,31 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.revisionReviewNote.set('');
     this.retryRevisionLoading.set(false);
     this.revisionReviewSaving.set(false);
+  }
+
+  private resetTimelineHistoryState(): void {
+    this.timelinePreviews.set([]);
+    this.timelineListLoading.set(false);
+    this.timelineListError.set(null);
+  }
+
+  private async loadTimelineHistory(sessionId: number): Promise<void> {
+    this.timelineListLoading.set(true);
+    this.timelineListError.set(null);
+    try {
+      const payload = await fetchInspectionSessionTimelineList(sessionId);
+      if (this.selected()?.session_id !== sessionId) return;
+      this.timelinePreviews.set(payload.items || []);
+    } catch (error) {
+      if (this.selected()?.session_id === sessionId) {
+        this.timelinePreviews.set([]);
+        this.timelineListError.set(formatUnknownError(error, 'Failed to load timeline history.'));
+      }
+    } finally {
+      if (this.selected()?.session_id === sessionId) {
+        this.timelineListLoading.set(false);
+      }
+    }
   }
 
   private async loadRevisionHistory(
@@ -991,10 +1027,43 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.saveStatus.set('Creating timeline...');
     try {
       await generateInspectionSessionTimeline(detail.session_id, { force_regenerate: true });
-      await this.router.navigate(['/sessions', detail.session_id, 'timetable']);
+      await this.loadTimelineHistory(detail.session_id);
+      this.saveStatus.set('Timeline generated.');
     } catch (error) {
       this.saveStatus.set(formatUnknownError(error, 'Failed to create timeline.'));
     }
+  }
+
+  async openTimelineView(preview: InspectionSessionTimelinePreview): Promise<void> {
+    if (preview.timeline_id) {
+      await this.router.navigate(['/sessions', preview.session_id, 'timetable', preview.timeline_id]);
+      return;
+    }
+    await this.router.navigate(['/sessions', preview.session_id, 'timetable']);
+  }
+
+  timelinePreviewRangeLabel(preview: InspectionSessionTimelinePreview): string {
+    if (preview.start_date && preview.end_date) {
+      const start = this.formatTimelinePreviewDate(preview.start_date);
+      const end = this.formatTimelinePreviewDate(preview.end_date);
+      return start === end ? start : `${start} - ${end}`;
+    }
+    if (preview.start_date) {
+      return this.formatTimelinePreviewDate(preview.start_date);
+    }
+    return 'Undated chronology';
+  }
+
+  timelinePreviewSourceLabel(preview: InspectionSessionTimelinePreview): string {
+    const model = preview.source_model?.trim();
+    if (model) {
+      return model;
+    }
+    return preview.generation_status === 'fallback' ? 'Fallback chronology' : 'Timeline extraction model';
+  }
+
+  timelinePreviewStatusLabel(preview: InspectionSessionTimelinePreview): string {
+    return preview.generation_status === 'fallback' ? 'Fallback' : 'LLM generated';
   }
 
   statusLabel(value: InspectionSessionStatus): string {
@@ -1539,9 +1608,21 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       if (!this.selected()) {
         this.revisionModelProvider.set(payload.use_cloud_services ? payload.llm_provider : 'ollama');
       }
+      this.timelineModelName.set(payload.text_extraction_model || '');
+      this.timelineModelSource.set(payload.use_cloud_services ? 'cloud' : 'local');
       this.syncRevisionModelSelections();
+      this.syncTimelineModelSelection(this.selected());
     } catch {
       // Keep existing revision form values if the shared model catalog cannot be loaded.
+    }
+  }
+
+  private syncTimelineModelSelection(detail: ClinicalSessionDetail | null): void {
+    const configuredModel = this.timelineModelName().trim();
+    const detailModel = detail?.text_extraction_model?.trim() || '';
+    this.timelineModelName.set(configuredModel || detailModel);
+    if (!configuredModel && detailModel) {
+      this.timelineModelSource.set('local');
     }
   }
 
@@ -1723,6 +1804,18 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       parts.push('Requires human review');
     }
     return parts.filter((part): part is string => Boolean(part)).join(' · ');
+  }
+
+  private formatTimelinePreviewDate(value: string): string {
+    const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(parsed);
   }
 
   private stopPoller(): void {

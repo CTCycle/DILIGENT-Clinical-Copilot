@@ -151,6 +151,7 @@ def test_sqlite_repository_additively_upgrades_existing_legacy_schema(
         assert inspector.has_table("clinical_session_revision_entities")
         assert inspector.has_table("clinical_session_revision_reviews")
         assert inspector.has_table("clinical_session_manual_edits")
+        assert inspector.has_table("clinical_session_timelines")
 
         with repository.session_factory() as db_session:
             session_count = db_session.execute(

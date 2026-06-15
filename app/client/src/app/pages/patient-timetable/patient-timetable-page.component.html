@@ -22,6 +22,7 @@
       <span class="toolbar-group">Display <strong>All event types</strong></span>
       <span class="toolbar-group">Group by <strong>None</strong></span>
       <span class="toolbar-group">Source <strong>{{ generationStatusLabel() }}</strong></span>
+      <span class="toolbar-group">Model <strong>{{ sourceModelLabel() }}</strong></span>
       <span class="toolbar-group">Generated <strong>{{ timeline()?.generated_at | date: 'mediumDate' }}</strong></span>
     </section>
 
@@ -38,29 +39,60 @@
     <section class="timetable-content">
       <div class="timeline-area">
         <div class="timeline-card">
-          <div class="timeline-scale" aria-label="Timeline range">
-            @for (label of scaleLabels(); track label) {
-              <span>{{ label }}</span>
+          <div class="timeline-card-header">
+            <div>
+              <span class="timeline-card-kicker">Timeline overview</span>
+              <h2>Clinical chronology</h2>
+            </div>
+            <p>Anchored events preserve exact sequence across clinical, therapy, laboratory, and uncertain findings.</p>
+          </div>
+
+          <div class="timeline-axis" aria-label="Timeline range">
+            <div class="timeline-axis-line"></div>
+            @for (point of scalePoints(); track point.label + '-' + point.positionPercent) {
+              <div class="timeline-axis-tick" [style.left.%]="point.positionPercent" [class.is-year]="point.isYearBoundary">
+                <span class="timeline-axis-dot"></span>
+                <strong>{{ point.shortLabel }}</strong>
+                <small>{{ point.label }}</small>
+              </div>
             }
           </div>
+
           <div class="lane-grid">
             @for (lane of lanes(); track lane.id) {
-              <section class="lane-row" [class.is-empty]="lane.items.length === 0">
+              <section class="lane-row" [class.is-empty]="lane.items.length === 0" [style.--lane-levels]="lane.levelCount">
                 <div class="lane-label">
                   <strong>{{ lane.label }}</strong>
                   <span>{{ lane.items.length }} events</span>
                 </div>
-                <div class="lane-events">
+                <div class="lane-track">
+                  <div class="lane-track-line"></div>
                   @if (lane.items.length > 0) {
                     @for (item of lane.items; track item.event.event_id) {
-                      <button type="button" class="event-card" [attr.aria-pressed]="selectedEventId() === item.event.event_id" [class.is-selected]="selectedEventId() === item.event.event_id" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
-                        <span class="event-card-type">{{ timingLabel(item.event.timing_type) }}</span>
-                        <strong>{{ item.event.title }}</strong>
-                        <small>{{ eventTimingText(item.event) }}</small>
+                      <button
+                        type="button"
+                        class="timeline-node"
+                        [attr.aria-pressed]="selectedEventId() === item.event.event_id"
+                        [class.is-selected]="selectedEventId() === item.event.event_id"
+                        [class.is-align-start]="item.align === 'start'"
+                        [class.is-align-center]="item.align === 'center'"
+                        [class.is-align-end]="item.align === 'end'"
+                        [style.left.%]="item.positionPercent"
+                        [style.--stack-level]="item.stackLevel"
+                        [style.--event-color]="item.color"
+                        (click)="selectEvent(item.event)"
+                      >
+                        <span class="timeline-node-dot"></span>
+                        <span class="timeline-node-stem"></span>
+                        <span class="timeline-node-card">
+                          <span class="timeline-node-type">{{ timingLabel(item.event.timing_type) }}</span>
+                          <strong>{{ item.event.title }}</strong>
+                          <small>{{ eventTimingText(item.event) }}</small>
+                        </span>
                       </button>
                     }
                   } @else {
-                    <p>No events in this lane.</p>
+                    <p class="lane-empty-note">No events in this lane.</p>
                   }
                 </div>
               </section>

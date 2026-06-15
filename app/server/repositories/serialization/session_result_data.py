@@ -12,12 +12,15 @@ from sqlalchemy import and_, delete, exists, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from common.utils.logger import logger
+from domain.patient_timeline import PatientTimeline, SessionTimelinePreview
+from common.utils.text_utils import normalize_drug_name
 from repositories.schemas.models import (
     ClinicalSession,
     ClinicalSessionDrug,
     ClinicalSessionLab,
     ClinicalSessionManualEdit,
     ClinicalSessionResult,
+    ClinicalSessionTimeline,
     ClinicalSessionRevisionArtifact,
     ClinicalSessionRevisionEntity,
     ClinicalSessionRevisionReview,
@@ -27,7 +30,6 @@ from repositories.schemas.models import (
     Patient,
 )
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
-from common.utils.text_utils import normalize_drug_name
 from services.text.vocabulary import (
     invalidate_text_normalization_snapshot,
 )
@@ -234,6 +236,13 @@ def list_sessions(
         report_session_ids: set[int] = set()
         timeline_session_ids: set[int] = set()
         if session_ids:
+            persisted_timeline_rows = db_session.execute(
+                select(ClinicalSessionTimeline.session_id).where(
+                    ClinicalSessionTimeline.session_id.in_(session_ids)
+                )
+            ).all()
+            for (timeline_session_id,) in persisted_timeline_rows:
+                timeline_session_ids.add(int(timeline_session_id))
             result_rows = db_session.execute(
                 select(
                     ClinicalSessionResult.session_id,
@@ -418,6 +427,57 @@ def parse_session_result_payload(
 
 
 ###############################################################################
+def _validate_timeline_payload(payload: dict[str, Any] | None) -> PatientTimeline | None:
+    if not isinstance(payload, dict):
+        return None
+    try:
+        return PatientTimeline.model_validate(payload)
+    except Exception:
+        return None
+
+
+###############################################################################
+def _build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
+    dated_events = [event.event_date for event in payload.events if event.event_date]
+    sorted_dates = sorted(dated_events)
+    title = payload.events[0].title if payload.events else None
+    return SessionTimelinePreview(
+        timeline_id=payload.timeline_id,
+        session_id=payload.session_id,
+        generated_at=payload.generated_at,
+        generation_status=payload.generation_status,
+        generation_note=payload.generation_note,
+        source_model=payload.source_model,
+        source_kind=payload.source_kind,
+        model_provider=payload.model_provider,
+        event_count=len(payload.events),
+        start_date=sorted_dates[0] if sorted_dates else None,
+        end_date=sorted_dates[-1] if sorted_dates else None,
+        title=title,
+    ).model_dump(mode="json")
+
+
+###############################################################################
+def _build_legacy_timeline(self, session_id: int) -> PatientTimeline | None:
+    payload = self.get_session_result_payload(session_id)
+    if not isinstance(payload, dict):
+        return None
+    timeline_payload = payload.get("patient_timeline")
+    if not isinstance(timeline_payload, dict):
+        return None
+    timeline = _validate_timeline_payload(timeline_payload)
+    if timeline is None:
+        return None
+    return PatientTimeline(
+        **{
+            **timeline.model_dump(),
+            "timeline_id": timeline.timeline_id,
+            "source_kind": timeline.source_kind or "legacy",
+        }
+    )
+
+
+###############################################################################
 def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
     safe_session_id = int(session_id)
     db_session = self.session_factory()
@@ -461,6 +521,188 @@ def upsert_session_result_payload(
             existing_result.payload_json = serialized_payload
         db_session.commit()
         return True
+    except Exception:
+        db_session.rollback()
+        raise
+    finally:
+        db_session.close()
+
+
+###############################################################################
+def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
+    safe_session_id = int(session_id)
+    db_session = self.session_factory()
+    try:
+        session_row = db_session.get(ClinicalSession, safe_session_id)
+        if session_row is None:
+            return []
+        rows = (
+            db_session.execute(
+                select(ClinicalSessionTimeline)
+                .where(ClinicalSessionTimeline.session_id == safe_session_id)
+                .order_by(
+                    ClinicalSessionTimeline.generated_at.desc(),
+                    ClinicalSessionTimeline.id.desc(),
+                )
+            )
+            .scalars()
+            .all()
+        )
+        previews: list[dict[str, Any]] = []
+        for row in rows:
+            timeline = _validate_timeline_payload(
+                self.parse_session_result_payload(row.timeline_payload_json)
+            )
+            if timeline is None:
+                continue
+            previews.append(
+                _build_timeline_preview_payload(
+                    PatientTimeline(
+                        **{
+                            **timeline.model_dump(),
+                            "timeline_id": int(row.id),
+                            "session_id": safe_session_id,
+                            "generated_at": row.generated_at,
+                            "generation_status": row.generation_status,
+                            "generation_note": self.normalize_string(
+                                row.generation_note
+                            ),
+                            "source_model": self.normalize_string(row.source_model),
+                            "source_kind": self.normalize_string(row.source_kind),
+                            "model_provider": self.normalize_string(
+                                row.model_provider
+                            ),
+                        }
+                    )
+                )
+            )
+        if previews:
+            return previews
+        legacy = _build_legacy_timeline(self, safe_session_id)
+        if legacy is None:
+            return []
+        return [_build_timeline_preview_payload(legacy)]
+    finally:
+        db_session.close()
+
+
+###############################################################################
+def get_session_timeline_record(
+    self,
+    session_id: int,
+    timeline_id: int,
+) -> dict[str, Any] | None:
+    safe_session_id = int(session_id)
+    safe_timeline_id = int(timeline_id)
+    db_session = self.session_factory()
+    try:
+        row = db_session.execute(
+            select(ClinicalSessionTimeline).where(
+                ClinicalSessionTimeline.session_id == safe_session_id,
+                ClinicalSessionTimeline.id == safe_timeline_id,
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        timeline = _validate_timeline_payload(
+            self.parse_session_result_payload(row.timeline_payload_json)
+        )
+        if timeline is None:
+            return None
+        return PatientTimeline(
+            **{
+                **timeline.model_dump(),
+                "timeline_id": int(row.id),
+                "session_id": safe_session_id,
+                "generated_at": row.generated_at,
+                "generation_status": row.generation_status,
+                "generation_note": self.normalize_string(row.generation_note),
+                "source_model": self.normalize_string(row.source_model),
+                "source_kind": self.normalize_string(row.source_kind),
+                "model_provider": self.normalize_string(row.model_provider),
+            }
+        ).model_dump(mode="json")
+    finally:
+        db_session.close()
+
+
+###############################################################################
+def get_latest_session_timeline_record(self, session_id: int) -> dict[str, Any] | None:
+    safe_session_id = int(session_id)
+    db_session = self.session_factory()
+    try:
+        row = db_session.execute(
+            select(ClinicalSessionTimeline)
+            .where(ClinicalSessionTimeline.session_id == safe_session_id)
+            .order_by(
+                ClinicalSessionTimeline.generated_at.desc(),
+                ClinicalSessionTimeline.id.desc(),
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+        if row is not None:
+            timeline = _validate_timeline_payload(
+                self.parse_session_result_payload(row.timeline_payload_json)
+            )
+            if timeline is not None:
+                return PatientTimeline(
+                    **{
+                        **timeline.model_dump(),
+                        "timeline_id": int(row.id),
+                        "session_id": safe_session_id,
+                        "generated_at": row.generated_at,
+                        "generation_status": row.generation_status,
+                        "generation_note": self.normalize_string(row.generation_note),
+                        "source_model": self.normalize_string(row.source_model),
+                        "source_kind": self.normalize_string(row.source_kind),
+                        "model_provider": self.normalize_string(row.model_provider),
+                    }
+                ).model_dump(mode="json")
+        legacy = _build_legacy_timeline(self, safe_session_id)
+        return legacy.model_dump(mode="json") if legacy is not None else None
+    finally:
+        db_session.close()
+
+
+###############################################################################
+def create_session_timeline_record(self, session_id: int, payload: dict[str, Any]) -> dict[str, Any] | None:
+    safe_session_id = int(session_id)
+    timeline = _validate_timeline_payload(payload)
+    if timeline is None:
+        return None
+    serialized_payload = self.serialize_json_payload(
+        {
+            **timeline.model_dump(mode="json"),
+            "timeline_id": None,
+        }
+    )
+    if serialized_payload is None:
+        return None
+    db_session = self.session_factory()
+    try:
+        existing_session = db_session.get(ClinicalSession, safe_session_id)
+        if existing_session is None:
+            return None
+        record = ClinicalSessionTimeline(
+            session_id=safe_session_id,
+            generated_at=timeline.generated_at,
+            generation_status=timeline.generation_status,
+            generation_note=timeline.generation_note,
+            source_model=timeline.source_model,
+            source_kind=timeline.source_kind,
+            model_provider=timeline.model_provider,
+            timeline_payload_json=serialized_payload,
+        )
+        db_session.add(record)
+        db_session.commit()
+        db_session.refresh(record)
+        return PatientTimeline(
+            **{
+                **timeline.model_dump(),
+                "timeline_id": int(record.id),
+                "session_id": safe_session_id,
+            }
+        ).model_dump(mode="json")
     except Exception:
         db_session.rollback()
         raise
@@ -612,6 +854,11 @@ def delete_session(self, session_id: int) -> bool:
         db_session.execute(
             delete(ClinicalSessionResult).where(
                 ClinicalSessionResult.session_id == safe_session_id
+            )
+        )
+        db_session.execute(
+            delete(ClinicalSessionTimeline).where(
+                ClinicalSessionTimeline.session_id == safe_session_id
             )
         )
         db_session.execute(
