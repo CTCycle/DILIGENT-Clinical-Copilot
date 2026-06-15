@@ -25,22 +25,6 @@ class RecordingStructuredClient:
 
 
 ###############################################################################
-class RecordingStructuredClient:
-
-    # -------------------------------------------------------------------------
-    def __init__(self, response: PatientDrugs) -> None:
-        self.response = response
-        self.user_prompts: list[str] = []
-        self.call_count = 0
-
-    # -------------------------------------------------------------------------
-    async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
-        self.call_count += 1
-        self.user_prompts.append(str(kwargs.get("user_prompt", "")))
-        return self.response
-
-
-###############################################################################
 class FakeStructuredClient:
 
     # -------------------------------------------------------------------------

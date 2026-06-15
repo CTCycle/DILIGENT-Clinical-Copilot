@@ -8,8 +8,12 @@ from typing import Any
 
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
-from domain.clinical.entities import PatientDrugs, PipelineIssue
-from domain.clinical.entities import PatientRucamAssessmentBundle
+from domain.clinical.entities import (
+    PatientData,
+    PatientDrugs,
+    PatientRucamAssessmentBundle,
+    PipelineIssue,
+)
 from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.job_progress import ClinicalConsultationProgressCallback
 from services.llm.cloud import LLMError
