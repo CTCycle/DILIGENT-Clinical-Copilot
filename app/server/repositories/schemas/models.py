@@ -107,6 +107,10 @@ class ClinicalSession(Base):
         back_populates="session",
         uselist=False,
     )
+    timelines: Mapped[list["ClinicalSessionTimeline"]] = relationship(
+        "ClinicalSessionTimeline",
+        back_populates="session",
+    )
     manual_edits: Mapped[list["ClinicalSessionManualEdit"]] = relationship(
         "ClinicalSessionManualEdit",
         back_populates="session",
@@ -149,6 +153,47 @@ class ClinicalSessionResult(Base):
     __table_args__ = (
         UniqueConstraint("session_id", name="uq_clinical_session_results_session_id"),
         Index("ix_clinical_session_results_session_id", "session_id"),
+    )
+
+###############################################################################
+class ClinicalSessionTimeline(Base):
+    __tablename__ = "clinical_session_timelines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        nullable=False,
+    )
+    generated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    generation_status: Mapped[str] = mapped_column(String, nullable=False)
+    generation_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_kind: Mapped[str | None] = mapped_column(String, nullable=True)
+    model_provider: Mapped[str | None] = mapped_column(String, nullable=True)
+    timeline_payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+
+    session: Mapped["ClinicalSession"] = relationship(
+        "ClinicalSession",
+        back_populates="timelines",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "generation_status IN ('llm_generated', 'fallback')",
+            name="ck_clinical_session_timelines_generation_status",
+        ),
+        CheckConstraint(
+            "source_kind IS NULL OR source_kind IN ('local', 'cloud', 'legacy')",
+            name="ck_clinical_session_timelines_source_kind",
+        ),
+        Index("ix_clinical_session_timelines_session_id", "session_id"),
+        Index("ix_clinical_session_timelines_generated_at", "generated_at"),
     )
 
 ###############################################################################

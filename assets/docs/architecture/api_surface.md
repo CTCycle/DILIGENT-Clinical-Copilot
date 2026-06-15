@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-06-05
+Last updated: 2026-06-15
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
@@ -55,6 +55,9 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 - `GET /api/inspection/sessions/{session_id}/versions/{version_id}/entities`
 - `GET /api/inspection/sessions/{session_id}/versions/{version_id}/reviews`
 - `GET /api/inspection/sessions/{session_id}/versions/{version_id}/artifacts`
+- `GET /api/inspection/sessions/{session_id}/timelines`
+- `POST /api/inspection/sessions/{session_id}/timelines`
+- `GET /api/inspection/sessions/{session_id}/timelines/{timeline_id}`
 - `GET /api/inspection/sessions/{session_id}/timeline`
 - `POST /api/inspection/sessions/{session_id}/timeline`
 - `DELETE /api/inspection/sessions/{session_id}`

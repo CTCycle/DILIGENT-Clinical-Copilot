@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-06-12
+Last updated: 2026-06-15
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -37,9 +37,11 @@ Use it to review event order, clinical sequence, and patient chronology where da
 Recommended workflow:
 1. Open **Patient Timeline**.
 2. Locate the relevant patient or case.
-3. Review timeline entries in chronological order.
-4. Compare exposure dates against lab abnormalities and symptoms.
-5. Use the timeline to refine DILI Agent input if needed.
+3. Generate a new timeline when needed from the session timeline workspace.
+4. Reopen any previously generated timeline from the saved timeline preview list instead of regenerating it.
+5. Review timeline entries in chronological order.
+6. Compare exposure dates against lab abnormalities and symptoms.
+7. Use the timeline to refine DILI Agent input if needed.
 
 Timeline generation may show a fallback notice when local model extraction is unavailable. In that case, the timetable is built deterministically from persisted session fields and should be treated as a navigation aid rather than a model-extracted chronology.
 

@@ -554,17 +554,63 @@ def test_timetable_route_load_does_not_autogenerate_timeline(
         if (
             request.method == "POST"
             and "/api/inspection/sessions/" in request.url
-            and request.url.endswith("/timeline")
+            and request.url.endswith("/timelines")
         ):
             timeline_post_count += 1
         route.continue_()
 
-    page.route("**/api/inspection/sessions/*/timeline", count_timeline_posts)
+    page.route("**/api/inspection/sessions/*/timelines", count_timeline_posts)
     page.goto(f"{base_url}/sessions/{session_id}/timetable")
     page.wait_for_timeout(1200)
-    page.unroute("**/api/inspection/sessions/*/timeline", count_timeline_posts)
+    page.unroute("**/api/inspection/sessions/*/timelines", count_timeline_posts)
 
     assert timeline_post_count == 0
+
+
+###############################################################################
+def test_clinical_sessions_timeline_tab_lists_persisted_timelines(
+    page: Page, base_url: str, api_base_url: str
+):
+    sessions_response = page.request.get(
+        f"{api_base_url}/api/inspection/sessions",
+        params={"offset": 0, "limit": 10},
+    )
+    assert sessions_response.status == 200
+    sessions_payload = sessions_response.json()
+    items = (
+        sessions_payload.get("items") if isinstance(sessions_payload, dict) else None
+    )
+    assert isinstance(items, list) and items, "No sessions available for timeline history test."
+
+    target_session = next(
+        (
+            item
+            for item in items
+            if isinstance(item, dict)
+            and isinstance(item.get("session_id"), int)
+            and item.get("patient_name")
+        ),
+        None,
+    )
+    assert isinstance(target_session, dict), "No named session available for timeline history test."
+    session_id = target_session["session_id"]
+    patient_name = target_session["patient_name"]
+    assert isinstance(session_id, int) and session_id > 0
+    assert isinstance(patient_name, str) and patient_name.strip()
+
+    timeline_response = page.request.post(
+        f"{api_base_url}/api/inspection/sessions/{session_id}/timelines",
+        data={"force_regenerate": True},
+        timeout=360000,
+    )
+    assert timeline_response.status == 200
+
+    page.goto(f"{base_url}/clinical-sessions")
+    page.get_by_role("button", name=re.compile(re.escape(patient_name))).click()
+    page.get_by_role("button", name="Timeline").click()
+
+    expect(page.get_by_text("Generated Timelines")).to_be_visible()
+    expect(page.get_by_role("button", name="Open Timeline").first).to_be_visible()
 
 
 ###############################################################################
