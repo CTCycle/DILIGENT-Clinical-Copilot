@@ -4,7 +4,11 @@ from fastapi import APIRouter, Body, HTTPException, Query, status
 
 from api.inspection.common import InspectionEndpointBase
 from common.utils.logger import logger
-from domain.patient_timeline import PatientTimeline, SessionTimelineRegenerateRequest
+from domain.patient_timeline import (
+    PatientTimeline,
+    SessionTimelineListResponse,
+    SessionTimelineRegenerateRequest,
+)
 from services.inspection.service import DataInspectionService
 
 
@@ -29,6 +33,25 @@ class InspectionTimelineEndpoint(InspectionEndpointBase):
                 detail="Session timeline not found.",
             )
         return timeline
+
+    # -------------------------------------------------------------------------
+    def get_session_timeline_by_id(
+        self,
+        session_id: int,
+        timeline_id: int,
+    ) -> PatientTimeline:
+        timeline = self.service.get_session_timeline_by_id(session_id, timeline_id)
+        if timeline is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session timeline not found.",
+            )
+        return timeline
+
+    # -------------------------------------------------------------------------
+    def list_session_timelines(self, session_id: int) -> SessionTimelineListResponse:
+        items = self.service.list_session_timelines(session_id)
+        return SessionTimelineListResponse(items=items)
 
     # -------------------------------------------------------------------------
     def generate_session_timeline(
@@ -81,6 +104,27 @@ class InspectionTimelineEndpoint(InspectionEndpointBase):
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
+        self.router.add_api_route(
+            "/sessions/{session_id}/timelines",
+            self.list_session_timelines,
+            methods=["GET"],
+            response_model=SessionTimelineListResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/timelines",
+            self.generate_session_timeline,
+            methods=["POST"],
+            response_model=PatientTimeline,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/timelines/{timeline_id}",
+            self.get_session_timeline_by_id,
+            methods=["GET"],
+            response_model=PatientTimeline,
+            status_code=status.HTTP_200_OK,
+        )
         self.router.add_api_route(
             "/sessions/{session_id}/timeline",
             self.get_session_timeline,

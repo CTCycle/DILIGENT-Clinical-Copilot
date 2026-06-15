@@ -14,6 +14,7 @@ import {
   InspectionSessionCatalogResponse,
   InspectionSessionQuery,
   InspectionSessionTimeline,
+  InspectionSessionTimelineListResponse,
   InspectionSessionTimelineRequest,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobStatusResponse,
@@ -239,12 +240,33 @@ export async function fetchInspectionSessionTimeline(
   );
 }
 
+export async function fetchInspectionSessionTimelineList(
+  sessionId: number,
+): Promise<InspectionSessionTimelineListResponse> {
+  return requestJson<InspectionSessionTimelineListResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timelines`,
+    { method: "GET" },
+    TIMELINE_REQUEST_TIMEOUT_SECONDS,
+  );
+}
+
+export async function fetchInspectionSessionTimelineById(
+  sessionId: number,
+  timelineId: number,
+): Promise<InspectionSessionTimeline> {
+  return requestJson<InspectionSessionTimeline>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timelines/${encodeURIComponent(String(timelineId))}`,
+    { method: "GET" },
+    TIMELINE_REQUEST_TIMEOUT_SECONDS,
+  );
+}
+
 export async function generateInspectionSessionTimeline(
   sessionId: number,
   payload: InspectionSessionTimelineRequest = {},
 ): Promise<InspectionSessionTimeline> {
   return requestJson<InspectionSessionTimeline>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timeline`,
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timelines`,
     {
       method: "POST",
       headers: {

@@ -561,15 +561,38 @@ export type InspectionTimelineEvent = {
 };
 
 export type InspectionSessionTimeline = {
+  timeline_id?: number | null;
   session_id: number;
   generated_at: string;
   generation_status?: "llm_generated" | "fallback";
   generation_note?: string | null;
+  source_model?: string | null;
+  source_kind?: "local" | "cloud" | "legacy" | null;
+  model_provider?: string | null;
   events: InspectionTimelineEvent[];
 };
 
 export type InspectionSessionTimelineRequest = {
   force_regenerate?: boolean;
+};
+
+export type InspectionSessionTimelinePreview = {
+  timeline_id: number | null;
+  session_id: number;
+  generated_at: string;
+  generation_status?: "llm_generated" | "fallback";
+  generation_note?: string | null;
+  source_model?: string | null;
+  source_kind?: "local" | "cloud" | "legacy" | null;
+  model_provider?: string | null;
+  event_count: number;
+  start_date: string | null;
+  end_date: string | null;
+  title?: string | null;
+};
+
+export type InspectionSessionTimelineListResponse = {
+  items: InspectionSessionTimelinePreview[];
 };
 
 export type InspectionCatalogQuery = {

@@ -10,6 +10,7 @@ export const routes: Routes = [
   { path: '', component: DiliAgentPageComponent },
   { path: 'clinical-sessions', component: ClinicalSessionsPageComponent },
   { path: 'data', component: DataInspectionPageComponent },
+  { path: 'sessions/:sessionId/timetable/:timelineId', component: PatientTimetablePageComponent },
   { path: 'sessions/:sessionId/timetable', component: PatientTimetablePageComponent },
   { path: 'model-config', component: ModelConfigPageComponent },
   { path: '**', redirectTo: '' },

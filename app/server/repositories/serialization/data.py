@@ -201,6 +201,38 @@ class DataSerializer:
         return session_result_data.get_session_result_payload(self, session_id)
 
     # -------------------------------------------------------------------------
+    def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
+        return session_result_data.list_session_timelines(self, session_id)
+
+    # -------------------------------------------------------------------------
+    def get_session_timeline_record(
+        self,
+        session_id: int,
+        timeline_id: int,
+    ) -> dict[str, Any] | None:
+        return session_result_data.get_session_timeline_record(
+            self,
+            session_id,
+            timeline_id,
+        )
+
+    # -------------------------------------------------------------------------
+    def get_latest_session_timeline_record(
+        self, session_id: int
+    ) -> dict[str, Any] | None:
+        return session_result_data.get_latest_session_timeline_record(
+            self, session_id
+        )
+
+    # -------------------------------------------------------------------------
+    def create_session_timeline_record(
+        self, session_id: int, payload: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        return session_result_data.create_session_timeline_record(
+            self, session_id, payload
+        )
+
+    # -------------------------------------------------------------------------
     def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         return session_result_data.get_session_detail(self, session_id)
 

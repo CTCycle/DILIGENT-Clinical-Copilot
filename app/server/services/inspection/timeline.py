@@ -7,7 +7,10 @@ from typing import Any
 
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
-from domain.patient_timeline import PatientTimeline, PatientTimelineEvent
+from domain.patient_timeline import (
+    PatientTimeline,
+    PatientTimelineEvent,
+)
 from services.inspection.normalization import (
     extract_lab_marker,
     first_iso_date,
@@ -18,21 +21,44 @@ from services.inspection.runtime import coerce_optional_str
 
 ###############################################################################
 def get_session_timeline(service: Any, session_id: int) -> PatientTimeline | None:
-    payload = service.serializer.get_session_result_payload(session_id)
+    payload = service.serializer.get_latest_session_timeline_record(session_id)
     if not isinstance(payload, dict):
         return None
-    timeline_payload = payload.get("patient_timeline")
-    if not isinstance(timeline_payload, dict):
-        return None
     try:
-        return PatientTimeline.model_validate(timeline_payload)
+        return PatientTimeline.model_validate(payload)
     except Exception as exc:  # noqa: BLE001
         logger.warning(
-            "Invalid persisted timeline payload for session_id=%s: %s",
+            "Invalid persisted timeline record for session_id=%s: %s",
             session_id,
             exc,
         )
         return None
+
+
+###############################################################################
+def get_session_timeline_by_id(
+    service: Any,
+    session_id: int,
+    timeline_id: int,
+) -> PatientTimeline | None:
+    payload = service.serializer.get_session_timeline_record(session_id, timeline_id)
+    if not isinstance(payload, dict):
+        return None
+    try:
+        return PatientTimeline.model_validate(payload)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Invalid persisted timeline record for session_id=%s timeline_id=%s: %s",
+            session_id,
+            timeline_id,
+            exc,
+        )
+        return None
+
+
+###############################################################################
+def list_session_timelines(service: Any, session_id: int) -> list[dict[str, Any]]:
+    return service.serializer.list_session_timelines(session_id)
 
 
 ###############################################################################
@@ -203,6 +229,13 @@ def generate_session_timeline(
                     **timeline.model_dump(),
                     "generation_status": "llm_generated",
                     "generation_note": None,
+                    "source_model": requested_runtime_settings["text_extraction_model"],
+                    "source_kind": (
+                        "cloud"
+                        if requested_runtime_settings["use_cloud_services"]
+                        else "local"
+                    ),
+                    "model_provider": requested_runtime_settings["llm_provider"],
                 }
             )
         except Exception as exc:  # noqa: BLE001
@@ -215,6 +248,18 @@ def generate_session_timeline(
                 service,
                 session_id=safe_session_id,
                 source=source,
+            )
+            timeline = PatientTimeline(
+                **{
+                    **timeline.model_dump(),
+                    "source_model": requested_runtime_settings["text_extraction_model"],
+                    "source_kind": (
+                        "cloud"
+                        if requested_runtime_settings["use_cloud_services"]
+                        else "local"
+                    ),
+                    "model_provider": requested_runtime_settings["llm_provider"],
+                }
             )
 
         session_payload["runtime_settings"] = {
@@ -261,8 +306,15 @@ def generate_session_timeline(
         }
         session_payload["patient_timeline"] = timeline.model_dump(mode="json")
         service.serializer.upsert_session_result_payload(session_id, session_payload)
+        persisted = service.serializer.create_session_timeline_record(
+            session_id,
+            timeline.model_dump(mode="json"),
+        )
         with service.timeline_generation_lock:
             service.timeline_generation_cooldown_until.pop(safe_session_id, None)
+        if isinstance(persisted, dict):
+            validated = PatientTimeline.model_validate(persisted)
+            return validated
         return timeline
     finally:
         with service.timeline_generation_lock:

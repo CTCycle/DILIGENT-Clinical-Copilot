@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 PatientTimelineEventType = Literal["therapy", "disease", "lab", "other"]
 PatientTimelineGenerationStatus = Literal["llm_generated", "fallback"]
+PatientTimelineSourceKind = Literal["local", "cloud", "legacy"]
 PatientTimelineTimingType = Literal[
     "explicit_date",
     "relative",
@@ -83,10 +84,14 @@ class PatientTimelineEvent(BaseModel):
 ###############################################################################
 class PatientTimeline(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    timeline_id: int | None = Field(default=None, ge=1)
     session_id: int = Field(..., ge=1)
     generated_at: datetime
     generation_status: PatientTimelineGenerationStatus = "llm_generated"
     generation_note: str | None = Field(default=None, max_length=500)
+    source_model: str | None = Field(default=None, max_length=200)
+    source_kind: PatientTimelineSourceKind | None = None
+    model_provider: str | None = Field(default=None, max_length=40)
     events: list[PatientTimelineEvent] = Field(default_factory=list)
 
     # -------------------------------------------------------------------------
@@ -102,6 +107,27 @@ class PatientTimeline(BaseModel):
 class PatientTimelineExtraction(BaseModel):
     model_config = ConfigDict(extra="forbid")
     events: list[PatientTimelineEvent] = Field(default_factory=list)
+
+###############################################################################
+class SessionTimelinePreview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    timeline_id: int | None = Field(default=None, ge=1)
+    session_id: int = Field(..., ge=1)
+    generated_at: datetime
+    generation_status: PatientTimelineGenerationStatus = "llm_generated"
+    generation_note: str | None = Field(default=None, max_length=500)
+    source_model: str | None = Field(default=None, max_length=200)
+    source_kind: PatientTimelineSourceKind | None = None
+    model_provider: str | None = Field(default=None, max_length=40)
+    event_count: int = Field(default=0, ge=0)
+    start_date: str | None = Field(default=None, max_length=40)
+    end_date: str | None = Field(default=None, max_length=40)
+    title: str | None = Field(default=None, max_length=200)
+
+###############################################################################
+class SessionTimelineListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[SessionTimelinePreview] = Field(default_factory=list)
 
 ###############################################################################
 class SessionTimelineRegenerateRequest(BaseModel):

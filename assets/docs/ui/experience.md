@@ -1,5 +1,5 @@
 # Experience
-Last updated: 2026-06-03
+Last updated: 2026-06-15
 
 ## Page Structure
 - Routes:
@@ -22,6 +22,7 @@ Last updated: 2026-06-03
 
 ## Clinical Sessions UX Rules
 - Session detail is the canonical UI surface for report preview, parser output, metadata, revision audit, and timeline entry points.
+- Timeline generation from Session detail must preserve prior generated timelines as a revisitable history, not overwrite the user's only navigable entry point.
 - Session lists should stay in bounded scroll containers so page height remains stable with large histories.
 - Preview reports render as formatted HTML, not raw Markdown or plain text.
 - Drug evidence indicators should prefer persisted pipeline match metadata before catalog fallback.

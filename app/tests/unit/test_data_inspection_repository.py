@@ -41,6 +41,7 @@ def save_session(
     status: str | None,
     report: str,
     anamnesis: str,
+    payload: dict[str, Any] | None = None,
 ) -> None:
     serializer.save_clinical_session(
         {
@@ -51,7 +52,8 @@ def save_session(
             "drugs": "acetaminophen",
             "final_report": report,
             "detected_drugs": ["acetaminophen"],
-            "session_result_payload": {
+            "session_result_payload": payload
+            or {
                 "report": report,
                 "issues": [],
             },
@@ -414,7 +416,7 @@ class FailingTimelineExtractor:
         raise RuntimeError("structured extraction failed")
 
 ###############################################################################
-def test_timeline_generation_persists_and_reuses_payload() -> None:
+def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced() -> None:
     serializer, _ = build_serializer()
     save_session(
         serializer,
@@ -442,20 +444,43 @@ def test_timeline_generation_persists_and_reuses_payload() -> None:
 
     generated = service.generate_session_timeline(session_id)
     assert generated is not None
+    assert generated.timeline_id is not None
     assert generated.events[0].title == "Therapy started"
     assert extractor.call_count == 1
     assert extractor.last_runtime_settings is not None
     assert "text_extraction_model" in extractor.last_runtime_settings
     assert "clinical_model" in extractor.last_runtime_settings
 
+    previews = serializer.list_session_timelines(session_id)
+    assert len(previews) == 1
+    assert previews[0]["timeline_id"] == generated.timeline_id
+    assert previews[0]["event_count"] == 1
+
+    persisted = serializer.get_session_timeline_record(session_id, int(generated.timeline_id))
+    assert persisted is not None
+    assert persisted["timeline_id"] == generated.timeline_id
+
     cached = service.get_session_timeline(session_id)
     assert cached is not None
+    assert cached.timeline_id == generated.timeline_id
     assert cached.events[0].event_type == "therapy"
 
     reused = service.generate_session_timeline(session_id)
     assert reused is not None
+    assert reused.timeline_id == generated.timeline_id
     assert reused.events[0].title == "Therapy started"
     assert extractor.call_count == 1
+
+    regenerated = service.generate_session_timeline(session_id, force_regenerate=True)
+    assert regenerated is not None
+    assert regenerated.timeline_id is not None
+    assert regenerated.timeline_id != generated.timeline_id
+    assert extractor.call_count == 2
+
+    history = serializer.list_session_timelines(session_id)
+    assert len(history) == 2
+    assert history[0]["timeline_id"] == regenerated.timeline_id
+    assert history[1]["timeline_id"] == generated.timeline_id
 
 ###############################################################################
 def test_timeline_generation_marks_fallback_payload() -> None:
@@ -485,6 +510,7 @@ def test_timeline_generation_marks_fallback_payload() -> None:
 
     generated = service.generate_session_timeline(session_id, force_regenerate=True)
     assert generated is not None
+    assert generated.timeline_id is not None
     assert generated.generation_status == "fallback"
     assert generated.generation_note is not None
     assert generated.events
@@ -492,4 +518,62 @@ def test_timeline_generation_marks_fallback_payload() -> None:
 
     cached = service.get_session_timeline(session_id)
     assert cached is not None
+    assert cached.timeline_id == generated.timeline_id
     assert cached.generation_status == "fallback"
+
+    history = serializer.list_session_timelines(session_id)
+    assert len(history) == 1
+    assert history[0]["timeline_id"] == generated.timeline_id
+    assert history[0]["generation_status"] == "fallback"
+
+###############################################################################
+def test_legacy_session_payload_timeline_remains_readable_without_history_records() -> None:
+    serializer, _ = build_serializer()
+    legacy_timeline = PatientTimeline(
+        session_id=1,
+        generated_at=datetime(2025, 1, 2, 9, 15),
+        generation_status="llm_generated",
+        events=[
+            PatientTimelineEvent(
+                event_id="legacy-1",
+                title="Legacy timeline event",
+                event_type="other",
+                timing_type="relative",
+                sort_order=10,
+            )
+        ],
+    )
+    save_session(
+        serializer,
+        patient_name="Legacy Timeline Patient",
+        timestamp=datetime(2025, 1, 1, 8, 30),
+        status="successful",
+        report="Legacy timeline report",
+        anamnesis="Legacy timeline context.",
+        payload={"patient_timeline": legacy_timeline.model_dump(mode="json")},
+    )
+    session_rows, _ = serializer.list_sessions(
+        search="Legacy Timeline Patient",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(session_rows[0]["session_id"])
+    service = DataInspectionService(
+        serializer=serializer,
+        timeline_extractor=FakeTimelineExtractor(),
+        jobs=JobManager(),
+    )
+
+    latest = service.get_session_timeline(session_id)
+    assert latest is not None
+    assert latest.timeline_id is None
+    assert latest.source_kind == "legacy"
+    assert latest.events[0].title == "Legacy timeline event"
+
+    previews = serializer.list_session_timelines(session_id)
+    assert len(previews) == 1
+    assert previews[0]["timeline_id"] is None
+    assert previews[0]["title"] == "Legacy timeline event"
