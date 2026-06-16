@@ -32,7 +32,7 @@ describe('RevisionQaBadgeComponent source', () => {
     const source = readFileSync(sourcePath, 'utf-8');
 
     expect(source).toContain("return this.label.trim() || this.statusLabel(this.status);");
-    expect(source).toContain(".replace(/_/g, ' ')");
-    expect(source).toContain(".replace(/\\b\\w/g, (char) => char.toUpperCase())");
+    expect(source).toContain("import { humanizeStatusLabel }");
+    expect(source).toContain("return humanizeStatusLabel(value);");
   });
 });

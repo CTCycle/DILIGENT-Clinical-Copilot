@@ -18,7 +18,6 @@ import {
 import {
   AccessKeyProvider,
   CloudProvider,
-  JobStatus,
   ModelConfigStateResponse,
   ModelConfigUpdateRequest,
   RagSettings,
@@ -26,13 +25,14 @@ import {
 } from '../../core/models/types';
 import {
   fetchModelConfigState,
-  fetchModelPullJobStatus,
-  startModelPullJob,
   updateModelConfigState,
 } from '../../core/services/model-config-api';
-import { JobPollingService } from '../../core/services/job-polling.service';
-import { resolvePollIntervalMs } from '../../core/services/clinical-api';
+import {
+  ModelPullJobService,
+  ModelPullProgressState,
+} from '../../core/services/model-pull-job.service';
 import { AccessKeyModalComponent } from './components/access-key-modal.component';
+import { ModelConfigToggleCardComponent } from './components/model-config-toggle-card.component';
 import { ModelRoleActionButtonComponent } from './components/model-role-action-button.component';
 import {
   MODEL_FILTERS,
@@ -43,7 +43,6 @@ import {
   DraftRuntimeConfig,
   DraftRagSettings,
   ModelFilterKey,
-  ModelPullProgressState,
   ModelRole,
   RagSettingsSectionKey,
 } from './model-config.types';
@@ -57,7 +56,6 @@ const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
   openrouter: 'OpenRouter',
 };
 
-const TERMINAL_JOB_STATUSES: readonly JobStatus[] = ['completed', 'failed', 'cancelled'];
 const DEFAULT_RAG_SETTINGS_SECTION: RagSettingsSectionKey = 'general';
 
 const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
@@ -101,6 +99,7 @@ function resolveProviderLabel(provider: string): string {
     FormsModule,
     StatusMessageComponent,
     AccessKeyModalComponent,
+    ModelConfigToggleCardComponent,
     ModelRoleActionButtonComponent,
   ],
   templateUrl: './model-config-page.component.html',
@@ -108,7 +107,7 @@ function resolveProviderLabel(provider: string): string {
 })
 export class ModelConfigPageComponent implements OnInit {
   readonly appState = inject(AppStateService);
-  private readonly jobPolling = inject(JobPollingService);
+  private readonly modelPullJobs = inject(ModelPullJobService);
 
   readonly modelFilters = MODEL_FILTERS;
 
@@ -657,37 +656,21 @@ export class ModelConfigPageComponent implements OnInit {
     this.appState.updateDiliAgent({ isPulling: true });
     this.statusMessage.set(startMessage);
     let failureMessage = '';
-    const completed: string[] = [];
 
     try {
-      for (const modelName of requested) {
-        this.updateModelPullProgress(modelName, {
-          progress: 1,
-          status: 'pending',
-          message: `Starting pull for '${modelName}'...`,
-        });
+      const { completedModels } = await this.modelPullJobs.pullModels(
+        requested,
+        (modelName, progress) => this.updateModelPullProgress(modelName, progress),
+      );
 
-        try {
-          const start = await startModelPullJob(modelName);
-          const intervalMs = resolvePollIntervalMs(start.poll_interval);
-          await this.pollPullJob(modelName, start.job_id, intervalMs);
-          completed.push(modelName);
-        } catch (error) {
-          const description = error instanceof Error ? error.message : `Failed to pull '${modelName}'.`;
-          failureMessage = description.startsWith('[ERROR]') ? description : `[ERROR] ${description}`;
-          break;
-        } finally {
-          this.updateModelPullProgress(modelName, null);
-        }
-      }
-
-      if (!failureMessage) {
-        this.statusMessage.set(
-          completed.length === 1
-            ? `[INFO] Model available locally: ${completed[0]}.`
-            : `[INFO] Models available locally: ${completed.join(', ')}.`,
-        );
-      }
+      this.statusMessage.set(
+        completedModels.length === 1
+          ? `[INFO] Model available locally: ${completedModels[0]}.`
+          : `[INFO] Models available locally: ${completedModels.join(', ')}.`,
+      );
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Failed to pull selected models.';
+      failureMessage = description.startsWith('[ERROR]') ? description : `[ERROR] ${description}`;
     } finally {
       await this.loadModelConfig(false, true);
       if (failureMessage) {
@@ -695,44 +678,6 @@ export class ModelConfigPageComponent implements OnInit {
       }
       this.appState.updateDiliAgent({ isPulling: false });
     }
-  }
-
-  private async pollPullJob(modelName: string, jobId: string, intervalMs: number): Promise<void> {
-    const safeIntervalMs = Math.max(250, intervalMs);
-    const requestTimeoutSeconds = Math.min(30, Math.max(5, Math.ceil((safeIntervalMs / 1000) * 4)));
-
-    await this.jobPolling.run({
-      intervalMs: safeIntervalMs,
-      pollStep: async () => {
-        const payload = await fetchModelPullJobStatus(jobId, requestTimeoutSeconds);
-        const progress = Math.max(0, Math.min(100, payload.progress));
-        const message =
-          typeof payload.result?.progress_message === 'string' && payload.result.progress_message.trim()
-            ? payload.result.progress_message
-            : payload.status === 'completed'
-              ? `Model '${modelName}' is available locally.`
-              : payload.status === 'cancelled'
-                ? `Pull cancelled for '${modelName}'.`
-                : payload.status === 'failed'
-                  ? `Pull failed for '${modelName}'.`
-                  : `Pulling '${modelName}' from Ollama...`;
-
-        this.updateModelPullProgress(modelName, {
-          progress,
-          status: payload.status,
-          message,
-        });
-
-        if (!TERMINAL_JOB_STATUSES.includes(payload.status)) {
-          return true;
-        }
-        if (payload.status === 'completed') {
-          return false;
-        }
-        const errorMessage = payload.error?.trim() || message;
-        throw new Error(`[ERROR] ${errorMessage}`);
-      },
-    });
   }
 
   private updateModelPullProgress(modelName: string, progress: ModelPullProgressState | null): void {

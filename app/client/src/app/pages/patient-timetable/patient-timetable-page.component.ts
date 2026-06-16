@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import {
@@ -74,6 +75,7 @@ const CARD_COLLISION_GAP_PERCENT = 20;
 export class PatientTimetablePageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly sessionId = signal<number | null>(null);
   readonly timelineId = signal<number | null>(null);
@@ -203,12 +205,14 @@ export class PatientTimetablePageComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    this.route.paramMap.subscribe((params) => {
-      const sessionId = Number(params.get('sessionId'));
-      const timelineIdRaw = params.get('timelineId');
-      const timelineId = timelineIdRaw ? Number(timelineIdRaw) : null;
-      void this.handleRouteChange(sessionId, timelineId);
-    });
+    this.route.paramMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const sessionId = Number(params.get('sessionId'));
+        const timelineIdRaw = params.get('timelineId');
+        const timelineId = timelineIdRaw ? Number(timelineIdRaw) : null;
+        void this.handleRouteChange(sessionId, timelineId);
+      });
   }
 
   async loadTimeline(sessionId: number, timelineId: number | null): Promise<void> {

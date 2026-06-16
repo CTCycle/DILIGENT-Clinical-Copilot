@@ -34,6 +34,7 @@
     "@angular/cli": "21.2.12",
     "@angular/compiler-cli": "21.2.14",
     "@tauri-apps/cli": "2.11.2",
+    "@types/node": "^25.9.3",
     "jsdom": "^29.1.0",
     "typescript": "~5.9.2",
     "vitest": "4.1.7"

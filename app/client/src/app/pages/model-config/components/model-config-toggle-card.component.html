@@ -1,0 +1,56 @@
+<label
+  class="model-config-rag-card"
+  [class.model-config-reasoning-top-card]="reasoningLayout"
+  [class.is-active]="checked"
+>
+  <input
+    type="checkbox"
+    [attr.aria-label]="ariaLabel"
+    [ngModel]="checked"
+    (ngModelChange)="checkedChange.emit($event)"
+    [disabled]="disabled"
+  />
+  <span class="model-config-rag-card-top">
+    <span class="model-config-section-kicker">
+      <strong>{{ title }}</strong>
+    </span>
+    @if (showSettings) {
+      <button
+        class="model-config-rag-settings-btn"
+        type="button"
+        [attr.aria-label]="settingsLabel"
+        title="RAG settings"
+        (click)="handleSettingsClick($event)"
+        [disabled]="disabled"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 6h10" />
+          <path d="M18 6h2" />
+          <path d="M10 12h10" />
+          <path d="M4 12h2" />
+          <path d="M4 18h14" />
+          <path d="M22 18h-2" />
+          <circle cx="16" cy="6" r="2" />
+          <circle cx="8" cy="12" r="2" />
+          <circle cx="18" cy="18" r="2" />
+        </svg>
+      </button>
+    }
+    <span class="model-config-rag-state">{{ checked ? 'On' : 'Off' }}</span>
+    <span class="model-config-toggle" aria-hidden="true"><i></i></span>
+  </span>
+  <span class="model-config-rag-body">
+    <svg class="model-config-rag-icon" viewBox="0 0 24 24" aria-hidden="true">
+      @if (icon === 'rag') {
+        <ellipse cx="12" cy="6" rx="6.5" ry="2.75" />
+        <path d="M5.5 6v5c0 1.52 2.9 2.75 6.5 2.75s6.5-1.23 6.5-2.75V6" />
+        <path d="M5.5 11v5c0 1.52 2.9 2.75 6.5 2.75s6.5-1.23 6.5-2.75v-5" />
+      } @else {
+        <path d="M8 4h8a2 2 0 0 1 2 2v8l-4 4H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+        <path d="M14 14h4" />
+        <path d="M9 9h6M9 12h6" />
+      }
+    </svg>
+    <span>{{ description }}</span>
+  </span>
+</label>

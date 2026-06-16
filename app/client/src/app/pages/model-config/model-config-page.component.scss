@@ -100,7 +100,6 @@
 }
 
 .model-config-runtime-card,
-.model-config-rag-card,
 .model-config-catalog-panel,
 .model-config-cloud-options,
 .model-config-summary-panel {
@@ -180,8 +179,7 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mc-brand) 22%, transparent);
 }
 
-.model-config-runtime-option input,
-.model-config-rag-card input {
+.model-config-runtime-option input {
   position: absolute;
   opacity: 0;
 }
@@ -190,15 +188,7 @@
   pointer-events: none;
 }
 
-.model-config-rag-card input {
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
-}
-
 .model-config-option-icon,
-.model-config-rag-icon,
 .model-config-summary-icon {
   fill: none;
   stroke: currentColor;
@@ -248,108 +238,6 @@
 
 .model-config-runtime-option.is-active .model-config-radio-dot {
   border: 4px solid var(--mc-brand);
-}
-
-.model-config-rag-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 86px;
-  height: 100%;
-  padding: 10px 12px;
-  cursor: pointer;
-}
-
-.model-config-reasoning-top-card {
-  min-height: 86px;
-}
-
-.model-config-rag-card-top {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  align-items: center;
-  gap: 6px;
-}
-
-.model-config-rag-state {
-  color: var(--mc-brand);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.model-config-toggle {
-  display: inline-flex;
-  align-items: center;
-  width: 34px;
-  height: 20px;
-  padding: 3px;
-  border-radius: 999px;
-  background: #d8e7e1;
-  transition: background 0.18s ease;
-}
-
-.model-config-toggle i {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 1px 4px rgba(12, 45, 36, 0.24);
-  transition: transform 0.18s ease;
-}
-
-.model-config-rag-settings-btn {
-  position: relative;
-  z-index: 2;
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid color-mix(in srgb, var(--mc-border-strong) 72%, transparent);
-  border-radius: 5px;
-  background: var(--mc-surface);
-  color: var(--mc-brand);
-  padding: 0;
-  cursor: pointer;
-}
-
-.model-config-rag-settings-btn svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.9;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.model-config-rag-settings-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.model-config-rag-card.is-active .model-config-toggle {
-  background: linear-gradient(90deg, var(--mc-brand), var(--mc-brand-2));
-}
-
-.model-config-rag-card.is-active .model-config-toggle i {
-  transform: translateX(14px);
-}
-
-.model-config-rag-body {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  color: var(--mc-muted);
-  font-size: 11.5px;
-  line-height: 1.35;
-}
-
-.model-config-rag-icon {
-  width: 21px;
-  height: 21px;
-  color: #60998c;
 }
 
 .model-config-catalog-panel {
@@ -755,7 +643,6 @@
 }
 
 :host-context([data-theme="dark"]) .model-config-runtime-card,
-:host-context([data-theme="dark"]) .model-config-rag-card,
 :host-context([data-theme="dark"]) .model-config-catalog-panel,
 :host-context([data-theme="dark"]) .model-config-cloud-options,
 :host-context([data-theme="dark"]) .model-config-summary-panel {
@@ -843,14 +730,6 @@
 :host-context([data-theme="dark"]) .model-config-summary-badge {
   background: rgba(115, 232, 184, 0.17);
   color: #c8f7e4;
-}
-
-:host-context([data-theme="dark"]) .model-config-toggle {
-  background: #334a6f;
-}
-
-:host-context([data-theme="dark"]) .model-config-toggle i {
-  background: #eefbf6;
 }
 
 :host-context([data-theme="dark"]) .model-config-provider-mark.is-openai {

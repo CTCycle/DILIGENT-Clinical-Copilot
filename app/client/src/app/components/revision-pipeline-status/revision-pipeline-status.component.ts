@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 import { RevisionPipelineRun, RevisionPipelineStep } from '../../core/models/types';
+import { humanizeStatusLabel } from '../../core/utils/status-formatting';
 import { RevisionQaBadgeComponent } from '../revision-qa-badge/revision-qa-badge.component';
 
 @Component({
@@ -24,10 +25,7 @@ export class RevisionPipelineStatusComponent {
   }
 
   statusLabel(value: string | null | undefined): string {
-    if (!value) return 'Unknown';
-    return value
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (char) => char.toUpperCase());
+    return humanizeStatusLabel(value);
   }
 
   stepSummary(step: RevisionPipelineStep): string {

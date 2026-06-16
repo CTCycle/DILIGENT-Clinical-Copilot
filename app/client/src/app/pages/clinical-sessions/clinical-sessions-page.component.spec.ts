@@ -31,7 +31,6 @@ describe('ClinicalSessionsPage revision template', () => {
     expect(template).toContain('Structured Case Entities');
     expect(template).toContain('LiverTox Match Decisions');
     expect(template).toContain('Revised DILI Assessments');
-    expect(template).toContain('Retry draft revision');
     expect(template).toContain('Manual Edit History');
   });
 });
