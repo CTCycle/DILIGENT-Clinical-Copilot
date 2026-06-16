@@ -1,6 +1,23 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 
+import {
+  JobStatus,
+  SessionClinicalReviewStatus,
+  SessionLlmQaStatus,
+  SessionRevisionKind,
+  SessionVersionStatus,
+} from '../../core/models/types';
+import { humanizeStatusLabel } from '../../core/utils/status-formatting';
+
+type RevisionQaBadgeStatus =
+  | JobStatus
+  | SessionClinicalReviewStatus
+  | SessionLlmQaStatus
+  | SessionRevisionKind
+  | SessionVersionStatus
+  | string;
+
 @Component({
   selector: 'app-revision-qa-badge',
   standalone: true,
@@ -9,7 +26,7 @@ import { Component, Input } from '@angular/core';
   styleUrl: './revision-qa-badge.component.scss',
 })
 export class RevisionQaBadgeComponent {
-  @Input() status = '';
+  @Input() status: RevisionQaBadgeStatus = '';
   @Input() label = '';
 
   get resolvedLabel(): string {
@@ -52,9 +69,6 @@ export class RevisionQaBadgeComponent {
   }
 
   private statusLabel(value: string | null | undefined): string {
-    if (!value) return 'Unknown';
-    return value
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (char) => char.toUpperCase());
+    return humanizeStatusLabel(value);
   }
 }

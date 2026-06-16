@@ -60,75 +60,29 @@
             </div>
           </div>
 
-          <label class="model-config-rag-card" [class.is-active]="ragPipelineEnabled()">
-            <input
-              type="checkbox"
-              aria-label="RAG pipeline"
-              [ngModel]="ragPipelineEnabled()"
-              (ngModelChange)="handleRagPipelineChange($event)"
-              [disabled]="isSaving() || isLoading()"
-            />
-            <span class="model-config-rag-card-top">
-              <span class="model-config-section-kicker">
-                <strong>RAG pipeline</strong>
-              </span>
-              <button
-                class="model-config-rag-settings-btn"
-                type="button"
-                aria-label="Open RAG settings"
-                title="RAG settings"
-                (click)="$event.stopPropagation(); openRagSettingsPanel()"
-                [disabled]="isSaving() || isLoading()"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M4 6h10" />
-                  <path d="M18 6h2" />
-                  <path d="M10 12h10" />
-                  <path d="M4 12h2" />
-                  <path d="M4 18h14" />
-                  <path d="M22 18h-2" />
-                  <circle cx="16" cy="6" r="2" />
-                  <circle cx="8" cy="12" r="2" />
-                  <circle cx="18" cy="18" r="2" />
-                </svg>
-              </button>
-              <span class="model-config-rag-state">{{ ragPipelineEnabled() ? 'On' : 'Off' }}</span>
-              <span class="model-config-toggle" aria-hidden="true"><i></i></span>
-            </span>
-            <span class="model-config-rag-body">
-              <svg class="model-config-rag-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <ellipse cx="12" cy="6" rx="6.5" ry="2.75" />
-                <path d="M5.5 6v5c0 1.52 2.9 2.75 6.5 2.75s6.5-1.23 6.5-2.75V6" />
-                <path d="M5.5 11v5c0 1.52 2.9 2.75 6.5 2.75s6.5-1.23 6.5-2.75v-5" />
-              </svg>
-              <span>Use indexed clinical evidence during analysis</span>
-            </span>
-          </label>
+          <app-model-config-toggle-card
+            title="RAG pipeline"
+            description="Use indexed clinical evidence during analysis"
+            ariaLabel="RAG pipeline"
+            icon="rag"
+            [checked]="ragPipelineEnabled()"
+            [disabled]="isSaving() || isLoading()"
+            [showSettings]="true"
+            settingsLabel="Open RAG settings"
+            (checkedChange)="handleRagPipelineChange($event)"
+            (settingsClick)="openRagSettingsPanel()"
+          ></app-model-config-toggle-card>
 
-          <label class="model-config-rag-card model-config-reasoning-top-card" [class.is-active]="reasoningEnabled()">
-            <input
-              type="checkbox"
-              aria-label="Enable SDL/Reasoning"
-              [ngModel]="reasoningEnabled()"
-              (ngModelChange)="handleReasoningChange($event)"
-              [disabled]="isSaving() || isLoading()"
-            />
-            <span class="model-config-rag-card-top">
-              <span class="model-config-section-kicker">
-                <strong>Reasoning</strong>
-              </span>
-              <span class="model-config-rag-state">{{ reasoningEnabled() ? 'On' : 'Off' }}</span>
-              <span class="model-config-toggle" aria-hidden="true"><i></i></span>
-            </span>
-            <span class="model-config-rag-body">
-              <svg class="model-config-rag-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M8 4h8a2 2 0 0 1 2 2v8l-4 4H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
-                <path d="M14 14h4" />
-                <path d="M9 9h6M9 12h6" />
-              </svg>
-              <span>Improve accuracy for complex clinical reasoning.</span>
-            </span>
-          </label>
+          <app-model-config-toggle-card
+            title="Reasoning"
+            description="Improve accuracy for complex clinical reasoning."
+            ariaLabel="Enable SDL/Reasoning"
+            icon="reasoning"
+            [checked]="reasoningEnabled()"
+            [disabled]="isSaving() || isLoading()"
+            [reasoningLayout]="true"
+            (checkedChange)="handleReasoningChange($event)"
+          ></app-model-config-toggle-card>
         </section>
 
         <section class="model-config-catalog-panel" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
