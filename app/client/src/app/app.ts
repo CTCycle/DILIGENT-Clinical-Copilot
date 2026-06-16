@@ -1,4 +1,5 @@
-import { Component, inject } from '@angular/core';
+import { Component, DestroyRef, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 
@@ -19,10 +20,14 @@ import { NavSidebarComponent } from './components/nav-sidebar/nav-sidebar.compon
 export class App {
   readonly stateService = inject(AppStateService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
     this.router.events
-      .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
+      .pipe(
+        filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe((event) => {
         this.stateService.setActivePage(resolvePageIdFromPath(event.urlAfterRedirects));
       });

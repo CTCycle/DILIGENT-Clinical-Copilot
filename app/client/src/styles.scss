@@ -442,11 +442,18 @@ app-root {
 }
 
 .stitch-dili-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-height-md);
+  padding: 8px 12px;
   border: none;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-text-secondary);
   font-weight: 600;
   font-size: var(--font-sm);
+  font-family: inherit;
   cursor: pointer;
 }
 

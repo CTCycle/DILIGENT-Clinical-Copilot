@@ -1,4 +1,4 @@
-import { CloudProvider, JobStatus, RagSettings } from '../../core/models/types';
+import { CloudProvider, RagSettings } from '../../core/models/types';
 
 export type ModelFilterKey = 'installed' | 'missing' | 'small' | 'large' | 'quantized';
 
@@ -11,12 +11,6 @@ export type DraftRuntimeConfig = {
   clinicalModel: string;
   textExtractionModel: string;
   temperature: number;
-};
-
-export type ModelPullProgressState = {
-  progress: number;
-  status: JobStatus;
-  message: string;
 };
 
 export type DraftRagSettings = RagSettings;
