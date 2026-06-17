@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-06-03
+Last updated: 2026-06-17
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -66,6 +66,8 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
   - Controls, navigation, modal, and page composition rules.
 - `ui/experience.md`
   - Core journeys, responsiveness, accessibility, and design principles.
+- `ui/ui_standards.md`
+  - Practical spacing, typography, color, component, and do/don't rules for frontend UI work.
 
 ### User
 - `user/getting_started.md`
