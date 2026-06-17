@@ -7,9 +7,10 @@ app/client/node_modules/
 app/client/dist/
 app/client/dist-ssr/
 app/client/logs/
-app/src-tauri/
+app/src-tauri/**
 release/windows/
 runtimes/**
+QA/**
 
 # Python
 *.py[cod]

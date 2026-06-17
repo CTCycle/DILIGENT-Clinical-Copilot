@@ -22,22 +22,22 @@
 }
 
 .inspection-rag-summary {
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-lg);
   padding: 0;
-  border: 1px solid var(--color-border-subtle, #d8dce3);
-  border-radius: 0.75rem;
-  background: var(--color-surface-muted, #f7f8fa);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-alt);
 }
 
 .inspection-rag-summary-row {
   display: grid;
   grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
-  gap: 1rem;
-  padding: 0.9rem 1rem;
+  gap: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
 }
 
 .inspection-rag-summary-row + .inspection-rag-summary-row {
-  border-top: 1px solid var(--color-border-subtle, #d8dce3);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .inspection-rag-summary-label,
@@ -50,8 +50,17 @@
 }
 
 .inspection-rag-summary-value {
-  color: var(--color-text-secondary, #475467);
+  color: var(--color-text-secondary);
   word-break: break-word;
+}
+
+.inspection-update-overrides {
+  width: 100%;
+  min-height: 220px;
+}
+
+.inspection-update-actions {
+  margin-top: var(--space-sm);
 }
 
 @media (max-width: 900px) {

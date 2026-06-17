@@ -184,7 +184,7 @@ app-root {
 .stitch-dili-page {
   max-width: none;
   margin: 0;
-  background: #d2e0d9;
+  background: var(--color-surface-alt);
   border: 0;
   border-radius: 0;
   overflow: visible;
@@ -218,7 +218,7 @@ app-root {
   grid-template-columns: 1fr;
   gap: var(--space-2xl);
   align-items: stretch;
-  background: #d2e0d9;
+  background: var(--color-surface-alt);
   min-height: calc(100vh - var(--app-top-nav-height) - 92px);
 }
 
@@ -240,7 +240,7 @@ app-root {
   background: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
-  padding: 20px var(--space-2xl) var(--space-2xl);
+  padding: var(--space-xl) var(--space-2xl) var(--space-2xl);
   box-shadow: var(--shadow-md);
 }
 
@@ -249,15 +249,15 @@ app-root {
   background: transparent;
   border: 0;
   border-radius: 0;
-  padding: 24px var(--space-2xl) var(--space-2xl);
+  padding: var(--space-2xl);
   box-shadow: none;
 }
 
 .stitch-dili-input-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 20px;
-  margin-top: 6px;
+  gap: var(--space-xl);
+  margin-top: var(--space-sm);
 }
 
 .stitch-dili-card-title h2 {
@@ -272,12 +272,12 @@ app-root {
 .stitch-dili-input-stack {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  margin-top: 6px;
+  gap: var(--space-xl);
+  margin-top: var(--space-sm);
 }
 
 .stitch-dili-input-group h3 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-sm);
   font-family: "Manrope", "Inter", sans-serif;
   font-size: var(--font-lg);
   font-weight: 650;
@@ -342,9 +342,9 @@ app-root {
   position: static;
   top: auto;
   align-self: stretch;
-  background: #c6ddd0;
+  background: color-mix(in srgb, var(--color-brand-bg) 72%, var(--color-surface-alt));
   border-left: 0;
-  padding: 24px var(--space-xl) var(--space-2xl);
+  padding: var(--space-2xl) var(--space-xl) var(--space-2xl);
   min-height: 100%;
   display: flex;
   flex-direction: column;
@@ -364,7 +364,7 @@ app-root {
 @media (min-width: 1100px) {
   .stitch-dili-input-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 22px;
+    gap: var(--space-2xl);
   }
 }
 
@@ -379,8 +379,8 @@ app-root {
   width: 56px;
   height: 56px;
   border-radius: 999px;
-  background: #9ef3d6;
-  color: #005d49;
+  background: var(--color-brand-light);
+  color: var(--color-brand);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -412,8 +412,8 @@ app-root {
 }
 
 .stitch-dili-inline-fields .field input {
-  background: #e7efeb;
-  border-color: rgba(70, 95, 90, 0.36);
+  background: color-mix(in srgb, var(--color-surface-alt) 82%, var(--color-surface));
+  border-color: var(--color-border-subtle);
 }
 
 .stitch-dili-controls {
@@ -458,7 +458,7 @@ app-root {
 }
 
 .stitch-dili-clear:hover:not(:disabled) {
-  color: #a83836;
+  color: var(--color-status-error-text);
 }
 
 .stitch-dili-tip {
@@ -483,12 +483,12 @@ app-root {
 @media (max-width: 1099px) {
   .stitch-dili-grid {
     gap: 0;
-    background: #d2e0d9;
+    background: var(--color-surface-alt);
     min-height: auto;
   }
 
   .stitch-dili-workbench {
-    padding: 20px var(--space-xl);
+    padding: var(--space-xl);
   }
 
   .stitch-dili-sidebar {
@@ -496,7 +496,7 @@ app-root {
     top: auto;
     border-left: 0;
     border-top: 0;
-    padding: 20px var(--space-xl);
+    padding: var(--space-xl);
   }
 }
 
@@ -1880,7 +1880,7 @@ app-root {
 
   .stitch-dili-report-shell .report-toolbar-label {
     flex: 1 0 100%;
-    margin: 0 0 var(--space-2xs) 0;
+    margin: 0 0 var(--space-xs) 0;
   }
 
   .stitch-dili-report-shell .toolbar-btn {
@@ -4771,7 +4771,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border: 0;
   border-top: 1px solid rgba(15, 125, 90, 0.18);
   border-radius: 0;
-  background: #d2e0d9;
+  background: var(--color-surface-alt);
   box-shadow: none;
 }
 
@@ -4781,14 +4781,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   justify-content: flex-start;
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-xl);
-  background: #f3f7f4;
+  background: var(--color-surface);
   border-bottom: 1px solid rgba(15, 125, 90, 0.18);
 }
 
 .stitch-dili-report-shell .report-content {
   min-height: 260px;
   padding: 0 var(--space-xl) var(--space-xl);
-  background: #d2e0d9;
+  background: var(--color-surface-alt);
 }
 
 .report-toolbar-label {
@@ -4798,17 +4798,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #334155;
+  color: var(--color-text-secondary);
 }
 
 .stitch-dili-report-shell .toolbar-btn {
-  color: #334155;
+  color: var(--color-text-secondary);
   font-weight: 600;
 }
 
 .stitch-dili-report-shell .toolbar-btn:hover:not(:disabled) {
-  background: rgba(15, 125, 90, 0.1);
-  color: #1f2937;
+  background: var(--color-brand-bg);
+  color: var(--color-text-primary);
 }
 
 .report-shell.is-full-page .report-content {
@@ -4855,20 +4855,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .report-markdown code {
   background: var(--color-surface-alt);
   padding: 0.05rem 0.25rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 /* DILI layout final pass */
 .stitch-dili-workbench {
-  background: #d2e0d9;
+  background: var(--color-surface-alt);
   border: 0;
   box-shadow: none;
-  padding: 24px var(--space-2xl) var(--space-2xl);
+  padding: var(--space-2xl);
 }
 
 .stitch-dili-input-grid {
   grid-template-columns: 1fr;
-  gap: 18px;
+  gap: var(--space-xl);
 }
 
 .stitch-dili-input-group--wide {
@@ -4876,13 +4876,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stitch-dili-inline-fields {
-  margin-bottom: calc(var(--space-xl) + 6px);
+  margin-bottom: var(--space-2xl);
 }
 
 .stitch-dili-actions .btn-primary {
-  min-height: 32px;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  min-height: var(--control-height-sm);
+  padding-top: var(--space-xs);
+  padding-bottom: var(--space-xs);
 }
 
 .stitch-dili-report {
@@ -4893,12 +4893,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
    DILI Variant E (Selected)
    ============================================ */
 .app-shell {
-  background: #f4f8f6;
+  background: var(--color-surface-alt);
 }
 
 .app-header {
-  background: rgba(252, 255, 254, 0.95);
-  border-bottom: 1px solid #d9e8e1;
+  background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+  border-bottom: 1px solid var(--color-divider);
   backdrop-filter: blur(6px);
 }
 
@@ -4908,21 +4908,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .app-header-title {
-  color: #157b63;
+  color: var(--color-brand);
   font-weight: 700;
 }
 
 .tab-item {
-  color: #3f4d4a;
+  color: var(--color-text-secondary);
 }
 
 .tab-item.active {
-  color: #0f7d5a;
-  border-bottom-color: #20a480;
+  color: var(--color-brand);
+  border-bottom-color: var(--color-brand);
 }
 
 .page-container.stitch-dili-page {
-  background: #f4f8f6;
+  background: var(--color-surface-alt);
 }
 
 .stitch-dili-grid {
@@ -4931,13 +4931,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stitch-dili-main.stitch-dili-workbench {
-  background: #e7f1ed;
-  border-right: 1px solid #dce9e3;
+  background: color-mix(in srgb, var(--color-surface-alt) 84%, var(--color-surface));
+  border-right: 1px solid var(--color-divider);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .stitch-dili-sidebar {
-  background: linear-gradient(180deg, #f1f8f4 0%, #ecf5f1 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-brand-bg) 36%, var(--color-surface)) 0%,
+    color-mix(in srgb, var(--color-brand-bg) 48%, var(--color-surface-alt)) 100%
+  );
   position: relative;
 }
 
@@ -4956,31 +4960,31 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .stitch-dili-card textarea,
 .stitch-dili-workbench textarea {
-  background: #ffffff;
-  border: 1px solid #d4e4dd;
-  border-radius: 14px;
-  color: #2d3b38;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-primary);
 }
 
 .stitch-dili-inline-fields .field input {
-  background: #ffffff;
-  border-color: #cfded8;
+  background: var(--color-surface);
+  border-color: var(--color-border-subtle);
 }
 
 .stitch-dili-controls > p {
-  color: #5e6e69;
+  color: var(--color-text-secondary);
 }
 
 .stitch-dili-actions .btn-primary {
-  background: linear-gradient(90deg, #0d7f5f 0%, #37b58c 100%);
+  background: var(--color-brand);
   box-shadow: 0 12px 24px -18px rgba(23, 131, 99, 0.85);
   opacity: 1;
 }
 
 .stitch-dili-actions .btn:disabled {
-  color: #58706a;
-  background: #d8e7e1;
-  border-color: #c4d9d1;
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-subtle);
   box-shadow: none;
   cursor: not-allowed;
 }
@@ -4993,17 +4997,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .stitch-dili-clear-container {
   display: flex;
   justify-content: center;
-  padding: 6px 10px;
-  border: 1px solid #c3ddd5;
-  border-radius: 12px;
-  background: #e8f4ef;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-brand-bg);
   box-shadow: 0 10px 22px -20px rgba(23, 94, 76, 0.75);
 }
 
 .stitch-dili-clear-container .stitch-dili-clear {
   width: 100%;
-  background: #e8f4ef;
-  color: #254f62;
+  background: transparent;
+  color: var(--color-text-secondary);
 }
 
 :root[data-theme="dark"] .stitch-dili-clear-container {
@@ -5833,16 +5837,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-preview-a-layout .model-config-saved-note {
   color: #6d7f79;
-  font-size: 10.5px;
+  font-size: var(--font-xs);
   line-height: 1.35;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-summary-actions .btn-primary {
   height: 40px;
   min-height: 40px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: linear-gradient(90deg, #087d59, #049063);
-  font-size: 12.5px;
+  font-size: var(--font-sm);
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-summary-actions .btn-primary:disabled {
@@ -5859,7 +5863,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   min-height: 40px;
   align-items: center;
   padding: 7px 9px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-runtime-option:hover,
@@ -5908,8 +5912,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   gap: 5px;
   min-height: 34px;
   padding: 0 12px;
-  border-radius: 5px;
-  font-size: 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
   line-height: 1;
   text-align: center;
   white-space: nowrap;
@@ -6037,7 +6041,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-preview-a-layout .model-config-status-pill {
   gap: 5px;
-  font-size: 10.5px;
+  font-size: var(--font-xs);
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-status-pill::before {
@@ -6054,7 +6058,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   min-height: 30px;
   padding-right: 0;
   padding-left: 0;
-  font-size: 10.5px;
+  font-size: var(--font-xs);
   white-space: nowrap;
   transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
 }
@@ -6456,7 +6460,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   justify-items: center;
   overflow: auto;
   padding: 84px 28px 28px;
-  background: rgba(129, 144, 164, 0.34);
+  background: var(--color-overlay);
   backdrop-filter: blur(3px);
 }
 
@@ -6466,44 +6470,44 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   width: min(1090px, calc(100vw - 56px));
   height: min(760px, calc(100vh - 56px));
   overflow: hidden;
-  border: 1px solid rgba(24, 33, 45, 0.68);
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 24px 78px -34px rgba(15, 23, 42, 0.52);
-  color: #111827;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text-primary);
 }
 
 .model-config-rag-modal-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-lg);
   min-height: 74px;
-  padding: 20px 26px 14px;
-  border-bottom: 1px solid #d7e2de;
+  padding: var(--space-xl) var(--space-2xl) var(--space-lg);
+  border-bottom: 1px solid var(--color-divider);
 }
 
 .model-config-rag-modal-header h2 {
   margin: 0;
-  color: #111827;
-  font-size: 18px;
+  color: var(--color-text-primary);
+  font-size: var(--font-lg);
   font-weight: 780;
   line-height: 1.2;
 }
 
 .model-config-rag-modal-header p {
   margin: 7px 0 0;
-  color: #5e6b75;
-  font-size: 11.5px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
   line-height: 1.35;
 }
 
 .model-config-rag-modal-close {
   border: 0;
   background: transparent;
-  color: #53616b;
+  color: var(--color-text-secondary);
   padding: 1px 0;
-  font-size: 12px;
+  font-size: var(--font-sm);
   cursor: pointer;
 }
 
@@ -6516,34 +6520,34 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-rag-modal-tabs {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-sm);
   min-height: 0;
   padding: 14px 14px 86px;
-  border-right: 1px solid #d7e2de;
+  border-right: 1px solid var(--color-divider);
 }
 
 .model-config-rag-modal-tabs button {
   display: grid;
   grid-template-columns: 17px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   width: 100%;
   min-height: 32px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: #334155;
+  color: var(--color-text-secondary);
   padding: 0 9px;
   text-align: left;
-  font-size: 11px;
+  font-size: var(--font-xs);
   font-weight: 650;
   cursor: pointer;
 }
 
 .model-config-rag-modal-tabs button.is-active {
-  border-color: #94d6bd;
-  background: #daf3e8;
-  color: #087d59;
+  border-color: color-mix(in srgb, var(--color-brand) 38%, var(--color-border-subtle));
+  background: var(--color-brand-bg);
+  color: var(--color-brand);
 }
 
 .model-config-rag-modal-tabs svg {
@@ -6559,18 +6563,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-rag-modal-scroll {
   min-height: 0;
   overflow: auto;
-  padding: 12px 20px 28px;
+  padding: var(--space-md) var(--space-xl) var(--space-2xl);
   scrollbar-gutter: stable;
 }
 
 .model-config-rag-settings-section {
-  margin: 0 0 18px;
+  margin: 0 0 var(--space-lg);
 }
 
 .model-config-rag-settings-section h3 {
   margin: 0 0 8px;
-  color: #111827;
-  font-size: 14px;
+  color: var(--color-text-primary);
+  font-size: var(--font-base);
   font-weight: 760;
   line-height: 1.25;
 }
@@ -6580,42 +6584,42 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   grid-template-columns: minmax(240px, 1fr) minmax(220px, 390px);
   align-items: center;
   min-height: 49px;
-  border: 1px solid #d8e3df;
+  border: 1px solid var(--color-border-subtle);
   border-bottom: 0;
   background: rgba(255, 255, 255, 0.96);
-  padding: 7px 10px;
+  padding: var(--space-sm) var(--space-md);
 }
 
 .model-config-rag-setting-row:first-of-type {
-  border-top-left-radius: 6px;
-  border-top-right-radius: 6px;
+  border-top-left-radius: var(--radius-sm);
+  border-top-right-radius: var(--radius-sm);
 }
 
 .model-config-rag-setting-row:last-child {
-  border-bottom: 1px solid #d8e3df;
-  border-bottom-left-radius: 6px;
-  border-bottom-right-radius: 6px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-bottom-left-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
 }
 
 .model-config-rag-setting-row.is-invalid {
-  border-color: #f2a1a1;
-  background: #fff7f7;
+  border-color: var(--color-status-error-border);
+  background: var(--color-status-error-bg);
 }
 
 .model-config-rag-setting-row label {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-xs);
   margin: 0;
-  color: #111827;
-  font-size: 11px;
+  color: var(--color-text-primary);
+  font-size: var(--font-xs);
   font-weight: 750;
   line-height: 1.2;
 }
 
 .model-config-rag-setting-row label small {
-  color: #5e6b75;
-  font-size: 10.5px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
   font-weight: 500;
 }
 
@@ -6623,45 +6627,45 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-rag-setting-row select {
   width: 100%;
   min-height: 31px;
-  border: 1px solid #d8e3df;
-  border-radius: 5px;
-  background: #ffffff;
-  color: #1f2937;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
   padding: 0 11px;
-  font-size: 12px;
+  font-size: var(--font-sm);
 }
 
 .model-config-rag-checkbox {
   justify-self: end;
   width: 34px;
   height: 20px;
-  accent-color: #087d59;
+  accent-color: var(--color-brand);
 }
 
 .model-config-rag-modal-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-lg);
   min-height: 70px;
   padding: 13px 16px;
-  border-top: 1px solid #d7e2de;
+  border-top: 1px solid var(--color-divider);
 }
 
 .model-config-rag-modal-footer span {
-  color: #5e6b75;
-  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
 }
 
 .model-config-rag-modal-footer span.is-error {
-  color: #b42318;
+  color: var(--color-status-error-text);
   font-weight: 700;
 }
 
 .model-config-rag-modal-footer div {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-sm);
 }
 
 .model-config-rag-modal-primary,
@@ -6670,28 +6674,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   align-items: center;
   justify-content: center;
   min-height: 32px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   padding: 0 15px;
-  font-size: 11px;
+  font-size: var(--font-xs);
   font-weight: 760;
 }
 
 .model-config-rag-modal-primary {
-  border: 1px solid #087d59;
-  background: linear-gradient(180deg, #0aa06f, #087d59);
+  border: 1px solid var(--color-brand);
+  background: var(--color-brand);
   color: #ffffff;
 }
 
 .model-config-rag-modal-primary:disabled {
-  border-color: #9fbab0;
-  background: #c7d8d1;
-  color: #ffffff;
+  border-color: var(--color-border);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
 }
 
 .model-config-rag-modal-secondary {
-  border: 1px solid #d8e3df;
-  background: #ffffff;
-  color: #53616b;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 760px) {
