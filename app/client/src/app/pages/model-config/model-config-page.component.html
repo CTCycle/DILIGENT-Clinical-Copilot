@@ -634,21 +634,21 @@
             <section class="model-config-rag-settings-section">
               <h3>Cloud Provider Settings</h3>
               <div class="model-config-rag-setting-row">
-                <label for="rag-cloud-provider">
+                <label for="rag-provider-cloud-provider">
                   Cloud provider
                   <small>Select embedding provider</small>
                 </label>
-                <select id="rag-cloud-provider" [ngModel]="draftRagSettings().cloud_provider" (ngModelChange)="setDraftRagText('cloud_provider', $event)">
+                <select id="rag-provider-cloud-provider" [ngModel]="draftRagSettings().cloud_provider" (ngModelChange)="setDraftRagText('cloud_provider', $event)">
                   <option value="openai">openai</option>
                   <option value="gemini">gemini</option>
                 </select>
               </div>
               <div class="model-config-rag-setting-row">
-                <label for="rag-cloud-model">
+                <label for="rag-provider-cloud-model">
                   Cloud embedding model
                   <small>Model used when cloud embeddings are enabled</small>
                 </label>
-                <input id="rag-cloud-model" type="text" [ngModel]="draftRagSettings().cloud_embedding_model" (ngModelChange)="setDraftRagText('cloud_embedding_model', $event)" />
+                <input id="rag-provider-cloud-model" type="text" [ngModel]="draftRagSettings().cloud_embedding_model" (ngModelChange)="setDraftRagText('cloud_embedding_model', $event)" />
               </div>
             </section>
             }
@@ -664,11 +664,11 @@
                 <input id="rag-stream-batch" type="number" min="1" step="1" [ngModel]="draftRagSettings().vector_stream_batch_size" (ngModelChange)="setDraftRagNumber('vector_stream_batch_size', $event)" />
               </div>
               <div class="model-config-rag-setting-row">
-                <label>
+                <label for="rag-active-model">
                   Active RAG model
                   <small>Embedding model currently detected from the vector store</small>
                 </label>
-                <input type="text" [ngModel]="currentRagModelLabel()" disabled />
+                <input id="rag-active-model" type="text" [ngModel]="currentRagModelLabel()" disabled />
               </div>
             </section>
             }
