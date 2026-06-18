@@ -1,7 +1,6 @@
 <main class="page-container model-config-page">
   <header class="model-config-header-compact model-config-hero">
-    <h1>Model Configurations</h1>
-    <p class="lede">Select and configure the best models and settings for accurate, reliable clinical analysis.</p>
+    <p class="lede">Configure local and cloud model behavior, retrieval settings, reasoning defaults, and provider credentials for accurate, reliable clinical analysis across the full workflow.</p>
   </header>
 
   @if (!hasLoadedConfig()) {
@@ -304,7 +303,14 @@
               <div class="model-config-provider-name">
                 <span class="model-config-provider-mark" [class.is-openai]="provider === 'openai'" [class.is-gemini]="provider === 'gemini'">
                   @if (provider === 'openai') {
-                    <img src="/logos/openai-mark.svg" alt="OpenAI logo" />
+                    <span class="model-config-openai-mark" aria-label="OpenAI logo" role="img">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </span>
                   } @else {
                     <img src="/logos/google-g.svg" alt="Google logo" />
                   }

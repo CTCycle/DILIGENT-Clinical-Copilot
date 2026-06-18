@@ -14,6 +14,8 @@ from domain.inspection import (
     LiverToxExcerptResponse,
     ReferenceCatalogRuntimeObservationResponse,
     ReferenceCatalogRuntimeObservationUpsertRequest,
+    RxNavCatalogItem,
+    RxNavCatalogUpdateRequest,
     RxNavCatalogResponse,
 )
 from domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
@@ -56,6 +58,34 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
                 detail="Drug not found.",
             )
         return DrugAliasesResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def update_rxnav_drug(
+        self,
+        drug_id: int,
+        request: RxNavCatalogUpdateRequest | None = Body(default=None),
+    ) -> RxNavCatalogItem:
+        if request is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Drug name is required.",
+            )
+        try:
+            payload = self.service.update_rxnav_drug_name(
+                drug_id,
+                drug_name=request.drug_name,
+            )
+        except ValueError as error:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(error),
+            ) from error
+        if payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Drug not found.",
+            )
+        return RxNavCatalogItem(**payload)
 
     # -------------------------------------------------------------------------
     def delete_rxnav_drug(self, drug_id: int) -> DeleteEntityResponse:
@@ -227,6 +257,13 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
             self.get_rxnav_aliases,
             methods=["GET"],
             response_model=DrugAliasesResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/rxnav/{drug_id}",
+            self.update_rxnav_drug,
+            methods=["PUT"],
+            response_model=RxNavCatalogItem,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

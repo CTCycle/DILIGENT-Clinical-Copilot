@@ -1,7 +1,6 @@
 <main class="page-container inspection-page inspection-page-workbench">
   <header class="page-header inspection-page-intro">
-    <h1>Data Inspection</h1>
-    <p class="lede">Review curated drug knowledge sources, inspect RAG indexing details, and track update status across all inspection views.</p>
+    <p class="lede">Review curated drug knowledge sources, inspect alias and extraction details, update catalog entries directly, and monitor RAG indexing status from a single workspace.</p>
   </header>
 
   <section class="inspection-layout">
@@ -52,7 +51,7 @@
               <table class="inspection-table inspection-table-dense">
                 <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions"></th></tr></thead>
                 <tbody>
-                  @if (rxnavItems().length > 0) {
+                  @if (rxnavTopPaddingPx() > 0) {
                     <tr class="inspection-virtual-spacer-row"><td colspan="3" [style.height.px]="rxnavTopPaddingPx()"></td></tr>
                   }
                   @for (row of rxnavVisibleItems(); track row.drug_id) {
@@ -75,10 +74,11 @@
                           (activated)="removeRxNavDrug(row.drug_id)"
                         />
                         <app-inspection-action-icon-button
-                          [ariaLabel]="'Modify RxNav entry (not implemented)'"
-                          [title]="'Modify RxNav entry (not implemented)'"
+                          [buttonClass]="'inspection-icon-button'"
+                          [ariaLabel]="'Modify RxNav entry for ' + row.drug_name"
+                          [title]="'Modify RxNav entry for ' + row.drug_name"
                           [iconPath]="'m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z'"
-                          [disabled]="true"
+                          (activated)="openRxNavEdit(row)"
                         />
                       </td>
                     </tr>
@@ -119,7 +119,7 @@
               <table class="inspection-table inspection-table-dense">
                 <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions"></th></tr></thead>
                 <tbody>
-                  @if (livertoxItems().length > 0) {
+                  @if (livertoxTopPaddingPx() > 0) {
                     <tr class="inspection-virtual-spacer-row"><td colspan="3" [style.height.px]="livertoxTopPaddingPx()"></td></tr>
                   }
                   @for (row of livertoxVisibleItems(); track row.drug_id) {
@@ -215,7 +215,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @if (ragDocuments().length > 0) {
+                  @if (ragTopPaddingPx() > 0) {
                     <tr class="inspection-virtual-spacer-row"><td colspan="6" [style.height.px]="ragTopPaddingPx()"></td></tr>
                   }
                   @for (row of ragVisibleItems(); track row.path) {
@@ -272,6 +272,34 @@
         </section>
       }
     }
+  </app-modal-shell>
+
+  <app-modal-shell
+    [isOpen]="!!rxnavEditItem()"
+    title="Modify RxNav entry"
+    [subtitle]="rxnavEditItem()?.drug_name || ''"
+    dialogClassName="modal-container inspection-modal"
+    closeLabel="Close RxNav edit dialog"
+    (close)="closeRxNavEdit()"
+  >
+    <div class="inspection-edit-modal">
+      <label class="field-label" for="rxnav-drug-name">Drug value</label>
+      <input
+        id="rxnav-drug-name"
+        type="text"
+        class="field-input"
+        [ngModel]="rxnavEditValue()"
+        (ngModelChange)="setRxNavEditValue($event)"
+        [disabled]="rxnavEditSaving()"
+      />
+      @if (rxnavEditError()) {
+        <p class="inspection-error-text">{{ rxnavEditError() }}</p>
+      }
+      <div class="inspection-pager-actions inspection-update-actions">
+        <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="closeRxNavEdit()" [disabled]="rxnavEditSaving()">Exit</button>
+        <button class="btn btn-primary inspection-mini-btn" type="button" (click)="saveRxNavEdit()" [disabled]="rxnavEditSaving()">Confirm</button>
+      </div>
+    </div>
   </app-modal-shell>
 
   <app-modal-shell

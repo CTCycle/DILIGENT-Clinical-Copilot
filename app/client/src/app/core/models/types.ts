@@ -613,6 +613,10 @@ export type InspectionRxNavItem = {
   last_update: string | null;
 };
 
+export type InspectionRxNavUpdateRequest = {
+  drug_name: string;
+};
+
 export type InspectionRxNavCatalogResponse = {
   items: InspectionRxNavItem[];
   total: number;
