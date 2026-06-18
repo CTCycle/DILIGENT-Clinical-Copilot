@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 PatientTimelineEventType = Literal["therapy", "disease", "lab", "other"]
 PatientTimelineGenerationStatus = Literal["llm_generated", "fallback"]
-PatientTimelineSourceKind = Literal["local", "cloud", "legacy"]
+PatientTimelineSourceKind = Literal["local", "cloud"]
 PatientTimelineTimingType = Literal[
     "explicit_date",
     "relative",

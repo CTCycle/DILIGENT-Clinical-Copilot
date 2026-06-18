@@ -189,7 +189,7 @@ class ClinicalSessionTimeline(Base):
             name="ck_clinical_session_timelines_generation_status",
         ),
         CheckConstraint(
-            "source_kind IS NULL OR source_kind IN ('local', 'cloud', 'legacy')",
+            "source_kind IS NULL OR source_kind IN ('local', 'cloud')",
             name="ck_clinical_session_timelines_source_kind",
         ),
         Index("ix_clinical_session_timelines_session_id", "session_id"),

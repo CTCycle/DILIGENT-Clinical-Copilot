@@ -57,3 +57,11 @@ def test_build_rag_settings_enforces_candidate_floor() -> None:
     settings = payload["rag"]
     assert settings["retrieval_selected_count"] == 10
     assert settings["retrieval_candidate_count"] == 10
+
+
+###############################################################################
+def test_build_rag_settings_defaults_to_lightweight_reranker_profile() -> None:
+    payload = build_settings_payload_from_json({"rag": {}}, _env())
+    settings = payload["rag"]
+
+    assert settings["reranker_model"] == "lightweight-balanced-v1"

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import Coroutine
+from difflib import SequenceMatcher
 from typing import Any, Literal, Protocol, cast
 
 import httpx
-import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from common.constants import CLOUD_MODEL_CHOICES
 from common.paths import VECTOR_DB_PATH
@@ -37,30 +37,143 @@ class Reranker(Protocol):
     def predict(self, pairs: list[tuple[str, str]]) -> list[float]: ...
 
 ###############################################################################
-class LocalCrossEncoderReranker:
+class LocalHeuristicReranker:
+    TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
+    PROFILE_ALIASES = {
+        "balanced": "lightweight-balanced-v1",
+        "lightweight-balanced": "lightweight-balanced-v1",
+        "lightweight-balanced-v1": "lightweight-balanced-v1",
+        "lexical": "lightweight-lexical-v1",
+        "lightweight-lexical": "lightweight-lexical-v1",
+        "lightweight-lexical-v1": "lightweight-lexical-v1",
+        "phrase": "lightweight-phrase-v1",
+        "lightweight-phrase": "lightweight-phrase-v1",
+        "lightweight-phrase-v1": "lightweight-phrase-v1",
+    }
+    PROFILE_WEIGHTS = {
+        "lightweight-balanced-v1": {
+            "query_coverage": 0.45,
+            "document_precision": 0.20,
+            "sequence_ratio": 0.20,
+            "phrase_bonus": 0.35,
+            "bigram_bonus": 0.15,
+        },
+        "lightweight-lexical-v1": {
+            "query_coverage": 0.60,
+            "document_precision": 0.28,
+            "sequence_ratio": 0.10,
+            "phrase_bonus": 0.18,
+            "bigram_bonus": 0.08,
+        },
+        "lightweight-phrase-v1": {
+            "query_coverage": 0.32,
+            "document_precision": 0.12,
+            "sequence_ratio": 0.24,
+            "phrase_bonus": 0.55,
+            "bigram_bonus": 0.24,
+        },
+    }
 
     # -------------------------------------------------------------------------
     def __init__(self, model_name: str) -> None:
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
-        self.model.eval()
+        self.model_name = self.normalize_profile_name(model_name)
 
     # -------------------------------------------------------------------------
     def predict(self, pairs: list[tuple[str, str]]) -> list[float]:
         if not pairs:
             return []
-        with torch.no_grad():
-            encoded = self.tokenizer(
-                pairs,
-                padding=True,
-                truncation=True,
-                return_tensors="pt",
-            )
-            outputs = self.model(**encoded)
-            logits = outputs.logits.squeeze(-1)
-            if logits.ndim == 0:
-                logits = logits.unsqueeze(0)
-            return [float(value) for value in logits.tolist()]
+        return [self.score_pair(query, document, profile_name=self.model_name) for query, document in pairs]
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def score_pair(
+        cls,
+        query: str,
+        document: str,
+        *,
+        profile_name: str = "lightweight-balanced-v1",
+    ) -> float:
+        normalized_query = cls.normalize_text(query)
+        normalized_document = cls.normalize_text(document)
+        if not normalized_query or not normalized_document:
+            return 0.0
+
+        query_tokens = cls.tokenize(normalized_query)
+        document_tokens = cls.tokenize(normalized_document)
+        if not query_tokens or not document_tokens:
+            return 0.0
+
+        query_token_set = set(query_tokens)
+        document_token_set = set(document_tokens)
+        overlap_count = len(query_token_set & document_token_set)
+        query_coverage = overlap_count / max(len(query_token_set), 1)
+        document_precision = overlap_count / max(len(document_token_set), 1)
+        sequence_ratio = SequenceMatcher(
+            None,
+            normalized_query,
+            normalized_document,
+        ).ratio()
+        weights = cls.profile_weights(profile_name)
+        phrase_bonus = (
+            weights["phrase_bonus"] if normalized_query in normalized_document else 0.0
+        )
+        ordered_bigram_bonus = weights["bigram_bonus"] * cls.ordered_bigram_ratio(
+            query_tokens,
+            document_tokens,
+        )
+
+        return (
+            (query_coverage * weights["query_coverage"])
+            + (document_precision * weights["document_precision"])
+            + (sequence_ratio * weights["sequence_ratio"])
+            + phrase_bonus
+            + ordered_bigram_bonus
+        )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def normalize_profile_name(cls, value: str) -> str:
+        candidate = (value or "").strip().casefold()
+        if not candidate:
+            return "lightweight-balanced-v1"
+        return cls.PROFILE_ALIASES.get(candidate, "lightweight-balanced-v1")
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def profile_weights(cls, profile_name: str) -> dict[str, float]:
+        normalized = cls.normalize_profile_name(profile_name)
+        return cls.PROFILE_WEIGHTS[normalized]
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return " ".join(cls.TOKEN_PATTERN.findall((value or "").casefold()))
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def tokenize(cls, value: str) -> list[str]:
+        return cls.TOKEN_PATTERN.findall(value)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def ordered_bigram_ratio(
+        query_tokens: list[str],
+        document_tokens: list[str],
+    ) -> float:
+        if len(query_tokens) < 2 or len(document_tokens) < 2:
+            return 0.0
+        document_bigrams = {
+            (document_tokens[index], document_tokens[index + 1])
+            for index in range(len(document_tokens) - 1)
+        }
+        query_bigrams = [
+            (query_tokens[index], query_tokens[index + 1])
+            for index in range(len(query_tokens) - 1)
+        ]
+        matches = sum(1 for bigram in query_bigrams if bigram in document_bigrams)
+        if matches <= 0:
+            return 0.0
+        return matches / len(query_bigrams)
 
 ###############################################################################
 def _map_embedding_exception(
@@ -672,7 +785,7 @@ class SimilaritySearch:
         scored: list[dict[str, Any]] = []
         for candidate, score in zip(candidates, scores, strict=False):
             enriched = dict(candidate)
-            enriched["rerank_score"] = float(score)
+            enriched["rerank_score"] = float(score) + self.retrieval_prior(candidate)
             scored.append(enriched)
 
         scored.sort(key=self.rerank_sort_key, reverse=True)
@@ -681,10 +794,18 @@ class SimilaritySearch:
     # -------------------------------------------------------------------------
     def get_reranker(self) -> Reranker:
         if self.reranker is None:
-            self.reranker = LocalCrossEncoderReranker(
+            self.reranker = LocalHeuristicReranker(
                 build_effective_rag_settings().reranker_model
             )
         return self.reranker
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def retrieval_prior(document: dict[str, Any]) -> float:
+        raw_distance = document.get("distance")
+        if isinstance(raw_distance, (int, float)) and raw_distance >= 0:
+            return 0.15 / (1.0 + float(raw_distance))
+        return 0.0
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -701,6 +822,6 @@ __all__ = [
     "OllamaEmbeddingGenerator",
     "select_embedding_provider",
     "EmbeddingGenerator",
-    "LocalCrossEncoderReranker",
+    "LocalHeuristicReranker",
     "SimilaritySearch",
 ]

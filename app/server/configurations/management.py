@@ -413,7 +413,7 @@ def _build_rag_settings(
         retrieval_candidate_count=candidate_count,
         retrieval_selected_count=selected_count,
         reranker_model=coerce_str(
-            data.get("reranker_model"), "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            data.get("reranker_model"), "lightweight-balanced-v1"
         ),
         hybrid_vector_weight=max(
             coerce_float(data.get("hybrid_vector_weight"), 0.65), 0.0

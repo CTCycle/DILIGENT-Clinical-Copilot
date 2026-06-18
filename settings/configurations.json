@@ -11,7 +11,7 @@
     "use_reranking": true,
     "retrieval_candidate_count": 40,
     "retrieval_selected_count": 6,
-    "reranker_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "reranker_model": "lightweight-balanced-v1",
     "hybrid_vector_weight": 0.65,
     "hybrid_text_weight": 0.35,
     "embedding_backend": "ollama",

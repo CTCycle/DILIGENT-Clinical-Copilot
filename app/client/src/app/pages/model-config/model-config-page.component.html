@@ -595,10 +595,14 @@
               <h3>Model Settings</h3>
               <div class="model-config-rag-setting-row">
                 <label for="rag-reranker-model">
-                  Reranker model
-                  <small>Cross-encoder used to rerank retrieved candidates</small>
+                  Reranker profile
+                  <small>Choose the local reranking strategy: balanced, lexical, or phrase-focused</small>
                 </label>
-                <input id="rag-reranker-model" type="text" [ngModel]="draftRagSettings().reranker_model" (ngModelChange)="setDraftRagText('reranker_model', $event)" />
+                <select id="rag-reranker-model" [ngModel]="draftRagSettings().reranker_model" (ngModelChange)="setDraftRagText('reranker_model', $event)">
+                  @for (option of rerankerProfileOptions; track option.value) {
+                  <option [value]="option.value">{{ option.label }}</option>
+                  }
+                </select>
               </div>
               <div class="model-config-rag-setting-row">
                 <label for="rag-hf-model">
