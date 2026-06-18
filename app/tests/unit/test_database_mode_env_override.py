@@ -8,11 +8,9 @@ from configurations.management import (
     load_configuration_data,
 )
 
-
 ###############################################################################
 def _write_config(path, payload) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
-
 
 ###############################################################################
 def _base_payload() -> dict:
@@ -33,7 +31,6 @@ def _base_payload() -> dict:
             "select_page_size": 2000,
         }
     }
-
 
 ###############################################################################
 def test_database_settings_are_loaded_from_json_without_env_overlap(

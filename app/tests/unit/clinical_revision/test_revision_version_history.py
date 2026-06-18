@@ -6,13 +6,11 @@ from repositories.schemas.models import Base
 from repositories.serialization.data import DataSerializer
 from sqlalchemy import create_engine
 
-
 ###############################################################################
 def build_serializer() -> DataSerializer:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     return DataSerializer(engine=engine)
-
 
 ###############################################################################
 def test_list_session_versions_includes_official_versions_and_draft_shells() -> None:
@@ -76,7 +74,6 @@ def test_list_session_versions_includes_official_versions_and_draft_shells() -> 
     assert detail is not None
     assert detail["version"]["version_number"] == 2
     assert detail["session"]["session_id"] == revision_session_id
-
 
 ###############################################################################
 def test_failed_revision_run_preserves_failed_version_shell() -> None:

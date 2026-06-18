@@ -18,7 +18,6 @@ from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.job_progress import ClinicalConsultationProgressCallback
 from services.llm.cloud import LLMError
 
-
 ###############################################################################
 class ClinicalSessionConsultationMixin:
 
@@ -390,7 +389,6 @@ class ClinicalSessionConsultationMixin:
                     "synthesis_mode"
                 )
             return clinical_session, final_report, payload_metadata
-
 
         # -------------------------------------------------------------------------
         @classmethod

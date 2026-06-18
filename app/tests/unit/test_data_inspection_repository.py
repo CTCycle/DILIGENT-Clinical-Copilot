@@ -363,7 +363,6 @@ def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     assert final_livertox is not None
     assert final_livertox["status"] == "cancelled"
 
-
 ###############################################################################
 class FakeTimelineExtractor:
 

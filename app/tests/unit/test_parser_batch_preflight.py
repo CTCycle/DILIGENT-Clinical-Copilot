@@ -7,7 +7,6 @@ from services.session.preflight import (
     check_parser_batch_capacity,
 )
 
-
 ###############################################################################
 class _FakeClient:
 
@@ -32,7 +31,6 @@ class _FakeClient:
     async def close(self) -> None:
         return None
 
-
 ###############################################################################
 def test_batch_preflight_allows_non_local_provider(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -43,7 +41,6 @@ def test_batch_preflight_allows_non_local_provider(monkeypatch) -> None:
     assert isinstance(result, LocalModelBatchPreflightResult)
     assert result.concurrency_allowed is True
     assert result.provider == "openai"
-
 
 ###############################################################################
 def test_batch_preflight_denies_unavailable_local_model(monkeypatch) -> None:
@@ -58,7 +55,6 @@ def test_batch_preflight_denies_unavailable_local_model(monkeypatch) -> None:
     result = asyncio.run(check_parser_batch_capacity(task_count=2))
     assert result.concurrency_allowed is False
     assert result.reason is not None
-
 
 ###############################################################################
 def test_batch_preflight_allows_available_local_model(monkeypatch) -> None:

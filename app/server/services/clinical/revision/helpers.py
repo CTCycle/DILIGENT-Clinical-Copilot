@@ -5,7 +5,6 @@ from typing import Any
 from services.inspection.normalization import normalize_text as normalize_text_value
 from services.text.normalization import normalize_drug_query_name
 
-
 ###############################################################################
 def extract_revision_drug_names(payload: dict[str, Any]) -> list[str]:
     names: list[str] = []
@@ -28,7 +27,6 @@ def extract_revision_drug_names(payload: dict[str, Any]) -> list[str]:
         seen.add(normalized)
         unique.append(name)
     return unique
-
 
 ###############################################################################
 def build_revision_section_validation(

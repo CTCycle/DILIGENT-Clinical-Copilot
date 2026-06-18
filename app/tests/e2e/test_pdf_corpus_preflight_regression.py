@@ -16,7 +16,6 @@ try:
 except Exception:  # pragma: no cover
     from PyPDF2 import PdfReader  # type: ignore[no-redef]
 
-
 ###############################################################################
 def _extract_pdf_text(path: Path) -> str:
     reader = PdfReader(str(path))
@@ -29,7 +28,6 @@ def _extract_pdf_text(path: Path) -> str:
         if text:
             chunks.append(text)
     return "\n\n".join(chunks).strip()
-
 
 ###############################################################################
 @pytest.mark.skipif(

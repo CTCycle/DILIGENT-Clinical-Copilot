@@ -7,7 +7,6 @@ from configurations.llm_configs import LLMRuntimeConfig
 from services.llm.ollama_client import OllamaClient
 import services.llm.ollama_chat as ollama_chat
 
-
 ###############################################################################
 def test_build_chat_payload_includes_optional_fields() -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
@@ -32,7 +31,6 @@ def test_build_chat_payload_includes_optional_fields() -> None:
     assert payload["keep_alive"] == "10m"
     asyncio.run(client.close())
 
-
 ###############################################################################
 def test_prepare_generation_parameters_clamps_temperature_and_strips_options(
     monkeypatch,
@@ -54,7 +52,6 @@ def test_prepare_generation_parameters_clamps_temperature_and_strips_options(
     assert think is False
     assert options == {"num_predict": 4}
     asyncio.run(client.close())
-
 
 ###############################################################################
 def test_ensure_context_option_preserves_explicit_num_ctx_and_computes_when_absent(
@@ -86,7 +83,6 @@ def test_ensure_context_option_preserves_explicit_num_ctx_and_computes_when_abse
     assert computed == {"num_predict": 4, "num_ctx": 2048}
     asyncio.run(client.close())
 
-
 ###############################################################################
 def test_calculate_context_window_respects_model_context_limit(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
@@ -110,12 +106,10 @@ def test_calculate_context_window_respects_model_context_limit(monkeypatch) -> N
     assert value == 2_048
     asyncio.run(client.close())
 
-
 ###############################################################################
 def test_ollama_generate_prompt_helpers_are_removed() -> None:
     assert not hasattr(OllamaClient, "build_generate_payload")
     assert not hasattr(OllamaClient, "messages_to_prompt")
-
 
 ###############################################################################
 def test_ollama_chat_module_has_no_generate_fallback_helpers() -> None:
@@ -124,7 +118,6 @@ def test_ollama_chat_module_has_no_generate_fallback_helpers() -> None:
     assert "build_generate_payload" not in source
     assert "messages_to_prompt" not in source
     assert "/api/generate" not in source
-
 
 ###############################################################################
 def test_hardware_aware_context_uses_full(monkeypatch) -> None:
@@ -165,7 +158,6 @@ def test_hardware_aware_context_uses_full(monkeypatch) -> None:
     )
     assert value == native_limit
     asyncio.run(client.close())
-
 
 ###############################################################################
 def test_hardware_aware_context_scales_down(monkeypatch) -> None:
@@ -215,7 +207,6 @@ def test_hardware_aware_context_scales_down(monkeypatch) -> None:
     )
     assert value == expected
     asyncio.run(client.close())
-
 
 ###############################################################################
 def test_hardware_aware_context_fallback(monkeypatch) -> None:

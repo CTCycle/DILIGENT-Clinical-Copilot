@@ -7,7 +7,6 @@ from typing import Any
 from domain.clinical import DrugEntry, PatientDrugs
 from services.clinical.parser import DrugsParser
 
-
 ###############################################################################
 class RecordingStructuredClient:
 
@@ -22,7 +21,6 @@ class RecordingStructuredClient:
         self.call_count += 1
         self.user_prompts.append(str(kwargs.get("user_prompt", "")))
         return self.response
-
 
 ###############################################################################
 class FakeStructuredClient:
@@ -40,14 +38,12 @@ class FakeStructuredClient:
             return self.responses.pop(0)
         return schema(entries=[])
 
-
 ###############################################################################
 class AlwaysFailingStructuredClient:
 
     # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
         raise RuntimeError("simulated llm failure")
-
 
 ###############################################################################
 def test_extract_drugs_from_anamnesis_sends_full_context_to_llm() -> None:
@@ -75,7 +71,6 @@ def test_extract_drugs_from_anamnesis_sends_full_context_to_llm() -> None:
     assert "Co-Amoxicillina 1-0-1" in combined_prompts
     assert [entry.name for entry in parsed.entries if entry.name == "Co-Amoxicillina"]
 
-
 ###############################################################################
 def test_extract_drugs_from_anamnesis_sends_complete_anamnesis_to_llm() -> None:
     client = RecordingStructuredClient(
@@ -102,7 +97,6 @@ def test_extract_drugs_from_anamnesis_sends_complete_anamnesis_to_llm() -> None:
     assert "Co-Amoxicillina 1-0-1" in combined_prompt
     assert [entry.name for entry in parsed.entries if entry.name == "Co-Amoxicillina"]
 
-
 ###############################################################################
 def test_extract_drugs_from_anamnesis_sets_historical_tags() -> None:
     fake_client = FakeStructuredClient(
@@ -128,7 +122,6 @@ def test_extract_drugs_from_anamnesis_sets_historical_tags() -> None:
     assert entry.historical_flag is True
     assert entry.temporal_classification == "temporal_uncertain"
 
-
 ###############################################################################
 def test_extract_drugs_from_anamnesis_empty_result_is_allowed() -> None:
     parser = DrugsParser(client=FakeStructuredClient([PatientDrugs(entries=[])]))
@@ -138,7 +131,6 @@ def test_extract_drugs_from_anamnesis_empty_result_is_allowed() -> None:
     )
 
     assert parsed.entries == []
-
 
 ###############################################################################
 def test_extract_drugs_from_anamnesis_rule_fallback_recovers_drug_lines() -> None:
@@ -156,7 +148,6 @@ def test_extract_drugs_from_anamnesis_rule_fallback_recovers_drug_lines() -> Non
     assert entry.source == "anamnesis"
     assert entry.historical_flag is True
 
-
 ###############################################################################
 def test_extract_drugs_from_anamnesis_sends_long_input_as_single_chunk() -> None:
     client = FakeStructuredClient(
@@ -173,7 +164,6 @@ def test_extract_drugs_from_anamnesis_sends_long_input_as_single_chunk() -> None
 
     assert client.call_count == 1
     assert [entry.name for entry in parsed.entries] == ["Aspirin"]
-
 
 ###############################################################################
 def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
@@ -209,7 +199,6 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
         "Benziodiazepine",
         "Co-Amoxicillina",
     ]
-
 
 ###############################################################################
 def test_extract_drugs_from_anamnesis_llm_failure_uses_rule_fallback() -> None:

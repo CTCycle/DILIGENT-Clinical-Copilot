@@ -4,7 +4,6 @@ from domain.clinical.entities import DrugEntry
 from services.clinical.parser import DrugsParser
 from services.session.preflight import LocalModelBatchPreflightResult
 
-
 ###############################################################################
 def test_anamnesis_and_therapy_source_fields_are_preserved() -> None:
     parser = DrugsParser(client=None)
@@ -25,7 +24,6 @@ def test_anamnesis_and_therapy_source_fields_are_preserved() -> None:
     assert therapy_entry.source == "therapy"
     assert therapy_entry.historical_flag is False
 
-
 ###############################################################################
 def test_conservative_preparation_keeps_bullets_and_multiline_entries() -> None:
     parser = DrugsParser(client=None)
@@ -36,7 +34,6 @@ def test_conservative_preparation_keeps_bullets_and_multiline_entries() -> None:
     assert "Prednisone 25 mg/day" in prepared
     assert "\n" in prepared
 
-
 ###############################################################################
 def test_drug_without_temporal_information_is_filtered() -> None:
     parser = DrugsParser(client=None)
@@ -44,7 +41,6 @@ def test_drug_without_temporal_information_is_filtered() -> None:
     with_temporal = DrugEntry(name="Drug B", therapy_start_date="2026-03-10")
     assert parser.drug_entry_has_temporal_information(no_temporal) is False
     assert parser.drug_entry_has_temporal_information(with_temporal) is True
-
 
 ###############################################################################
 def test_batch_preflight_flags_cover_concurrent_and_sequential_paths() -> None:
@@ -62,7 +58,6 @@ def test_batch_preflight_flags_cover_concurrent_and_sequential_paths() -> None:
     assert allow.concurrency_allowed is True
     assert deny.concurrency_allowed is False
     assert deny.reason
-
 
 ###############################################################################
 def test_source_differences_prevent_cross_section_collapse() -> None:

@@ -6,7 +6,6 @@ from typing import Any
 from domain.clinical import DrugEntry
 from services.clinical.parser import DrugsParser
 
-
 ###############################################################################
 class FailingStructuredClient:
 
@@ -14,7 +13,6 @@ class FailingStructuredClient:
     async def llm_structured_call(self, **kwargs: Any):
         _ = kwargs
         raise AssertionError("LLM should not be called for deterministic therapy lines")
-
 
 ###############################################################################
 def test_extract_drugs_from_therapy_parses_schedule_route_and_dates() -> None:
@@ -47,7 +45,6 @@ def test_extract_drugs_from_therapy_parses_schedule_route_and_dates() -> None:
     assert second.suspension_date == "2024-01-03"
     assert second.temporal_classification == "temporal_known"
 
-
 ###############################################################################
 def test_extract_drugs_from_therapy_missing_schedule_remains_parseable() -> None:
     parser = DrugsParser(client=object())
@@ -65,7 +62,6 @@ def test_extract_drugs_from_therapy_missing_schedule_remains_parseable() -> None
     assert entry.source == "therapy"
     assert entry.historical_flag is False
 
-
 ###############################################################################
 def test_extract_drugs_from_therapy_supports_decimal_schedule_padding() -> None:
     parser = DrugsParser(client=object())
@@ -79,7 +75,6 @@ def test_extract_drugs_from_therapy_supports_decimal_schedule_padding() -> None:
     assert entry.administration_pattern == "0.5-0-0"
     assert entry.daytime_administration == [0.5, 0.0, 0.0, 0.0]
     assert entry.temporal_classification == "temporal_known"
-
 
 ###############################################################################
 def test_extract_drugs_from_therapy_detects_ongoing_vs_suspended() -> None:
@@ -105,7 +100,6 @@ def test_extract_drugs_from_therapy_detects_ongoing_vs_suspended() -> None:
     assert ongoing.therapy_start_date == "2024-02-11"
     assert ongoing.temporal_classification == "temporal_known"
 
-
 ###############################################################################
 def test_extract_drugs_from_therapy_strips_temporal_tail_from_name() -> None:
     parser = DrugsParser(client=object())
@@ -123,7 +117,6 @@ def test_extract_drugs_from_therapy_strips_temporal_tail_from_name() -> None:
         "Trastuzumab deruxtecan",
     ]
     assert [entry.route for entry in parsed.entries] == ["iv", "iv", "iv"]
-
 
 ###############################################################################
 def test_extract_drugs_from_therapy_does_not_parse_iso_dates_as_schedule() -> None:
@@ -146,7 +139,6 @@ def test_extract_drugs_from_therapy_does_not_parse_iso_dates_as_schedule() -> No
     assert entry.suspension_status is True
     assert entry.suspension_date == "2026-02-16"
 
-
 ###############################################################################
 def test_extract_drugs_from_therapy_skips_non_assumed_drug_line() -> None:
     parser = DrugsParser(client=object())
@@ -158,7 +150,6 @@ def test_extract_drugs_from_therapy_skips_non_assumed_drug_line() -> None:
     parsed = asyncio.run(parser.extract_drugs_from_therapy(therapy_text))
 
     assert [entry.name for entry in parsed.entries] == ["Esomeprazolo"]
-
 
 ###############################################################################
 def test_extract_drugs_from_therapy_keeps_continuation_lines_with_drug_blocks() -> None:
@@ -182,7 +173,6 @@ def test_extract_drugs_from_therapy_keeps_continuation_lines_with_drug_blocks() 
         "Diovan",
         "Domperidon axapharm lingual cpr orodisp",
     ]
-
 
 ###############################################################################
 def test_extract_drugs_from_therapy_uses_rules_before_llm_for_structured_blocks() -> (
@@ -216,7 +206,6 @@ def test_extract_drugs_from_therapy_uses_rules_before_llm_for_structured_blocks(
         "Pantozol",
     ]
 
-
 ###############################################################################
 def test_extract_drugs_from_therapy_splits_reserve_drugs_without_bullets() -> None:
     parser = DrugsParser(client=FailingStructuredClient())
@@ -246,7 +235,6 @@ def test_extract_drugs_from_therapy_splits_reserve_drugs_without_bullets() -> No
         "Rivotril",
     ]
 
-
 ###############################################################################
 def test_extract_drugs_from_therapy_empty_input_is_safe() -> None:
     parser = DrugsParser(client=object())
@@ -254,7 +242,6 @@ def test_extract_drugs_from_therapy_empty_input_is_safe() -> None:
     parsed = asyncio.run(parser.extract_drugs_from_therapy(""))
 
     assert parsed.entries == []
-
 
 ###############################################################################
 def test_normalize_entry_filters_non_drug_fragments() -> None:
@@ -307,7 +294,6 @@ def test_normalize_entry_filters_non_drug_fragments() -> None:
     )
     assert kept is not None
     assert kept.name == "Pemetrexed"
-
 
 ###############################################################################
 def test_post_process_llm_entry_splits_dosage_from_temporal_details() -> None:

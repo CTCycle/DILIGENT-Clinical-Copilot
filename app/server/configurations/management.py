@@ -10,8 +10,6 @@ from urllib.parse import urlparse
 from pydantic import ValidationError
 
 from common.constants import (
-    CLINICAL_MODEL_CHOICES,
-    CLOUD_MODEL_CHOICES,
     DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT,
     DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE,
     DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
@@ -26,7 +24,11 @@ from common.constants import (
     OLLAMA_DEFAULT_HOST,
     OLLAMA_DEFAULT_PORT,
     OLLAMA_DEFAULT_SCHEME,
-    TEXT_EXTRACTION_MODEL_CHOICES,
+)
+from common.catalogs.model_choices import (
+    get_cloud_model_choices,
+    get_clinical_model_choices,
+    get_text_extraction_model_choices,
 )
 from common.paths import CONFIGURATIONS_FILE
 from common.utils.types import (
@@ -54,13 +56,11 @@ from domain.settings.environment import (
     EnvironmentSnapshot,
 )
 
-
 ###############################################################################
 def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
-
 
 ###############################################################################
 def load_configuration_data(path: str | Path) -> dict[str, Any]:
@@ -128,7 +128,6 @@ class ConfigurationManager:
         block = self.get_block(block_name)
         return block.get(key, default)
 
-
 ###############################################################################
 def _resolve_ollama_url_with_scheme(
     normalized_host: str,
@@ -149,14 +148,12 @@ def _resolve_ollama_url_with_scheme(
     resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
     return f"{scheme}://{host_port}:{resolved_port}"
 
-
 ###############################################################################
 def _normalize_ollama_host(host: str) -> str:
     normalized = host.strip()
     if normalized.lower() in {"localhost", "::1", "[::1]"}:
         return "127.0.0.1"
     return normalized
-
 
 ###############################################################################
 def resolve_ollama_base_url(
@@ -183,7 +180,6 @@ def resolve_ollama_base_url(
     if port_value is not None:
         return f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{port_value}"
     return fallback.rstrip("/")
-
 
 ###############################################################################
 def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
@@ -219,17 +215,17 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
         ),
     )
 
-
 ###############################################################################
 def _default_llm_runtime_defaults(
     environment: EnvironmentSnapshot,
 ) -> LLMRuntimeDefaults:
-    text_extraction_default = (
-        TEXT_EXTRACTION_MODEL_CHOICES[0] if TEXT_EXTRACTION_MODEL_CHOICES else ""
-    )
-    clinical_default = CLINICAL_MODEL_CHOICES[0] if CLINICAL_MODEL_CHOICES else ""
+    text_choices = get_text_extraction_model_choices()
+    clinical_choices = get_clinical_model_choices()
+    cloud_choices = get_cloud_model_choices()
+    text_extraction_default = text_choices[0] if text_choices else ""
+    clinical_default = clinical_choices[0] if clinical_choices else ""
     provider_default = "openai"
-    provider_models = CLOUD_MODEL_CHOICES.get(provider_default, [])
+    provider_models = cloud_choices.get(provider_default, [])
     cloud_default = provider_models[0] if provider_models else ""
     return LLMRuntimeDefaults(
         text_extraction_model=text_extraction_default,
@@ -247,7 +243,6 @@ def _default_llm_runtime_defaults(
         ),
     )
 
-
 ###############################################################################
 def _build_fastapi_settings() -> FastAPISettings:
     return FastAPISettings(
@@ -256,7 +251,6 @@ def _build_fastapi_settings() -> FastAPISettings:
         description=FASTAPI_DESCRIPTION,
     )
 
-
 ###############################################################################
 def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     payload = ensure_mapping(data)
@@ -264,7 +258,6 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     if polling_interval <= 0:
         polling_interval = 1.0
     return JobsSettings(polling_interval=polling_interval)
-
 
 ###############################################################################
 def _parse_database_url(url: str | None) -> dict[str, Any]:
@@ -280,7 +273,6 @@ def _parse_database_url(url: str | None) -> dict[str, Any]:
         "username": parsed.username or None,
         "password": parsed.password or None,
     }
-
 
 ###############################################################################
 def _build_database_settings(
@@ -346,7 +338,6 @@ def _build_database_settings(
         select_page_size=select_page_size,
     )
 
-
 ###############################################################################
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     return DrugsMatcherSettings(
@@ -388,7 +379,6 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
             DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
         ),
     )
-
 
 ###############################################################################
 def _build_rag_settings(
@@ -437,7 +427,6 @@ def _build_rag_settings(
         ),
         embedding_max_workers=coerce_positive_int(data.get("embedding_max_workers"), 4),
     )
-
 
 ###############################################################################
 def _build_runtime_settings(
@@ -509,7 +498,6 @@ def _build_runtime_settings(
         ),
     )
 
-
 ###############################################################################
 def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
     min_length = coerce_positive_int(data.get("drug_name_min_length"), 3)
@@ -521,7 +509,6 @@ def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
         drug_name_max_length=max_length,
         drug_name_max_tokens=coerce_positive_int(data.get("drug_name_max_tokens"), 8),
     )
-
 
 ###############################################################################
 def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSettings:
@@ -549,7 +536,6 @@ def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSet
             4,
         ),
     )
-
 
 ###############################################################################
 def build_settings_payload_from_json(

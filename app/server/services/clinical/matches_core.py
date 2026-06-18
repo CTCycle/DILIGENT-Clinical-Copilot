@@ -20,7 +20,6 @@ KT = TypeVar("KT")
 VT = TypeVar("VT")
 CACHE_MISS = object()
 
-
 ###############################################################################
 def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
     values = get_reference_catalog_snapshot().values(
@@ -64,7 +63,6 @@ class BoundedCache(Generic[KT, VT]):
 
 from services.clinical.drug_matcher import DrugMatcher
 from services.clinical.drug_name_service import DrugNameService
-
 
 ###############################################################################
 class DrugsLookup:

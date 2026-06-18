@@ -65,10 +65,15 @@ class ClinicalSessionEndpoint:
         return self.service.cancel_clinical_job(job_id)
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def get_section_template() -> ClinicalSectionTemplateResponse:
+        return get_clinical_section_template()
+
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "/clinical/section-template",
-            get_clinical_section_template,
+            self.get_section_template,
             methods=["GET"],
             response_model=ClinicalSectionTemplateResponse,
             status_code=status.HTTP_200_OK,

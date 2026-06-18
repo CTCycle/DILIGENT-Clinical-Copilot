@@ -8,7 +8,6 @@ from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
 from repositories.serialization.data import DataSerializer
 
-
 ###############################################################################
 def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
 

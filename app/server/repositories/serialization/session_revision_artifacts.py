@@ -27,7 +27,6 @@ from repositories.serialization.session_revision_data import (
     validate_revision_livertox_decision,
 )
 
-
 ###############################################################################
 def persist_revision_artifacts(
     self,
@@ -248,7 +247,6 @@ def persist_revision_artifacts(
     finally:
         db_session.close()
 
-
 ###############################################################################
 def persist_revision_entities(
     self,
@@ -448,7 +446,6 @@ def persist_revision_entities(
     finally:
         db_session.close()
 
-
 ###############################################################################
 def list_revision_artifacts_for_version(
     self,
@@ -473,7 +470,6 @@ def list_revision_artifacts_for_version(
         return [serialize_revision_artifact_row(self, row) for row in rows]
     finally:
         db_session.close()
-
 
 ###############################################################################
 def list_revision_entities_for_version(

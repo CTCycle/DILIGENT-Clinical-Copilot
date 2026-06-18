@@ -18,7 +18,6 @@ from pydantic import ValidationError
 from repositories.serialization.data import DataSerializer
 from services.inspection import DataInspectionService
 
-
 ###############################################################################
 def get_route_owner(router: Any, route_path: str) -> Any:
     for route in router.routes:

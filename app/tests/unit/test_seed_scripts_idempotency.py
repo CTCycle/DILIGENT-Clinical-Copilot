@@ -327,7 +327,6 @@ def test_ensure_drug_conflict_raises() -> None:
         rows = db_session.execute(select(Drug)).scalars().all()
         assert len(rows) == 2
 
-
 ###############################################################################
 def test_text_normalization_runtime_observation_writes_only_runtime_manifest() -> None:
     _, engine = build_serializer()

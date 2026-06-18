@@ -5,7 +5,7 @@ from contextvars import ContextVar, Token
 from datetime import datetime
 from typing import Literal
 
-from common.constants import CLOUD_MODEL_CHOICES
+from common.catalogs.model_choices import get_cloud_model_choices
 from configurations.startup import get_server_settings
 from domain.model_configs import ModelConfigSnapshot
 from domain.settings.configuration import LLMRuntimeDefaults
@@ -29,12 +29,12 @@ class LLMRuntimeConfig:
     @staticmethod
     def _normalize_provider(value: str | None, fallback: str) -> str:
         normalized = (value or "").strip().lower()
-        return normalized if normalized in CLOUD_MODEL_CHOICES else fallback
+        return normalized if normalized in get_cloud_model_choices() else fallback
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _normalize_cloud_model(provider: str, value: str | None, fallback: str) -> str:
-        allowed = CLOUD_MODEL_CHOICES.get(provider, [])
+        allowed = get_cloud_model_choices().get(provider, [])
         normalized = (value or "").strip()
         if normalized and normalized in allowed:
             return normalized

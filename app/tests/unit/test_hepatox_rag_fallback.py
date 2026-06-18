@@ -5,7 +5,6 @@ import asyncio
 from domain.clinical import PatientDrugs
 from services.clinical.hepatox_core import HepatoxConsultation
 
-
 ###############################################################################
 class FailingRagConsultation(HepatoxConsultation):
 
@@ -16,7 +15,6 @@ class FailingRagConsultation(HepatoxConsultation):
     # -------------------------------------------------------------------------
     def search_supporting_documents(self, query_text: str):
         raise RuntimeError("embedding backend unavailable")
-
 
 ###############################################################################
 def test_fetch_rag_documents_degrades_when_embedding_backend_fails() -> None:

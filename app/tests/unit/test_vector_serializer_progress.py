@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from services.rag.vector_serializer import VectorSerializer
 
-
 ###############################################################################
 def test_batch_progress_scales_through_embedding_window() -> None:
     events: list[tuple[float, str]] = []

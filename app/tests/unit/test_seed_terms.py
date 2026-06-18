@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from common.utils.seed_terms import detect_seed_matches, load_seed_term_catalog
 
-
 ###############################################################################
 def test_detects_keywords_and_stopwords_from_catalog() -> None:
     catalog = load_seed_term_catalog()

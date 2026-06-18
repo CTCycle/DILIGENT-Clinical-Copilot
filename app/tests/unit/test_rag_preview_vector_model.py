@@ -3,7 +3,6 @@ from __future__ import annotations
 from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
 
-
 ###############################################################################
 def test_rag_preview_includes_vector_model(monkeypatch) -> None:
     service = DataInspectionService(jobs=JobManager())

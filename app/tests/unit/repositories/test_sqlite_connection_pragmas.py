@@ -4,7 +4,6 @@ import sqlite3
 
 from repositories.database.sqlite import SQLiteRepository
 
-
 ###############################################################################
 def test_sqlite_connection_uses_memory_journal_for_embedded_workspace_writes() -> None:
     connection = sqlite3.connect(":memory:")
