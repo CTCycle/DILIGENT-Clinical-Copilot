@@ -22,6 +22,7 @@ from repositories.serialization import (
     evidence_data,
     rxnav_data,
     session_result_data,
+    session_timelines,
     session_revision_artifacts,
     session_revision_data,
     session_revision_steps,
@@ -202,7 +203,7 @@ class DataSerializer:
 
     # -------------------------------------------------------------------------
     def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
-        return session_result_data.list_session_timelines(self, session_id)
+        return session_timelines.list_session_timelines(self, session_id)
 
     # -------------------------------------------------------------------------
     def get_session_timeline_record(
@@ -210,7 +211,7 @@ class DataSerializer:
         session_id: int,
         timeline_id: int,
     ) -> dict[str, Any] | None:
-        return session_result_data.get_session_timeline_record(
+        return session_timelines.get_session_timeline_record(
             self,
             session_id,
             timeline_id,
@@ -220,15 +221,13 @@ class DataSerializer:
     def get_latest_session_timeline_record(
         self, session_id: int
     ) -> dict[str, Any] | None:
-        return session_result_data.get_latest_session_timeline_record(
-            self, session_id
-        )
+        return session_timelines.get_latest_session_timeline_record(self, session_id)
 
     # -------------------------------------------------------------------------
     def create_session_timeline_record(
         self, session_id: int, payload: dict[str, Any]
     ) -> dict[str, Any] | None:
-        return session_result_data.create_session_timeline_record(
+        return session_timelines.create_session_timeline_record(
             self, session_id, payload
         )
 
@@ -609,7 +608,7 @@ class DataSerializer:
 
     # -------------------------------------------------------------------------
     def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
-        return session_result_data.get_session_timeline_source(self, session_id)
+        return session_timelines.get_session_timeline_source(self, session_id)
 
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:

@@ -58,6 +58,9 @@ from services.inspection.update_config import InspectionUpdateConfigMixin
 from services.inspection.revision_diff import InspectionRevisionDiffMixin
 from services.inspection.revision_decisions import InspectionRevisionDecisionsMixin
 from services.inspection.revision_runner import InspectionRevisionRunnerMixin
+from services.inspection.revision_runner_support import (
+    REVISION_STEP_SEQUENCE as REVISION_STEP_SEQUENCE_VALUE,
+)
 from services.runtime.jobs import JobManager
 from services.text.normalization import normalize_drug_query_name
 
@@ -76,28 +79,7 @@ class DataInspectionService(
     RAG_JOB_TYPE = "rag_update"
     REVISION_JOB_TYPE = "session_revision"
     RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"
-    REVISION_STEP_SEQUENCE: list[tuple[str, str]] = [
-        ("load_source_version", "Loading selected source version"),
-        ("analyze_reviewer_instructions", "Analyzing reviewer instructions"),
-        ("prepare_runtime", "Preparing revision runtime"),
-        ("preprocess_input", "Preprocessing source clinical text"),
-        ("generate_revision", "Generating revised clinical session"),
-        ("resolve_revision_extraction", "Resolving revision extraction bundle"),
-        ("validate_anamnesis_drugs", "Validating revised anamnesis drugs"),
-        (
-            "extract_missing_anamnesis_drugs",
-            "Extracting missing anamnesis drug candidates",
-        ),
-        ("revise_labs_timeline", "Revising structured laboratory timeline"),
-        ("reconcile_revision_candidates", "Reconciling revision candidate selection"),
-        ("merge_revision_snapshot", "Merging revision entity snapshot"),
-        ("resolve_livertox_matches", "Resolving revision LiverTox matches"),
-        ("rerun_dili_assessments", "Rebuilding revision DILI assessments"),
-        ("rebuild_final_report", "Rebuilding revision final report"),
-        ("qa_validate_revision", "Validating rebuilt revision output"),
-        ("persist_revision", "Persisting revision artifacts"),
-        ("finalize_revision_version", "Finalizing revision version state"),
-    ]
+    REVISION_STEP_SEQUENCE = REVISION_STEP_SEQUENCE_VALUE
     UPDATE_PHASES: dict[UpdateTarget, list[PhaseStep]] = {
         "rxnav": [
             ("configuration_accepted", 1, 7, "Configuration accepted"),

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from services.retrieval.embeddings import SimilaritySearch
+from services.retrieval.embeddings import LocalHeuristicReranker, SimilaritySearch
 
 ###############################################################################
 class SearchTableStub:
@@ -133,6 +133,47 @@ def sample_vectors() -> dict[str, list[float]]:
         "beta": [0.98, 0.2],
         "gamma": [0.8, 0.1],
     }
+
+###############################################################################
+def test_local_heuristic_reranker_prefers_stronger_lexical_match() -> None:
+    reranker = LocalHeuristicReranker("lightweight-balanced-v1")
+
+    scores = reranker.predict(
+        [
+            ("drug induced liver injury", "general reference text"),
+            ("drug induced liver injury", "drug induced liver injury guidance"),
+        ]
+    )
+
+    assert scores[1] > scores[0]
+
+###############################################################################
+def test_local_heuristic_reranker_normalizes_alias_profiles() -> None:
+    reranker = LocalHeuristicReranker("lexical")
+
+    assert reranker.model_name == "lightweight-lexical-v1"
+
+###############################################################################
+def test_local_heuristic_reranker_profiles_shift_relative_scores() -> None:
+    lexical_reranker = LocalHeuristicReranker("lightweight-lexical-v1")
+    phrase_reranker = LocalHeuristicReranker("lightweight-phrase-v1")
+
+    lexical_scores = lexical_reranker.predict(
+        [
+            ("drug induced liver injury", "drug induced liver injury guidance"),
+            ("drug induced liver injury", "drug induced liver safety guidance"),
+        ]
+    )
+    phrase_scores = phrase_reranker.predict(
+        [
+            ("drug induced liver injury", "drug induced liver injury guidance"),
+            ("drug induced liver injury", "drug induced liver safety guidance"),
+        ]
+    )
+
+    assert lexical_scores[0] > lexical_scores[1]
+    assert phrase_scores[0] > phrase_scores[1]
+    assert (phrase_scores[0] - phrase_scores[1]) > (lexical_scores[0] - lexical_scores[1])
 
 ###############################################################################
 def test_search_with_reranking_reorders_and_trims_results() -> None:

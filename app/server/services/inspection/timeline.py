@@ -304,7 +304,6 @@ def generate_session_timeline(
                 else LLMRuntimeConfig.is_ollama_reasoning_enabled()
             ),
         }
-        session_payload["patient_timeline"] = timeline.model_dump(mode="json")
         service.serializer.upsert_session_result_payload(session_id, session_payload)
         persisted = service.serializer.create_session_timeline_record(
             session_id,
