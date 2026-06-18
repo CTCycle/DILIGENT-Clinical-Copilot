@@ -502,6 +502,73 @@ def get_rxnav_alias_groups(self, drug_id: int) -> dict[str, Any] | None:
 
 
 ###############################################################################
+def update_rxnav_drug_name(
+    self,
+    drug_id: int,
+    *,
+    drug_name: str,
+) -> dict[str, Any] | None:
+    safe_drug_id = int(drug_id)
+    clean_name = self.normalize_string(drug_name)
+    if clean_name is None:
+        raise ValueError("Drug name is required.")
+    normalized_name = normalize_drug_name(clean_name)
+    if not normalized_name or not self.is_valid_drug_name(clean_name):
+        raise ValueError("Drug name is invalid.")
+
+    db_session = self.session_factory()
+    try:
+        existing = db_session.get(Drug, safe_drug_id)
+        if existing is None:
+            return None
+
+        conflicting = db_session.scalar(
+            select(Drug)
+            .where(
+                Drug.canonical_name_norm == normalized_name,
+                Drug.id != safe_drug_id,
+            )
+            .limit(1)
+        )
+        if conflicting is not None:
+            raise ValueError("Another drug already uses this name.")
+
+        previous_name = self.normalize_string(existing.canonical_name)
+        existing.canonical_name = clean_name
+        existing.canonical_name_norm = normalized_name
+
+        self.upsert_drug_alias(
+            db_session,
+            drug_id=safe_drug_id,
+            alias=clean_name,
+            alias_kind="canonical",
+            source="manual",
+            term_type=None,
+        )
+        if previous_name and previous_name.casefold() != clean_name.casefold():
+            self.upsert_drug_alias(
+                db_session,
+                drug_id=safe_drug_id,
+                alias=previous_name,
+                alias_kind="canonical",
+                source="manual",
+                term_type=None,
+            )
+
+        db_session.commit()
+        return {
+            "drug_id": safe_drug_id,
+            "drug_name": existing.canonical_name,
+            "last_update": self.normalize_date(existing.rxnav_last_update),
+        }
+    except Exception:
+        db_session.rollback()
+        raise
+    finally:
+        db_session.close()
+
+
+###############################################################################
 def list_livertox_catalog(
     self,
     *,

@@ -811,6 +811,18 @@ class DataInspectionService(
         return self.serializer.get_rxnav_alias_groups(drug_id)
 
     # -------------------------------------------------------------------------
+    def update_rxnav_drug_name(
+        self,
+        drug_id: int,
+        *,
+        drug_name: str,
+    ) -> dict[str, Any] | None:
+        return self.serializer.update_rxnav_drug_name(
+            drug_id,
+            drug_name=drug_name,
+        )
+
+    # -------------------------------------------------------------------------
     def list_livertox_catalog(
         self,
         *,

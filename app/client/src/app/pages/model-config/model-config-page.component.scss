@@ -53,23 +53,16 @@
 .model-config-hero {
   width: 100%;
   margin-inline: 0;
-  padding: 0 0 4px;
-}
-
-.model-config-header-compact h1 {
-  color: var(--mc-text);
-  font-family: "Manrope", "Inter", sans-serif;
-  font-size: 28px;
-  font-weight: 780;
-  line-height: 1.1;
+  padding: 0 0 8px;
 }
 
 .model-config-header-compact .lede {
-  max-width: 760px;
-  margin-top: 8px;
+  max-width: 920px;
+  margin-top: 0;
   color: var(--mc-muted);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 520;
 }
 
 .model-config-preview-a-layout {
@@ -583,8 +576,8 @@
 
 .model-config-cloud-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 140px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 16px;
   align-items: center;
   min-height: 64px;
   border-top: 1px solid color-mix(in srgb, var(--mc-border) 64%, transparent);
@@ -614,6 +607,42 @@
   color: #0f172a;
 }
 
+.model-config-openai-mark {
+  position: relative;
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.model-config-openai-mark span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 11px;
+  margin-left: -3.5px;
+  margin-top: -9.5px;
+  border: 2.2px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  transform-origin: 50% 8px;
+}
+
+.model-config-openai-mark span:nth-child(1) { transform: rotate(0deg) translateY(-4px); }
+.model-config-openai-mark span:nth-child(2) { transform: rotate(60deg) translateY(-4px); }
+.model-config-openai-mark span:nth-child(3) { transform: rotate(120deg) translateY(-4px); }
+.model-config-openai-mark span:nth-child(4) { transform: rotate(180deg) translateY(-4px); }
+.model-config-openai-mark span:nth-child(5) { transform: rotate(240deg) translateY(-4px); }
+.model-config-openai-mark span:nth-child(6) { transform: rotate(300deg) translateY(-4px); }
+
+.model-config-openai-mark::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1.6px solid currentColor;
+  border-radius: 50%;
+  background: var(--mc-surface);
+}
 
 .model-config-provider-mark img {
   width: 22px;
@@ -621,11 +650,6 @@
   object-fit: contain;
   display: block;
 }
-
-:host-context([data-theme="dark"]) .model-config-provider-mark.is-openai img {
-  filter: invert(1) brightness(1.65);
-}
-
 
 .model-config-provider-name strong,
 .model-config-provider-name small {
@@ -741,6 +765,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-width: 180px;
   min-height: 38px;
   border: 1px solid var(--mc-border-strong);
   border-radius: var(--radius-sm);
@@ -750,8 +775,9 @@
   font-size: var(--font-xs);
   font-weight: 760;
   white-space: nowrap;
-  align-self: end;
-  margin-bottom: 1px;
+  justify-self: end;
+  align-self: center;
+  margin-bottom: 0;
 }
 
 .model-config-test-btn svg,

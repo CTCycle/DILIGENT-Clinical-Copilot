@@ -489,6 +489,20 @@ class RxNavCatalogResponse(BaseModel):
     limit: int
 
 ###############################################################################
+class RxNavCatalogUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    drug_name: str = Field(..., min_length=1, max_length=200)
+
+    # -------------------------------------------------------------------------
+    @field_validator("drug_name", mode="before")
+    @classmethod
+    def normalize_drug_name(cls, value: Any) -> str:
+        normalized = CONTROL_CHARACTERS_RE.sub(" ", str(value or "")).strip()
+        if not normalized:
+            raise ValueError("Drug name is required.")
+        return normalized
+
+###############################################################################
 class DrugAliasEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
     alias: str

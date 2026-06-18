@@ -26,6 +26,7 @@ import {
   startInspectionLiverToxUpdateJob,
   startInspectionRagUpdateJob,
   startInspectionRxNavUpdateJob,
+  updateInspectionRxNavDrug,
 } from '../../core/services/inspection-api';
 import { JobPollingService } from '../../core/services/job-polling.service';
 import {
@@ -156,6 +157,10 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly aliasData = this.aliasDetail.data;
   readonly aliasLoading = this.aliasDetail.loading;
   readonly aliasError = this.aliasDetail.error;
+  readonly rxnavEditItem = signal<InspectionRxNavItem | null>(null);
+  readonly rxnavEditValue = signal('');
+  readonly rxnavEditError = signal<string | null>(null);
+  readonly rxnavEditSaving = signal(false);
 
   private readonly excerptDetail = new InspectionDetailResource<InspectionLiverToxExcerptResponse>();
   readonly excerptData = this.excerptDetail.data;
@@ -293,6 +298,55 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   closeAliases(): void {
     this.aliasDetail.close();
+  }
+
+  openRxNavEdit(row: InspectionRxNavItem): void {
+    this.rxnavEditItem.set(row);
+    this.rxnavEditValue.set(row.drug_name);
+    this.rxnavEditError.set(null);
+  }
+
+  closeRxNavEdit(): void {
+    if (this.rxnavEditSaving()) {
+      return;
+    }
+    this.rxnavEditItem.set(null);
+    this.rxnavEditValue.set('');
+    this.rxnavEditError.set(null);
+  }
+
+  setRxNavEditValue(value: string): void {
+    this.rxnavEditValue.set(value);
+    if (this.rxnavEditError()) {
+      this.rxnavEditError.set(null);
+    }
+  }
+
+  async saveRxNavEdit(): Promise<void> {
+    const item = this.rxnavEditItem();
+    const drugName = this.rxnavEditValue().trim();
+    if (!item) {
+      return;
+    }
+    if (!drugName) {
+      this.rxnavEditError.set('[ERROR] Drug name is required.');
+      return;
+    }
+    this.rxnavEditSaving.set(true);
+    this.rxnavEditError.set(null);
+    try {
+      await updateInspectionRxNavDrug(item.drug_id, { drug_name: drugName });
+      await this.loadRxNav();
+      this.rxnavEditItem.set(null);
+      this.rxnavEditValue.set('');
+      this.rxnavEditError.set(null);
+    } catch (error) {
+      this.rxnavEditError.set(
+        error instanceof Error ? error.message : '[ERROR] Failed to update the RxNav entry.',
+      );
+    } finally {
+      this.rxnavEditSaving.set(false);
+    }
   }
 
   async removeRxNavDrug(drugId: number): Promise<void> {

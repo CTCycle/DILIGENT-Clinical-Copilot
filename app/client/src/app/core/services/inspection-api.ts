@@ -11,6 +11,7 @@ import {
   InspectionRagVectorStoreSummary,
   InspectionRxNavCatalogResponse,
   InspectionRxNavOverrideRequest,
+  InspectionRxNavUpdateRequest,
   InspectionSessionCatalogResponse,
   InspectionSessionQuery,
   InspectionSessionTimeline,
@@ -316,6 +317,22 @@ export async function deleteInspectionRxNavDrug(
   return requestJson<InspectionDeleteResponse>(
     `${API_BASE_URL}/inspection/rxnav/${encodeURIComponent(String(drugId))}`,
     { method: "DELETE" },
+  );
+}
+
+export async function updateInspectionRxNavDrug(
+  drugId: number,
+  payload: InspectionRxNavUpdateRequest,
+): Promise<InspectionRxNavCatalogResponse["items"][number]> {
+  return requestJson<InspectionRxNavCatalogResponse["items"][number]>(
+    `${API_BASE_URL}/inspection/rxnav/${encodeURIComponent(String(drugId))}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
   );
 }
 
