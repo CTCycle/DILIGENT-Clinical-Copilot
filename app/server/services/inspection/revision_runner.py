@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any
 
 from configurations.llm_configs import LLMRuntimeConfig
@@ -14,43 +15,20 @@ from services.clinical.revision.qa import build_revision_qa_validation_payload
 from services.clinical.revision.report_builder import (
     build_revision_final_report_payload,
 )
+from services.inspection.revision_runner_support import (
+    REVISION_STEP_SEQUENCE,
+    derive_revision_qa_outcome,
+    derive_revision_run_actor_source,
+    ensure_revision_not_cancelled,
+    get_revision_entity_pipeline,
+    report_revision_progress,
+    summarize_revision_entity_stage_payload,
+)
 from services.session.factory import build_clinical_session_service
 
 
 ###############################################################################
 class InspectionRevisionRunnerMixin:
-    REVISION_STEP_SEQUENCE: list[tuple[str, str]] = [
-        ("load_source_version", "Loading selected source version"),
-        ("analyze_reviewer_instructions", "Analyzing reviewer instructions"),
-        ("prepare_runtime", "Preparing revision runtime"),
-        ("preprocess_input", "Preprocessing source clinical text"),
-        ("generate_revision", "Generating revised clinical session"),
-        ("resolve_revision_extraction", "Resolving revision extraction bundle"),
-        ("validate_anamnesis_drugs", "Validating revised anamnesis drugs"),
-        (
-            "extract_missing_anamnesis_drugs",
-            "Extracting missing anamnesis drug candidates",
-        ),
-        ("revise_labs_timeline", "Revising structured laboratory timeline"),
-        ("reconcile_revision_candidates", "Reconciling revision candidate selection"),
-        ("merge_revision_snapshot", "Merging revision entity snapshot"),
-        ("resolve_livertox_matches", "Resolving revision LiverTox matches"),
-        ("rerun_dili_assessments", "Rebuilding revision DILI assessments"),
-        ("rebuild_final_report", "Rebuilding revision final report"),
-        ("qa_validate_revision", "Validating rebuilt revision output"),
-        ("persist_revision", "Persisting revision artifacts"),
-        ("finalize_revision_version", "Finalizing revision version state"),
-    ]
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _revision_run_actor_source(metadata: dict[str, Any]) -> str:
-        return (
-            "manual_entry"
-            if str((metadata or {}).get("reviewer") or "").strip()
-            else "unknown"
-        )
-
     # -------------------------------------------------------------------------
     def _start_revision_background_job(
         self,
@@ -109,7 +87,7 @@ class InspectionRevisionRunnerMixin:
             (
                 index
                 for index, (candidate_name, _) in enumerate(
-                    self.REVISION_STEP_SEQUENCE, start=1
+                    REVISION_STEP_SEQUENCE, start=1
                 )
                 if candidate_name == step_name
             ),
@@ -121,7 +99,7 @@ class InspectionRevisionRunnerMixin:
             pipeline_run_id=pipeline_run_id,
             step_name=step_name,
             step_index=step_index,
-            step_count=len(self.REVISION_STEP_SEQUENCE),
+            step_count=len(REVISION_STEP_SEQUENCE),
             input_summary=input_summary,
             input_payload=input_payload,
             model_name=model_name,
@@ -166,127 +144,6 @@ class InspectionRevisionRunnerMixin:
             error={"message": str(exc)[:500]},
             latency_ms=latency_ms,
         )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _derive_revision_qa_outcome(
-        result_payload: dict[str, Any],
-    ) -> tuple[str, str]:
-        revision_payload = result_payload.get("revision")
-        if isinstance(revision_payload, dict):
-            qa_validation = revision_payload.get("qa_validation")
-            if isinstance(qa_validation, dict):
-                version_status = str(qa_validation.get("version_status") or "").strip()
-                qa_status = str(qa_validation.get("status") or "").strip()
-                if version_status in {
-                    "llm_qa_passed",
-                    "qa_failed",
-                    "requires_human_review",
-                } and qa_status in {
-                    "passed",
-                    "passed_with_warnings",
-                    "failed",
-                    "requires_human_review",
-                }:
-                    return version_status, qa_status
-        blocking_issues = result_payload.get("blocking_issues")
-        if isinstance(blocking_issues, list) and blocking_issues:
-            return "qa_failed", "failed"
-        if bool(result_payload.get("manual_review_required")):
-            return "requires_human_review", "requires_human_review"
-        pipeline_artifacts = result_payload.get("pipeline_artifacts")
-        if isinstance(pipeline_artifacts, dict) and isinstance(
-            pipeline_artifacts.get("faithfulness_audit"),
-            dict,
-        ):
-            return "llm_qa_passed", "passed"
-        return "requires_human_review", "not_run"
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _get_revision_entity_pipeline(
-        result_payload: dict[str, Any],
-    ) -> dict[str, dict[str, Any]]:
-        revision_payload = result_payload.get("revision")
-        if not isinstance(revision_payload, dict):
-            return {}
-        entity_pipeline = revision_payload.get("entity_pipeline")
-        if not isinstance(entity_pipeline, dict):
-            return {}
-        return {
-            str(step_name): payload
-            for step_name, payload in entity_pipeline.items()
-            if isinstance(step_name, str) and isinstance(payload, dict)
-        }
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _summarize_revision_entity_stage_payload(
-        step_name: str,
-        payload: dict[str, Any],
-    ) -> dict[str, Any]:
-        if step_name == "validate_anamnesis_drugs":
-            return {
-                "status": payload.get("status"),
-                "deterministic_detected_count": len(
-                    payload.get("deterministic_detected_names") or []
-                ),
-                "revised_detected_count": len(
-                    payload.get("revised_detected_names") or []
-                ),
-                "supplemental_detected_count": len(
-                    payload.get("revised_only_names") or []
-                ),
-            }
-        if step_name == "resolve_revision_extraction":
-            return {
-                "status": payload.get("status"),
-                "therapy_source": payload.get("therapy_source"),
-                "anamnesis_source": payload.get("anamnesis_source"),
-                "disease_source": payload.get("disease_source"),
-                "therapy_structured_count": len(
-                    payload.get("therapy_structured_names") or []
-                ),
-                "anamnesis_structured_count": len(
-                    payload.get("anamnesis_structured_names") or []
-                ),
-                "disease_deterministic_count": len(
-                    payload.get("disease_deterministic_names") or []
-                ),
-            }
-        if step_name == "extract_missing_anamnesis_drugs":
-            return {
-                "status": payload.get("status"),
-                "supplemental_drug_count": len(
-                    payload.get("supplemental_drug_names") or []
-                ),
-            }
-        if step_name == "revise_labs_timeline":
-            return {
-                "status": payload.get("status"),
-                "lab_entry_count": int(payload.get("lab_entry_count") or 0),
-                "marker_count": len(payload.get("marker_names") or []),
-            }
-        if step_name == "reconcile_revision_candidates":
-            return {
-                "status": payload.get("status"),
-                "analysis_drug_count": len(payload.get("analysis_drug_names") or []),
-                "relevant_drug_count": len(payload.get("relevant_drug_names") or []),
-                "unresolved_drug_count": len(
-                    payload.get("unresolved_drug_names") or []
-                ),
-            }
-        if step_name == "merge_revision_snapshot":
-            return {
-                "status": payload.get("status"),
-                "therapy_drug_count": len(payload.get("therapy_drug_names") or []),
-                "anamnesis_drug_count": len(payload.get("anamnesis_drug_names") or []),
-                "analysis_drug_count": len(payload.get("analysis_drug_names") or []),
-                "rucam_assessment_count": int(
-                    payload.get("rucam_assessment_count") or 0
-                ),
-            }
-        return {"status": payload.get("status")}
 
     # -------------------------------------------------------------------------
     def start_revision_job(
@@ -344,7 +201,7 @@ class InspectionRevisionRunnerMixin:
             reviewer_note=str(metadata.get("revision_note") or "").strip() or None,
             status="running",
             initiated_by=str(metadata.get("reviewer") or "").strip() or None,
-            actor_source=self._revision_run_actor_source(metadata),
+            actor_source=derive_revision_run_actor_source(metadata),
             actor_confidence="unverified",
             started_at=datetime.now(UTC),
             trace_id=pipeline_run_id,
@@ -427,7 +284,7 @@ class InspectionRevisionRunnerMixin:
             reviewer_note=str(metadata.get("revision_note") or "").strip() or None,
             status="running",
             initiated_by=str(metadata.get("reviewer") or "").strip() or None,
-            actor_source=self._revision_run_actor_source(metadata),
+            actor_source=derive_revision_run_actor_source(metadata),
             actor_confidence="unverified",
             started_at=datetime.now(UTC),
             completed_at=None,
@@ -523,19 +380,9 @@ class InspectionRevisionRunnerMixin:
             model_overrides=effective_overrides,
             metadata=metadata,
         )
-        actor_source = self._revision_run_actor_source(metadata)
-
-        def report_revision_progress(
-            _stage: str,
-            progress: float,
-            _detail: str | None = None,
-        ) -> None:
-            if job_id:
-                self.jobs.update_progress(job_id, progress)
-
-        def ensure_revision_not_cancelled() -> None:
-            if job_id and self.jobs.should_stop(job_id):
-                raise RuntimeError("Revision job was cancelled")
+        actor_source = derive_revision_run_actor_source(metadata)
+        progress_callback = partial(report_revision_progress, self.jobs, job_id)
+        stop_check = partial(ensure_revision_not_cancelled, self.jobs, job_id)
 
         try:
             load_step_started_at = datetime.now(UTC)
@@ -801,8 +648,8 @@ class InspectionRevisionRunnerMixin:
                             },
                             original_session_text=source_text,
                             revision_focus_context=revision_focus_context,
-                            progress_callback=report_revision_progress,
-                            stop_check=ensure_revision_not_cancelled,
+                            progress_callback=progress_callback,
+                            stop_check=stop_check,
                         )
                     )
                 except Exception as exc:
@@ -831,7 +678,7 @@ class InspectionRevisionRunnerMixin:
                         ),
                     },
                 )
-                entity_pipeline = self._get_revision_entity_pipeline(result_payload)
+                entity_pipeline = get_revision_entity_pipeline(result_payload)
                 for step_name in (
                     "resolve_revision_extraction",
                     "validate_anamnesis_drugs",
@@ -852,7 +699,7 @@ class InspectionRevisionRunnerMixin:
                         step_name=step_name,
                         attempt_number=int(step["attempt_number"]),
                         started_at=step_started_at,
-                        output_summary=self._summarize_revision_entity_stage_payload(
+                        output_summary=summarize_revision_entity_stage_payload(
                             step_name,
                             step_payload,
                         ),
@@ -980,7 +827,7 @@ class InspectionRevisionRunnerMixin:
                 revision_payload["qa_validation"] = (
                     qa_validation_payload.model_dump()
                 )
-                version_status, llm_qa_status = self._derive_revision_qa_outcome(
+                version_status, llm_qa_status = derive_revision_qa_outcome(
                     result_payload
                 )
                 self.serializer.upsert_session_result_payload(

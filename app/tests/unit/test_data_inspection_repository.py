@@ -527,16 +527,16 @@ def test_timeline_generation_marks_fallback_payload() -> None:
     assert history[0]["generation_status"] == "fallback"
 
 ###############################################################################
-def test_legacy_session_payload_timeline_remains_readable_without_history_records() -> None:
+def test_session_payload_timeline_is_not_read_as_history_record() -> None:
     serializer, _ = build_serializer()
-    legacy_timeline = PatientTimeline(
+    payload_timeline = PatientTimeline(
         session_id=1,
         generated_at=datetime(2025, 1, 2, 9, 15),
         generation_status="llm_generated",
         events=[
             PatientTimelineEvent(
-                event_id="legacy-1",
-                title="Legacy timeline event",
+                event_id="payload-1",
+                title="Payload-only timeline event",
                 event_type="other",
                 timing_type="relative",
                 sort_order=10,
@@ -545,15 +545,15 @@ def test_legacy_session_payload_timeline_remains_readable_without_history_record
     )
     save_session(
         serializer,
-        patient_name="Legacy Timeline Patient",
+        patient_name="Payload Timeline Patient",
         timestamp=datetime(2025, 1, 1, 8, 30),
         status="successful",
-        report="Legacy timeline report",
-        anamnesis="Legacy timeline context.",
-        payload={"patient_timeline": legacy_timeline.model_dump(mode="json")},
+        report="Payload timeline report",
+        anamnesis="Payload timeline context.",
+        payload={"patient_timeline": payload_timeline.model_dump(mode="json")},
     )
     session_rows, _ = serializer.list_sessions(
-        search="Legacy Timeline Patient",
+        search="Payload Timeline Patient",
         status_filter=None,
         date_mode=None,
         filter_date=None,
@@ -568,12 +568,7 @@ def test_legacy_session_payload_timeline_remains_readable_without_history_record
     )
 
     latest = service.get_session_timeline(session_id)
-    assert latest is not None
-    assert latest.timeline_id is None
-    assert latest.source_kind == "legacy"
-    assert latest.events[0].title == "Legacy timeline event"
+    assert latest is None
 
     previews = serializer.list_session_timelines(session_id)
-    assert len(previews) == 1
-    assert previews[0]["timeline_id"] is None
-    assert previews[0]["title"] == "Legacy timeline event"
+    assert previews == []

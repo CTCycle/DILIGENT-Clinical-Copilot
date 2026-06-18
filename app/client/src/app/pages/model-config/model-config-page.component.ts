@@ -57,6 +57,11 @@ const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
 };
 
 const DEFAULT_RAG_SETTINGS_SECTION: RagSettingsSectionKey = 'general';
+const RERANKER_PROFILE_OPTIONS = [
+  { value: 'lightweight-balanced-v1', label: 'Balanced' },
+  { value: 'lightweight-lexical-v1', label: 'Lexical' },
+  { value: 'lightweight-phrase-v1', label: 'Phrase' },
+] as const;
 
 const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
   chunk_size: 1024,
@@ -66,7 +71,7 @@ const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
   use_reranking: true,
   retrieval_candidate_count: 40,
   retrieval_selected_count: 6,
-  reranker_model: 'cross-encoder/ms-marco-MiniLM-L-6-v2',
+  reranker_model: 'lightweight-balanced-v1',
   hybrid_vector_weight: 0.7,
   hybrid_text_weight: 0.3,
   embedding_backend: 'ollama',
@@ -110,6 +115,7 @@ export class ModelConfigPageComponent implements OnInit {
   private readonly modelPullJobs = inject(ModelPullJobService);
 
   readonly modelFilters = MODEL_FILTERS;
+  readonly rerankerProfileOptions = RERANKER_PROFILE_OPTIONS;
 
   readonly isLoading = signal(true);
   readonly hasLoadedConfig = signal(false);
@@ -379,9 +385,13 @@ export class ModelConfigPageComponent implements OnInit {
   }
 
   private normalizeRagSettings(settings: Partial<RagSettings> | null | undefined): DraftRagSettings {
+    const rerankerModel = typeof settings?.reranker_model === 'string'
+      ? settings.reranker_model.trim()
+      : '';
     return {
       ...DEFAULT_RAG_SETTINGS,
       ...(settings || {}),
+      reranker_model: rerankerModel || DEFAULT_RAG_SETTINGS.reranker_model,
       retrieval_candidate_count: this.coercePositiveInteger(
         settings?.retrieval_candidate_count,
         DEFAULT_RAG_SETTINGS.retrieval_candidate_count,
