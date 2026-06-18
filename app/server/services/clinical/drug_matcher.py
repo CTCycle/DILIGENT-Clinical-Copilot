@@ -7,7 +7,6 @@ from domain.clinical.matching import LiverToxMatch, MonographRecord
 # Sentinel used to distinguish cache hits from None-valued cache entries.
 CACHE_MISS = object()
 
-
 ###############################################################################
 class DrugMatcher:
     """Drug matching workflow — multi-stage pipeline, result creation, diagnostics."""

@@ -3,7 +3,6 @@ from __future__ import annotations
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.clinical.parser import DrugsParser
 
-
 ###############################################################################
 def test_deterministic_anamnesis_regimen_extraction_captures_oncology_history() -> None:
     parser = DrugsParser(client=object())
@@ -24,7 +23,6 @@ def test_deterministic_anamnesis_regimen_extraction_captures_oncology_history() 
     assert "Olaparib" in names
     assert "Gemcitabina" in names
     assert result.regimen_lines
-
 
 ###############################################################################
 def test_deterministic_disease_extraction_captures_hepatic_and_oncologic_context() -> (

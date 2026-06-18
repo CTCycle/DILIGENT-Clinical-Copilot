@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from common import constants, paths
 
-
 ###############################################################################
 def test_common_constants_no_longer_exposes_shared_paths() -> None:
     forbidden_names = {

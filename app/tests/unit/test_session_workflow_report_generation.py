@@ -17,7 +17,6 @@ from domain.clinical.entities import (
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.session_workflow import process_single_patient_workflow
 
-
 ###############################################################################
 class FakePatternAnalyzer:
 
@@ -31,7 +30,6 @@ class FakePatternAnalyzer:
             else "Not available"
         }
 
-
 ###############################################################################
 class FakeDrugsParser:
     model = "test-parser"
@@ -40,7 +38,6 @@ class FakeDrugsParser:
     def clean_text(self, text: str) -> str:
         return text
 
-
 ###############################################################################
 class FakeSerializer:
 
@@ -48,7 +45,6 @@ class FakeSerializer:
     def save_clinical_session(self, payload: dict[str, Any]) -> int | None:
         self.saved_payload = payload
         return None
-
 
 ###############################################################################
 class FakeClinicalService:
@@ -186,7 +182,6 @@ class FakeClinicalService:
             else:
                 serialized.append(dict(issue))
         return serialized
-
 
 ###############################################################################
 def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:

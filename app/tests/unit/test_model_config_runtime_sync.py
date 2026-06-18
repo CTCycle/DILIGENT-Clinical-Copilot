@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from services.llm.model_config import ModelConfigService
 
-
 ###############################################################################
 def test_model_config_service_ensure_defaults_applies_snapshot(monkeypatch) -> None:
     sentinel_snapshot = object()

@@ -23,7 +23,6 @@ from services.updater.rxnav_client import (
     run_with_semaphore,
 )
 
-
 ###############################################################################
 class RxNavDrugCatalogBuilder:
     TERMS_URL = "https://rxnav.nlm.nih.gov/REST/RxTerms/allconcepts.json"

@@ -107,7 +107,6 @@ async def download_bulk_data(
         "source_url": metadata["source_url"],
     }
 
-
 ###############################################################################
 def refresh_master_list(
     self,
@@ -141,7 +140,6 @@ def refresh_master_list(
     metadata["records"] = len(sanitized.index)
 
     return metadata, sanitized
-
 
 ###############################################################################
 async def download_master_list(
@@ -203,7 +201,6 @@ async def download_master_list(
         "source_url": metadata["source_url"],
     }
 
-
 ###############################################################################
 async def resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
     try:
@@ -216,7 +213,6 @@ async def resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
         logger.warning("Primary FTP lookup failed: %s", exc)
         fallback_url = await resolve_master_list_via_datagov(self, client)
         return fallback_url
-
 
 ###############################################################################
 async def resolve_master_list_from_bookshelf(self, client: httpx.AsyncClient) -> str:
@@ -275,7 +271,6 @@ async def resolve_master_list_from_bookshelf(self, client: httpx.AsyncClient) ->
 
     raise RuntimeError("Unable to resolve master list via Bookshelf report page")
 
-
 ###############################################################################
 async def resolve_master_list_from_bin(
     self, client: httpx.AsyncClient, base_url: str
@@ -328,7 +323,6 @@ async def resolve_master_list_from_bin(
     candidates.sort(key=lambda item: item[0])
     chosen_url = candidates[0][0]
     return chosen_url
-
 
 ###############################################################################
 async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> str:
@@ -413,7 +407,6 @@ async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> st
         ) from last_error
     raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
 
-
 ###############################################################################
 def normalize_datagov_resource_url(self, url: str) -> str | None:
     normalized = url.strip()
@@ -426,7 +419,6 @@ def normalize_datagov_resource_url(self, url: str) -> str | None:
     if normalized.startswith("//"):
         return f"https:{normalized}"
     return None
-
 
 ###############################################################################
 async def probe_master_list_candidate(
@@ -446,7 +438,6 @@ async def probe_master_list_candidate(
             return str(response.url)
         raise RuntimeError("Candidate does not appear to be an Excel file")
     return str(response.url)
-
 
 ###############################################################################
 async def fetch_candidate_with_get(
@@ -472,7 +463,6 @@ async def fetch_candidate_with_get(
         else:
             raise RuntimeError("Master list candidate returned HTTP error") from exc
     return response
-
 
 ###############################################################################
 def collect_local_archive_info(self, archive_path: str) -> dict[str, Any]:

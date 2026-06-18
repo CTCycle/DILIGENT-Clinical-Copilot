@@ -43,7 +43,6 @@ def build_error_payload(
         retryable=retryable,
     ).model_dump()
 
-
 ###############################################################################
 def make_json_safe(value: object) -> object:
     if isinstance(value, dict):

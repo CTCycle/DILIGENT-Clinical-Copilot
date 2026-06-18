@@ -63,7 +63,7 @@ class HepatotoxicityPatternCalculator:
 
 ###############################################################################
 class HepatotoxicityPatternAnalyzer:
-    
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.r_score: float | None = None

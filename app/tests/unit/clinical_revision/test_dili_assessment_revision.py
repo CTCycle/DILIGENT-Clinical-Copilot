@@ -5,7 +5,6 @@ from services.inspection.service import (
     ReviewerInstructionProfile,
 )
 
-
 ###############################################################################
 def test_revised_dili_assessment_tracks_previous_version_changes() -> None:
     assessments = DataInspectionService.build_revised_dili_assessments(
@@ -42,7 +41,6 @@ def test_revised_dili_assessment_tracks_previous_version_changes() -> None:
     assert assessments[0]["previous_assessment_present"] is True
     assert assessments[0]["requires_human_review"] is False
 
-
 ###############################################################################
 def test_revised_dili_assessment_requires_human_review_without_match_and_when_challenged() -> None:
     profile = ReviewerInstructionProfile(
@@ -72,7 +70,6 @@ def test_revised_dili_assessment_requires_human_review_without_match_and_when_ch
     assert assessments[0]["requires_human_review"] is True
     assert "No reliable LiverTox match is available for this revised drug." in assessments[0]["unresolved_questions"]
     assert "Reviewer explicitly requested reassessment of causality reasoning." in assessments[0]["unresolved_questions"]
-
 
 ###############################################################################
 def test_revised_dili_assessment_notes_retained_previous_assessment_when_unchanged() -> None:

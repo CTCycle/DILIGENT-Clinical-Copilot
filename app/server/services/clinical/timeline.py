@@ -5,7 +5,7 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
-from common.constants import CLOUD_MODEL_CHOICES
+from common.catalogs.model_choices import get_cloud_model_choices
 from common.prompts.timeline import PATIENT_TIMELINE_EXTRACTION_PROMPT
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
@@ -78,9 +78,9 @@ class PatientTimelineExtractor:
         llm_provider = cls._coerce_optional_text(
             runtime_settings.get("llm_provider")
         ).lower()
-        if llm_provider not in CLOUD_MODEL_CHOICES:
+        if llm_provider not in get_cloud_model_choices():
             llm_provider = LLMRuntimeConfig.get_llm_provider().strip().lower()
-        if llm_provider not in CLOUD_MODEL_CHOICES:
+        if llm_provider not in get_cloud_model_choices():
             llm_provider = "openai"
 
         if use_cloud_services:

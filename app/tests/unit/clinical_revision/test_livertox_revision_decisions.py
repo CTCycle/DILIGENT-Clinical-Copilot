@@ -5,7 +5,6 @@ from services.inspection.service import (
     ReviewerInstructionProfile,
 )
 
-
 ###############################################################################
 def test_livertox_revision_decisions_reuse_high_confidence_previous_match() -> None:
     decisions = DataInspectionService.build_revision_livertox_decisions(
@@ -30,7 +29,6 @@ def test_livertox_revision_decisions_reuse_high_confidence_previous_match() -> N
     assert decisions[0]["decision"] == "reused_high_confidence_previous_match"
     assert decisions[0]["source"] == "previous_version"
     assert decisions[0]["requires_human_review"] is False
-
 
 ###############################################################################
 def test_livertox_revision_decisions_force_refresh_when_reviewer_challenges_matching() -> None:
@@ -62,7 +60,6 @@ def test_livertox_revision_decisions_force_refresh_when_reviewer_challenges_matc
     assert decisions[0]["decision"] == "llm_assisted_resolved_match"
     assert decisions[0]["reviewer_challenged"] is True
     assert decisions[0]["source"] == "llm_fallback"
-
 
 ###############################################################################
 def test_livertox_revision_decisions_require_human_review_for_missing_match() -> None:

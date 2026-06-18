@@ -4,7 +4,6 @@ import asyncio
 
 from services.runtime.async_batches import run_batched_in_order
 
-
 ###############################################################################
 def test_run_batched_in_order_preserves_order() -> None:
     async def worker(item: int) -> int:
@@ -21,7 +20,6 @@ def test_run_batched_in_order_preserves_order() -> None:
     )
     assert result == [2, 4, 6, 8]
 
-
 ###############################################################################
 def test_run_batched_in_order_empty_input() -> None:
     async def worker(item: int) -> int:
@@ -36,7 +34,6 @@ def test_run_batched_in_order_empty_input() -> None:
         )
     )
     assert result == []
-
 
 ###############################################################################
 def test_run_batched_in_order_propagates_exceptions() -> None:

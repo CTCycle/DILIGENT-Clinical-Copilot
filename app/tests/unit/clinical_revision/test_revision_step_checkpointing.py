@@ -6,13 +6,11 @@ from repositories.schemas.models import Base
 from repositories.serialization.data import DataSerializer
 from sqlalchemy import create_engine
 
-
 ###############################################################################
 def build_serializer() -> DataSerializer:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     return DataSerializer(engine=engine)
-
 
 ###############################################################################
 def test_revision_step_retry_supersedes_previous_attempt_and_increments_retry_count() -> None:

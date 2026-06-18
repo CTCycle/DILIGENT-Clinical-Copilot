@@ -7,13 +7,11 @@ from repositories.serialization.data import DataSerializer
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 def build_serializer() -> tuple[DataSerializer, sessionmaker]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     return DataSerializer(engine=engine), sessionmaker(bind=engine, future=True)
-
 
 ###############################################################################
 def seed_session(serializer: DataSerializer) -> int:
@@ -34,7 +32,6 @@ def seed_session(serializer: DataSerializer) -> int:
     if session_id is None:
         raise AssertionError("Session seed failed")
     return session_id
-
 
 ###############################################################################
 def test_manual_edit_updates_report_without_mutating_source_text_or_version() -> None:

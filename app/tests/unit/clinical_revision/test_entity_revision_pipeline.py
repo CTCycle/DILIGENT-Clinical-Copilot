@@ -24,11 +24,9 @@ FIXTURE_PATH = (
     / "entity_revision_cases.json"
 )
 
-
 ###############################################################################
 def _load_cases() -> list[dict[str, object]]:
     return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
-
 
 ###############################################################################
 def test_entity_revision_pipeline_fixture_case_produces_expected_stages() -> None:

@@ -9,7 +9,7 @@ from typing import Any, Literal, Protocol, cast
 
 import httpx
 
-from common.constants import CLOUD_MODEL_CHOICES
+from common.catalogs.model_choices import get_cloud_model_choices
 from common.paths import VECTOR_DB_PATH
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
@@ -357,10 +357,10 @@ def select_embedding_provider(
         if not cloud_embedding_model:
             raise ValueError("Cloud embedding model is required")
         provider_normalized = cloud_provider.lower().strip()
-        if provider_normalized not in CLOUD_MODEL_CHOICES:
+        if provider_normalized not in get_cloud_model_choices():
             raise ValueError(
                 f"Unsupported cloud provider: {cloud_provider}. "
-                f"Allowed: {', '.join(CLOUD_MODEL_CHOICES.keys())}"
+                f"Allowed: {', '.join(get_cloud_model_choices().keys())}"
             )
         return CloudEmbeddingGenerator(
             provider=cast(ProviderName, provider_normalized),

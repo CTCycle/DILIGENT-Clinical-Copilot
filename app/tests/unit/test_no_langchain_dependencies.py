@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 ###############################################################################
 def test_no_forbidden_dependency_strings_remain() -> None:
     repo_root = Path(__file__).resolve().parents[3]

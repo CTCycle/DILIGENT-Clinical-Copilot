@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from time import monotonic
 from typing import Any, Protocol, cast
 
-from common.constants import CLOUD_MODEL_CHOICES
+from common.catalogs.model_choices import get_cloud_model_choices
 from common.exceptions import ServiceValidationError
 from common.paths import VECTOR_DB_PATH
 from common.utils.catalog_loader import CatalogLoader
@@ -440,7 +440,7 @@ class ModelConfigService:
         if model_name is None:
             return None
         if use_cloud_models:
-            cloud_model_names = set(CLOUD_MODEL_CHOICES.get(cloud_provider, []))
+            cloud_model_names = set(get_cloud_model_choices().get(cloud_provider, []))
             if not cloud_model_names:
                 raise ServiceValidationError(
                     f"No cloud models are available for provider '{cloud_provider}'.",
@@ -463,17 +463,17 @@ class ModelConfigService:
     @staticmethod
     def resolve_provider(provider: str | None) -> str:
         normalized = (provider or "").strip().lower()
-        if normalized in CLOUD_MODEL_CHOICES:
+        if normalized in get_cloud_model_choices():
             return normalized
-        if LLMRuntimeConfig.get_llm_provider() in CLOUD_MODEL_CHOICES:
+        if LLMRuntimeConfig.get_llm_provider() in get_cloud_model_choices():
             return LLMRuntimeConfig.get_llm_provider()
-        available = sorted(CLOUD_MODEL_CHOICES.keys())
+        available = sorted(get_cloud_model_choices().keys())
         return available[0] if available else "openai"
 
     # -------------------------------------------------------------------------
     @staticmethod
     def resolve_cloud_model(provider: str, model_name: str | None) -> str | None:
-        models = CLOUD_MODEL_CHOICES.get(provider, [])
+        models = get_cloud_model_choices().get(provider, [])
         if not models:
             return None
         normalized = (model_name or "").strip()
@@ -620,7 +620,7 @@ class ModelConfigService:
         )
         return ModelConfigStateResponse(
             local_models=local_models,
-            cloud_model_choices=CLOUD_MODEL_CHOICES,
+            cloud_model_choices=get_cloud_model_choices(),
             use_cloud_services=bool(snapshot.use_cloud_models),
             llm_provider=provider,
             cloud_model=cloud_model,

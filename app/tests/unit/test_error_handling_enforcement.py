@@ -30,7 +30,6 @@ EXCLUDED_DIRS = {
 APP_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SERVER_ROOT = APP_ROOT / "server"
 
-
 ###############################################################################
 def get_route_service(router: Any, route_path: str) -> Any:
     for route in router.routes:

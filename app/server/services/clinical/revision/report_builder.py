@@ -4,7 +4,6 @@ from typing import Literal, Protocol
 
 from domain.clinical.revision import RevisionFinalReportPayload
 
-
 ###############################################################################
 class ReviewerInstructionProfileLike(Protocol):
     instruction_summary: str
@@ -21,7 +20,6 @@ class ReviewerInstructionProfileLike(Protocol):
         ]
     ]
 
-
 ###############################################################################
 def _unique_preserve_order(values: list[str]) -> list[str]:
     seen: set[str] = set()
@@ -33,7 +31,6 @@ def _unique_preserve_order(values: list[str]) -> list[str]:
         seen.add(cleaned)
         unique.append(cleaned)
     return unique
-
 
 ###############################################################################
 def build_revision_final_report_payload(

@@ -10,7 +10,6 @@ from services.clinical.language import detect_clinical_language
 from services.clinical.validation import build_validation_bundle
 from services.session.session_shared import NarrativeBuilder
 
-
 ###############################################################################
 def test_italian_input_yields_italian_language_detection_and_messages() -> None:
     payload = PatientData(
@@ -22,7 +21,6 @@ def test_italian_input_yields_italian_language_detection_and_messages() -> None:
     assert detected.report_language == "it"
     bundle = build_validation_bundle(detected.report_language)
     assert bundle.missing_anamnesis.startswith("Fornire")
-
 
 ###############################################################################
 def test_english_input_yields_english_output_bundle() -> None:
@@ -36,7 +34,6 @@ def test_english_input_yields_english_output_bundle() -> None:
     bundle = build_validation_bundle(detected.report_language)
     assert bundle.missing_visit_date.startswith("Provide")
 
-
 ###############################################################################
 def test_mixed_input_prefers_dominant_section() -> None:
     payload = PatientData(
@@ -46,7 +43,6 @@ def test_mixed_input_prefers_dominant_section() -> None:
     )
     detected = detect_clinical_language(payload)
     assert detected.report_language == "it"
-
 
 ###############################################################################
 def test_narrative_builder_does_not_force_english_for_italian() -> None:
@@ -65,7 +61,6 @@ def test_narrative_builder_does_not_force_english_for_italian() -> None:
     )
     assert "# Sintesi Visita Clinica" in report
     assert "## Report Clinico" in report
-
 
 ###############################################################################
 def test_italian_clinician_report_wrappers_do_not_use_english_labels() -> None:

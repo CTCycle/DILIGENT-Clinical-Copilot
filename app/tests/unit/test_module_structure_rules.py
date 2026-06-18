@@ -39,7 +39,6 @@ ALLOWED_OVERSIZED_BACKEND_FILES = {
     (SERVER_ROOT / "services" / "session" / "revision_workflow.py").resolve(),
 }
 
-
 ###############################################################################
 def _iter_python_files(root: Path) -> list[Path]:
     return sorted(
@@ -48,13 +47,11 @@ def _iter_python_files(root: Path) -> list[Path]:
         if path.is_file() and EXCLUDED_DIRS.isdisjoint(path.parts)
     )
 
-
 ###############################################################################
 def test_backend_structure_scan_scope_is_not_empty() -> None:
     assert _iter_python_files(SERVER_ROOT), (
         f"Backend structure tests scanned no files under {SERVER_ROOT}"
     )
-
 
 ###############################################################################
 def test_backend_python_files_do_not_exceed_1000_lines() -> None:
@@ -70,7 +67,6 @@ def test_backend_python_files_do_not_exceed_1000_lines() -> None:
         + "\n".join(violations)
     )
 
-
 ###############################################################################
 def _is_dataclass_decorator(decorator: ast.expr) -> bool:
     if isinstance(decorator, ast.Name):
@@ -80,7 +76,6 @@ def _is_dataclass_decorator(decorator: ast.expr) -> bool:
     if isinstance(decorator, ast.Call):
         return _is_dataclass_decorator(decorator.func)
     return False
-
 
 ###############################################################################
 def _is_pydantic_model(class_node: ast.ClassDef) -> bool:
@@ -99,19 +94,16 @@ def _is_pydantic_model(class_node: ast.ClassDef) -> bool:
             return True
     return False
 
-
 ###############################################################################
 def _format_violation(path: Path, node: ast.AST, label: str) -> str:
     line = getattr(node, "lineno", 1)
     return f"{path.as_posix()}:{line} ({label})"
-
 
 ###############################################################################
 def _is_top_level_import(
     tree: ast.Module, import_node: ast.Import | ast.ImportFrom
 ) -> bool:
     return import_node in tree.body
-
 
 ###############################################################################
 def test_no_nested_local_python_functions() -> None:
@@ -146,7 +138,6 @@ def test_no_nested_local_python_functions() -> None:
     assert not violations, "Nested local functions are forbidden:\n" + "\n".join(
         violations
     )
-
 
 ###############################################################################
 def test_no_conditional_python_imports() -> None:
@@ -188,7 +179,6 @@ def test_no_conditional_python_imports() -> None:
         violations
     )
 
-
 ###############################################################################
 def test_models_live_under_domain() -> None:
     violations: list[str] = []
@@ -216,7 +206,6 @@ def test_models_live_under_domain() -> None:
         "Request/response models must be defined under app/server/domain; internal dataclasses outside domain require explicit allowlisting:\n"
         + "\n".join(violations)
     )
-
 
 ###############################################################################
 def test_livertox_updater_has_no_module_forwarding_wrappers() -> None:
@@ -255,7 +244,6 @@ def test_livertox_updater_has_no_module_forwarding_wrappers() -> None:
         "LiverToxUpdater facade wrappers are forbidden:\n" + "\n".join(violations)
     )
 
-
 ###############################################################################
 def test_services_do_not_import_fastapi() -> None:
     services_root = SERVER_ROOT / "services"
@@ -283,7 +271,6 @@ def test_services_do_not_import_fastapi() -> None:
         + "\n".join(violations)
     )
 
-
 ###############################################################################
 def test_backend_imports_are_top_level_only() -> None:
     root = SERVER_ROOT
@@ -304,7 +291,6 @@ def test_backend_imports_are_top_level_only() -> None:
     assert not violations, (
         "Imports inside functions/classes are forbidden:\n" + "\n".join(violations)
     )
-
 
 ###############################################################################
 def test_services_do_not_import_sqlalchemy_orm_persistence() -> None:

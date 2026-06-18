@@ -11,7 +11,6 @@ from domain.clinical import ClinicalSessionRequest
 from services.clinical import job_progress as clinical_job_progress
 from services.session import session_workflow
 
-
 ###############################################################################
 def get_route_owner(router: Any, route_path: str) -> Any:
     for route in router.routes:

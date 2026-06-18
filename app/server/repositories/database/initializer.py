@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import urllib.parse
-
 import sqlalchemy
 from sqlalchemy import column, literal, select, table
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.elements import TextClause
 
+from common.catalogs.manifest_loader import (
+    compute_manifest_hash,
+    iter_catalog_manifest_paths,
+    load_catalog_manifest,
+)
+from common.catalogs.provider import catalog_provider
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
+from domain.catalogs import CatalogSeedResult
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.postgres import PostgresRepository
 from repositories.database.sqlite import SQLiteRepository
@@ -24,8 +30,6 @@ from repositories.serialization.access_key_encryption import (
 from repositories.serialization.catalogs import (
     ReferenceCatalogSerializer,
 )
-from services.catalogs.runtime import reload_reference_catalog_snapshot
-from services.catalogs.seeder import ReferenceCatalogSeeder
 
 ###############################################################################
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
@@ -82,6 +86,52 @@ def build_postgres_create_database_sql(
     )
 
 ###############################################################################
+def _seed_catalogs(
+    serializer: ReferenceCatalogSerializer,
+    force: bool = False,
+) -> CatalogSeedResult:
+    paths = iter_catalog_manifest_paths()
+    manifests_seeded = 0
+    entries_written = 0
+    for path in paths:
+        manifest_hash = compute_manifest_hash(path)
+        manifest = load_catalog_manifest(path)
+        if (not force) and serializer.has_successful_seed(
+            manifest.manifest, manifest_hash
+        ):
+            continue
+        try:
+            written = serializer.replace_manifest_entries(
+                manifest=manifest,
+                manifest_hash=manifest_hash,
+                source_path=str(path),
+            )
+            serializer.record_seed_success(
+                manifest=manifest.manifest,
+                version=manifest.version,
+                hash=manifest_hash,
+                source_path=str(path),
+                entry_count=written,
+            )
+            if written > 0:
+                manifests_seeded += 1
+                entries_written += written
+        except Exception as exc:
+            serializer.record_seed_failure(
+                manifest=manifest.manifest,
+                version=manifest.version,
+                hash=manifest_hash,
+                source_path=str(path),
+                error=str(exc),
+            )
+            raise
+    return CatalogSeedResult(
+        manifests_seen=len(paths),
+        manifests_seeded=manifests_seeded,
+        entries_written=entries_written,
+    )
+
+###############################################################################
 def initialize_sqlite_database(
     settings: DatabaseSettings,
     *,
@@ -107,16 +157,15 @@ def initialize_sqlite_database(
             "session_factory",
             sessionmaker(bind=repository.engine, future=True),
         )
-        result = ReferenceCatalogSeeder(
-            ReferenceCatalogSerializer(session_factory=session_factory)
-        ).seed_missing_or_changed_manifests(force=force_reseed_catalogs)
+        serializer = ReferenceCatalogSerializer(session_factory=session_factory)
+        result = _seed_catalogs(serializer, force=force_reseed_catalogs)
         logger.info(
             "Catalog seeding completed for SQLite: seen=%s seeded=%s entries=%s",
             result.manifests_seen,
             result.manifests_seeded,
             result.entries_written,
         )
-        reload_reference_catalog_snapshot(repository)
+        catalog_provider.invalidate()
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
 
 ###############################################################################
@@ -179,9 +228,8 @@ def ensure_postgres_database(
     if seed_catalogs:
         session_factory = getattr(repository, "session_factory", None)
         if session_factory is not None:
-            result = ReferenceCatalogSeeder(
-                ReferenceCatalogSerializer(session_factory=session_factory)
-            ).seed_missing_or_changed_manifests(force=force_reseed_catalogs)
+            serializer = ReferenceCatalogSerializer(session_factory=session_factory)
+            result = _seed_catalogs(serializer, force=force_reseed_catalogs)
         else:
             result = None
         if result is not None:
@@ -191,7 +239,7 @@ def ensure_postgres_database(
                 result.manifests_seeded,
                 result.entries_written,
             )
-            reload_reference_catalog_snapshot(repository)
+            catalog_provider.invalidate()
     logger.info("Ensured PostgreSQL tables exist in %s", target_database)
 
     return target_database

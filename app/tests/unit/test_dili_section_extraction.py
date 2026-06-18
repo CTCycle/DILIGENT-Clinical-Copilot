@@ -6,7 +6,6 @@ from services.session.clinical_section_parsers import (
     missing_required_section_names,
 )
 
-
 ###############################################################################
 def test_extract_preferred_markdown_headings() -> None:
     text = "## Anamnesis\nA details\n\n## Therapy\nT details\n\n## Laboratory history\nL details"
@@ -15,7 +14,6 @@ def test_extract_preferred_markdown_headings() -> None:
     assert sections["anamnesis"].text == "A details"
     assert sections["therapy"].text == "T details"
     assert sections["laboratory_history"].text == "L details"
-
 
 ###############################################################################
 def test_markdown_sections_ignore_body_subheadings() -> None:
@@ -38,7 +36,6 @@ def test_markdown_sections_ignore_body_subheadings() -> None:
     assert "Terapia specialistica eseguita:" in sections["anamnesis"].text
     assert "Terapia farmacologica" in sections["therapy"].text
 
-
 ###############################################################################
 def test_final_report_heading_is_not_anamnesis_typo() -> None:
     text = (
@@ -52,7 +49,6 @@ def test_final_report_heading_is_not_anamnesis_typo() -> None:
 
     assert missing_required_section_names(sections) == []
     assert sections["laboratory_history"].text == "L"
-
 
 ###############################################################################
 def test_unclassified_markdown_headings_bound_sections_generically() -> None:
@@ -69,13 +65,11 @@ def test_unclassified_markdown_headings_bound_sections_generically() -> None:
     assert missing_required_section_names(sections) == []
     assert sections["laboratory_history"].text == "L"
 
-
 ###############################################################################
 def test_phrase_aware_typo_matching_accepts_heading_typos() -> None:
     text = "## Clinical History\nA\n\n## Medicatons\nT\n\n## Laboratroy tests\nL"
     sections = extract_required_dili_sections(text)
     assert missing_required_section_names(sections) == []
-
 
 ###############################################################################
 def test_accepts_common_variants() -> None:
@@ -84,7 +78,6 @@ def test_accepts_common_variants() -> None:
     )
     sections = extract_required_dili_sections(text)
     assert missing_required_section_names(sections) == []
-
 
 ###############################################################################
 def test_mixed_language_therapy_heading_is_inferred_from_section_body() -> None:
@@ -101,13 +94,11 @@ def test_mixed_language_therapy_heading_is_inferred_from_section_body() -> None:
     assert missing_required_section_names(sections) == []
     assert "Fortecortin" in sections["therapy"].text
 
-
 ###############################################################################
 def test_rejects_missing_required_section() -> None:
     text = "## Anamnesis\nA\n\n## Therapy\nT"
     sections = extract_required_dili_sections(text)
     assert "laboratory_history" in missing_required_section_names(sections)
-
 
 ###############################################################################
 def test_rejects_untitled_prose_inference() -> None:
@@ -120,7 +111,6 @@ def test_rejects_untitled_prose_inference() -> None:
         "therapy",
         "laboratory_history",
     ]
-
 
 ###############################################################################
 def test_duplicate_competing_headings_raise() -> None:

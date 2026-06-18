@@ -18,7 +18,6 @@ class RucamAnchor:
     source: Literal["qualifying_lab", "onset_context", "visit_proxy", "none"] = "none"
     is_score_eligible: bool = False
 
-
 ###############################################################################
 @dataclass(slots=True)
 class RucamSourceReportedScore:
@@ -27,13 +26,11 @@ class RucamSourceReportedScore:
     source_name: str
     evidence: str
 
-
 ###############################################################################
 @dataclass(slots=True)
 class RucamDataSufficiency:
     sufficient: bool
     blocking_reasons: list[str]
-
 
 ###############################################################################
 @dataclass(slots=True)

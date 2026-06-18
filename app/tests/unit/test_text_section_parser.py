@@ -6,7 +6,6 @@ from services.session.clinical_section_parsers import (
 )
 from services.session.text_section_parser import parse_initial_text_sections
 
-
 ###############################################################################
 def test_parses_required_sections_with_line_ranges() -> None:
     text = "ANAMNESIS\nhistory text\nDRUGS:\ndrug row\nLABORATORY ANALYSIS\nlab row\n"
@@ -17,13 +16,11 @@ def test_parses_required_sections_with_line_ranges() -> None:
     assert result.sections["drugs"].start_line == 3
     assert result.sections["laboratory_analysis"].start_line == 5
 
-
 ###############################################################################
 def test_rejects_missing_anamnesis() -> None:
     text = "DRUGS\nx\nLABORATORY ANALYSIS\ny\n"
     result = parse_initial_text_sections(text)
     assert "anamnesis" in result.missing_required_sections
-
 
 ###############################################################################
 def test_rejects_empty_required_section() -> None:
@@ -31,13 +28,11 @@ def test_rejects_empty_required_section() -> None:
     result = parse_initial_text_sections(text)
     assert "empty:drugs" in result.malformed_sections
 
-
 ###############################################################################
 def test_rejects_duplicate_section_heading() -> None:
     text = "ANAMNESIS\na\nANAMNESIS\nb\nDRUGS\nd\nLABORATORY ANALYSIS\nl\n"
     result = parse_initial_text_sections(text)
     assert "duplicate:anamnesis" in result.malformed_sections
-
 
 ###############################################################################
 def test_reports_ambiguous_heading_collisions() -> None:
@@ -65,7 +60,6 @@ def test_reports_ambiguous_heading_collisions() -> None:
     )
     assert resolved == []
     assert diagnostics == ["ambiguous_heading:4:clinical therapy"]
-
 
 ###############################################################################
 def test_parses_mixed_language_therapy_heading_from_live_preflight_path() -> None:

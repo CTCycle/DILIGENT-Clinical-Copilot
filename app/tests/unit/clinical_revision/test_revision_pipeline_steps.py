@@ -13,14 +13,12 @@ from sqlalchemy import create_engine
 import services.inspection.service as inspection_service_module
 import services.inspection.revision_runner as revision_runner_module
 
-
 ###############################################################################
 def build_service() -> tuple[DataInspectionService, DataSerializer]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     serializer = DataSerializer(engine=engine)
     return DataInspectionService(serializer=serializer, jobs=JobManager()), serializer
-
 
 ###############################################################################
 def seed_session(serializer: DataSerializer) -> int:
@@ -55,7 +53,6 @@ def seed_session(serializer: DataSerializer) -> int:
     if session_id is None:
         raise AssertionError("Session seed failed")
     return session_id
-
 
 ###############################################################################
 def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
@@ -597,7 +594,6 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
     assert version_detail["version"]["session_id"] == result["session_id"]
     assert version_detail["version"]["version_status"] == "llm_qa_passed"
     assert version_detail["version"]["llm_qa_status"] == "passed"
-
 
 ###############################################################################
 def test_run_revision_job_reuses_persisted_source_sections(monkeypatch) -> None:

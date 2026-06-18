@@ -22,7 +22,6 @@ from domain.inspection import (
 )
 from services.inspection.service import DataInspectionService
 
-
 ###############################################################################
 class InspectionSessionEndpoint(InspectionJobEndpointMixin):
 

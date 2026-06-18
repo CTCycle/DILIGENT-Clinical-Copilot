@@ -13,7 +13,6 @@ from domain.catalogs import (
 )
 from repositories.schemas.models import ReferenceCatalogEntry, ReferenceCatalogSeedRun
 
-
 ###############################################################################
 class ReferenceCatalogSerializer:
 

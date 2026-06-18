@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 
-from services.catalogs.runtime import get_reference_catalog_snapshot
+from common.catalogs.provider import catalog_provider
 
 SUPPORTED_REPORT_LANGUAGES: tuple[str, ...] = ("en", "it", "de", "fr", "es")
 TOKEN_PATTERN = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+")
@@ -20,11 +20,10 @@ LANGUAGE_FUNCTION_HINTS: dict[str, set[str]] = {}
 LANGUAGE_PHRASE_HINTS: dict[str, tuple[str, ...]] = {}
 LANGUAGE_DIACRITIC_HINTS: dict[str, set[str]] = {}
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def _catalog_language_hints() -> dict[str, set[str]]:
-    snapshot = get_reference_catalog_snapshot()
+    snapshot = catalog_provider.get_snapshot()
     result: dict[str, set[str]] = {}
     for lang in SUPPORTED_REPORT_LANGUAGES:
         values = snapshot.values("language_detection", "language_hints", key=lang)
@@ -32,11 +31,10 @@ def _catalog_language_hints() -> dict[str, set[str]]:
             result[lang] = {value.casefold() for value in values if value.strip()}
     return result
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def _catalog_phrase_hints() -> dict[str, tuple[str, ...]]:
-    snapshot = get_reference_catalog_snapshot()
+    snapshot = catalog_provider.get_snapshot()
     result: dict[str, tuple[str, ...]] = {}
     for lang in SUPPORTED_REPORT_LANGUAGES:
         values = snapshot.values(
@@ -48,11 +46,10 @@ def _catalog_phrase_hints() -> dict[str, tuple[str, ...]]:
             result[lang] = tuple(value.casefold() for value in values if value.strip())
     return result
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def _catalog_function_hints() -> dict[str, set[str]]:
-    snapshot = get_reference_catalog_snapshot()
+    snapshot = catalog_provider.get_snapshot()
     result: dict[str, set[str]] = {}
     for lang in SUPPORTED_REPORT_LANGUAGES:
         values = snapshot.values(
@@ -64,11 +61,10 @@ def _catalog_function_hints() -> dict[str, set[str]]:
             result[lang] = {value.casefold() for value in values if value.strip()}
     return result
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def _catalog_diacritic_hints() -> dict[str, set[str]]:
-    snapshot = get_reference_catalog_snapshot()
+    snapshot = catalog_provider.get_snapshot()
     result: dict[str, set[str]] = {lang: set() for lang in SUPPORTED_REPORT_LANGUAGES}
     for lang in SUPPORTED_REPORT_LANGUAGES:
         values = snapshot.values(
@@ -80,21 +76,17 @@ def _catalog_diacritic_hints() -> dict[str, set[str]]:
             result[lang] = {value for value in values if value.strip()}
     return result
 
-
 ###############################################################################
 def get_language_hints() -> dict[str, set[str]]:
     return _catalog_language_hints()
-
 
 ###############################################################################
 def get_language_phrase_hints() -> dict[str, tuple[str, ...]]:
     return _catalog_phrase_hints()
 
-
 ###############################################################################
 def get_language_function_hints() -> dict[str, set[str]]:
     return _catalog_function_hints()
-
 
 ###############################################################################
 def get_language_diacritic_hints() -> dict[str, set[str]]:
@@ -162,7 +154,6 @@ VALIDATION_MESSAGE_BUNDLES: dict[str, dict[str, str]] = {
         ),
     },
 }
-
 
 ###############################################################################
 def resolve_supported_language_code(language: str | None) -> str:

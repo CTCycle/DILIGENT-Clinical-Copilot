@@ -7,7 +7,6 @@ from domain.clinical.entities import DrugEntry
 from services.clinical.match_resolution import conservative_fuzzy_livertox_match
 from services.clinical.preparation import ClinicalKnowledgePreparation
 
-
 ###############################################################################
 def _build_livertox_df() -> pd.DataFrame:
     return pd.DataFrame(
@@ -31,7 +30,6 @@ def _build_livertox_df() -> pd.DataFrame:
         ]
     )
 
-
 ###############################################################################
 def test_conservative_fuzzy_livertox_match_high_threshold() -> None:
     assert (
@@ -48,7 +46,6 @@ def test_conservative_fuzzy_livertox_match_high_threshold() -> None:
         )
         is None
     )
-
 
 ###############################################################################
 def test_resolve_livertox_match_for_drug_direct() -> None:

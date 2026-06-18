@@ -7,7 +7,6 @@ from services.text import vocabulary as vocabulary_module
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 def test_runtime_upsert_list_and_deactivate_term() -> None:
     engine = create_engine("sqlite:///:memory:", future=True)
@@ -39,7 +38,6 @@ def test_runtime_upsert_list_and_deactivate_term() -> None:
         category="brand_combo_preference"
     )
     assert rows[0]["is_active"] is False
-
 
 ###############################################################################
 def test_seed_mapping_categories_are_loaded() -> None:

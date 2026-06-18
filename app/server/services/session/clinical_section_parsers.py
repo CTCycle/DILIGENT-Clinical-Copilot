@@ -66,7 +66,6 @@ SectionMatchStrategy = Literal[
     "fallback_assignment",
 ]
 
-
 ###############################################################################
 def _section_profiles_from_catalog() -> dict[str, dict[str, set[str]]]:
     snapshot = get_reference_catalog_snapshot()
@@ -116,7 +115,6 @@ def _section_profiles_from_catalog() -> dict[str, dict[str, set[str]]]:
             )
     return profiles
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class SectionHeadingMatch:
@@ -129,7 +127,6 @@ class SectionHeadingMatch:
     line_end: int
     body_start: int | None = None
     body_end: int | None = None
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -146,13 +143,11 @@ class ClinicalRawSection:
     text: str
     verbatim_coherent: bool
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class HeadingScanResult:
     section_headings: list[SectionHeadingMatch]
     boundary_line_starts: set[int]
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -162,14 +157,12 @@ class HeadingBoundary:
     line_end: int
     is_markdown_heading: bool
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ParsedDiliSectionsResult:
     sections: dict[str, ClinicalRawSection]
     missing_required_sections: list[str]
     malformed_sections: list[str]
-
 
 ###############################################################################
 def normalize_heading_text(value: str) -> str:
@@ -181,14 +174,12 @@ def normalize_heading_text(value: str) -> str:
     text = WS_RE.sub(" ", text).strip()
     return text.casefold()
 
-
 ###############################################################################
 def tokenize_heading(value: str) -> tuple[str, ...]:
     normalized = normalize_heading_text(value)
     if not normalized:
         return ()
     return tuple(token for token in normalized.split(" ") if token)
-
 
 ###############################################################################
 def is_structural_heading_line(line: str) -> bool:
@@ -213,11 +204,9 @@ def is_structural_heading_line(line: str) -> bool:
         )
     )
 
-
 ###############################################################################
 def _token_similarity(left: str, right: str) -> float:
     return SequenceMatcher(None, left, right).ratio()
-
 
 ###############################################################################
 def _looks_like_typo(candidate: str, token: str) -> bool:
@@ -226,7 +215,6 @@ def _looks_like_typo(candidate: str, token: str) -> bool:
         candidate[:prefix_len] == token[:prefix_len]
         and _token_similarity(candidate, token) >= MIN_TYPO_SIMILARITY
     )
-
 
 ###############################################################################
 def _phrase_matches_with_typo(tokens: set[str], phrase: str) -> bool:
@@ -250,7 +238,6 @@ def _phrase_matches_with_typo(tokens: set[str], phrase: str) -> bool:
         found_typo = True
     return found_typo
 
-
 ###############################################################################
 def _classify_against_profile(
     normalized_heading: str,
@@ -271,7 +258,6 @@ def _classify_against_profile(
         if _phrase_matches_with_typo(tokens, phrase):
             return (0.88, "typo_tolerant")
     return None
-
 
 ###############################################################################
 def _semantic_prefix_score(normalized_heading: str) -> tuple[str, float] | None:
@@ -297,7 +283,6 @@ def _semantic_prefix_score(normalized_heading: str) -> tuple[str, float] | None:
         return None
     return (best_key, best_score)
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def _semantic_heading_prefixes() -> dict[str, tuple[str, ...]]:
@@ -313,7 +298,6 @@ def _semantic_heading_prefixes() -> dict[str, tuple[str, ...]]:
                         token[: min(len(token), 8)]
                     )
     return {key: tuple(sorted(values)) for key, values in prefixes.items()}
-
 
 ###############################################################################
 def classify_dili_heading(
@@ -362,11 +346,9 @@ def classify_dili_heading(
         return None
     return candidates[0]
 
-
 ###############################################################################
 def is_markdown_heading_line(line: str) -> bool:
     return bool(MARKDOWN_HEADING_RE.match(line or ""))
-
 
 ###############################################################################
 def _accept_heading_match(
@@ -388,7 +370,6 @@ def _accept_heading_match(
     is_title = all((not word[0].isalpha()) or word[0].isupper() for word in words)
     return is_upper or is_title
 
-
 ###############################################################################
 def _iter_heading_boundaries(raw_text: str) -> list[HeadingBoundary]:
     boundaries: list[HeadingBoundary] = []
@@ -406,7 +387,6 @@ def _iter_heading_boundaries(raw_text: str) -> list[HeadingBoundary]:
             )
         )
     return boundaries
-
 
 ###############################################################################
 def _selected_heading_boundaries(raw_text: str) -> list[HeadingBoundary]:
@@ -430,7 +410,6 @@ def _selected_heading_boundaries(raw_text: str) -> list[HeadingBoundary]:
         ):
             selected.append(boundary)
     return selected
-
 
 ###############################################################################
 def scan_dili_section_headings(raw_text: str) -> HeadingScanResult:
@@ -463,18 +442,15 @@ def scan_dili_section_headings(raw_text: str) -> HeadingScanResult:
         },
     )
 
-
 ###############################################################################
 def find_dili_section_headings(raw_text: str) -> list[SectionHeadingMatch]:
     return scan_dili_section_headings(raw_text).section_headings
-
 
 ###############################################################################
 def resolve_heading_collisions(
     matches: Sequence[SectionHeadingMatch],
 ) -> list[SectionHeadingMatch]:
     return resolve_heading_collisions_with_diagnostics(matches)[0]
-
 
 ###############################################################################
 def resolve_heading_collisions_with_diagnostics(
@@ -496,7 +472,6 @@ def resolve_heading_collisions_with_diagnostics(
         resolved.append(top)
     return resolved, diagnostics
 
-
 ###############################################################################
 def _line_char_offsets(raw_text: str) -> list[tuple[int, int]]:
     offsets: list[tuple[int, int]] = []
@@ -508,7 +483,6 @@ def _line_char_offsets(raw_text: str) -> list[tuple[int, int]]:
     if not offsets:
         offsets.append((0, 0))
     return offsets
-
 
 ###############################################################################
 @lru_cache(maxsize=1)
@@ -529,7 +503,6 @@ def _therapy_signal_re() -> re.Pattern[str]:
         return re.compile(r"$^")
     return re.compile(r"\b(?:" + "|".join(escaped) + r")\b", re.IGNORECASE)
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def _laboratory_signal_re() -> re.Pattern[str]:
@@ -549,7 +522,6 @@ def _laboratory_signal_re() -> re.Pattern[str]:
     if not escaped:
         return re.compile(r"$^")
     return re.compile(r"\b(?:" + "|".join(escaped) + r")\b", re.IGNORECASE)
-
 
 ###############################################################################
 def _score_section_content(raw_heading: str, content: str) -> dict[str, float]:
@@ -587,7 +559,6 @@ def _score_section_content(raw_heading: str, content: str) -> dict[str, float]:
         scores["anamnesis"] += 0.08
     return scores
 
-
 ###############################################################################
 def _infer_section_match(
     raw_heading: str,
@@ -620,7 +591,6 @@ def _infer_section_match(
         line_start=line_start,
         line_end=line_end,
     )
-
 
 ###############################################################################
 def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
@@ -788,7 +758,6 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
         malformed_sections=sorted(set([*malformed_sections, *collision_diagnostics])),
     )
 
-
 ###############################################################################
 def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSection]:
     result = parse_required_dili_sections(raw_text)
@@ -801,7 +770,6 @@ def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSectio
         )
     return result.sections
 
-
 ###############################################################################
 def _next_boundary_line_start(
     current_line_start: int, boundary_line_starts: set[int]
@@ -810,7 +778,6 @@ def _next_boundary_line_start(
         if line_start > current_line_start:
             return line_start
     return None
-
 
 ###############################################################################
 def verify_verbatim_section_coherence(
@@ -822,7 +789,6 @@ def verify_verbatim_section_coherence(
         return False
     span_text = raw_text[section.body_start : section.body_end].strip("\r\n")
     return span_text == section.text
-
 
 ###############################################################################
 def missing_required_section_names(
@@ -841,7 +807,6 @@ def missing_required_section_names(
 def find_section_markers(text: str) -> list[SectionHeadingMatch]:
     return find_dili_section_headings(text)
 
-
 ###############################################################################
 def extract_sections_from_markers(
     text: str, _markers: list[SectionHeadingMatch]
@@ -857,7 +822,6 @@ def extract_sections_from_markers(
         "drugs": sections["therapy"].text,
         "laboratory_analysis": sections["laboratory_history"].text,
     }
-
 
 ###############################################################################
 def validate_sections_against_source(

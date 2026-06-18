@@ -44,7 +44,6 @@ only-include = [
     "common",
     "configurations",
     "domain",
-    "models",
     "repositories",
     "services",
 ]

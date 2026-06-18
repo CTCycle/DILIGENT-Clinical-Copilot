@@ -11,7 +11,6 @@ from domain.clinical.revision import (
     RevisionLiverToxDecision,
 )
 
-
 ###############################################################################
 def test_revised_drug_payload_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError):
@@ -23,7 +22,6 @@ def test_revised_drug_payload_rejects_unknown_fields() -> None:
             }
         )
 
-
 ###############################################################################
 def test_revised_lab_payload_rejects_string_numeric_coercion() -> None:
     with pytest.raises(ValidationError):
@@ -34,7 +32,6 @@ def test_revised_lab_payload_rejects_string_numeric_coercion() -> None:
                 "source": "laboratory_analysis",
             }
         )
-
 
 ###############################################################################
 def test_revision_livertox_decision_requires_structured_shape() -> None:
@@ -59,7 +56,6 @@ def test_revision_livertox_decision_requires_structured_shape() -> None:
 
     assert payload.decision == "reused_high_confidence_previous_match"
     assert payload.match_confidence == 0.99
-
 
 ###############################################################################
 def test_revised_dili_assessment_rejects_extra_fields() -> None:
@@ -87,7 +83,6 @@ def test_revised_dili_assessment_rejects_extra_fields() -> None:
                 "unknown": "should-fail",
             }
         )
-
 
 ###############################################################################
 def test_revised_disease_payload_accepts_expected_fields() -> None:

@@ -11,7 +11,6 @@ from configurations.startup import (
     reset_app_settings_cache,
 )
 
-
 ###############################################################################
 def test_initialize_environment_loads_dotenv_with_override_precedence(
     tmp_path, monkeypatch
@@ -30,7 +29,6 @@ def test_initialize_environment_loads_dotenv_with_override_precedence(
     assert "DILIGENT_TAURI_MODE" in environment.get_dotenv_injected_keys()
     assert os.environ.get("FASTAPI_HOST") == "0.0.0.0"
 
-
 ###############################################################################
 def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(
     monkeypatch, tmp_path
@@ -46,7 +44,6 @@ def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(
 
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     reset_app_settings_cache()
-
 
 ###############################################################################
 def test_ui_owned_json_keys_are_ignored(monkeypatch, tmp_path) -> None:

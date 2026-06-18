@@ -3,13 +3,11 @@ from __future__ import annotations
 from common.utils.embedding_model import build_embedding_model_signature
 from services.retrieval.embeddings import EmbeddingModelMismatchError, SimilaritySearch
 
-
 ###############################################################################
 def test_embedding_model_signature_is_deterministic() -> None:
     a = build_embedding_model_signature("ollama", "nomic-embed-text", 768, "local")
     b = build_embedding_model_signature("ollama", "nomic-embed-text", 768, "local")
     assert a == b
-
 
 ###############################################################################
 def test_similarity_search_raises_on_model_mismatch() -> None:

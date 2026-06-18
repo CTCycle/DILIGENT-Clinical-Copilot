@@ -18,7 +18,6 @@ from services.session.robust_pipeline import (
     validate_fact_graph,
 )
 
-
 ###############################################################################
 def _load_corpus_payloads() -> list[dict[str, object]]:
     corpus_file = Path("tmp_dili_5run_results.json")
@@ -28,7 +27,6 @@ def _load_corpus_payloads() -> list[dict[str, object]]:
     if not isinstance(content, list) or not content:
         pytest.skip("Captured corpus file is empty or malformed.")
     return [item for item in content if isinstance(item, dict)]
-
 
 ###############################################################################
 def test_preflight_allows_captured_corpus_without_blocking_extraction_errors(
@@ -62,7 +60,6 @@ def test_preflight_allows_captured_corpus_without_blocking_extraction_errors(
     assert not blocking_results, (
         f"Unexpected preflight blocking issues: {blocking_results}"
     )
-
 
 ###############################################################################
 def test_preprocess_unified_input_succeeds_for_all_captured_corpus_cases() -> None:

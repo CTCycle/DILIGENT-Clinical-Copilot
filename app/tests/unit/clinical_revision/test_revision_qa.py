@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from services.clinical.revision.qa import build_revision_qa_validation_payload
 from services.clinical.revision.report_builder import RevisionFinalReportPayload
 
-
 ###############################################################################
 def test_revision_qa_marks_unaddressed_requested_sections_as_warning() -> None:
     final_report_payload = RevisionFinalReportPayload(
@@ -44,7 +43,6 @@ def test_revision_qa_marks_unaddressed_requested_sections_as_warning() -> None:
     assert "section:labs" in qa_payload.unaddressed_items
     assert "entity:report_wording" in qa_payload.addressed_items
     assert "Some reviewer-requested sections or entities could not be verified as addressed." in qa_payload.warnings
-
 
 ###############################################################################
 def test_revision_qa_fails_when_blocking_issues_exist() -> None:

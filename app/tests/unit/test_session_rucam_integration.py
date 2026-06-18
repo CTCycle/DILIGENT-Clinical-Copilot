@@ -19,7 +19,6 @@ from domain.clinical import (
 )
 from services.clinical.preparation import HepatoxPreparedInputs
 
-
 ###############################################################################
 def get_session_service() -> Any:
     for route in session_module.router.routes:
@@ -29,14 +28,12 @@ def get_session_service() -> Any:
                 return owner.service
     raise AssertionError("Clinical route not found")
 
-
 ###############################################################################
 class FakeSerializer:
 
     # -------------------------------------------------------------------------
     def save_clinical_session(self, payload: dict[str, Any]) -> None:
         _ = payload
-
 
 ###############################################################################
 class FakeInputPreparator:
@@ -51,7 +48,6 @@ class FakeInputPreparator:
             clinical_context="Clinical context.",
         )
 
-
 ###############################################################################
 class FakeHepatoxConsultation:
 
@@ -65,7 +61,6 @@ class FakeHepatoxConsultation:
     async def run_analysis(self, **kwargs: Any) -> dict[str, Any]:
         _ = kwargs
         return {"final_report": "ok"}
-
 
 ###############################################################################
 class FakeDrugsParser:
@@ -110,7 +105,6 @@ class FakeDrugsParser:
         _ = kwargs
         return PatientDrugs(entries=[])
 
-
 ###############################################################################
 class FakeDiseaseExtractor:
     timeout_s = 1.0
@@ -122,7 +116,6 @@ class FakeDiseaseExtractor:
         _ = text
         _ = kwargs
         return PatientDiseaseContext(entries=[])
-
 
 ###############################################################################
 class FakeLabExtractor:
@@ -154,7 +147,6 @@ class FakeLabExtractor:
             onset_date="2025-01-10", onset_basis="first_abnormal_lab"
         )
 
-
 ###############################################################################
 @dataclass
 class FakeRucamEstimator:
@@ -177,7 +169,6 @@ class FakeRucamEstimator:
             ]
         )
 
-
 ###############################################################################
 def _payload() -> PatientData:
     return PatientData(
@@ -187,7 +178,6 @@ def _payload() -> PatientData:
         drugs="Drug A 50 mg",
         laboratory_analysis="ALT 300 U/L",
     )
-
 
 ###############################################################################
 def test_session_passes_report_language_to_rucam_estimator(monkeypatch) -> None:

@@ -10,7 +10,6 @@ from domain.patient_timeline import (
 )
 from services.clinical.timeline import PatientTimelineExtractor
 
-
 ###############################################################################
 class FakeTimelineClient:
 
@@ -24,7 +23,6 @@ class FakeTimelineClient:
         _ = kwargs
         self.call_count += 1
         return self.payload
-
 
 ###############################################################################
 def test_timeline_extractor_sorts_and_deduplicates_events() -> None:

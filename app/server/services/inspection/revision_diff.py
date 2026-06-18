@@ -5,7 +5,6 @@ from typing import Any
 
 from services.inspection.normalization import normalize_text as _normalize_text_value
 
-
 ###############################################################################
 def _append_derived_revision_entity(
     *,
@@ -58,7 +57,6 @@ def _append_derived_revision_entity(
             "superseded_at": None,
         }
     )
-
 
 ###############################################################################
 class InspectionRevisionDiffMixin:

@@ -28,7 +28,6 @@ def get_residency_targets() -> dict[str, str]:
         targets["text_extraction"] = text_extraction
     return targets
 
-
 ###############################################################################
 def dedupe_models(models: list[str]) -> list[str]:
     unique: list[str] = []
@@ -37,7 +36,6 @@ def dedupe_models(models: list[str]) -> list[str]:
         if value and value not in unique:
             unique.append(value)
     return unique
-
 
 ###############################################################################
 def extract_bytes_from_fields(
@@ -61,7 +59,6 @@ def extract_bytes_from_fields(
             maximum = max(maximum, cls.parse_size_to_bytes(block[field]))
     return maximum
 
-
 ###############################################################################
 def extract_footprint_from_payload(
     cls,
@@ -76,7 +73,6 @@ def extract_footprint_from_payload(
         fields=("size_vram", "vram", "vram_size", "gpu_size", "gpu_memory"),
     )
     return ram_bytes, vram_bytes
-
 
 ###############################################################################
 async def list_running_models(self) -> dict[str, dict[str, Any]]:
@@ -102,7 +98,6 @@ async def list_running_models(self) -> dict[str, dict[str, Any]]:
         if name:
             running[name] = row
     return running
-
 
 ###############################################################################
 async def get_model_footprint_bytes(
@@ -132,7 +127,6 @@ async def get_model_footprint_bytes(
     if ram_bytes <= 0:
         ram_bytes = self.DEFAULT_MODEL_FOOTPRINT_BYTES
     return ram_bytes, vram_bytes
-
 
 ###############################################################################
 async def evaluate_dual_residency_plan(self) -> dict[str, Any]:
@@ -185,7 +179,6 @@ async def evaluate_dual_residency_plan(self) -> dict[str, Any]:
     )
     return plan
 
-
 ###############################################################################
 async def get_cached_residency_plan(
     self,
@@ -208,7 +201,6 @@ async def get_cached_residency_plan(
         self.residency_plan_cache_expiry = loop.time() + self.RESIDENCY_PLAN_TTL
         return dict(plan)
 
-
 ###############################################################################
 async def resolve_policy_keep_alive(
     self,
@@ -226,7 +218,6 @@ async def resolve_policy_keep_alive(
         return self.residency_dual_keep_alive
     return self.residency_single_keep_alive
 
-
 ###############################################################################
 def record_target_usage(self, model: str) -> None:
     now = time.monotonic()
@@ -237,7 +228,6 @@ def record_target_usage(self, model: str) -> None:
         if event_ts >= cutoff:
             break
         self.residency_usage_history.popleft()
-
 
 ###############################################################################
 def predict_next_target_model(
@@ -269,7 +259,6 @@ def predict_next_target_model(
         (candidate for candidate in candidates if candidate != current_model), None
     )
 
-
 ###############################################################################
 def _recent_residency_history(self, candidates: list[str]) -> list[tuple[float, str]]:
     now = time.monotonic()
@@ -280,7 +269,6 @@ def _recent_residency_history(self, candidates: list[str]) -> list[tuple[float, 
         if ts >= cutoff and model in candidates
     ]
 
-
 ###############################################################################
 def _count_residency_frequency(
     history: list[tuple[float, str]],
@@ -288,7 +276,6 @@ def _count_residency_frequency(
 ) -> None:
     for _, model in history:
         frequency[model] += 1
-
 
 ###############################################################################
 def _count_residency_transitions(
@@ -302,7 +289,6 @@ def _count_residency_transitions(
         key = (prev_model, next_model)
         transitions[key] = transitions.get(key, 0) + 1
     return transitions
-
 
 ###############################################################################
 def _select_target_model(
@@ -329,7 +315,6 @@ def _select_target_model(
             selected_score = score
     return selected
 
-
 ###############################################################################
 def handle_prefetch_task_done(self, task: asyncio.Task[None]) -> None:
     with contextlib.suppress(asyncio.CancelledError):
@@ -337,7 +322,6 @@ def handle_prefetch_task_done(self, task: asyncio.Task[None]) -> None:
             task.result()
         except Exception as exc:  # noqa: BLE001
             logger.debug("Ollama model prefetch task failed: %s", exc)
-
 
 ###############################################################################
 async def prefetch_model(
@@ -371,7 +355,6 @@ async def prefetch_model(
         logger.debug("Timed out prefetching Ollama model '%s': %s", model, exc)
     except httpx.RequestError as exc:
         logger.debug("Request error prefetching Ollama model '%s': %s", model, exc)
-
 
 ###############################################################################
 async def maybe_prefetch_target_model(self, *, active_model: str) -> None:
@@ -408,7 +391,6 @@ async def maybe_prefetch_target_model(self, *, active_model: str) -> None:
     task.add_done_callback(self.handle_prefetch_task_done)
     self.prefetch_tasks[candidate] = task
 
-
 ###############################################################################
 def parse_size_to_bytes(value: Any) -> int:
     if isinstance(value, (int, float)):
@@ -441,7 +423,6 @@ def parse_size_to_bytes(value: Any) -> int:
         return int(number * factor)
     return 0
 
-
 ###############################################################################
 def get_available_memory_bytes() -> int:
     for getter in (
@@ -454,7 +435,6 @@ def get_available_memory_bytes() -> int:
             return available
     return 0
 
-
 ###############################################################################
 def get_available_vram_bytes() -> int:
     env_value = (os.getenv("OLLAMA_AVAILABLE_VRAM_BYTES") or "").strip()
@@ -463,7 +443,6 @@ def get_available_vram_bytes() -> int:
         if parsed > 0:
             return parsed
     return _get_available_vram_nvidia_smi()
-
 
 ###############################################################################
 def _get_available_vram_nvidia_smi() -> int:
@@ -499,7 +478,6 @@ def _get_available_vram_nvidia_smi() -> int:
         total += mib * 1_048_576
     return total
 
-
 ###############################################################################
 def _get_available_memory_windows() -> int:
     kernel32 = getattr(getattr(ctypes, "windll", None), "kernel32", None)
@@ -527,7 +505,6 @@ def _get_available_memory_windows() -> int:
         return int(status.ullAvailPhys)
     return 0
 
-
 ###############################################################################
 def _get_available_memory_sysconf() -> int:
     sysconf = getattr(os, "sysconf", None)
@@ -545,7 +522,6 @@ def _get_available_memory_sysconf() -> int:
     except (ValueError, OSError, AttributeError):
         pass
     return 0
-
 
 ###############################################################################
 def _parse_meminfo_line(line: str) -> int | None:
@@ -568,7 +544,6 @@ def _parse_meminfo_line(line: str) -> int | None:
         "gib": 1_073_741_824,
     }.get(unit)
     return value * multiplier if multiplier else value
-
 
 ###############################################################################
 def _get_available_memory_proc() -> int:

@@ -12,7 +12,6 @@ from domain.clinical.entities import (
 )
 from services.clinical.rucam import RucamScoreEstimator
 
-
 ###############################################################################
 def _inputs():
     payload = PatientData(
@@ -42,7 +41,6 @@ def _inputs():
     )
     return payload, analysis_drugs, timeline
 
-
 ###############################################################################
 def test_provided_rucam_score_is_used_directly() -> None:
     estimator = RucamScoreEstimator()
@@ -61,7 +59,6 @@ def test_provided_rucam_score_is_used_directly() -> None:
     )
     assert bundle.entries[0].total_score == 7
     assert bundle.entries[0].calculation_method == "source_reported"
-
 
 ###############################################################################
 def test_incomplete_inputs_skip_calculation() -> None:

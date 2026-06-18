@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib
 import sys
 
-
 ###############################################################################
 def test_fastapi_app_import_does_not_trigger_database_initializer(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     called = {"postgres": False}

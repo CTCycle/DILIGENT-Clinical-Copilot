@@ -19,7 +19,6 @@ import pytest
 from common import paths as common_paths
 from repositories.database import sqlite as sqlite_module
 
-
 ###############################################################################
 def _configure_test_embedded_database_path() -> None:
     temp_root = Path(tempfile.gettempdir()) / "diligent-pytest-dbs"
@@ -27,7 +26,6 @@ def _configure_test_embedded_database_path() -> None:
     db_path = temp_root / f"embedded-{uuid.uuid4().hex}.db"
     common_paths.DATABASE_FILE_PATH = db_path
     sqlite_module.DATABASE_FILE_PATH = db_path
-
 
 ###############################################################################
 def _configure_playwright_node_runtime() -> None:
@@ -45,7 +43,6 @@ def _configure_playwright_node_runtime() -> None:
 
 _configure_playwright_node_runtime()
 _configure_test_embedded_database_path()
-
 
 ###############################################################################
 class CoroutineThreadRunner:
@@ -75,13 +72,11 @@ class CoroutineThreadRunner:
         except BaseException as exc:
             self.box["error"] = exc
 
-
 ###############################################################################
 def _normalize_host_for_url(host: str) -> str:
     if host in {"0.0.0.0", "::", "[::]"}:
         return "127.0.0.1"
     return host
-
 
 ###############################################################################
 def _build_base_url(
@@ -93,7 +88,6 @@ def _build_base_url(
     host = _normalize_host_for_url(os.getenv(host_env, default_host))
     port = os.getenv(port_env, default_port)
     return f"http://{host}:{port}"
-
 
 ###############################################################################
 def run_coroutine_in_thread(
@@ -109,7 +103,6 @@ def run_coroutine_in_thread(
     if "error" in runner.box:
         raise runner.box["error"]
     return runner.box.get("result")
-
 
 ###############################################################################
 class AsyncioRunPatch:
@@ -144,20 +137,17 @@ API_BASE_URL = (
     or _build_base_url("FASTAPI_HOST", "FASTAPI_PORT", "127.0.0.1", "8000")
 )
 
-
 ###############################################################################
 @pytest.fixture(scope="session")
 def base_url() -> str:
     """Returns the base URL of the UI."""
     return UI_BASE_URL
 
-
 ###############################################################################
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
     """Returns the base URL of the API."""
     return API_BASE_URL
-
 
 ###############################################################################
 @pytest.fixture
@@ -169,7 +159,6 @@ def api_context(playwright):
     context = playwright.request.new_context(base_url=API_BASE_URL)
     yield context
     context.dispose()
-
 
 ###############################################################################
 @pytest.fixture(autouse=True)

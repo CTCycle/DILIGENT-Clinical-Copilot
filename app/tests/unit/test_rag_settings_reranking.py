@@ -5,7 +5,6 @@ from configurations.management import (
     build_settings_payload_from_json,
 )
 
-
 ###############################################################################
 def _env() -> EnvironmentSnapshot:
     return EnvironmentSnapshot(
@@ -13,7 +12,6 @@ def _env() -> EnvironmentSnapshot:
         ollama_host="localhost",
         ollama_port=11434,
     )
-
 
 ###############################################################################
 def test_build_rag_settings_reads_retrieval_counts() -> None:
@@ -47,7 +45,6 @@ def test_build_rag_settings_reads_retrieval_counts() -> None:
     assert settings["embedding_backend"] == "ollama"
     assert settings["ollama_embedding_model"] == "nomic-embed-text:latest"
 
-
 ###############################################################################
 def test_build_rag_settings_enforces_candidate_floor() -> None:
     payload = build_settings_payload_from_json(
@@ -57,7 +54,6 @@ def test_build_rag_settings_enforces_candidate_floor() -> None:
     settings = payload["rag"]
     assert settings["retrieval_selected_count"] == 10
     assert settings["retrieval_candidate_count"] == 10
-
 
 ###############################################################################
 def test_build_rag_settings_defaults_to_lightweight_reranker_profile() -> None:

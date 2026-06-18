@@ -5,7 +5,6 @@ from pathlib import Path
 
 import common.paths as common_paths
 
-
 ###############################################################################
 def test_database_file_path_honors_sqlite_env_override(monkeypatch) -> None:
     override_path = Path("C:/temp/diligent-sqlite-override.db")

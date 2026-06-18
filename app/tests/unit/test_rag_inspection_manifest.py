@@ -4,7 +4,6 @@ from pathlib import Path
 
 from services.inspection.service import DataInspectionService
 
-
 ###############################################################################
 def test_effective_rag_documents_path_prefers_manifest(
     monkeypatch,
@@ -24,7 +23,6 @@ def test_effective_rag_documents_path_prefers_manifest(
     )
 
     assert service.get_effective_rag_documents_path() == r"C:\external\rag"
-
 
 ###############################################################################
 def test_write_rag_manifest_persists_latest_successful_source(
