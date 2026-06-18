@@ -631,6 +631,19 @@ class DataSerializer:
         return evidence_data.get_rxnav_alias_groups(self, drug_id)
 
     # -------------------------------------------------------------------------
+    def update_rxnav_drug_name(
+        self,
+        drug_id: int,
+        *,
+        drug_name: str,
+    ) -> dict[str, Any] | None:
+        return evidence_data.update_rxnav_drug_name(
+            self,
+            drug_id,
+            drug_name=drug_name,
+        )
+
+    # -------------------------------------------------------------------------
     def list_livertox_catalog(
         self,
         *,
