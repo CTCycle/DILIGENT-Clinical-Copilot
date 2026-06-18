@@ -4,7 +4,6 @@ import time
 
 from playwright.sync_api import APIRequestContext
 
-
 ###############################################################################
 def test_access_keys_crud_returns_metadata_only(api_context: APIRequestContext) -> None:
     provider = "openai"
@@ -42,7 +41,6 @@ def test_access_keys_crud_returns_metadata_only(api_context: APIRequestContext) 
         if created_id is not None:
             api_context.delete(f"/api/access-keys/{created_id}?provider={provider}")
 
-
 ###############################################################################
 def test_activate_and_delete_require_provider(api_context: APIRequestContext) -> None:
     provider = "openai"
@@ -60,7 +58,6 @@ def test_activate_and_delete_require_provider(api_context: APIRequestContext) ->
         assert delete_response.status == 422
     finally:
         api_context.delete(f"/api/access-keys/{key_id}?provider={provider}")
-
 
 ###############################################################################
 def test_access_key_creation_rejects_short_secret(

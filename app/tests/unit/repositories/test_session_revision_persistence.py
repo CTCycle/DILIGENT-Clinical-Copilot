@@ -10,7 +10,6 @@ from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
 
-
 ###############################################################################
 def build_service() -> tuple[DataInspectionService, DataSerializer]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
@@ -18,7 +17,6 @@ def build_service() -> tuple[DataInspectionService, DataSerializer]:
     serializer = DataSerializer(engine=engine)
     service = DataInspectionService(serializer=serializer, jobs=JobManager())
     return service, serializer
-
 
 ###############################################################################
 def seed_session(serializer: DataSerializer) -> int:
@@ -39,7 +37,6 @@ def seed_session(serializer: DataSerializer) -> int:
         raise AssertionError("Session seed failed")
     return session_id
 
-
 ###############################################################################
 def test_legacy_update_session_route_now_performs_safe_manual_report_edit() -> None:
     service, serializer = build_service()
@@ -59,7 +56,6 @@ def test_legacy_update_session_route_now_performs_safe_manual_report_edit() -> N
     assert len(updated["manual_edit_history"]) == 1
     assert updated["manual_edit_history"][0]["edited_fields"] == ["report_text"]
 
-
 ###############################################################################
 def test_metadata_only_update_does_not_create_manual_edit_audit() -> None:
     service, serializer = build_service()
@@ -76,7 +72,6 @@ def test_metadata_only_update_does_not_create_manual_edit_audit() -> None:
     assert updated["official_report_text"] == "Initial report draft"
     assert updated["source_clinical_text"] == "Stable source clinical narrative"
     assert updated["manual_edit_history"] == []
-
 
 ###############################################################################
 def test_get_session_detail_reconstructs_source_text_from_persisted_sections() -> None:
@@ -105,7 +100,6 @@ def test_get_session_detail_reconstructs_source_text_from_persisted_sections() -
         "Laboratory Analysis:\nSection-only labs"
     )
     assert detail["source_clinical_text"] == detail["session_text"]
-
 
 ###############################################################################
 def test_revision_review_actions_are_persisted_and_update_version_state() -> None:
@@ -170,7 +164,6 @@ def test_revision_review_actions_are_persisted_and_update_version_state() -> Non
     assert len(history) == 1
     assert history[0]["reviewer_note"] == "Approved after manual chronology check."
     assert history[0]["metadata"]["decision_source"] == "clinical_review"
-
 
 ###############################################################################
 def test_compare_session_versions_returns_backend_diff_payload() -> None:
@@ -272,7 +265,6 @@ def test_compare_session_versions_returns_backend_diff_payload() -> None:
     assert comparison["qa_summary"]["right_llm_qa_status"] == "not_run"
     assert comparison["qa_summary"]["right_warning_count"] == 1
 
-
 ###############################################################################
 def test_compare_session_versions_derives_entities_when_revision_entities_are_missing() -> None:
     service, serializer = build_service()
@@ -347,7 +339,6 @@ def test_compare_session_versions_derives_entities_when_revision_entities_are_mi
         and item["entity_type"] == "livertox_match"
         for item in comparison["corrected_entities"]
     )
-
 
 ###############################################################################
 def test_persist_revision_entities_records_schema_names_per_entity_type() -> None:
@@ -429,7 +420,6 @@ def test_persist_revision_entities_records_schema_names_per_entity_type() -> Non
     assert ("lab_timeline_entry", "revised_lab_entry") in schema_names
     assert ("livertox_match", "revision_livertox_decision") in schema_names
     assert ("dili_assessment", "revised_dili_assessment") in schema_names
-
 
 ###############################################################################
 def test_persist_revision_entities_rejects_invalid_revision_payloads() -> None:

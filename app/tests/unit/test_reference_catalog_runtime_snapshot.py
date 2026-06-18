@@ -5,7 +5,6 @@ from types import MappingProxyType
 from domain.catalogs import CatalogEntry
 from services.catalogs.runtime import _build_snapshot
 
-
 ###############################################################################
 def test_runtime_snapshot_values_and_metadata() -> None:
     snapshot = _build_snapshot(

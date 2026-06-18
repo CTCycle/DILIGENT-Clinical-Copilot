@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from types import MappingProxyType
 
+from common.catalogs.provider import catalog_provider
 from domain.catalogs import CatalogEntry, ReferenceCatalogSnapshot
 from repositories.database.session import get_default_repository
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
@@ -58,3 +59,9 @@ def reload_reference_catalog_snapshot(repository=None) -> ReferenceCatalogSnapsh
 ###############################################################################
 def reset_reference_catalog_snapshot_for_tests() -> None:
     _cached_reference_catalog_snapshot.cache_clear()
+
+
+catalog_provider.register(
+    get_reference_catalog_snapshot,
+    invalidate=_cached_reference_catalog_snapshot.cache_clear,
+)

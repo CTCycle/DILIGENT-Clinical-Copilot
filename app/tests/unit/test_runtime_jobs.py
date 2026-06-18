@@ -6,7 +6,6 @@ import time
 from services.runtime.jobs import JobManager
 from services.session.session_service import ClinicalSessionService
 
-
 ###############################################################################
 class _SnapshotCancelManager:
 
@@ -28,7 +27,6 @@ class _SnapshotCancelManager:
             "progress": 0.5,
         }
 
-
 ###############################################################################
 def test_clinical_cancel_response_converts_job_snapshot_to_success_bool() -> None:
     service = ClinicalSessionService.__new__(ClinicalSessionService)
@@ -38,7 +36,6 @@ def test_clinical_cancel_response_converts_job_snapshot_to_success_bool() -> Non
 
     assert response.success is True
     assert response.job_id == "job-123"
-
 
 ###############################################################################
 def test_running_cancel_transitions_to_cancelled_immediately() -> None:
@@ -66,7 +63,6 @@ def test_running_cancel_transitions_to_cancelled_immediately() -> None:
     assert terminal is not None
     assert terminal["status"] == "cancelled"
 
-
 ###############################################################################
 def test_running_cancel_allows_duplicate_job_submission_immediately() -> None:
     manager = JobManager()
@@ -83,7 +79,6 @@ def test_running_cancel_allows_duplicate_job_submission_immediately() -> None:
     manager.cancel_job(job_id)
     assert manager.is_job_running("runtime_test") is False
     release.set()
-
 
 ###############################################################################
 def test_job_result_merge_is_single_source_of_truth() -> None:

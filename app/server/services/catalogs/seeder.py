@@ -4,12 +4,11 @@ from pathlib import Path
 
 from domain.catalogs import CatalogSeedResult
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
-from services.catalogs.manifest_loader import (
+from common.catalogs.manifest_loader import (
     compute_manifest_hash,
     iter_catalog_manifest_paths,
     load_catalog_manifest,
 )
-
 
 ###############################################################################
 class ReferenceCatalogSeeder:

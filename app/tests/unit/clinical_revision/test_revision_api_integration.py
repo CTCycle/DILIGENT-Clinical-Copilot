@@ -9,7 +9,6 @@ from fastapi.testclient import TestClient
 import app as server_app_module
 from api import data_inspection as data_inspection_api
 
-
 ###############################################################################
 def _get_route_service(route_path_fragment: str) -> Any:
     for route in data_inspection_api.router.routes:
@@ -18,7 +17,6 @@ def _get_route_service(route_path_fragment: str) -> Any:
             if endpoint_owner is not None:
                 return endpoint_owner.service
     raise AssertionError(f"Route not found for fragment {route_path_fragment}")
-
 
 ###############################################################################
 def _wait_for_terminal_job_status(
@@ -36,7 +34,6 @@ def _wait_for_terminal_job_status(
             return payload
         time.sleep(0.05)
     raise AssertionError("Timed out waiting for terminal revision job state.")
-
 
 ###############################################################################
 def _seed_source_session(service: Any) -> int:
@@ -100,7 +97,6 @@ def _seed_source_session(service: Any) -> int:
     if session_id is None:
         raise AssertionError("Failed to seed source session")
     return session_id
-
 
 ###############################################################################
 def test_revision_api_routes_preserve_manual_edits_and_persist_revision_lineage(

@@ -32,7 +32,6 @@ ITALIAN_THERAPY_TEXT = """
 ■ Invanz sol iniet [g] 0-0-0-0 i.
 """
 
-
 ###############################################################################
 class FailingLabClient:
 
@@ -40,7 +39,6 @@ class FailingLabClient:
     async def llm_structured_call(self, **kwargs: Any) -> LabExtractionPayload:
         _ = kwargs
         raise RuntimeError("simulated lab extraction failure")
-
 
 ###############################################################################
 class SlowLabClient:
@@ -50,7 +48,6 @@ class SlowLabClient:
         _ = kwargs
         await asyncio.sleep(1.0)
         return LabExtractionPayload(entries=[], onset_context=None)
-
 
 ###############################################################################
 def test_clinical_session_factory_uses_configured_parser_timeouts(
@@ -70,7 +67,6 @@ def test_clinical_session_factory_uses_configured_parser_timeouts(
     assert service.lab_extractor.timeout_s == 120.0
     assert service.disease_extractor.timeout_s == 150.0
 
-
 ###############################################################################
 def test_italian_therapy_text_parses_multiple_drugs_without_llm() -> None:
     parser = DrugsParser(client=object())
@@ -82,7 +78,6 @@ def test_italian_therapy_text_parses_multiple_drugs_without_llm() -> None:
     assert "Amlodipin axapharm" in names
     assert "Clopidogrel Spirig HC" in names
     assert "Aspirin Cardio" in names
-
 
 ###############################################################################
 def test_italian_laboratory_text_uses_deterministic_fallback() -> None:
@@ -104,7 +99,6 @@ def test_italian_laboratory_text_uses_deterministic_fallback() -> None:
     assert ("AST", "2025-01-16", 344.0) in observed
     assert ("ALT", "2025-02-13", 591.0) in observed
 
-
 ###############################################################################
 def test_lab_llm_chunk_timeout_uses_deterministic_fallback(monkeypatch: Any) -> None:
     extractor = ClinicalLabExtractor(client=SlowLabClient(), timeout_s=3600.0)
@@ -123,7 +117,6 @@ def test_lab_llm_chunk_timeout_uses_deterministic_fallback(monkeypatch: Any) -> 
     }
     assert ("ALT", "2025-01-10", 345.0) in observed
     assert ("ALP", "2025-01-10", 1055.0) in observed
-
 
 ###############################################################################
 def test_runtime_timeout_resolution_does_not_apply_six_second_parser_cap() -> None:

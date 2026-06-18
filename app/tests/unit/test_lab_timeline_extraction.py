@@ -13,7 +13,6 @@ from services.clinical.labs import (
     LabExtractionPayload,
 )
 
-
 ###############################################################################
 class FakeLabClient:
 
@@ -30,7 +29,6 @@ class FakeLabClient:
         if self.responses:
             return self.responses.pop(0)
         return LabExtractionPayload(entries=[], onset_context=None)
-
 
 ###############################################################################
 def test_extracts_dated_alt_alp_and_bilirubin() -> None:
@@ -78,7 +76,6 @@ def test_extracts_dated_alt_alp_and_bilirubin() -> None:
     assert "ALP" in markers
     assert "TBIL" in markers
 
-
 ###############################################################################
 def test_uses_ast_when_alt_absent() -> None:
     extractor = ClinicalLabExtractor(
@@ -106,7 +103,6 @@ def test_uses_ast_when_alt_absent() -> None:
     assert len(timeline.entries) == 1
     assert timeline.entries[0].marker_name == "AST"
 
-
 ###############################################################################
 def test_merges_manual_labs_with_extracted_entries() -> None:
     extractor = ClinicalLabExtractor(
@@ -122,7 +118,6 @@ def test_merges_manual_labs_with_extracted_entries() -> None:
 
     assert len(timeline.entries) == 2
     assert {entry.marker_name for entry in timeline.entries} == {"ALT", "ALP"}
-
 
 ###############################################################################
 def test_preserves_relative_timing_without_absolute_dates() -> None:
@@ -154,7 +149,6 @@ def test_preserves_relative_timing_without_absolute_dates() -> None:
     assert len(timeline.entries) == 1
     assert timeline.entries[0].sample_date is None
     assert timeline.entries[0].relative_time == "2 weeks after starting therapy"
-
 
 ###############################################################################
 def test_deduplicates_near_identical_entries() -> None:
@@ -192,7 +186,6 @@ def test_deduplicates_near_identical_entries() -> None:
 
     assert len(timeline.entries) == 1
 
-
 ###############################################################################
 def test_extracts_onset_clue_context() -> None:
     onset = LiverInjuryOnsetContext(
@@ -214,7 +207,6 @@ def test_extracts_onset_clue_context() -> None:
     assert onset_context.onset_date == "2025-01-11"
     assert onset_context.onset_basis == "first_symptom"
 
-
 ###############################################################################
 def test_lab_llm_receives_full_text_without_chunk_markers() -> None:
     client = FakeLabClient([LabExtractionPayload(entries=[], onset_context=None)])
@@ -230,14 +222,12 @@ def test_lab_llm_receives_full_text_without_chunk_markers() -> None:
     assert all("full clinical laboratory text" in prompt for prompt in client.prompts)
     assert all("[Chunk" not in prompt for prompt in client.prompts)
 
-
 ###############################################################################
 def test_extracts_explicit_pattern_and_rucam_score() -> None:
     extractor = ClinicalLabExtractor(client=FakeLabClient([]))
     text = "Hepatic pattern: mixed. RUCAM score: 7."
     assert extractor.extract_explicit_hepatic_pattern(text) == "mixed"
     assert extractor.extract_explicit_rucam_score(text) == 7
-
 
 ###############################################################################
 def test_calculates_pattern_from_alt_alp_with_uln() -> None:

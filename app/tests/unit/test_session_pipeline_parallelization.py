@@ -4,7 +4,6 @@ import asyncio
 
 from services.runtime.async_batches import run_batched_in_order
 
-
 ###############################################################################
 def test_parallelization_runner_preserves_input_order() -> None:
     async def worker(name: str) -> str:
@@ -21,7 +20,6 @@ def test_parallelization_runner_preserves_input_order() -> None:
         )
     )
     assert outputs == [f"done:{item}" for item in inputs]
-
 
 ###############################################################################
 def test_parallelization_runner_batch_size_enforced() -> None:

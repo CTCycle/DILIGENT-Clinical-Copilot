@@ -8,7 +8,6 @@ from services.session.clinical_input_extractor import (
     ClinicalInputExtractor,
 )
 
-
 ###############################################################################
 def test_deterministic_success_does_not_call_fallback() -> None:
     text = "# Anamnesis\nA\n# Therapy\nT\n# Laboratory history\nL"
@@ -25,7 +24,6 @@ def test_deterministic_success_does_not_call_fallback() -> None:
     assert result.anamnesis == "A"
     assert result.drugs == "T"
     assert result.laboratory_analysis == "L"
-
 
 ###############################################################################
 def test_deterministic_failure_raises_without_fallback() -> None:
@@ -45,14 +43,12 @@ def test_deterministic_failure_raises_without_fallback() -> None:
         asyncio.run(extractor.extract(clinical_input=text))
     assert called["value"] is False
 
-
 ###############################################################################
 def test_untitled_prose_is_rejected() -> None:
     text = "Anamnesis text. Therapy text. Lab text."
     extractor = ClinicalInputExtractor()
     with pytest.raises(ClinicalInputExtractionError):
         asyncio.run(extractor.extract(clinical_input=text))
-
 
 ###############################################################################
 def test_fallback_summarized_is_rejected() -> None:
@@ -72,7 +68,6 @@ def test_fallback_summarized_is_rejected() -> None:
     extractor = ClinicalInputExtractor(client=FakeClient())
     with pytest.raises(ClinicalInputExtractionError):
         asyncio.run(extractor.extract(clinical_input=text))
-
 
 ###############################################################################
 def test_fallback_missing_section_is_rejected() -> None:

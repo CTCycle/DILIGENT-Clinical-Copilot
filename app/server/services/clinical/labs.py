@@ -33,7 +33,6 @@ DATE_RE = re.compile(
     r"\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b"
 )
 
-
 ###############################################################################
 def _load_marker_aliases() -> dict[str, tuple[str, ...]]:
     snapshot = get_reference_catalog_snapshot()
@@ -64,7 +63,6 @@ RUCAM_SCORE_TEXT_RE = re.compile(
     r"\brucam\b\s*(?:score)?\s*[:=]?\s*(-?\d{1,2})\b",
     re.IGNORECASE,
 )
-
 
 ###############################################################################
 def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:

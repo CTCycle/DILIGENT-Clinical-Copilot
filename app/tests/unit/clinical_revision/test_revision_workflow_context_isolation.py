@@ -20,7 +20,6 @@ from services.session.document_normalizer import DocumentNormalizer
 import services.session.session_workflow as session_workflow_module
 from services.session.revision_workflow import process_revision_patient_workflow
 
-
 ###############################################################################
 class FakePatternAnalyzer:
 
@@ -34,7 +33,6 @@ class FakePatternAnalyzer:
             else "Not available"
         }
 
-
 ###############################################################################
 class FakeDrugsParser:
     model = "test-parser"
@@ -43,7 +41,6 @@ class FakeDrugsParser:
     def clean_text(self, text: str) -> str:
         return text
 
-
 ###############################################################################
 class FakeSerializer:
 
@@ -51,7 +48,6 @@ class FakeSerializer:
     def save_clinical_session(self, payload: dict[str, Any]) -> int | None:
         self.saved_payload = payload
         return None
-
 
 ###############################################################################
 class FakeRevisionClinicalService:
@@ -225,7 +221,6 @@ class FakeRevisionClinicalService:
             else:
                 serialized.append(dict(issue))
         return serialized
-
 
 ###############################################################################
 def test_revision_focus_context_isolated_from_retrieval_and_lookup(
@@ -427,7 +422,6 @@ def test_revision_focus_context_isolated_from_retrieval_and_lookup(
     ]
     assert result["unresolved_drugs"] == []
 
-
 ###############################################################################
 def test_revision_reuses_persisted_deterministic_extraction(
     monkeypatch,
@@ -543,7 +537,6 @@ def test_revision_reuses_persisted_deterministic_extraction(
         "revised_only_names": ["Drug B"],
         "unresolved_lines": [],
     }
-
 
 ###############################################################################
 def test_revision_reuses_persisted_disease_and_lab_artifacts(

@@ -10,14 +10,12 @@ from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
 
-
 ###############################################################################
 def build_service() -> tuple[DataInspectionService, DataSerializer]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     serializer = DataSerializer(engine=engine)
     return DataInspectionService(serializer=serializer, jobs=JobManager()), serializer
-
 
 ###############################################################################
 def seed_session(serializer: DataSerializer) -> int:
@@ -37,7 +35,6 @@ def seed_session(serializer: DataSerializer) -> int:
     if session_id is None:
         raise AssertionError("Session seed failed")
     return session_id
-
 
 ###############################################################################
 def test_start_revision_job_persists_run_and_single_draft_shell() -> None:
@@ -84,7 +81,6 @@ def test_start_revision_job_persists_run_and_single_draft_shell() -> None:
     draft_versions = [item for item in versions if item["pipeline_run_id"] == pipeline_run_id]
     assert len(draft_versions) == 1
     assert draft_versions[0]["version_status"] == "draft_revision"
-
 
 ###############################################################################
 def test_retry_revision_job_reuses_existing_draft_shell() -> None:

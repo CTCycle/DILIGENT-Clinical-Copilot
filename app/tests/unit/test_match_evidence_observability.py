@@ -6,7 +6,6 @@ from domain.clinical import PatientRucamAssessmentBundle
 from services.clinical.match_quality import classify_match_evidence
 from services.session.session_service import ClinicalSessionService
 
-
 ###############################################################################
 def test_classify_match_evidence_marks_related_fallback() -> None:
     quality = classify_match_evidence(
@@ -22,7 +21,6 @@ def test_classify_match_evidence_marks_related_fallback() -> None:
     assert quality["evidence_warnings"] == [
         "Evidence excerpt was borrowed from a related LiverTox monograph."
     ]
-
 
 ###############################################################################
 def test_matched_drug_payload_exposes_evidence_quality() -> None:
@@ -59,7 +57,6 @@ def test_matched_drug_payload_exposes_evidence_quality() -> None:
         in payload[0]["evidence_warnings"]
     )
 
-
 ###############################################################################
 def test_matched_drug_payload_marks_missing_evidence_when_knowledge_base_unavailable() -> (
     None
@@ -76,7 +73,6 @@ def test_matched_drug_payload_marks_missing_evidence_when_knowledge_base_unavail
     assert payload[0]["evidence_warnings"] == [
         "No local RxNav/LiverTox match was found."
     ]
-
 
 ###############################################################################
 def test_knowledge_base_unavailable_issue_is_structured_for_persistence() -> None:

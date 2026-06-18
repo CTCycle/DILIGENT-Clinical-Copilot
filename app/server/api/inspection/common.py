@@ -6,7 +6,6 @@ from common.utils.logger import logger
 from domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from services.inspection.service import DataInspectionService
 
-
 ###############################################################################
 class InspectionEndpointBase:
 
@@ -19,7 +18,6 @@ class InspectionEndpointBase:
     ) -> None:
         self.router = router
         self.service = service
-
 
 ###############################################################################
 class InspectionJobEndpointMixin(InspectionEndpointBase):

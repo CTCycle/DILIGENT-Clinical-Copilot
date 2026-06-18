@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from services.catalogs.runtime import get_reference_catalog_snapshot
+from common.catalogs.provider import catalog_provider
 
 
 ###############################################################################
 def get_sensitive_error_tokens() -> tuple[str, ...]:
-    snapshot = get_reference_catalog_snapshot()
+    snapshot = catalog_provider.get_snapshot()
     return tuple(
         value.lower()
         for value in snapshot.values(

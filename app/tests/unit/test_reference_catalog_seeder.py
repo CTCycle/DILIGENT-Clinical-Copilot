@@ -7,7 +7,6 @@ from domain.catalogs import CatalogEntry, CatalogManifest
 from services.catalogs import seeder as seeder_module
 from services.catalogs.seeder import ReferenceCatalogSeeder
 
-
 ###############################################################################
 class _FakeSerializer:
 
@@ -39,7 +38,6 @@ class _FakeSerializer:
     ) -> None:
         raise AssertionError(error)
 
-
 ###############################################################################
 def _manifest(name: str) -> CatalogManifest:
     return CatalogManifest(
@@ -63,7 +61,6 @@ def _manifest(name: str) -> CatalogManifest:
             ),
         ),
     )
-
 
 ###############################################################################
 def test_seeder_skips_existing_hash(monkeypatch) -> None:  # type: ignore[no-untyped-def]

@@ -9,11 +9,9 @@ import time
 import pytest
 from playwright.sync_api import APIRequestContext
 
-
 ###############################################################################
 def repeated_words(count: int) -> str:
     return " ".join(f"clinicalword{i}" for i in range(count))
-
 
 ###############################################################################
 def build_minimal_payload() -> dict:
@@ -31,7 +29,6 @@ def build_minimal_payload() -> dict:
         "selected_model_providers": ["openai"],
     }
 
-
 ###############################################################################
 def wait_for_job_completion(api_context: APIRequestContext, job_id: str) -> dict:
     for _ in range(180):
@@ -43,7 +40,6 @@ def wait_for_job_completion(api_context: APIRequestContext, job_id: str) -> dict
             return payload
         time.sleep(0.25)
     raise AssertionError("Clinical job did not finish in time")
-
 
 ###############################################################################
 @pytest.fixture(autouse=True)
@@ -61,13 +57,11 @@ def reset_runtime_to_local(api_context: APIRequestContext) -> None:
     )
     assert response.status == 200
 
-
 ###############################################################################
 def test_clinical_requires_sections(api_context: APIRequestContext):
     response = api_context.post("/api/clinical/jobs", data={"name": "Test"})
     assert response.status == 422
     assert "Clinical input is required." in response.text()
-
 
 ###############################################################################
 def test_clinical_validate_input_returns_deterministic_diagnostics(
@@ -82,7 +76,6 @@ def test_clinical_validate_input_returns_deterministic_diagnostics(
     assert "deterministic_diagnostics" in payload
     assert payload["deterministic_diagnostics"]["therapy"]["drug_count"] >= 1
 
-
 ###############################################################################
 def test_clinical_rejects_blank_sections(api_context: APIRequestContext):
     response = api_context.post(
@@ -90,7 +83,6 @@ def test_clinical_rejects_blank_sections(api_context: APIRequestContext):
         data={"clinical_input": "  \n", "visit_date": None},
     )
     assert response.status == 422
-
 
 ###############################################################################
 def test_clinical_job_accepts_minimal_payload(api_context: APIRequestContext):
@@ -104,7 +96,6 @@ def test_clinical_job_accepts_minimal_payload(api_context: APIRequestContext):
     api_context.delete(f"/api/clinical/jobs/{job_id}")
     wait_for_job_completion(api_context, job_id)
 
-
 ###############################################################################
 def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):
     payload = build_minimal_payload()
@@ -115,7 +106,6 @@ def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):
     api_context.delete(f"/api/clinical/jobs/{job_id}")
     wait_for_job_completion(api_context, job_id)
 
-
 ###############################################################################
 def test_clinical_rejects_empty_provider_selection(api_context: APIRequestContext):
     payload = build_minimal_payload()
@@ -124,7 +114,6 @@ def test_clinical_rejects_empty_provider_selection(api_context: APIRequestContex
     response = api_context.post("/api/clinical/jobs", data=payload)
     assert response.status == 422
     assert "At least one model provider must be selected." in response.text()
-
 
 ###############################################################################
 def test_clinical_requires_visit_date(api_context: APIRequestContext):

@@ -8,7 +8,6 @@ from domain.clinical.entities import (
 from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.report_language import phrase, report_heading, rucam_summary_text
 
-
 ###############################################################################
 def test_report_heading_labels_exist_in_selected_language() -> None:
     assert report_heading("report_section_summary", "it")
@@ -17,7 +16,6 @@ def test_report_heading_labels_exist_in_selected_language() -> None:
     assert phrase("case_summary", "en")
     assert phrase("laboratory_history", "en")
     assert phrase("not_calculated_insufficient_data", "en")
-
 
 ###############################################################################
 def test_missing_data_labels_are_stable() -> None:
@@ -30,7 +28,6 @@ def test_missing_data_labels_are_stable() -> None:
         calculation_method="not_calculated",
     )
     assert "RUCAM" in rucam_summary_text(assessment, "en")
-
 
 ###############################################################################
 def test_deterministic_laboratory_section_rendering() -> None:
@@ -50,7 +47,6 @@ def test_deterministic_laboratory_section_rendering() -> None:
     )
     assert "## Laboratory history" in section
     assert "ALT: 210.0 U/L" in section
-
 
 ###############################################################################
 def test_deterministic_bibliography_section_rendering() -> None:

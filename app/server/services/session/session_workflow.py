@@ -69,7 +69,6 @@ _PROGRESS_SEQUENCE: list[tuple[str, float]] = [
     ("session.saving", 99.0),
 ]
 
-
 ###############################################################################
 def _emit_progress(
     progress_callback, stage: str, progress: float, detail: str | None = None
@@ -80,7 +79,6 @@ def _emit_progress(
         progress_callback(stage, progress, detail)
     except TypeError:
         progress_callback(stage, progress)
-
 
 ###############################################################################
 def _extract_deterministic_drugs(
@@ -96,7 +94,6 @@ def _extract_deterministic_drugs(
     if callable(method):
         return method(text)
     return type("_Fallback", (), {"entries": [], "unresolved_lines": [], "regimen_lines": []})()
-
 
 ###############################################################################
 def _append_warning_issue(
@@ -124,7 +121,6 @@ def _append_warning_issue(
         )
     )
 
-
 ###############################################################################
 def _has_temporal_information(service: Any, entry: Any) -> bool:
     parser = getattr(service, "drugs_parser", None)
@@ -132,7 +128,6 @@ def _has_temporal_information(service: Any, entry: Any) -> bool:
     if callable(checker):
         return bool(checker(entry))
     return True
-
 
 ###############################################################################
 def _resolve_rucam_source(entries: list[DrugRucamAssessment]) -> str:
@@ -147,7 +142,6 @@ def _resolve_rucam_source(entries: list[DrugRucamAssessment]) -> str:
     if any(entry.total_score is not None for entry in entries):
         return "calculated"
     return "not_calculated_insufficient_data"
-
 
 ###############################################################################
 def build_single_matched_drug_row_workflow(
@@ -197,7 +191,6 @@ def build_single_matched_drug_row_workflow(
         "rucam": rucam_entry.model_dump() if rucam_entry is not None else None,
     }
 
-
 ###############################################################################
 def _normalized_resolved_drug_map(prepared_inputs) -> dict[str, dict[str, Any]]:
     if prepared_inputs is None:
@@ -209,7 +202,6 @@ def _normalized_resolved_drug_map(prepared_inputs) -> dict[str, dict[str, Any]]:
             resolved_drug_map[normalized_key] = value
     return resolved_drug_map
 
-
 ###############################################################################
 def _normalized_rucam_map(
     rucam_bundle: PatientRucamAssessmentBundle,
@@ -220,7 +212,6 @@ def _normalized_rucam_map(
         if normalized_key:
             rucam_by_name[normalized_key] = item
     return rucam_by_name
-
 
 ###############################################################################
 def build_matched_drugs_payload_workflow(
@@ -251,7 +242,6 @@ def build_matched_drugs_payload_workflow(
         )
     return matched_drugs_payload
 
-
 ###############################################################################
 async def process_single_patient_workflow(
     service: Any,
@@ -278,7 +268,6 @@ async def process_single_patient_workflow(
         progress_callback=progress_callback,
         stop_check=stop_check,
     )
-
 
 ###############################################################################
 async def _process_standard_patient_workflow_internal(
@@ -632,7 +621,6 @@ async def _process_standard_patient_workflow_internal(
     except Exception as exc:
         logger.warning("Session persistence unavailable; returning in-memory result only: %s", exc)
     return result_payload
-
 
 ###############################################################################
 def start_clinical_job_workflow(

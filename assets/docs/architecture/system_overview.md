@@ -1,5 +1,5 @@
 # System Overview
-Last updated: 2026-06-06
+Last updated: 2026-06-18
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
@@ -36,7 +36,12 @@ Maintained source-level structure, with build and cache artifacts omitted:
 |   |   |-- repositories/
 |   |   |-- services/
 |   |   |-- common/
-|   |   `-- models/
+|   |   |   |-- catalogs/
+|   |   |   |   |-- provider.py
+|   |   |   |   |-- manifest_loader.py
+|   |   |   |-- utils/
+|   |   |   |-- security/
+|   |   |   |-- prompts/
 |   |-- client/
 |   |   |-- package.json
 |   |   |-- src/

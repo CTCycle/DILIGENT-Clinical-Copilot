@@ -26,9 +26,9 @@ from services.inspection.revision_runner_support import (
 )
 from services.session.factory import build_clinical_session_service
 
-
 ###############################################################################
 class InspectionRevisionRunnerMixin:
+
     # -------------------------------------------------------------------------
     def _start_revision_background_job(
         self,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from services.clinical.job_progress import CLINICAL_PROGRESS_MESSAGES
 
-
 ###############################################################################
 def test_progress_messages_cover_ordered_events() -> None:
     ordered = [

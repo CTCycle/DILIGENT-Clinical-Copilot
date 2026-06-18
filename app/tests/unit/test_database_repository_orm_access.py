@@ -7,7 +7,6 @@ from repositories.database.sqlite import SQLiteRepository
 from repositories.schemas.models import ModelSelection
 from sqlalchemy import select
 
-
 ###############################################################################
 def _build_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -25,7 +24,6 @@ def _build_settings() -> DatabaseSettings:
         insert_commit_interval=5,
         select_page_size=2000,
     )
-
 
 ###############################################################################
 def test_sqlite_repository_exposes_orm_session_factory(

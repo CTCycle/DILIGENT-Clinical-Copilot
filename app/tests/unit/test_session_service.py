@@ -16,11 +16,9 @@ from services.session.factory import build_clinical_session_service
 from services.session.session_service import ClinicalSessionService
 from services.session.session_workflow import start_clinical_job_workflow
 
-
 ###############################################################################
 def _build_service() -> ClinicalSessionService:
     return build_clinical_session_service(get_job_manager())
-
 
 ###############################################################################
 def test_preprocess_unified_input_accepts_fragment_aggregated_sections() -> None:
@@ -39,7 +37,6 @@ def test_preprocess_unified_input_accepts_fragment_aggregated_sections() -> None
     assert preprocessed.laboratory_analysis == "L"
     assert returned_extraction is not None
 
-
 ###############################################################################
 def test_preprocess_unified_input_rejects_invalid_sections() -> None:
     service = _build_service()
@@ -49,7 +46,6 @@ def test_preprocess_unified_input_rejects_invalid_sections() -> None:
         ServiceValidationError, match="Clinical input sections are invalid"
     ):
         asyncio.run(service.preprocess_unified_input(request))
-
 
 ###############################################################################
 def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
@@ -81,7 +77,6 @@ def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
     assert prepared["patient_payload"].anamnesis == "History text"
     assert prepared["patient_payload"].drugs == "Drug 10 mg 1-0-0-0"
     assert prepared["patient_payload"].laboratory_analysis == "ALT 120 U/L"
-
 
 ###############################################################################
 def test_start_clinical_job_requires_active_cloud_key_before_extraction(
@@ -128,7 +123,6 @@ def test_start_clinical_job_requires_active_cloud_key_before_extraction(
     ):
         start_clinical_job_workflow(service, request)
 
-
 ###############################################################################
 def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -139,7 +133,6 @@ def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) ->
     resolved = ClinicalSessionService._resolve_runtime_timeout(base_timeout_s=7200.0)
 
     assert resolved == 7200.0
-
 
 ###############################################################################
 def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) -> None:
@@ -162,7 +155,6 @@ def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) ->
     resolved = ClinicalSessionService._resolve_consultation_timeout()
 
     assert resolved == 5400.0
-
 
 ###############################################################################
 def test_run_revision_consultation_uses_revision_analysis_entrypoint(

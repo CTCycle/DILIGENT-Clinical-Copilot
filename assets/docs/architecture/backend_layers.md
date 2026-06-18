@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-06-10
+Last updated: 2026-06-18
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -24,11 +24,15 @@ Last updated: 2026-06-10
   - Owns SQL persistence, serialization, and vector store access.
   - Access key persistence mapping and active key retrieval stay in `app/server/repositories/serialization/access_keys.py`.
   - Reference catalog persistence and seeding are implemented through `reference_catalog_entries` and `reference_catalog_seed_runs` in `app/server/repositories/serialization/catalogs.py`.
+  - Database initialization (`repositories/database/initializer.py`) handles catalog seeding inline using `common/catalogs/manifest_loader.py` rather than the services layer, preserving strict layering during bootstrapping.
 - Config and common layers: `app/server/configurations/*`, `app/server/common/*`
   - Own runtime settings, constants, environment bootstrap, logging, and shared security helpers.
   - Provider-key cryptography lives under `app/server/common/security/cryptography.py`.
   - Shared pure-utility modules (text normalization, chunking, seed terms, embedding model specs) live under `app/server/common/utils/` (`text_utils.py`, `chunking.py`, `seed_terms.py`, `embedding_model.py`) and are the canonical single source of truth — service modules import from here rather than duplicating logic.
   - Endpoint-layer request validation lives in `app/server/api/session_validation.py`.
+  - Catalog snapshot provider (`common/catalogs/provider.py`) provides cross-layer access to reference catalog data through a registered provider pattern — service-layer runtime (`services/catalogs/runtime.py`) registers itself as the provider during import.
+  - Catalog manifest loading (`common/catalogs/manifest_loader.py`) handles file I/O for catalog JSON manifests, decoupled from persistence logic.
+  - Constants that depend on external catalog files (e.g., `CLOUD_MODEL_CHOICES`) are exposed as lazy accessor functions (`get_cloud_model_choices()`) to avoid import-time I/O side effects.
 
 ## Frontend Boundaries
 - `app/client/src/app/pages/*`

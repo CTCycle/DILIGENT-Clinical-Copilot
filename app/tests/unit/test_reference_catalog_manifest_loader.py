@@ -5,7 +5,6 @@ import json
 import pytest
 from services.catalogs.manifest_loader import load_catalog_manifest, validate_manifest
 
-
 ###############################################################################
 def test_validate_manifest_rejects_duplicate_normalized_values() -> None:
     payload = {
@@ -22,7 +21,6 @@ def test_validate_manifest_rejects_duplicate_normalized_values() -> None:
     }
     with pytest.raises(ValueError):
         validate_manifest(payload)
-
 
 ###############################################################################
 def test_load_catalog_manifest_parses_entries(tmp_path) -> None:  # type: ignore[no-untyped-def]

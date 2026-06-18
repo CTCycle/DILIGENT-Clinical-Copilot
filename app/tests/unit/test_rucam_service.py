@@ -12,7 +12,6 @@ from domain.clinical import (
 )
 from services.clinical.rucam import RucamScoreEstimator
 
-
 ###############################################################################
 def _base_inputs() -> tuple[PatientData, PatientDrugs, PatientLabTimeline]:
     payload = PatientData(
@@ -45,7 +44,6 @@ def _base_inputs() -> tuple[PatientData, PatientDrugs, PatientLabTimeline]:
     )
     return payload, drugs, timeline
 
-
 ###############################################################################
 def test_source_reported_rucam_score_is_used_directly() -> None:
     estimator = RucamScoreEstimator()
@@ -73,7 +71,6 @@ def test_source_reported_rucam_score_is_used_directly() -> None:
     assert item.total_score == 8
     assert item.calculation_method == "source_reported"
     assert item.data_sufficient is True
-
 
 ###############################################################################
 def test_laboratory_history_rucam_score_has_priority() -> None:
@@ -104,7 +101,6 @@ def test_laboratory_history_rucam_score_has_priority() -> None:
     assert item.calculation_method == "source_reported"
     assert item.score_source == "laboratory_history"
 
-
 ###############################################################################
 def test_livertox_likelihood_score_is_not_treated_as_rucam() -> None:
     estimator = RucamScoreEstimator()
@@ -124,7 +120,6 @@ def test_livertox_likelihood_score_is_not_treated_as_rucam() -> None:
     )
     item = bundle.entries[0]
     assert item.calculation_method != "source_reported"
-
 
 ###############################################################################
 def test_insufficient_data_returns_not_calculated_assessment() -> None:
@@ -148,7 +143,6 @@ def test_insufficient_data_returns_not_calculated_assessment() -> None:
     assert item.calculation_method == "not_calculated"
     assert item.data_sufficient is False
 
-
 ###############################################################################
 def test_select_pattern_anchor_returns_qualifying_lab() -> None:
     estimator = RucamScoreEstimator()
@@ -168,7 +162,6 @@ def test_select_pattern_anchor_returns_qualifying_lab() -> None:
     )
     assert anchor.source == "qualifying_lab"
     assert anchor.is_score_eligible is True
-
 
 ###############################################################################
 def test_visit_proxy_anchor_is_not_score_eligible() -> None:

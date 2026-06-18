@@ -8,7 +8,6 @@ import pytest
 from configurations.startup import get_server_settings
 from services import startup_validation
 
-
 ###############################################################################
 class _FakeModelConfigService:
 
@@ -22,7 +21,6 @@ class _FakeModelConfigService:
     # -------------------------------------------------------------------------
     def ensure_defaults(self) -> SimpleNamespace:
         return self._snapshot
-
 
 ###############################################################################
 def test_run_startup_validations_requires_reference_catalogs(
@@ -45,7 +43,6 @@ def test_run_startup_validations_requires_reference_catalogs(
 
     with pytest.raises(RuntimeError, match="Reference catalogs"):
         startup_validation.run_startup_validations(get_server_settings())
-
 
 ###############################################################################
 def test_run_startup_validations_requires_client_build_in_tauri_mode(

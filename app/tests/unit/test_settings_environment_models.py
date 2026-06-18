@@ -6,7 +6,6 @@ from domain.settings.environment import (
     EnvironmentSnapshot,
 )
 
-
 ###############################################################################
 def test_environment_snapshot_from_os_env_uses_domain_models(monkeypatch) -> None:
     env_names = [

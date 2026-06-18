@@ -14,7 +14,6 @@ from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 
-
 ###############################################################################
 class InMemorySerializer:
 
@@ -32,7 +31,6 @@ class InMemorySerializer:
         data.update(updates)
         self.snapshot = ModelConfigSnapshot(**data)
         return self.snapshot
-
 
 ###############################################################################
 def test_model_config_roundtrip_preserves_cloud_selection() -> None:
@@ -65,7 +63,6 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
     assert snapshot.clinical_model == "gpt-oss:20b"
     assert snapshot.text_extraction_model == "qwen3:1.7b"
 
-
 ###############################################################################
 def test_clinical_service_reads_runtime_from_persisted_config() -> None:
     clinical_service = build_clinical_session_service(get_job_manager())
@@ -75,7 +72,6 @@ def test_clinical_service_reads_runtime_from_persisted_config() -> None:
     )
     assert parser_provider
     assert parser_model
-
 
 ###############################################################################
 def test_model_config_service_accepts_cloud_models_for_role_assignments() -> None:
@@ -108,7 +104,6 @@ def test_model_config_service_accepts_cloud_models_for_role_assignments() -> Non
     assert serializer.snapshot.clinical_model == "gpt-4.1-mini"
     assert serializer.snapshot.text_extraction_model == "gpt-4.1"
 
-
 ###############################################################################
 def test_model_config_service_normalizes_stale_local_roles_in_cloud_mode() -> None:
     serializer = InMemorySerializer(
@@ -139,7 +134,6 @@ def test_model_config_service_normalizes_stale_local_roles_in_cloud_mode() -> No
     assert response.text_extraction_model == "gpt-4.1-mini"
     assert serializer.snapshot.clinical_model == "gpt-4.1-mini"
     assert serializer.snapshot.text_extraction_model == "gpt-4.1-mini"
-
 
 ###############################################################################
 def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) -> None:
@@ -191,7 +185,6 @@ def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) ->
 
     assert len(warnings) == 2
 
-
 ###############################################################################
 def test_openai_connectivity_check_uses_configured_cloud_model(monkeypatch) -> None:
     serializer = InMemorySerializer(
@@ -242,7 +235,6 @@ def test_openai_connectivity_check_uses_configured_cloud_model(monkeypatch) -> N
     assert response.response_preview == "OK"
     assert calls[0]["init"]["provider"] == "openai"
     assert calls[1]["chat"]["model"] == "gpt-4.1-mini"
-
 
 ###############################################################################
 def test_openai_connectivity_check_reports_llm_error(monkeypatch) -> None:

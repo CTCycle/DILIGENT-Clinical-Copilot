@@ -7,13 +7,11 @@ from typing import Any
 import httpx
 import pytest
 
-
 ###############################################################################
 def _normalize_host_for_url(host: str) -> str:
     if host in {"0.0.0.0", "::", "[::]"}:
         return "127.0.0.1"
     return host
-
 
 ###############################################################################
 def _build_base_url(
@@ -33,7 +31,6 @@ API_BASE_URL = (
     or _build_base_url("FASTAPI_HOST", "FASTAPI_PORT", "127.0.0.1", "8000")
 )
 
-
 ###############################################################################
 @pytest.fixture
 def api_client() -> httpx.Client:
@@ -46,7 +43,6 @@ def api_client() -> httpx.Client:
     except httpx.HTTPError as exc:  # pragma: no cover - environment availability path
         pytest.skip(f"Backend API is unavailable at {API_BASE_URL}: {exc}")
 
-
 ###############################################################################
 def _list_sessions(api_client: httpx.Client) -> list[dict[str, Any]]:
     response = api_client.get("/api/inspection/sessions", params={"offset": 0, "limit": 20})
@@ -54,7 +50,6 @@ def _list_sessions(api_client: httpx.Client) -> list[dict[str, Any]]:
     payload = response.json()
     items = payload.get("items") if isinstance(payload, dict) else None
     return items if isinstance(items, list) else []
-
 
 ###############################################################################
 def _get_session_detail(
@@ -67,7 +62,6 @@ def _get_session_detail(
     assert isinstance(payload, dict)
     return payload
 
-
 ###############################################################################
 def _get_session_versions(
     api_client: httpx.Client,
@@ -78,7 +72,6 @@ def _get_session_versions(
     payload = response.json()
     items = payload.get("items") if isinstance(payload, dict) else None
     return items if isinstance(items, list) else []
-
 
 ###############################################################################
 def _wait_for_revision_job(
@@ -102,7 +95,6 @@ def _wait_for_revision_job(
         raise AssertionError("Revision job never returned a status payload.")
     return last_payload
 
-
 ###############################################################################
 def _find_editable_session(api_client: httpx.Client) -> tuple[int, dict[str, Any]]:
     for item in _list_sessions(api_client):
@@ -114,7 +106,6 @@ def _find_editable_session(api_client: httpx.Client) -> tuple[int, dict[str, Any
         if report_text:
             return session_id, detail
     pytest.skip("No persisted clinical session with an editable report is available.")
-
 
 ###############################################################################
 def test_manual_report_edit_flow_preserves_version_and_audits_change(
@@ -157,7 +148,6 @@ def test_manual_report_edit_flow_preserves_version_and_audits_change(
     versions = _get_session_versions(api_client, session_id)
     assert versions
     assert versions[-1]["version_number"] == original_version
-
 
 ###############################################################################
 def test_revision_workflow_start_persists_draft_shell_and_pipeline_run(
