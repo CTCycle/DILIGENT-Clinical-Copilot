@@ -51,12 +51,11 @@ Last updated: 2026-06-18
 - `app/server/repositories/serialization/data.py` and DB repositories
 - Performs clinical preflight before job creation, normalizes the submitted document, applies deterministic section-first extraction before clinical LLM extraction, persists evidence-locked pipeline artifacts in `session_result_payload`, and returns artifact and gate summaries through the job result.
 - Core section extraction is deterministic only and preserves verbatim source slices with heading spans, body spans, char spans, match strategy, confidence, source hash, and review flags.
-- Therapy and laboratory extraction use deterministic parsing and local extraction tools first. The pipeline records a strategy decision of `deterministic`, `hybrid`, or `llm` when unresolved or ambiguous fragments require model assistance.
-- Anamnesis extraction remains LLM-preferred for free text, but extracted drugs and diseases must carry source evidence, confidence, attribution, and current or diagnostic status where available.
-- Deterministic extraction tool schemas live under `app/resources/tools` and runtime dispatch lives under `app/server/services/extraction_tools`.
+- Therapy, anamnesis, disease, and laboratory extraction use provider-agnostic structured LLM calls first for both cloud and local providers, then fall back to direct rule-based parsing after bounded validation or provider failures.
+- Extracted drugs and diseases must carry source evidence, confidence, attribution, and current or diagnostic status where available.
 - Hepatic pattern handling resolves explicit source-provided values separately from calculated R-ratio values and flags conflicts instead of silently overwriting the calculated score.
 - LiverTox and RxNav matching preserve raw mentions, candidates, rejected candidates, origins, confidence, status, and warning issues for missing, ambiguous, low-confidence, or unvalidated matches.
-- Persisted audit artifacts include section extraction audit, extraction strategy decisions, tool calls, hepatic pattern resolution, and match audit details.
+- Persisted audit artifacts include section extraction audit, extraction strategy decisions, hepatic pattern resolution, and match audit details.
 
 ### `POST /api/clinical/validate-input`
 - `app/server/api/session.py`
