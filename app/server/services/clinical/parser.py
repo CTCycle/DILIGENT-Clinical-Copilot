@@ -55,6 +55,7 @@ from services.clinical.parser_validation import (
 )
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
+from services.extraction_tools.strategy import decide_extraction_strategy
 from common.utils.text_utils import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
 
@@ -263,6 +264,132 @@ class DrugsParser:
         )
         self.emit_progress(progress_callback, 1.0)
         return PatientDrugs(entries=combined)
+
+    # -------------------------------------------------------------------------
+    async def extract_drugs_from_therapy_with_audit(
+        self,
+        text: str | None,
+        *,
+        already_cleaned: bool = False,
+        progress_callback: Callable[[float], None] | None = None,
+    ) -> dict[str, Any]:
+        cleaned = (
+            (text or "")
+            if already_cleaned
+            else self.conservative_prepare_drug_section_text(text)
+        )
+        if not cleaned:
+            decision = decide_extraction_strategy(
+                section="therapy",
+                meaningful_line_count=0,
+                parsed_line_count=0,
+                unresolved_line_count=0,
+                evidence_span_count=0,
+            )
+            return {
+                "patient_drugs": PatientDrugs(entries=[]),
+                "strategy": decision.strategy,
+                "decision": decision.model_dump(),
+                "unresolved_lines": [],
+                "warnings": [],
+            }
+        deterministic = self.extract_drugs_from_therapy_deterministic(cleaned)
+        meaningful_line_count = len(
+            [
+                block.text
+                for block in isolate_drug_blocks(cleaned)
+                if block.text.strip()
+                and not self.is_non_therapy_line(block.text.strip())
+            ]
+        )
+        parsed_entries = self._attach_therapy_evidence_spans(
+            deterministic.entries,
+            cleaned,
+        )
+        if not deterministic.unresolved_lines:
+            decision = decide_extraction_strategy(
+                section="therapy",
+                meaningful_line_count=meaningful_line_count,
+                parsed_line_count=len(parsed_entries),
+                unresolved_line_count=0,
+                evidence_span_count=sum(
+                    1 for entry in parsed_entries if entry.source_span
+                ),
+            )
+            return {
+                "patient_drugs": PatientDrugs(
+                    entries=self.deduplicate_drug_entries(parsed_entries)
+                ),
+                "strategy": decision.strategy,
+                "decision": decision.model_dump(),
+                "unresolved_lines": [],
+                "warnings": [],
+            }
+        combined = await self.extract_drugs_from_therapy_hybrid(
+            cleaned,
+            progress_callback=progress_callback,
+        )
+        entries = self._attach_therapy_evidence_spans(combined, cleaned)
+        decision = decide_extraction_strategy(
+            section="therapy",
+            meaningful_line_count=meaningful_line_count,
+            parsed_line_count=max(
+                0, meaningful_line_count - len(deterministic.unresolved_lines)
+            ),
+            unresolved_line_count=len(deterministic.unresolved_lines),
+            evidence_span_count=sum(1 for entry in entries if entry.source_span),
+        )
+        return {
+            "patient_drugs": PatientDrugs(
+                entries=self.deduplicate_drug_entries(entries)
+            ),
+            "strategy": decision.strategy,
+            "decision": decision.model_dump(),
+            "unresolved_lines": deterministic.unresolved_lines,
+            "warnings": [
+                {"code": "therapy_unresolved_line", "raw_line": line}
+                for line in deterministic.unresolved_lines
+            ],
+        }
+
+    # -------------------------------------------------------------------------
+    def _attach_therapy_evidence_spans(
+        self,
+        entries: list[DrugEntry],
+        source_text: str,
+    ) -> list[DrugEntry]:
+        updated: list[DrugEntry] = []
+        casefold_source = source_text.casefold()
+        for entry in entries:
+            if entry.source_span and entry.evidence:
+                updated.append(entry)
+                continue
+            raw_name = (entry.name or "").strip()
+            start = casefold_source.find(raw_name.casefold()) if raw_name else -1
+            if start < 0:
+                updated.append(
+                    entry.model_copy(
+                        update={
+                            "source": entry.source or "therapy",
+                            "confidence": entry.confidence or "moderate",
+                        }
+                    )
+                )
+                continue
+            end = start + len(raw_name)
+            updated.append(
+                entry.model_copy(
+                    update={
+                        "source": entry.source or "therapy",
+                        "evidence": source_text[start:end],
+                        "source_span": [start, end],
+                        "confidence": entry.confidence or "high",
+                        "attribution": entry.attribution or "patient",
+                        "current_status": entry.current_status or "unclear",
+                    }
+                )
+            )
+        return updated
 
     # -------------------------------------------------------------------------
     async def extract_drugs_from_therapy_hybrid(
@@ -1130,10 +1257,46 @@ class DrugsParser:
         if entry is None:
             return None
         enriched = self.enrich_entry_from_line(entry, raw_line)
-        return self.normalize_entry(
+        normalized = self.normalize_entry(
             enriched,
             source=source,
             historical_flag=historical_flag,
+        )
+        if normalized is None:
+            return None
+        evidence = (normalized.evidence or "").strip()
+        if evidence and evidence in raw_line:
+            start = raw_line.index(evidence)
+            return normalized.model_copy(
+                update={
+                    "source_span": normalized.source_span
+                    or [start, start + len(evidence)],
+                    "confidence": normalized.confidence or "high",
+                    "attribution": normalized.attribution or "patient",
+                    "current_status": normalized.current_status
+                    or ("past" if historical_flag else "unclear"),
+                }
+            )
+        raw_name = (normalized.name or "").strip()
+        start = raw_line.casefold().find(raw_name.casefold()) if raw_name else -1
+        if start >= 0:
+            end = start + len(raw_name)
+            return normalized.model_copy(
+                update={
+                    "evidence": raw_line[start:end],
+                    "source_span": [start, end],
+                    "confidence": normalized.confidence or "moderate",
+                    "attribution": normalized.attribution or "patient",
+                    "current_status": normalized.current_status
+                    or ("past" if historical_flag else "unclear"),
+                }
+            )
+        return normalized.model_copy(
+            update={
+                "confidence": "low",
+                "attribution": normalized.attribution or "unclear",
+                "current_status": normalized.current_status or "unclear",
+            }
         )
 
     # -------------------------------------------------------------------------

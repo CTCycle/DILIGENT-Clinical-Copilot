@@ -8,7 +8,6 @@ from domain.catalogs import CatalogEntry, ReferenceCatalogSnapshot
 from repositories.database.session import get_default_repository
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
-
 ###############################################################################
 def _build_snapshot(entries: list[CatalogEntry]) -> ReferenceCatalogSnapshot:
     grouped: dict[tuple[str, str, str, str], list[CatalogEntry]] = {}
@@ -23,19 +22,16 @@ def _build_snapshot(entries: list[CatalogEntry]) -> ReferenceCatalogSnapshot:
     }
     return ReferenceCatalogSnapshot(entries_by_scope=MappingProxyType(packed))
 
-
 ###############################################################################
 def _build_reference_catalog_snapshot() -> ReferenceCatalogSnapshot:
     repository = get_default_repository()
     serializer = ReferenceCatalogSerializer(session_factory=repository.session_factory)
     return _build_snapshot(serializer.list_active_entries())
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def _cached_reference_catalog_snapshot() -> ReferenceCatalogSnapshot:
     return _build_reference_catalog_snapshot()
-
 
 ###############################################################################
 def get_reference_catalog_snapshot(
@@ -46,7 +42,6 @@ def get_reference_catalog_snapshot(
     serializer = ReferenceCatalogSerializer(session_factory=repository.session_factory)
     return _build_snapshot(serializer.list_active_entries())
 
-
 ###############################################################################
 def reload_reference_catalog_snapshot(repository=None) -> ReferenceCatalogSnapshot:
     if repository is None:
@@ -54,7 +49,6 @@ def reload_reference_catalog_snapshot(repository=None) -> ReferenceCatalogSnapsh
         return _cached_reference_catalog_snapshot()
     _cached_reference_catalog_snapshot.cache_clear()
     return _build_snapshot([])
-
 
 ###############################################################################
 def reset_reference_catalog_snapshot_for_tests() -> None:

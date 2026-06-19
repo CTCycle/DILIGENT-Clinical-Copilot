@@ -1,0 +1,8 @@
+Anamnesis
+Patient has jaundice.
+
+Therapy
+Drug J 10 mg daily.
+
+Laboratory history
+Hepatic pattern: mixed. ALT 350 U/L, ALP 320 U/L.

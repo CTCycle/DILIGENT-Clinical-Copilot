@@ -28,6 +28,13 @@ Rules:
   only when stated.
 - Populate `daytime_administration` only for explicit schedules; otherwise use [].
 - Set `source` to "anamnesis" for all entries.
+- For every entry, include exact source `evidence` copied from the input and
+  `source_span` character offsets when possible.
+- Classify `confidence` as high, moderate, or low based on source grounding.
+- Classify `attribution` as patient, family_history, allergy, negated, or unclear.
+- Classify `current_status` as current, past, suspected, ruled_out, or unclear.
+- Do not treat family-history, allergy-only, negated, or ruled-out mentions as
+  active patient conditions unless the text explicitly says they apply to the patient.
 
 Return a JSON object matching `PatientDrugs` with an `entries` array.
 """
@@ -42,6 +49,13 @@ Rules:
 - For each condition, return name, occurrence_time, timeline, severity,
   diagnosis_status, symptoms, clinical_context, chronic, hepatic_related, and
   a short supporting evidence snippet when available.
+- Include exact source evidence and `source_span` character offsets when possible.
+- Classify `confidence` as high, moderate, or low and `attribution` as patient,
+  family_history, negated, or unclear.
+- Distinguish confirmed, suspected, ruled-out, past, and unclear diagnoses in
+  `diagnosis_status`.
+- Do not extract family history, allergy-only context, or ruled-out diagnoses as
+  active patient diseases unless explicitly marked as patient conditions.
 - Normalize spacing only; do not invent diseases or attributes.
 
 Return a JSON object matching `PatientDiseaseContext` with an `entries` array.

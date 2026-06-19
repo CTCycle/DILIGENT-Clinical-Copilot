@@ -286,13 +286,26 @@ class ClinicalSessionExtractionPipelineMixin:
             base_timeout_s=float(getattr(self.lab_extractor, "timeout_s", 1.0))
         )
         try:
-            lab_timeline, onset_context = await asyncio.wait_for(
-                self.lab_extractor.extract_from_payload(
-                    payload,
-                    progress_callback=lab_progress_callback,
-                ),
-                timeout=timeout_s,
-            )
+            if hasattr(self.lab_extractor, "extract_from_payload_with_audit"):
+                lab_audit = await asyncio.wait_for(
+                    self.lab_extractor.extract_from_payload_with_audit(
+                        payload,
+                        progress_callback=lab_progress_callback,
+                    ),
+                    timeout=timeout_s,
+                )
+                self.latest_lab_extraction_audit = lab_audit
+                lab_timeline = lab_audit["lab_timeline"]
+                onset_context = lab_audit["onset_context"]
+            else:
+                lab_timeline, onset_context = await asyncio.wait_for(
+                    self.lab_extractor.extract_from_payload(
+                        payload,
+                        progress_callback=lab_progress_callback,
+                    ),
+                    timeout=timeout_s,
+                )
+                self.latest_lab_extraction_audit = None
             self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
             logger.info("Anamnesis lab extraction required %.4f seconds", elapsed)
@@ -357,6 +370,7 @@ class ClinicalSessionExtractionPipelineMixin:
             normalized_entries.sort(key=self.lab_extractor.lab_entry_sort_key)
             lab_timeline = PatientLabTimeline(entries=normalized_entries)
             onset_context = None
+            self.latest_lab_extraction_audit = None
         self.emit_progress(
             progress_callback, stage="anamnesis_lab_extraction", value=54.0
         )
@@ -474,9 +488,7 @@ class ClinicalSessionExtractionPipelineMixin:
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
     ) -> dict[str, str] | None:
-        self.emit_progress(
-            progress_callback, stage="rag_query_building", value=75.0
-        )
+        self.emit_progress(progress_callback, stage="rag_query_building", value=75.0)
         rag_query: dict[str, str] | None = None
         if payload.use_rag:
             query_builder = DILIQueryBuilder(analysis_drugs)
@@ -486,9 +498,7 @@ class ClinicalSessionExtractionPipelineMixin:
                 pattern_classification=pattern_score.classification,
                 r_score=pattern_score.r_score,
             )
-        self.emit_progress(
-            progress_callback, stage="rag_query_building", value=82.0
-        )
+        self.emit_progress(progress_callback, stage="rag_query_building", value=82.0)
         self.run_stop_check(stop_check)
         return rag_query
 

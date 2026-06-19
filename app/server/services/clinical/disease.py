@@ -139,6 +139,44 @@ class DiseaseExtractor:
             chronic=entry.chronic,
             hepatic_related=entry.hepatic_related,
             evidence=evidence,
+            source_span=entry.source_span,
+            confidence=entry.confidence,
+            attribution=entry.attribution,
+        )
+
+    # -------------------------------------------------------------------------
+    def validate_entry_evidence(
+        self,
+        entry: DiseaseContextEntry,
+        source_text: str,
+    ) -> DiseaseContextEntry:
+        evidence = (entry.evidence or "").strip()
+        if evidence and evidence in source_text:
+            start = source_text.index(evidence)
+            return entry.model_copy(
+                update={
+                    "source_span": entry.source_span or [start, start + len(evidence)],
+                    "confidence": entry.confidence or "high",
+                    "attribution": entry.attribution or "patient",
+                }
+            )
+        name = (entry.name or "").strip()
+        start = source_text.casefold().find(name.casefold()) if name else -1
+        if start >= 0:
+            end = start + len(name)
+            return entry.model_copy(
+                update={
+                    "evidence": source_text[start:end],
+                    "source_span": [start, end],
+                    "confidence": entry.confidence or "moderate",
+                    "attribution": entry.attribution or "patient",
+                }
+            )
+        return entry.model_copy(
+            update={
+                "confidence": "low",
+                "attribution": entry.attribution or "unclear",
+            }
         )
 
     # -------------------------------------------------------------------------
@@ -193,7 +231,7 @@ class DiseaseExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -287,7 +325,9 @@ class DiseaseExtractor:
         for entry in raw_entries:
             normalized = self.normalize_entry(entry)
             if normalized is not None:
-                normalized_entries.append(normalized)
+                normalized_entries.append(
+                    self.validate_entry_evidence(normalized, unresolved_source)
+                )
 
         deduplicated = self.deduplicate_entries(normalized_entries)
         deduplicated = self.deduplicate_entries([*accumulated_entries, *deduplicated])

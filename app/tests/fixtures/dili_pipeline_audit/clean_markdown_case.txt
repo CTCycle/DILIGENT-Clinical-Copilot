@@ -1,0 +1,8 @@
+# Anamnesis
+Adult patient with fatigue and no prior chronic liver disease.
+
+# Therapy
+Amoxicillin 500 mg oral bid from 2024-01-02.
+
+# Laboratory history
+ALT 450 U/L, AST 220 U/L, ALP 180 U/L, bilirubin 2.1 mg/dL.

@@ -1,0 +1,9 @@
+Anamnesis
+Patient has no known liver disease.
+
+Therapy
+- Drug E 250 mg oral bid from 2024-02-01.
+- Drug F 5 mg once daily.
+
+Laboratory history
+ALT 420 U/L.

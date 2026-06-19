@@ -24,6 +24,8 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 ### Architecture
 - `architecture/system_overview.md`
   - Repository layout, maintained code structure, and entry points.
+- `architecture/dili_assessment_pipeline.md`
+  - Production DILI extraction audit design, tool registry, strategy decisions, hepatic pattern resolution, match audit, and testing matrix.
 - `architecture/api_surface.md`
   - Backend route catalog and stable HTTP boundaries.
 - `architecture/backend_layers.md`
