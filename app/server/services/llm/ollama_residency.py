@@ -324,6 +324,13 @@ def handle_prefetch_task_done(self, task: asyncio.Task[None]) -> None:
             logger.debug("Ollama model prefetch task failed: %s", exc)
 
 ###############################################################################
+def format_prefetch_error(exc: Exception) -> str:
+    message = str(exc).replace("\r", " ").replace("\n", " ").strip()
+    if len(message) > 500:
+        return message[:497] + "..."
+    return message or type(exc).__name__
+
+###############################################################################
 async def prefetch_model(
     self,
     *,
@@ -350,11 +357,23 @@ async def prefetch_model(
             keep_alive,
         )
     except OllamaError as exc:
-        logger.debug("Skipping Ollama prefetch for '%s': %s", model, exc)
+        logger.warning(
+            "Skipping Ollama prefetch for '%s'; provider rejected the bounded warm-up request: %s",
+            model,
+            format_prefetch_error(exc),
+        )
     except httpx.TimeoutException as exc:
-        logger.debug("Timed out prefetching Ollama model '%s': %s", model, exc)
+        logger.warning(
+            "Timed out prefetching Ollama model '%s': %s",
+            model,
+            format_prefetch_error(exc),
+        )
     except httpx.RequestError as exc:
-        logger.debug("Request error prefetching Ollama model '%s': %s", model, exc)
+        logger.warning(
+            "Request error prefetching Ollama model '%s': %s",
+            model,
+            format_prefetch_error(exc),
+        )
 
 ###############################################################################
 async def maybe_prefetch_target_model(self, *, active_model: str) -> None:
