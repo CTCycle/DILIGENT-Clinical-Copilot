@@ -1,4 +1,4 @@
-from services.extraction_tools.strategy import decide_extraction_strategy
+from services.clinical.extraction_strategy import decide_extraction_strategy
 
 
 ###############################################################################

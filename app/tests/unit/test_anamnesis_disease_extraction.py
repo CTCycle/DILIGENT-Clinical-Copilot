@@ -140,6 +140,54 @@ def test_extract_diseases_from_anamnesis_retries_transient_failures(
     assert [entry.name for entry in parsed.entries] == ["Steatosi epatica"]
 
 ###############################################################################
+def test_case_style_anamnesis_merges_missed_grounded_disease_candidates() -> None:
+    client = FakeDiseaseClient(
+        [
+            PatientDiseaseContext(
+                entries=[
+                    DiseaseContextEntry(name="Colestasi", evidence="colestasi"),
+                    DiseaseContextEntry(name="Diabete", evidence="Diabete mellito"),
+                ]
+            ),
+            PatientDiseaseContext(
+                entries=[
+                    DiseaseContextEntry(name="Colestasi", evidence="colestasi"),
+                    DiseaseContextEntry(name="Diabete", evidence="Diabete mellito"),
+                ]
+            ),
+        ]
+    )
+    extractor = DiseaseExtractor(client=client)
+    anamnesis = """
+    Pyoderma gangrenosum dell'arto inferiore destro DD calcifilassi.
+    Recente infezione da virus Influenza A.
+    Pan-ipopuitarismo in paziente con macroadenoma ipofisario.
+    Attuale: insufficienza surrenalica acuta.
+    Elevazione degli indici di colestasi nel contesto di terapia antibiotica.
+    Insufficienza renale acuta AKI I su cronica KDIGO G3b.
+    Fibrillazione atriale in trattamento con Xarelto.
+    Anemia normocita normocromica di verosimile origine infiammatoria.
+    Diabete mellito tipo 2.
+    Cardiopatia ischemica su coronaropatia trivasale.
+    Malattia da reflusso gastro-esofageo.
+    Iperplasia prostatica.
+    Possibile miopatia da statina.
+    Polineuropatia degenerativa degli arti inferiori.
+    POCUS: colecistolitiasi senza segni di flogosi.
+    """
+
+    parsed = asyncio.run(extractor.extract_diseases_from_anamnesis(anamnesis))
+
+    names = {entry.name for entry in parsed.entries}
+    assert client.call_count == 2
+    assert "Pyoderma gangrenosum" in names
+    assert "Insufficienza renale acuta" in names
+    assert "Fibrillazione atriale" in names
+    assert "Cardiopatia ischemica" in names
+    assert "Colecistolitiasi" in names
+    assert len(names) >= 14
+
+###############################################################################
 def test_build_structured_clinical_context_includes_disease_timeline() -> None:
     payload = PatientData(
         name="Patient A",

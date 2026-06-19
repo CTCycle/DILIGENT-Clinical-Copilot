@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-06-18
+Last updated: 2026-06-19
 
 ## Relational Database
 - SQLAlchemy-backed storage
@@ -51,8 +51,8 @@ app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-resee
 ## Filesystem Resources
 - `app/resources/sources`
   - Source catalogs, documents, and archives
-- `app/resources/tools`
-  - Extraction tool manifests and deterministic tool-related assets
+- `app/resources/catalogs`
+  - JSON seed manifests for database-backed reference catalogs, including extraction validation vocabulary
 
 ## Access Key Persistence
 - Encrypted provider keys are persisted in database tables.

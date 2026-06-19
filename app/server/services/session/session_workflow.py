@@ -779,11 +779,6 @@ async def _process_standard_patient_workflow_internal(
                     None,
                 ),
             },
-            "tool_calls": {
-                "laboratory_history": (
-                    getattr(service, "latest_lab_extraction_audit", None) or {}
-                ).get("tool_calls", [])
-            },
             "hepatic_pattern_resolution": hepatic_pattern_resolution.model_dump(),
             "match_audit": {
                 "issues": [issue.model_dump() for issue in match_audit_issues],
