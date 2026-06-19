@@ -457,7 +457,8 @@
         "tbil",
         "total bilirubin",
         "bilirubin total",
-        "bilirubin"
+        "bilirubin",
+        "bilirubina totale"
       ],
       "metadata": {
         "case_sensitive": false,
@@ -473,7 +474,8 @@
       "values": [
         "dbil",
         "direct bilirubin",
-        "bilirubin direct"
+        "bilirubin direct",
+        "bilirubina diretta"
       ],
       "metadata": {
         "case_sensitive": false,
@@ -494,6 +496,36 @@
       "metadata": {
         "case_sensitive": false,
         "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_markers",
+      "key": "CR",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "cr",
+        "creatinina",
+        "creatinine"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_markers",
+      "key": "EGFR",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "egfr"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
       }
     },
     {
@@ -800,7 +832,15 @@
       "locale": "und",
       "priority": 100,
       "values": [
-        "originariamente previsto"
+        "originariamente previsto",
+        "biopsia",
+        "cutaneo",
+        "dermo ipodermica",
+        "neutrofili",
+        "tappeto",
+        "labor",
+        "bilirubina",
+        "colestasi"
       ],
       "metadata": {
         "case_sensitive": false,

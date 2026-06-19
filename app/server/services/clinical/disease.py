@@ -224,6 +224,43 @@ class DiseaseExtractor:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def format_expected_candidates(entries: list[DiseaseContextEntry]) -> str:
+        lines: list[str] = []
+        for entry in entries[:30]:
+            parts = [entry.name]
+            if entry.evidence:
+                parts.append(f"evidence={entry.evidence[:180]}")
+            if entry.chronic is not None:
+                parts.append(f"chronic={'yes' if entry.chronic else 'no'}")
+            if entry.hepatic_related is not None:
+                parts.append(
+                    f"hepatic_related={'yes' if entry.hepatic_related else 'no'}"
+                )
+            lines.append("- " + " | ".join(parts))
+        return "\n".join(lines)
+
+    # -------------------------------------------------------------------------
+    def validate_disease_coverage(
+        self,
+        entries: list[DiseaseContextEntry],
+        candidates: list[DiseaseContextEntry],
+    ) -> tuple[list[str], list[DiseaseContextEntry]]:
+        present = {normalize_token(entry.name) for entry in entries}
+        missing = [
+            candidate
+            for candidate in candidates
+            if normalize_token(candidate.name) not in present
+        ]
+        feedback: list[str] = []
+        if missing:
+            feedback.append(
+                "Missing grounded disease candidates: "
+                + "; ".join(entry.name for entry in missing[:12])
+            )
+        return feedback, missing
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def extract_rate_limit_wait_hint_seconds(exc: Exception) -> float | None:
         message = str(exc)
         match = RATE_LIMIT_WAIT_HINT_RE.search(message)
@@ -259,83 +296,111 @@ class DiseaseExtractor:
         if not cleaned:
             return PatientDiseaseContext(entries=[])
 
-        deterministic = extract_deterministic_diseases(cleaned)
-        accumulated_entries = list(deterministic.context.entries)
-        self.emit_progress(progress_callback, 0.15 if accumulated_entries else 0.0)
-
-        unresolved_source = "\n".join(deterministic.unresolved_lines).strip()
-        if not unresolved_source:
-            self.emit_progress(progress_callback, 1.0)
-            return PatientDiseaseContext(
-                entries=self.deduplicate_entries(accumulated_entries)
-            )
-
-        await self.ensure_client()
-        if self.client is None:
-            self.emit_progress(progress_callback, 1.0)
-            return PatientDiseaseContext(
-                entries=self.deduplicate_entries(accumulated_entries)
-            )
-
-        raw_entries: list[DiseaseContextEntry] = []
         self.emit_progress(progress_callback, 0.0)
-        user_prompt = (
-            "Extract diseases from this full anamnesis text, with temporal and hepatic metadata.\n"
-            f"{unresolved_source}"
+        deterministic = extract_deterministic_diseases(cleaned)
+        deterministic_candidates = self.deduplicate_entries(
+            list(deterministic.context.entries)
         )
-        parsed: PatientDiseaseContext | None = None
-        for attempt in range(1, self.extraction_retry_attempts + 1):
-            try:
-                parsed = await asyncio.wait_for(
-                    self.client.llm_structured_call(
-                        model=self.model,
-                        system_prompt=ANAMNESIS_DISEASE_EXTRACTION_PROMPT.strip(),
-                        user_prompt=user_prompt,
-                        schema=PatientDiseaseContext,
-                        temperature=self.temperature,
-                        use_json_mode=True,
-                        max_repair_attempts=1,
-                    ),
-                    timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
+        try:
+            await self.ensure_client()
+            if self.client is None:
+                raise RuntimeError("LLM client is not initialized for disease extraction")
+            candidate_text = self.format_expected_candidates(deterministic_candidates)
+            user_prompt = (
+                "Extract diseases from this full anamnesis text, with temporal and hepatic metadata.\n"
+                f"{cleaned}"
+            )
+            if candidate_text:
+                user_prompt = (
+                    f"{user_prompt}\n\n"
+                    "Grounded candidate checklist from source text. Use it to avoid omissions, but still "
+                    "return only clinically relevant diseases/conditions supported by the source:\n"
+                    f"{candidate_text}"
                 )
-                break
-            except Exception as exc:
-                if attempt >= self.extraction_retry_attempts:
-                    raise RuntimeError(
-                        "Failed to extract diseases from anamnesis"
-                    ) from exc
-                delay = self.retry_backoff_seconds(attempt, exc=exc)
-                logger.warning(
-                    (
-                        "Retrying anamnesis disease extraction "
-                        "(attempt %d/%d, delay %.2fs): %s"
-                    ),
-                    attempt,
-                    self.extraction_retry_attempts,
-                    delay,
-                    exc,
+            last_wrong_output = ""
+            last_errors: list[str] = []
+            max_attempts = max(1, self.extraction_retry_attempts + 1)
+            for attempt in range(1, max_attempts + 1):
+                if attempt > 1:
+                    user_prompt = (
+                        "Retry the disease extraction. The previous output was rejected by semantic validation.\n"
+                        "Return only clinically relevant diseases/conditions explicitly supported by the source.\n\n"
+                        f"Validation errors:\n- {'; '.join(last_errors)}\n\n"
+                        f"Grounded candidate checklist:\n{candidate_text}\n\n"
+                        f"Previous wrong output:\n{last_wrong_output}\n\n"
+                        f"Source text:\n{cleaned}"
+                    )
+                try:
+                    parsed = await asyncio.wait_for(
+                        self.client.llm_structured_call(
+                            model=self.model,
+                            system_prompt=ANAMNESIS_DISEASE_EXTRACTION_PROMPT.strip(),
+                            user_prompt=user_prompt,
+                            schema=PatientDiseaseContext,
+                            temperature=self.temperature,
+                            use_json_mode=True,
+                            max_repair_attempts=1,
+                        ),
+                        timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
+                    )
+                except Exception as exc:
+                    if attempt >= max_attempts:
+                        raise
+                    delay = self.retry_backoff_seconds(attempt, exc=exc)
+                    logger.warning(
+                        (
+                            "Retrying anamnesis disease extraction "
+                            "(attempt %d/%d, delay %.2fs): %s"
+                        ),
+                        attempt,
+                        max_attempts,
+                        delay,
+                        exc,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                last_wrong_output = parsed.model_dump_json()
+                normalized_entries: list[DiseaseContextEntry] = []
+                for entry in parsed.entries:
+                    normalized = self.normalize_entry(entry)
+                    if normalized is not None:
+                        normalized_entries.append(
+                            self.validate_entry_evidence(normalized, cleaned)
+                        )
+                deduplicated = self.deduplicate_entries(normalized_entries)
+                feedback, missing_candidates = self.validate_disease_coverage(
+                    deduplicated,
+                    deterministic_candidates,
                 )
-                await asyncio.sleep(delay)
-        if parsed is None:
-            raise RuntimeError("Failed to extract diseases from anamnesis")
-        raw_entries.extend(parsed.entries)
-        self.emit_progress(progress_callback, 0.9)
+                coverage_ok = not missing_candidates or (
+                    len(deduplicated) >= max(1, int(len(deterministic_candidates) * 0.8))
+                )
+                if deduplicated and coverage_ok:
+                    self.emit_progress(progress_callback, 1.0)
+                    logger.info(
+                        "Anamnesis disease LLM extraction produced %s entries (%s raw LLM entries).",
+                        len(deduplicated),
+                        len(parsed.entries),
+                    )
+                    return PatientDiseaseContext(entries=deduplicated)
+                if attempt >= max_attempts and deduplicated:
+                    logger.warning(
+                        "LLM disease extraction missed %d grounded candidates after retry; merging deterministic fallback candidates.",
+                        len(missing_candidates),
+                    )
+                    merged = self.deduplicate_entries([*deduplicated, *missing_candidates])
+                    self.emit_progress(progress_callback, 1.0)
+                    return PatientDiseaseContext(entries=merged)
+                last_errors = feedback or [
+                    "The model returned no valid disease entries despite disease-like source evidence."
+                ]
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Anamnesis disease LLM extraction failed; using deterministic fallback: %s",
+                exc,
+            )
 
-        normalized_entries: list[DiseaseContextEntry] = []
-        for entry in raw_entries:
-            normalized = self.normalize_entry(entry)
-            if normalized is not None:
-                normalized_entries.append(
-                    self.validate_entry_evidence(normalized, unresolved_source)
-                )
-
-        deduplicated = self.deduplicate_entries(normalized_entries)
-        deduplicated = self.deduplicate_entries([*accumulated_entries, *deduplicated])
-        logger.info(
-            "Anamnesis disease extraction produced %s entries (%s raw LLM entries, %s deterministic entries).",
-            len(deduplicated),
-            len(raw_entries),
-            len(accumulated_entries),
-        )
         self.emit_progress(progress_callback, 1.0)
-        return PatientDiseaseContext(entries=deduplicated)
+        return PatientDiseaseContext(
+            entries=deterministic_candidates
+        )

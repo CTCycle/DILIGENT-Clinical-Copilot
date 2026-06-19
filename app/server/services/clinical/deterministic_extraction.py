@@ -37,6 +37,86 @@ CAPITALIZED_DRUG_TOKEN_RE = re.compile(
 )
 LOWER_DISEASE_PATTERNS: tuple[tuple[re.Pattern[str], dict[str, object]], ...] = (
     (
+        re.compile(r"\bpyoderma\s+gangrenosum\b", re.IGNORECASE),
+        {"name": "Pyoderma gangrenosum", "chronic": True, "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\bcalcifilassi\b", re.IGNORECASE),
+        {"name": "Calcifilassi", "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\barteriopatia\s+periferica\s+obliterante\b", re.IGNORECASE),
+        {
+            "name": "Arteriopatia periferica obliterante",
+            "chronic": True,
+            "hepatic_related": False,
+        },
+    ),
+    (
+        re.compile(r"\binfezione\s+da\s+virus\s+influenza\s+a\b", re.IGNORECASE),
+        {"name": "Infezione da virus Influenza A", "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\bpan[-\s]?ipopuitarismo\b", re.IGNORECASE),
+        {"name": "Pan-ipopuitarismo", "chronic": True, "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\bmacroadenoma\s+ipofisario\b", re.IGNORECASE),
+        {"name": "Macroadenoma ipofisario", "chronic": True, "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\binsufficienza\s+surrenalica\s+acuta\b", re.IGNORECASE),
+        {"name": "Insufficienza surrenalica acuta", "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\binsufficienza\s+renale\s+acuta\b", re.IGNORECASE),
+        {"name": "Insufficienza renale acuta", "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\bkdigo\s+g3b\b", re.IGNORECASE),
+        {"name": "Malattia renale cronica KDIGO G3b", "chronic": True, "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\bfibrillazione\s+atriale\b", re.IGNORECASE),
+        {"name": "Fibrillazione atriale", "chronic": True, "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\banemia\s+normocit[ai]a\s+normocromica\b", re.IGNORECASE),
+        {"name": "Anemia normocitica normocromica", "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\bcardiopatia\s+ischemica\b", re.IGNORECASE),
+        {"name": "Cardiopatia ischemica", "chronic": True, "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\bcoronaropatia\s+trivasale\b", re.IGNORECASE),
+        {"name": "Coronaropatia trivasale", "chronic": True, "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\bmalattia\s+da\s+reflusso\s+gastro[-\s]?esofageo\b", re.IGNORECASE),
+        {
+            "name": "Malattia da reflusso gastro-esofageo",
+            "chronic": True,
+            "hepatic_related": False,
+        },
+    ),
+    (
+        re.compile(r"\biperplasia\s+prostatica\b", re.IGNORECASE),
+        {"name": "Iperplasia prostatica", "chronic": True, "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\bmiopatia\s+da\s+statina\b", re.IGNORECASE),
+        {"name": "Miopatia da statina", "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\bpolineuropatia\s+degenerativa\b", re.IGNORECASE),
+        {"name": "Polineuropatia degenerativa", "chronic": True, "hepatic_related": False},
+    ),
+    (
+        re.compile(r"\bcolecistolitiasi\b", re.IGNORECASE),
+        {"name": "Colecistolitiasi", "hepatic_related": True},
+    ),
+    (
         re.compile(r"\bsteatosi\s+epatica\b", re.IGNORECASE),
         {"name": "Steatosi epatica", "chronic": True, "hepatic_related": True},
     ),
@@ -259,7 +339,7 @@ def extract_deterministic_diseases(
             matched_lines.append(line)
             entries.extend(line_entries)
         elif re.search(
-            r"\b(carcinom|carcinosi|epatit|cirr|steatosi|colecistit|polmonit|ipertension|diabet|obes)\b",
+            r"\b(carcinom|carcinosi|epatit|cirr|steatosi|colecistit|polmonit|ipertension|diabet|obes|pyoderma|calcifilassi|arteriopatia|influenza|ipopuitarismo|macroadenoma|surrenalica|renale|fibrillazione|anemia|cardiopatia|coronaropatia|reflusso|iperplasia|miopatia|polineuropatia|colecistolitiasi)\b",
             line,
             re.IGNORECASE,
         ):

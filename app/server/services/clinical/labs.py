@@ -19,9 +19,7 @@ from domain.clinical.entities import (
 )
 from domain.clinical.extras import LabExtractionPayload
 from services.catalogs.runtime import get_reference_catalog_snapshot
-from services.extraction_tools.registry import run_extraction_tool
-from services.extraction_tools.schemas import RegexToolResult
-from services.extraction_tools.strategy import decide_extraction_strategy
+from services.clinical.extraction_strategy import decide_extraction_strategy
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
 from services.text.vocabulary import get_text_normalization_snapshot
@@ -33,8 +31,13 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
 )
 NUMERIC_RE = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 DATE_RE = re.compile(
-    r"\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b"
+    r"\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\b"
 )
+VALUE_UNIT_RE = re.compile(
+    r"(?P<value>[-+]?\d+(?:[.,]\d+)?)\s*(?P<unit>u/l|ui/l|µmol/l|umol/l|mg/dl|ml/min(?:/1\.73m2)?)?",
+    re.IGNORECASE,
+)
+SINGLE_VALUE_MARKERS = frozenset({"CR", "EGFR", "INR", "ALB"})
 
 ###############################################################################
 def _load_marker_aliases() -> dict[str, tuple[str, ...]]:
@@ -284,7 +287,7 @@ class ClinicalLabExtractor:
         if not text:
             return []
         entries: list[ClinicalLabEntry] = []
-        for raw_line in text.splitlines():
+        for raw_line in self.iter_logical_lab_lines(text):
             line = raw_line.strip()
             if not line:
                 continue
@@ -299,6 +302,45 @@ class ClinicalLabExtractor:
         return entries
 
     # -------------------------------------------------------------------------
+    def iter_logical_lab_lines(self, text: str) -> list[str]:
+        logical_lines: list[str] = []
+        current = ""
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            has_marker = bool(self.find_marker_matches(line.casefold()))
+            if has_marker:
+                if current:
+                    logical_lines.append(current)
+                current = line
+                continue
+            if current and self.line_looks_like_lab_continuation(line):
+                current = f"{current} {line}"
+                continue
+            if current:
+                logical_lines.append(current)
+                current = ""
+            logical_lines.append(line)
+        if current:
+            logical_lines.append(current)
+        return logical_lines
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def line_looks_like_lab_continuation(line: str) -> bool:
+        lowered = line.casefold()
+        has_number = NUMERIC_RE.search(line) is not None
+        has_unit = any(
+            token in lowered
+            for token in ("u/l", "ui/l", "umol/l", "µmol/l", "mg/dl", "ml/min")
+        )
+        has_temporal_word = any(
+            token in lowered for token in ("zenit", "rialzo", "fluttuante", "range")
+        )
+        return has_number and (has_unit or has_temporal_word)
+
+    # -------------------------------------------------------------------------
     def extract_entries_from_line(
         self,
         *,
@@ -308,42 +350,111 @@ class ClinicalLabExtractor:
     ) -> list[ClinicalLabEntry]:
         entries: list[ClinicalLabEntry] = []
         normalized_line = line.casefold()
-        for canonical, aliases in MARKER_ALIASES.items():
-            alias_token = self.find_marker_token(normalized_line, aliases)
-            if alias_token is None:
-                continue
-            marker_position = normalized_line.find(alias_token)
-            if marker_position < 0:
-                continue
-            tail = line[marker_position:]
-            value = self.parse_numeric(tail)
-            if value is None:
-                continue
-            upper_limit = self.extract_upper_limit(tail)
-            entries.append(
-                ClinicalLabEntry(
-                    marker_name=canonical,
-                    value=value,
-                    value_text=str(value),
-                    upper_limit_normal=upper_limit,
-                    upper_limit_text=str(upper_limit)
-                    if upper_limit is not None
-                    else None,
-                    sample_date=sample_date,
-                    evidence=line[:500],
-                    source=source,
-                )
+        marker_matches = self.find_marker_matches(normalized_line)
+        for index, marker_match in enumerate(marker_matches):
+            canonical, alias_token, marker_position = marker_match
+            next_position = (
+                marker_matches[index + 1][2]
+                if index + 1 < len(marker_matches)
+                else len(line)
             )
+            segment = line[marker_position:next_position]
+            values = self.extract_values_from_marker_segment(
+                segment,
+                marker=canonical,
+            )
+            if not values:
+                continue
+            upper_limit = self.extract_upper_limit(segment)
+            for value, value_text, unit in values:
+                entries.append(
+                    ClinicalLabEntry(
+                        marker_name=canonical,
+                        value=value,
+                        value_text=value_text,
+                        unit=unit,
+                        upper_limit_normal=upper_limit,
+                        upper_limit_text=str(upper_limit)
+                        if upper_limit is not None
+                        else None,
+                        sample_date=sample_date,
+                        evidence=line[:500],
+                        source=source,
+                    )
+                )
         return entries
 
     # -------------------------------------------------------------------------
     @staticmethod
     def find_marker_token(text: str, aliases: tuple[str, ...]) -> str | None:
-        for alias in aliases:
+        for alias in sorted(aliases, key=len, reverse=True):
             token = alias.casefold()
             if re.search(rf"\b{re.escape(token)}\b", text):
                 return token
         return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def find_marker_matches(text: str) -> list[tuple[str, str, int]]:
+        matches: list[tuple[str, str, int]] = []
+        occupied: list[range] = []
+        alias_items: list[tuple[str, str]] = []
+        for canonical, aliases in MARKER_ALIASES.items():
+            for alias in aliases:
+                alias_items.append((canonical, alias.casefold()))
+        for canonical, alias in sorted(alias_items, key=lambda item: len(item[1]), reverse=True):
+            for match in re.finditer(rf"\b{re.escape(alias)}\b", text):
+                span_range = range(match.start(), match.end())
+                if any(
+                    match.start() < item.stop and match.end() > item.start
+                    for item in occupied
+                ):
+                    continue
+                matches.append((canonical, alias, match.start()))
+                occupied.append(span_range)
+        return sorted(matches, key=lambda item: item[2])
+
+    # -------------------------------------------------------------------------
+    def extract_values_from_marker_segment(
+        self,
+        segment: str,
+        *,
+        marker: str,
+    ) -> list[tuple[float, str, str | None]]:
+        date_spans = [match.span() for match in DATE_RE.finditer(segment)]
+        upper_limit_spans = [
+            match.span(1)
+            for pattern in (
+                r"\bULN\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)",
+                r"upper\s+limit(?:\s+normal)?\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)",
+            )
+            for match in re.finditer(pattern, segment, flags=re.IGNORECASE)
+        ]
+        values: list[tuple[float, str, str | None]] = []
+        seen: set[tuple[str, str | None]] = set()
+        for match in VALUE_UNIT_RE.finditer(segment):
+            start, end = match.span("value")
+            if any(start < date_end and end > date_start for date_start, date_end in date_spans):
+                continue
+            if any(
+                start < limit_end and end > limit_start
+                for limit_start, limit_end in upper_limit_spans
+            ):
+                continue
+            raw_value = match.group("value")
+            parsed = self.parse_numeric(raw_value)
+            if parsed is None:
+                continue
+            unit = match.group("unit")
+            normalized_unit = unit.strip() if unit else None
+            key = (raw_value.replace(",", "."), normalized_unit)
+            if key in seen:
+                continue
+            seen.add(key)
+            values.append((parsed, raw_value, normalized_unit))
+            if marker in SINGLE_VALUE_MARKERS:
+                break
+        return values
 
     # -------------------------------------------------------------------------
     def extract_date_from_text(
@@ -558,7 +669,11 @@ class ClinicalLabExtractor:
         *,
         text: str,
         reinforced: bool,
+        expected_candidates: list[ClinicalLabEntry] | None = None,
+        validation_feedback: list[str] | None = None,
+        previous_wrong_output: str | None = None,
     ) -> LabExtractionPayload:
+        candidates_text = self.format_expected_candidates(expected_candidates or [])
         user_prompt = (
             "Extract longitudinal liver-related labs and onset clues from this full clinical laboratory text.\n"
             f"{text}"
@@ -566,9 +681,26 @@ class ClinicalLabExtractor:
         if reinforced:
             user_prompt = (
                 f"{user_prompt}\n\n"
-                "Important: this text contains explicit lab values. "
-                "Extract every liver-related marker/value pair found (e.g., ALAT/ALT, ASAT/AST, GGT, ALP, "
-                "bilirubina totale/diretta), preserving unit text and available dates."
+                "Important: this text contains explicit lab values. Extract every marker/value pair found, "
+                "including multiple values for the same marker such as current, first abnormal, and peak values. "
+                "Preserve unit text and available dates."
+            )
+        if candidates_text:
+            user_prompt = (
+                f"{user_prompt}\n\n"
+                "Grounded candidate checklist from source text. Use it to avoid omissions, but still return "
+                "only values supported by the source:\n"
+                f"{candidates_text}"
+            )
+        if validation_feedback:
+            user_prompt = (
+                f"{user_prompt}\n\n"
+                "Validation feedback from the previous attempt:\n"
+                + "\n".join(f"- {item}" for item in validation_feedback)
+            )
+        if previous_wrong_output:
+            user_prompt = (
+                f"{user_prompt}\n\nPrevious wrong output:\n{previous_wrong_output}"
             )
         parsed: LabExtractionPayload | None = None
         if self.client is None:
@@ -607,6 +739,71 @@ class ClinicalLabExtractor:
         if parsed is None:
             raise RuntimeError("Failed to extract clinical labs from full text")
         return parsed
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def format_expected_candidates(entries: list[ClinicalLabEntry]) -> str:
+        lines: list[str] = []
+        for entry in entries[:30]:
+            parts = [
+                entry.marker_name,
+                str(entry.value_text or entry.value or ""),
+            ]
+            if entry.unit:
+                parts.append(entry.unit)
+            if entry.sample_date:
+                parts.append(f"date={entry.sample_date}")
+            if entry.evidence:
+                parts.append(f"evidence={entry.evidence[:160]}")
+            line = " | ".join(part for part in parts if part)
+            if line:
+                lines.append(f"- {line}")
+        return "\n".join(lines)
+
+    # -------------------------------------------------------------------------
+    def validate_lab_entries_against_candidates(
+        self,
+        entries: list[ClinicalLabEntry],
+        candidates: list[ClinicalLabEntry],
+    ) -> tuple[list[str], list[ClinicalLabEntry]]:
+        normalized_entries = [
+            prepared
+            for entry in entries
+            if (prepared := self.normalize_entry(entry, visit_date=None)) is not None
+        ]
+        present = {
+            (
+                entry.marker_name.upper(),
+                str(entry.value_text or entry.value or "").replace(",", "."),
+            )
+            for entry in normalized_entries
+        }
+        missing = [
+            candidate
+            for candidate in candidates
+            if (
+                candidate.marker_name.upper(),
+                str(candidate.value_text or candidate.value or "").replace(",", "."),
+            )
+            not in present
+        ]
+        feedback: list[str] = []
+        if missing:
+            feedback.append(
+                "Missing grounded lab candidates: "
+                + "; ".join(
+                    f"{entry.marker_name} {entry.value_text or entry.value}"
+                    for entry in missing[:12]
+                )
+            )
+        for entry in normalized_entries:
+            evidence = (entry.evidence or "").replace(",", ".")
+            value_text = str(entry.value_text or entry.value or "").replace(",", ".")
+            if value_text and evidence and value_text not in evidence:
+                feedback.append(
+                    f"{entry.marker_name} value {value_text} is not present in its evidence snippet."
+                )
+        return feedback, missing
 
     # -------------------------------------------------------------------------
     async def extract_from_payload(
@@ -648,6 +845,7 @@ class ClinicalLabExtractor:
                     parsed = await self.llm_extract_full_text(
                         text=merged_source_text,
                         reinforced=False,
+                        expected_candidates=deterministic_entries,
                     )
                 except Exception as exc:
                     logger.warning(
@@ -670,6 +868,7 @@ class ClinicalLabExtractor:
                         reinforced = await self.llm_extract_full_text(
                             text=merged_source_text,
                             reinforced=True,
+                            expected_candidates=deterministic_entries,
                         )
                     except Exception as exc:
                         logger.warning(
@@ -680,14 +879,50 @@ class ClinicalLabExtractor:
                         if reinforced.entries:
                             parsed = reinforced
 
+                feedback, missing_candidates = self.validate_lab_entries_against_candidates(
+                    list(parsed.entries),
+                    deterministic_entries,
+                )
+                if feedback and deterministic_entries:
+                    try:
+                        reinforced = await self.llm_extract_full_text(
+                            text=merged_source_text,
+                            reinforced=True,
+                            expected_candidates=deterministic_entries,
+                            validation_feedback=feedback,
+                            previous_wrong_output=parsed.model_dump_json(),
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "Feedback clinical lab extraction failed: %s",
+                            exc,
+                        )
+                    else:
+                        parsed = reinforced
+                        feedback, missing_candidates = self.validate_lab_entries_against_candidates(
+                            list(parsed.entries),
+                            deterministic_entries,
+                        )
+
                 timeline_entries.extend(parsed.entries)
                 self.emit_progress(progress_callback, 0.7)
-                if llm_unavailable or (not parsed.entries and deterministic_entries):
+                if (
+                    llm_unavailable
+                    or (not parsed.entries and deterministic_entries)
+                    or missing_candidates
+                ):
                     if not parsed.entries and deterministic_entries:
                         logger.warning(
                             "LLM lab extraction returned no entries despite detectable lab markers; using deterministic lab parser output."
                         )
-                    timeline_entries.extend(deterministic_entries)
+                    if missing_candidates:
+                        logger.warning(
+                            "LLM lab extraction missed %d grounded candidates after retry; merging deterministic fallback candidates.",
+                            len(missing_candidates),
+                        )
+                        timeline_entries.extend(missing_candidates)
+                    elif llm_unavailable or not parsed.entries:
+                        timeline_entries.extend(deterministic_entries)
                 onset_context = parsed.onset_context
             except Exception as exc:
                 logger.warning(
@@ -734,18 +969,6 @@ class ClinicalLabExtractor:
             source="laboratory_analysis",
             visit_date=payload.visit_date,
         )
-        tool_result = run_extraction_tool(
-            "search_lab_value_by_regex",
-            {
-                "text": primary_labs_text,
-                "source_section": "laboratory_history",
-            },
-        )
-        lab_tool_matches = (
-            len(tool_result.matches)
-            if isinstance(tool_result, RegexToolResult)
-            else len(deterministic_entries)
-        )
         meaningful_lab_lines = len(
             [
                 line
@@ -760,35 +983,8 @@ class ClinicalLabExtractor:
             unresolved_line_count=max(
                 0, meaningful_lab_lines - len(deterministic_entries)
             ),
-            evidence_span_count=lab_tool_matches,
+            evidence_span_count=len(deterministic_entries),
         )
-        if decision.strategy == "deterministic":
-            normalized: list[ClinicalLabEntry] = []
-            seen: set[tuple[str, str, str, str]] = set()
-            for entry in deterministic_entries:
-                prepared = self.normalize_entry(entry, visit_date=payload.visit_date)
-                if prepared is None:
-                    continue
-                key = self.dedupe_key(prepared)
-                if key in seen:
-                    continue
-                seen.add(key)
-                normalized.append(prepared)
-            normalized.sort(key=self.lab_entry_sort_key)
-            return {
-                "lab_timeline": PatientLabTimeline(entries=normalized),
-                "onset_context": None,
-                "strategy": decision.strategy,
-                "decision": decision.model_dump(),
-                "tool_calls": [
-                    tool_result.model_dump()
-                    if isinstance(tool_result, RegexToolResult)
-                    else tool_result.model_dump()
-                ],
-                "unresolved_lines": [],
-                "confidence": decision.confidence,
-                "warnings": [],
-            }
         timeline, onset_context = await self.extract_from_payload(
             payload,
             already_cleaned=already_cleaned,
@@ -799,11 +995,6 @@ class ClinicalLabExtractor:
             "onset_context": onset_context,
             "strategy": decision.strategy,
             "decision": decision.model_dump(),
-            "tool_calls": [
-                tool_result.model_dump()
-                if hasattr(tool_result, "model_dump")
-                else {"error": str(tool_result)}
-            ],
             "unresolved_lines": [],
             "confidence": decision.confidence,
             "warnings": [],

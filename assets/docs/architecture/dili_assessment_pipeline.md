@@ -6,19 +6,17 @@ Last updated: 2026-06-19
 
 LLM fallback is not part of section extraction. Content inference, fallback assignment, low-confidence semantic matches, duplicate headings, or ambiguous headings are surfaced as diagnostics or review signals.
 
-## Tool Schema Contract
-Deterministic extraction tool manifests live in `app/resources/tools/extraction_tools.json`. Runtime dispatch lives in `app/server/services/extraction_tools`.
+## Structured Extraction Contract
+Drug, disease, and laboratory extraction use provider-agnostic structured LLM calls for both cloud and local providers. The active runtime provider and model are resolved from persisted model configuration.
 
-Every tool definition includes an OpenAI-compatible function schema, version, supported section types, default regex profile, allowed profiles, and a deterministic return contract. Tool results include match text, normalized value, exact character span, line number, source section, pattern id, confidence, and warnings.
+Structured LLM output is validated against Pydantic schemas and semantic guardrails. Invalid or contaminated output is retried with the rejected output and validation feedback. If bounded LLM attempts fail, the pipeline falls back to direct rule-based parsers and records fallback warnings.
 
 ## Strategy Matrix
-Therapy and laboratory extraction run deterministic parsing first.
+Therapy, anamnesis, disease, and laboratory extraction attempt structured LLM extraction first when a configured provider is available.
 
-- `deterministic`: structured coverage and evidence-span coverage meet thresholds, with no unresolved meaningful lines.
-- `hybrid`: deterministic extraction found useful evidence but unresolved or ambiguous fragments remain.
-- `llm`: deterministic structure is insufficient for the section.
-
-Anamnesis remains LLM-preferred for free-text enrichment, while deterministic extraction remains available for obvious entities and fallback.
+- `llm`: structured LLM extraction produced schema-valid, semantically acceptable output.
+- `hybrid`: structured LLM extraction succeeded but direct rule-based evidence is retained for audit or fallback support.
+- `deterministic`: bounded LLM attempts failed or no structured client was available, so direct rule-based parsing was used.
 
 ## Hepatic Pattern Resolution
 If an explicit hepatic pattern is present in the laboratory source, it becomes the final pattern with source `provided`. The calculated R-ratio pattern is preserved separately. If both exist and differ, the pipeline emits `hepatic_pattern_source_calculation_conflict`.
@@ -35,7 +33,7 @@ Pipeline issues are emitted for missing LiverTox matches, ambiguous LiverTox mat
 - Duplicate required headings block deterministic section extraction.
 - Ambiguous or low-confidence section assignments require review.
 - Missing or ambiguous external drug matches do not force a match.
-- Unsupported native LLM tool calling returns a structured provider error.
+- LLM structured output failures fall back to direct deterministic parsing after bounded retries.
 
 ## Testing Matrix
 Regression fixtures under `app/tests/fixtures/dili_pipeline_audit` cover clean, noisy, incomplete, and adversarial clinical documents, including duplicate headings, ambiguous headings, structured and unstructured therapy, structured and noisy laboratories, hepatic-pattern conflicts, family-history disease mentions, allergy-only drug mentions, negated diagnoses, combination therapy, brand/generic variants, and missing LiverTox matches.

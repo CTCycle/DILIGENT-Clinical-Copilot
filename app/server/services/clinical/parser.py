@@ -55,7 +55,7 @@ from services.clinical.parser_validation import (
 )
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
-from services.extraction_tools.strategy import decide_extraction_strategy
+from services.clinical.extraction_strategy import decide_extraction_strategy
 from common.utils.text_utils import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
 
@@ -110,6 +110,11 @@ class DrugsParser:
             self.runtime_revision = LLMRuntimeConfig.get_revision()
         self._embedded_aliases = self._load_embedded_aliases()
         self._non_drug_tokens = self._load_non_drug_tokens()
+        self.NON_DRUG_EXACT_NAMES = self._load_non_drug_exact_names()
+        self.NON_DRUG_PREFIXES = self._load_non_drug_prefixes()
+        self.NON_DRUG_CONTAINS = self._load_non_drug_contains()
+        self.WEEKDAY_TOKENS = self._load_weekday_terms()
+        self.NON_THERAPY_LINE_PREFIXES = self._load_non_therapy_line_prefixes()
         self.ROUTE_PATTERNS = build_route_patterns()
         self.DOSE_CUE_RE = build_dose_cue_re()
         self.DOSAGE_TEMPORAL_SPLIT_RE = build_dosage_temporal_split_re()
@@ -142,6 +147,66 @@ class DrugsParser:
                 "drug_non_name_tokens",
             )
             if value
+        )
+
+    # -------------------------------------------------------------------------
+    def _load_non_drug_exact_names(self) -> set[str]:
+        snapshot = get_reference_catalog_snapshot()
+        values = set(
+            snapshot.values("clinical_extraction", "drug_non_name_exact", key="default")
+        )
+        values.update(NON_DRUG_EXACT_NAMES)
+        return values
+
+    # -------------------------------------------------------------------------
+    def _load_non_drug_prefixes(self) -> tuple[str, ...]:
+        snapshot = get_reference_catalog_snapshot()
+        return tuple(
+            dict.fromkeys(
+                [
+                    *snapshot.values(
+                        "clinical_extraction",
+                        "drug_non_name_prefixes",
+                        key="default",
+                    ),
+                    *NON_DRUG_PREFIXES,
+                ]
+            )
+        )
+
+    # -------------------------------------------------------------------------
+    def _load_non_drug_contains(self) -> tuple[str, ...]:
+        snapshot = get_reference_catalog_snapshot()
+        return tuple(
+            dict.fromkeys(
+                [
+                    *snapshot.values(
+                        "clinical_extraction",
+                        "drug_non_name_contains",
+                        key="default",
+                    ),
+                    *NON_DRUG_CONTAINS,
+                ]
+            )
+        )
+
+    # -------------------------------------------------------------------------
+    def _load_weekday_terms(self) -> set[str]:
+        snapshot = get_reference_catalog_snapshot()
+        values = set(snapshot.values("clinical_extraction", "weekday_terms", key="default"))
+        values.update(WEEKDAY_TOKENS)
+        return values
+
+    # -------------------------------------------------------------------------
+    def _load_non_therapy_line_prefixes(self) -> tuple[str, ...]:
+        snapshot = get_reference_catalog_snapshot()
+        return tuple(
+            dict.fromkeys(
+                [
+                    *snapshot.values("clinical_extraction", "drug_line_prefixes"),
+                    *NON_THERAPY_LINE_PREFIXES,
+                ]
+            )
         )
 
     # -------------------------------------------------------------------------
@@ -258,12 +323,32 @@ class DrugsParser:
         if not cleaned:
             return PatientDrugs(entries=[])
         self.emit_progress(progress_callback, 0.0)
-        combined = await self.extract_drugs_from_therapy_hybrid(
-            cleaned,
-            progress_callback=progress_callback,
-        )
+        try:
+            structured = await self.llm_extract_drugs_from_section(
+                cleaned,
+                source="therapy",
+                historical_flag=False,
+                progress_callback=progress_callback,
+            )
+            combined = self._attach_therapy_evidence_spans(
+                structured.entries,
+                cleaned,
+            )
+            logger.info(
+                "Therapy LLM extraction succeeded with %s normalized entries",
+                len(combined),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Therapy LLM extraction failed; using deterministic fallback: %s",
+                exc,
+            )
+            combined = await self.extract_drugs_from_therapy_hybrid(
+                cleaned,
+                progress_callback=progress_callback,
+            )
         self.emit_progress(progress_callback, 1.0)
-        return PatientDrugs(entries=combined)
+        return PatientDrugs(entries=self.deduplicate_drug_entries(combined))
 
     # -------------------------------------------------------------------------
     async def extract_drugs_from_therapy_with_audit(
@@ -547,16 +632,35 @@ class DrugsParser:
             self.emit_progress(progress_callback, 1.0)
             return PatientDrugs(entries=entries)
 
-        if source == "anamnesis":
-            anamnesis_text = self.clean_text(text)
-            parsed_entries: list[DrugEntry] = []
+        source_text = self.clean_text(text)
+        prompt = (
+            ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip()
+            if source == "anamnesis"
+            else DRUG_EXTRACTION_PROMPT.strip()
+        )
+        user_prompt = (
+            "Extract all drugs mentioned in the following patient anamnesis:\n\n"
+            if source == "anamnesis"
+            else "Extract all structured medication entries from this therapy section:\n\n"
+        ) + source_text
+        last_wrong_output = ""
+        last_errors: list[str] = []
+        max_attempts = 2
+        for attempt in range(1, max_attempts + 1):
+            if attempt > 1:
+                user_prompt = (
+                    "Retry the extraction. The previous output was rejected by semantic validation.\n"
+                    "Return only entries that are explicit medications in the source text. "
+                    "Do not extract lab values, biopsy/pathology prose, diseases, dates, or units as drugs.\n\n"
+                    f"Validation errors:\n- {'; '.join(last_errors)}\n\n"
+                    f"Previous wrong output:\n{last_wrong_output}\n\n"
+                    f"Source text:\n{source_text}"
+                )
             parsed = await asyncio.wait_for(
                 self.client.llm_structured_call(
                     model=self.model,
-                    system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
-                    user_prompt=(
-                        f"Extract all drugs mentioned in the following patient anamnesis:\n\n{anamnesis_text}"
-                    ),
+                    system_prompt=prompt,
+                    user_prompt=user_prompt,
                     schema=PatientDrugs,
                     temperature=self.temperature,
                     use_json_mode=True,
@@ -564,48 +668,42 @@ class DrugsParser:
                 ),
                 timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
             )
-            parsed_entries.extend(parsed.entries)
-            self.emit_progress(progress_callback, 1.0)
-            normalized_candidates: list[DrugEntry | None] = [
+            last_wrong_output = parsed.model_dump_json()
+            normalized_candidates = [
                 self.normalize_entry(
                     entry,
                     source=source,
                     historical_flag=historical_flag,
                 )
-                for entry in parsed_entries
+                for entry in parsed.entries
             ]
-            filtered_candidates = [
-                entry for entry in normalized_candidates if entry is not None
-            ]
-            return PatientDrugs(entries=filtered_candidates)
-
-        lines = [
-            block.text.strip()
-            for block in isolate_drug_blocks(text)
-            if block.text.strip() and not self.is_non_therapy_line(block.text.strip())
-        ]
-        parsed, fallback = self.rule_based_parse(lines)
-        normalized = [entry for _, entry in parsed]
-        if not fallback:
-            return PatientDrugs(entries=normalized)
-        fallback_lines = [line for _, line in fallback]
-        structured = await self.llm_extract_drugs(
-            fallback_lines,
-            progress_callback=progress_callback,
-            progress_start=0.2,
-            progress_span=0.8,
-        )
-        for index, entry in enumerate(structured.entries):
-            raw_line = fallback_lines[index] if index < len(fallback_lines) else ""
-            post_processed = self.post_process_llm_entry(
-                entry,
-                raw_line=raw_line,
-                source=source,
-                historical_flag=historical_flag,
+            filtered_candidates = self.deduplicate_drug_entries(
+                [entry for entry in normalized_candidates if entry is not None]
             )
-            if post_processed is not None:
-                normalized.append(post_processed)
-        return PatientDrugs(entries=normalized)
+            source_has_medication_signal = (
+                bool(filtered_candidates)
+                or any(
+                    self.is_likely_medication_line(line)
+                    for line in source_text.splitlines()
+                    if line.strip()
+                )
+                or bool(
+                    self.extract_drugs_from_anamnesis_deterministic(
+                        source_text
+                    ).entries
+                    if source == "anamnesis"
+                    else self.extract_drugs_from_therapy_deterministic(
+                        source_text
+                    ).entries
+                )
+            )
+            if filtered_candidates or not source_has_medication_signal:
+                self.emit_progress(progress_callback, 1.0)
+                return PatientDrugs(entries=filtered_candidates)
+            last_errors = [
+                "The model returned no valid medication entries despite medication-like source evidence."
+            ]
+        raise RuntimeError("LLM drug extraction produced no semantically valid entries")
 
     # -------------------------------------------------------------------------
     def extract_drugs_from_anamnesis_rule_based(
@@ -1065,6 +1163,13 @@ class DrugsParser:
         if "\n" in raw_text or "\r" in raw_text:
             return None
         normalized = re.sub(r"\s+", " ", raw_text).strip(" \t,;:.-")
+        normalized = re.sub(r"\s*\(=\s*$", "", normalized).strip(" \t,;:.-")
+        normalized = re.sub(
+            r"\s+(?:flac|flacone|cpr|caps|sacc|ml)\s*$",
+            "",
+            normalized,
+            flags=re.IGNORECASE,
+        ).strip(" \t,;:.-")
         if not normalized:
             return None
         if len(normalized.split()) > 8:
@@ -1079,6 +1184,16 @@ class DrugsParser:
     def extract_embedded_drug_name(self, value: str) -> str:
         if not value:
             return value
+        contextual_match = re.search(
+            r"\b(?:con|with)\s+([A-ZÀ-ÖØ-Þ][\wÀ-ÖØ-öø-ÿ'/-]+(?:\s+[A-ZÀ-ÖØ-Þ][\wÀ-ÖØ-öø-ÿ'/-]+){0,3})\b",
+            value,
+        )
+        if contextual_match and re.search(
+            r"\b(?:terapia|antibiotic[ao]|farmacolog)\b",
+            value,
+            re.IGNORECASE,
+        ):
+            return contextual_match.group(1).strip()
         normalized = self.normalize_filter_key(value)
         for alias, replacement in self._embedded_aliases:
             if alias in normalized:

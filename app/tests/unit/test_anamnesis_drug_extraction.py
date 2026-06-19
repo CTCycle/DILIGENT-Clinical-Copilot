@@ -39,6 +39,24 @@ class FakeStructuredClient:
         return schema(entries=[])
 
 ###############################################################################
+class RecordingSequenceStructuredClient:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, responses: Sequence[PatientDrugs]) -> None:
+        self.responses = list(responses)
+        self.call_count = 0
+        self.user_prompts: list[str] = []
+
+    # -------------------------------------------------------------------------
+    async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
+        self.call_count += 1
+        self.user_prompts.append(str(kwargs.get("user_prompt", "")))
+        schema = kwargs.get("schema", PatientDrugs)
+        if self.responses:
+            return self.responses.pop(0)
+        return schema(entries=[])
+
+###############################################################################
 class AlwaysFailingStructuredClient:
 
     # -------------------------------------------------------------------------
@@ -210,3 +228,51 @@ def test_extract_drugs_from_anamnesis_llm_failure_uses_rule_fallback() -> None:
     assert [entry.name for entry in parsed.entries] == ["Xanax"]
     assert parsed.entries[0].historical_flag is True
     assert parsed.entries[0].source == "anamnesis"
+
+###############################################################################
+def test_extract_drugs_from_therapy_uses_llm_before_rule_fallback() -> None:
+    client = FakeStructuredClient(
+        [PatientDrugs(entries=[DrugEntry(name="Aspirin Cardio", dosage="100 mg")])]
+    )
+    parser = DrugsParser(client=client)
+
+    parsed = asyncio.run(
+        parser.extract_drugs_from_therapy("Aspirin Cardio 100 mg cpr\n1-0-0-0")
+    )
+
+    assert client.call_count == 1
+    assert [entry.name for entry in parsed.entries] == ["Aspirin Cardio"]
+    assert parsed.entries[0].source == "therapy"
+    assert parsed.entries[0].historical_flag is False
+
+###############################################################################
+def test_extract_drugs_retries_semantically_invalid_llm_output() -> None:
+    client = RecordingSequenceStructuredClient(
+        [
+            PatientDrugs(entries=[DrugEntry(name="neutrofili a tappeto, cutaneo")]),
+            PatientDrugs(entries=[DrugEntry(name="Co-Amoxicillina")]),
+        ]
+    )
+    parser = DrugsParser(client=client)
+
+    parsed = asyncio.run(
+        parser.extract_drugs_from_anamnesis(
+            "Biopsia: neutrofili a tappeto, cutaneo.\n"
+            "Terapia antibiotica con Co-Amoxicillina 1000 mg x2."
+        )
+    )
+
+    assert client.call_count == 2
+    assert "Previous wrong output" in client.user_prompts[1]
+    assert "neutrofili a tappeto" in client.user_prompts[1]
+    assert [entry.name for entry in parsed.entries] == ["Co-Amoxicillina"]
+
+###############################################################################
+def test_extract_drugs_from_therapy_falls_back_after_llm_failure() -> None:
+    parser = DrugsParser(client=AlwaysFailingStructuredClient())
+
+    parsed = asyncio.run(
+        parser.extract_drugs_from_therapy("Aspirin Cardio 100 mg cpr\n1-0-0-0")
+    )
+
+    assert [entry.name for entry in parsed.entries] == ["Aspirin Cardio"]

@@ -241,3 +241,42 @@ def test_calculates_pattern_from_alt_alp_with_uln() -> None:
         extractor.calculate_hepatic_pattern_from_lab_timeline(parsed)
         == "hepatocellular"
     )
+
+###############################################################################
+def test_case_style_lab_lines_extract_multiple_grounded_values() -> None:
+    extractor = ClinicalLabExtractor(
+        client=FakeLabClient([LabExtractionPayload(entries=[], onset_context=None)])
+    )
+    payload = PatientData(
+        laboratory_analysis=(
+            "Labor 03.03.2025: Cr 111 eGFR 58 ml/min/1.73m2 Cockroft 58ml/min\n"
+            "03.03.2025 ALAT 27 U/L (sempre nel range di normalità ad ogni misurazione)\n"
+            "03.03.2025 ASAT 66 U/L (primo rialzo a 66 U/L il 20.02.2025)\n"
+            "04.03.2025 bilirubina diretta 3.8 umol/L "
+            "(primo rialzo 5.3 umol/L il 01.02.25, zenit 18.02.25 10.2 umol/L)\n"
+            "03.03.2025 GGT primo aumento il 01.02.25 a 204 U/L con successivo "
+            "andamento fluttuante e zenit 605 U/L il 20.02.2025\n"
+            "03.03.2025 ALP 317 U/L (andamento fluttuante, primo rialzo a 174 U/L "
+            "il 29.01.2025, zenit in data 17.02.2025 432 U/L)"
+        ),
+        drugs="Drug A",
+    )
+
+    timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
+
+    observed = {(entry.marker_name, entry.value) for entry in timeline.entries}
+    assert ("CR", 111.0) in observed
+    assert ("EGFR", 58.0) in observed
+    assert ("ALT", 27.0) in observed
+    assert ("AST", 66.0) in observed
+    assert {value for marker, value in observed if marker == "DBIL"} >= {
+        3.8,
+        5.3,
+        10.2,
+    }
+    assert {value for marker, value in observed if marker == "GGT"} >= {204.0, 605.0}
+    assert {value for marker, value in observed if marker == "ALP"} >= {
+        317.0,
+        174.0,
+        432.0,
+    }

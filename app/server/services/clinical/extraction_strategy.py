@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from services.extraction_tools.schemas import ExtractionStrategyDecision
+from domain.clinical.extraction import ExtractionStrategy, ExtractionStrategyDecision
 
 UNRESOLVED_DETERMINISTIC_MAX = 0.05
 UNRESOLVED_HYBRID_MAX = 0.45
 STRUCTURE_DETERMINISTIC_MIN = 0.78
 SPAN_COVERAGE_DETERMINISTIC_MIN = 0.7
-
 
 ###############################################################################
 def decide_extraction_strategy(
@@ -30,7 +29,7 @@ def decide_extraction_strategy(
         and evidence_coverage >= SPAN_COVERAGE_DETERMINISTIC_MIN
         and ambiguity_count == 0
     ):
-        strategy = "deterministic"
+        strategy: ExtractionStrategy = "deterministic"
         confidence = min(0.98, (structure_score + evidence_coverage) / 2)
         reasons.append("deterministic coverage meets threshold")
     elif unresolved_ratio <= UNRESOLVED_HYBRID_MAX or parsed_line_count > 0:

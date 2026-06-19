@@ -19,7 +19,6 @@ def build_adapter() -> StructuredOutputAdapter:
         model_name="test-model",
         supports_native_json_schema=False,
         supports_strict_schema=False,
-        supports_tool_schema=False,
         supports_json_mode=True,
     )
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from services.catalogs.manifest_loader import load_catalog_manifest, validate_manifest
+from common.catalogs.manifest_loader import load_catalog_manifest, validate_manifest
 
 ###############################################################################
 def test_validate_manifest_rejects_duplicate_normalized_values() -> None:

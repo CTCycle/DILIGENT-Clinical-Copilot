@@ -96,14 +96,12 @@ class StructuredOutputAdapter:
         model_name: str,
         supports_native_json_schema: bool,
         supports_strict_schema: bool,
-        supports_tool_schema: bool,
         supports_json_mode: bool,
     ) -> None:
         self.provider = provider
         self.model_name = model_name
         self.supports_native_json_schema = bool(supports_native_json_schema)
         self.supports_strict_schema = bool(supports_strict_schema)
-        self.supports_tool_schema = bool(supports_tool_schema)
         self.supports_json_mode = bool(supports_json_mode)
 
     # -------------------------------------------------------------------------
@@ -157,7 +155,6 @@ class StructuredOutputAdapter:
                 "schema": schema,
                 "supports_native_json_schema": self.supports_native_json_schema,
                 "supports_strict_schema": self.supports_strict_schema,
-                "supports_tool_schema": self.supports_tool_schema,
                 "supports_json_mode": self.supports_json_mode,
             }
         )
