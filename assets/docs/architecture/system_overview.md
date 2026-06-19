@@ -26,7 +26,7 @@ Maintained source-level structure, with build and cache artifacts omitted:
 |   `-- configurations.json
 |-- app/
 |   |-- resources/
-|   |   |-- models/
+|   |   |-- tools/
 |   |   `-- sources/
 |   |-- server/
 |   |   |-- app.py

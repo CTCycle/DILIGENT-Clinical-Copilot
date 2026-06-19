@@ -7,7 +7,7 @@ APP_DIR = Path(__file__).resolve().parents[2]
 ROOT_DIR = Path(__file__).resolve().parents[3]
 SETTINGS_PATH = ROOT_DIR / "settings"
 RESOURCES_PATH = APP_DIR / "resources"
-MODELS_PATH = RESOURCES_PATH / "models"
+TOOLS_PATH = RESOURCES_PATH / "tools"
 SOURCES_PATH = RESOURCES_PATH / "sources"
 ARCHIVES_PATH = SOURCES_PATH / "archives"
 DOCS_PATH = SOURCES_PATH / "documents"
@@ -29,7 +29,7 @@ __all__ = [
     "ROOT_DIR",
     "SETTINGS_PATH",
     "RESOURCES_PATH",
-    "MODELS_PATH",
+    "TOOLS_PATH",
     "SOURCES_PATH",
     "ARCHIVES_PATH",
     "DOCS_PATH",

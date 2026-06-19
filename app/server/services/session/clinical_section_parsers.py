@@ -621,9 +621,11 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
             body_end = next_heading_line_start
         else:
             body_end = len(raw_text)
+        while body_end > body_start and raw_text[body_end - 1] in "\r\n":
+            body_end -= 1
         heading = heading_lookup.get((boundary.line_start, boundary.line_end))
-        content = raw_text[body_start:body_end].strip("\r\n")
-        if not content:
+        content = raw_text[body_start:body_end]
+        if not content.strip():
             if heading is not None:
                 malformed_sections.append(f"empty:{heading.canonical_key}")
             continue
@@ -787,7 +789,7 @@ def verify_verbatim_section_coherence(
         return False
     if section.body_end > len(raw_text):
         return False
-    span_text = raw_text[section.body_start : section.body_end].strip("\r\n")
+    span_text = raw_text[section.body_start : section.body_end]
     return span_text == section.text
 
 ###############################################################################

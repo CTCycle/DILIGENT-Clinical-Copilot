@@ -37,6 +37,25 @@ def _build_timing_terms() -> list[str]:
     values.extend(snapshot.values("clinical_extraction", "drug_timing_terms"))
     values.extend(snapshot.values("clinical_extraction", "drug_metadata_labels"))
     values.extend(snapshot.values("clinical_extraction", "drug_continuation_markers"))
+    values.extend(
+        [
+            "started",
+            "starting",
+            "initiated",
+            "iniziata",
+            "iniziato",
+            "inizio",
+            "sospesa",
+            "sospeso",
+            "suspended",
+            "stopped",
+            "dal",
+            "da",
+            "from",
+            "since",
+            "ultima somministrazione",
+        ]
+    )
     return [value for value in values if value]
 
 ###############################################################################
@@ -46,6 +65,11 @@ def build_route_patterns() -> tuple[tuple[str, re.Pattern[str]], ...]:
     grouped: dict[str, list[str]] = {}
     for entry in entries:
         grouped.setdefault(entry.key, []).append(entry.value)
+    if not grouped:
+        grouped = {
+            "oral": ["oral", "per os", "po"],
+            "iv": ["iv", "ev", "intravenous"],
+        }
     patterns: list[tuple[str, re.Pattern[str]]] = []
     for key, values in grouped.items():
         regex = _phrase_pattern(values)
@@ -57,6 +81,7 @@ def build_route_patterns() -> tuple[tuple[str, re.Pattern[str]], ...]:
 def build_dose_cue_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
     units = list(snapshot.values("clinical_extraction", "drug_dosage_units"))
+    units.extend(["mg", "g", "mcg", "ug", "ml"])
     escaped_units = [re.escape(unit.strip()) for unit in units if unit and unit.strip()]
     if not escaped_units:
         return re.compile(r"$^")
@@ -93,6 +118,7 @@ def build_name_temporal_split_re() -> re.Pattern[str]:
 def build_trailing_route_token_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
     terms = list(snapshot.values("clinical_extraction", "drug_route_terms"))
+    terms.extend(["oral", "per os", "po", "iv", "ev", "intravenous"])
     escaped = [re.escape(term.strip()) for term in terms if term and term.strip()]
     if not escaped:
         return re.compile(r"$^")
@@ -104,6 +130,18 @@ def build_trailing_route_token_re() -> re.Pattern[str]:
 def build_start_event_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
     terms = list(snapshot.values("clinical_extraction", "drug_start_terms"))
+    terms.extend(
+        [
+            "started",
+            "starting",
+            "initiated",
+            "inizio",
+            "iniziata",
+            "iniziato",
+            "avviata",
+            "avviato",
+        ]
+    )
     cue = _phrase_pattern(terms).pattern.replace(r"\b(?:", "(?:").replace(r")\b", ")")
     if cue == r"$^":
         return re.compile(r"$^")
@@ -116,6 +154,9 @@ def build_start_event_re() -> re.Pattern[str]:
 def build_suspension_event_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
     terms = list(snapshot.values("clinical_extraction", "drug_suspension_terms"))
+    terms.extend(
+        ["sospesa", "sospeso", "suspended", "stopped", "interrotta", "interrotto"]
+    )
     cue = _phrase_pattern(terms).pattern.replace(r"\b(?:", "(?:").replace(r")\b", ")")
     if cue == r"$^":
         return re.compile(r"$^")

@@ -1,0 +1,11 @@
+Anamnesis
+Patient has fever.
+
+Therapy
+Drug A 10 mg daily.
+
+Therapy
+Drug B 20 mg daily.
+
+Laboratory history
+ALT 200 U/L.

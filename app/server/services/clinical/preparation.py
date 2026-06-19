@@ -10,6 +10,7 @@ from domain.clinical.entities import (
     DrugEntry,
     HepatotoxicityPatternScore,
     PatientDrugs,
+    PipelineIssue,
 )
 from domain.clinical.extras import HepatoxPreparedInputs
 from repositories.serialization.data import DataSerializer
@@ -168,6 +169,66 @@ class ClinicalKnowledgePreparation:
             pattern_prompt=pattern_prompt,
             clinical_context=normalized_context,
         )
+
+    # -------------------------------------------------------------------------
+    def build_match_audit_issues(
+        self,
+        resolved_drugs: dict[str, dict[str, Any]] | None,
+    ) -> list[PipelineIssue]:
+        issues: list[PipelineIssue] = []
+        if not resolved_drugs:
+            return issues
+        for payload in resolved_drugs.values():
+            raw_mentions = payload.get("raw_mentions") or []
+            raw_label = ", ".join(str(item) for item in raw_mentions if item) or str(
+                payload.get("drug_name") or payload.get("canonical_name") or "unknown"
+            )
+            status = str(payload.get("match_status") or "").lower()
+            confidence = payload.get("match_confidence")
+            if payload.get("missing_livertox") or status in {
+                "missing",
+                "missing_match",
+                "no_match",
+            }:
+                issues.append(
+                    PipelineIssue(
+                        severity="warning",
+                        code="livertox_match_missing",
+                        field="matched_drugs",
+                        message=f"No LiverTox match was validated for {raw_label}.",
+                    )
+                )
+            if payload.get("ambiguous_match") or status == "ambiguous":
+                issues.append(
+                    PipelineIssue(
+                        severity="warning",
+                        code="livertox_match_ambiguous",
+                        field="matched_drugs",
+                        message=f"LiverTox match is ambiguous for {raw_label}.",
+                    )
+                )
+            if isinstance(confidence, int | float) and float(confidence) < 0.75:
+                issues.append(
+                    PipelineIssue(
+                        severity="warning",
+                        code="livertox_match_low_confidence",
+                        field="matched_drugs",
+                        message=f"LiverTox match confidence is low for {raw_label}.",
+                    )
+                )
+            if (
+                not payload.get("rxnav_validated")
+                and payload.get("rxnav_rxcui") is None
+            ):
+                issues.append(
+                    PipelineIssue(
+                        severity="warning",
+                        code="rxnav_alias_not_validated",
+                        field="matched_drugs",
+                        message=f"RxNav alias was not validated for {raw_label}.",
+                    )
+                )
+        return issues
 
     # -------------------------------------------------------------------------
     @staticmethod

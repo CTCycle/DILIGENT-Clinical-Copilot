@@ -1,0 +1,8 @@
+Anamnesis
+Patient has cough.
+
+Therapy
+Amoxicillin plus clavulanate 875/125 mg oral bid.
+
+Laboratory history
+ALT 310 U/L.

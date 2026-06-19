@@ -1,0 +1,8 @@
+Anamnesis
+Patient describes recent infection.
+
+Therapy
+She says she may have taken an old antibiotic from home, possibly Drug G, dose unknown.
+
+Laboratory history
+ALT 390 U/L.

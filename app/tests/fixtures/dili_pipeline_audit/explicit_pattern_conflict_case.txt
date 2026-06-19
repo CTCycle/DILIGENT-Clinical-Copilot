@@ -1,0 +1,8 @@
+Anamnesis
+Patient has dark urine.
+
+Therapy
+Drug K 10 mg daily.
+
+Laboratory history
+Hepatic pattern: cholestatic. ALT 900 U/L, ALP 120 U/L.

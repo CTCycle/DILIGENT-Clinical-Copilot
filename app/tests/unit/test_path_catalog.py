@@ -9,7 +9,7 @@ def test_common_constants_no_longer_exposes_shared_paths() -> None:
         "ROOT_DIR",
         "SETTINGS_PATH",
         "RESOURCES_PATH",
-        "MODELS_PATH",
+        "TOOLS_PATH",
         "SOURCES_PATH",
         "ARCHIVES_PATH",
         "DOCS_PATH",

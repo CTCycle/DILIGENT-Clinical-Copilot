@@ -1,0 +1,10 @@
+# Anamnesis
+Patient has abdominal pain.
+## Past history
+Appendectomy.
+
+# Therapy
+Drug C 5 mg oral.
+
+# Laboratory history
+AST 300 U/L.

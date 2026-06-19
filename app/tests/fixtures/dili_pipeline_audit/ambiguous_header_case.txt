@@ -1,0 +1,8 @@
+Clinical notes
+Patient takes Drug D 10 mg and has ALT 400 U/L in the same paragraph.
+
+Therapy
+Drug D 10 mg daily.
+
+Laboratory history
+ALT 400 U/L.

@@ -14,6 +14,7 @@ from domain.clinical.sections import (
 from services.session.clinical_section_parsers import (
     parse_required_dili_sections,
 )
+from services.session.audit import build_source_hash
 
 ###############################################################################
 class ParsedTextSection(NamedTuple):
@@ -22,6 +23,29 @@ class ParsedTextSection(NamedTuple):
     text: str
     start_line: int
     end_line: int
+    body_start: int = 0
+    body_end: int = 0
+    canonical_key: str = ""
+    normalized_heading: str = ""
+    match_strategy: str = ""
+    confidence_score: float = 0.0
+    verbatim_coherent: bool = False
+    requires_review: bool = False
+
+###############################################################################
+def _line_number_for_offset(text: str, offset: int) -> int:
+    return text.count("\n", 0, max(0, offset)) + 1
+
+###############################################################################
+def _section_requires_review(match_strategy: str, confidence_score: float) -> bool:
+    return (
+        match_strategy
+        in {
+            "content_inference",
+            "fallback_assignment",
+        }
+        or confidence_score < 0.75
+    )
 
 ###############################################################################
 class InitialTextSectionParseResult(NamedTuple):
@@ -62,14 +86,25 @@ def parse_initial_text_sections(raw_text: str) -> InitialTextSectionParseResult:
         payload_key = _map_canonical_key(canonical_key)
         if payload_key is None:
             continue
-        text = section.text.strip()
+        requires_review = _section_requires_review(
+            section.match_strategy,
+            section.confidence_score,
+        )
         parsed[payload_key] = ParsedTextSection(
             key=payload_key,
             title=section.raw_heading
             or SECTION_DISPLAY_NAMES.get(payload_key, payload_key),
-            text=text,
+            text=section.text,
             start_line=section.line_start,
             end_line=section.line_end,
+            body_start=section.body_start,
+            body_end=section.body_end,
+            canonical_key=section.canonical_key,
+            normalized_heading=section.normalized_heading,
+            match_strategy=section.match_strategy,
+            confidence_score=section.confidence_score,
+            verbatim_coherent=section.verbatim_coherent,
+            requires_review=requires_review,
         )
 
     return InitialTextSectionParseResult(
@@ -91,8 +126,12 @@ def build_section_extraction_from_initial_text(
     source_line_ranges: dict[str, dict[str, int]] = {}
     metadata: dict[str, object] = {
         "parser": "deterministic_initial_text_sections_v2",
+        "source_hash": build_source_hash(source_text),
         "source_line_ranges": source_line_ranges,
+        "sections": {},
     }
+    section_metadata = metadata["sections"]
+    assert isinstance(section_metadata, dict)
     for key in SECTION_KEYS:
         section = parse_result.sections.get(key)
         if section is None:
@@ -105,6 +144,24 @@ def build_section_extraction_from_initial_text(
         source_line_ranges[key] = {
             "start_line": section.start_line,
             "end_line": section.end_line,
+        }
+        body_line_start = _line_number_for_offset(source_text, section.body_start)
+        body_line_end = _line_number_for_offset(
+            source_text,
+            max(section.body_start, section.body_end - 1),
+        )
+        section_metadata[key] = {
+            "canonical_key": section.canonical_key,
+            "payload_key": section.key,
+            "raw_heading": section.title,
+            "normalized_heading": section.normalized_heading,
+            "match_strategy": section.match_strategy,
+            "confidence_score": section.confidence_score,
+            "heading_line_span": [section.start_line, section.end_line],
+            "body_line_span": [body_line_start, body_line_end],
+            "char_span": [section.body_start, section.body_end],
+            "verbatim_coherent": section.verbatim_coherent,
+            "requires_review": section.requires_review,
         }
 
     return ClinicalSectionExtractionResult(

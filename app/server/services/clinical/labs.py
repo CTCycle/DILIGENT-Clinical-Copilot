@@ -19,6 +19,9 @@ from domain.clinical.entities import (
 )
 from domain.clinical.extras import LabExtractionPayload
 from services.catalogs.runtime import get_reference_catalog_snapshot
+from services.extraction_tools.registry import run_extraction_tool
+from services.extraction_tools.schemas import RegexToolResult
+from services.extraction_tools.strategy import decide_extraction_strategy
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
 from services.text.vocabulary import get_text_normalization_snapshot
@@ -500,7 +503,7 @@ class ClinicalLabExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -712,3 +715,96 @@ class ClinicalLabExtractor:
         normalized.sort(key=self.lab_entry_sort_key)
         self.emit_progress(progress_callback, 1.0)
         return PatientLabTimeline(entries=normalized), onset_context
+
+    # -------------------------------------------------------------------------
+    async def extract_from_payload_with_audit(
+        self,
+        payload: PatientData,
+        *,
+        already_cleaned: bool = False,
+        progress_callback: Callable[[float], None] | None = None,
+    ) -> dict[str, Any]:
+        primary_labs_text = (
+            (payload.laboratory_analysis or "")
+            if already_cleaned
+            else self.clean_text(payload.laboratory_analysis)
+        )
+        deterministic_entries = self.extract_entries_from_text(
+            text=primary_labs_text,
+            source="laboratory_analysis",
+            visit_date=payload.visit_date,
+        )
+        tool_result = run_extraction_tool(
+            "search_lab_value_by_regex",
+            {
+                "text": primary_labs_text,
+                "source_section": "laboratory_history",
+            },
+        )
+        lab_tool_matches = (
+            len(tool_result.matches)
+            if isinstance(tool_result, RegexToolResult)
+            else len(deterministic_entries)
+        )
+        meaningful_lab_lines = len(
+            [
+                line
+                for line in primary_labs_text.splitlines()
+                if line.strip() and self.has_explicit_lab_signal(line)
+            ]
+        )
+        decision = decide_extraction_strategy(
+            section="laboratory_history",
+            meaningful_line_count=meaningful_lab_lines,
+            parsed_line_count=len(deterministic_entries),
+            unresolved_line_count=max(
+                0, meaningful_lab_lines - len(deterministic_entries)
+            ),
+            evidence_span_count=lab_tool_matches,
+        )
+        if decision.strategy == "deterministic":
+            normalized: list[ClinicalLabEntry] = []
+            seen: set[tuple[str, str, str, str]] = set()
+            for entry in deterministic_entries:
+                prepared = self.normalize_entry(entry, visit_date=payload.visit_date)
+                if prepared is None:
+                    continue
+                key = self.dedupe_key(prepared)
+                if key in seen:
+                    continue
+                seen.add(key)
+                normalized.append(prepared)
+            normalized.sort(key=self.lab_entry_sort_key)
+            return {
+                "lab_timeline": PatientLabTimeline(entries=normalized),
+                "onset_context": None,
+                "strategy": decision.strategy,
+                "decision": decision.model_dump(),
+                "tool_calls": [
+                    tool_result.model_dump()
+                    if isinstance(tool_result, RegexToolResult)
+                    else tool_result.model_dump()
+                ],
+                "unresolved_lines": [],
+                "confidence": decision.confidence,
+                "warnings": [],
+            }
+        timeline, onset_context = await self.extract_from_payload(
+            payload,
+            already_cleaned=already_cleaned,
+            progress_callback=progress_callback,
+        )
+        return {
+            "lab_timeline": timeline,
+            "onset_context": onset_context,
+            "strategy": decision.strategy,
+            "decision": decision.model_dump(),
+            "tool_calls": [
+                tool_result.model_dump()
+                if hasattr(tool_result, "model_dump")
+                else {"error": str(tool_result)}
+            ],
+            "unresolved_lines": [],
+            "confidence": decision.confidence,
+            "warnings": [],
+        }

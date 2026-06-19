@@ -1,0 +1,8 @@
+ANAMNESIS:
+Patient denies alcohol excess.
+
+therapy:
+Ibuprofen 600 mg po tid.
+
+LABORATORY HISTORY:
+bilirubin total 3.0 mg/dL.
