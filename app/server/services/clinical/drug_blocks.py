@@ -25,6 +25,26 @@ def _metadata_re() -> re.Pattern[str]:
     terms.extend(snapshot.values("clinical_extraction", "drug_dosage_units"))
     terms.extend(snapshot.values("clinical_extraction", "drug_frequency_terms"))
     terms.extend(snapshot.values("clinical_extraction", "drug_route_terms"))
+    terms.extend(
+        [
+            "mg",
+            "g",
+            "mcg",
+            "ug",
+            "ml",
+            "cpr",
+            "caps",
+            "ev",
+            "iv",
+            "po",
+            "per os",
+            "oral",
+            "bid",
+            "tid",
+            "qid",
+            "q8h",
+        ]
+    )
     escaped = [re.escape(term) for term in terms if term.strip()]
     if not escaped:
         return re.compile(r"$^")
@@ -38,6 +58,7 @@ def _metadata_re() -> re.Pattern[str]:
 def _continuation_prefix_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
     terms = list(snapshot.values("clinical_extraction", "drug_continuation_markers"))
+    terms.extend(["dal", "da", "dall", "se", "in riserva"])
     escaped = [re.escape(term) + r"\b" for term in terms if term.strip()]
     prefix_body = "|".join(escaped) if escaped else r"$^"
     return re.compile(
@@ -54,6 +75,8 @@ def _regimen_split_re() -> re.Pattern[str]:
         for value in snapshot.values("clinical_extraction", "drug_regimen_separators")
         if value
     ]
+    if not separators:
+        separators = ["plus"]
     separator_map = {
         "semicolon": r";",
         "plus": r"\+|\s+plus\s+",

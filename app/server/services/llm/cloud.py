@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import httpx
 from google import genai
@@ -19,6 +19,12 @@ from services.llm.structured import (
     StructuredOutputParser,
     T,
     parse_json_dict,
+)
+from services.llm.tool_calling import (
+    LLMToolCall,
+    LLMToolCallError,
+    LLMToolCallRequest,
+    LLMToolCallResult,
 )
 
 ProviderName = Literal["openai", "gemini"]
@@ -562,6 +568,151 @@ class CloudLLMClient:
             format_instructions=format_instructions,
             use_json_mode=use_json_mode,
             max_repair_attempts=max_repair_attempts,
+        )
+
+    # -------------------------------------------------------------------------
+    async def llm_tool_call(
+        self,
+        request: LLMToolCallRequest,
+    ) -> LLMToolCallResult | LLMToolCallError:
+        resolved_model = request.model or (self.default_model or "")
+        if not resolved_model:
+            return LLMToolCallError(
+                provider=self.provider,
+                code="missing_model",
+                message="Model is required for tool calling.",
+            )
+        if self.provider == "openai":
+            return await self._tool_call_openai(request, resolved_model)
+        if self.provider == "gemini":
+            return await self._tool_call_gemini(request, resolved_model)
+        return LLMToolCallError(
+            provider=self.provider,
+            code="unsupported_provider",
+            message=f"Provider '{self.provider}' does not support native tool calling.",
+        )
+
+    # -------------------------------------------------------------------------
+    async def _tool_call_openai(
+        self,
+        request: LLMToolCallRequest,
+        resolved_model: str,
+    ) -> LLMToolCallResult | LLMToolCallError:
+        if self.openai_client is None:
+            return LLMToolCallError(
+                provider="openai",
+                code="client_unavailable",
+                message="OpenAI client is not configured.",
+            )
+        kwargs: dict[str, Any] = {
+            "model": resolved_model,
+            "input": [{"role": "user", "content": request.user_prompt}],
+            "tools": [
+                {
+                    "type": "function",
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                }
+                for tool in request.tools
+            ],
+        }
+        if request.system_prompt.strip():
+            kwargs["instructions"] = request.system_prompt.strip()
+        if not self.is_gpt5_family_model(resolved_model):
+            kwargs["temperature"] = float(request.temperature)
+        try:
+            response = await self.openai_client.responses.create(**kwargs)
+        except Exception as exc:  # noqa: BLE001
+            mapped = self._map_provider_exception(exc)
+            return LLMToolCallError(
+                provider="openai",
+                code="provider_error",
+                message=str(mapped),
+            )
+        tool_calls: list[LLMToolCall] = []
+        for item in getattr(response, "output", []) or []:
+            if getattr(item, "type", None) != "function_call":
+                continue
+            raw_arguments = getattr(item, "arguments", {}) or {}
+            if isinstance(raw_arguments, str):
+                try:
+                    arguments = json.loads(raw_arguments)
+                except json.JSONDecodeError:
+                    arguments = {}
+            else:
+                arguments = dict(raw_arguments)
+            tool_calls.append(
+                LLMToolCall(
+                    id=getattr(item, "call_id", None) or getattr(item, "id", None),
+                    name=str(getattr(item, "name", "")),
+                    arguments=arguments,
+                )
+            )
+        return LLMToolCallResult(
+            provider="openai",
+            model=resolved_model,
+            content=self._extract_openai_output_text(response),
+            tool_calls=tool_calls,
+        )
+
+    # -------------------------------------------------------------------------
+    async def _tool_call_gemini(
+        self,
+        request: LLMToolCallRequest,
+        resolved_model: str,
+    ) -> LLMToolCallResult | LLMToolCallError:
+        if self.gemini_client is None:
+            return LLMToolCallError(
+                provider="gemini",
+                code="client_unavailable",
+                message="Gemini client is not configured.",
+            )
+        declarations = [
+            genai_types.FunctionDeclaration(
+                name=tool.name,
+                description=tool.description,
+                parameters=cast(Any, tool.parameters),
+            )
+            for tool in request.tools
+        ]
+        config = genai_types.GenerateContentConfig(
+            tools=[genai_types.Tool(function_declarations=declarations)],
+            temperature=float(request.temperature),
+            system_instruction=request.system_prompt.strip() or None,
+        )
+        try:
+            response = await asyncio.to_thread(
+                self.gemini_client.models.generate_content,
+                model=resolved_model,
+                contents=request.user_prompt,
+                config=config,
+            )
+        except Exception as exc:  # noqa: BLE001
+            mapped = self._map_provider_exception(exc)
+            return LLMToolCallError(
+                provider="gemini",
+                code="provider_error",
+                message=str(mapped),
+            )
+        tool_calls: list[LLMToolCall] = []
+        for candidate in getattr(response, "candidates", []) or []:
+            content = getattr(candidate, "content", None)
+            for part in getattr(content, "parts", []) or []:
+                function_call = getattr(part, "function_call", None)
+                if function_call is None:
+                    continue
+                tool_calls.append(
+                    LLMToolCall(
+                        name=str(getattr(function_call, "name", "")),
+                        arguments=dict(getattr(function_call, "args", {}) or {}),
+                    )
+                )
+        return LLMToolCallResult(
+            provider="gemini",
+            model=resolved_model,
+            content=getattr(response, "text", None),
+            tool_calls=tool_calls,
         )
 
     # -------------------------------------------------------------------------

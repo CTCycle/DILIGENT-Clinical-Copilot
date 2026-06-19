@@ -101,7 +101,7 @@ class PatientData(BaseModel):
             day = int(str(value.get("day", "")).strip())
             month = int(str(value.get("month", "")).strip())
             year = int(str(value.get("year", "")).strip())
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         try:
             return date(year, month, day)
@@ -318,6 +318,29 @@ class DrugEntry(BaseModel):
         default=None,
         description="True for historical/anamnesis mentions, False for active therapy entries.",
     )
+    evidence: str | None = Field(default=None, max_length=500)
+    source_span: list[int] | None = Field(default=None, min_length=2, max_length=2)
+    confidence: Literal["low", "moderate", "high"] | None = Field(default=None)
+    attribution: (
+        Literal[
+            "patient",
+            "family_history",
+            "allergy",
+            "negated",
+            "unclear",
+        ]
+        | None
+    ) = Field(default=None)
+    current_status: (
+        Literal[
+            "current",
+            "past",
+            "suspected",
+            "ruled_out",
+            "unclear",
+        ]
+        | None
+    ) = Field(default=None)
 
     # -------------------------------------------------------------------------
     @field_validator("daytime_administration", mode="before")
@@ -335,7 +358,7 @@ class DrugEntry(BaseModel):
                 continue
             try:
                 cleaned.append(float(slot))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
         if not cleaned:
             return []
@@ -386,6 +409,17 @@ class DiseaseContextEntry(BaseModel):
     chronic: bool | None = Field(default=None)
     hepatic_related: bool | None = Field(default=None)
     evidence: str | None = Field(default=None, max_length=500)
+    source_span: list[int] | None = Field(default=None, min_length=2, max_length=2)
+    confidence: Literal["low", "moderate", "high"] | None = Field(default=None)
+    attribution: (
+        Literal[
+            "patient",
+            "family_history",
+            "negated",
+            "unclear",
+        ]
+        | None
+    ) = Field(default=None)
 
     # -------------------------------------------------------------------------
     @field_validator(

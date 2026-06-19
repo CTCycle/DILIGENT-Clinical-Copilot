@@ -4,7 +4,6 @@ from collections.abc import Callable
 
 from domain.catalogs import ReferenceCatalogSnapshot
 
-
 ###############################################################################
 class _CatalogProvider:
 

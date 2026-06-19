@@ -1,0 +1,8 @@
+Anamnesis
+Patient with malaise.
+
+Therapy
+Drug H 100 mg daily.
+
+Laboratory history
+2024-03-02 ALT 500 U/L, AST 260 U/L, ALP 210 U/L, bilirubin 2.4 mg/dL.

@@ -51,8 +51,8 @@ app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-resee
 ## Filesystem Resources
 - `app/resources/sources`
   - Source catalogs, documents, and archives
-- `app/resources/models`
-  - Model-related assets
+- `app/resources/tools`
+  - Extraction tool manifests and deterministic tool-related assets
 
 ## Access Key Persistence
 - Encrypted provider keys are persisted in database tables.

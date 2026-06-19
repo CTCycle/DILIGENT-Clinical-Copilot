@@ -8,7 +8,6 @@ from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
-    ClinicalSectionLineRange,
 )
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
@@ -16,6 +15,10 @@ from services.session.clinical_section_parsers import (
     extract_required_dili_sections,
     missing_required_section_names,
     verify_verbatim_section_coherence,
+)
+from services.session.text_section_parser import (
+    build_section_extraction_from_initial_text,
+    parse_initial_text_sections,
 )
 
 ###############################################################################
@@ -85,7 +88,8 @@ class ClinicalInputExtractor:
     def _deterministic_extract(
         self, clinical_input: str
     ) -> ClinicalSectionExtractionResult:
-        sections = extract_required_dili_sections(clinical_input)
+        source_text = (clinical_input or "").replace("\r\n", "\n").replace("\r", "\n")
+        sections = extract_required_dili_sections(source_text)
         missing = missing_required_section_names(sections)
         if missing:
             raise ClinicalInputExtractionError(
@@ -94,7 +98,7 @@ class ClinicalInputExtractor:
         for key, section in sections.items():
             if not section.text.strip():
                 raise ClinicalInputExtractionError(f"Section '{key}' is empty.")
-            if not verify_verbatim_section_coherence(clinical_input, section):
+            if not verify_verbatim_section_coherence(source_text, section):
                 raise ClinicalInputExtractionError(
                     f"Section '{key}' does not match a coherent verbatim span."
                 )
@@ -102,7 +106,7 @@ class ClinicalInputExtractor:
         labs = sections["laboratory_history"]
         anamnesis = sections["anamnesis"]
         strict_verbatim = validate_extracted_sections_against_source(
-            clinical_input,
+            source_text,
             anamnesis=anamnesis.text,
             therapy=therapy.text,
             lab_analysis=labs.text,
@@ -111,47 +115,13 @@ class ClinicalInputExtractor:
             raise ClinicalInputExtractionError(
                 "Deterministic section extraction failed source grounding."
             )
-        return ClinicalSectionExtractionResult(
-            source_text=clinical_input,
-            anamnesis=anamnesis.text,
-            drugs=therapy.text,
-            laboratory_analysis=labs.text,
-            line_ranges={
-                "anamnesis": [
-                    ClinicalSectionLineRange(
-                        start_line=anamnesis.line_start,
-                        end_line=anamnesis.line_end,
-                    )
-                ],
-                "drugs": [
-                    ClinicalSectionLineRange(
-                        start_line=therapy.line_start,
-                        end_line=therapy.line_end,
-                    )
-                ],
-                "laboratory_analysis": [
-                    ClinicalSectionLineRange(
-                        start_line=labs.line_start,
-                        end_line=labs.line_end,
-                    )
-                ],
-            },
-            confidence=0.95 if strict_verbatim else 0.7,
-            metadata={
-                "sections": {
-                    key: {
-                        "canonical_key": value.canonical_key,
-                        "raw_heading": value.raw_heading,
-                        "normalized_heading": value.normalized_heading,
-                        "match_strategy": value.match_strategy,
-                        "score": value.confidence_score,
-                        "line_span": [value.line_start, value.line_end],
-                        "char_span": [value.body_start, value.body_end],
-                        "verbatim_coherent": value.verbatim_coherent,
-                    }
-                    for key, value in sections.items()
-                }
-            },
+        parse_result = parse_initial_text_sections(source_text)
+        extraction = build_section_extraction_from_initial_text(
+            parse_result,
+            source_text,
+        )
+        return extraction.model_copy(
+            update={"confidence": 0.95 if strict_verbatim else 0.7}
         )
 
     # -------------------------------------------------------------------------
