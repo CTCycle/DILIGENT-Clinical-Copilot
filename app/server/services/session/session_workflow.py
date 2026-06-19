@@ -267,33 +267,6 @@ async def process_single_patient_workflow(
     progress_callback=None,
     stop_check=None,
 ) -> dict[str, Any]:
-    return await _process_standard_patient_workflow_internal(
-        service,
-        payload,
-        patient_image_base64=patient_image_base64,
-        section_extraction=section_extraction,
-        normalized_document=normalized_document,
-        report_mode=report_mode,
-        session_version=session_version,
-        original_session_id=original_session_id,
-        progress_callback=progress_callback,
-        stop_check=stop_check,
-    )
-
-###############################################################################
-async def _process_standard_patient_workflow_internal(
-    service: Any,
-    payload: PatientData,
-    *,
-    patient_image_base64: str | None = None,
-    section_extraction: ClinicalSectionExtractionResult | None = None,
-    normalized_document: NormalizedDocument | None = None,
-    report_mode: str = "faithful_only",
-    session_version: int = 1,
-    original_session_id: int | None = None,
-    progress_callback=None,
-    stop_check=None,
-) -> dict[str, Any]:
     service.run_stop_check(stop_check)
     logger.info(
         "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
@@ -353,13 +326,13 @@ async def _process_standard_patient_workflow_internal(
             service.extract_anamnesis_drugs(
                 anamnesis_text=cleaned_anamnesis_text,
                 issues=issues,
-                progress_callback=None,
+                progress_callback=progress_callback,
                 stop_check=stop_check,
             ),
             service.extract_therapy_drugs(
                 cleaned_therapy_text=cleaned_therapy_text,
                 issues=issues,
-                progress_callback=None,
+                progress_callback=progress_callback,
                 stop_check=stop_check,
             ),
         )
@@ -377,16 +350,16 @@ async def _process_standard_patient_workflow_internal(
             message="Parser batch preflight denied concurrent extraction; using sequential extraction for local runtime safety.",
             field="clinical_input",
         )
-        anamnesis_drugs = await service.extract_anamnesis_drugs(
-            anamnesis_text=cleaned_anamnesis_text,
-            issues=issues,
-            progress_callback=None,
-            stop_check=stop_check,
-        )
         therapy_drugs = await service.extract_therapy_drugs(
             cleaned_therapy_text=cleaned_therapy_text,
             issues=issues,
-            progress_callback=None,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
+        anamnesis_drugs = await service.extract_anamnesis_drugs(
+            anamnesis_text=cleaned_anamnesis_text,
+            issues=issues,
+            progress_callback=progress_callback,
             stop_check=stop_check,
         )
 
@@ -407,7 +380,7 @@ async def _process_standard_patient_workflow_internal(
     disease_context = await service.extract_disease_context(
         anamnesis_text=anamnesis_text,
         issues=issues,
-        progress_callback=None,
+        progress_callback=progress_callback,
         stop_check=stop_check,
     )
 
@@ -420,7 +393,7 @@ async def _process_standard_patient_workflow_internal(
     lab_timeline, onset_context = await service.extract_lab_timeline(
         payload=payload,
         issues=issues,
-        progress_callback=None,
+        progress_callback=progress_callback,
         stop_check=stop_check,
     )
 
@@ -434,7 +407,7 @@ async def _process_standard_patient_workflow_internal(
         lab_timeline=lab_timeline,
         validation_bundle=validation_bundle,
         issues=issues,
-        progress_callback=None,
+        progress_callback=progress_callback,
         stop_check=stop_check,
     )
     calculated_pattern_score = pattern_assessment.score
@@ -510,7 +483,7 @@ async def _process_standard_patient_workflow_internal(
         pattern_score=pattern_score,
         report_language=report_language,
         issues=issues,
-        progress_callback=None,
+        progress_callback=progress_callback,
         stop_check=stop_check,
     )
     structured_context = service.build_structured_clinical_context(
@@ -533,7 +506,7 @@ async def _process_standard_patient_workflow_internal(
         analysis_drugs=analysis_drugs,
         structured_context=structured_context,
         pattern_score=pattern_score,
-        progress_callback=None,
+        progress_callback=progress_callback,
         stop_check=stop_check,
     )
     _emit_progress(
@@ -547,7 +520,7 @@ async def _process_standard_patient_workflow_internal(
         structured_context=structured_context,
         pattern_score=pattern_score,
         issues=issues,
-        progress_callback=None,
+        progress_callback=progress_callback,
         stop_check=stop_check,
     )
     match_audit_issues: list[PipelineIssue] = []
@@ -591,7 +564,7 @@ async def _process_standard_patient_workflow_internal(
         rag_query=rag_query,
         rucam_bundle=rucam_bundle,
         issues=issues,
-        progress_callback=None,
+        progress_callback=progress_callback,
         stop_check=stop_check,
     )
 
