@@ -22,7 +22,6 @@ import {
   JobCancelResponse,
   JobStartResponse,
   ClinicalSessionDetail,
-  ManualReportEditAudit,
   ManualReportEditRequest,
   ManualReportEditResponse,
   ClinicalSessionRevisionRequest,
@@ -35,7 +34,6 @@ import {
   RevisionPipelineRun,
   RevisionPipelineStepListResponse,
   SessionVersionComparisonResponse,
-  SessionVersionDetailResponse,
   SessionVersionListResponse,
 } from "../models/types";
 import { buildQueryString, requestJson } from "./http-api";
@@ -68,30 +66,11 @@ export async function fetchClinicalSessionDetail(
   );
 }
 
-export async function fetchClinicalSessionManualEdits(
-  sessionId: number,
-): Promise<ManualReportEditAudit[]> {
-  return requestJson<ManualReportEditAudit[]>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/manual-edits`,
-    { method: "GET" },
-  );
-}
-
 export async function fetchClinicalSessionVersions(
   sessionId: number,
 ): Promise<SessionVersionListResponse> {
   return requestJson<SessionVersionListResponse>(
     `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions`,
-    { method: "GET" },
-  );
-}
-
-export async function fetchClinicalSessionVersionDetail(
-  sessionId: number,
-  versionId: number,
-): Promise<SessionVersionDetailResponse> {
-  return requestJson<SessionVersionDetailResponse>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}`,
     { method: "GET" },
   );
 }

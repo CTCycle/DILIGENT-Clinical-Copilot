@@ -460,20 +460,15 @@ def _validate_requested_provider(
     }
     provider = str(runtime_settings.get("llm_provider") or "").lower()
     if not selected:
-        # Backward-compatible behavior for clients that do not send
-        # selected_model_providers: assume the active runtime provider.
-        if provider:
-            selected = {provider}
-        else:
-            blocking.append(
-                ClinicalInputPreflightIssue(
-                    severity="blocking",
-                    code="provider_selection_missing",
-                    message="At least one model provider must be selected.",
-                    field="selected_model_providers",
-                )
+        blocking.append(
+            ClinicalInputPreflightIssue(
+                severity="blocking",
+                code="provider_selection_missing",
+                message="At least one model provider must be selected.",
+                field="selected_model_providers",
             )
-            return
+        )
+        return
     if provider and provider not in selected:
         blocking.append(
             ClinicalInputPreflightIssue(
