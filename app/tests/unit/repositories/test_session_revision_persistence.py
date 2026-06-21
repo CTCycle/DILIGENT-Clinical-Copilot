@@ -44,12 +44,12 @@ def test_legacy_update_session_route_now_performs_safe_manual_report_edit() -> N
 
     updated = service.update_session(
         session_id,
-        session_text="Revised report content via legacy route",
+        report_text="Revised report content via current route",
         metadata={"reviewer": "Legacy Reviewer"},
     )
 
     assert updated is not None
-    assert updated["official_report_text"] == "Revised report content via legacy route"
+    assert updated["official_report_text"] == "Revised report content via current route"
     assert updated["source_clinical_text"] == "Stable source clinical narrative"
     assert updated["version"] == 1
     assert updated["metadata"]["reviewer"] == "Legacy Reviewer"
@@ -63,7 +63,7 @@ def test_metadata_only_update_does_not_create_manual_edit_audit() -> None:
 
     updated = service.update_session(
         session_id,
-        session_text=None,
+        report_text=None,
         metadata={"reviewer": "Metadata Only"},
     )
 

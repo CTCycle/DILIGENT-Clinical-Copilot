@@ -209,7 +209,7 @@ def test_session_report_and_text_use_result_payload_only() -> None:
     )
     assert legacy_detail is not None
     assert legacy_detail["report"] is None
-    assert legacy_detail["session_text"] == ""
+    assert legacy_detail["session_text"] == "Anamnesis:\nLegacy anamnesis\n\nDrugs:\nibuprofen"
 
 ###############################################################################
 def test_catalog_search_and_drug_delete_cleanup() -> None:

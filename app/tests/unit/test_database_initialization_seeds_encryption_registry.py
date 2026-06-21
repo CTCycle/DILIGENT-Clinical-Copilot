@@ -179,18 +179,10 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
         manifests_seeded = 1
         entries_written = 1
 
-    ###############################################################################
-    class FakeCatalogSeeder:
-
-        # -------------------------------------------------------------------------
-        def __init__(self, _serializer) -> None:
-            pass
-
-        # -------------------------------------------------------------------------
-        def seed_missing_or_changed_manifests(self, *, force: bool = False):
-            assert force is False
-            order.append("catalog_seeded")
-            return FakeCatalogSeedResult()
+    def fake_seed_catalogs(_serializer, *, force: bool = False):
+        assert force is False
+        order.append("catalog_seeded")
+        return FakeCatalogSeedResult()
 
     monkeypatch.setattr(
         initializer.sqlalchemy, "create_engine", lambda *a, **k: FakeAdminEngine()
@@ -203,11 +195,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     monkeypatch.setattr(
         initializer, "ReferenceCatalogSerializer", FakeCatalogSerializer
     )
-    monkeypatch.setattr(
-        initializer,
-        "ReferenceCatalogSeeder",
-        FakeCatalogSeeder,
-    )
+    monkeypatch.setattr(initializer, "_seed_catalogs", fake_seed_catalogs)
 
     db_name = initializer.ensure_postgres_database(settings)
 

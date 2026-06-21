@@ -10,6 +10,7 @@ from configurations.startup import get_server_settings
 from domain.clinical import ClinicalSessionRequest
 from services.clinical import job_progress as clinical_job_progress
 from services.session import session_workflow
+from services.session import session_shared
 
 ###############################################################################
 def get_route_owner(router: Any, route_path: str) -> Any:
@@ -129,17 +130,12 @@ def test_clinical_progress_callback_raises_when_stop_requested(monkeypatch) -> N
         def should_stop(self, job_id: str) -> bool:
             return True
 
-    monkeypatch.setattr(
-        clinical_job_progress,
-        "get_job_manager",
-        lambda: StopRequestedJobManagerStub(),
-    )
-
     try:
-        clinical_job_progress.report_clinical_job_progress(
-            "job-cancelled",
-            stage="llm_analysis",
-            progress=75.0,
+        session_shared.report_clinical_job_progress(
+            "llm_analysis",
+            75.0,
+            job_manager=StopRequestedJobManagerStub(),
+            job_id="job-cancelled",
         )
     except clinical_job_progress.ClinicalJobCancelled:
         return
