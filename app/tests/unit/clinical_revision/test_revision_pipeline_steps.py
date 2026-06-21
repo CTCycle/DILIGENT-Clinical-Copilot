@@ -257,7 +257,7 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
                     },
                 },
                 "revision": {
-                    "execution_mode": "revision",
+                    "revision_kind": "llm_assisted_revision",
                     "consultation_context_metadata": {
                         "source_version_id": int(source_version["version_id"]),
                         "revision_version_id": int(target_shell["version_id"]),
@@ -475,8 +475,8 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
     assert artifacts[9]["artifact_key"] == "revision_finalization_execution"
     assert artifacts[10]["artifact_key"] == "report_comparison"
     assert (
-        version_detail["session"]["result_payload"]["revision"]["execution_mode"]
-        == "revision"
+        version_detail["session"]["result_payload"]["revision"]["revision_kind"]
+        == "llm_assisted_revision"
     )
     assert (
         version_detail["session"]["result_payload"]["revision"]["instruction_profile"][
@@ -765,7 +765,7 @@ def test_run_revision_job_reuses_persisted_source_sections(monkeypatch) -> None:
                     }
                 },
                 "revision": {
-                    "execution_mode": "revision",
+                    "revision_kind": "llm_assisted_revision",
                     "consultation_context_metadata": {
                         "source_version_id": int(source_version["version_id"]),
                         "revision_version_id": int(target_shell["version_id"]),

@@ -6,6 +6,7 @@ from datetime import date
 from typing import Any
 
 from common.utils.logger import logger
+from domain.clinical.claims import ClinicalClaim, DrugClinicalNarrative
 from domain.clinical.entities import (
     DrugClinicalAssessment,
     DrugEntry,
@@ -25,6 +26,62 @@ class AnalysisRunner:
     # -------------------------------------------------------------------------
     def __init__(self, consultation: Any) -> None:
         self.consultation = consultation
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_clinical_narrative(
+        *,
+        drug_name: str,
+        excerpts: list[str],
+        rucam: DrugRucamAssessment | None,
+        missing_livertox: bool,
+        evidence_warnings: list[str],
+    ) -> DrugClinicalNarrative:
+        claims: list[ClinicalClaim] = []
+        if excerpts:
+            claims.append(
+                ClinicalClaim(
+                    claim=f"{drug_name} has source-text evidence in the clinical record.",
+                    source="source_text",
+                    evidence_quote=excerpts[0],
+                    confidence="high",
+                    requires_review=False,
+                )
+            )
+        else:
+            claims.append(
+                ClinicalClaim(
+                    claim=f"{drug_name} lacks a direct source-text evidence quote in the generated assessment context.",
+                    source="unknown",
+                    evidence_quote=None,
+                    confidence="low",
+                    requires_review=True,
+                )
+            )
+        if rucam is not None:
+            confidence = "moderate" if rucam.data_sufficient else "low"
+            claims.append(
+                ClinicalClaim(
+                    claim=(
+                        f"{drug_name} RUCAM causality is {rucam.causality_category}."
+                    ),
+                    source="rucam",
+                    evidence_quote=None,
+                    confidence=confidence,
+                    requires_review=not rucam.data_sufficient,
+                )
+            )
+        limitations = list(evidence_warnings)
+        if missing_livertox:
+            limitations.append("No matched LiverTox monograph was available.")
+        if rucam is not None:
+            limitations.extend(rucam.limitations)
+        return DrugClinicalNarrative(
+            drug_name=drug_name,
+            summary=f"Auditable claim envelope for {drug_name}.",
+            claims=claims,
+            limitations=limitations,
+        )
 
     # -------------------------------------------------------------------------
     async def run_analysis(
@@ -387,6 +444,14 @@ class AnalysisRunner:
             suspension=suspension,
             rucam=rucam,
         )
+        entry.narrative = self.build_clinical_narrative(
+            drug_name=drug_entry.name,
+            excerpts=excerpts_list,
+            rucam=rucam,
+            missing_livertox=missing_livertox,
+            evidence_warnings=match_quality["evidence_warnings"],
+        )
+        entry.claims = entry.narrative.claims
         return entry, knowledge_prompt, excerpts_list
 
     # -------------------------------------------------------------------------

@@ -742,6 +742,16 @@
   font-weight: 700;
 }
 
+.clinical-session-table-value.is-warn,
+.clinical-session-evidence-fallback {
+  color: #93660f;
+}
+
+.clinical-session-evidence-fallback {
+  display: block;
+  font-weight: 750;
+}
+
 .clinical-session-audit-list {
   display: grid;
   gap: var(--space-sm);

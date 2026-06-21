@@ -12,6 +12,7 @@ import {
   normalizeVisitDateInput,
 } from '../../core/utils';
 import {
+  ClinicalInputPreflightIssue,
   JobStatus,
   JobStatusResponse,
 } from '../../core/models/types';
@@ -27,6 +28,10 @@ import { MarkdownRendererService } from '../../core/services/markdown-renderer.s
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const STALL_THRESHOLD_MS = 600_000;
+const SECTION_REVIEW_WARNING_CODES = new Set([
+  'section_extraction_confidence_needs_review',
+  'section_extraction_requires_review',
+]);
 const CLINICAL_INPUT_TEMPLATE_FALLBACK = `Chief concern:
 History of present illness:
 Current medications (dose/start date):
@@ -54,6 +59,9 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   readonly isCancelling = signal(false);
   readonly isRunActionLocked = signal(false);
+  readonly preflightReviewAcknowledged = signal(false);
+  readonly preflightReviewMessages = signal<string[]>([]);
+  readonly preflightReviewNoticeVisible = computed(() => this.preflightReviewMessages().length > 0);
   readonly todayIso = todayIso;
   readonly finalReportMarkdown = computed(() => this.stateService.state().diliAgent.message || this.reportBody);
   readonly renderedReport = computed(() => this.markdownRenderer.render(this.finalReportMarkdown()));
@@ -98,6 +106,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   handleFormChange<K extends keyof typeof this.vm.form>(key: K, value: (typeof this.vm.form)[K]): void {
+    this.clearPreflightReviewState();
     const currentMessage = this.vm.message ?? '';
     const shouldClearStaleOutput =
       !this.vm.isRunning &&
@@ -187,6 +196,18 @@ export class DiliAgentPageComponent implements OnDestroy {
       jobStage: null,
       jobStageMessage: null,
     });
+  }
+
+  private clearPreflightReviewState(): void {
+    this.preflightReviewAcknowledged.set(false);
+    this.preflightReviewMessages.set([]);
+  }
+
+  private collectReviewRequiredWarnings(issues: ClinicalInputPreflightIssue[]): string[] {
+    return issues
+      .filter((issue) => SECTION_REVIEW_WARNING_CODES.has(issue.code))
+      .map((issue) => issue.message.trim())
+      .filter(Boolean);
   }
 
   private stopPoller(): void {
@@ -313,12 +334,26 @@ export class DiliAgentPageComponent implements OnDestroy {
       const payload = buildClinicalPayload(this.vm.form, this.vm.settings);
       const preflight = await validateClinicalInput(payload);
       if (!preflight.ready) {
+        this.clearPreflightReviewState();
         this.stateService.updateDiliAgent({
           isStarting: false,
           isRunning: false,
           message: `[ERROR] ${preflight.blocking_issues.map((issue) => issue.message).join(' ')}`,
         });
         return;
+      }
+      const reviewWarnings = this.collectReviewRequiredWarnings(preflight.non_blocking_issues);
+      if (reviewWarnings.length && !this.preflightReviewAcknowledged()) {
+        this.preflightReviewMessages.set(reviewWarnings);
+        this.stateService.updateDiliAgent({
+          isStarting: false,
+          isRunning: false,
+          message: '[WARN] Review section extraction warnings and acknowledge before running.',
+        });
+        return;
+      }
+      if (!reviewWarnings.length) {
+        this.clearPreflightReviewState();
       }
       const preflightWarningSummary = preflight.non_blocking_issues.length
         ? `[WARN] ${preflight.non_blocking_issues.map((issue) => issue.message).join(' ')}`
@@ -385,6 +420,7 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   clearAll(): void {
     this.revokeObjectUrl();
+    this.clearPreflightReviewState();
     this.stateService.updateDiliAgent({
       form: { ...DEFAULT_FORM_STATE },
       message: '',
@@ -396,6 +432,10 @@ export class DiliAgentPageComponent implements OnDestroy {
       jobStageMessage: null,
       isStarting: false,
     });
+  }
+
+  acknowledgePreflightReview(): void {
+    this.preflightReviewAcknowledged.set(true);
   }
 
   async copyReport(): Promise<void> {

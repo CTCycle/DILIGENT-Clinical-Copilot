@@ -47,6 +47,8 @@ Default local endpoints:
 ## 3. Runtime Profiles
 DILIGENT is configuration-first and uses one active runtime file: `settings/.env`.
 
+The current deployment posture is explicit local single-user operation. Network production deployment without authentication is unsupported; runtime validation rejects non-local deployment modes until access-control work is added.
+
 Switch to local profile:
 ```cmd
 copy /Y settings\.env.local.example settings\.env
@@ -58,6 +60,8 @@ copy /Y settings\.env.local.tauri.example settings\.env
 ```
 
 See `assets/docs/runtime/modes.md` for full runtime and packaging details.
+
+Clinical job execution is process-local. Persisted clinical sessions, revision runs, and revision draft shells remain durable, but in-memory job ids are not durable across backend restarts.
 
 ## 4. Using the Application
 Typical workflow:

@@ -37,6 +37,12 @@ def build_failed_session_payload(
     section_extraction: ClinicalSectionExtractionResult | None = None,
 ) -> dict[str, Any]:
     language_result = ClinicalLanguageDetector.detect(payload)
+    input_character_counts = {
+        "anamnesis": len(payload.anamnesis or ""),
+        "drugs": len(payload.drugs or ""),
+        "laboratory_analysis": len(payload.laboratory_analysis or ""),
+    }
+    safe_error_message = "Clinical analysis failed before completion."
     runtime_settings = {
         "use_cloud_services": bool(LLMRuntimeConfig.is_cloud_enabled()),
         "llm_provider": LLMRuntimeConfig.get_llm_provider(),
@@ -50,12 +56,12 @@ def build_failed_session_payload(
     return {
         "patient_name": payload.name,
         "patient_visit_date": payload.visit_date,
-        "patient_image_base64": patient_image_base64,
+        "patient_image_base64": None,
         "session_timestamp": datetime.now(),
         "hepatic_pattern": "indeterminate",
-        "anamnesis": payload.anamnesis,
-        "drugs": payload.drugs,
-        "laboratory_analysis": payload.laboratory_analysis,
+        "anamnesis": None,
+        "drugs": None,
+        "laboratory_analysis": None,
         "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
         "clinical_model": LLMRuntimeConfig.get_clinical_model(),
         "total_duration": elapsed_seconds,
@@ -67,7 +73,14 @@ def build_failed_session_payload(
         "session_result_payload": {
             "report": "",
             "issues": issues,
-            "error": error_message,
+            "error": safe_error_message,
+            "failure_metadata": {
+                "failure_stage": "clinical_analysis",
+                "error_code": "clinical_job_failed",
+                "error_type": type(error_message).__name__,
+                "input_character_counts": input_character_counts,
+                "has_patient_image": bool(patient_image_base64),
+            },
             "pattern_status": "failed",
             "detected_drugs": [],
             "anamnesis_drugs": [],
@@ -82,11 +95,7 @@ def build_failed_session_payload(
             "excluded_drugs": [],
             "unresolved_drugs": [],
             "structured_case": {},
-            "section_extraction": (
-                section_extraction.model_dump()
-                if section_extraction is not None
-                else None
-            ),
+            "section_extraction": None,
             "runtime_settings": runtime_settings,
         },
     }

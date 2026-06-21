@@ -41,6 +41,7 @@ from common.utils.types import (
 )
 from domain.settings.configuration import (
     DatabaseSettings,
+    DeploymentSettings,
     DrugsMatcherSettings,
     FastAPISettings,
     IngestionSettings,
@@ -258,6 +259,13 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     if polling_interval <= 0:
         polling_interval = 1.0
     return JobsSettings(polling_interval=polling_interval)
+
+###############################################################################
+def _build_deployment_settings(data: dict[str, Any]) -> DeploymentSettings:
+    payload = ensure_mapping(data)
+    return DeploymentSettings(
+        mode=coerce_str(payload.get("mode"), "local_single_user")
+    )
 
 ###############################################################################
 def _parse_database_url(url: str | None) -> dict[str, Any]:
@@ -550,6 +558,7 @@ def build_settings_payload_from_json(
         }
     )
     jobs_payload = ensure_mapping(payload.get("jobs"))
+    deployment_payload = ensure_mapping(payload.get("deployment"))
     drugs_matcher_payload = ensure_mapping(payload.get("drugs_matcher"))
     rag_payload = ensure_mapping(payload.get("rag"))
     runtime_payload = ensure_mapping(payload.get("runtime"))
@@ -557,6 +566,7 @@ def build_settings_payload_from_json(
     session_pipeline_payload = ensure_mapping(payload.get("session_pipeline"))
     return {
         "fastapi": _build_fastapi_settings().model_dump(),
+        "deployment": _build_deployment_settings(deployment_payload).model_dump(),
         "jobs": _build_jobs_settings(jobs_payload).model_dump(),
         "database": _build_database_settings(database_environment).model_dump(),
         "drugs_matcher": _build_drugs_matcher_settings(

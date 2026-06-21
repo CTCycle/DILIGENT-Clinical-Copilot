@@ -3,7 +3,6 @@ from services.clinical.pattern_resolution import (
     resolve_hepatic_pattern,
 )
 
-
 ###############################################################################
 def test_explicit_pattern_is_preserved_without_overwriting_calculated_value() -> None:
     result = resolve_hepatic_pattern(
@@ -19,7 +18,6 @@ def test_explicit_pattern_is_preserved_without_overwriting_calculated_value() ->
     assert result.source == "provided"
     assert result.conflict is True
     assert result.warnings[0].code == "hepatic_pattern_source_calculation_conflict"
-
 
 ###############################################################################
 def test_calculated_and_indeterminate_pattern_resolution() -> None:

@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-06-15
+Last updated: 2026-06-21
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -28,6 +28,8 @@ Important distinctions:
 - Manual report edits do not create a new official version.
 - LLM-assisted revision creates a new versioned draft and keeps the previous version unchanged.
 - Human clinical review status is separate from LLM QA status.
+- Backend-provided matched drugs, structured case fields, revision entities, RxNav identifiers, and LiverTox matches are treated as authoritative persisted evidence.
+- Frontend-derived display fallbacks are labeled as **Display fallback** or **Not backend-confirmed**. These values are navigation aids only and must not be interpreted as RxNav, LiverTox, RUCAM, or backend-confirmed clinical evidence.
 
 ## Use Patient Timeline
 Open **Patient Timeline** from the sidebar.
