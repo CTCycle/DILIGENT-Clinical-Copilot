@@ -2,18 +2,20 @@ from __future__ import annotations
 
 import re
 
-from fastapi import HTTPException, status
-
 from domain.clinical.entities import ClinicalSessionRequest
 
 WORD_PATTERN = re.compile(r"\b[\wÀ-ÖØ-öø-ÿ']+\b", re.UNICODE)
+
 
 ###############################################################################
 def count_words(text: str) -> int:
     return len(WORD_PATTERN.findall(text or ""))
 
+
 ###############################################################################
-def validate_clinical_session_request(request: ClinicalSessionRequest) -> None:
+def validate_clinical_session_request(
+    request: ClinicalSessionRequest,
+) -> list[dict[str, str]]:
     details: list[dict[str, str]] = []
 
     clinical_input = (request.clinical_input or "").strip()
@@ -44,7 +46,4 @@ def validate_clinical_session_request(request: ClinicalSessionRequest) -> None:
             }
         )
 
-    if details:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=details
-        )
+    return details
