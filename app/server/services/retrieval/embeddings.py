@@ -39,17 +39,11 @@ class Reranker(Protocol):
 ###############################################################################
 class LocalHeuristicReranker:
     TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
-    PROFILE_ALIASES = {
-        "balanced": "lightweight-balanced-v1",
-        "lightweight-balanced": "lightweight-balanced-v1",
-        "lightweight-balanced-v1": "lightweight-balanced-v1",
-        "lexical": "lightweight-lexical-v1",
-        "lightweight-lexical": "lightweight-lexical-v1",
-        "lightweight-lexical-v1": "lightweight-lexical-v1",
-        "phrase": "lightweight-phrase-v1",
-        "lightweight-phrase": "lightweight-phrase-v1",
-        "lightweight-phrase-v1": "lightweight-phrase-v1",
-    }
+    KNOWN_PROFILES = frozenset({
+        "lightweight-balanced-v1",
+        "lightweight-lexical-v1",
+        "lightweight-phrase-v1",
+    })
     PROFILE_WEIGHTS = {
         "lightweight-balanced-v1": {
             "query_coverage": 0.45,
@@ -134,9 +128,9 @@ class LocalHeuristicReranker:
     @classmethod
     def normalize_profile_name(cls, value: str) -> str:
         candidate = (value or "").strip().casefold()
-        if not candidate:
-            return "lightweight-balanced-v1"
-        return cls.PROFILE_ALIASES.get(candidate, "lightweight-balanced-v1")
+        if candidate in cls.KNOWN_PROFILES:
+            return candidate
+        return "lightweight-balanced-v1"
 
     # -------------------------------------------------------------------------
     @classmethod
