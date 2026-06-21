@@ -31,6 +31,7 @@ from services.clinical.report_language import (
 from services.llm.provider_factory import initialize_llm_client
 from services.retrieval.embeddings import SimilaritySearch
 from services.retrieval.settings import build_effective_rag_settings
+from services.text.normalization import normalize_drug_query_name
 from services.clinical.analysis_runner import AnalysisRunner
 from services.clinical.drug_analysis import DrugAnalysisService
 from services.clinical import hepatox_scoring
@@ -133,6 +134,32 @@ class HepatoxConsultation:
         self.rag_support = RagSupportService(self)
 
     # -------------------------------------------------------------------------
+    def _analysis_runner(self) -> AnalysisRunner:
+        if not hasattr(self, "analysis_runner"):
+            self.analysis_runner = AnalysisRunner(self)
+        return self.analysis_runner
+
+    # -------------------------------------------------------------------------
+    def _drug_analysis(self) -> DrugAnalysisService:
+        if not hasattr(self, "drug_analysis"):
+            self._analysis_runner()
+            self._rag_support()
+            self.drug_analysis = DrugAnalysisService(self)
+        return self.drug_analysis
+
+    # -------------------------------------------------------------------------
+    def _report_finalizer(self) -> ReportFinalizer:
+        if not hasattr(self, "report_finalizer"):
+            self.report_finalizer = ReportFinalizer(self)
+        return self.report_finalizer
+
+    # -------------------------------------------------------------------------
+    def _rag_support(self) -> RagSupportService:
+        if not hasattr(self, "rag_support"):
+            self.rag_support = RagSupportService(self)
+        return self.rag_support
+
+    # -------------------------------------------------------------------------
     async def run_analysis(
         self,
         *,
@@ -143,7 +170,7 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
-        return await self.analysis_runner.run_analysis(
+        return await self._analysis_runner().run_analysis(
             prepared_inputs=prepared_inputs,
             visit_date=visit_date,
             report_language=report_language,
@@ -163,7 +190,7 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
-        return await self.analysis_runner.run_revision_analysis(
+        return await self._analysis_runner().run_revision_analysis(
             prepared_inputs=prepared_inputs,
             visit_date=visit_date,
             report_language=report_language,
@@ -185,7 +212,7 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> PatientDrugClinicalReport:
-        return await self.analysis_runner.compile_clinical_assessment(
+        return await self._analysis_runner().compile_clinical_assessment(
             resolved_drugs,
             clinical_context=clinical_context,
             visit_date=visit_date,
@@ -209,7 +236,7 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> PatientDrugClinicalReport:
-        return await self.analysis_runner.compile_revision_clinical_assessment(
+        return await self._analysis_runner().compile_revision_clinical_assessment(
             resolved_drugs,
             clinical_context=clinical_context,
             visit_date=visit_date,
@@ -245,7 +272,7 @@ class HepatoxConsultation:
         coroutine: Any,
         semaphore: asyncio.Semaphore,
     ) -> tuple[int, Any]:
-        return await self.analysis_runner.execute_bounded_job(index, coroutine, semaphore)
+        return await self._analysis_runner().execute_bounded_job(index, coroutine, semaphore)
 
     # -------------------------------------------------------------------------
     async def prepare_drug_assessment(
@@ -261,7 +288,7 @@ class HepatoxConsultation:
         rag_query: dict[str, str] | None,
         rucam_by_key: dict[str, DrugRucamAssessment],
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
-        return await self.analysis_runner.prepare_drug_assessment(
+        return await self._analysis_runner().prepare_drug_assessment(
             idx=idx,
             drug_entry=drug_entry,
             resolved_drugs=resolved_drugs,
@@ -287,7 +314,7 @@ class HepatoxConsultation:
         rag_query: dict[str, str] | None,
         rucam_by_key: dict[str, DrugRucamAssessment],
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
-        return await self.analysis_runner.prepare_revision_drug_assessment(
+        return await self._analysis_runner().prepare_revision_drug_assessment(
             idx=idx,
             drug_entry=drug_entry,
             resolved_drugs=resolved_drugs,
@@ -307,7 +334,7 @@ class HepatoxConsultation:
         normalized_key: str,
         resolved_drugs: dict[str, dict[str, Any]],
     ) -> dict[str, Any]:
-        return self.analysis_runner.resolve_livertox_data_for_entry(
+        return self._analysis_runner().resolve_livertox_data_for_entry(
             raw_name=raw_name,
             normalized_key=normalized_key,
             resolved_drugs=resolved_drugs,
@@ -322,29 +349,52 @@ class HepatoxConsultation:
     async def fetch_rag_documents(
         self, rag_query: dict[str, str] | None, drug_name: str
     ) -> str | None:
-        return await self.rag_support.fetch_rag_documents(rag_query, drug_name)
+        if type(self).search_supporting_documents is not HepatoxConsultation.search_supporting_documents:
+            if not rag_query:
+                return None
+            normalized_key = normalize_drug_query_name(drug_name)
+            drug_rag_query = rag_query.get(drug_name) or rag_query.get(normalized_key)
+            if drug_rag_query is None:
+                for key, value in rag_query.items():
+                    if normalize_drug_query_name(key) == normalized_key:
+                        drug_rag_query = value
+                        break
+            if not drug_rag_query:
+                return None
+            try:
+                return await asyncio.to_thread(
+                    self.search_supporting_documents,
+                    drug_rag_query,
+                )
+            except Exception as exc:
+                self.record_rag_retrieval_issue(drug_name=drug_name, error=exc)
+                return (
+                    "No additional documents provided "
+                    f"(reason: RAG retrieval unavailable: {exc})."
+                )
+        return await self._rag_support().fetch_rag_documents(rag_query, drug_name)
 
     # -------------------------------------------------------------------------
     def record_rag_retrieval_issue(self, *, drug_name: str, error: Exception) -> None:
-        self.rag_support.record_rag_retrieval_issue(drug_name=drug_name, error=error)
+        self._rag_support().record_rag_retrieval_issue(drug_name=drug_name, error=error)
 
     # -------------------------------------------------------------------------
     def ensure_similarity_search(self) -> bool:
-        return self.rag_support.ensure_similarity_search()
+        return self._rag_support().ensure_similarity_search()
 
     # -------------------------------------------------------------------------
     def select_excerpt(self, excerpts: list[str]) -> str | None:
-        return self.rag_support.select_excerpt(excerpts)
+        return self._rag_support().select_excerpt(excerpts)
 
     # -------------------------------------------------------------------------
     def search_supporting_documents(self, query_text: str | Any) -> str | None:
-        return self.rag_support.search_supporting_documents(query_text)
+        return self._rag_support().search_supporting_documents(query_text)
 
     # -------------------------------------------------------------------------
     def format_similarity_fragment(
         self, index: int, record: dict[str, Any]
     ) -> str | None:
-        return self.rag_support.format_similarity_fragment(index, record)
+        return self._rag_support().format_similarity_fragment(index, record)
 
     # -------------------------------------------------------------------------
     def format_similarity_header(
@@ -354,7 +404,7 @@ class HepatoxConsultation:
         distance: Any,
         rerank_score: Any = None,
     ) -> str:
-        return self.rag_support.format_similarity_header(
+        return self._rag_support().format_similarity_header(
             index, distance=distance, rerank_score=rerank_score
         )
 
@@ -665,7 +715,7 @@ class HepatoxConsultation:
         source_text: str,
         report_language: str,
     ) -> str:
-        return await self.rag_support.repair_language_once(
+        return await self._rag_support().repair_language_once(
             source_text=source_text, report_language=report_language
         )
 
@@ -689,7 +739,7 @@ class HepatoxConsultation:
         knowledge_prompt: str = "No supplemental knowledge prompt available.",
         report_language: str = "en",
     ) -> str:
-        return await self.drug_analysis.request_drug_analysis(
+        return await self._drug_analysis().request_drug_analysis(
             drug_name=drug_name,
             canonical_name=canonical_name,
             origins=origins,
@@ -727,7 +777,7 @@ class HepatoxConsultation:
         knowledge_prompt: str = "No supplemental knowledge prompt available.",
         report_language: str = "en",
     ) -> str:
-        return await self.drug_analysis.request_revision_drug_analysis(
+        return await self._drug_analysis().request_revision_drug_analysis(
             drug_name=drug_name,
             canonical_name=canonical_name,
             origins=origins,
@@ -757,13 +807,13 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     def extract_rate_limit_wait_hint_seconds(self, exc: Exception) -> float | None:
-        return self.rag_support.extract_rate_limit_wait_hint_seconds(exc)
+        return self._rag_support().extract_rate_limit_wait_hint_seconds(exc)
 
     # -------------------------------------------------------------------------
     def retry_backoff_seconds(
         self, attempt: int, *, exc: Exception | None = None
     ) -> float:
-        return self.analysis_runner.retry_backoff_seconds(attempt, exc=exc)
+        return self._analysis_runner().retry_backoff_seconds(attempt, exc=exc)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -789,10 +839,11 @@ class HepatoxConsultation:
         clinical_context: str | None,
         report_language: str,
     ) -> str | None:
-        return await self.report_finalizer.finalize_patient_report(
+        return await self._report_finalizer()._build_and_finalize_report(
             entries,
             clinical_context=clinical_context,
             report_language=report_language,
+            generate_conclusion_fn=self.generate_conclusion,
         )
 
     # -------------------------------------------------------------------------
@@ -803,15 +854,16 @@ class HepatoxConsultation:
         clinical_context: str | None,
         report_language: str,
     ) -> str | None:
-        return await self.report_finalizer.finalize_revision_patient_report(
+        return await self._report_finalizer()._build_and_finalize_report(
             entries,
             clinical_context=clinical_context,
             report_language=report_language,
+            generate_conclusion_fn=self.generate_revision_conclusion,
         )
 
     # -------------------------------------------------------------------------
     def should_render_as_matched_drug(self, entry: DrugClinicalAssessment) -> bool:
-        return self.report_finalizer.should_render_as_matched_drug(entry)
+        return self._report_finalizer().should_render_as_matched_drug(entry)
 
     # -------------------------------------------------------------------------
     def render_matched_drug_section(
@@ -1015,7 +1067,7 @@ class HepatoxConsultation:
         multi_drug_report: str,
         report_language: str,
     ) -> str | None:
-        return await self.report_finalizer.generate_conclusion(
+        return await self._report_finalizer().generate_conclusion(
             clinical_context=clinical_context,
             multi_drug_report=multi_drug_report,
             report_language=report_language,
@@ -1029,7 +1081,7 @@ class HepatoxConsultation:
         multi_drug_report: str,
         report_language: str,
     ) -> str | None:
-        return await self.report_finalizer.generate_revision_conclusion(
+        return await self._report_finalizer().generate_revision_conclusion(
             clinical_context=clinical_context,
             multi_drug_report=multi_drug_report,
             report_language=report_language,

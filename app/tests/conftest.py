@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import tempfile
 import threading
 import uuid
@@ -43,6 +44,47 @@ def _configure_playwright_node_runtime() -> None:
 
 _configure_playwright_node_runtime()
 _configure_test_embedded_database_path()
+
+###############################################################################
+class WorkspaceTempPathFactory:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    # -------------------------------------------------------------------------
+    def mktemp(self, basename: str, numbered: bool = True) -> Path:
+        safe_basename = "".join(
+            char if char.isalnum() or char in {"-", "_"} else "_"
+            for char in basename
+        ).strip("_")
+        if not safe_basename:
+            safe_basename = "tmp"
+        suffix = f"-{uuid.uuid4().hex}" if numbered else ""
+        path = self.root / f"{safe_basename}{suffix}"
+        path.mkdir(parents=True, exist_ok=False)
+        return path
+
+
+###############################################################################
+@pytest.fixture(scope="session")
+def tmp_path_factory() -> WorkspaceTempPathFactory:
+    root = Path(tempfile.gettempdir()) / "diligent-pytest-fixtures" / uuid.uuid4().hex
+    factory = WorkspaceTempPathFactory(root)
+    yield factory
+    shutil.rmtree(root, ignore_errors=True)
+
+
+###############################################################################
+@pytest.fixture
+def tmp_path(
+    request: pytest.FixtureRequest,
+    tmp_path_factory: WorkspaceTempPathFactory,
+) -> Path:
+    path = tmp_path_factory.mktemp(request.node.name)
+    yield path
+    shutil.rmtree(path, ignore_errors=True)
 
 ###############################################################################
 class CoroutineThreadRunner:
