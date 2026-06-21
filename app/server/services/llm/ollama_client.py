@@ -14,7 +14,7 @@ from services.llm.ollama_runtime import (
     OllamaTimeout,
     ProgressCb,
     env_float,
-    env_str
+    env_str,
 )
 from services.llm.structured import (
     StructuredOutputParser,
@@ -22,6 +22,7 @@ from services.llm.structured import (
 )
 
 __all__ = ["OllamaClient", "OllamaError", "OllamaTimeout"]
+
 
 ###############################################################################
 class OllamaClient:

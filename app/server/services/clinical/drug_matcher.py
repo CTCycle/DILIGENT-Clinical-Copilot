@@ -4,8 +4,10 @@ from typing import Any
 
 from common.utils.logger import logger
 from domain.clinical.matching import LiverToxMatch, MonographRecord
+
 # Sentinel used to distinguish cache hits from None-valued cache entries.
 CACHE_MISS = object()
+
 
 ###############################################################################
 class DrugMatcher:
@@ -103,8 +105,8 @@ class DrugMatcher:
                 notes=["No alias candidates available."],
             )
 
-        source_backed_aliases = (
-            self.lookup.resolve_source_backed_query_variants(normalized_query)
+        source_backed_aliases = self.lookup.resolve_source_backed_query_variants(
+            normalized_query
         )
         local_aliases = [
             alias for alias, from_catalog in alias_entries if not from_catalog

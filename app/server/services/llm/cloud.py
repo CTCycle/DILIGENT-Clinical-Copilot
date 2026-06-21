@@ -24,17 +24,21 @@ from services.llm.structured import (
 
 ProviderName = Literal["openai", "gemini"]
 
+
 ###############################################################################
 class LLMError(RuntimeError):
     pass
+
 
 ###############################################################################
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
 
+
 ###############################################################################
 def short_output_hash(output_text: str) -> str:
     return hashlib.sha256((output_text or "").encode("utf-8")).hexdigest()[:12]
+
 
 ###############################################################################
 class CloudLLMClient:

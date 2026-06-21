@@ -3,6 +3,7 @@ from __future__ import annotations
 from domain.clinical.entities import ClinicalSectionTemplateResponse
 from services.catalogs.runtime import get_reference_catalog_snapshot
 
+
 ###############################################################################
 def get_clinical_section_template() -> ClinicalSectionTemplateResponse:
     snapshot = get_reference_catalog_snapshot()

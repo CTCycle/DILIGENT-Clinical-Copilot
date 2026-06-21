@@ -19,6 +19,7 @@ from services.text.vocabulary import get_text_normalization_snapshot
 
 CACHE_MISS = object()
 
+
 ###############################################################################
 class DrugNameService:
     """Drug name normalization, alias resolution, synonym parsing, and spelling correction."""
@@ -54,9 +55,7 @@ class DrugNameService:
         return []
 
     # -------------------------------------------------------------------------
-    def has_trusted_exact_key(
-        self, normalized_key: str, data: LiverToxData
-    ) -> bool:
+    def has_trusted_exact_key(self, normalized_key: str, data: LiverToxData) -> bool:
         return (
             normalized_key in data.primary_index
             or normalized_key in data.synonym_index
@@ -132,7 +131,9 @@ class DrugNameService:
         if len(query_parts) != len(candidate_parts):
             return False
         total_distance = 0
-        for query_part, candidate_part in zip(query_parts, candidate_parts, strict=True):
+        for query_part, candidate_part in zip(
+            query_parts, candidate_parts, strict=True
+        ):
             if abs(len(query_part) - len(candidate_part)) > 2:
                 return False
             distance_limit = max(
@@ -149,8 +150,7 @@ class DrugNameService:
             total_distance += distance
         allowed_distance = (
             self.lookup.SPELLING_SHORT_MAX_DISTANCE
-            if max(len(query), len(candidate))
-            < self.lookup.SPELLING_SHORT_NAME_LENGTH
+            if max(len(query), len(candidate)) < self.lookup.SPELLING_SHORT_NAME_LENGTH
             else self.lookup.SPELLING_LONG_MAX_DISTANCE
         )
         return 0 < total_distance <= allowed_distance
@@ -266,8 +266,7 @@ class DrugNameService:
         has_excerpt = int(bool(coerce_text(record.excerpt)))
         is_combo = int(len(normalized_record_name.split()) > 1)
         is_preferred_combo = int(
-            preferred_combo is not None
-            and normalized_record_name == preferred_combo
+            preferred_combo is not None and normalized_record_name == preferred_combo
         )
         normalized_notes = [note.casefold() for note in notes]
         alias_priority = 0
@@ -278,8 +277,7 @@ class DrugNameService:
         if any(note.startswith("ingredient=") for note in normalized_notes):
             alias_priority = max(alias_priority, 1)
         exact_name = int(
-            bool(normalized_query)
-            and normalized_record_name == normalized_query
+            bool(normalized_query) and normalized_record_name == normalized_query
         )
         return (
             is_preferred_combo,
@@ -304,9 +302,9 @@ class DrugNameService:
             normalized_query,
             self.lookup.normalize_name(canonical_query),
         ):
-            preferred = preferences.get(candidate) or self.lookup.BRAND_COMBO_PREFERENCES.get(
+            preferred = preferences.get(
                 candidate
-            )
+            ) or self.lookup.BRAND_COMBO_PREFERENCES.get(candidate)
             if preferred is None:
                 continue
             normalized_preferred = self.lookup.normalize_name(preferred)
@@ -342,10 +340,7 @@ class DrugNameService:
 
         for record in data.records:
             for synonym_original in record.synonyms.values():
-                if (
-                    self.lookup.canonicalize_query(synonym_original)
-                    != canonical_query
-                ):
+                if self.lookup.canonicalize_query(synonym_original) != canonical_query:
                     continue
                 matches[self.lookup.record_identity_key(record)] = (
                     record,
@@ -353,19 +348,14 @@ class DrugNameService:
                     [f"synonym='{synonym_original}'"],
                 )
 
-        alias_sources: tuple[
-            tuple[str, dict[str, list[tuple[str, str]]]], ...
-        ] = (
+        alias_sources: tuple[tuple[str, dict[str, list[tuple[str, str]]]], ...] = (
             ("brand", data.brand_index),
             ("ingredient", data.ingredient_index),
         )
         for alias_type, alias_index in alias_sources:
             for entries in alias_index.values():
                 for alias_value, primary_name in entries:
-                    if (
-                        self.lookup.canonicalize_query(alias_value)
-                        != canonical_query
-                    ):
+                    if self.lookup.canonicalize_query(alias_value) != canonical_query:
                         continue
                     primary_matches = self.lookup.match_primary_all(
                         self.lookup.canonicalize_query(primary_name)
@@ -441,9 +431,7 @@ class DrugNameService:
         alias_entries: list[tuple[str, bool]] = []
         seen: set[str] = set()
         if include_catalog:
-            cache_entry = self.lookup.alias_cache.get(
-                normalized_query, CACHE_MISS
-            )
+            cache_entry = self.lookup.alias_cache.get(normalized_query, CACHE_MISS)
             if cache_entry is not CACHE_MISS:
                 alias_entries = list(cache_entry.entries)
                 seen = set(cache_entry.seen)
@@ -480,9 +468,7 @@ class DrugNameService:
                             values_to_expand.add(fallback_alias)
 
                     for value in sorted(values_to_expand, key=str.casefold):
-                        self.lookup.add_alias_entry(
-                            alias_entries, seen, value, True
-                        )
+                        self.lookup.add_alias_entry(alias_entries, seen, value, True)
                         for variant in self.lookup.expand_variant(value):
                             self.lookup.add_alias_entry(
                                 alias_entries, seen, variant, True
@@ -673,9 +659,7 @@ class DrugNameService:
                 "synonyms": unique_synonyms,
                 "fallback_aliases": fallback_aliases,
             }
-            self.lookup.register_catalog_entry(
-                entry, normalized_map, fallback_aliases
-            )
+            self.lookup.register_catalog_entry(entry, normalized_map, fallback_aliases)
 
     # -------------------------------------------------------------------------
     def register_catalog_entry(
@@ -692,9 +676,7 @@ class DrugNameService:
             normalized_alias = self.lookup.normalize_name(alias)
             if not normalized_alias:
                 continue
-            self.lookup.add_catalog_index_entry(
-                normalized_alias, entry, False, alias
-            )
+            self.lookup.add_catalog_index_entry(normalized_alias, entry, False, alias)
 
     # -------------------------------------------------------------------------
     def add_catalog_index_entry(
@@ -751,9 +733,7 @@ class DrugNameService:
     # -------------------------------------------------------------------------
     @staticmethod
     def parse_catalog_synonyms(value: Any) -> list[str]:
-        return sorted(
-            dict.fromkeys(parse_synonym_list(value)), key=str.casefold
-        )
+        return sorted(dict.fromkeys(parse_synonym_list(value)), key=str.casefold)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -827,9 +807,7 @@ class DrugNameService:
         if not normalized:
             return set()
         return {
-            token
-            for token in normalized.split()
-            if self.lookup.is_token_valid(token)
+            token for token in normalized.split() if self.lookup.is_token_valid(token)
         }
 
     # -------------------------------------------------------------------------

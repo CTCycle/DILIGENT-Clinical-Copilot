@@ -25,9 +25,9 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 class DiseaseExtractor:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -268,7 +268,7 @@ class DiseaseExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -304,7 +304,9 @@ class DiseaseExtractor:
         try:
             await self.ensure_client()
             if self.client is None:
-                raise RuntimeError("LLM client is not initialized for disease extraction")
+                raise RuntimeError(
+                    "LLM client is not initialized for disease extraction"
+                )
             candidate_text = self.format_expected_candidates(deterministic_candidates)
             user_prompt = (
                 "Extract diseases from this full anamnesis text, with temporal and hepatic metadata.\n"
@@ -373,7 +375,8 @@ class DiseaseExtractor:
                     deterministic_candidates,
                 )
                 coverage_ok = not missing_candidates or (
-                    len(deduplicated) >= max(1, int(len(deterministic_candidates) * 0.8))
+                    len(deduplicated)
+                    >= max(1, int(len(deterministic_candidates) * 0.8))
                 )
                 if deduplicated and coverage_ok:
                     self.emit_progress(progress_callback, 1.0)
@@ -388,7 +391,9 @@ class DiseaseExtractor:
                         "LLM disease extraction missed %d grounded candidates after retry; merging deterministic fallback candidates.",
                         len(missing_candidates),
                     )
-                    merged = self.deduplicate_entries([*deduplicated, *missing_candidates])
+                    merged = self.deduplicate_entries(
+                        [*deduplicated, *missing_candidates]
+                    )
                     self.emit_progress(progress_callback, 1.0)
                     return PatientDiseaseContext(entries=merged)
                 last_errors = feedback or [
@@ -401,6 +406,4 @@ class DiseaseExtractor:
             )
 
         self.emit_progress(progress_callback, 1.0)
-        return PatientDiseaseContext(
-            entries=deterministic_candidates
-        )
+        return PatientDiseaseContext(entries=deterministic_candidates)

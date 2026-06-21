@@ -11,6 +11,7 @@ from domain.clinical.entities import (
     PatientDrugs,
 )
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class CandidateSelectionResult:
@@ -19,12 +20,14 @@ class CandidateSelectionResult:
     unresolved: list[dict[str, str]]
     ordered_analysis_drugs: PatientDrugs
 
+
 ###############################################################################
 @dataclass(slots=True)
 class HepatoxPreparedInputs:
     resolved_drugs: dict[str, dict[str, Any]]
     pattern_prompt: str
     clinical_context: str
+
 
 ###############################################################################
 class LabExtractionPayload(BaseModel):

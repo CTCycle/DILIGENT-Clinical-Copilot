@@ -14,6 +14,7 @@ from common.prompts.clinical_assessment import (
 from common.utils.logger import logger
 from domain.clinical.entities import DrugRucamAssessment, DrugSuspensionContext
 
+
 ###############################################################################
 class DrugAnalysisService:
     """Handles per-drug LLM consultation — building prompts, calling the LLM, parsing responses."""

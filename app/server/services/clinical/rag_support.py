@@ -17,6 +17,7 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 class RagSupportService:
     """RAG document retrieval, similarity search, and language repair utilities."""
@@ -171,7 +172,7 @@ class RagSupportService:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None

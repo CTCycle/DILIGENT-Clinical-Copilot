@@ -139,7 +139,7 @@ def build_single_matched_drug_row(
     if match_confidence is not None:
         try:
             match_confidence = float(match_confidence)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             match_confidence = None
     match_quality = classify_match_evidence(
         match_status=resolved.get("match_status"),

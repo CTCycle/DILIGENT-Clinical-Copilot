@@ -18,6 +18,7 @@ MAX_DRUGS_TEXT_LENGTH = 20000
 
 # HELPERS
 
+
 ###############################################################################
 def sanitize_field(value: str | None) -> str | None:
     if value is None:
@@ -25,10 +26,12 @@ def sanitize_field(value: str | None) -> str | None:
     stripped = value.strip()
     return stripped or None
 
+
 ###############################################################################
 def strip_html(value: str) -> str:
     unescaped = html.unescape(value)
     return HTML_TAG_RE.sub(" ", unescaped)
+
 
 ###############################################################################
 def sanitize_drug_line(value: str) -> str:
@@ -38,6 +41,7 @@ def sanitize_drug_line(value: str) -> str:
     without_symbols = DRUG_ALLOWED_SYMBOLS_RE.sub(" ", without_marks)
     compact = MULTISPACE_RE.sub(" ", without_symbols).strip(" \t,;:-")
     return compact
+
 
 ###############################################################################
 def sanitize_drugs_text(value: str | None) -> str | None:
@@ -63,6 +67,7 @@ def sanitize_drugs_text(value: str | None) -> str | None:
     clipped = clipped.strip()
     return clipped or joined[:MAX_DRUGS_TEXT_LENGTH].strip() or None
 
+
 ###############################################################################
 def sanitize_anamnesis_text(value: str | None) -> str | None:
     if value is None:
@@ -81,6 +86,7 @@ def sanitize_anamnesis_text(value: str | None) -> str | None:
         return None
     return "\n".join(cleaned_lines)
 
+
 ###############################################################################
 def sanitize_laboratory_text(value: str | None) -> str | None:
     if value is None:
@@ -96,6 +102,7 @@ def sanitize_laboratory_text(value: str | None) -> str | None:
     if not cleaned_lines:
         return None
     return "\n".join(cleaned_lines)
+
 
 ###############################################################################
 def normalize_visit_date(
@@ -121,7 +128,7 @@ def normalize_visit_date(
             month = int(month_raw)
             year = int(year_raw)
             normalized = date(year, month, day)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     elif isinstance(value, datetime):
@@ -150,6 +157,7 @@ def normalize_visit_date(
     if normalized > today:
         return today
     return normalized
+
 
 ###############################################################################
 def sanitize_dili_payload(
@@ -180,9 +188,9 @@ def sanitize_dili_payload(
         "use_rag": bool(use_rag),
     }
 
+
 ###############################################################################
 class PayloadSanitizationService:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def sanitize_dili_payload(

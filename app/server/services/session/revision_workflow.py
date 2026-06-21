@@ -63,6 +63,7 @@ from services.session.workflow_shared import (
     resolve_rucam_source as _resolve_rucam_source,
 )
 
+
 ###############################################################################
 def _unique_non_empty_names(values: list[str | None]) -> list[str]:
     seen: set[str] = set()
@@ -78,6 +79,7 @@ def _unique_non_empty_names(values: list[str | None]) -> list[str]:
         normalized.append(cleaned)
     return normalized
 
+
 ###############################################################################
 def _normalize_candidate_selection_names(values: list[Any]) -> list[str]:
     normalized_values: list[str | None] = []
@@ -87,6 +89,7 @@ def _normalize_candidate_selection_names(values: list[Any]) -> list[str]:
             continue
         normalized_values.append(str(value or "").strip() or None)
     return _unique_non_empty_names(normalized_values)
+
 
 ###############################################################################
 def _candidate_selection_index(
@@ -105,6 +108,7 @@ def _candidate_selection_index(
         }
     return indexed
 
+
 ###############################################################################
 def _rebuild_drug_entries(payload: Any) -> list[DrugEntry]:
     if not isinstance(payload, list):
@@ -119,6 +123,7 @@ def _rebuild_drug_entries(payload: Any) -> list[DrugEntry]:
             continue
     return entries
 
+
 ###############################################################################
 def _rebuild_disease_entries(payload: Any) -> list[DiseaseContextEntry]:
     if not isinstance(payload, list):
@@ -132,6 +137,7 @@ def _rebuild_disease_entries(payload: Any) -> list[DiseaseContextEntry]:
         except Exception:
             continue
     return entries
+
 
 ###############################################################################
 def _load_persisted_deterministic_drug_extraction(
@@ -158,6 +164,7 @@ def _load_persisted_deterministic_drug_extraction(
         regimen_lines=regimen_lines,
     )
 
+
 ###############################################################################
 def _load_persisted_deterministic_disease_extraction(
     payload: Any,
@@ -182,6 +189,7 @@ def _load_persisted_deterministic_disease_extraction(
         matched_lines=matched_lines,
         unresolved_lines=unresolved_lines,
     )
+
 
 ###############################################################################
 def _load_revision_source_deterministic_extraction(
@@ -232,6 +240,7 @@ def _load_revision_source_deterministic_extraction(
         ),
     }
 
+
 ###############################################################################
 def _load_revision_source_disease_context(
     session_metadata: dict[str, Any] | None,
@@ -243,12 +252,11 @@ def _load_revision_source_disease_context(
     )
     if not isinstance(source_structured_case, dict):
         return None, "recomputed_current_revision"
-    entries = _rebuild_disease_entries(
-        source_structured_case.get("anamnesis_diseases")
-    )
+    entries = _rebuild_disease_entries(source_structured_case.get("anamnesis_diseases"))
     if not entries:
         return None, "recomputed_current_revision"
     return PatientDiseaseContext(entries=entries), "persisted_source_version"
+
 
 ###############################################################################
 def _load_revision_source_lab_timeline(
@@ -296,6 +304,7 @@ def _load_revision_source_lab_timeline(
         },
     )
 
+
 ###############################################################################
 def _build_revision_anamnesis_validation_stage(
     *,
@@ -314,9 +323,7 @@ def _build_revision_anamnesis_validation_stage(
         name for name in revised_names if name.casefold() in deterministic_name_keys
     ]
     deterministic_only_names = [
-        name
-        for name in deterministic_names
-        if name.casefold() not in revised_name_keys
+        name for name in deterministic_names if name.casefold() not in revised_name_keys
     ]
     revised_only_names = [
         name for name in revised_names if name.casefold() not in deterministic_name_keys
@@ -338,6 +345,7 @@ def _build_revision_anamnesis_validation_stage(
         "revised_only_names": revised_only_names,
         "unresolved_lines": unresolved_lines,
     }
+
 
 ###############################################################################
 def _build_revision_extraction_bundle(
@@ -393,6 +401,7 @@ def _build_revision_extraction_bundle(
         ),
     }
 
+
 ###############################################################################
 def _resolve_revision_extraction(
     *,
@@ -420,6 +429,7 @@ def _resolve_revision_extraction(
         extraction_bundle=extraction_bundle,
     )
 
+
 ###############################################################################
 def _build_revision_missing_anamnesis_drugs_stage(
     *,
@@ -441,6 +451,7 @@ def _build_revision_missing_anamnesis_drugs_stage(
         "supplemental_drug_names": supplemental_drug_names,
         "supplemental_entries": supplemental_entries,
     }
+
 
 ###############################################################################
 def _build_revision_analysis_drugs(
@@ -475,6 +486,7 @@ def _build_revision_analysis_drugs(
             seen_entry_names.add(entry_key)
             collected_entries.append(entry)
     return PatientDrugs(entries=collected_entries or base_analysis_drugs.entries)
+
 
 ###############################################################################
 def _reconcile_revision_candidate_selection(
@@ -511,6 +523,7 @@ def _reconcile_revision_candidate_selection(
         ordered_analysis_drugs=analysis_drugs,
     )
 
+
 ###############################################################################
 def _build_revision_candidate_selection_stage(
     *,
@@ -534,6 +547,7 @@ def _build_revision_candidate_selection_stage(
             list(candidate_selection.unresolved or [])
         ),
     }
+
 
 ###############################################################################
 def _select_revision_candidates(
@@ -590,6 +604,7 @@ def _select_revision_candidates(
         },
     )
 
+
 ###############################################################################
 def _build_revision_lab_revision_stage(
     *,
@@ -613,6 +628,7 @@ def _build_revision_lab_revision_stage(
         "onset_context_present": onset_context is not None,
         "pattern_classification": getattr(pattern_score, "classification", None),
     }
+
 
 ###############################################################################
 def _build_revision_snapshot_merge_stage(
@@ -653,6 +669,7 @@ def _build_revision_snapshot_merge_stage(
         ),
         "rucam_assessment_count": len(rucam_bundle.entries),
     }
+
 
 ###############################################################################
 def _build_revision_snapshot_context(
@@ -698,12 +715,11 @@ def _build_revision_snapshot_context(
         if analysis_names:
             chunks.append("Revision analysis drugs:\n" + ", ".join(analysis_names))
         if disease_names:
-            chunks.append(
-                "Revision disease context:\n" + ", ".join(disease_names)
-            )
+            chunks.append("Revision disease context:\n" + ", ".join(disease_names))
     if not chunks:
         return None
     return "\n\n".join(chunks)
+
 
 ###############################################################################
 def _build_revision_consultation_drugs(
@@ -740,6 +756,7 @@ def _build_revision_consultation_drugs(
         collected_entries.append(entry)
     return PatientDrugs(entries=collected_entries or analysis_drugs.entries)
 
+
 ###############################################################################
 def _build_revision_consultation_context(
     *,
@@ -753,9 +770,7 @@ def _build_revision_consultation_context(
     ).strip()
     source_version_id = (session_metadata or {}).get("source_version_id")
     revision_version_id = (session_metadata or {}).get("target_revision_version_id")
-    pipeline_run_id = str(
-        (session_metadata or {}).get("pipeline_run_id") or ""
-    ).strip()
+    pipeline_run_id = str((session_metadata or {}).get("pipeline_run_id") or "").strip()
     previous_assessments = (
         (session_metadata or {}).get("source_rucam_assessments")
         if isinstance((session_metadata or {}).get("source_rucam_assessments"), list)
@@ -767,9 +782,7 @@ def _build_revision_consultation_context(
             continue
         drug_name = str(item.get("drug_name") or "").strip()
         causality = str(
-            item.get("causality_category")
-            or item.get("causality_assessment")
-            or ""
+            item.get("causality_category") or item.get("causality_assessment") or ""
         ).strip()
         if drug_name and causality:
             assessment_summaries.append(f"{drug_name}: {causality}")
@@ -796,13 +809,9 @@ def _build_revision_consultation_context(
     if pipeline_run_id:
         revision_metadata_lines.append(f"Pipeline run: {pipeline_run_id}")
     if revision_metadata_lines:
-        chunks.append(
-            "Revision metadata:\n" + "\n".join(revision_metadata_lines)
-        )
+        chunks.append("Revision metadata:\n" + "\n".join(revision_metadata_lines))
     if previous_report:
-        chunks.append(
-            "Previous report for comparison only:\n" + previous_report
-        )
+        chunks.append("Previous report for comparison only:\n" + previous_report)
     if assessment_summaries:
         chunks.append(
             "Previous per-drug assessments for comparison only:\n"
@@ -814,6 +823,7 @@ def _build_revision_consultation_context(
         "Treat previous report content as comparison context only."
     )
     return "\n\n".join(chunks), context_metadata
+
 
 ###############################################################################
 def _build_revision_consultation_inputs(
@@ -845,6 +855,7 @@ def _build_revision_consultation_inputs(
         consultation_context=consultation_context,
         context_metadata=context_metadata,
     )
+
 
 ###############################################################################
 def _build_revision_consultation_execution_payload(
@@ -881,6 +892,7 @@ def _build_revision_consultation_execution_payload(
         payload.update(service_payload)
     return payload
 
+
 ###############################################################################
 async def _run_revision_consultation(
     service: Any,
@@ -909,26 +921,26 @@ async def _run_revision_consultation(
         therapy_drugs=therapy_drugs,
         anamnesis_drugs=anamnesis_drugs,
     )
-    revision_consultation_runner = getattr(
-        service, "run_revision_consultation", None
-    )
+    revision_consultation_runner = getattr(service, "run_revision_consultation", None)
     if not callable(revision_consultation_runner):
         raise ServiceError("Revision consultation runner is not configured")
     service_payload: dict[str, Any] | None = None
-    clinical_session, final_report, service_payload = (
-        await revision_consultation_runner(
-            payload=payload,
-            analysis_drugs=consultation_inputs.analysis_drugs,
-            prepared_inputs=prepared_inputs,
-            consultation_context=consultation_inputs.consultation_context,
-            consultation_context_metadata=consultation_inputs.context_metadata,
-            report_language=report_language,
-            rag_query=rag_query,
-            rucam_bundle=rucam_bundle,
-            issues=issues,
-            progress_callback=None,
-            stop_check=stop_check,
-        )
+    (
+        clinical_session,
+        final_report,
+        service_payload,
+    ) = await revision_consultation_runner(
+        payload=payload,
+        analysis_drugs=consultation_inputs.analysis_drugs,
+        prepared_inputs=prepared_inputs,
+        consultation_context=consultation_inputs.consultation_context,
+        consultation_context_metadata=consultation_inputs.context_metadata,
+        report_language=report_language,
+        rag_query=rag_query,
+        rucam_bundle=rucam_bundle,
+        issues=issues,
+        progress_callback=None,
+        stop_check=stop_check,
     )
     return RevisionConsultationExecution(
         inputs=consultation_inputs,
@@ -939,6 +951,7 @@ async def _run_revision_consultation(
             service_payload=service_payload,
         ),
     )
+
 
 ###############################################################################
 def _build_revision_finalization_payload(
@@ -964,6 +977,7 @@ def _build_revision_finalization_payload(
         or None,
         "consultation_model": getattr(clinical_session, "llm_model", None),
     }
+
 
 ###############################################################################
 def _finalize_revision_report_outputs(
@@ -994,6 +1008,7 @@ def _finalize_revision_report_outputs(
         ),
     )
 
+
 ###############################################################################
 async def process_revision_patient_workflow(
     service: Any,
@@ -1015,7 +1030,12 @@ async def process_revision_patient_workflow(
     logger.info("Starting DILI revision analysis for patient: %s", payload.name)
 
     global_start_time = time.perf_counter()
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[1][1], _PROGRESS_SEQUENCE[1][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[1][1],
+        _PROGRESS_SEQUENCE[1][0],
+    )
     language_result = ClinicalLanguageDetector.detect(payload)
     report_language = language_result.report_language
     validation_bundle = service.build_validation_bundle_for_payload(payload)
@@ -1026,42 +1046,108 @@ async def process_revision_patient_workflow(
             section_extraction.source_text if section_extraction is not None else ""
         )
     extraction_artifact = build_extraction_artifact(
-        normalized_document=normalized_document, section_extraction=section_extraction, payload=payload,
+        normalized_document=normalized_document,
+        section_extraction=section_extraction,
+        payload=payload,
     )
 
     issues = []
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[2][1], _PROGRESS_SEQUENCE[2][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[2][1],
+        _PROGRESS_SEQUENCE[2][0],
+    )
     cleaned_therapy_text = service.drugs_parser.clean_text(payload.drugs or "")
     cleaned_anamnesis_text = service.drugs_parser.clean_text(payload.anamnesis or "")
 
     persisted_deterministic_extraction, deterministic_source_modes = (
         _load_revision_source_deterministic_extraction(session_metadata)
     )
-    therapy_deterministic = persisted_deterministic_extraction.get("therapy") or _extract_deterministic_drugs(service, text=cleaned_therapy_text, source="therapy")
-    anamnesis_deterministic = persisted_deterministic_extraction.get("anamnesis") or _extract_deterministic_drugs(service, text=cleaned_anamnesis_text, source="anamnesis")
-    disease_deterministic = persisted_deterministic_extraction.get("diseases") or extract_deterministic_diseases(cleaned_anamnesis_text)
+    therapy_deterministic = persisted_deterministic_extraction.get(
+        "therapy"
+    ) or _extract_deterministic_drugs(
+        service, text=cleaned_therapy_text, source="therapy"
+    )
+    anamnesis_deterministic = persisted_deterministic_extraction.get(
+        "anamnesis"
+    ) or _extract_deterministic_drugs(
+        service, text=cleaned_anamnesis_text, source="anamnesis"
+    )
+    disease_deterministic = persisted_deterministic_extraction.get(
+        "diseases"
+    ) or extract_deterministic_diseases(cleaned_anamnesis_text)
 
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[3][1], _PROGRESS_SEQUENCE[3][0])
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[4][1], _PROGRESS_SEQUENCE[4][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[3][1],
+        _PROGRESS_SEQUENCE[3][0],
+    )
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[4][1],
+        _PROGRESS_SEQUENCE[4][0],
+    )
 
     preflight = await check_parser_batch_capacity(task_count=2)
     if preflight.concurrency_allowed:
         anamnesis_drugs, therapy_drugs = await asyncio.gather(
-            service.extract_anamnesis_drugs(anamnesis_text=cleaned_anamnesis_text, issues=issues, progress_callback=None, stop_check=stop_check),
-            service.extract_therapy_drugs(cleaned_therapy_text=cleaned_therapy_text, issues=issues, progress_callback=None, stop_check=stop_check),
+            service.extract_anamnesis_drugs(
+                anamnesis_text=cleaned_anamnesis_text,
+                issues=issues,
+                progress_callback=None,
+                stop_check=stop_check,
+            ),
+            service.extract_therapy_drugs(
+                cleaned_therapy_text=cleaned_therapy_text,
+                issues=issues,
+                progress_callback=None,
+                stop_check=stop_check,
+            ),
         )
     else:
-        logger.info("Parser batch preflight denied concurrency for provider=%s model=%s: %s", preflight.provider, preflight.model, preflight.reason)
-        _append_warning_issue(service, issues, code="parser_batch_preflight_sequential_fallback", message="Parser batch preflight denied concurrent extraction; using sequential extraction for local runtime safety.", field="clinical_input")
-        anamnesis_drugs = await service.extract_anamnesis_drugs(anamnesis_text=cleaned_anamnesis_text, issues=issues, progress_callback=None, stop_check=stop_check)
-        therapy_drugs = await service.extract_therapy_drugs(cleaned_therapy_text=cleaned_therapy_text, issues=issues, progress_callback=None, stop_check=stop_check)
+        logger.info(
+            "Parser batch preflight denied concurrency for provider=%s model=%s: %s",
+            preflight.provider,
+            preflight.model,
+            preflight.reason,
+        )
+        _append_warning_issue(
+            service,
+            issues,
+            code="parser_batch_preflight_sequential_fallback",
+            message="Parser batch preflight denied concurrent extraction; using sequential extraction for local runtime safety.",
+            field="clinical_input",
+        )
+        anamnesis_drugs = await service.extract_anamnesis_drugs(
+            anamnesis_text=cleaned_anamnesis_text,
+            issues=issues,
+            progress_callback=None,
+            stop_check=stop_check,
+        )
+        therapy_drugs = await service.extract_therapy_drugs(
+            cleaned_therapy_text=cleaned_therapy_text,
+            issues=issues,
+            progress_callback=None,
+            stop_check=stop_check,
+        )
 
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[5][1], _PROGRESS_SEQUENCE[5][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[5][1],
+        _PROGRESS_SEQUENCE[5][0],
+    )
 
     revision_extraction_resolution = _resolve_revision_extraction(
-        therapy_deterministic=therapy_deterministic, anamnesis_deterministic=anamnesis_deterministic,
-        disease_deterministic=disease_deterministic, therapy_drugs=therapy_drugs,
-        anamnesis_drugs=anamnesis_drugs, source_modes=deterministic_source_modes,
+        therapy_deterministic=therapy_deterministic,
+        anamnesis_deterministic=anamnesis_deterministic,
+        disease_deterministic=disease_deterministic,
+        therapy_drugs=therapy_drugs,
+        anamnesis_drugs=anamnesis_drugs,
+        source_modes=deterministic_source_modes,
     )
     if revision_extraction_resolution is not None:
         therapy_deterministic = revision_extraction_resolution.therapy_deterministic
@@ -1070,87 +1156,271 @@ async def process_revision_patient_workflow(
         therapy_drugs = revision_extraction_resolution.therapy_drugs
         anamnesis_drugs = revision_extraction_resolution.anamnesis_drugs
 
-    persisted_disease_context, disease_context_source = _load_revision_source_disease_context(session_metadata)
+    persisted_disease_context, disease_context_source = (
+        _load_revision_source_disease_context(session_metadata)
+    )
     anamnesis_text = payload.anamnesis or ""
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[6][1], _PROGRESS_SEQUENCE[6][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[6][1],
+        _PROGRESS_SEQUENCE[6][0],
+    )
     if persisted_disease_context is not None:
         disease_context = persisted_disease_context
     else:
-        disease_context = await service.extract_disease_context(anamnesis_text=anamnesis_text, issues=issues, progress_callback=None, stop_check=stop_check)
+        disease_context = await service.extract_disease_context(
+            anamnesis_text=anamnesis_text,
+            issues=issues,
+            progress_callback=None,
+            stop_check=stop_check,
+        )
 
-    persisted_lab_timeline, persisted_onset_context, lab_source_modes = _load_revision_source_lab_timeline(session_metadata)
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[7][1], _PROGRESS_SEQUENCE[7][0])
+    persisted_lab_timeline, persisted_onset_context, lab_source_modes = (
+        _load_revision_source_lab_timeline(session_metadata)
+    )
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[7][1],
+        _PROGRESS_SEQUENCE[7][0],
+    )
     if persisted_lab_timeline is not None:
         lab_timeline = persisted_lab_timeline
         onset_context = persisted_onset_context
     else:
-        lab_timeline, onset_context = await service.extract_lab_timeline(payload=payload, issues=issues, progress_callback=None, stop_check=stop_check)
+        lab_timeline, onset_context = await service.extract_lab_timeline(
+            payload=payload,
+            issues=issues,
+            progress_callback=None,
+            stop_check=stop_check,
+        )
 
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[8][1], _PROGRESS_SEQUENCE[8][0])
-    pattern_assessment = service.assess_pattern(lab_timeline=lab_timeline, validation_bundle=validation_bundle, issues=issues, progress_callback=None, stop_check=stop_check)
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[8][1],
+        _PROGRESS_SEQUENCE[8][0],
+    )
+    pattern_assessment = service.assess_pattern(
+        lab_timeline=lab_timeline,
+        validation_bundle=validation_bundle,
+        issues=issues,
+        progress_callback=None,
+        stop_check=stop_check,
+    )
     pattern_score = pattern_assessment.score
     pattern_source = "calculated"
     explicit_hepatic_pattern = None
     lab_extractor = getattr(service, "lab_extractor", None)
-    if lab_extractor is not None and hasattr(lab_extractor, "extract_explicit_hepatic_pattern") and payload.laboratory_analysis:
+    if (
+        lab_extractor is not None
+        and hasattr(lab_extractor, "extract_explicit_hepatic_pattern")
+        and payload.laboratory_analysis
+    ):
         try:
-            explicit_hepatic_pattern = lab_extractor.extract_explicit_hepatic_pattern(payload.laboratory_analysis)
+            explicit_hepatic_pattern = lab_extractor.extract_explicit_hepatic_pattern(
+                payload.laboratory_analysis
+            )
         except Exception:
             explicit_hepatic_pattern = None
     if explicit_hepatic_pattern:
         pattern_score.classification = explicit_hepatic_pattern
         pattern_source = "provided"
-    temporal_uncertain_count = sum(1 for entry in [*anamnesis_drugs.entries, *therapy_drugs.entries] if not _has_temporal_information(service, entry))
+    temporal_uncertain_count = sum(
+        1
+        for entry in [*anamnesis_drugs.entries, *therapy_drugs.entries]
+        if not _has_temporal_information(service, entry)
+    )
     filtered_out_count = 0
     if temporal_uncertain_count > 0:
-        _append_warning_issue(service, issues, code="drugs_missing_temporal_information_present", message=f"{temporal_uncertain_count} extracted drug entries have uncertain temporal information and are reported with reduced causal confidence.", field="drugs")
+        _append_warning_issue(
+            service,
+            issues,
+            code="drugs_missing_temporal_information_present",
+            message=f"{temporal_uncertain_count} extracted drug entries have uncertain temporal information and are reported with reduced causal confidence.",
+            field="drugs",
+        )
 
     revision_candidate_resolution = _select_revision_candidates(
-        extraction_bundle=revision_extraction_resolution.extraction_bundle if revision_extraction_resolution is not None else {"status": "not_available"},
-        anamnesis_deterministic=anamnesis_deterministic, anamnesis_drugs=anamnesis_drugs,
-        therapy_drugs=therapy_drugs, lab_timeline=lab_timeline, onset_context=onset_context,
-        pattern_score=pattern_score, visit_date=payload.visit_date,
+        extraction_bundle=revision_extraction_resolution.extraction_bundle
+        if revision_extraction_resolution is not None
+        else {"status": "not_available"},
+        anamnesis_deterministic=anamnesis_deterministic,
+        anamnesis_drugs=anamnesis_drugs,
+        therapy_drugs=therapy_drugs,
+        lab_timeline=lab_timeline,
+        onset_context=onset_context,
+        pattern_score=pattern_score,
+        visit_date=payload.visit_date,
     )
-    candidate_selection = revision_candidate_resolution.candidate_selection if revision_candidate_resolution is not None else select_relevant_candidates(therapy_drugs=therapy_drugs, anamnesis_drugs=anamnesis_drugs, visit_date=payload.visit_date)
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[9][1], _PROGRESS_SEQUENCE[9][0])
-    analysis_drugs = revision_candidate_resolution.analysis_drugs if revision_candidate_resolution is not None else candidate_selection.ordered_analysis_drugs
+    candidate_selection = (
+        revision_candidate_resolution.candidate_selection
+        if revision_candidate_resolution is not None
+        else select_relevant_candidates(
+            therapy_drugs=therapy_drugs,
+            anamnesis_drugs=anamnesis_drugs,
+            visit_date=payload.visit_date,
+        )
+    )
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[9][1],
+        _PROGRESS_SEQUENCE[9][0],
+    )
+    analysis_drugs = (
+        revision_candidate_resolution.analysis_drugs
+        if revision_candidate_resolution is not None
+        else candidate_selection.ordered_analysis_drugs
+    )
     effective_candidate_selection = candidate_selection
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[10][1], _PROGRESS_SEQUENCE[10][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[10][1],
+        _PROGRESS_SEQUENCE[10][0],
+    )
 
-    rucam_bundle = service.estimate_rucam(payload=payload, analysis_drugs=analysis_drugs, anamnesis_drugs=anamnesis_drugs, disease_context=disease_context, lab_timeline=lab_timeline, onset_context=onset_context, pattern_score=pattern_score, report_language=report_language, issues=issues, progress_callback=None, stop_check=stop_check)
-    structured_context = service.build_structured_clinical_context(payload, therapy_drugs=therapy_drugs, anamnesis_drugs=anamnesis_drugs, disease_context=disease_context, lab_timeline=lab_timeline, onset_context=onset_context, pattern_score=pattern_score)
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[11][1], _PROGRESS_SEQUENCE[11][0])
-    rag_query = service.build_rag_query(payload=payload, analysis_drugs=analysis_drugs, structured_context=structured_context, pattern_score=pattern_score, progress_callback=None, stop_check=stop_check)
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[12][1], _PROGRESS_SEQUENCE[12][0])
+    rucam_bundle = service.estimate_rucam(
+        payload=payload,
+        analysis_drugs=analysis_drugs,
+        anamnesis_drugs=anamnesis_drugs,
+        disease_context=disease_context,
+        lab_timeline=lab_timeline,
+        onset_context=onset_context,
+        pattern_score=pattern_score,
+        report_language=report_language,
+        issues=issues,
+        progress_callback=None,
+        stop_check=stop_check,
+    )
+    structured_context = service.build_structured_clinical_context(
+        payload,
+        therapy_drugs=therapy_drugs,
+        anamnesis_drugs=anamnesis_drugs,
+        disease_context=disease_context,
+        lab_timeline=lab_timeline,
+        onset_context=onset_context,
+        pattern_score=pattern_score,
+    )
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[11][1],
+        _PROGRESS_SEQUENCE[11][0],
+    )
+    rag_query = service.build_rag_query(
+        payload=payload,
+        analysis_drugs=analysis_drugs,
+        structured_context=structured_context,
+        pattern_score=pattern_score,
+        progress_callback=None,
+        stop_check=stop_check,
+    )
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[12][1],
+        _PROGRESS_SEQUENCE[12][0],
+    )
 
     lookup_drugs = analysis_drugs
-    prepared_inputs = await service.run_livertox_lookup(all_detected_drugs=lookup_drugs, structured_context=structured_context, pattern_score=pattern_score, issues=issues, progress_callback=None, stop_check=stop_check)
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[13][1], _PROGRESS_SEQUENCE[13][0])
-    rucam_bundle = service.reestimate_rucam_with_livertox(payload=payload, analysis_drugs=analysis_drugs, anamnesis_drugs=anamnesis_drugs, disease_context=disease_context, lab_timeline=lab_timeline, onset_context=onset_context, pattern_score=pattern_score, report_language=report_language, prepared_inputs=prepared_inputs, rucam_bundle=rucam_bundle, issues=issues)
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[14][1], _PROGRESS_SEQUENCE[14][0])
+    prepared_inputs = await service.run_livertox_lookup(
+        all_detected_drugs=lookup_drugs,
+        structured_context=structured_context,
+        pattern_score=pattern_score,
+        issues=issues,
+        progress_callback=None,
+        stop_check=stop_check,
+    )
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[13][1],
+        _PROGRESS_SEQUENCE[13][0],
+    )
+    rucam_bundle = service.reestimate_rucam_with_livertox(
+        payload=payload,
+        analysis_drugs=analysis_drugs,
+        anamnesis_drugs=anamnesis_drugs,
+        disease_context=disease_context,
+        lab_timeline=lab_timeline,
+        onset_context=onset_context,
+        pattern_score=pattern_score,
+        report_language=report_language,
+        prepared_inputs=prepared_inputs,
+        rucam_bundle=rucam_bundle,
+        issues=issues,
+    )
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[14][1],
+        _PROGRESS_SEQUENCE[14][0],
+    )
 
     revision_entity_pipeline = {
-        **(revision_candidate_resolution.entity_pipeline if revision_candidate_resolution is not None else {}),
-        "merge_revision_snapshot": _build_revision_snapshot_merge_stage(therapy_drugs=therapy_drugs, anamnesis_drugs=anamnesis_drugs, disease_context=disease_context, lab_timeline=lab_timeline, analysis_drugs=analysis_drugs, candidate_selection=effective_candidate_selection, rucam_bundle=rucam_bundle),
+        **(
+            revision_candidate_resolution.entity_pipeline
+            if revision_candidate_resolution is not None
+            else {}
+        ),
+        "merge_revision_snapshot": _build_revision_snapshot_merge_stage(
+            therapy_drugs=therapy_drugs,
+            anamnesis_drugs=anamnesis_drugs,
+            disease_context=disease_context,
+            lab_timeline=lab_timeline,
+            analysis_drugs=analysis_drugs,
+            candidate_selection=effective_candidate_selection,
+            rucam_bundle=rucam_bundle,
+        ),
     }
 
     revision_consultation_execution = await _run_revision_consultation(
-        service, payload=payload, structured_context=structured_context,
-        entity_pipeline=revision_entity_pipeline, revision_focus_context=revision_focus_context,
-        session_metadata=session_metadata, analysis_drugs=analysis_drugs,
-        therapy_drugs=therapy_drugs, anamnesis_drugs=anamnesis_drugs,
-        prepared_inputs=prepared_inputs, report_language=report_language,
-        rag_query=rag_query, rucam_bundle=rucam_bundle, issues=issues, stop_check=stop_check,
+        service,
+        payload=payload,
+        structured_context=structured_context,
+        entity_pipeline=revision_entity_pipeline,
+        revision_focus_context=revision_focus_context,
+        session_metadata=session_metadata,
+        analysis_drugs=analysis_drugs,
+        therapy_drugs=therapy_drugs,
+        anamnesis_drugs=anamnesis_drugs,
+        prepared_inputs=prepared_inputs,
+        report_language=report_language,
+        rag_query=rag_query,
+        rucam_bundle=rucam_bundle,
+        issues=issues,
+        stop_check=stop_check,
     )
     revision_snapshot_context = revision_consultation_execution.inputs.snapshot_context
     consultation_analysis_drugs = revision_consultation_execution.inputs.analysis_drugs
     clinical_session = revision_consultation_execution.clinical_session
     final_report = revision_consultation_execution.final_report
 
-    fact_graph = build_fact_graph(extraction_artifact=extraction_artifact, payload=payload, therapy_drugs=therapy_drugs, anamnesis_drugs=anamnesis_drugs, lab_timeline=lab_timeline, pattern_score=pattern_score, rucam_bundle=rucam_bundle)
+    fact_graph = build_fact_graph(
+        extraction_artifact=extraction_artifact,
+        payload=payload,
+        therapy_drugs=therapy_drugs,
+        anamnesis_drugs=anamnesis_drugs,
+        lab_timeline=lab_timeline,
+        pattern_score=pattern_score,
+        rucam_bundle=rucam_bundle,
+    )
     fact_graph_validation = validate_fact_graph(fact_graph)
-    generated_report, report_metadata = render_fact_graph_report(fact_graph=fact_graph, patient_name=payload.name, visit_date=payload.visit_date, report_mode=report_mode, report_language=report_language)
-    faithfulness_audit = audit_report(extraction_artifact=extraction_artifact, fact_graph_validation=fact_graph_validation, report_metadata=report_metadata)
+    generated_report, report_metadata = render_fact_graph_report(
+        fact_graph=fact_graph,
+        patient_name=payload.name,
+        visit_date=payload.visit_date,
+        report_mode=report_mode,
+        report_language=report_language,
+    )
+    faithfulness_audit = audit_report(
+        extraction_artifact=extraction_artifact,
+        fact_graph_validation=fact_graph_validation,
+        report_metadata=report_metadata,
+    )
     try:
         report_comparison_payload = json.loads(faithfulness_audit.discrepancy_report)
     except Exception:
@@ -1159,23 +1429,39 @@ async def process_revision_patient_workflow(
             "agreements": ["Unable to parse structured comparison payload."],
             "omissions": ["Comparison payload is not structured JSON."],
             "differences": ["Falling back to raw discrepancy report text."],
-            "unsupported": [faithfulness_audit.discrepancy_report or "No details available."],
-            "manual_review": "yes" if faithfulness_audit.manual_review_required else "no",
+            "unsupported": [
+                faithfulness_audit.discrepancy_report or "No details available."
+            ],
+            "manual_review": "yes"
+            if faithfulness_audit.manual_review_required
+            else "no",
         }
     if faithfulness_audit.blocking_issues:
         issues.extend(
-            PipelineIssue(severity="error", code=str(issue.get("code", "faithfulness_gate_blocked")), message=str(issue.get("message", "Faithfulness gate blocked finalization."))[:500])
+            PipelineIssue(
+                severity="error",
+                code=str(issue.get("code", "faithfulness_gate_blocked")),
+                message=str(
+                    issue.get("message", "Faithfulness gate blocked finalization.")
+                )[:500],
+            )
             for issue in faithfulness_audit.blocking_issues
         )
 
     revision_finalization_outputs = _finalize_revision_report_outputs(
-        report_metadata=report_metadata, faithfulness_audit=faithfulness_audit,
-        report_comparison_payload=report_comparison_payload, generated_report=generated_report,
-        final_report=final_report, report_language=report_language, clinical_session=clinical_session,
+        report_metadata=report_metadata,
+        faithfulness_audit=faithfulness_audit,
+        report_comparison_payload=report_comparison_payload,
+        generated_report=generated_report,
+        final_report=final_report,
+        report_language=report_language,
+        clinical_session=clinical_session,
     )
     if revision_finalization_outputs is not None:
         final_report = revision_finalization_outputs.final_report
-        report_comparison_payload = revision_finalization_outputs.report_comparison_payload
+        report_comparison_payload = (
+            revision_finalization_outputs.report_comparison_payload
+        )
         faithfulness_audit = revision_finalization_outputs.faithfulness_audit
         report_metadata = revision_finalization_outputs.report_metadata
         generated_report = revision_finalization_outputs.generated_report
@@ -1184,22 +1470,42 @@ async def process_revision_patient_workflow(
 
     patient_label = payload.name or "Unknown patient"
     report_language_key = resolve_supported_language_code(report_language)
-    visit_label = payload.visit_date.strftime("%d %B %Y") if payload.visit_date else MISSING_VISIT_LABEL_BY_LANGUAGE.get(report_language_key, "Not provided")
+    visit_label = (
+        payload.visit_date.strftime("%d %B %Y")
+        if payload.visit_date
+        else MISSING_VISIT_LABEL_BY_LANGUAGE.get(report_language_key, "Not provided")
+    )
     global_elapsed = time.perf_counter() - global_start_time
-    detected_drugs = [entry.name for entry in consultation_analysis_drugs.entries if entry.name]
-    anamnesis_detected_drugs = [entry.name for entry in anamnesis_drugs.entries if entry.name]
-    anamnesis_detected_diseases = [entry.name for entry in disease_context.entries if entry.name]
+    detected_drugs = [
+        entry.name for entry in consultation_analysis_drugs.entries if entry.name
+    ]
+    anamnesis_detected_drugs = [
+        entry.name for entry in anamnesis_drugs.entries if entry.name
+    ]
+    anamnesis_detected_diseases = [
+        entry.name for entry in disease_context.entries if entry.name
+    ]
 
-    matched_drugs_payload = build_matched_drugs_payload_workflow(detected_drugs=detected_drugs, prepared_inputs=prepared_inputs, rucam_bundle=rucam_bundle)
+    matched_drugs_payload = build_matched_drugs_payload_workflow(
+        detected_drugs=detected_drugs,
+        prepared_inputs=prepared_inputs,
+        rucam_bundle=rucam_bundle,
+    )
     serialized_issues = service.serialize_pipeline_issues(issues)
     pattern_strings = service.pattern_analyzer.stringify_scores(pattern_score)
     narrative = NarrativeBuilder.build_patient_narrative(
-        patient_label=patient_label, visit_label=visit_label,
-        anamnesis=payload.anamnesis, drugs_text=payload.drugs,
-        pattern_score=pattern_score, pattern_strings=pattern_strings,
-        detected_drugs=detected_drugs, anamnesis_detected_drugs=anamnesis_detected_drugs,
-        rucam_assessments=rucam_bundle.entries, report_language=report_language,
-        issues=issues, final_report=final_report,
+        patient_label=patient_label,
+        visit_label=visit_label,
+        anamnesis=payload.anamnesis,
+        drugs_text=payload.drugs,
+        pattern_score=pattern_score,
+        pattern_strings=pattern_strings,
+        detected_drugs=detected_drugs,
+        anamnesis_detected_drugs=anamnesis_detected_drugs,
+        rucam_assessments=rucam_bundle.entries,
+        report_language=report_language,
+        issues=issues,
+        final_report=final_report,
     )
     persisted_session_metadata = {
         **(session_metadata or {}),
@@ -1207,7 +1513,9 @@ async def process_revision_patient_workflow(
     }
     source_version_id = persisted_session_metadata.get("source_version_id")
     revision_version_id = persisted_session_metadata.get("target_revision_version_id")
-    pipeline_run_id = str(persisted_session_metadata.get("pipeline_run_id") or "").strip() or None
+    pipeline_run_id = (
+        str(persisted_session_metadata.get("pipeline_run_id") or "").strip() or None
+    )
     result_payload = {
         "report": narrative,
         "final_report": final_report,
@@ -1226,21 +1534,52 @@ async def process_revision_patient_workflow(
         "excluded_drugs": effective_candidate_selection.excluded,
         "unresolved_drugs": effective_candidate_selection.unresolved,
         "extraction_metadata": {
-            "drug_filtering": {"filtered_out_count": filtered_out_count, "temporal_uncertain_count": temporal_uncertain_count, "reason": "temporal_uncertainty_retained_with_low_confidence"},
-            "hepatic_pattern": {"value": pattern_score.classification, "source": pattern_source},
+            "drug_filtering": {
+                "filtered_out_count": filtered_out_count,
+                "temporal_uncertain_count": temporal_uncertain_count,
+                "reason": "temporal_uncertainty_retained_with_low_confidence",
+            },
+            "hepatic_pattern": {
+                "value": pattern_score.classification,
+                "source": pattern_source,
+            },
             "rucam": {"source": _resolve_rucam_source(rucam_bundle.entries)},
         },
         "structured_case": {
             "therapy_drugs": [entry.model_dump() for entry in therapy_drugs.entries],
-            "anamnesis_drugs": [entry.model_dump() for entry in anamnesis_drugs.entries],
-            "anamnesis_diseases": [entry.model_dump() for entry in disease_context.entries],
+            "anamnesis_drugs": [
+                entry.model_dump() for entry in anamnesis_drugs.entries
+            ],
+            "anamnesis_diseases": [
+                entry.model_dump() for entry in disease_context.entries
+            ],
         },
         "deterministic_extraction": {
-            "therapy": {"entries": [entry.model_dump() for entry in therapy_deterministic.entries], "unresolved_lines": therapy_deterministic.unresolved_lines},
-            "anamnesis": {"entries": [entry.model_dump() for entry in anamnesis_deterministic.entries], "regimen_lines": anamnesis_deterministic.regimen_lines, "unresolved_lines": anamnesis_deterministic.unresolved_lines},
-            "diseases": {"entries": [entry.model_dump() for entry in disease_deterministic.context.entries], "matched_lines": disease_deterministic.matched_lines, "unresolved_lines": disease_deterministic.unresolved_lines},
+            "therapy": {
+                "entries": [
+                    entry.model_dump() for entry in therapy_deterministic.entries
+                ],
+                "unresolved_lines": therapy_deterministic.unresolved_lines,
+            },
+            "anamnesis": {
+                "entries": [
+                    entry.model_dump() for entry in anamnesis_deterministic.entries
+                ],
+                "regimen_lines": anamnesis_deterministic.regimen_lines,
+                "unresolved_lines": anamnesis_deterministic.unresolved_lines,
+            },
+            "diseases": {
+                "entries": [
+                    entry.model_dump()
+                    for entry in disease_deterministic.context.entries
+                ],
+                "matched_lines": disease_deterministic.matched_lines,
+                "unresolved_lines": disease_deterministic.unresolved_lines,
+            },
         },
-        "section_extraction": section_extraction.model_dump() if section_extraction is not None else None,
+        "section_extraction": section_extraction.model_dump()
+        if section_extraction is not None
+        else None,
         "runtime_settings": {
             "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
             "llm_provider": LLMRuntimeConfig.get_llm_provider(),
@@ -1259,9 +1598,27 @@ async def process_revision_patient_workflow(
             "normalized_document": normalized_document.model_dump(),
             "extraction_artifact": extraction_artifact.model_dump(),
             "deterministic_extraction": {
-                "therapy": {"entries": [entry.model_dump() for entry in therapy_deterministic.entries], "unresolved_lines": therapy_deterministic.unresolved_lines},
-                "anamnesis": {"entries": [entry.model_dump() for entry in anamnesis_deterministic.entries], "regimen_lines": anamnesis_deterministic.regimen_lines, "unresolved_lines": anamnesis_deterministic.unresolved_lines},
-                "diseases": {"entries": [entry.model_dump() for entry in disease_deterministic.context.entries], "matched_lines": disease_deterministic.matched_lines, "unresolved_lines": disease_deterministic.unresolved_lines},
+                "therapy": {
+                    "entries": [
+                        entry.model_dump() for entry in therapy_deterministic.entries
+                    ],
+                    "unresolved_lines": therapy_deterministic.unresolved_lines,
+                },
+                "anamnesis": {
+                    "entries": [
+                        entry.model_dump() for entry in anamnesis_deterministic.entries
+                    ],
+                    "regimen_lines": anamnesis_deterministic.regimen_lines,
+                    "unresolved_lines": anamnesis_deterministic.unresolved_lines,
+                },
+                "diseases": {
+                    "entries": [
+                        entry.model_dump()
+                        for entry in disease_deterministic.context.entries
+                    ],
+                    "matched_lines": disease_deterministic.matched_lines,
+                    "unresolved_lines": disease_deterministic.unresolved_lines,
+                },
             },
             "fact_graph": fact_graph.model_dump(),
             "fact_graph_validation": fact_graph_validation.model_dump(),
@@ -1288,19 +1645,30 @@ async def process_revision_patient_workflow(
                 "lab_timeline": lab_source_modes.get("lab_timeline"),
                 "onset_context": lab_source_modes.get("onset_context"),
             },
-            "extraction_bundle": revision_extraction_resolution.extraction_bundle if revision_extraction_resolution is not None else None,
+            "extraction_bundle": revision_extraction_resolution.extraction_bundle
+            if revision_extraction_resolution is not None
+            else None,
             "entity_pipeline": revision_entity_pipeline,
             "entity_snapshot_context": revision_snapshot_context,
             "consultation_drug_names": detected_drugs,
             "consultation_context_metadata": revision_consultation_execution.inputs.context_metadata,
             "consultation_execution": revision_consultation_execution.payload,
-            "finalization_execution": revision_finalization_outputs.payload if revision_finalization_outputs is not None else None,
+            "finalization_execution": revision_finalization_outputs.payload
+            if revision_finalization_outputs is not None
+            else None,
         },
     }
-    result_payload["run_bundle_index"] = build_run_bundle_index(run_id="pending", session_id=None).model_dump()
+    result_payload["run_bundle_index"] = build_run_bundle_index(
+        run_id="pending", session_id=None
+    ).model_dump()
     if original_session_text is not None:
         result_payload["original_session_text"] = original_session_text
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[15][1], _PROGRESS_SEQUENCE[15][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[15][1],
+        _PROGRESS_SEQUENCE[15][0],
+    )
 
     persisted_session_id = None
     try:
@@ -1319,7 +1687,9 @@ async def process_revision_patient_workflow(
                 "anamnesis": payload.anamnesis,
                 "drugs": payload.drugs,
                 "laboratory_analysis": payload.laboratory_analysis,
-                "section_extraction": section_extraction.model_dump() if section_extraction is not None else None,
+                "section_extraction": section_extraction.model_dump()
+                if section_extraction is not None
+                else None,
                 "text_extraction_model": getattr(service.drugs_parser, "model", None),
                 "clinical_model": getattr(clinical_session, "llm_model", None),
                 "total_duration": global_elapsed,
@@ -1333,8 +1703,14 @@ async def process_revision_patient_workflow(
         )
         if persisted_session_id is not None:
             result_payload["session_id"] = persisted_session_id
-            result_payload["run_bundle_index"] = build_run_bundle_index(run_id=str(persisted_session_id), session_id=persisted_session_id).model_dump()
-            await asyncio.to_thread(service.serializer.upsert_session_result_payload, persisted_session_id, result_payload)
+            result_payload["run_bundle_index"] = build_run_bundle_index(
+                run_id=str(persisted_session_id), session_id=persisted_session_id
+            ).model_dump()
+            await asyncio.to_thread(
+                service.serializer.upsert_session_result_payload,
+                persisted_session_id,
+                result_payload,
+            )
     except Exception as exc:
         logger.warning(
             "Clinical revision persistence failed: error_type=%s",
