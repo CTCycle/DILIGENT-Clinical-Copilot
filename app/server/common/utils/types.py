@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
 from typing import Any
 
 ###############################################################################
@@ -111,67 +110,6 @@ def coerce_str_or_none(value: Any) -> str | None:
         stripped = value.strip()
         return stripped or None
     return None
-
-###############################################################################
-def coerce_str_sequence(value: Any, default: Iterable[str]) -> tuple[str, ...]:
-    candidates, default_items = _coerce_str_sequence_candidates(value, default)
-    return _coerce_str_sequence_unique(candidates, default_items)
-
-###############################################################################
-def _coerce_str_sequence_candidates(
-    value: Any, default: Iterable[str]
-) -> tuple[list[str], list[str]]:
-    default_items = list(default)
-    if isinstance(value, str):
-        candidates = [
-            segment.strip() for segment in value.split(",") if segment.strip()
-        ]
-        return candidates, default_items
-    if isinstance(value, Iterable):
-        candidates: list[str] = []
-        for item in value:
-            if isinstance(item, str):
-                trimmed = item.strip()
-                if trimmed:
-                    candidates.append(trimmed)
-        return candidates, default_items
-    return default_items, default_items
-
-###############################################################################
-def _coerce_str_sequence_unique(
-    candidates: list[str], default_items: list[str]
-) -> tuple[str, ...]:
-    items: list[str] = []
-    seen: set[str] = set()
-    for candidate in candidates or default_items:
-        lowered = candidate.lower()
-        if lowered not in seen:
-            seen.add(lowered)
-            items.append(lowered)
-    return tuple(items)
-
-###############################################################################
-def _normalize_string_candidate(candidate: Any) -> str | None:
-    if candidate is None:
-        return None
-    text = candidate.strip() if isinstance(candidate, str) else str(candidate).strip()
-    return text or None
-
-###############################################################################
-def coerce_string_tuple(value: Any) -> tuple[str, ...]:
-    if isinstance(value, (list, tuple, set)):
-        candidates = list(value)
-    elif value is None:
-        candidates = []
-    else:
-        candidates = [value]
-    normalized = [
-        text
-        for candidate in candidates
-        if (text := _normalize_string_candidate(candidate))
-    ]
-    return tuple(normalized)
-
 
 __all__ = [
     "coerce_bool",

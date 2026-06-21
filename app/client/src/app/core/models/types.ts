@@ -567,7 +567,7 @@ export type InspectionSessionTimeline = {
   generation_status?: "llm_generated" | "fallback";
   generation_note?: string | null;
   source_model?: string | null;
-  source_kind?: "local" | "cloud" | "legacy" | null;
+  source_kind?: "local" | "cloud" | null;
   model_provider?: string | null;
   events: InspectionTimelineEvent[];
 };
@@ -583,7 +583,7 @@ export type InspectionSessionTimelinePreview = {
   generation_status?: "llm_generated" | "fallback";
   generation_note?: string | null;
   source_model?: string | null;
-  source_kind?: "local" | "cloud" | "legacy" | null;
+  source_kind?: "local" | "cloud" | null;
   model_provider?: string | null;
   event_count: number;
   start_date: string | null;

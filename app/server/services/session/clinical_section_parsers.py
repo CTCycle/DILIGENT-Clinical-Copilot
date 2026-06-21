@@ -802,35 +802,3 @@ def missing_required_section_names(
         if key not in sections or not sections[key].text.strip()
     ]
 
-
-# Compatibility wrappers for current callers/tests.
-
-###############################################################################
-def find_section_markers(text: str) -> list[SectionHeadingMatch]:
-    return find_dili_section_headings(text)
-
-###############################################################################
-def extract_sections_from_markers(
-    text: str, _markers: list[SectionHeadingMatch]
-) -> dict[ClinicalSectionKey, str] | None:
-    try:
-        sections = extract_required_dili_sections(text)
-    except ValueError:
-        return None
-    if missing_required_section_names(sections):
-        return None
-    return {
-        "anamnesis": sections["anamnesis"].text,
-        "drugs": sections["therapy"].text,
-        "laboratory_analysis": sections["laboratory_history"].text,
-    }
-
-###############################################################################
-def validate_sections_against_source(
-    text: str, sections: dict[ClinicalSectionKey, str]
-) -> bool:
-    for key in ("anamnesis", "drugs", "laboratory_analysis"):
-        value = (sections.get(key) or "").strip()
-        if not value or value not in text:
-            return False
-    return True

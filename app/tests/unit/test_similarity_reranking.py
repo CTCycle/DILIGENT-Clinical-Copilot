@@ -148,10 +148,10 @@ def test_local_heuristic_reranker_prefers_stronger_lexical_match() -> None:
     assert scores[1] > scores[0]
 
 ###############################################################################
-def test_local_heuristic_reranker_normalizes_alias_profiles() -> None:
-    reranker = LocalHeuristicReranker("lexical")
+def test_local_heuristic_reranker_unknown_profile_defaults_to_balanced() -> None:
+    reranker = LocalHeuristicReranker("unknown-profile-name")
 
-    assert reranker.model_name == "lightweight-lexical-v1"
+    assert reranker.model_name == "lightweight-balanced-v1"
 
 ###############################################################################
 def test_local_heuristic_reranker_profiles_shift_relative_scores() -> None:
