@@ -53,6 +53,29 @@ class InitialTextSectionParseResult(NamedTuple):
     missing_required_sections: list[str]
     malformed_sections: list[str]
 
+###############################################################################
+def _aggregate_section_confidence(
+    parse_result: InitialTextSectionParseResult,
+) -> float:
+    confidences = [
+        section.confidence_score
+        for key, section in parse_result.sections.items()
+        if key in SECTION_KEYS
+    ]
+    if not confidences:
+        return 0.0
+    return max(0.0, min(1.0, min(confidences)))
+
+###############################################################################
+def _review_required_sections(
+    parse_result: InitialTextSectionParseResult,
+) -> list[str]:
+    return [
+        key
+        for key, section in parse_result.sections.items()
+        if key in SECTION_KEYS and section.requires_review
+    ]
+
 
 _CANONICAL_TO_PAYLOAD_KEY: dict[str, ClinicalSectionKey] = {
     "anamnesis": "anamnesis",
@@ -163,6 +186,9 @@ def build_section_extraction_from_initial_text(
             "verbatim_coherent": section.verbatim_coherent,
             "requires_review": section.requires_review,
         }
+    review_required_sections = _review_required_sections(parse_result)
+    metadata["requires_review"] = bool(review_required_sections)
+    metadata["requires_review_sections"] = review_required_sections
 
     return ClinicalSectionExtractionResult(
         source_text=source_text,
@@ -179,6 +205,6 @@ def build_section_extraction_from_initial_text(
             ParsedTextSection("laboratory_analysis", "Laboratory analysis", "", 1, 1),
         ).text,
         line_ranges=line_ranges,
-        confidence=1.0,
+        confidence=_aggregate_section_confidence(parse_result),
         metadata=metadata,
     )

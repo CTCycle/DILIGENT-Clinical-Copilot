@@ -5,6 +5,8 @@ from datetime import date
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
+
 from domain.clinical.entities import (
     ClinicalLabEntry,
     DrugEntry,
@@ -15,7 +17,9 @@ from domain.clinical.entities import (
     PatientRucamAssessmentBundle,
 )
 from services.session.document_normalizer import DocumentNormalizer
+from services.session.session_shared import build_failed_session_payload
 from services.session.session_workflow import process_single_patient_workflow
+from services.session.workflow_shared import ClinicalPersistenceError
 
 ###############################################################################
 class FakePatternAnalyzer:
@@ -44,7 +48,14 @@ class FakeSerializer:
     # -------------------------------------------------------------------------
     def save_clinical_session(self, payload: dict[str, Any]) -> int | None:
         self.saved_payload = payload
-        return None
+        return 101
+
+    # -------------------------------------------------------------------------
+    def upsert_session_result_payload(
+        self, session_id: int, payload: dict[str, Any]
+    ) -> None:
+        self.upserted_session_id = session_id
+        self.upserted_payload = payload
 
 ###############################################################################
 class FakeClinicalService:
@@ -220,3 +231,59 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
         result["extraction_metadata"]["rucam"]["source"]
         == "not_calculated_insufficient_data"
     )
+
+###############################################################################
+def test_workflow_fails_when_persistence_returns_no_session_id() -> None:
+    payload = PatientData(
+        name="Mario Rossi",
+        visit_date=date(2025, 5, 20),
+        anamnesis="Paziente con ittero.",
+        drugs="Paracetamolo 1-0-0-0",
+        laboratory_analysis="ALT 100 U/L, ALP 120 U/L.",
+    )
+    service = FakeClinicalService()
+    service.serializer.save_clinical_session = lambda payload: None
+
+    with pytest.raises(ClinicalPersistenceError):
+        asyncio.run(
+            process_single_patient_workflow(
+                service,
+                payload,
+                normalized_document=DocumentNormalizer().normalize(
+                    "Paziente con ittero.\nParacetamolo 1-0-0-0\nALT 100 U/L, ALP 120 U/L."
+                ),
+                report_mode="faithful_only",
+            ),
+        )
+
+###############################################################################
+def test_failed_session_payload_omits_raw_clinical_text_and_base64_image() -> None:
+    payload = PatientData(
+        name="Mario Rossi",
+        visit_date=date(2025, 5, 20),
+        anamnesis="Sensitive anamnesis text.",
+        drugs="Sensitive drug text.",
+        laboratory_analysis="Sensitive lab text.",
+    )
+
+    failed_payload = build_failed_session_payload(
+        payload=payload,
+        patient_image_base64="base64-sensitive-image",
+        issues=[],
+        error_message="Sensitive error details",
+        elapsed_seconds=1.2,
+    )
+
+    assert failed_payload["patient_image_base64"] is None
+    assert failed_payload["anamnesis"] is None
+    assert failed_payload["drugs"] is None
+    assert failed_payload["laboratory_analysis"] is None
+    result_payload = failed_payload["session_result_payload"]
+    assert result_payload["section_extraction"] is None
+    assert result_payload["error"] == "Clinical analysis failed before completion."
+    assert result_payload["failure_metadata"]["has_patient_image"] is True
+    assert result_payload["failure_metadata"]["input_character_counts"] == {
+        "anamnesis": len(payload.anamnesis or ""),
+        "drugs": len(payload.drugs or ""),
+        "laboratory_analysis": len(payload.laboratory_analysis or ""),
+    }

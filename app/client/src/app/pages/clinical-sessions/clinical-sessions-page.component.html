@@ -166,6 +166,9 @@
                           <td>
                             <strong>{{ drug.name }}</strong>
                             <small>{{ drug.temporalReference }}</small>
+                            @if (drug.extractionFallback) {
+                              <small class="clinical-session-evidence-fallback">Display fallback</small>
+                            }
                           </td>
                           <td>
                             @if (drug.inAnamnesis || drug.inTherapy) {
@@ -180,9 +183,16 @@
                             }
                           </td>
                           <td>
-                            <span class="clinical-session-table-value" [class.is-muted]="!drug.liverTox">
-                              {{ drug.liverTox ? 'LiverTox' : 'None' }}
+                            <span
+                              class="clinical-session-table-value"
+                              [class.is-muted]="!drug.liverTox && !drug.rxNav"
+                              [class.is-warn]="drug.bibliographyFallback"
+                            >
+                              {{ drug.bibliographyLabel }}
                             </span>
+                            @if (drug.bibliographyFallback) {
+                              <small class="clinical-session-evidence-fallback">Not backend-confirmed</small>
+                            }
                           </td>
                         </tr>
                       }

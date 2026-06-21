@@ -63,9 +63,15 @@ class JobManager:
         runner: Callable[..., dict[str, Any]],
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
+        scope_key: str | None = None,
     ) -> str:
         job_id = str(uuid.uuid4())[:8]
-        state = JobState(job_id=job_id, job_type=job_type, status="pending")
+        state = JobState(
+            job_id=job_id,
+            job_type=job_type,
+            status="pending",
+            scope_key=scope_key,
+        )
         runner_kwargs = kwargs.copy() if kwargs else {}
 
         if self.runner_accepts_job_id(runner):
@@ -86,7 +92,7 @@ class JobManager:
         state.update(status="running")
         thread.start()
 
-        logger.info("Started job %s (type=%s)", job_id, job_type)
+        logger.info("Started job %s (type=%s scope=%s)", job_id, job_type, scope_key)
         return job_id
 
     # -------------------------------------------------------------------------
@@ -131,15 +137,37 @@ class JobManager:
         return snapshot
 
     # -------------------------------------------------------------------------
-    def is_job_running(self, job_type: str | None = None) -> bool:
+    def is_job_running(
+        self, job_type: str | None = None, *, scope_key: str | None = None
+    ) -> bool:
         with self.lock:
             for state in self.jobs.values():
                 if state.stop_requested:
                     continue
                 if state.status in ("pending", "running"):
-                    if job_type is None or state.job_type == job_type:
-                        return True
+                    if job_type is not None and state.job_type != job_type:
+                        continue
+                    if scope_key is not None and state.scope_key != scope_key:
+                        continue
+                    return True
         return False
+
+    # -------------------------------------------------------------------------
+    def get_running_job(
+        self, job_type: str, *, scope_key: str | None = None
+    ) -> dict[str, Any] | None:
+        with self.lock:
+            states = list(self.jobs.values())
+        for state in states:
+            if state.stop_requested:
+                continue
+            if state.job_type != job_type:
+                continue
+            if scope_key is not None and state.scope_key != scope_key:
+                continue
+            if state.status in ("pending", "running"):
+                return state.snapshot()
+        return None
 
     # -------------------------------------------------------------------------
     def list_jobs(self, job_type: str | None = None) -> list[dict[str, Any]]:

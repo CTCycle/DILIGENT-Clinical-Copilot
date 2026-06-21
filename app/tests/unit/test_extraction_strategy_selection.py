@@ -1,6 +1,5 @@
 from services.clinical.extraction_strategy import decide_extraction_strategy
 
-
 ###############################################################################
 def test_strategy_selects_deterministic_hybrid_and_llm() -> None:
     deterministic = decide_extraction_strategy(

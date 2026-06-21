@@ -719,6 +719,19 @@ def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
         db_session.close()
 
 ###############################################################################
+def list_revision_runs_by_status(self, status: str) -> list[dict[str, Any]]:
+    db_session = self.session_factory()
+    try:
+        rows = db_session.execute(
+            select(ClinicalSessionRevisionRun)
+            .where(ClinicalSessionRevisionRun.status == str(status))
+            .order_by(ClinicalSessionRevisionRun.started_at.asc())
+        ).scalars()
+        return [serialize_revision_run_row(self, row) for row in rows]
+    finally:
+        db_session.close()
+
+###############################################################################
 def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
     db_session = self.session_factory()
     try:

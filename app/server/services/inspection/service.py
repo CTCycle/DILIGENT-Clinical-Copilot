@@ -131,6 +131,32 @@ class DataInspectionService(
             report_job_progress=self._report_job_progress_for_runner,
             write_rag_manifest=self._write_rag_manifest_for_runner,
         )
+        self.reconcile_process_local_revision_runs()
+
+    # -------------------------------------------------------------------------
+    def reconcile_process_local_revision_runs(self) -> None:
+        try:
+            running_runs = self.serializer.list_revision_runs_by_status("running")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Unable to reconcile process-local revision runs: error_type=%s",
+                type(exc).__name__,
+            )
+            return
+        for run in running_runs:
+            pipeline_run_id = str(run.get("pipeline_run_id") or "").strip()
+            if not pipeline_run_id:
+                continue
+            self.serializer.fail_revision_run(
+                pipeline_run_id=pipeline_run_id,
+                error={
+                    "code": "revision_job_process_lost",
+                    "message": (
+                        "Revision job state is process-local and was lost during "
+                        "backend restart. Retry the draft revision if needed."
+                    ),
+                },
+            )
 
     # -------------------------------------------------------------------------
     def list_sessions(
@@ -1085,7 +1111,8 @@ class DataInspectionService(
     def start_update_job(
         self, job_type: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        if self.jobs.is_job_running(job_type):
+        scope_key = f"catalog:{job_type}"
+        if self.jobs.is_job_running(job_type, scope_key=scope_key):
             raise ValueError(f"Job type '{job_type}' is already running")
         override_values = dict(overrides or {})
         if job_type == self.RXNAV_JOB_TYPE:
@@ -1096,7 +1123,11 @@ class DataInspectionService(
             runner = partial(self.run_rag_update_job, overrides=override_values)
         else:
             raise ValueError(f"Unsupported job type: {job_type}")
-        job_id = self.jobs.start_job(job_type=job_type, runner=runner)
+        job_id = self.jobs.start_job(
+            job_type=job_type,
+            runner=runner,
+            scope_key=scope_key,
+        )
         status_payload = self.jobs.get_job_status(job_id)
         if status_payload is None:
             raise RuntimeError(f"Failed to initialize {job_type} job")
@@ -1109,6 +1140,26 @@ class DataInspectionService(
     ) -> dict[str, Any] | None:
         payload = self.jobs.get_job_status(job_id)
         if payload is None:
+            if expected_type == self.REVISION_JOB_TYPE:
+                return {
+                    "job_id": job_id,
+                    "job_type": expected_type,
+                    "scope_key": None,
+                    "status": "failed",
+                    "progress": 0.0,
+                    "result": {
+                        "recoverable": True,
+                        "recovery_action": "reload_revision_run_and_retry",
+                    },
+                    "error": (
+                        "Revision job state is process-local and is no longer "
+                        "available. Reload the revision run and retry if it remains "
+                        "draft."
+                    ),
+                    "created_at": None,
+                    "completed_at": None,
+                    "version": None,
+                }
             return None
         job_type = str(payload.get("job_type") or "")
         if job_type != expected_type:

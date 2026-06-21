@@ -1,6 +1,5 @@
 from services.clinical.preparation import ClinicalKnowledgePreparation
 
-
 ###############################################################################
 def test_livertox_match_audit_flags_missing_ambiguous_and_low_confidence() -> None:
     preparation = ClinicalKnowledgePreparation()

@@ -33,4 +33,17 @@ describe('ClinicalSessionsPage revision template', () => {
     expect(template).toContain('Revised DILI Assessments');
     expect(template).toContain('Manual Edit History');
   });
+
+  it('labels frontend-derived clinical evidence as fallback', () => {
+    const templatePath = resolve(
+      __dirname,
+      './clinical-sessions-page.component.html',
+    );
+    const template = readFileSync(templatePath, 'utf-8');
+
+    expect(template).toContain('Display fallback');
+    expect(template).toContain('Not backend-confirmed');
+    expect(template).toContain('drug.bibliographyLabel');
+    expect(template).toContain('drug.bibliographyFallback');
+  });
 });

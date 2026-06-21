@@ -527,9 +527,6 @@ class ClinicalSessionService(
         report_mode: str = "faithful_only",
         session_version: int = 1,
         original_session_id: int | None = None,
-        session_metadata: dict[str, Any] | None = None,
-        original_session_text: str | None = None,
-        revision_focus_context: str | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
         stop_check: Callable[[], None] | None = None,
     ) -> dict[str, Any]:

@@ -269,9 +269,58 @@ def validate_clinical_input_preflight(
         }
         extraction_quality = {
             "confidence": extraction_artifact.confidence,
+            "section_confidence": section_extraction.confidence,
+            "requires_review": bool(
+                section_extraction.metadata.get("requires_review")
+                if isinstance(section_extraction.metadata, dict)
+                else False
+            ),
+            "requires_review_sections": (
+                section_extraction.metadata.get("requires_review_sections", [])
+                if isinstance(section_extraction.metadata, dict)
+                else []
+            ),
             "timed_drug_count": len(extraction_artifact.timed_drugs),
             "contamination_flags": extraction_artifact.contamination_flags.model_dump(),
         }
+        section_confidence = float(section_extraction.confidence)
+        requires_review_sections = extraction_quality["requires_review_sections"]
+        if section_confidence < 0.65:
+            blocking.append(
+                ClinicalInputPreflightIssue(
+                    severity="blocking",
+                    code="section_extraction_confidence_too_low",
+                    message=(
+                        "Clinical input section extraction confidence is too low "
+                        f"for safe processing ({section_confidence:.2f})."
+                    ),
+                    field="clinical_input",
+                )
+            )
+        elif section_confidence < 0.85:
+            non_blocking.append(
+                ClinicalInputPreflightIssue(
+                    severity="non_blocking",
+                    code="section_extraction_confidence_needs_review",
+                    message=(
+                        "Clinical input section extraction is usable but should be "
+                        f"reviewed before processing ({section_confidence:.2f})."
+                    ),
+                    field="clinical_input",
+                )
+            )
+        if isinstance(requires_review_sections, list) and requires_review_sections:
+            non_blocking.append(
+                ClinicalInputPreflightIssue(
+                    severity="non_blocking",
+                    code="section_extraction_requires_review",
+                    message=(
+                        "Review inferred or low-confidence sections before running: "
+                        + ", ".join(str(item) for item in requires_review_sections)
+                    ),
+                    field="clinical_input",
+                )
+            )
         if anamnesis_result.unresolved_lines:
             non_blocking.append(
                 ClinicalInputPreflightIssue(

@@ -11,6 +11,7 @@ app/src-tauri/**
 release/windows/
 runtimes/**
 QA/**
+.playwright-mcp/
 
 # Python
 *.py[cod]

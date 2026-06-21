@@ -14,6 +14,7 @@ from pydantic import (
     model_validator,
 )
 
+from domain.clinical.claims import ClinicalClaim, DrugClinicalNarrative
 from domain.clinical.sections import ClinicalSectionKey
 
 Comparator = Literal["<=", "<", ">=", ">"]
@@ -101,7 +102,7 @@ class PatientData(BaseModel):
             day = int(str(value.get("day", "")).strip())
             month = int(str(value.get("month", "")).strip())
             year = int(str(value.get("year", "")).strip())
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         try:
             return date(year, month, day)
@@ -358,7 +359,7 @@ class DrugEntry(BaseModel):
                 continue
             try:
                 cleaned.append(float(slot))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
         if not cleaned:
             return []
@@ -777,6 +778,8 @@ class DrugClinicalAssessment(BaseModel):
         default_factory=create_drug_suspension_context,
     )
     rucam: DrugRucamAssessment | None = Field(default=None)
+    claims: list[ClinicalClaim] = Field(default_factory=list)
+    narrative: DrugClinicalNarrative | None = Field(default=None)
     paragraph: str | None = Field(default=None)
 
     # -------------------------------------------------------------------------

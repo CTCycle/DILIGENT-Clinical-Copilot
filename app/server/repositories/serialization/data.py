@@ -432,6 +432,10 @@ class DataSerializer:
         return session_revision_data.get_revision_run(self, pipeline_run_id)
 
     # -------------------------------------------------------------------------
+    def list_revision_runs_by_status(self, status: str) -> list[dict[str, Any]]:
+        return session_revision_data.list_revision_runs_by_status(self, status)
+
+    # -------------------------------------------------------------------------
     def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
         return session_revision_data.list_revision_steps(self, pipeline_run_id)
 

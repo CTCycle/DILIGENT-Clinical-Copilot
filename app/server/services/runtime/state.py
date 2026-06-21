@@ -14,6 +14,7 @@ class JobState:
     job_id: str
     job_type: str
     status: str
+    scope_key: str | None = None
     progress: float = 0.0
     result: dict[str, Any] | None = None
     error: str | None = None
@@ -41,6 +42,7 @@ class JobState:
             return {
                 "job_id": self.job_id,
                 "job_type": self.job_type,
+                "scope_key": self.scope_key,
                 "status": self.status,
                 "progress": self.progress,
                 "result": self.result,

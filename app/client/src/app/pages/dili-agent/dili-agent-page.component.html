@@ -94,6 +94,24 @@
             </button>
           </div>
         </div>
+        @if (preflightReviewNoticeVisible()) {
+          <div class="stitch-dili-review-warning" role="alert" aria-live="polite">
+            <p class="stitch-dili-review-warning__title">Review extracted section quality before running.</p>
+            <ul>
+              @for (message of preflightReviewMessages(); track message) {
+                <li>{{ message }}</li>
+              }
+            </ul>
+            <button
+              class="btn btn-secondary"
+              type="button"
+              (click)="acknowledgePreflightReview()"
+              [disabled]="preflightReviewAcknowledged()"
+            >
+              {{ preflightReviewAcknowledged() ? 'Acknowledged' : 'Acknowledge review' }}
+            </button>
+          </div>
+        }
       </section>
 
     </aside>

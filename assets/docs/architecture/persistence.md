@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-06-19
+Last updated: 2026-06-21
 
 ## Relational Database
 - SQLAlchemy-backed storage
@@ -31,6 +31,9 @@ Last updated: 2026-06-19
   - generated report metadata
   - discrepancy report
   - `run_bundle_index`
+- Successful clinical and revision workflows require persistence. Serializer failures, missing persisted ids, or failed upserts are treated as service dependency failures rather than silent in-memory success.
+- Revision payload lineage uses `revision_kind`, `source_session_id`, `source_version_id`, `revision_version_id`, and `pipeline_run_id`; `execution_mode` is not persisted as the revision discriminator.
+- Revision run records are durable, but job worker state is process-local. Startup reconciliation marks stale `running` revision runs as failed/recoverable so a backend restart does not leave a completed-looking broken revision.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
 
 ## Reference Catalog Persistence

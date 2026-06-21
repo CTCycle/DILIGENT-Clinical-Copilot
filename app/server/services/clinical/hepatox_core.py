@@ -837,11 +837,13 @@ class HepatoxConsultation:
             entry,
             report_language=report_language,
         )
+        claim_review_lines = self.render_claim_review_lines(entry)
         report_label = phrase("report_label", report_language)
         bibliography_label = phrase("bibliography_source", report_language)
         return (
             f"**{title}**\n\n"
             f"{evidence_lines}\n\n"
+            f"{claim_review_lines}\n\n"
             f"**RUCAM**: {localized_rucam}\n\n"
             f"**{report_label}**\n\n"
             f"{body}\n\n"
@@ -872,6 +874,23 @@ class HepatoxConsultation:
             f"{phrase('matched_local_record', report_language)}: {target}. "
             f"{phrase('warnings', report_language)}: {warnings}."
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def render_claim_review_lines(entry: DrugClinicalAssessment) -> str:
+        review_claims = [claim for claim in entry.claims if claim.requires_review]
+        limitations = list(entry.narrative.limitations if entry.narrative else [])
+        if not review_claims and not limitations:
+            return "**Claim review**: no unsupported structured claims identified."
+        parts: list[str] = []
+        if review_claims:
+            parts.append(
+                "review required for "
+                + "; ".join(claim.claim for claim in review_claims[:3])
+            )
+        if limitations:
+            parts.append("limitations: " + "; ".join(limitations[:3]))
+        return "**Claim review**: " + " ".join(parts) + "."
 
     # -------------------------------------------------------------------------
     def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:

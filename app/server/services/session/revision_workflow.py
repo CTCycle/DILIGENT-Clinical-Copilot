@@ -52,14 +52,15 @@ from services.session.robust_pipeline import (
     validate_fact_graph,
 )
 from services.session.session_shared import NarrativeBuilder
-from services.session.session_workflow import (
-    _extract_deterministic_drugs,
-    _append_warning_issue,
-    _emit_progress,
-    _has_temporal_information,
-    _resolve_rucam_source,
-    build_matched_drugs_payload_workflow,
-    _PROGRESS_SEQUENCE,
+from services.session.workflow_shared import (
+    ClinicalPersistenceError,
+    PROGRESS_SEQUENCE as _PROGRESS_SEQUENCE,
+    append_warning_issue as _append_warning_issue,
+    build_matched_drugs_payload as build_matched_drugs_payload_workflow,
+    emit_progress as _emit_progress,
+    extract_deterministic_drugs as _extract_deterministic_drugs,
+    has_temporal_information as _has_temporal_information,
+    resolve_rucam_source as _resolve_rucam_source,
 )
 
 ###############################################################################
@@ -1204,6 +1205,9 @@ async def process_revision_patient_workflow(
         **(session_metadata or {}),
         "use_rag": bool(payload.use_rag),
     }
+    source_version_id = persisted_session_metadata.get("source_version_id")
+    revision_version_id = persisted_session_metadata.get("target_revision_version_id")
+    pipeline_run_id = str(persisted_session_metadata.get("pipeline_run_id") or "").strip() or None
     result_payload = {
         "report": narrative,
         "final_report": final_report,
@@ -1267,11 +1271,15 @@ async def process_revision_patient_workflow(
             "discrepancy_report": faithfulness_audit.discrepancy_report,
         },
         "revision": {
+            "revision_kind": "llm_assisted_revision",
+            "source_session_id": original_session_id,
+            "source_version_id": source_version_id,
+            "revision_version_id": revision_version_id,
+            "pipeline_run_id": pipeline_run_id,
             "version": session_version,
             "original_session_id": original_session_id,
             "metadata": persisted_session_metadata,
             "focus_context": revision_focus_context,
-            "execution_mode": "revision",
             "source_artifact_reuse": {
                 "therapy_deterministic": deterministic_source_modes.get("therapy"),
                 "anamnesis_deterministic": deterministic_source_modes.get("anamnesis"),
@@ -1328,5 +1336,18 @@ async def process_revision_patient_workflow(
             result_payload["run_bundle_index"] = build_run_bundle_index(run_id=str(persisted_session_id), session_id=persisted_session_id).model_dump()
             await asyncio.to_thread(service.serializer.upsert_session_result_payload, persisted_session_id, result_payload)
     except Exception as exc:
-        logger.warning("Session persistence unavailable; returning in-memory result only: %s", exc)
+        logger.warning(
+            "Clinical revision persistence failed: error_type=%s",
+            type(exc).__name__,
+        )
+        raise ClinicalPersistenceError(
+            "Clinical revision completed, but the result could not be saved. "
+            "No revised report was finalized."
+        ) from exc
+    if persisted_session_id is None:
+        logger.warning("Clinical revision persistence returned no session id.")
+        raise ClinicalPersistenceError(
+            "Clinical revision completed, but the result could not be saved. "
+            "No revised report was finalized."
+        )
     return result_payload

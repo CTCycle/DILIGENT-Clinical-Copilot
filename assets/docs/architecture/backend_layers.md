@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-06-18
+Last updated: 2026-06-21
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -11,6 +11,7 @@ Last updated: 2026-06-18
   - Inspection update orchestration is implemented in `app/server/services/inspection/update_jobs.py` through `DataInspectionUpdateJobRunner`.
   - `DataInspectionService` (in `app/server/services/inspection/service.py`) composes behavior from mixins in `update_config.py`, `revision_diff.py`, `revision_decisions.py`, and `revision_runner.py`.
   - `ClinicalSessionService` (in `app/server/services/session/session_service.py`) composes behavior from mixins in `consultation.py` and `extraction_pipeline.py`.
+  - Clinical and revision workflow helper code shared across session paths lives in `app/server/services/session/workflow_shared.py`; revision workflows must not import from first-run workflow modules.
   - RAG vector serialization lives in `app/server/services/rag/vector_serializer.py`.
   - `app/server/services/text/vocabulary.py` provides cache-facing text normalization business access and does not manage SQLAlchemy sessions directly.
   - `app/server/services/llm/ollama_runtime.py` owns canonical Ollama runtime aliases, errors, environment helpers, message normalization, and exception mapping. Ollama service modules must import these definitions instead of duplicating or monkey-patching them.
@@ -18,6 +19,7 @@ Last updated: 2026-06-18
 - Domain layer: `app/server/domain/*`
   - Owns Pydantic and domain request-response schemas and typed contracts.
   - Clinical extraction schemas used by orchestration live under `app/server/domain/clinical/`.
+  - Clinical claim envelopes live in `app/server/domain/clinical/claims.py` and are attached to per-drug DILI assessments for source and limitation review.
 - Runtime state: `app/server/services/runtime/state.py`
   - Internal job state only. It is not a public domain contract and must not be imported by endpoints.
 - Repository layer: `app/server/repositories/*`
@@ -51,11 +53,14 @@ Last updated: 2026-06-18
 - `app/server/repositories/serialization/data.py` and DB repositories
 - Performs clinical preflight before job creation, normalizes the submitted document, applies deterministic section-first extraction before clinical LLM extraction, persists evidence-locked pipeline artifacts in `session_result_payload`, and returns artifact and gate summaries through the job result.
 - Core section extraction is deterministic only and preserves verbatim source slices with heading spans, body spans, char spans, match strategy, confidence, source hash, and review flags.
+- Low-confidence section extraction blocks preflight below `0.65`; review-required section extraction returns non-blocking preflight issues that the frontend must acknowledge before starting the job.
 - Therapy, anamnesis, disease, and laboratory extraction use provider-agnostic structured LLM calls first for both cloud and local providers, then fall back to direct rule-based parsing after bounded validation or provider failures.
+- Strict structured LLM parsing rejects prose-contaminated JSON and logs only sanitized repair diagnostics.
 - Extracted drugs and diseases must carry source evidence, confidence, attribution, and current or diagnostic status where available.
 - Hepatic pattern handling resolves explicit source-provided values separately from calculated R-ratio values and flags conflicts instead of silently overwriting the calculated score.
 - LiverTox and RxNav matching preserve raw mentions, candidates, rejected candidates, origins, confidence, status, and warning issues for missing, ambiguous, low-confidence, or unvalidated matches.
 - Persisted audit artifacts include section extraction audit, extraction strategy decisions, hepatic pattern resolution, and match audit details.
+- Successful clinical jobs require database persistence. If the serializer cannot return a persisted session id, the workflow fails with a service dependency error rather than returning an unpersisted success.
 
 ### `POST /api/clinical/validate-input`
 - `app/server/api/session.py`
@@ -81,6 +86,7 @@ Last updated: 2026-06-18
 - `app/server/services/clinical/revision/qa.py`
 - `app/server/repositories/serialization/data.py`
 - Revision jobs persist source-loading, reviewer-instruction analysis, runtime preparation, source preprocessing that prefers persisted source-version sections before reparsing raw text, deterministic source-artifact reuse for therapy/anamnesis/disease extraction when the selected source version already stores those artifacts, source-version structured artifact reuse for disease context, lab timeline, and onset context when those artifacts already exist, generation, revision-stage entity checkpoints (`resolve_revision_extraction`, `validate_anamnesis_drugs`, `extract_missing_anamnesis_drugs`, `revise_labs_timeline`, `reconcile_revision_candidates`, `merge_revision_snapshot`), revision-specific analysis and lookup drug inputs derived from the staged anamnesis additions, a dedicated `ClinicalSessionService.run_revision_consultation(...)` execution path with consultation metadata and selected-drug inputs derived from the merged revision snapshot, a dedicated consultation-engine entrypoint (`HepatoxConsultation.run_revision_analysis(...)`) underneath that service boundary, revision-specific drug-analysis/conclusion composition entrypoints (`request_revision_drug_analysis(...)`, `finalize_revision_patient_report(...)`, `generate_revision_conclusion(...)`) with comparison-aware synthesis guidance and dedicated revision prompt templates, revision-aware candidate classification reconciliation for promoted drugs, a dedicated revision finalization stage that owns post-consultation report shaping and audit summaries, source-version LiverTox match reuse or refresh decisions with provenance, revised DILI reassessment handling that can reference prior source-version per-drug assessments, final-report rebuild through `services/clinical/revision/report_builder.py`, revision QA validation through `services/clinical/revision/qa.py`, artifact/entity persistence, and final version-state transitions through revision run and step tables.
+- Revision result payloads identify lineage through `revision_kind`, `source_session_id`, `source_version_id`, `revision_version_id`, and `pipeline_run_id`; `execution_mode` is not a revision contract.
 - First-class revision entities are strict domain schemas under `app/server/domain/clinical/revision.py`; repository persistence validates revised drugs, diseases, lab entries, LiverTox decisions, and revised DILI assessments against those schemas before writing `clinical_session_revision_entities`.
 
 ## Async And Sync Behavior
@@ -91,6 +97,8 @@ Last updated: 2026-06-18
   - They are managed by `JobManager` in `app/server/services/runtime/jobs.py` using daemon threads.
   - Shared access goes through `get_job_manager()`.
   - Work is exposed through start, poll, and cancel endpoints.
+- Job execution state is process-local. Revision run records remain durable, and stale `running` revision runs are failed/recoverable during service startup when their in-memory worker no longer exists.
+- Job concurrency uses explicit scope keys: clinical assessment currently uses `clinical:global`, session revision uses `revision:{root_session_id}`, and catalog updates use `catalog:{job_type}`.
 - CPU-heavy or blocking work must run through the job system instead of blocking request handlers.
 
 ## Architectural Constraints
@@ -98,6 +106,7 @@ Last updated: 2026-06-18
 - Runtime settings come from `settings/.env` and `settings/configurations.json`.
 - Database connection and database-mode values are sourced from `settings/.env`.
 - Runtime settings are accessed through `get_server_settings()`.
+- Supported deployment mode is `local_single_user`; startup validation rejects any other deployment mode until multi-user/server deployment controls exist.
 - Runtime and security helpers use canonical service modules; transitional shims are not maintained.
 - Supported external access-key providers are `openai`, `gemini`, and `brave`.
 - Containerized runtime is not implemented in the current repository.

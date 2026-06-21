@@ -33,6 +33,7 @@ from domain.clinical.entities import (
     RucamComponentAssessment,
     create_drug_suspension_context,
 )
+from domain.clinical.claims import ClinicalClaim, DrugClinicalNarrative
 from domain.clinical.extraction import LlmClinicalSectionTextDraft
 from domain.clinical.extras import (
     CandidateSelectionResult,
@@ -60,11 +61,13 @@ __all__ = [
     "CONTROL_CHARACTERS_RE",
     "MAX_LAB_TEXT_LENGTH",
     "ClinicalLabEntry",
+    "ClinicalClaim",
     "ClinicalPipelineValidationError",
     "ClinicalSectionLineRange",
     "ClinicalSessionRequest",
     "DiseaseContextEntry",
     "DrugClinicalAssessment",
+    "DrugClinicalNarrative",
     "DrugEntry",
     "DrugHepatotoxicityAnalysis",
     "DrugRucamAssessment",

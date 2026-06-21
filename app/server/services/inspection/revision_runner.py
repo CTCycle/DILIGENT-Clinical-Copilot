@@ -27,6 +27,10 @@ from services.inspection.revision_runner_support import (
 from services.session.factory import build_clinical_session_service
 
 ###############################################################################
+def build_revision_job_scope_key(root_session_id: int) -> str:
+    return f"revision:{int(root_session_id)}"
+
+###############################################################################
 class InspectionRevisionRunnerMixin:
 
     # -------------------------------------------------------------------------
@@ -47,6 +51,7 @@ class InspectionRevisionRunnerMixin:
         job_id = self.jobs.start_job(
             job_type=self.REVISION_JOB_TYPE,
             runner=self.run_revision_job,
+            scope_key=build_revision_job_scope_key(root_session_id),
             kwargs={
                 "job_id": None,
                 "pipeline_run_id": pipeline_run_id,
@@ -155,8 +160,6 @@ class InspectionRevisionRunnerMixin:
         model_overrides: dict[str, Any],
         metadata: dict[str, Any],
     ) -> dict[str, Any]:
-        if self.jobs.is_job_running(self.REVISION_JOB_TYPE):
-            raise ValueError("Session revision is already running")
         detail = self.get_session_detail(session_id)
         if detail is None:
             raise ValueError("Session not found")
@@ -164,6 +167,11 @@ class InspectionRevisionRunnerMixin:
         if not source_text:
             raise ValueError("Session text is empty")
         root_session_id = int(detail.get("original_session_id") or session_id)
+        if self.jobs.is_job_running(
+            self.REVISION_JOB_TYPE,
+            scope_key=build_revision_job_scope_key(root_session_id),
+        ):
+            raise ValueError("Session revision is already running for this session")
         version = self.serializer.get_next_session_version(root_session_id)
         source_version = self.serializer.get_version_record_for_session(session_id)
         if source_version is None:
@@ -221,11 +229,15 @@ class InspectionRevisionRunnerMixin:
 
     # -------------------------------------------------------------------------
     def retry_revision_job(self, pipeline_run_id: str) -> dict[str, Any]:
-        if self.jobs.is_job_running(self.REVISION_JOB_TYPE):
-            raise ValueError("Session revision is already running")
         run = self.serializer.get_revision_run(pipeline_run_id)
         if run is None:
             raise ValueError("Revision pipeline run not found")
+        root_session_id = int(run["root_session_id"])
+        if self.jobs.is_job_running(
+            self.REVISION_JOB_TYPE,
+            scope_key=build_revision_job_scope_key(root_session_id),
+        ):
+            raise ValueError("Session revision is already running for this session")
         if str(run.get("status") or "").casefold() == "running":
             raise ValueError("Session revision is already running")
         target_revision_version_id = run.get("target_revision_version_id")
@@ -297,7 +309,7 @@ class InspectionRevisionRunnerMixin:
             source_version_id=int(run["source_version_id"]),
             target_revision_version_id=target_revision_version_id,
             session_detail=source_detail["session"],
-            root_session_id=int(run["root_session_id"]),
+            root_session_id=root_session_id,
             version=int(target_version["version_number"]),
             selected_text=selected_text,
             revision_instruction=revision_instruction,

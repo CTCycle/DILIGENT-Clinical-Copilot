@@ -12,7 +12,6 @@ class LlmClinicalSectionTextDraft(BaseModel):
     therapy: str = ""
     lab_analysis: str = ""
 
-
 ###############################################################################
 class ExtractionStrategyDecision(BaseModel):
     section: str
