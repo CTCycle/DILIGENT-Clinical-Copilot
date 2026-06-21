@@ -4,9 +4,9 @@ from collections.abc import Callable
 
 from domain.catalogs import ReferenceCatalogSnapshot
 
+
 ###############################################################################
 class _CatalogProvider:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._impl: Callable[[], ReferenceCatalogSnapshot] | None = None

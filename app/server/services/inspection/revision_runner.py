@@ -26,13 +26,14 @@ from services.inspection.revision_runner_support import (
 )
 from services.session.factory import build_clinical_session_service
 
+
 ###############################################################################
 def build_revision_job_scope_key(root_session_id: int) -> str:
     return f"revision:{int(root_session_id)}"
 
+
 ###############################################################################
 class InspectionRevisionRunnerMixin:
-
     # -------------------------------------------------------------------------
     def _start_revision_background_job(
         self,
@@ -788,23 +789,25 @@ class InspectionRevisionRunnerMixin:
                     )
                 persisted_session_id = int(result_payload.get("session_id") or 0)
                 if persisted_session_id <= 0:
-                    raise ValueError("Revision result did not include a persisted session id")
+                    raise ValueError(
+                        "Revision result did not include a persisted session id"
+                    )
                 revision_payload = result_payload.get("revision")
                 if not isinstance(revision_payload, dict):
                     revision_payload = {}
                     result_payload["revision"] = revision_payload
-                if (
-                    instruction_profile is not None
-                    and not isinstance(revision_payload.get("instruction_profile"), dict)
+                if instruction_profile is not None and not isinstance(
+                    revision_payload.get("instruction_profile"), dict
                 ):
                     revision_payload["instruction_profile"] = (
                         instruction_profile.model_dump()
                     )
-                if (
-                    instruction_trace is not None
-                    and not isinstance(revision_payload.get("instruction_trace"), dict)
+                if instruction_trace is not None and not isinstance(
+                    revision_payload.get("instruction_trace"), dict
                 ):
-                    revision_payload["instruction_trace"] = instruction_trace.model_dump()
+                    revision_payload["instruction_trace"] = (
+                        instruction_trace.model_dump()
+                    )
                 revision_payload["livertox_revision_decisions"] = (
                     self.build_revision_livertox_decisions(
                         matched_drugs=result_payload.get("matched_drugs") or [],
@@ -814,8 +817,7 @@ class InspectionRevisionRunnerMixin:
                 )
                 revision_payload["revised_dili_assessments"] = (
                     self.build_revised_dili_assessments(
-                        rucam_assessments=result_payload.get("rucam_assessments")
-                        or [],
+                        rucam_assessments=result_payload.get("rucam_assessments") or [],
                         matched_drugs=result_payload.get("matched_drugs") or [],
                         source_rucam_assessments=source_rucam_assessments,
                         revision_version_id=int(target_revision_version_id),
@@ -836,9 +838,7 @@ class InspectionRevisionRunnerMixin:
                     instruction_profile=instruction_profile,
                     final_report_payload=final_report_payload,
                 )
-                revision_payload["qa_validation"] = (
-                    qa_validation_payload.model_dump()
-                )
+                revision_payload["qa_validation"] = qa_validation_payload.model_dump()
                 version_status, llm_qa_status = derive_revision_qa_outcome(
                     result_payload
                 )

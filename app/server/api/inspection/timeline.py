@@ -11,9 +11,9 @@ from domain.patient_timeline import (
 )
 from services.inspection.service import DataInspectionService
 
+
 ###############################################################################
 class InspectionTimelineEndpoint(InspectionEndpointBase):
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

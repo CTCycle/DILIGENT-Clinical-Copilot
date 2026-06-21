@@ -74,7 +74,11 @@ LOWER_DISEASE_PATTERNS: tuple[tuple[re.Pattern[str], dict[str, object]], ...] = 
     ),
     (
         re.compile(r"\bkdigo\s+g3b\b", re.IGNORECASE),
-        {"name": "Malattia renale cronica KDIGO G3b", "chronic": True, "hepatic_related": False},
+        {
+            "name": "Malattia renale cronica KDIGO G3b",
+            "chronic": True,
+            "hepatic_related": False,
+        },
     ),
     (
         re.compile(r"\bfibrillazione\s+atriale\b", re.IGNORECASE),
@@ -93,7 +97,9 @@ LOWER_DISEASE_PATTERNS: tuple[tuple[re.Pattern[str], dict[str, object]], ...] = 
         {"name": "Coronaropatia trivasale", "chronic": True, "hepatic_related": False},
     ),
     (
-        re.compile(r"\bmalattia\s+da\s+reflusso\s+gastro[-\s]?esofageo\b", re.IGNORECASE),
+        re.compile(
+            r"\bmalattia\s+da\s+reflusso\s+gastro[-\s]?esofageo\b", re.IGNORECASE
+        ),
         {
             "name": "Malattia da reflusso gastro-esofageo",
             "chronic": True,
@@ -110,7 +116,11 @@ LOWER_DISEASE_PATTERNS: tuple[tuple[re.Pattern[str], dict[str, object]], ...] = 
     ),
     (
         re.compile(r"\bpolineuropatia\s+degenerativa\b", re.IGNORECASE),
-        {"name": "Polineuropatia degenerativa", "chronic": True, "hepatic_related": False},
+        {
+            "name": "Polineuropatia degenerativa",
+            "chronic": True,
+            "hepatic_related": False,
+        },
     ),
     (
         re.compile(r"\bcolecistolitiasi\b", re.IGNORECASE),
@@ -212,6 +222,7 @@ NON_DRUG_TOKENS = frozenset(
     }
 )
 
+
 ###############################################################################
 def line_has_regimen_signal(line: str) -> bool:
     stripped = (line or "").strip()
@@ -222,6 +233,7 @@ def line_has_regimen_signal(line: str) -> bool:
     if REGIMEN_SIGNAL_RE.search(stripped):
         return True
     return "+" in stripped and bool(CAPITALIZED_DRUG_TOKEN_RE.search(stripped))
+
 
 ###############################################################################
 def extract_regimen_drug_candidates(
@@ -280,6 +292,7 @@ def extract_regimen_drug_candidates(
         seen.add(lowered)
         entries.append(normalized)
     return entries
+
 
 ###############################################################################
 def extract_deterministic_diseases(

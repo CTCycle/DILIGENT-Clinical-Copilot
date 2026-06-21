@@ -10,9 +10,9 @@ from common.constants import (
 from common.prompts.retrieval import DILI_RAG_QUERY_PROMPT
 from domain.clinical.entities import PatientDrugs
 
+
 ###############################################################################
 class DILIQueryBuilder:
-
     # -------------------------------------------------------------------------
     def __init__(self, drugs: PatientDrugs) -> None:
         self.drug_names = [x.name for x in drugs.entries if x.name]

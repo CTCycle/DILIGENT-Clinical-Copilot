@@ -39,6 +39,7 @@ VALUE_UNIT_RE = re.compile(
 )
 SINGLE_VALUE_MARKERS = frozenset({"CR", "EGFR", "INR", "ALB"})
 
+
 ###############################################################################
 def _load_marker_aliases() -> dict[str, tuple[str, ...]]:
     snapshot = get_reference_catalog_snapshot()
@@ -70,14 +71,15 @@ RUCAM_SCORE_TEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
     normalized = (marker_name or "").strip().casefold()
     return aliases.get(normalized, marker_name)
 
+
 ###############################################################################
 class ClinicalLabExtractor:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -402,7 +404,9 @@ class ClinicalLabExtractor:
         for canonical, aliases in MARKER_ALIASES.items():
             for alias in aliases:
                 alias_items.append((canonical, alias.casefold()))
-        for canonical, alias in sorted(alias_items, key=lambda item: len(item[1]), reverse=True):
+        for canonical, alias in sorted(
+            alias_items, key=lambda item: len(item[1]), reverse=True
+        ):
             for match in re.finditer(rf"\b{re.escape(alias)}\b", text):
                 span_range = range(match.start(), match.end())
                 if any(
@@ -434,7 +438,10 @@ class ClinicalLabExtractor:
         seen: set[tuple[str, str | None]] = set()
         for match in VALUE_UNIT_RE.finditer(segment):
             start, end = match.span("value")
-            if any(start < date_end and end > date_start for date_start, date_end in date_spans):
+            if any(
+                start < date_end and end > date_start
+                for date_start, date_end in date_spans
+            ):
                 continue
             if any(
                 start < limit_end and end > limit_start
@@ -614,7 +621,7 @@ class ClinicalLabExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -879,9 +886,11 @@ class ClinicalLabExtractor:
                         if reinforced.entries:
                             parsed = reinforced
 
-                feedback, missing_candidates = self.validate_lab_entries_against_candidates(
-                    list(parsed.entries),
-                    deterministic_entries,
+                feedback, missing_candidates = (
+                    self.validate_lab_entries_against_candidates(
+                        list(parsed.entries),
+                        deterministic_entries,
+                    )
                 )
                 if feedback and deterministic_entries:
                     try:
@@ -899,9 +908,11 @@ class ClinicalLabExtractor:
                         )
                     else:
                         parsed = reinforced
-                        feedback, missing_candidates = self.validate_lab_entries_against_candidates(
-                            list(parsed.entries),
-                            deterministic_entries,
+                        feedback, missing_candidates = (
+                            self.validate_lab_entries_against_candidates(
+                                list(parsed.entries),
+                                deterministic_entries,
+                            )
                         )
 
                 timeline_entries.extend(parsed.entries)

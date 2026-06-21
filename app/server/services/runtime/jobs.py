@@ -13,9 +13,9 @@ from common.utils.error_filters import get_sensitive_error_tokens
 from common.utils.logger import logger
 from services.runtime.state import JobState
 
+
 ###############################################################################
 class JobErrorSanitizer:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def can_show_exception_message(message: str) -> bool:
@@ -47,9 +47,9 @@ class JobErrorSanitizer:
             return candidate
         return "Operation failed unexpectedly. Please retry."
 
+
 ###############################################################################
 class JobManager:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.jobs: dict[str, JobState] = {}
@@ -258,13 +258,14 @@ class JobManager:
     def runner_accepts_job_id(self, runner: Callable[..., dict[str, Any]]) -> bool:
         try:
             signature = inspect.signature(runner)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
         parameters = list(signature.parameters.values())
         for param in parameters:
             if param.kind == inspect.Parameter.VAR_KEYWORD:
                 return True
         return any(param.name == "job_id" for param in parameters)
+
 
 ###############################################################################
 @lru_cache(maxsize=1)

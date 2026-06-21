@@ -79,6 +79,7 @@ from services.session.session_workflow import (
 from services.session.consultation import ClinicalSessionConsultationMixin
 from services.session.extraction_pipeline import ClinicalSessionExtractionPipelineMixin
 
+
 ###############################################################################
 class ClinicalSessionService(
     ClinicalSessionFormattingMixin,

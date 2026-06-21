@@ -19,6 +19,7 @@ from services.clinical.match_quality import classify_match_evidence
 from services.clinical.preparation import HepatoxPreparedInputs
 from services.text.normalization import normalize_drug_query_name
 
+
 ###############################################################################
 class AnalysisRunner:
     """Orchestrates the top-level analysis workflow — runs the full drug assessment pipeline."""
@@ -95,7 +96,9 @@ class AnalysisRunner:
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
         if prepared_inputs is None:
-            logger.info("No prepared inputs provided; skipping hepatotoxicity consultation")
+            logger.info(
+                "No prepared inputs provided; skipping hepatotoxicity consultation"
+            )
             return None
         resolved_mapping = prepared_inputs.resolved_drugs
         if not resolved_mapping:
@@ -126,13 +129,19 @@ class AnalysisRunner:
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
         if prepared_inputs is None:
-            logger.info("No prepared inputs provided; skipping revision hepatotoxicity consultation")
+            logger.info(
+                "No prepared inputs provided; skipping revision hepatotoxicity consultation"
+            )
             return None
         resolved_mapping = prepared_inputs.resolved_drugs
         if not resolved_mapping:
-            logger.info("No matched drugs available for revision hepatotoxicity consultation")
+            logger.info(
+                "No matched drugs available for revision hepatotoxicity consultation"
+            )
             return None
-        logger.info("Running revision clinical hepatotoxicity assessment for matched drugs")
+        logger.info(
+            "Running revision clinical hepatotoxicity assessment for matched drugs"
+        )
         report = await self.compile_revision_clinical_assessment(
             resolved_mapping,
             clinical_context=prepared_inputs.clinical_context,
@@ -261,7 +270,9 @@ class AnalysisRunner:
             if job:
                 llm_jobs.append(job)
 
-        consultation.emit_progress(progress_callback, stage="llm_analysis", fraction=0.0)
+        consultation.emit_progress(
+            progress_callback, stage="llm_analysis", fraction=0.0
+        )
         if llm_jobs:
             semaphore = asyncio.Semaphore(consultation.max_parallel_analyses)
             pending_tasks = [
@@ -392,7 +403,7 @@ class AnalysisRunner:
         if match_confidence is not None:
             try:
                 match_confidence = float(match_confidence)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 match_confidence = None
         match_reason = livertox_data.get("match_reason")
         match_quality = classify_match_evidence(
@@ -591,7 +602,9 @@ class AnalysisRunner:
             ),
             reverse=True,
         )
-        if exact is not None and self.livertox_payload_rank(exact) >= self.livertox_payload_rank(grouped[0]):
+        if exact is not None and self.livertox_payload_rank(
+            exact
+        ) >= self.livertox_payload_rank(grouped[0]):
             return exact
         return grouped[0]
 
@@ -616,11 +629,14 @@ class AnalysisRunner:
         self, attempt: int, *, exc: Exception | None = None
     ) -> float:
         if exc is not None:
-            hinted_wait = self.consultation.rag_support.extract_rate_limit_wait_hint_seconds(exc)
+            hinted_wait = (
+                self.consultation.rag_support.extract_rate_limit_wait_hint_seconds(exc)
+            )
             if hinted_wait is not None:
                 return hinted_wait
         normalized_attempt = max(int(attempt), 1)
         return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
+
 
 ###############################################################################
 def summarize_drug_source_context(entry: DrugEntry) -> str:
@@ -635,6 +651,7 @@ def summarize_drug_source_context(entry: DrugEntry) -> str:
         return "Historical anamnesis section entry."
     return "Source section unavailable."
 
+
 ###############################################################################
 def assess_temporal_plausibility(
     entry: DrugEntry,
@@ -648,6 +665,7 @@ def assess_temporal_plausibility(
     if entry.therapy_start_date:
         return "Therapy start is available; temporal assessment is partially supported."
     return "Temporal evidence is limited."
+
 
 ###############################################################################
 def assess_pattern_compatibility(

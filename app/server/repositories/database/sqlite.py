@@ -14,9 +14,9 @@ from repositories.serialization.access_key_encryption import (
 )
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
+
 ###############################################################################
 class SQLiteRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, settings: DatabaseSettings) -> None:
         self.db_path = DATABASE_FILE_PATH

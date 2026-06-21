@@ -18,6 +18,7 @@ from services.inspection.normalization import (
 )
 from services.inspection.runtime import coerce_optional_str
 
+
 ###############################################################################
 def get_session_timeline(service: Any, session_id: int) -> PatientTimeline | None:
     payload = service.serializer.get_latest_session_timeline_record(session_id)
@@ -32,6 +33,7 @@ def get_session_timeline(service: Any, session_id: int) -> PatientTimeline | Non
             exc,
         )
         return None
+
 
 ###############################################################################
 def get_session_timeline_by_id(
@@ -53,9 +55,11 @@ def get_session_timeline_by_id(
         )
         return None
 
+
 ###############################################################################
 def list_session_timelines(service: Any, session_id: int) -> list[dict[str, Any]]:
     return service.serializer.list_session_timelines(session_id)
+
 
 ###############################################################################
 def build_fallback_timeline(
@@ -143,6 +147,7 @@ def build_fallback_timeline(
         ),
         events=events,
     )
+
 
 ###############################################################################
 def generate_session_timeline(

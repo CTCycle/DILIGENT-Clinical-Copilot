@@ -27,6 +27,7 @@ from services.text.normalization import (
     normalize_drug_query_name,
 )
 
+
 ###############################################################################
 class ClinicalKnowledgePreparation:
     REGIMEN_SEPARATOR_RE = re.compile(

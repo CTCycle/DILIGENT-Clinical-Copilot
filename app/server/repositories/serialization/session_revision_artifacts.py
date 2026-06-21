@@ -27,6 +27,7 @@ from repositories.serialization.session_revision_data import (
     validate_revision_livertox_decision,
 )
 
+
 ###############################################################################
 def persist_revision_artifacts(
     self,
@@ -48,7 +49,11 @@ def persist_revision_artifacts(
 
         structured_case = result_payload.get("structured_case")
         if isinstance(structured_case, dict):
-            for entity_type in ("therapy_drugs", "anamnesis_drugs", "anamnesis_diseases"):
+            for entity_type in (
+                "therapy_drugs",
+                "anamnesis_drugs",
+                "anamnesis_diseases",
+            ):
                 entries = structured_case.get(entity_type)
                 if not isinstance(entries, list):
                     continue
@@ -121,7 +126,9 @@ def persist_revision_artifacts(
                 pipeline_run_id=safe_pipeline_run_id,
                 artifact_kind="report_comparison",
                 artifact_key="report_comparison",
-                status=self.normalize_string(str(report_comparison.get("outcome") or "")),
+                status=self.normalize_string(
+                    str(report_comparison.get("outcome") or "")
+                ),
                 payload=report_comparison,
             )
             db_session.add(row)
@@ -180,7 +187,9 @@ def persist_revision_artifacts(
                     pipeline_run_id=safe_pipeline_run_id,
                     artifact_kind="llm_qa_output",
                     artifact_key="revision_qa_validation",
-                    status=self.normalize_string(str(qa_validation.get("status") or "")),
+                    status=self.normalize_string(
+                        str(qa_validation.get("status") or "")
+                    ),
                     payload=qa_validation,
                 )
                 db_session.add(row)
@@ -199,7 +208,10 @@ def persist_revision_artifacts(
                 db_session.add(row)
                 created_rows.append(row)
             entity_snapshot_context = revision_payload.get("entity_snapshot_context")
-            if isinstance(entity_snapshot_context, str) and entity_snapshot_context.strip():
+            if (
+                isinstance(entity_snapshot_context, str)
+                and entity_snapshot_context.strip()
+            ):
                 row = _create_revision_artifact_row(
                     self,
                     revision_version_id=safe_revision_version_id,
@@ -246,6 +258,7 @@ def persist_revision_artifacts(
         raise
     finally:
         db_session.close()
+
 
 ###############################################################################
 def persist_revision_entities(
@@ -353,7 +366,9 @@ def persist_revision_entities(
                     self,
                     revision_version_id=safe_revision_version_id,
                     source_version_id=(
-                        int(source_version_id) if source_version_id is not None else None
+                        int(source_version_id)
+                        if source_version_id is not None
+                        else None
                     ),
                     pipeline_run_id=safe_pipeline_run_id,
                     step_name="generate_revision",
@@ -446,6 +461,7 @@ def persist_revision_entities(
     finally:
         db_session.close()
 
+
 ###############################################################################
 def list_revision_artifacts_for_version(
     self,
@@ -470,6 +486,7 @@ def list_revision_artifacts_for_version(
         return [serialize_revision_artifact_row(self, row) for row in rows]
     finally:
         db_session.close()
+
 
 ###############################################################################
 def list_revision_entities_for_version(
@@ -496,4 +513,3 @@ def list_revision_entities_for_version(
         return [serialize_revision_entity_row(self, row) for row in rows]
     finally:
         db_session.close()
-

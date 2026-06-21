@@ -4,6 +4,7 @@ from typing import Literal, Protocol
 
 from domain.clinical.revision import RevisionFinalReportPayload
 
+
 ###############################################################################
 class ReviewerInstructionProfileLike(Protocol):
     instruction_summary: str
@@ -20,6 +21,7 @@ class ReviewerInstructionProfileLike(Protocol):
         ]
     ]
 
+
 ###############################################################################
 def _unique_preserve_order(values: list[str]) -> list[str]:
     seen: set[str] = set()
@@ -31,6 +33,7 @@ def _unique_preserve_order(values: list[str]) -> list[str]:
         seen.add(cleaned)
         unique.append(cleaned)
     return unique
+
 
 ###############################################################################
 def build_revision_final_report_payload(
@@ -45,7 +48,9 @@ def build_revision_final_report_payload(
     warnings: list[str] = []
     if isinstance(report_comparison, dict):
         comparison_outcome = str(report_comparison.get("outcome") or "").strip() or None
-        manual_review = str(report_comparison.get("manual_review") or "").strip().casefold()
+        manual_review = (
+            str(report_comparison.get("manual_review") or "").strip().casefold()
+        )
         if manual_review in {"yes", "true", "required"}:
             warnings.append("Report comparison still requests manual review.")
     if not report_text:

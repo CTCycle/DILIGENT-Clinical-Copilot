@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+
 ###############################################################################
 class LiverToxExcerptSanitizer:
     WHITESPACE_RE = re.compile(r"\s+")

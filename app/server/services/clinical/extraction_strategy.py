@@ -7,6 +7,7 @@ UNRESOLVED_HYBRID_MAX = 0.45
 STRUCTURE_DETERMINISTIC_MIN = 0.78
 SPAN_COVERAGE_DETERMINISTIC_MIN = 0.7
 
+
 ###############################################################################
 def decide_extraction_strategy(
     *,

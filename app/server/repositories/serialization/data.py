@@ -28,9 +28,9 @@ from repositories.serialization import (
     session_revision_steps,
 )
 
+
 ###############################################################################
 class DataSerializer:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -967,4 +967,3 @@ class DataSerializer:
     # -------------------------------------------------------------------------
     def first_alias_model_term_type(self, aliases: list[DrugAlias]) -> str | None:
         return evidence_aliases.first_alias_model_term_type(self, aliases)
-

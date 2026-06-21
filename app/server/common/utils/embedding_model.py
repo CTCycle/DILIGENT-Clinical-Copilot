@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from typing import NamedTuple
 
+
 ###############################################################################
 class EmbeddingModelSpec(NamedTuple):
     provider: str
@@ -10,6 +11,7 @@ class EmbeddingModelSpec(NamedTuple):
     dimension: int
     mode: str
     signature: str
+
 
 ###############################################################################
 def build_embedding_model_signature(

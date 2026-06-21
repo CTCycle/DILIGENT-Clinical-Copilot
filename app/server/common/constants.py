@@ -36,7 +36,6 @@ OPENAI_API_BASE = "https://api.openai.com/v1"
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1"
 
 
-
 # [DATA SERIALIZATION]
 ###############################################################################
 TABLE_CLINICAL_SESSIONS = "clinical_sessions"

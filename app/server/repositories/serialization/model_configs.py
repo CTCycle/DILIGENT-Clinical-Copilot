@@ -18,6 +18,7 @@ from repositories.schemas.models import ModelSelection, RuntimeSetting
 ModelRoleType = Literal["clinical", "text_extraction", "cloud"]
 UNSET = object()
 
+
 ###############################################################################
 class ModelConfigSerializer:
     OLLAMA_TEMPERATURE_KEY = "ollama_temperature"

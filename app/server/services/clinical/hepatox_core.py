@@ -68,9 +68,9 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 class HepatoxConsultation:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -90,7 +90,7 @@ class HepatoxConsultation:
         self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             chat_signature = None
         self.chat_supports_temperature = (
             chat_signature is not None and "temperature" in chat_signature.parameters
@@ -272,7 +272,9 @@ class HepatoxConsultation:
         coroutine: Any,
         semaphore: asyncio.Semaphore,
     ) -> tuple[int, Any]:
-        return await self._analysis_runner().execute_bounded_job(index, coroutine, semaphore)
+        return await self._analysis_runner().execute_bounded_job(
+            index, coroutine, semaphore
+        )
 
     # -------------------------------------------------------------------------
     async def prepare_drug_assessment(
@@ -349,7 +351,10 @@ class HepatoxConsultation:
     async def fetch_rag_documents(
         self, rag_query: dict[str, str] | None, drug_name: str
     ) -> str | None:
-        if type(self).search_supporting_documents is not HepatoxConsultation.search_supporting_documents:
+        if (
+            type(self).search_supporting_documents
+            is not HepatoxConsultation.search_supporting_documents
+        ):
             if not rag_query:
                 return None
             normalized_key = normalize_drug_query_name(drug_name)
@@ -912,9 +917,13 @@ class HepatoxConsultation:
         quality = entry.evidence_quality or phrase("unknown", report_language)
         matched_name = ""
         if isinstance(entry.matched_livertox_row, dict):
-            matched_name = str(entry.matched_livertox_row.get("drug_name") or "").strip()
+            matched_name = str(
+                entry.matched_livertox_row.get("drug_name") or ""
+            ).strip()
         target = (
-            matched_name or entry.canonical_name or phrase("not_available", report_language)
+            matched_name
+            or entry.canonical_name
+            or phrase("not_available", report_language)
         )
         warnings = (
             "; ".join(entry.evidence_warnings)
@@ -1024,7 +1033,9 @@ class HepatoxConsultation:
             label = (entry.drug_name or "").strip() or phrase(
                 "unnamed_drug", report_language
             )
-            reason = self.describe_unresolved_entry(entry, report_language=report_language)
+            reason = self.describe_unresolved_entry(
+                entry, report_language=report_language
+            )
             rucam_summary = (
                 rucam_summary_text(entry.rucam, report_language)
                 if entry.rucam is not None

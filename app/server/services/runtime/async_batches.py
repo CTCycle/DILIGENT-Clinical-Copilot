@@ -7,6 +7,7 @@ from typing import TypeVar
 T = TypeVar("T")
 R = TypeVar("R")
 
+
 ###############################################################################
 async def _run_batched_item(
     semaphore: asyncio.Semaphore,
@@ -17,6 +18,7 @@ async def _run_batched_item(
     async with semaphore:
         result = await worker(item)
         return index, result
+
 
 ###############################################################################
 async def run_batched_in_order(

@@ -20,9 +20,9 @@ from domain.clinical.entities import (
 from domain.clinical.extras import HepatoxPreparedInputs
 from services.retrieval.query import DILIQueryBuilder
 
+
 ###############################################################################
 class ClinicalSessionExtractionPipelineMixin:
-
     # -------------------------------------------------------------------------
     async def extract_therapy_drugs(
         self,

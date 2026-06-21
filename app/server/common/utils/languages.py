@@ -20,6 +20,7 @@ LANGUAGE_FUNCTION_HINTS: dict[str, set[str]] = {}
 LANGUAGE_PHRASE_HINTS: dict[str, tuple[str, ...]] = {}
 LANGUAGE_DIACRITIC_HINTS: dict[str, set[str]] = {}
 
+
 ###############################################################################
 @lru_cache(maxsize=1)
 def _catalog_language_hints() -> dict[str, set[str]]:
@@ -30,6 +31,7 @@ def _catalog_language_hints() -> dict[str, set[str]]:
         if values:
             result[lang] = {value.casefold() for value in values if value.strip()}
     return result
+
 
 ###############################################################################
 @lru_cache(maxsize=1)
@@ -46,6 +48,7 @@ def _catalog_phrase_hints() -> dict[str, tuple[str, ...]]:
             result[lang] = tuple(value.casefold() for value in values if value.strip())
     return result
 
+
 ###############################################################################
 @lru_cache(maxsize=1)
 def _catalog_function_hints() -> dict[str, set[str]]:
@@ -60,6 +63,7 @@ def _catalog_function_hints() -> dict[str, set[str]]:
         if values:
             result[lang] = {value.casefold() for value in values if value.strip()}
     return result
+
 
 ###############################################################################
 @lru_cache(maxsize=1)
@@ -76,17 +80,21 @@ def _catalog_diacritic_hints() -> dict[str, set[str]]:
             result[lang] = {value for value in values if value.strip()}
     return result
 
+
 ###############################################################################
 def get_language_hints() -> dict[str, set[str]]:
     return _catalog_language_hints()
+
 
 ###############################################################################
 def get_language_phrase_hints() -> dict[str, tuple[str, ...]]:
     return _catalog_phrase_hints()
 
+
 ###############################################################################
 def get_language_function_hints() -> dict[str, set[str]]:
     return _catalog_function_hints()
+
 
 ###############################################################################
 def get_language_diacritic_hints() -> dict[str, set[str]]:
@@ -154,6 +162,7 @@ VALIDATION_MESSAGE_BUNDLES: dict[str, dict[str, str]] = {
         ),
     },
 }
+
 
 ###############################################################################
 def resolve_supported_language_code(language: str | None) -> str:
