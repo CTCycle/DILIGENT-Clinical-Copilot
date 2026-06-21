@@ -32,7 +32,15 @@ def get_session_service() -> Any:
 class FakeSerializer:
 
     # -------------------------------------------------------------------------
-    def save_clinical_session(self, payload: dict[str, Any]) -> None:
+    def save_clinical_session(self, payload: dict[str, Any]) -> int:
+        _ = payload
+        return 101
+
+    # -------------------------------------------------------------------------
+    def upsert_session_result_payload(
+        self, session_id: int, payload: dict[str, Any]
+    ) -> None:
+        _ = session_id
         _ = payload
 
 ###############################################################################
