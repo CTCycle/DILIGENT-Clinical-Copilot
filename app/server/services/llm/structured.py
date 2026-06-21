@@ -9,6 +9,7 @@ from pydantic import BaseModel, ValidationError
 
 T = TypeVar("T", bound=BaseModel)
 
+
 ###############################################################################
 def extract_first_json_dict(text: str) -> dict[str, Any] | None:
     decoder = json.JSONDecoder()
@@ -22,6 +23,7 @@ def extract_first_json_dict(text: str) -> dict[str, Any] | None:
             return parsed
     return None
 
+
 ###############################################################################
 def parse_json_dict(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
     if isinstance(obj_or_text, dict):
@@ -34,9 +36,9 @@ def parse_json_dict(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return extract_first_json_dict(obj_or_text)
 
+
 ###############################################################################
 class StructuredOutputParser(Generic[T]):
-
     # -------------------------------------------------------------------------
     def __init__(self, *, schema: type[T]) -> None:
         self.schema = schema
@@ -58,6 +60,7 @@ class StructuredOutputParser(Generic[T]):
     def parse(self, text: str) -> T:
         payload = parse_json_object_strict(text)
         return self.schema.model_validate(payload)
+
 
 ###############################################################################
 def parse_json_object_strict(raw: str) -> dict[str, Any]:
@@ -83,9 +86,9 @@ def parse_json_object_strict(raw: str) -> dict[str, Any]:
         raise ValueError("trailing_prose_not_allowed")
     return parsed
 
+
 ###############################################################################
 class StructuredOutputAdapter:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

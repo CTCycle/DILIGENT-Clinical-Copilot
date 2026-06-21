@@ -7,6 +7,7 @@ import pandas as pd
 from common.utils.logger import logger
 from services.updater import livertox_parse
 
+
 ###############################################################################
 def build_unified_dataset(
     self,
@@ -100,6 +101,7 @@ def build_unified_dataset(
     dataset = cast(pd.DataFrame, dataset[final_columns])
     return sanitize_unified_dataset(self, dataset)
 
+
 ###############################################################################
 def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
@@ -137,6 +139,7 @@ def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
     sanitized.loc[excerpt_values.isin(["", "nan", "None", "NaT"]), "excerpt"] = pd.NA
     sanitized.loc[cast(pd.Series, sanitized["excerpt"]).isna(), "excerpt"] = pd.NA
     return sanitized.reset_index(drop=True)
+
 
 ###############################################################################
 def finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:

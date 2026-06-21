@@ -20,6 +20,7 @@ KT = TypeVar("KT")
 VT = TypeVar("VT")
 CACHE_MISS = object()
 
+
 ###############################################################################
 def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
     values = get_reference_catalog_snapshot().values(
@@ -28,6 +29,7 @@ def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
         key="default",
     )
     return tuple(value.strip().upper() for value in values if value.strip())
+
 
 ###############################################################################
 class BoundedCache(Generic[KT, VT]):
@@ -63,6 +65,7 @@ class BoundedCache(Generic[KT, VT]):
 
 from services.clinical.drug_matcher import DrugMatcher
 from services.clinical.drug_name_service import DrugNameService
+
 
 ###############################################################################
 class DrugsLookup:
@@ -162,7 +165,9 @@ class DrugsLookup:
 
     # -------------------------------------------------------------------------
     def resolve_source_backed_query_variants(self, normalized_query: str) -> list[str]:
-        return self.drug_name_service.resolve_source_backed_query_variants(normalized_query)
+        return self.drug_name_service.resolve_source_backed_query_variants(
+            normalized_query
+        )
 
     # -------------------------------------------------------------------------
     def has_trusted_exact_key(self, normalized_key: str, data: LiverToxData) -> bool:
@@ -173,7 +178,9 @@ class DrugsLookup:
         self,
         normalized_query: str,
     ) -> list[tuple[MonographRecord, float, list[str]]]:
-        return self.drug_name_service.match_authoritative_spelling_candidates(normalized_query)
+        return self.drug_name_service.match_authoritative_spelling_candidates(
+            normalized_query
+        )
 
     # -------------------------------------------------------------------------
     def is_small_spelling_difference(self, query: str, candidate: str) -> bool:
@@ -511,9 +518,9 @@ class DrugsLookup:
     def require_data(self) -> LiverToxData:
         return self.drug_name_service.require_data()
 
+
 ###############################################################################
 class LiverToxMatcher:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

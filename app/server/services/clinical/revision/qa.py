@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Literal, Protocol
 
-from domain.clinical.revision import RevisionFinalReportPayload, RevisionQaValidationPayload
+from domain.clinical.revision import (
+    RevisionFinalReportPayload,
+    RevisionQaValidationPayload,
+)
+
 
 ###############################################################################
 class ReviewerInstructionProfileLike(Protocol):
@@ -33,6 +37,7 @@ class ReviewerInstructionProfileLike(Protocol):
         ]
     ]
 
+
 ###############################################################################
 def _unique_preserve_order(values: list[str]) -> list[str]:
     seen: set[str] = set()
@@ -44,6 +49,7 @@ def _unique_preserve_order(values: list[str]) -> list[str]:
         seen.add(cleaned)
         unique.append(cleaned)
     return unique
+
 
 ###############################################################################
 def build_revision_qa_validation_payload(
@@ -175,7 +181,9 @@ def build_revision_qa_validation_payload(
     else:
         status = "requires_human_review"
         version_status = "requires_human_review"
-        warnings.append("Revision QA could not confirm a persisted final report or QA audit.")
+        warnings.append(
+            "Revision QA could not confirm a persisted final report or QA audit."
+        )
 
     deduped_warnings = _unique_preserve_order(warnings)
     return RevisionQaValidationPayload(

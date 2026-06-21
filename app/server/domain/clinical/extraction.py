@@ -6,11 +6,13 @@ from pydantic import BaseModel, Field
 
 ExtractionStrategy = Literal["deterministic", "llm", "hybrid"]
 
+
 ###############################################################################
 class LlmClinicalSectionTextDraft(BaseModel):
     anamnesis: str = ""
     therapy: str = ""
     lab_analysis: str = ""
+
 
 ###############################################################################
 class ExtractionStrategyDecision(BaseModel):

@@ -59,6 +59,7 @@ from services.clinical.extraction_strategy import decide_extraction_strategy
 from common.utils.text_utils import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
 
+
 ###############################################################################
 class DrugsParser:
     LLM_CLIENT_NOT_INITIALIZED_ERROR = (
@@ -193,7 +194,9 @@ class DrugsParser:
     # -------------------------------------------------------------------------
     def _load_weekday_terms(self) -> set[str]:
         snapshot = get_reference_catalog_snapshot()
-        values = set(snapshot.values("clinical_extraction", "weekday_terms", key="default"))
+        values = set(
+            snapshot.values("clinical_extraction", "weekday_terms", key="default")
+        )
         values.update(WEEKDAY_TOKENS)
         return values
 
@@ -688,9 +691,7 @@ class DrugsParser:
                     if line.strip()
                 )
                 or bool(
-                    self.extract_drugs_from_anamnesis_deterministic(
-                        source_text
-                    ).entries
+                    self.extract_drugs_from_anamnesis_deterministic(source_text).entries
                     if source == "anamnesis"
                     else self.extract_drugs_from_therapy_deterministic(
                         source_text

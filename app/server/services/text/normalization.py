@@ -23,6 +23,7 @@ _STRENGTH_FRAGMENT_RE = re.compile(
 )
 _PARENTHETICAL_RE = re.compile(r"\([^)]*\)")
 
+
 ###############################################################################
 def canonicalize_drug_query(value: str | None) -> str:
     if not value:
@@ -78,12 +79,14 @@ def canonicalize_drug_query(value: str | None) -> str:
     canonical = normalize_whitespace(" ".join(kept_tokens))
     return resolve_known_query_alias(canonical)
 
+
 ###############################################################################
 def normalize_drug_query_name(value: str | None) -> str:
     canonical = canonicalize_drug_query(value)
     if not canonical:
         return ""
     return normalize_drug_name(canonical)
+
 
 ###############################################################################
 def strip_manufacturer_suffix_tokens(tokens: list[str]) -> list[str]:
@@ -104,6 +107,7 @@ def strip_manufacturer_suffix_tokens(tokens: list[str]) -> list[str]:
         break
     return trimmed
 
+
 ###############################################################################
 def strip_trailing_temporal_tokens(tokens: list[str]) -> list[str]:
     if not tokens:
@@ -116,6 +120,7 @@ def strip_trailing_temporal_tokens(tokens: list[str]) -> list[str]:
             continue
         break
     return trimmed
+
 
 ###############################################################################
 def resolve_known_query_alias(value: str) -> str:

@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 
 from common.constants import (
-    DEFAULT_DILI_CLASSIFICATION,    
+    DEFAULT_DILI_CLASSIFICATION,
     R_SCORE_CHOLESTATIC_THRESHOLD,
-    R_SCORE_HEPATOCELLULAR_THRESHOLD    
+    R_SCORE_HEPATOCELLULAR_THRESHOLD,
 )
 from domain.clinical.entities import (
     ClinicalLabEntry,
@@ -17,9 +17,9 @@ from domain.clinical.entities import (
 
 NOT_AVAILABLE_TEXT = "N/A"
 
+
 ###############################################################################
 class HepatotoxicityPatternCalculator:
-
     # -------------------------------------------------------------------------
     def calculate(
         self,
@@ -61,9 +61,9 @@ class HepatotoxicityPatternCalculator:
             return None
         return value / reference
 
+
 ###############################################################################
 class HepatotoxicityPatternAnalyzer:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.r_score: float | None = None
@@ -248,4 +248,3 @@ class HepatotoxicityPatternAnalyzer:
 
 
 ###############################################################################
-

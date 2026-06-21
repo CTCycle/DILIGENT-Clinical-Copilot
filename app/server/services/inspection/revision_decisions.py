@@ -4,9 +4,9 @@ from typing import Any
 
 from services.text.normalization import normalize_drug_query_name
 
+
 ###############################################################################
 class InspectionRevisionDecisionsMixin:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def build_revision_livertox_decisions(
@@ -62,7 +62,7 @@ class InspectionRevisionDecisionsMixin:
                 match_confidence = (
                     float(raw_confidence) if raw_confidence is not None else None
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 match_confidence = None
             normalized_drug_name = normalize_drug_query_name(drug_name)
             previous_match = (
@@ -86,7 +86,7 @@ class InspectionRevisionDecisionsMixin:
                         if previous_confidence_raw is not None
                         else None
                     )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 previous_match_confidence = None
             same_match_name = bool(
                 previous_match_name
