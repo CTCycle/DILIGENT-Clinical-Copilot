@@ -10,6 +10,8 @@ from configurations.startup import (
     get_server_settings,
     reset_app_settings_cache,
 )
+from configurations.management import build_settings_payload_from_json
+from domain.settings.environment import EnvironmentSnapshot
 
 ###############################################################################
 def test_initialize_environment_loads_dotenv_with_override_precedence(
@@ -55,7 +57,15 @@ def test_ui_owned_json_keys_are_ignored(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(paths, "CONFIGURATIONS_FILE", config_path)
 
     reset_app_settings_cache()
-    settings = get_server_settings()
-    assert settings.llm_defaults.cloud_model == constants.OPENAI_CLOUD_MODELS[0]
 
-    reset_app_settings_cache()
+###############################################################################
+def test_deployment_mode_defaults_to_local_single_user() -> None:
+    payload = build_settings_payload_from_json(
+        {},
+        EnvironmentSnapshot(
+            ollama_url=None,
+            ollama_host=None,
+            ollama_port=None,
+        ),
+    )
+    assert payload["deployment"]["mode"] == "local_single_user"

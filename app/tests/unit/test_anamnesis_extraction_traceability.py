@@ -2,7 +2,6 @@ from domain.clinical.entities import DiseaseContextEntry, DrugEntry
 from services.clinical.disease import DiseaseExtractor
 from services.clinical.parser import DrugsParser
 
-
 ###############################################################################
 def test_drug_llm_post_processing_downgrades_ungrounded_evidence() -> None:
     parser = DrugsParser()
@@ -16,7 +15,6 @@ def test_drug_llm_post_processing_downgrades_ungrounded_evidence() -> None:
     assert result is not None
     assert result.confidence == "low"
     assert result.attribution == "unclear"
-
 
 ###############################################################################
 def test_disease_evidence_validation_sets_span_and_attribution() -> None:

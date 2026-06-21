@@ -56,9 +56,7 @@ class StructuredOutputParser(Generic[T]):
 
     # -------------------------------------------------------------------------
     def parse(self, text: str) -> T:
-        payload = parse_json_dict(text)
-        if payload is None:
-            raise ValueError("No JSON object found in model output")
+        payload = parse_json_object_strict(text)
         return self.schema.model_validate(payload)
 
 ###############################################################################

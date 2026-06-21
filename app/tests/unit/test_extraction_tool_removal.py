@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 ###############################################################################
 def test_extraction_tool_architecture_is_removed() -> None:
     repo_root = Path(__file__).resolve().parents[2]

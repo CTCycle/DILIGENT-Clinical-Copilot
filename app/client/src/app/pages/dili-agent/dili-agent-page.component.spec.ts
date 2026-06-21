@@ -52,4 +52,17 @@ describe('DiliAgentPageComponent', () => {
 
     expect(stopSessionSpy).toHaveBeenCalled();
   });
+
+  it('tracks acknowledgement for preflight review warnings', () => {
+    component.preflightReviewMessages.set([
+      'Review extracted timeline section before relying on generated output.',
+    ]);
+
+    expect(component.preflightReviewNoticeVisible()).toBeTruthy();
+    expect(component.preflightReviewAcknowledged()).toBeFalsy();
+
+    component.acknowledgePreflightReview();
+
+    expect(component.preflightReviewAcknowledged()).toBeTruthy();
+  });
 });

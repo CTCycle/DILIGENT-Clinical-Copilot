@@ -128,7 +128,7 @@ def test_revision_review_actions_are_persisted_and_update_version_state() -> Non
             "session_result_payload": {
                 "original_session_text": "Stable source clinical narrative",
                 "report": "Revised report draft",
-                "revision": {"execution_mode": "revision"},
+                "revision": {"revision_kind": "llm_assisted_revision"},
             },
         }
     )

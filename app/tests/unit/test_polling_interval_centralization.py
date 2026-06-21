@@ -28,7 +28,10 @@ class JobManagerStub:
         self.job_type: str | None = None
 
     # -------------------------------------------------------------------------
-    def is_job_running(self, job_type: str | None = None) -> bool:
+    def is_job_running(
+        self, job_type: str | None = None, *, scope_key: str | None = None
+    ) -> bool:
+        _ = scope_key
         return False
 
     # -------------------------------------------------------------------------
@@ -38,7 +41,9 @@ class JobManagerStub:
         runner: Any,
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
+        scope_key: str | None = None,
     ) -> str:
+        _ = scope_key
         self.job_type = job_type
         return "job-1234"
 
@@ -71,32 +76,14 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
         staticmethod(lambda: False),
     )
 
-    async def preprocess_unified_input(
-        request_payload: ClinicalSessionRequest,
-    ) -> tuple[ClinicalSessionRequest, object]:
-        return request_payload, object()
-
-    monkeypatch.setattr(
-        endpoint.service, "preprocess_unified_input", preprocess_unified_input
-    )
     monkeypatch.setattr(
         endpoint.service,
-        "validate_assessment_prerequisites_without_llm",
-        lambda _: SimpleNamespace(
-            sections={
-                "anamnesis": SimpleNamespace(
-                    text="Clinical context", start_line=1, end_line=1
-                ),
-                "drugs": SimpleNamespace(
-                    text="Acetaminophen 500 mg", start_line=2, end_line=2
-                ),
-                "laboratory_analysis": SimpleNamespace(
-                    text="ALT 300 U/L", start_line=3, end_line=3
-                ),
-            },
-            missing_required_sections=[],
-            malformed_sections=[],
-        ),
+        "prepare_structured_clinical_input",
+        lambda request_payload: {
+            "normalized_document": object(),
+            "section_extraction": object(),
+            "patient_payload": object(),
+        },
     )
     monkeypatch.setattr(
         endpoint.service, "build_patient_payload", lambda request_payload: object()

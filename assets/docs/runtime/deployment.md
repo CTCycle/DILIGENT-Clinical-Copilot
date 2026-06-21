@@ -1,5 +1,5 @@
 # Deployment And Packaging
-Last updated: 2026-06-03
+Last updated: 2026-06-21
 
 ## Desktop Packaging
 - Packaging command:
@@ -26,5 +26,6 @@ release\tauri\build_with_tauri.bat
 
 ## Packaging Constraints
 - Desktop packaging is Windows-focused in the current repository.
+- Supported deployment mode is `local_single_user`; startup rejects other deployment modes.
 - No supported container deployment path exists.
 - Packaged runtime depends on the bundled frontend dist plus backend resources being present and aligned.

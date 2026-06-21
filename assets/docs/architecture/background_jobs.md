@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-06-04
+Last updated: 2026-06-21
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -25,6 +25,8 @@ Each job tracks:
 
 ## Execution Behavior
 - Jobs run in daemon threads.
+- Job execution state is process-local. Clinical and update job ids are not durable across backend restarts.
+- Revision runs are persisted separately from the in-memory job state; startup reconciliation marks stale `running` revision runs as failed/recoverable when no in-process worker can own them.
 - `start_job` can auto-inject `job_id` into runners.
 - `update_result` merges interim patches with final payload.
 - Unhandled runner exceptions mark the job `failed` unless cancellation was requested.
@@ -62,6 +64,8 @@ Additional rules:
 - Inspection update jobs may include `phase`, `step_index`, `step_count`, `progress_message`, and `summary`.
 - Inspection update runners use cooperative cancellation and progress callbacks consistently across `rxnav`, `livertox`, and `rag`.
 - Session revision jobs reprocess the persisted session text, create a new session version, and persist a `revision_audit` payload with parser cross-validation, selected-focus context, user instructions, detected-drug diffs, model overrides, and conclusion action metadata.
+- Missing in-memory revision job status returns a recoverable failed status instead of a bare not-found response so the frontend can reload the persisted revision run and offer retry when the draft shell is still valid.
+- Clinical and session revision jobs must persist their successful result payloads before returning completion. Persistence failures move the job to failed state with sanitized error metadata.
 
 Frontend polling is implemented in `app/client/src/app/core/services/api.ts` and stops on terminal states.
 
@@ -74,8 +78,12 @@ If a runner does not check stop requests, cancellation is delayed.
 
 ## Clinical Job Notes
 - Clinical jobs run input preflight before job creation.
+- Clinical assessment concurrency is explicitly scoped as `clinical:global`.
+- Revision concurrency is scoped per root clinical session; a second revision for the same root session conflicts, while unrelated root sessions can follow their configured policy independently.
+- Catalog update concurrency is scoped per catalog target.
 - Completed results include database-backed evidence-lock artifacts and gate fields such as `manual_review_required`, `blocking_issues`, `pipeline_artifacts`, and `run_bundle_index`.
 - These artifacts are persisted through the clinical session result payload rather than loose files.
+- Failed clinical results omit raw anamnesis, drug text, laboratory text, and patient image base64 content. Failure payloads expose generic error text plus `failure_metadata` for diagnostics.
 - DILI sessions perform deterministic section validation before clinical extraction and may parallelize parser-model extraction only when parser batch preflight marks concurrency as safe; otherwise the workflow falls back to sequential execution.
 
 ## New Job Checklist

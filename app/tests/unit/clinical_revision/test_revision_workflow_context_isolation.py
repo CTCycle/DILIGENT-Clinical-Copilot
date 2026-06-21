@@ -47,7 +47,14 @@ class FakeSerializer:
     # -------------------------------------------------------------------------
     def save_clinical_session(self, payload: dict[str, Any]) -> int | None:
         self.saved_payload = payload
-        return None
+        return 202
+
+    # -------------------------------------------------------------------------
+    def upsert_session_result_payload(
+        self, session_id: int, payload: dict[str, Any]
+    ) -> None:
+        self.upserted_session_id = session_id
+        self.upserted_payload = payload
 
 ###############################################################################
 class FakeRevisionClinicalService:
@@ -177,7 +184,7 @@ class FakeRevisionClinicalService:
             SimpleNamespace(llm_model="test-clinical-model"),
             "Revision-focused final report",
             {
-                "execution_mode": "revision",
+                "revision_kind": "llm_assisted_revision",
                 "analysis_entrypoint": "run_revision_analysis",
                 "used_fallback_report": False,
                 "consultation_model": "test-clinical-model",
@@ -302,7 +309,12 @@ def test_revision_focus_context_isolated_from_retrieval_and_lookup(
     )
     assert service.consultation_drug_names == ["Drug B"]
     assert result["revision"]["focus_context"] == "Rewrite the chronology section only."
-    assert result["revision"]["execution_mode"] == "revision"
+    assert result["revision"]["revision_kind"] == "llm_assisted_revision"
+    assert "execution_mode" not in result["revision"]
+    assert result["revision"]["source_session_id"] is None
+    assert result["revision"]["source_version_id"] == 11
+    assert result["revision"]["revision_version_id"] == 12
+    assert result["revision"]["pipeline_run_id"] == "pipe-test-001"
     assert result["revision"]["extraction_bundle"] == {
         "status": "resolved",
         "therapy_source": "recomputed_current_revision",
@@ -334,7 +346,7 @@ def test_revision_focus_context_isolated_from_retrieval_and_lookup(
         "previous_assessment_summaries": ["Drug A: possible"],
     }
     assert result["revision"]["consultation_execution"] == {
-        "execution_mode": "revision",
+        "revision_kind": "llm_assisted_revision",
         "analysis_entrypoint": "run_revision_analysis",
         "used_fallback_report": False,
         "consultation_model": "test-clinical-model",

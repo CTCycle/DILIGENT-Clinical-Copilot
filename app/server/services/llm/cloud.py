@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import asyncio
 import json
 from typing import Any, Literal
@@ -30,6 +31,10 @@ class LLMError(RuntimeError):
 ###############################################################################
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
+
+###############################################################################
+def short_output_hash(output_text: str) -> str:
+    return hashlib.sha256((output_text or "").encode("utf-8")).hexdigest()[:12]
 
 ###############################################################################
 class CloudLLMClient:
@@ -654,8 +659,12 @@ class CloudLLMClient:
             except Exception as err:
                 if attempt >= max_repair_attempts:
                     logger.error(
-                        "Structured parse failed after retries. Last text: %s",
-                        text,
+                        "Structured parse failed after retries: schema=%s attempts=%s output_length=%s output_hash=%s error=%s",
+                        parser.schema.__name__,
+                        attempt + 1,
+                        len(text or ""),
+                        short_output_hash(text or ""),
+                        type(err).__name__,
                     )
                     raise RuntimeError(f"Structured parsing failed: {err}") from err
 

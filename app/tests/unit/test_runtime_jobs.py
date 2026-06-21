@@ -95,3 +95,28 @@ def test_job_result_merge_is_single_source_of_truth() -> None:
     release.set()
     assert snapshot is not None
     assert snapshot["result"] == {"a": 1, "b": 2}
+
+###############################################################################
+def test_job_running_checks_can_be_scoped() -> None:
+    manager = JobManager()
+    started = threading.Event()
+    release = threading.Event()
+
+    def runner() -> dict[str, int]:
+        started.set()
+        release.wait(timeout=5)
+        return {"ok": 1}
+
+    job_id = manager.start_job("runtime_test", runner, scope_key="scope:a")
+    try:
+        assert started.wait(timeout=1)
+        assert manager.is_job_running("runtime_test") is True
+        assert manager.is_job_running("runtime_test", scope_key="scope:a") is True
+        assert manager.is_job_running("runtime_test", scope_key="scope:b") is False
+        running = manager.get_running_job("runtime_test", scope_key="scope:a")
+        assert running is not None
+        assert running["job_id"] == job_id
+        assert running["scope_key"] == "scope:a"
+    finally:
+        manager.cancel_job(job_id)
+        release.set()

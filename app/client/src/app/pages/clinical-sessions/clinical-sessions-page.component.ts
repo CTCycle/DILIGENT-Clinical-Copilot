@@ -67,6 +67,9 @@ type DetectedDrugEvidence = {
   inAnamnesis: boolean;
   inTherapy: boolean;
   temporalReference: string;
+  extractionFallback: boolean;
+  bibliographyLabel: string;
+  bibliographyFallback: boolean;
 };
 
 type LabTimelineRow = {
@@ -1111,8 +1114,10 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (this.selected()?.session_id === detail.session_id) {
       this.detectedDrugEvidence.set(rows.map(({ hasPersistedMatch: _hasPersistedMatch, ...row }) => ({
         ...row,
-        rxNav: fallbackByName.get(row.name)?.rxNav ?? row.rxNav,
-        liverTox: fallbackByName.get(row.name)?.liverTox ?? row.liverTox,
+        bibliographyLabel: this.resolveDrugBibliographyLabel(row, fallbackByName.get(row.name)),
+        bibliographyFallback: row.bibliographyFallback
+          || (!row.liverTox && Boolean(fallbackByName.get(row.name)?.liverTox))
+          || (!row.rxNav && Boolean(fallbackByName.get(row.name)?.rxNav)),
       })));
     }
   }
@@ -1120,11 +1125,14 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   private buildPersistedDrugEvidence(detail: ClinicalSessionDetail): DrugEvidenceDraft[] {
     const rows = new Map<string, DrugEvidenceDraft>();
     const sections = this.sectionTextMap(detail);
-    const ensureRow = (name: string): DrugEvidenceDraft => {
+    const ensureRow = (name: string, options: { fallback?: boolean } = {}): DrugEvidenceDraft => {
       const normalized = this.normalizeDrugName(name);
       const key = normalized || name.trim().toLowerCase();
       const existing = rows.get(key);
-      if (existing) return existing;
+      if (existing) {
+        existing.extractionFallback = existing.extractionFallback && Boolean(options.fallback);
+        return existing;
+      }
       const next: DrugEvidenceDraft = {
         name,
         liverTox: false,
@@ -1132,6 +1140,9 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         inAnamnesis: this.textContainsDrug(sections.anamnesis, name),
         inTherapy: this.textContainsDrug(sections.therapy, name),
         temporalReference: this.drugTemporalReference(name, detail),
+        extractionFallback: Boolean(options.fallback),
+        bibliographyLabel: 'No backend match',
+        bibliographyFallback: false,
         hasPersistedMatch: false,
       };
       rows.set(key, next);
@@ -1140,7 +1151,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
     for (const name of this.previewDetectedDrugs(detail)) {
       for (const candidate of this.expandDrugCandidates(name, detail)) {
-        ensureRow(candidate);
+        ensureRow(candidate, { fallback: candidate !== name });
       }
     }
 
@@ -1154,7 +1165,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       const name = this.drugNameFromUnknown(item);
       if (!name) continue;
       for (const candidate of this.expandDrugCandidates(name, detail)) {
-        ensureRow(candidate).inTherapy = true;
+        ensureRow(candidate, { fallback: candidate !== name }).inTherapy = true;
       }
     }
     for (const item of anamnesisDrugs) {
@@ -1172,7 +1183,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       if (!name) continue;
       const expandedNames = this.expandDrugCandidates(name, detail);
       for (const expandedName of expandedNames) {
-        ensureRow(expandedName).hasPersistedMatch = true;
+        ensureRow(expandedName, { fallback: expandedName !== name }).hasPersistedMatch = true;
       }
       if (this.looksLikeSentenceFragment(name) && expandedNames.length) continue;
       const row = ensureRow(name);
@@ -1181,12 +1192,29 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       row.name = row.name || matchedName || name;
       row.liverTox = row.liverTox || this.hasLiverToxEvidence(record);
       row.rxNav = row.rxNav || this.hasRxNavEvidence(record);
+      row.bibliographyLabel = this.resolveDrugBibliographyLabel(row);
       row.inTherapy = row.inTherapy || this.originsContain(record, 'therapy') || this.rawMentionsContain(record, sections.therapy);
       row.inAnamnesis = row.inAnamnesis || this.originsContain(record, 'anamnesis') || this.rawMentionsContain(record, sections.anamnesis);
       row.temporalReference = this.drugTemporalReference(row.name, detail);
     }
 
     return [...rows.values()];
+  }
+
+  private resolveDrugBibliographyLabel(
+    row: Pick<DetectedDrugEvidence, 'liverTox' | 'rxNav'>,
+    fallback?: Partial<Pick<DetectedDrugEvidence, 'liverTox' | 'rxNav'>>,
+  ): string {
+    const backendLabels = [
+      row.liverTox ? 'LiverTox' : null,
+      row.rxNav ? 'RxNav' : null,
+    ].filter((label): label is string => Boolean(label));
+    if (backendLabels.length) return backendLabels.join(' + ');
+    const fallbackLabels = [
+      fallback?.liverTox ? 'LiverTox catalog fallback' : null,
+      fallback?.rxNav ? 'RxNav catalog fallback' : null,
+    ].filter((label): label is string => Boolean(label));
+    return fallbackLabels.length ? fallbackLabels.join(' + ') : 'No backend match';
   }
 
   private expandDrugCandidates(name: string, detail: ClinicalSessionDetail): string[] {
