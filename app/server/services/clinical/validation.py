@@ -13,7 +13,6 @@ from domain.clinical.entities import (
 )
 from domain.clinical.validation import ValidationMessageBundle
 
-
 ###############################################################################
 def build_validation_bundle(report_language: str) -> ValidationMessageBundle:
     language_code = resolve_supported_language_code(report_language)
@@ -22,7 +21,6 @@ def build_validation_bundle(report_language: str) -> ValidationMessageBundle:
         VALIDATION_MESSAGE_BUNDLES["en"],
     )
     return ValidationMessageBundle(**message_bundle)
-
 
 ###############################################################################
 def ensure_required_sections(
@@ -52,7 +50,6 @@ def ensure_required_sections(
     if issues:
         raise ClinicalPipelineValidationError(issues=issues, message=issues[0].message)
 
-
 ###############################################################################
 def has_timing_information(entry: DrugEntry) -> bool:
     has_schedule = bool((entry.administration_pattern or "").strip()) or any(
@@ -66,7 +63,6 @@ def has_timing_information(entry: DrugEntry) -> bool:
         or entry.suspension_status is True
         or has_schedule
     )
-
 
 ###############################################################################
 def ensure_timed_therapy_drug(

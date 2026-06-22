@@ -27,14 +27,12 @@ from services.updater import livertox_common
 
 MONOGRAPH_PROGRESS_INTERVAL = 25
 
-
 ###############################################################################
 def process_monograph_payload(
     member_name: str,
     data: bytes,
 ) -> dict[str, str] | None:
     return process_monograph_member(member_name, data)
-
 
 ###############################################################################
 def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | None:
@@ -101,13 +99,11 @@ def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | No
 
     return data.reset_index(drop=True)
 
-
 ###############################################################################
 def clean_master_list_column(self, series: pd.Series) -> pd.Series:
     cleaned = series.fillna("").astype(str).str.strip()
     cleaned = cleaned.replace("", pd.NA)
     return cleaned
-
 
 ###############################################################################
 def collect_monographs(
@@ -256,7 +252,6 @@ def collect_monographs(
             )
     return sort_monograph_records(self, collected)
 
-
 ###############################################################################
 def emit_monograph_progress(
     self,
@@ -283,7 +278,6 @@ def emit_monograph_progress(
         total_payloads,
     )
     return processed_count
-
 
 ###############################################################################
 def drain_monograph_futures(
@@ -333,7 +327,6 @@ def drain_monograph_futures(
         )
     return processed_count, last_reported_count
 
-
 ###############################################################################
 def sort_monograph_records(self, records: list[dict[str, str]]) -> list[dict[str, str]]:
     return sorted(
@@ -344,7 +337,6 @@ def sort_monograph_records(self, records: list[dict[str, str]]) -> list[dict[str
             str(item.get("excerpt", "")).casefold(),
         ),
     )
-
 
 ###############################################################################
 def process_monograph_member(
@@ -375,7 +367,6 @@ def process_monograph_member(
         "excerpt": cleaned_text,
     }
 
-
 ###############################################################################
 def convert_member_bytes(
     member_name: str, data: bytes
@@ -391,14 +382,12 @@ def convert_member_bytes(
     text = html_to_text(markup)
     return text, markup
 
-
 ###############################################################################
 def decode_markup(data: bytes) -> str:
     try:
         return data.decode("utf-8")
     except UnicodeDecodeError:
         return data.decode("latin-1", errors="ignore")
-
 
 ###############################################################################
 def pdf_to_text(data: bytes) -> str:
@@ -429,7 +418,6 @@ def pdf_to_text(data: bytes) -> str:
     except UnicodeDecodeError:
         return data.decode("latin-1", errors="ignore")
 
-
 ###############################################################################
 def extract_nbk(member_name: str, content: str) -> str | None:
     match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
@@ -440,14 +428,12 @@ def extract_nbk(member_name: str, content: str) -> str | None:
         return match.group(0).upper()
     return None
 
-
 ###############################################################################
 def derive_identifier(member_name: str) -> str:
     base = PurePosixPath(member_name).name
     stem = PurePosixPath(base).stem
     cleaned = normalize_whitespace(strip_punctuation(stem))
     return cleaned or base
-
 
 ###############################################################################
 def extract_title(html_text: str, plain_text: str, default: str) -> str:
@@ -471,11 +457,9 @@ def extract_title(html_text: str, plain_text: str, default: str) -> str:
                 return normalized
     return normalize_extracted_title(default) or default
 
-
 ###############################################################################
 def clean_fragment(fragment: str) -> str:
     return html_to_text(fragment)
-
 
 ###############################################################################
 def normalize_extracted_title(value: str) -> str:
@@ -490,7 +474,6 @@ def normalize_extracted_title(value: str) -> str:
     )
     return normalize_whitespace(cleaned)
 
-
 ###############################################################################
 def html_to_text(html_text: str) -> str:
     # Tempered dot avoids runaway backtracking on malformed HTML.
@@ -499,13 +482,11 @@ def html_to_text(html_text: str) -> str:
     unescaped = html.unescape(stripped)
     return normalize_whitespace(unescaped)
 
-
 ###############################################################################
 def strip_punctuation(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value)
     folded = "".join(char for char in normalized if not unicodedata.combining(char))
     return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
-
 
 ###############################################################################
 def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
@@ -528,7 +509,6 @@ def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
     sanitized["synonyms"] = synonyms.where(pd.notnull(synonyms), pd.NA)
     return sanitized.reset_index(drop=True)
 
-
 ###############################################################################
 def sanitize_excerpt(self, value: Any) -> str | Any:
     if value is None or pd.isna(value):
@@ -540,7 +520,6 @@ def sanitize_excerpt(self, value: Any) -> str | Any:
     if not cleaned:
         return pd.NA
     return cleaned
-
 
 ###############################################################################
 def normalize_nbk_id(self, value: Any) -> str | None:
@@ -554,7 +533,6 @@ def normalize_nbk_id(self, value: Any) -> str | None:
     if not livertox_common.NBK_ID_PATTERN.fullmatch(normalized):
         return None
     return normalized
-
 
 ###############################################################################
 def contains_symbol(self, value: str) -> bool:

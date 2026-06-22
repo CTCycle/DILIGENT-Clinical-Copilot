@@ -63,7 +63,6 @@ GGUF_ARCH_PREFIXES = frozenset(
 VRAM_SAFETY_RATIO = 0.85
 RAM_SAFETY_RATIO = 0.75
 
-
 ###############################################################################
 def resolve_model_name(self, name: str | None) -> str:
     candidate = (name or "").strip()
@@ -73,13 +72,11 @@ def resolve_model_name(self, name: str | None) -> str:
         return self.default_model
     raise OllamaError("Model name must be provided.")
 
-
 ###############################################################################
 def get_pull_guard(cls) -> asyncio.Lock:
     if cls.pull_locks_guard is None:
         cls.pull_locks_guard = asyncio.Lock()
     return cls.pull_locks_guard
-
 
 ###############################################################################
 async def get_model_lock(cls, name: str) -> asyncio.Lock:
@@ -89,7 +86,6 @@ async def get_model_lock(cls, name: str) -> asyncio.Lock:
             lock = asyncio.Lock()
             cls.pull_locks[name] = lock
         return lock
-
 
 ###############################################################################
 async def refresh_model_cache(self) -> set[str]:
@@ -127,7 +123,6 @@ async def refresh_model_cache(self) -> set[str]:
         self.model_cache_expiry = loop.time() + self.MODEL_CACHE_TTL
     return set(names)
 
-
 ###############################################################################
 async def get_cached_models(self, *, force_refresh: bool = False) -> set[str]:
     loop = asyncio.get_running_loop()
@@ -140,7 +135,6 @@ async def get_cached_models(self, *, force_refresh: bool = False) -> set[str]:
         if cache_valid:
             return set(self.model_cache)
     return await self.refresh_model_cache()
-
 
 ###############################################################################
 def prepare_generation_parameters(
@@ -157,7 +151,6 @@ def prepare_generation_parameters(
     else:
         think_value = bool(think)
     return round(temp_value, 2), think_value, options_payload
-
 
 ###############################################################################
 def resolve_temperature(
@@ -182,7 +175,6 @@ def resolve_temperature(
             options_payload = None
     return temp_value, options_payload
 
-
 ###############################################################################
 def compose_payload(
     payload: dict[str, Any],
@@ -198,7 +190,6 @@ def compose_payload(
     if keep_alive:
         payload["keep_alive"] = keep_alive
     return payload
-
 
 ###############################################################################
 def build_chat_payload(
@@ -227,7 +218,6 @@ def build_chat_payload(
         keep_alive=keep_alive,
     )
 
-
 ###############################################################################
 async def ensure_context_option(
     self,
@@ -247,7 +237,6 @@ async def ensure_context_option(
     merged = dict(options) if options else {}
     merged.setdefault("num_ctx", context_window)
     return merged
-
 
 ###############################################################################
 async def prepare_common_options(
@@ -273,7 +262,6 @@ async def prepare_common_options(
     )
     return resolved_model, temp_value, think_value, enriched
 
-
 ###############################################################################
 async def ensure_model_ready(self, name: str) -> None:
     model = self.resolve_model_name(name)
@@ -294,7 +282,6 @@ async def ensure_model_ready(self, name: str) -> None:
         if model not in available:
             raise OllamaError(f"Model '{model}' was not found after pull completed")
 
-
 ###############################################################################
 def extract_chat_content(payload: dict[str, Any]) -> Any:
     if not isinstance(payload, dict):
@@ -305,7 +292,6 @@ def extract_chat_content(payload: dict[str, Any]) -> Any:
     if "response" in payload:
         return payload.get("response", "")
     return ""
-
 
 ###############################################################################
 def normalize_embedding_payload(
@@ -330,7 +316,6 @@ def normalize_embedding_payload(
     if len(normalized) != expected:
         raise OllamaError("Mismatch between Ollama embeddings and inputs")
     return normalized
-
 
 ###############################################################################
 async def embed(
@@ -363,7 +348,6 @@ async def embed(
 
     return normalize_embedding_payload(payload, expected=len(input_texts))
 
-
 ###############################################################################
 def raise_for_status(resp: httpx.Response) -> None:
     try:
@@ -371,7 +355,6 @@ def raise_for_status(resp: httpx.Response) -> None:
     except httpx.HTTPStatusError as e:
         detail = resp.text
         raise OllamaError(f"Ollama HTTP {resp.status_code}: {detail}") from e
-
 
 ###############################################################################
 async def maybe_await(cb: ProgressCb | None, evt: dict[str, Any]) -> None:
@@ -385,7 +368,6 @@ async def maybe_await(cb: ProgressCb | None, evt: dict[str, Any]) -> None:
         # attach minimal context; callers can log externally
         raise OllamaError(f"Progress callback failed: {e!r}") from e
 
-
 ###############################################################################
 def decode_response_content(content: Any) -> Any:
     if isinstance(content, dict):
@@ -396,7 +378,6 @@ def decode_response_content(content: Any) -> Any:
         except json.JSONDecodeError:
             return content
     return str(content)
-
 
 ###############################################################################
 async def iter_json_stream_events(
@@ -411,13 +392,11 @@ async def iter_json_stream_events(
             continue
         yield evt
 
-
 ###############################################################################
 async def list_models(self) -> list[str]:
     await self.get_cached_models(force_refresh=True)
     async with self.model_cache_lock:
         return list(self.model_cache_list)
-
 
 ###############################################################################
 async def pull(
@@ -447,7 +426,6 @@ async def pull(
         raise OllamaTimeout(f"Timed out pulling model '{name}'") from e
     await self.refresh_cache_after_pull(completed)
 
-
 ###############################################################################
 async def pull_stream(
     self,
@@ -466,13 +444,11 @@ async def pull_stream(
                 await asyncio.sleep(poll_sleep_s)
     return False
 
-
 ###############################################################################
 async def pull_once(self, *, payload: dict[str, Any]) -> bool:
     resp = await self.client.post("/api/pull", json=payload)
     self.raise_for_status(resp)
     return True
-
 
 ###############################################################################
 async def refresh_cache_after_pull(self, completed: bool) -> None:
@@ -482,7 +458,6 @@ async def refresh_cache_after_pull(self, completed: bool) -> None:
         await self.refresh_model_cache()
     except OllamaError as exc:
         logger.debug("Failed to refresh Ollama model cache after pull: %s", exc)
-
 
 ###############################################################################
 async def show_model(self, name: str) -> dict[str, Any]:
@@ -506,7 +481,6 @@ async def show_model(self, name: str) -> dict[str, Any]:
 
     return data
 
-
 ###############################################################################
 async def is_server_online(self) -> bool:
     try:
@@ -515,7 +489,6 @@ async def is_server_online(self) -> bool:
     except httpx.RequestError, httpx.HTTPStatusError:
         return False
     return True
-
 
 ###############################################################################
 async def start_server(
@@ -564,7 +537,6 @@ async def start_server(
 
     raise OllamaTimeout("Timed out waiting for Ollama server to start")
 
-
 ###############################################################################
 async def check_model_availability(self, name: str, *, auto_pull: bool = True) -> None:
     model = self.resolve_model_name(name)
@@ -574,7 +546,6 @@ async def check_model_availability(self, name: str, *, auto_pull: bool = True) -
     names = await self.get_cached_models(force_refresh=True)
     if model not in names:
         raise OllamaError(f"Model '{model}' not found and auto_pull=False")
-
 
 ###############################################################################
 async def chat(
@@ -636,7 +607,6 @@ async def chat(
     normalized = normalize_model_content(content)
     await self.maybe_prefetch_target_model(active_model=resolved_model)
     return normalized
-
 
 ###############################################################################
 async def chat_stream(
@@ -723,7 +693,6 @@ async def chat_stream(
     yield {"message": {"role": "assistant", "content": final_content}, "done": True}
     await self.maybe_prefetch_target_model(active_model=resolved_model)
 
-
 ###############################################################################
 def extract_context_limit(cls, metadata: dict[str, Any]) -> int | None:
     if not isinstance(metadata, dict):
@@ -741,7 +710,6 @@ def extract_context_limit(cls, metadata: dict[str, Any]) -> int | None:
                     return candidate
     return None
 
-
 ###############################################################################
 async def get_model_context_limit(self, name: str) -> int | None:
     cached = self.model_context_limits.get(name)
@@ -756,7 +724,6 @@ async def get_model_context_limit(self, name: str) -> int | None:
     self.model_context_limits[name] = limit
     return limit or None
 
-
 ###############################################################################
 def estimate_tokens(text: str) -> int:
     if not text:
@@ -767,7 +734,6 @@ def estimate_tokens(text: str) -> int:
     pieces = re.findall(r"\w+|[^\w\s]", normalized)
     approximate = max(len(pieces), math.ceil(len(normalized) / 4))
     return max(approximate, 1)
-
 
 ###############################################################################
 def _parse_param_count_text(text: str) -> int | None:
@@ -788,7 +754,6 @@ def _parse_param_count_text(text: str) -> int | None:
     }
     return int(num * multipliers.get(unit, 1))
 
-
 ###############################################################################
 def _infer_param_count(metadata: dict[str, Any], model_name: str) -> int | None:
     details = metadata.get("details")
@@ -802,7 +767,6 @@ def _infer_param_count(metadata: dict[str, Any], model_name: str) -> int | None:
     if match:
         return _parse_param_count_text(match.group(0))
     return None
-
 
 ###############################################################################
 def extract_model_architecture(metadata: dict[str, Any]) -> dict[str, int] | None:
@@ -827,7 +791,6 @@ def extract_model_architecture(metadata: dict[str, Any]) -> dict[str, int] | Non
             }
     return None
 
-
 ###############################################################################
 def estimate_kv_cache_bytes_per_token(
     metadata: dict[str, Any],
@@ -849,7 +812,6 @@ def estimate_kv_cache_bytes_per_token(
             if param_count >= lower_bound:
                 return per_token
     return None
-
 
 ###############################################################################
 async def estimate_max_feasible_context(
@@ -883,7 +845,6 @@ async def estimate_max_feasible_context(
     if feasible == 0:
         return None
     return min(native_limit, feasible)
-
 
 ###############################################################################
 async def calculate_context_window(

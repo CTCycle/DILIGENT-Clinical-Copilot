@@ -28,9 +28,9 @@ from repositories.serialization import (
     session_revision_steps,
 )
 
-
 ###############################################################################
 class DataSerializer:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

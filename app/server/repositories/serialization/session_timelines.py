@@ -13,7 +13,6 @@ from repositories.schemas.models import (
     Patient,
 )
 
-
 ###############################################################################
 def _validate_timeline_payload(
     payload: dict[str, Any] | None,
@@ -24,7 +23,6 @@ def _validate_timeline_payload(
         return PatientTimeline.model_validate(payload)
     except Exception:
         return None
-
 
 ###############################################################################
 def _build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
@@ -45,7 +43,6 @@ def _build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
         end_date=sorted_dates[-1] if sorted_dates else None,
         title=title,
     ).model_dump(mode="json")
-
 
 ###############################################################################
 def _timeline_from_row(
@@ -72,7 +69,6 @@ def _timeline_from_row(
             "model_provider": self.normalize_string(row.model_provider),
         }
     )
-
 
 ###############################################################################
 def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
@@ -104,7 +100,6 @@ def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
     finally:
         db_session.close()
 
-
 ###############################################################################
 def get_session_timeline_record(
     self,
@@ -127,7 +122,6 @@ def get_session_timeline_record(
         return timeline.model_dump(mode="json") if timeline is not None else None
     finally:
         db_session.close()
-
 
 ###############################################################################
 def get_latest_session_timeline_record(self, session_id: int) -> dict[str, Any] | None:
@@ -153,7 +147,6 @@ def get_latest_session_timeline_record(self, session_id: int) -> dict[str, Any] 
         return timeline.model_dump(mode="json") if timeline is not None else None
     finally:
         db_session.close()
-
 
 ###############################################################################
 def create_session_timeline_record(
@@ -201,7 +194,6 @@ def create_session_timeline_record(
         raise
     finally:
         db_session.close()
-
 
 ###############################################################################
 def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:

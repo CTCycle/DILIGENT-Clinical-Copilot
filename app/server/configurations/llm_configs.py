@@ -13,7 +13,6 @@ from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
 
-
 ###############################################################################
 class LLMRuntimeConfig:
     _runtime_override: ContextVar[dict[str, object] | None] = ContextVar(

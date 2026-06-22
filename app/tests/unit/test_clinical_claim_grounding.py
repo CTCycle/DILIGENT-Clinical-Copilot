@@ -4,7 +4,6 @@ from domain.clinical import DrugClinicalAssessment, DrugRucamAssessment
 from services.clinical.analysis_runner import AnalysisRunner
 from services.clinical.hepatox_core import HepatoxConsultation
 
-
 ###############################################################################
 def test_source_text_evidence_produces_high_confidence_claim() -> None:
     narrative = AnalysisRunner.build_clinical_narrative(
@@ -18,7 +17,6 @@ def test_source_text_evidence_produces_high_confidence_claim() -> None:
     assert narrative.claims[0].source == "source_text"
     assert narrative.claims[0].confidence == "high"
     assert narrative.claims[0].requires_review is False
-
 
 ###############################################################################
 def test_missing_evidence_claim_requires_review_and_renders_warning() -> None:

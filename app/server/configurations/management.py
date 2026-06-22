@@ -57,13 +57,11 @@ from domain.settings.environment import (
     EnvironmentSnapshot,
 )
 
-
 ###############################################################################
 def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
-
 
 ###############################################################################
 def load_configuration_data(path: str | Path) -> dict[str, Any]:
@@ -79,9 +77,9 @@ def load_configuration_data(path: str | Path) -> dict[str, Any]:
         raise RuntimeError("Configuration must be a JSON object.")
     return data
 
-
 ###############################################################################
 class ConfigurationManager:
+
     # -------------------------------------------------------------------------
     def __init__(self, config_path: str | None = None) -> None:
         self._config_path = Path(config_path or CONFIGURATIONS_FILE)
@@ -131,7 +129,6 @@ class ConfigurationManager:
         block = self.get_block(block_name)
         return block.get(key, default)
 
-
 ###############################################################################
 def _resolve_ollama_url_with_scheme(
     normalized_host: str,
@@ -152,14 +149,12 @@ def _resolve_ollama_url_with_scheme(
     resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
     return f"{scheme}://{host_port}:{resolved_port}"
 
-
 ###############################################################################
 def _normalize_ollama_host(host: str) -> str:
     normalized = host.strip()
     if normalized.lower() in {"localhost", "::1", "[::1]"}:
         return "127.0.0.1"
     return normalized
-
 
 ###############################################################################
 def resolve_ollama_base_url(
@@ -186,7 +181,6 @@ def resolve_ollama_base_url(
     if port_value is not None:
         return f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{port_value}"
     return fallback.rstrip("/")
-
 
 ###############################################################################
 def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
@@ -222,7 +216,6 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
         ),
     )
 
-
 ###############################################################################
 def _default_llm_runtime_defaults(
     environment: EnvironmentSnapshot,
@@ -251,7 +244,6 @@ def _default_llm_runtime_defaults(
         ),
     )
 
-
 ###############################################################################
 def _build_fastapi_settings() -> FastAPISettings:
     return FastAPISettings(
@@ -259,7 +251,6 @@ def _build_fastapi_settings() -> FastAPISettings:
         version=FASTAPI_VERSION,
         description=FASTAPI_DESCRIPTION,
     )
-
 
 ###############################################################################
 def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
@@ -269,12 +260,10 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
         polling_interval = 1.0
     return JobsSettings(polling_interval=polling_interval)
 
-
 ###############################################################################
 def _build_deployment_settings(data: dict[str, Any]) -> DeploymentSettings:
     payload = ensure_mapping(data)
     return DeploymentSettings(mode=coerce_str(payload.get("mode"), "local_single_user"))
-
 
 ###############################################################################
 def _parse_database_url(url: str | None) -> dict[str, Any]:
@@ -290,7 +279,6 @@ def _parse_database_url(url: str | None) -> dict[str, Any]:
         "username": parsed.username or None,
         "password": parsed.password or None,
     }
-
 
 ###############################################################################
 def _build_database_settings(
@@ -356,7 +344,6 @@ def _build_database_settings(
         select_page_size=select_page_size,
     )
 
-
 ###############################################################################
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     return DrugsMatcherSettings(
@@ -398,7 +385,6 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
             DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
         ),
     )
-
 
 ###############################################################################
 def _build_rag_settings(
@@ -447,7 +433,6 @@ def _build_rag_settings(
         ),
         embedding_max_workers=coerce_positive_int(data.get("embedding_max_workers"), 4),
     )
-
 
 ###############################################################################
 def _build_runtime_settings(
@@ -519,7 +504,6 @@ def _build_runtime_settings(
         ),
     )
 
-
 ###############################################################################
 def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
     min_length = coerce_positive_int(data.get("drug_name_min_length"), 3)
@@ -531,7 +515,6 @@ def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
         drug_name_max_length=max_length,
         drug_name_max_tokens=coerce_positive_int(data.get("drug_name_max_tokens"), 8),
     )
-
 
 ###############################################################################
 def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSettings:
@@ -559,7 +542,6 @@ def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSet
             4,
         ),
     )
-
 
 ###############################################################################
 def build_settings_payload_from_json(

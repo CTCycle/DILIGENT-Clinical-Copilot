@@ -260,14 +260,12 @@ _PHRASES = {
     },
 }
 
-
 ###############################################################################
 def resolve_report_language(code: str | None) -> str:
     resolved = resolve_supported_language_code(code)
     if resolved == "en" and (code or "").strip().lower().startswith("pt"):
         return "pt"
     return resolved if resolved in SUPPORTED_REPORT_LANGUAGE_CODES else "en"
-
 
 ###############################################################################
 def phrase(key: str, language: str, **values: object) -> str:
@@ -276,7 +274,6 @@ def phrase(key: str, language: str, **values: object) -> str:
     if key not in table:
         raise KeyError(f"Missing phrase key: {key}")
     return table[key].format(**values)
-
 
 ###############################################################################
 def rucam_summary_text(assessment: DrugRucamAssessment, language: str) -> str:
@@ -292,11 +289,9 @@ def rucam_summary_text(assessment: DrugRucamAssessment, language: str) -> str:
         category=assessment.causality_category,
     )
 
-
 ###############################################################################
 def report_heading(key: str, language: str) -> str:
     return phrase(key, language)
-
 
 ###############################################################################
 def requires_language_repair(text: str, expected_language: str) -> bool:

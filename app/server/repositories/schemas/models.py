@@ -20,7 +20,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-
 ###############################################################################
 class Base(DeclarativeBase):
     pass
@@ -31,7 +30,6 @@ CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
 PATIENTS_ID_FK = "patients.id"
 ACTIVE_SQLITE_WHERE = "is_active = 1"
 ACTIVE_POSTGRESQL_WHERE = "is_active = true"
-
 
 ###############################################################################
 class Patient(Base):
@@ -59,7 +57,6 @@ class Patient(Base):
         Index("ix_patients_name", "name"),
         Index("ix_patients_visit_date", "visit_date"),
     )
-
 
 ###############################################################################
 class ClinicalSession(Base):
@@ -130,7 +127,6 @@ class ClinicalSession(Base):
         Index("ix_clinical_sessions_status", "session_status"),
     )
 
-
 ###############################################################################
 class ClinicalSessionResult(Base):
     __tablename__ = "clinical_session_results"
@@ -157,7 +153,6 @@ class ClinicalSessionResult(Base):
         UniqueConstraint("session_id", name="uq_clinical_session_results_session_id"),
         Index("ix_clinical_session_results_session_id", "session_id"),
     )
-
 
 ###############################################################################
 class ClinicalSessionTimeline(Base):
@@ -199,7 +194,6 @@ class ClinicalSessionTimeline(Base):
         Index("ix_clinical_session_timelines_session_id", "session_id"),
         Index("ix_clinical_session_timelines_generated_at", "generated_at"),
     )
-
 
 ###############################################################################
 class ClinicalSessionManualEdit(Base):
@@ -255,7 +249,6 @@ class ClinicalSessionManualEdit(Base):
         ),
         Index("ix_clinical_session_manual_edits_edited_at", "edited_at"),
     )
-
 
 ###############################################################################
 class ClinicalSessionVersion(Base):
@@ -340,7 +333,6 @@ class ClinicalSessionVersion(Base):
         Index("ix_clinical_session_versions_pipeline_run_id", "pipeline_run_id"),
         Index("ix_clinical_session_versions_status", "version_status"),
     )
-
 
 ###############################################################################
 class ClinicalSessionRevisionRun(Base):
@@ -428,7 +420,6 @@ class ClinicalSessionRevisionRun(Base):
         Index("ix_clinical_session_revision_runs_started_at", "started_at"),
     )
 
-
 ###############################################################################
 class ClinicalSessionRevisionReview(Base):
     __tablename__ = "clinical_session_revision_reviews"
@@ -490,7 +481,6 @@ class ClinicalSessionRevisionReview(Base):
         Index("ix_clinical_session_revision_reviews_reviewed_at", "reviewed_at"),
     )
 
-
 ###############################################################################
 class ClinicalSessionRevisionStep(Base):
     __tablename__ = "clinical_session_revision_steps"
@@ -546,7 +536,6 @@ class ClinicalSessionRevisionStep(Base):
         Index("ix_clinical_session_revision_steps_status", "status"),
     )
 
-
 ###############################################################################
 class ClinicalSessionRevisionArtifact(Base):
     __tablename__ = "clinical_session_revision_artifacts"
@@ -599,7 +588,6 @@ class ClinicalSessionRevisionArtifact(Base):
             "entity_type",
         ),
     )
-
 
 ###############################################################################
 class ClinicalSessionRevisionEntity(Base):
@@ -664,7 +652,6 @@ class ClinicalSessionRevisionEntity(Base):
         ),
     )
 
-
 ###############################################################################
 class Drug(Base):
     __tablename__ = "drugs"
@@ -701,7 +688,6 @@ class Drug(Base):
         Index("ix_drugs_livertox_nbk_id", "livertox_nbk_id"),
     )
 
-
 ###############################################################################
 class DrugRxnormCode(Base):
     __tablename__ = "drug_rxnorm_codes"
@@ -719,7 +705,6 @@ class DrugRxnormCode(Base):
         UniqueConstraint("drug_id", "rxcui", name="uq_drug_rxnorm_codes_identity"),
         Index("ix_drug_rxnorm_codes_drug_id", "drug_id"),
     )
-
 
 ###############################################################################
 class DrugAlias(Base):
@@ -748,7 +733,6 @@ class DrugAlias(Base):
         Index("ix_drug_aliases_alias_norm_source", "alias_norm", "source"),
         Index("ix_drug_aliases_drug_id", "drug_id"),
     )
-
 
 ###############################################################################
 class LiverToxMonograph(Base):
@@ -782,7 +766,6 @@ class LiverToxMonograph(Base):
         Index("ix_livertox_monographs_drug_name_norm", "drug_name_norm"),
     )
 
-
 ###############################################################################
 class ClinicalSessionSection(Base):
     __tablename__ = "clinical_session_sections"
@@ -809,7 +792,6 @@ class ClinicalSessionSection(Base):
         ),
         Index("ix_clinical_session_sections_session_id", "session_id"),
     )
-
 
 ###############################################################################
 class ClinicalSessionLab(Base):
@@ -838,7 +820,6 @@ class ClinicalSessionLab(Base):
         ),
         Index("ix_clinical_session_labs_session_id", "session_id"),
     )
-
 
 ###############################################################################
 class ClinicalSessionDrug(Base):
@@ -875,7 +856,6 @@ class ClinicalSessionDrug(Base):
         Index("ix_clinical_session_drugs_drug_id", "drug_id"),
         Index("ix_clinical_session_drugs_raw_drug_name_norm", "raw_drug_name_norm"),
     )
-
 
 ###############################################################################
 class KbMatchCache(Base):
@@ -935,7 +915,6 @@ class KbMatchCache(Base):
         Index("ix_kb_match_cache_valid", "invalidated_at"),
     )
 
-
 ###############################################################################
 class ModelSelection(Base):
     __tablename__ = "model_selections"
@@ -984,7 +963,6 @@ class ModelSelection(Base):
         ),
     )
 
-
 ###############################################################################
 class RuntimeSetting(Base):
     __tablename__ = "runtime_settings"
@@ -1008,7 +986,6 @@ class RuntimeSetting(Base):
         UniqueConstraint("setting_key", name="uq_runtime_settings_setting_key"),
         Index("ix_runtime_settings_setting_key", "setting_key"),
     )
-
 
 ###############################################################################
 class ReferenceCatalogEntry(Base):
@@ -1071,7 +1048,6 @@ class ReferenceCatalogEntry(Base):
         Index("ix_reference_catalog_entries_active", "active"),
     )
 
-
 ###############################################################################
 class ReferenceCatalogSeedRun(Base):
     __tablename__ = "reference_catalog_seed_runs"
@@ -1100,7 +1076,6 @@ class ReferenceCatalogSeedRun(Base):
         Index("ix_reference_catalog_seed_runs_manifest", "manifest"),
         Index("ix_reference_catalog_seed_runs_status", "status"),
     )
-
 
 ###############################################################################
 class AccessKeyEncryptionMaterial(Base):
@@ -1153,7 +1128,6 @@ class AccessKeyEncryptionMaterial(Base):
             "key_version",
         ),
     )
-
 
 ###############################################################################
 class AccessKey(Base):

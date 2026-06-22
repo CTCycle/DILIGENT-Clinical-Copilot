@@ -67,7 +67,6 @@ from services.text.normalization import normalize_drug_query_name
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
 
-
 ###############################################################################
 class DataInspectionService(
     InspectionUpdateConfigMixin,

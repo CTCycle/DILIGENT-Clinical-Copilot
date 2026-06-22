@@ -23,14 +23,12 @@ from common.exceptions import ServiceError
 from common.utils.logger import logger
 from domain.errors import ApiErrorResponse
 
-
 ###############################################################################
 def resolve_request_id(request: Request) -> str:
     candidate = getattr(request.state, "request_id", "")
     if isinstance(candidate, str) and candidate.strip():
         return candidate.strip()
     return "n/a"
-
 
 ###############################################################################
 def build_error_payload(
@@ -45,7 +43,6 @@ def build_error_payload(
         retryable=retryable,
     ).model_dump()
 
-
 ###############################################################################
 def make_json_safe(value: object) -> object:
     if isinstance(value, dict):
@@ -58,9 +55,9 @@ def make_json_safe(value: object) -> object:
         return value
     return str(value)
 
-
 ###############################################################################
 class RequestIdMiddleware(BaseHTTPMiddleware):
+
     # -------------------------------------------------------------------------
     async def dispatch(
         self,
@@ -71,7 +68,6 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         response.headers.setdefault(REQUEST_ID_HEADER, resolve_request_id(request))
         return response
-
 
 ###############################################################################
 def request_validation_error_handler(
@@ -97,7 +93,6 @@ def request_validation_error_handler(
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
     return response
 
-
 ###############################################################################
 def timeout_error_handler(
     request: Request,
@@ -121,7 +116,6 @@ def timeout_error_handler(
     )
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
     return response
-
 
 ###############################################################################
 def dependency_error_handler(
@@ -147,7 +141,6 @@ def dependency_error_handler(
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
     return response
 
-
 ###############################################################################
 def missing_resource_error_handler(
     request: Request,
@@ -171,7 +164,6 @@ def missing_resource_error_handler(
     )
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
     return response
-
 
 ###############################################################################
 def service_error_handler(
@@ -200,7 +192,6 @@ def service_error_handler(
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
     return response
 
-
 ###############################################################################
 def unhandled_error_handler(
     request: Request,
@@ -224,7 +215,6 @@ def unhandled_error_handler(
     )
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
     return response
-
 
 ###############################################################################
 def register_error_handling(app: FastAPI) -> None:

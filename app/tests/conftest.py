@@ -66,7 +66,6 @@ class WorkspaceTempPathFactory:
         path.mkdir(parents=True, exist_ok=False)
         return path
 
-
 ###############################################################################
 @pytest.fixture(scope="session")
 def tmp_path_factory() -> WorkspaceTempPathFactory:
@@ -74,7 +73,6 @@ def tmp_path_factory() -> WorkspaceTempPathFactory:
     factory = WorkspaceTempPathFactory(root)
     yield factory
     shutil.rmtree(root, ignore_errors=True)
-
 
 ###############################################################################
 @pytest.fixture

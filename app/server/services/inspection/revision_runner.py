@@ -26,14 +26,13 @@ from services.inspection.revision_runner_support import (
 )
 from services.session.factory import build_clinical_session_service
 
-
 ###############################################################################
 def build_revision_job_scope_key(root_session_id: int) -> str:
     return f"revision:{int(root_session_id)}"
 
-
 ###############################################################################
 class InspectionRevisionRunnerMixin:
+
     # -------------------------------------------------------------------------
     def _start_revision_background_job(
         self,

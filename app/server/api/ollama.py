@@ -14,9 +14,9 @@ from services.runtime.jobs import get_job_manager
 
 router = APIRouter(prefix="/models", tags=["models"])
 
-
 ###############################################################################
 class OllamaEndpoint:
+
     # -------------------------------------------------------------------------
     def __init__(self, *, router: APIRouter, service: OllamaService) -> None:
         self.router = router

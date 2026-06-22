@@ -63,7 +63,6 @@ from services.session.workflow_shared import (
 
 _CLOUD_PROVIDERS = {"openai", "gemini"}
 
-
 ###############################################################################
 async def process_single_patient_workflow(
     service: Any,
@@ -666,7 +665,6 @@ async def process_single_patient_workflow(
         logger.warning("Clinical assessment persistence returned no session id.")
         raise ClinicalPersistenceError()
     return result_payload
-
 
 ###############################################################################
 def start_clinical_job_workflow(
