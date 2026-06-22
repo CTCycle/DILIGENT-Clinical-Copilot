@@ -8,13 +8,11 @@ from domain.clinical.entities import HepatotoxicityPatternScore, PipelineIssue
 
 PatternSource = Literal["provided", "calculated", "undetermined"]
 
-
 ###############################################################################
 class HepaticPatternResolutionInput(BaseModel):
     explicit_pattern: str | None = None
     calculated_pattern: str | None = None
     r_score: float | None = None
-
 
 ###############################################################################
 class HepaticPatternResolutionResult(BaseModel):
@@ -26,14 +24,12 @@ class HepaticPatternResolutionResult(BaseModel):
     r_score: float | None = None
     warnings: list[PipelineIssue] = Field(default_factory=list)
 
-
 ###############################################################################
 def _normalize_pattern(value: str | None) -> str | None:
     normalized = (value or "").strip().lower().replace(" ", "_")
     if normalized in {"hepatocellular", "cholestatic", "mixed", "indeterminate"}:
         return normalized
     return None
-
 
 ###############################################################################
 def resolve_hepatic_pattern(
@@ -73,7 +69,6 @@ def resolve_hepatic_pattern(
         r_score=resolution_input.r_score,
         warnings=warnings,
     )
-
 
 ###############################################################################
 def copy_pattern_score_with_resolution(

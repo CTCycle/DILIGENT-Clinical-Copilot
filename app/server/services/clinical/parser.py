@@ -59,7 +59,6 @@ from services.clinical.extraction_strategy import decide_extraction_strategy
 from common.utils.text_utils import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
 
-
 ###############################################################################
 class DrugsParser:
     LLM_CLIENT_NOT_INITIALIZED_ERROR = (

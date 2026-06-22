@@ -19,7 +19,6 @@ from services.clinical.match_quality import classify_match_evidence
 from services.clinical.preparation import HepatoxPreparedInputs
 from services.text.normalization import normalize_drug_query_name
 
-
 ###############################################################################
 class AnalysisRunner:
     """Orchestrates the top-level analysis workflow — runs the full drug assessment pipeline."""
@@ -637,7 +636,6 @@ class AnalysisRunner:
         normalized_attempt = max(int(attempt), 1)
         return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
 
-
 ###############################################################################
 def summarize_drug_source_context(entry: DrugEntry) -> str:
     source = (
@@ -650,7 +648,6 @@ def summarize_drug_source_context(entry: DrugEntry) -> str:
     if source == "anamnesis":
         return "Historical anamnesis section entry."
     return "Source section unavailable."
-
 
 ###############################################################################
 def assess_temporal_plausibility(
@@ -665,7 +662,6 @@ def assess_temporal_plausibility(
     if entry.therapy_start_date:
         return "Therapy start is available; temporal assessment is partially supported."
     return "Temporal evidence is limited."
-
 
 ###############################################################################
 def assess_pattern_compatibility(

@@ -11,7 +11,6 @@ from repositories.database.session import get_default_repository
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 from services.catalogs.runtime import get_reference_catalog_snapshot
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
@@ -85,11 +84,9 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
         )
         return empty_text_normalization_snapshot()
 
-
 ###############################################################################
 def invalidate_text_normalization_snapshot() -> None:
     get_text_normalization_snapshot.cache_clear()
-
 
 ###############################################################################
 def record_text_normalization_observation(term: str, *, category: str) -> None:
@@ -113,7 +110,6 @@ def record_text_normalization_observation(term: str, *, category: str) -> None:
         invalidate_text_normalization_snapshot()
     except Exception:
         logger.debug("Failed recording text normalization observation.", exc_info=True)
-
 
 ###############################################################################
 def list_text_normalization_term_payloads(
@@ -151,7 +147,6 @@ def list_text_normalization_term_payloads(
         logger.warning("Failed listing text normalization terms.", exc_info=True)
         return []
 
-
 ###############################################################################
 def upsert_text_normalization_term_payload(
     *,
@@ -182,7 +177,6 @@ def upsert_text_normalization_term_payload(
         "encounter_count": 1,
         "is_active": bool(is_active),
     }
-
 
 ###############################################################################
 def deactivate_text_normalization_term_payload(*, category: str, term: str) -> bool:

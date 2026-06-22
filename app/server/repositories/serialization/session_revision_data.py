@@ -28,28 +28,23 @@ from repositories.schemas.models import (
     ClinicalSessionVersion,
 )
 
-
 ###############################################################################
 def build_text_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
-
 
 ###############################################################################
 def build_payload_hash(payload: Any) -> str:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
-
 ###############################################################################
 def normalize_text_key(value: str | None) -> str | None:
     cleaned = str(value or "").strip().casefold()
     return cleaned or None
 
-
 ###############################################################################
 def default_version_status(*, is_latest: bool) -> str:
     return "current" if is_latest else "superseded"
-
 
 ###############################################################################
 def sync_preserved_version_status(
@@ -61,7 +56,6 @@ def sync_preserved_version_status(
     if normalized in {"", "current", "superseded"}:
         return default_version_status(is_latest=is_latest_completed)
     return normalized
-
 
 ###############################################################################
 def derive_revision_kind(session_row: ClinicalSession, root_session_id: int) -> str:
@@ -80,31 +74,25 @@ REVISION_LIVERTOX_DECISION_SCHEMA_NAME = "revision_livertox_decision"
 REVISION_DILI_ASSESSMENT_SCHEMA_NAME = "revised_dili_assessment"
 REVISION_ENTITY_SCHEMA_VERSION = "1"
 
-
 ###############################################################################
 def validate_revised_drug_payload(payload: Any) -> RevisedDrugPayload:
     return RevisedDrugPayload.model_validate(payload)
-
 
 ###############################################################################
 def validate_revised_disease_payload(payload: Any) -> RevisedDiseasePayload:
     return RevisedDiseasePayload.model_validate(payload)
 
-
 ###############################################################################
 def validate_revised_lab_payload(payload: Any) -> RevisedLabPayload:
     return RevisedLabPayload.model_validate(payload)
-
 
 ###############################################################################
 def validate_revision_livertox_decision(payload: Any) -> RevisionLiverToxDecision:
     return RevisionLiverToxDecision.model_validate(payload)
 
-
 ###############################################################################
 def validate_revised_dili_assessment(payload: Any) -> RevisedDiliAssessment:
     return RevisedDiliAssessment.model_validate(payload)
-
 
 ###############################################################################
 def serialize_version_row(
@@ -135,7 +123,6 @@ def serialize_version_row(
         "updated_at": row.updated_at,
         "completed_at": row.completed_at,
     }
-
 
 ###############################################################################
 def serialize_revision_run_row(
@@ -176,7 +163,6 @@ def serialize_revision_run_row(
         "updated_at": row.updated_at,
     }
 
-
 ###############################################################################
 def serialize_revision_step_row(
     self,
@@ -211,7 +197,6 @@ def serialize_revision_step_row(
         "updated_at": row.updated_at,
     }
 
-
 ###############################################################################
 def serialize_revision_artifact_row(
     self,
@@ -230,7 +215,6 @@ def serialize_revision_artifact_row(
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }
-
 
 ###############################################################################
 def serialize_revision_review_row(
@@ -252,7 +236,6 @@ def serialize_revision_review_row(
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }
-
 
 ###############################################################################
 def _create_revision_artifact_row(
@@ -279,7 +262,6 @@ def _create_revision_artifact_row(
         schema_version=self.normalize_string(schema_version),
         payload_json=self.serialize_json_payload(payload),
     )
-
 
 ###############################################################################
 def _create_revision_entity_row(
@@ -326,7 +308,6 @@ def _create_revision_entity_row(
         superseded_at=None,
     )
 
-
 ###############################################################################
 def serialize_revision_entity_row(
     self,
@@ -361,7 +342,6 @@ def serialize_revision_entity_row(
         "superseded_at": row.superseded_at,
     }
 
-
 ###############################################################################
 def get_root_session_id_for_session(
     db_session: Session,
@@ -371,7 +351,6 @@ def get_root_session_id_for_session(
     if session_row is None:
         return None
     return int(session_row.original_session_id or session_row.id)
-
 
 ###############################################################################
 def ensure_version_record_for_session(
@@ -426,7 +405,6 @@ def ensure_version_record_for_session(
     db_session.flush()
     return version_row
 
-
 ###############################################################################
 def sync_version_records_for_root(
     self,
@@ -461,7 +439,6 @@ def sync_version_records_for_root(
         synced.append(version_row)
     return synced
 
-
 ###############################################################################
 def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
     safe_session_id = int(session_id)
@@ -488,7 +465,6 @@ def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
         raise
     finally:
         db_session.close()
-
 
 ###############################################################################
 def get_session_version_detail(
@@ -523,7 +499,6 @@ def get_session_version_detail(
     finally:
         db_session.close()
 
-
 ###############################################################################
 def get_latest_version_record_for_session(
     self,
@@ -533,7 +508,6 @@ def get_latest_version_record_for_session(
     if not versions:
         return None
     return versions[-1]
-
 
 ###############################################################################
 def get_version_record_for_session(
@@ -559,7 +533,6 @@ def get_version_record_for_session(
         raise
     finally:
         db_session.close()
-
 
 ###############################################################################
 def create_revision_version_shell(
@@ -629,7 +602,6 @@ def create_revision_version_shell(
     finally:
         db_session.close()
 
-
 ###############################################################################
 def finalize_revision_version(
     self,
@@ -666,7 +638,6 @@ def finalize_revision_version(
         raise
     finally:
         db_session.close()
-
 
 ###############################################################################
 def create_or_update_revision_run(
@@ -745,7 +716,6 @@ def create_or_update_revision_run(
     finally:
         db_session.close()
 
-
 ###############################################################################
 def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
     db_session = self.session_factory()
@@ -759,7 +729,6 @@ def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
     finally:
         db_session.close()
 
-
 ###############################################################################
 def list_revision_runs_by_status(self, status: str) -> list[dict[str, Any]]:
     db_session = self.session_factory()
@@ -772,7 +741,6 @@ def list_revision_runs_by_status(self, status: str) -> list[dict[str, Any]]:
         return [serialize_revision_run_row(self, row) for row in rows]
     finally:
         db_session.close()
-
 
 ###############################################################################
 def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
@@ -791,7 +759,6 @@ def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
     finally:
         db_session.close()
 
-
 ###############################################################################
 def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
     safe_session_id = int(session_id)
@@ -808,7 +775,6 @@ def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
         return [serialize_manual_edit_row(self, row) for row in rows]
     finally:
         db_session.close()
-
 
 ###############################################################################
 def serialize_manual_edit_row(self, row: ClinicalSessionManualEdit) -> dict[str, Any]:
@@ -836,7 +802,6 @@ def serialize_manual_edit_row(self, row: ClinicalSessionManualEdit) -> dict[str,
         "reviewer_note": self.normalize_string(row.reviewer_note),
         "metadata": metadata if isinstance(metadata, dict) else {},
     }
-
 
 ###############################################################################
 def update_current_report_text_with_manual_audit(
@@ -932,7 +897,6 @@ def update_current_report_text_with_manual_audit(
     finally:
         db_session.close()
 
-
 ###############################################################################
 def update_session_metadata(
     self,
@@ -955,7 +919,6 @@ def update_session_metadata(
         raise
     finally:
         db_session.close()
-
 
 ###############################################################################
 def fail_revision_run(

@@ -15,7 +15,6 @@ from services.text.vocabulary import (
     upsert_text_normalization_term_payload,
 )
 
-
 ###############################################################################
 class InspectionUpdateConfigMixin:
     RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"

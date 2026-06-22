@@ -39,7 +39,6 @@ VALUE_UNIT_RE = re.compile(
 )
 SINGLE_VALUE_MARKERS = frozenset({"CR", "EGFR", "INR", "ALB"})
 
-
 ###############################################################################
 def _load_marker_aliases() -> dict[str, tuple[str, ...]]:
     snapshot = get_reference_catalog_snapshot()
@@ -71,15 +70,14 @@ RUCAM_SCORE_TEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 ###############################################################################
 def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
     normalized = (marker_name or "").strip().casefold()
     return aliases.get(normalized, marker_name)
 
-
 ###############################################################################
 class ClinicalLabExtractor:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

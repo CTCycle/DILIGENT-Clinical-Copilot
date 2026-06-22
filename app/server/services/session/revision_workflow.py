@@ -63,7 +63,6 @@ from services.session.workflow_shared import (
     resolve_rucam_source as _resolve_rucam_source,
 )
 
-
 ###############################################################################
 def _unique_non_empty_names(values: list[str | None]) -> list[str]:
     seen: set[str] = set()
@@ -79,7 +78,6 @@ def _unique_non_empty_names(values: list[str | None]) -> list[str]:
         normalized.append(cleaned)
     return normalized
 
-
 ###############################################################################
 def _normalize_candidate_selection_names(values: list[Any]) -> list[str]:
     normalized_values: list[str | None] = []
@@ -89,7 +87,6 @@ def _normalize_candidate_selection_names(values: list[Any]) -> list[str]:
             continue
         normalized_values.append(str(value or "").strip() or None)
     return _unique_non_empty_names(normalized_values)
-
 
 ###############################################################################
 def _candidate_selection_index(
@@ -108,7 +105,6 @@ def _candidate_selection_index(
         }
     return indexed
 
-
 ###############################################################################
 def _rebuild_drug_entries(payload: Any) -> list[DrugEntry]:
     if not isinstance(payload, list):
@@ -123,7 +119,6 @@ def _rebuild_drug_entries(payload: Any) -> list[DrugEntry]:
             continue
     return entries
 
-
 ###############################################################################
 def _rebuild_disease_entries(payload: Any) -> list[DiseaseContextEntry]:
     if not isinstance(payload, list):
@@ -137,7 +132,6 @@ def _rebuild_disease_entries(payload: Any) -> list[DiseaseContextEntry]:
         except Exception:
             continue
     return entries
-
 
 ###############################################################################
 def _load_persisted_deterministic_drug_extraction(
@@ -164,7 +158,6 @@ def _load_persisted_deterministic_drug_extraction(
         regimen_lines=regimen_lines,
     )
 
-
 ###############################################################################
 def _load_persisted_deterministic_disease_extraction(
     payload: Any,
@@ -189,7 +182,6 @@ def _load_persisted_deterministic_disease_extraction(
         matched_lines=matched_lines,
         unresolved_lines=unresolved_lines,
     )
-
 
 ###############################################################################
 def _load_revision_source_deterministic_extraction(
@@ -240,7 +232,6 @@ def _load_revision_source_deterministic_extraction(
         ),
     }
 
-
 ###############################################################################
 def _load_revision_source_disease_context(
     session_metadata: dict[str, Any] | None,
@@ -256,7 +247,6 @@ def _load_revision_source_disease_context(
     if not entries:
         return None, "recomputed_current_revision"
     return PatientDiseaseContext(entries=entries), "persisted_source_version"
-
 
 ###############################################################################
 def _load_revision_source_lab_timeline(
@@ -304,7 +294,6 @@ def _load_revision_source_lab_timeline(
         },
     )
 
-
 ###############################################################################
 def _build_revision_anamnesis_validation_stage(
     *,
@@ -345,7 +334,6 @@ def _build_revision_anamnesis_validation_stage(
         "revised_only_names": revised_only_names,
         "unresolved_lines": unresolved_lines,
     }
-
 
 ###############################################################################
 def _build_revision_extraction_bundle(
@@ -401,7 +389,6 @@ def _build_revision_extraction_bundle(
         ),
     }
 
-
 ###############################################################################
 def _resolve_revision_extraction(
     *,
@@ -429,7 +416,6 @@ def _resolve_revision_extraction(
         extraction_bundle=extraction_bundle,
     )
 
-
 ###############################################################################
 def _build_revision_missing_anamnesis_drugs_stage(
     *,
@@ -451,7 +437,6 @@ def _build_revision_missing_anamnesis_drugs_stage(
         "supplemental_drug_names": supplemental_drug_names,
         "supplemental_entries": supplemental_entries,
     }
-
 
 ###############################################################################
 def _build_revision_analysis_drugs(
@@ -486,7 +471,6 @@ def _build_revision_analysis_drugs(
             seen_entry_names.add(entry_key)
             collected_entries.append(entry)
     return PatientDrugs(entries=collected_entries or base_analysis_drugs.entries)
-
 
 ###############################################################################
 def _reconcile_revision_candidate_selection(
@@ -523,7 +507,6 @@ def _reconcile_revision_candidate_selection(
         ordered_analysis_drugs=analysis_drugs,
     )
 
-
 ###############################################################################
 def _build_revision_candidate_selection_stage(
     *,
@@ -547,7 +530,6 @@ def _build_revision_candidate_selection_stage(
             list(candidate_selection.unresolved or [])
         ),
     }
-
 
 ###############################################################################
 def _select_revision_candidates(
@@ -604,7 +586,6 @@ def _select_revision_candidates(
         },
     )
 
-
 ###############################################################################
 def _build_revision_lab_revision_stage(
     *,
@@ -628,7 +609,6 @@ def _build_revision_lab_revision_stage(
         "onset_context_present": onset_context is not None,
         "pattern_classification": getattr(pattern_score, "classification", None),
     }
-
 
 ###############################################################################
 def _build_revision_snapshot_merge_stage(
@@ -669,7 +649,6 @@ def _build_revision_snapshot_merge_stage(
         ),
         "rucam_assessment_count": len(rucam_bundle.entries),
     }
-
 
 ###############################################################################
 def _build_revision_snapshot_context(
@@ -720,7 +699,6 @@ def _build_revision_snapshot_context(
         return None
     return "\n\n".join(chunks)
 
-
 ###############################################################################
 def _build_revision_consultation_drugs(
     *,
@@ -755,7 +733,6 @@ def _build_revision_consultation_drugs(
         seen_entry_names.add(entry_name.casefold())
         collected_entries.append(entry)
     return PatientDrugs(entries=collected_entries or analysis_drugs.entries)
-
 
 ###############################################################################
 def _build_revision_consultation_context(
@@ -824,7 +801,6 @@ def _build_revision_consultation_context(
     )
     return "\n\n".join(chunks), context_metadata
 
-
 ###############################################################################
 def _build_revision_consultation_inputs(
     *,
@@ -855,7 +831,6 @@ def _build_revision_consultation_inputs(
         consultation_context=consultation_context,
         context_metadata=context_metadata,
     )
-
 
 ###############################################################################
 def _build_revision_consultation_execution_payload(
@@ -891,7 +866,6 @@ def _build_revision_consultation_execution_payload(
     if isinstance(service_payload, dict):
         payload.update(service_payload)
     return payload
-
 
 ###############################################################################
 async def _run_revision_consultation(
@@ -952,7 +926,6 @@ async def _run_revision_consultation(
         ),
     )
 
-
 ###############################################################################
 def _build_revision_finalization_payload(
     *,
@@ -977,7 +950,6 @@ def _build_revision_finalization_payload(
         or None,
         "consultation_model": getattr(clinical_session, "llm_model", None),
     }
-
 
 ###############################################################################
 def _finalize_revision_report_outputs(
@@ -1007,7 +979,6 @@ def _finalize_revision_report_outputs(
             clinical_session=clinical_session,
         ),
     )
-
 
 ###############################################################################
 async def process_revision_patient_workflow(

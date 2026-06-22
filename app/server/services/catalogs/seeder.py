@@ -10,9 +10,9 @@ from common.catalogs.manifest_loader import (
     load_catalog_manifest,
 )
 
-
 ###############################################################################
 class ReferenceCatalogSeeder:
+
     # -------------------------------------------------------------------------
     def __init__(self, serializer: ReferenceCatalogSerializer) -> None:
         self.serializer = serializer
