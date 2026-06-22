@@ -5,7 +5,6 @@ from datetime import datetime
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ModelConfigSnapshot:
@@ -20,14 +19,12 @@ class ModelConfigSnapshot:
     rag_settings: dict[str, object] | None = None
     updated_at: datetime | None = None
 
-
 ###############################################################################
 class LocalModelCard(BaseModel):
     name: str
     family: str
     description: str
     available_in_ollama: bool
-
 
 ###############################################################################
 class ModelConfigUpdateRequest(BaseModel):
@@ -45,7 +42,6 @@ class ModelConfigUpdateRequest(BaseModel):
     ollama_reasoning: bool | None = None
     rag_settings: dict[str, object] | None = None
 
-
 ###############################################################################
 class ModelConfigStateResponse(BaseModel):
     local_models: list[LocalModelCard]
@@ -62,12 +58,10 @@ class ModelConfigStateResponse(BaseModel):
     rag_model: str | None = None
     updated_at: datetime | None = None
 
-
 ###############################################################################
 class OpenAIConnectivityCheckRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     model: str | None = None
-
 
 ###############################################################################
 class OpenAIConnectivityCheckResponse(BaseModel):

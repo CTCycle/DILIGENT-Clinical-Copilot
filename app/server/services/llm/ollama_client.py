@@ -23,7 +23,6 @@ from services.llm.structured import (
 
 __all__ = ["OllamaClient", "OllamaError", "OllamaTimeout"]
 
-
 ###############################################################################
 class OllamaClient:
     """

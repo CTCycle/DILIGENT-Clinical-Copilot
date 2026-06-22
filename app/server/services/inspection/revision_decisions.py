@@ -4,9 +4,9 @@ from typing import Any
 
 from services.text.normalization import normalize_drug_query_name
 
-
 ###############################################################################
 class InspectionRevisionDecisionsMixin:
+
     # -------------------------------------------------------------------------
     @staticmethod
     def build_revision_livertox_decisions(

@@ -26,7 +26,6 @@ REVISION_STEP_SEQUENCE: list[tuple[str, str]] = [
     ("finalize_revision_version", "Finalizing revision version state"),
 ]
 
-
 ###############################################################################
 def derive_revision_run_actor_source(metadata: dict[str, Any]) -> str:
     return (
@@ -34,7 +33,6 @@ def derive_revision_run_actor_source(metadata: dict[str, Any]) -> str:
         if str((metadata or {}).get("reviewer") or "").strip()
         else "unknown"
     )
-
 
 ###############################################################################
 def report_revision_progress(
@@ -47,12 +45,10 @@ def report_revision_progress(
     if job_id:
         jobs.update_progress(job_id, progress)
 
-
 ###############################################################################
 def ensure_revision_not_cancelled(jobs: Any, job_id: str | None) -> None:
     if job_id and jobs.should_stop(job_id):
         raise RuntimeError("Revision job was cancelled")
-
 
 ###############################################################################
 def derive_revision_qa_outcome(result_payload: dict[str, Any]) -> tuple[str, str]:
@@ -86,7 +82,6 @@ def derive_revision_qa_outcome(result_payload: dict[str, Any]) -> tuple[str, str
         return "llm_qa_passed", "passed"
     return "requires_human_review", "not_run"
 
-
 ###############################################################################
 def get_revision_entity_pipeline(
     result_payload: dict[str, Any],
@@ -102,7 +97,6 @@ def get_revision_entity_pipeline(
         for step_name, payload in entity_pipeline.items()
         if isinstance(step_name, str) and isinstance(payload, dict)
     }
-
 
 ###############################################################################
 def summarize_revision_entity_stage_payload(

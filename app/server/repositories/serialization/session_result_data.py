@@ -33,7 +33,6 @@ from services.text.vocabulary import (
     invalidate_text_normalization_snapshot,
 )
 
-
 ###############################################################################
 def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
     if not session_data:
@@ -76,7 +75,6 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
     finally:
         db_session.close()
 
-
 ###############################################################################
 def normalize_session_status(self, value: Any) -> str:
     normalized = self.normalize_string(value)
@@ -86,7 +84,6 @@ def normalize_session_status(self, value: Any) -> str:
     if lowered == "failed":
         return "failed"
     return "successful"
-
 
 ###############################################################################
 def persist_patient(self, db_session: Session, session_data: dict[str, Any]) -> Patient:
@@ -104,7 +101,6 @@ def persist_patient(self, db_session: Session, session_data: dict[str, Any]) -> 
     db_session.flush()
     return patient
 
-
 ###############################################################################
 def decode_patient_image(self, value: Any) -> bytes | None:
     normalized = self.normalize_string(value)
@@ -118,7 +114,6 @@ def decode_patient_image(self, value: Any) -> bytes | None:
     except binascii.Error, ValueError:
         logger.warning("Skipping invalid patient image payload during session save")
         return None
-
 
 ###############################################################################
 def list_sessions(
@@ -253,7 +248,6 @@ def list_sessions(
     finally:
         db_session.close()
 
-
 ###############################################################################
 def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
     safe_session_id = int(session_id)
@@ -346,7 +340,6 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
     finally:
         db_session.close()
 
-
 ###############################################################################
 def update_session_text_and_metadata(
     self,
@@ -372,7 +365,6 @@ def update_session_text_and_metadata(
     finally:
         db_session.close()
 
-
 ###############################################################################
 def get_next_session_version(self, original_session_id: int) -> int:
     safe_original_id = int(original_session_id)
@@ -390,7 +382,6 @@ def get_next_session_version(self, original_session_id: int) -> int:
     finally:
         db_session.close()
 
-
 ###############################################################################
 def parse_session_result_payload(
     self, payload_json: str | None
@@ -403,7 +394,6 @@ def parse_session_result_payload(
     except json.JSONDecodeError:
         return None
     return parsed if isinstance(parsed, dict) else None
-
 
 ###############################################################################
 def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
@@ -418,7 +408,6 @@ def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
         return self.parse_session_result_payload(payload_json)
     finally:
         db_session.close()
-
 
 ###############################################################################
 def upsert_session_result_payload(
@@ -454,7 +443,6 @@ def upsert_session_result_payload(
         raise
     finally:
         db_session.close()
-
 
 ###############################################################################
 def delete_session(self, session_id: int) -> bool:
@@ -582,7 +570,6 @@ def delete_session(self, session_id: int) -> bool:
     finally:
         db_session.close()
 
-
 ###############################################################################
 def normalize_string(self, value: Any) -> str | None:
     if isinstance(value, str):
@@ -603,7 +590,6 @@ def normalize_string(self, value: Any) -> str | None:
         return None
     return normalized
 
-
 ###############################################################################
 def normalize_flag(self, value: Any) -> int | None:
     normalized = self.normalize_string(value)
@@ -622,7 +608,6 @@ def normalize_flag(self, value: Any) -> int | None:
         return None
     return 1 if numeric != 0 else 0
 
-
 ###############################################################################
 def normalize_date(self, value: Any) -> str | None:
     normalized_date = self.normalize_date_value(value)
@@ -630,7 +615,6 @@ def normalize_date(self, value: Any) -> str | None:
         normalized = self.normalize_string(value)
         return normalized or None
     return normalized_date.isoformat()
-
 
 ###############################################################################
 def normalize_date_value(self, value: Any) -> date | None:
@@ -665,13 +649,11 @@ def normalize_date_value(self, value: Any) -> date | None:
         return None
     return parsed.date()
 
-
 ###############################################################################
 def join_values(self, values: set[str]) -> str | None:
     if not values:
         return None
     return "; ".join(sorted(values))
-
 
 ###############################################################################
 def to_int(self, value: Any) -> int | None:
@@ -683,7 +665,6 @@ def to_int(self, value: Any) -> int | None:
     except TypeError, ValueError:
         return None
 
-
 ###############################################################################
 def to_float(self, value: Any) -> float | None:
     normalized = self.normalize_string(value)
@@ -693,7 +674,6 @@ def to_float(self, value: Any) -> float | None:
         return float(normalized)
     except TypeError, ValueError:
         return None
-
 
 ###############################################################################
 def parse_datetime(self, value: Any) -> Any:
@@ -707,7 +687,6 @@ def parse_datetime(self, value: Any) -> Any:
     if isinstance(parsed, pd.Timestamp):
         return parsed.to_pydatetime()
     return parsed
-
 
 ###############################################################################
 def persist_session_sections(
@@ -737,7 +716,6 @@ def persist_session_sections(
                 content=content,
             )
         )
-
 
 ###############################################################################
 def persist_session_labs(
@@ -794,7 +772,6 @@ def persist_session_labs(
                 upper_limit_raw=upper_limit_raw,
             )
         )
-
 
 ###############################################################################
 def persist_session_drugs(
@@ -911,7 +888,6 @@ def persist_session_drugs(
     if vocabulary_changed:
         invalidate_text_normalization_snapshot()
 
-
 ###############################################################################
 def persist_session_result_payload(
     self, db_session: Session, session_id: int, session_data: dict[str, Any]
@@ -926,7 +902,6 @@ def persist_session_result_payload(
             payload_json=serialized_payload,
         )
     )
-
 
 ###############################################################################
 def serialize_json_payload(self, payload: Any) -> str | None:

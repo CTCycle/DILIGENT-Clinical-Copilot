@@ -4,7 +4,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 ###############################################################################
 class FastAPISettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -12,18 +11,15 @@ class FastAPISettings(BaseModel):
     description: str
     version: str
 
-
 ###############################################################################
 class JobsSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     polling_interval: float = Field(gt=0)
 
-
 ###############################################################################
 class DeploymentSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     mode: Literal["local_single_user"] = "local_single_user"
-
 
 ###############################################################################
 class DatabaseSettings(BaseModel):
@@ -42,7 +38,6 @@ class DatabaseSettings(BaseModel):
     insert_commit_interval: int
     select_page_size: int
 
-
 ###############################################################################
 class DrugsMatcherSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -60,7 +55,6 @@ class DrugsMatcherSettings(BaseModel):
     spelling_short_name_length: int
     spelling_short_max_distance: int
     spelling_long_max_distance: int
-
 
 ###############################################################################
 class RagSettings(BaseModel):
@@ -90,7 +84,6 @@ class RagSettings(BaseModel):
     vector_stream_batch_size: int
     embedding_max_workers: int
 
-
 ###############################################################################
 class RuntimeSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -112,14 +105,12 @@ class RuntimeSettings(BaseModel):
     rxnav_request_timeout: float
     rxnav_max_concurrency: int
 
-
 ###############################################################################
 class IngestionSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     drug_name_min_length: int
     drug_name_max_length: int
     drug_name_max_tokens: int
-
 
 ###############################################################################
 class LLMRuntimeDefaults(BaseModel):
@@ -134,7 +125,6 @@ class LLMRuntimeDefaults(BaseModel):
     ollama_reasoning: bool
     ollama_host_default: str
 
-
 ###############################################################################
 class SessionPipelineSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -144,7 +134,6 @@ class SessionPipelineSettings(BaseModel):
     retrieval_max_concurrency: int
     clinical_assessment_batch_size: int
     clinical_assessment_max_concurrency: int
-
 
 ###############################################################################
 class ServerSettings(BaseModel):

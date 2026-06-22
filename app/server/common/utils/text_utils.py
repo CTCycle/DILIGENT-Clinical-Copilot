@@ -7,7 +7,6 @@ from typing import Any
 
 import pandas as pd
 
-
 ###############################################################################
 def coerce_text(value: Any) -> str | None:
     if value is None:
@@ -23,13 +22,11 @@ def coerce_text(value: Any) -> str | None:
     text = str(value).strip()
     return text or None
 
-
 ###############################################################################
 def normalize_whitespace(value: str) -> str:
     if not value:
         return ""
     return re.sub(r"\s+", " ", value).strip()
-
 
 ###############################################################################
 def normalize_drug_name(value: str) -> str:
@@ -42,7 +39,6 @@ def normalize_drug_name(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
     return normalize_whitespace(normalized)
 
-
 ###############################################################################
 def normalize_token(token: str) -> str:
     if not token:
@@ -51,7 +47,6 @@ def normalize_token(token: str) -> str:
 
 
 SYNONYM_SPLIT_RE = re.compile(r"[;,/\n]+")
-
 
 ###############################################################################
 def parse_synonym_list(value: Any) -> list[str]:
@@ -62,7 +57,6 @@ def parse_synonym_list(value: Any) -> list[str]:
         if text:
             synonyms.append(text)
     return synonyms
-
 
 ###############################################################################
 def split_synonym_variants(value: str) -> list[str]:
@@ -75,7 +69,6 @@ def split_synonym_variants(value: str) -> list[str]:
         if stripped:
             variants.append(stripped)
     return variants
-
 
 ###############################################################################
 def extract_synonym_strings(value: Any, seen_refs: set[int] | None = None) -> list[str]:
@@ -114,7 +107,6 @@ def extract_synonym_strings(value: Any, seen_refs: set[int] | None = None) -> li
     if text is None:
         return []
     return extract_synonym_strings(text, seen_refs)
-
 
 ###############################################################################
 def try_parse_json(value: str) -> Any:
