@@ -23,6 +23,31 @@ CACHE_MISS = object()
 class DrugNameService:
     """Drug name normalization, alias resolution, synonym parsing, and spelling correction."""
 
+    GENERIC_ALIAS_WORDS = {
+        "auto",
+        "autoinjector",
+        "capsule",
+        "cartridge",
+        "concentrate",
+        "delayed",
+        "depot",
+        "extended",
+        "gel",
+        "injection",
+        "injector",
+        "ml",
+        "month",
+        "months",
+        "nan",
+        "oral",
+        "per",
+        "prefilled",
+        "release",
+        "syringe",
+        "tablet",
+        "unt",
+    }
+
     # -------------------------------------------------------------------------
     def __init__(self, lookup: Any) -> None:
         self.lookup = lookup
@@ -611,11 +636,16 @@ class DrugNameService:
             raw_synonyms = self.lookup.parse_catalog_synonyms(
                 getattr(row, "synonyms", None)
             )
-            if not raw_synonyms:
-                continue
             unique_synonyms: list[str] = []
             seen_synonyms: set[str] = set()
             for synonym in raw_synonyms:
+                if not self.catalog_alias_quality_allowed(
+                    synonym,
+                    raw_name=raw_name_value,
+                    base_name=base_name_value,
+                    term_type=term_type,
+                ):
+                    continue
                 if synonym in seen_synonyms:
                     continue
                 unique_synonyms.append(synonym)
@@ -631,8 +661,6 @@ class DrugNameService:
                         continue
                     if normalized_variant not in normalized_map:
                         normalized_map[normalized_variant] = synonym
-            if not normalized_map:
-                continue
             fallback_aliases: list[str] = []
             fallback_seen: set[str] = set()
             for alias_value in (raw_name_value, base_name_value):
@@ -649,6 +677,8 @@ class DrugNameService:
                     continue
                 fallback_aliases.append(brand)
                 fallback_seen.add(brand)
+            if not normalized_map and not fallback_aliases:
+                continue
             entry = {
                 "rxcui": getattr(row, "rxcui", ""),
                 "term_type": term_type,
@@ -673,7 +703,12 @@ class DrugNameService:
             )
         for alias in fallback_aliases:
             normalized_alias = self.lookup.normalize_name(alias)
-            if not normalized_alias:
+            if not normalized_alias or not self.catalog_alias_quality_allowed(
+                alias,
+                raw_name=entry.get("raw_name"),
+                base_name=entry.get("name"),
+                term_type=entry.get("term_type"),
+            ):
                 continue
             self.lookup.add_catalog_index_entry(normalized_alias, entry, False, alias)
 
@@ -685,6 +720,13 @@ class DrugNameService:
         is_synonym: bool,
         original: str,
     ) -> None:
+        if not self.catalog_alias_quality_allowed(
+            original,
+            raw_name=entry.get("raw_name"),
+            base_name=entry.get("name"),
+            term_type=entry.get("term_type"),
+        ):
+            return
         if normalized_value in self.lookup.catalog_global_index:
             self.lookup.catalog_global_index[normalized_value] = (
                 entry,
@@ -708,6 +750,40 @@ class DrugNameService:
         if not normalized:
             return True
         return not normalized.endswith(self.lookup.CATALOG_EXCLUDED_TERM_SUFFIXES)
+
+    # -------------------------------------------------------------------------
+    def catalog_alias_quality_allowed(
+        self,
+        value: Any,
+        *,
+        raw_name: Any = None,
+        base_name: Any = None,
+        term_type: str | None = None,
+    ) -> bool:
+        if not self.lookup.catalog_term_type_allowed(term_type):
+            return False
+        normalized = self.lookup.normalize_name(coerce_text(value))
+        if not normalized:
+            return False
+        stopwords = get_text_normalization_snapshot().matching_stopwords
+        meaningful_tokens = [
+            token
+            for token in normalized.split()
+            if token not in stopwords and token not in self.GENERIC_ALIAS_WORDS
+        ]
+        if not meaningful_tokens:
+            return False
+        if all(len(token) < self.lookup.TOKEN_MIN_LENGTH for token in meaningful_tokens):
+            return False
+        base_normalized = self.lookup.normalize_name(coerce_text(base_name))
+        raw_normalized = self.lookup.normalize_name(coerce_text(raw_name))
+        source_tokens = set(base_normalized.split()) | set(raw_normalized.split())
+        if len(meaningful_tokens) == 1:
+            token = meaningful_tokens[0]
+            if token in source_tokens:
+                return True
+            return len(token) >= max(self.lookup.TOKEN_MIN_LENGTH, 5)
+        return True
 
     # -------------------------------------------------------------------------
     @staticmethod
