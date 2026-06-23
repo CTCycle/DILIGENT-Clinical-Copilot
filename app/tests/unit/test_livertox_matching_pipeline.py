@@ -515,6 +515,40 @@ def test_matcher_accepts_small_authoritative_name_misspellings() -> None:
     assert morfina.status == "missing"
 
 ###############################################################################
+def test_matcher_resolves_brand_suffix_variants_through_authoritative_spelling() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0901",
+                "drug_name": "Prednisone",
+                "excerpt": "Prednisone excerpt.",
+                "synonyms": "",
+                "ingredient": "Prednisone",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0902",
+                "drug_name": "Abiraterone",
+                "excerpt": "Abiraterone excerpt.",
+                "synonyms": "",
+                "ingredient": "Abiraterone",
+                "brand_name": "",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+
+    prednisone = matcher.match_drug_names(["Prednison Examplebrand HC"])[0]
+    abiraterone = matcher.match_drug_names(["Abirateron Examplebrand"])[0]
+
+    assert prednisone.status == "matched"
+    assert prednisone.matched_name == "Prednisone"
+    assert prednisone.reason == "spelling_correction"
+    assert abiraterone.status == "matched"
+    assert abiraterone.matched_name == "Abiraterone"
+    assert abiraterone.reason == "spelling_correction"
+
+###############################################################################
 def test_matcher_keeps_unsafe_multilingual_fallbacks_unresolved() -> None:
     frame = pd.DataFrame(
         [

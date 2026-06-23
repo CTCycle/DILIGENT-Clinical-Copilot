@@ -85,6 +85,43 @@ class DrugsParser:
     NON_THERAPY_LINE_PREFIXES = NON_THERAPY_LINE_PREFIXES
     LAB_MEASUREMENT_NAME_RE = re.compile(r"\b(?:u/l|ui/l|mg/dl|uln)\b", re.IGNORECASE)
     LAB_MARKER_NAME_RE = re.compile(r"\b(?:alt|ast|alp|bilirubin|inr)\b", re.IGNORECASE)
+    MEDICATION_CONTEXT_RE = re.compile(
+        r"\b(?:"
+        r"drug|drugs|medication|medications|medicine|therapy|treatment|"
+        r"farmac[io]|terapia|terapie|trattamento|assume|assunta|assunto|"
+        r"somministrat[aoie]|prescritt[aoie]|sospes[aoie]|antibiotic[ao]|"
+        r"chemioterapia|protocollo|allergi[aoe]"
+        r")\b",
+        re.IGNORECASE,
+    )
+    MEDICATION_NAME_PREFIX_RE = re.compile(
+        r"\b(?:"
+        r"con|with|assume|assunta|assunto|somministrat[aoie]|prescritt[aoie]|"
+        r"sospes[aoie]|terapia|therapy|treatment|farmac[io]|antibiotic[ao]|"
+        r"protocollo"
+        r")\s*$",
+        re.IGNORECASE,
+    )
+    FUNCTION_WORD_NAMES = {
+        "a",
+        "al",
+        "alla",
+        "con",
+        "da",
+        "dal",
+        "dalla",
+        "del",
+        "della",
+        "di",
+        "il",
+        "in",
+        "nel",
+        "nella",
+        "per",
+        "the",
+        "to",
+        "with",
+    }
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -349,6 +386,7 @@ class DrugsParser:
                 cleaned,
                 progress_callback=progress_callback,
             )
+            combined = self._attach_therapy_evidence_spans(combined, cleaned)
         self.emit_progress(progress_callback, 1.0)
         return PatientDrugs(entries=self.deduplicate_drug_entries(combined))
 
@@ -446,13 +484,12 @@ class DrugsParser:
         source_text: str,
     ) -> list[DrugEntry]:
         updated: list[DrugEntry] = []
-        casefold_source = source_text.casefold()
         for entry in entries:
             if entry.source_span and entry.evidence:
                 updated.append(entry)
                 continue
             raw_name = (entry.name or "").strip()
-            start = casefold_source.find(raw_name.casefold()) if raw_name else -1
+            start, end = self.find_grounded_name_span(raw_name, source_text)
             if start < 0:
                 updated.append(
                     entry.model_copy(
@@ -463,7 +500,6 @@ class DrugsParser:
                     )
                 )
                 continue
-            end = start + len(raw_name)
             updated.append(
                 entry.model_copy(
                     update={
@@ -679,16 +715,26 @@ class DrugsParser:
                 )
                 for entry in parsed.entries
             ]
-            filtered_candidates = self.deduplicate_drug_entries(
-                [entry for entry in normalized_candidates if entry is not None]
-            )
+            grounded_candidates: list[DrugEntry] = []
+            for entry in normalized_candidates:
+                if entry is None:
+                    continue
+                grounded = self.validate_llm_drug_entry_grounding(
+                    entry,
+                    source_text=source_text,
+                    source=source,
+                    historical_flag=historical_flag,
+                )
+                if grounded is not None:
+                    grounded_candidates.append(grounded)
+            filtered_candidates = self.deduplicate_drug_entries(grounded_candidates)
             source_has_medication_signal = (
-                bool(filtered_candidates)
-                or any(
+                any(
                     self.is_likely_medication_line(line)
                     for line in source_text.splitlines()
                     if line.strip()
                 )
+                or self.has_medication_context_signal(source_text)
                 or bool(
                     self.extract_drugs_from_anamnesis_deterministic(source_text).entries
                     if source == "anamnesis"
@@ -720,16 +766,6 @@ class DrugsParser:
         unresolved_lines: list[str] = []
         regimen_lines: list[str] = []
         for line in lines:
-            if self.is_likely_medication_line(line):
-                candidate = self.parse_line(line)
-                normalized = self.normalize_entry(
-                    candidate,
-                    source="anamnesis",
-                    historical_flag=True,
-                )
-                if normalized is not None:
-                    entries.append(normalized)
-                    continue
             if line_has_regimen_signal(line):
                 regimen_lines.append(line)
                 regimen_entries = extract_regimen_drug_candidates(
@@ -739,6 +775,16 @@ class DrugsParser:
                 )
                 if regimen_entries:
                     entries.extend(regimen_entries)
+                    continue
+            if self.is_likely_medication_line(line):
+                candidate = self.parse_line(line)
+                normalized = self.normalize_entry(
+                    candidate,
+                    source="anamnesis",
+                    historical_flag=True,
+                )
+                if normalized is not None:
+                    entries.append(normalized)
                     continue
             if line_has_regimen_signal(line) or re.search(
                 r"\b(antibiotic|antibiotic[ao]|farmac|chemioterap|protocollo)\b",
@@ -838,7 +884,15 @@ class DrugsParser:
             cleaned_anamnesis
         )
 
-        merged_entries = deterministic_result.entries
+        merged_entries: list[DrugEntry] = []
+        for entry in deterministic_result.entries:
+            grounded = self.attach_source_grounding(
+                entry,
+                source_text=cleaned_anamnesis,
+                historical_flag=True,
+                require_medication_syntax=False,
+            )
+            merged_entries.append(grounded or entry)
         raw_llm_entries = 0
         llm_input_text = cleaned_anamnesis.strip()
         if llm_input_text:
@@ -1235,6 +1289,8 @@ class DrugsParser:
         duration_words = set(snapshot.drug_duration_words)
         if not normalized:
             return True
+        if normalized in self.FUNCTION_WORD_NAMES:
+            return True
         if normalized in non_drug_exact:
             return True
         if any(normalized.startswith(prefix) for prefix in self.NON_DRUG_PREFIXES):
@@ -1328,6 +1384,157 @@ class DrugsParser:
             self.derive_temporal_classification(normalized),
         )
         return normalized
+
+    # -------------------------------------------------------------------------
+    def validate_llm_drug_entry_grounding(
+        self,
+        entry: DrugEntry,
+        *,
+        source_text: str,
+        source: Literal["therapy", "anamnesis"],
+        historical_flag: bool,
+    ) -> DrugEntry | None:
+        if source == "therapy":
+            return self.attach_source_grounding(
+                entry,
+                source_text=source_text,
+                historical_flag=historical_flag,
+                require_medication_syntax=False,
+            )
+        return self.attach_source_grounding(
+            entry,
+            source_text=source_text,
+            historical_flag=historical_flag,
+            require_medication_syntax=True,
+        )
+
+    # -------------------------------------------------------------------------
+    def attach_source_grounding(
+        self,
+        entry: DrugEntry,
+        *,
+        source_text: str,
+        historical_flag: bool,
+        require_medication_syntax: bool,
+    ) -> DrugEntry | None:
+        if not source_text.strip():
+            return None
+        evidence = self.sanitize_text_field(entry.evidence)
+        source_fold = source_text.casefold()
+        evidence_start = (
+            source_fold.find(evidence.casefold()) if evidence else -1
+        )
+        raw_name = (entry.name or "").strip()
+        name_start, name_end = self.find_grounded_name_span(raw_name, source_text)
+        if evidence_start < 0 and name_start < 0:
+            return None
+        anchor_start = evidence_start if evidence_start >= 0 else name_start
+        anchor_end = (
+            evidence_start + len(evidence)
+            if evidence_start >= 0 and evidence is not None
+            else name_end
+        )
+        evidence_text = (
+            source_text[evidence_start : evidence_start + len(evidence)]
+            if evidence_start >= 0 and evidence is not None
+            else source_text[name_start:name_end]
+        )
+        if require_medication_syntax and not self.has_grounded_medication_identity(
+            entry,
+            source_text=source_text,
+            name_start=name_start,
+            name_end=name_end,
+            evidence_start=evidence_start,
+            evidence_end=evidence_start + len(evidence)
+            if evidence_start >= 0 and evidence is not None
+            else -1,
+        ):
+            return None
+        return entry.model_copy(
+            update={
+                "evidence": evidence_text,
+                "source_span": entry.source_span or [anchor_start, anchor_end],
+                "confidence": entry.confidence or "moderate",
+                "attribution": entry.attribution or "patient",
+                "current_status": entry.current_status
+                or ("past" if historical_flag else "unclear"),
+            }
+        )
+
+    # -------------------------------------------------------------------------
+    def find_grounded_name_span(self, name: str, source_text: str) -> tuple[int, int]:
+        if not name:
+            return -1, -1
+        source_fold = source_text.casefold()
+        direct_start = source_fold.find(name.casefold())
+        if direct_start >= 0:
+            return direct_start, direct_start + len(name)
+        normalized_name = self.normalize_filter_key(name)
+        for alias, replacement in self._embedded_aliases:
+            if self.normalize_filter_key(replacement) != normalized_name:
+                continue
+            alias_pattern = re.compile(
+                r"\b"
+                + r"[\s-]+".join(re.escape(part) for part in alias.split())
+                + r"\b",
+                re.IGNORECASE,
+            )
+            match = alias_pattern.search(source_text)
+            if match is not None:
+                return match.start(), match.end()
+        return -1, -1
+
+    # -------------------------------------------------------------------------
+    def has_grounded_medication_identity(
+        self,
+        entry: DrugEntry,
+        *,
+        source_text: str,
+        name_start: int,
+        name_end: int,
+        evidence_start: int,
+        evidence_end: int,
+    ) -> bool:
+        if self.drug_entry_has_temporal_information(entry):
+            return True
+        if entry.dosage or entry.route or entry.administration_mode:
+            return True
+        if name_start >= 0 and self.name_has_medication_syntax(
+            source_text,
+            name_start=name_start,
+            name_end=name_end,
+        ):
+            return True
+        if evidence_start >= 0:
+            window_start = max(0, evidence_start - 80)
+            window_end = min(len(source_text), evidence_end + 80)
+            evidence_context = source_text[window_start:window_end]
+            return self.has_medication_context_signal(evidence_context)
+        return False
+
+    # -------------------------------------------------------------------------
+    def name_has_medication_syntax(
+        self,
+        source_text: str,
+        *,
+        name_start: int,
+        name_end: int,
+    ) -> bool:
+        before = source_text[max(0, name_start - 50) : name_start]
+        after = source_text[name_end : min(len(source_text), name_end + 80)]
+        if self.MEDICATION_NAME_PREFIX_RE.search(before):
+            return True
+        if self.SCHEDULE_RE.search(after):
+            return True
+        if self.DOSE_CUE_RE.search(after):
+            return True
+        if self.detect_route(after):
+            return True
+        return False
+
+    # -------------------------------------------------------------------------
+    def has_medication_context_signal(self, text: str) -> bool:
+        return bool(self.MEDICATION_CONTEXT_RE.search(text))
 
     # -------------------------------------------------------------------------
     def enrich_entry_from_line(self, entry: DrugEntry, raw_line: str) -> DrugEntry:
