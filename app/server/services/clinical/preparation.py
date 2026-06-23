@@ -16,6 +16,7 @@ from domain.clinical.extras import HepatoxPreparedInputs
 from repositories.serialization.data import DataSerializer
 from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.drug_identity import DrugIdentityResolver
+from services.clinical.drug_resolution import DrugResolutionService
 from services.clinical.match_resolution import (
     DrugEvidenceMatchResult,
     conservative_fuzzy_livertox_match,
@@ -140,27 +141,17 @@ class ClinicalKnowledgePreparation:
         self.emit_progress(progress_callback, 0.2)
         if not await self.ensure_livertox_matcher() or self.livertox_matcher is None:
             return None
-        drug_candidates = self.build_drug_candidates(drugs)
-        if not drug_candidates:
+        if not hasattr(getattr(self.livertox_matcher, "lookup", None), "match_alias_exact_all"):
+            resolved_drugs = await self.prepare_inputs_legacy(drugs)
+        else:
+            resolver = DrugResolutionService(self.livertox_matcher)
+            resolved_drugs = await asyncio.to_thread(resolver.resolve, drugs)
+        if not resolved_drugs:
             logger.info("No drugs detected for input preparation")
             return None
         self.emit_progress(progress_callback, 0.35)
-
-        patient_drugs = [candidate["canonical_name"] for candidate in drug_candidates]
-        matches = await asyncio.to_thread(
-            self.livertox_matcher.match_drug_names,
-            patient_drugs,
-        )
         self.emit_progress(progress_callback, 0.65)
-        livertox_information = await asyncio.to_thread(
-            self.livertox_matcher.build_drugs_to_excerpt_mapping,
-            patient_drugs,
-            matches,
-        )
         self.emit_progress(progress_callback, 0.9)
-
-        resolved_drugs = self.normalize_livertox_mapping(livertox_information)
-        self.attach_candidate_metadata(resolved_drugs, drug_candidates)
         self.knowledge_composer.enrich_resolved_drugs(resolved_drugs)
         pattern_prompt = self.build_pattern_prompt(pattern_score)
         normalized_context = (clinical_context or "").strip()
@@ -170,6 +161,26 @@ class ClinicalKnowledgePreparation:
             pattern_prompt=pattern_prompt,
             clinical_context=normalized_context,
         )
+
+    # -------------------------------------------------------------------------
+    async def prepare_inputs_legacy(
+        self,
+        drugs: PatientDrugs,
+    ) -> dict[str, dict[str, Any]]:
+        drug_candidates = self.build_drug_candidates(drugs)
+        patient_drugs = [candidate["canonical_name"] for candidate in drug_candidates]
+        matches = await asyncio.to_thread(
+            self.livertox_matcher.match_drug_names,
+            patient_drugs,
+        )
+        livertox_information = await asyncio.to_thread(
+            self.livertox_matcher.build_drugs_to_excerpt_mapping,
+            patient_drugs,
+            matches,
+        )
+        resolved_drugs = self.normalize_livertox_mapping(livertox_information)
+        self.attach_candidate_metadata(resolved_drugs, drug_candidates)
+        return resolved_drugs
 
     # -------------------------------------------------------------------------
     def build_match_audit_issues(

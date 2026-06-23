@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-06-21
+Last updated: 2026-06-23
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -28,7 +28,20 @@ If an explicit hepatic pattern is present in the laboratory source, it becomes t
 If no explicit pattern exists, the calculated value is used. If neither is available, the final value is `indeterminate` with source `undetermined`.
 
 ## Match Audit
-LiverTox and RxNav matching keeps raw extracted name, normalized name, matched LiverTox name, RxNorm RXCUI when available, match status, confidence, reason, candidates, rejected candidates, origins, raw mentions, and extraction metadata.
+Drug matching uses a first-class local resolution decision layer. Extracted mentions are normalized once, regimen parents and components are preserved separately, RxNav candidates are built from the persisted RxNorm-backed catalog, LiverTox candidates are built from local monographs, and a deterministic policy decides whether a match can be accepted automatically.
+
+LiverTox and RxNav matching keeps raw extracted name, normalized name, matched LiverTox name, RxNorm RXCUI when available, RxNav validation status, match status, confidence, reason, candidates, rejected candidates, origins, raw mentions, extraction metadata, and the full `DrugResolutionDecision`.
+
+Resolution statuses are:
+- `accepted_exact_livertox`
+- `accepted_rxnav_validated`
+- `accepted_livertox_without_rxnav`
+- `ambiguous_requires_review`
+- `missing_rxnav`
+- `missing_livertox`
+- `rejected_false_positive`
+
+An available LiverTox excerpt means evidence text is available for the accepted monograph. It is not treated as proof that a ranked or ambiguous candidate is clinically correct.
 
 Pipeline issues are emitted for missing LiverTox matches, ambiguous LiverTox matches, low-confidence matches, and unvalidated RxNav aliases.
 
@@ -39,6 +52,8 @@ Per-drug clinical assessments carry claim envelopes and narrative limits. Claim 
 - Duplicate required headings block deterministic section extraction.
 - Ambiguous or low-confidence section assignments require review.
 - Missing or ambiguous external drug matches do not force a match.
+- Ambiguous drug matches are included for review but are not used as authoritative LiverTox evidence.
+- Broad categories and rejected false-positive extracted text remain audit-only and do not become concrete drug matches.
 - LLM structured output failures fall back to direct deterministic parsing after bounded retries.
 - Session persistence is mandatory for successful clinical and revision jobs. Persistence write failures raise a service dependency error instead of returning an apparently successful unpersisted report.
 - Failed job payloads omit raw clinical input and patient image content; job-level errors expose generic failure text plus sanitized failure metadata.

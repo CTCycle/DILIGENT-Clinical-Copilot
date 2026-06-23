@@ -611,15 +611,29 @@ class AnalysisRunner:
     @staticmethod
     def livertox_payload_rank(payload: dict[str, Any]) -> int:
         status = str(payload.get("match_status") or "").strip().lower()
-        if status == "matched_with_excerpt":
+        if status in {
+            "matched_with_excerpt",
+            "accepted_exact_livertox",
+            "accepted_rxnav_validated",
+            "accepted_livertox_without_rxnav",
+        }:
             return 4
         if status == "matched_no_excerpt":
             return 3
         if status in {"matched", "match"}:
             return 3
-        if status in {"ambiguous", "ambiguous_match"} or payload.get("ambiguous_match"):
+        if status in {
+            "ambiguous",
+            "ambiguous_match",
+            "ambiguous_requires_review",
+        } or payload.get("ambiguous_match"):
             return 2
-        if status in {"missing", "missing_match"} or payload.get("missing_livertox"):
+        if status in {
+            "missing",
+            "missing_match",
+            "missing_livertox",
+            "rejected_false_positive",
+        } or payload.get("missing_livertox"):
             return 1
         return 0
 
