@@ -53,18 +53,21 @@ class DrugMatcher:
                 alias_entries=alias_entries,
             )
 
-            if match.status == "missing":
-                alias_entries = self.lookup.resolve_alias_candidates(
+            if match.status in {"missing", "ambiguous"}:
+                catalog_alias_entries = self.lookup.resolve_alias_candidates(
                     raw_name,
                     normalized_query,
                     include_catalog=True,
                 )
-                match = self.lookup.match_query(
-                    raw_name=raw_name,
-                    canonical_query=canonical_query,
-                    normalized_query=normalized_query,
-                    alias_entries=alias_entries,
-                )
+                if catalog_alias_entries:
+                    retry = self.lookup.match_query(
+                        raw_name=raw_name,
+                        canonical_query=canonical_query,
+                        normalized_query=normalized_query,
+                        alias_entries=catalog_alias_entries,
+                    )
+                    if match.status == "missing" or retry.status == "matched":
+                        match = retry
 
             self.lookup.match_cache.put(normalized_query, match)
             results.append(match)

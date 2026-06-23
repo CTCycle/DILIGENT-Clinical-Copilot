@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import pandas as pd
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from domain.clinical import DrugEntry, PatientDrugs
+from repositories.schemas.models import Base, Drug, DrugRxnormCode, KbMatchCache, LiverToxMonograph
+from repositories.serialization.data import DataSerializer
 from services.clinical.drug_resolution import DrugResolutionService
 from services.clinical.matches_core import LiverToxMatcher
 
@@ -274,3 +278,255 @@ def test_false_positive_lab_text_is_rejected_before_matching() -> None:
 
     assert payload["decision_status"] == "rejected_false_positive"
     assert payload["missing_livertox"] is True
+
+
+###############################################################################
+# DB match-cache integration tests
+
+
+def _build_cache_db() -> tuple[DataSerializer, Drug, LiverToxMonograph]:
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    serializer = DataSerializer(engine=engine)
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as session:
+        drug = Drug(
+            canonical_name="Acetaminophen",
+            canonical_name_norm="acetaminophen",
+            livertox_nbk_id="NBK0001",
+        )
+        session.add(drug)
+        session.flush()
+
+        monograph = LiverToxMonograph(
+            drug_id=int(drug.id),
+            monograph_key="test_monograph_001",
+            drug_name_norm="acetaminophen",
+            nbk_id="NBK0001",
+            excerpt="Cached Acetaminophen excerpt.",
+        )
+        session.add(monograph)
+        session.flush()
+
+        cache = KbMatchCache(
+            raw_drug_name="Acetaminophen",
+            raw_drug_name_norm="acetaminophen",
+            normalized_drug_key="acetaminophen",
+            drug_id=int(drug.id),
+            livertox_monograph_key="test_monograph_001",
+            livertox_nbk_id="NBK0001",
+            source="livertox",
+            confidence=0.96,
+            evidence_json="{}",
+        )
+        session.add(cache)
+        session.commit()
+    return serializer, drug, monograph
+
+
+def test_db_cache_hit_returns_cached_result() -> None:
+    serializer, drug, monograph = _build_cache_db()
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0001",
+                "drug_name": "Acetaminophen",
+                "excerpt": "Fresh Acetaminophen excerpt.",
+                "synonyms": "Tylenol; Paracetamol",
+                "ingredient": "Acetaminophen",
+                "brand_name": "Tylenol",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+    cache_lookup = (
+        lambda key: serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+    )
+    resolver = DrugResolutionService(
+        matcher,
+        cache_lookup=cache_lookup,
+    )
+    resolved = resolver.resolve(
+        PatientDrugs(entries=[DrugEntry(name="Acetaminophen")])
+    )
+    assert resolved
+    payload = next(iter(resolved.values()))
+
+    assert "cache_hit_previous_match" in payload.get("match_reason", "")
+    assert payload["accepted_livertox_name"] == "Acetaminophen"
+    assert payload["accepted_livertox_nbk_id"] == "NBK0001"
+    assert payload["missing_livertox"] is False
+    assert payload["extracted_excerpts"] == ["Cached Acetaminophen excerpt."]
+    assert payload.get("decision_status") in {
+        "accepted_exact_livertox",
+        "accepted_livertox_without_rxnav",
+    }
+
+
+def test_db_cache_miss_falls_through_to_pipeline() -> None:
+    serializer, drug, monograph = _build_cache_db()
+    factory = sessionmaker(
+        bind=serializer.session_factory.kw["bind"],
+        future=True,
+    )
+    with factory() as session:
+        session.query(KbMatchCache).delete()
+        session.commit()
+
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0001",
+                "drug_name": "Acetaminophen",
+                "excerpt": "Fresh Acetaminophen excerpt.",
+                "synonyms": "Tylenol; Paracetamol",
+                "ingredient": "Acetaminophen",
+                "brand_name": "Tylenol",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+    cache_lookup = (
+        lambda key: serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+    )
+    resolver = DrugResolutionService(
+        matcher,
+        cache_lookup=cache_lookup,
+    )
+    resolved = resolver.resolve(
+        PatientDrugs(entries=[DrugEntry(name="Acetaminophen")])
+    )
+    assert resolved
+    payload = next(iter(resolved.values()))
+
+    assert "cache_hit_previous_match" not in payload.get("match_reason", "")
+    assert payload["accepted_livertox_name"] == "Acetaminophen"
+    assert payload["missing_livertox"] is False
+
+
+def test_db_cache_low_confidence_not_used() -> None:
+    serializer, drug, monograph = _build_cache_db()
+    factory = sessionmaker(
+        bind=serializer.session_factory.kw["bind"],
+        future=True,
+    )
+    with factory() as session:
+        existing = session.query(KbMatchCache).first()
+        existing.confidence = 0.70
+        session.commit()
+
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0001",
+                "drug_name": "Acetaminophen",
+                "excerpt": "Fresh Acetaminophen excerpt.",
+                "synonyms": "Tylenol; Paracetamol",
+                "ingredient": "Acetaminophen",
+                "brand_name": "Tylenol",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+    cache_lookup = (
+        lambda key: serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+    )
+    resolver = DrugResolutionService(
+        matcher,
+        cache_lookup=cache_lookup,
+    )
+    resolved = resolver.resolve(
+        PatientDrugs(entries=[DrugEntry(name="Acetaminophen")])
+    )
+    assert resolved
+    payload = next(iter(resolved.values()))
+
+    assert "cache_hit_previous_match" not in payload.get("match_reason", "")
+    assert payload["accepted_livertox_name"] == "Acetaminophen"
+    assert payload["missing_livertox"] is False
+    assert payload["extracted_excerpts"] == ["Fresh Acetaminophen excerpt."]
+
+
+def test_db_cache_uses_previously_resolved_rxcui() -> None:
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    serializer = DataSerializer(engine=engine)
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as session:
+        drug = Drug(
+            canonical_name="Omeprazole",
+            canonical_name_norm="omeprazole",
+            livertox_nbk_id="NBK0002",
+        )
+        session.add(drug)
+        session.flush()
+
+        monograph = LiverToxMonograph(
+            drug_id=int(drug.id),
+            monograph_key="test_monograph_002",
+            drug_name_norm="omeprazole",
+            nbk_id="NBK0002",
+            excerpt="Cached Omeprazole excerpt.",
+        )
+        session.add(monograph)
+        session.flush()
+
+        cache = KbMatchCache(
+            raw_drug_name="Omeprazole",
+            raw_drug_name_norm="omeprazole",
+            normalized_drug_key="omeprazole",
+            drug_id=int(drug.id),
+            rxnorm_rxcui="7646",
+            livertox_monograph_key="test_monograph_002",
+            livertox_nbk_id="NBK0002",
+            source="rxnav",
+            confidence=0.98,
+            evidence_json='{"match_reason": "rxnorm_direct"}',
+        )
+        session.add(
+            DrugRxnormCode(
+                drug_id=int(drug.id),
+                rxcui="7646",
+            )
+        )
+        session.add(cache)
+        session.commit()
+
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0002",
+                "drug_name": "Omeprazole",
+                "excerpt": "Fresh Omeprazole excerpt.",
+                "synonyms": "Losec",
+                "ingredient": "Omeprazole",
+                "brand_name": "Losec",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+    cache_lookup = (
+        lambda key: serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+    )
+    resolver = DrugResolutionService(
+        matcher,
+        cache_lookup=cache_lookup,
+    )
+    resolved = resolver.resolve(
+        PatientDrugs(entries=[DrugEntry(name="Omeprazole")])
+    )
+    assert resolved
+    payload = next(iter(resolved.values()))
+
+    assert "cache_hit_previous_match" in payload.get("match_reason", "")
+    assert payload["decision_status"] == "accepted_rxnav_validated"
+    assert payload["accepted_rxnav_rxcui"] == "7646"
+    assert payload["accepted_livertox_nbk_id"] == "NBK0002"
