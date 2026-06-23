@@ -897,6 +897,7 @@ def load_livertox_match_from_db_cache(
         if drug is None:
             cache.invalidated_at = datetime.utcnow()
             cache.invalidation_reason = "matched_drug_deleted"
+            db_session.commit()
             return None
 
         if (
@@ -905,6 +906,7 @@ def load_livertox_match_from_db_cache(
         ):
             cache.invalidated_at = datetime.utcnow()
             cache.invalidation_reason = "rxnorm_code_no_longer_resolves"
+            db_session.commit()
             return None
 
         monograph = db_session.scalar(
@@ -915,6 +917,7 @@ def load_livertox_match_from_db_cache(
         if monograph is None:
             cache.invalidated_at = datetime.utcnow()
             cache.invalidation_reason = "livertox_monograph_identity_changed"
+            db_session.commit()
             return None
 
         evidence = {}

@@ -104,6 +104,7 @@ class DrugResolutionService:
             has_excerpt=bool(cached.get("excerpt")),
             confidence=cached.get("confidence"),
             reason="cache_hit",
+            accepted=True,
         )
 
         decision = DrugResolutionDecision(
