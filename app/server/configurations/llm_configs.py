@@ -236,5 +236,8 @@ class LLMRuntimeConfig:
         if snapshot.use_cloud_models:
             provider = (snapshot.cloud_provider or "").strip()
             cloud_model = (snapshot.cloud_model or "").strip()
-            return provider, local_model or cloud_model
+            cloud_models = set(get_cloud_model_choices().get(provider, []))
+            if local_model in cloud_models:
+                return provider, local_model
+            return provider, cloud_model
         return "ollama", local_model
