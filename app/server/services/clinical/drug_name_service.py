@@ -702,15 +702,23 @@ class DrugNameService:
                 normalized_synonym, entry, True, original
             )
         for alias in fallback_aliases:
-            normalized_alias = self.lookup.normalize_name(alias)
-            if not normalized_alias or not self.catalog_alias_quality_allowed(
+            normalized_aliases = [
+                self.lookup.normalize_name(alias),
+                self.lookup.normalize_name(self.lookup.canonicalize_query(alias)),
+            ]
+            if not any(normalized_aliases) or not self.catalog_alias_quality_allowed(
                 alias,
                 raw_name=entry.get("raw_name"),
                 base_name=entry.get("name"),
                 term_type=entry.get("term_type"),
             ):
                 continue
-            self.lookup.add_catalog_index_entry(normalized_alias, entry, False, alias)
+            for normalized_alias in dict.fromkeys(
+                item for item in normalized_aliases if item
+            ):
+                self.lookup.add_catalog_index_entry(
+                    normalized_alias, entry, False, alias
+                )
 
     # -------------------------------------------------------------------------
     def add_catalog_index_entry(
@@ -774,7 +782,15 @@ class DrugNameService:
         if not meaningful_tokens:
             return False
         if all(len(token) < self.lookup.TOKEN_MIN_LENGTH for token in meaningful_tokens):
-            return False
+            compact_alias = "".join(meaningful_tokens)
+            is_compact_alphanumeric_brand = (
+                len(meaningful_tokens) > 1
+                and len(compact_alias) >= max(self.lookup.TOKEN_MIN_LENGTH, 5)
+                and any(char.isalpha() for char in compact_alias)
+                and any(char.isdigit() for char in compact_alias)
+            )
+            if not is_compact_alphanumeric_brand:
+                return False
         base_normalized = self.lookup.normalize_name(coerce_text(base_name))
         raw_normalized = self.lookup.normalize_name(coerce_text(raw_name))
         source_tokens = set(base_normalized.split()) | set(raw_normalized.split())

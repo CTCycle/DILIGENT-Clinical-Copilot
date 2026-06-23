@@ -375,6 +375,37 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
     assert "No matching LiverTox record available." in report
 
 ###############################################################################
+def test_finalize_patient_report_renders_accepted_resolution_status_as_matched() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+
+    async def fake_generate_conclusion(**kwargs):  # type: ignore[no-untyped-def]
+        _ = kwargs
+        return None
+
+    consultation.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
+    report = asyncio.run(
+        consultation.finalize_patient_report(
+            [
+                DrugClinicalAssessment(
+                    drug_name="Abiraterone",
+                    match_status="accepted_exact_livertox",
+                    missing_livertox=False,
+                    matched_livertox_row={"likelihood_score": "C"},
+                    extracted_excerpts=["Abiraterone excerpt."],
+                    paragraph="Abiraterone clinical narrative.",
+                )
+            ],
+            clinical_context="Clinical context",
+            report_language="en",
+        )
+    )
+
+    assert report is not None
+    assert "**Abiraterone - LiverTox score C**" in report
+    assert "Abiraterone clinical narrative." in report
+    assert "## Unresolved Drug Mentions" not in report
+
+###############################################################################
 def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     resolved = {
