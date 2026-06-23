@@ -231,7 +231,9 @@ def line_has_regimen_signal(line: str) -> bool:
         return True
     if REGIMEN_SIGNAL_RE.search(stripped):
         return True
-    return "+" in stripped and bool(CAPITALIZED_DRUG_TOKEN_RE.search(stripped))
+    return bool(re.search(r"(?<!\d)\+(?!\d)", stripped)) and bool(
+        CAPITALIZED_DRUG_TOKEN_RE.search(stripped)
+    )
 
 ###############################################################################
 def extract_regimen_drug_candidates(
