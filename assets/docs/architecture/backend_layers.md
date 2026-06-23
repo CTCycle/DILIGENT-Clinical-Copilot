@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-06-21
+Last updated: 2026-06-23
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -12,6 +12,7 @@ Last updated: 2026-06-21
   - `DataInspectionService` (in `app/server/services/inspection/service.py`) composes behavior from mixins in `update_config.py`, `revision_diff.py`, `revision_decisions.py`, and `revision_runner.py`.
   - `ClinicalSessionService` (in `app/server/services/session/session_service.py`) composes behavior from mixins in `consultation.py` and `extraction_pipeline.py`.
   - Clinical and revision workflow helper code shared across session paths lives in `app/server/services/session/workflow_shared.py`; revision workflows must not import from first-run workflow modules.
+  - Drug resolution lives in `app/server/services/clinical/drug_resolution/` and owns local-first RxNav catalog candidate generation, LiverTox candidate generation, deterministic acceptance policy, and prepared-input serialization.
   - RAG vector serialization lives in `app/server/services/rag/vector_serializer.py`.
   - `app/server/services/text/vocabulary.py` provides cache-facing text normalization business access and does not manage SQLAlchemy sessions directly.
   - `app/server/services/llm/ollama_runtime.py` owns canonical Ollama runtime aliases, errors, environment helpers, message normalization, and exception mapping. Ollama service modules must import these definitions instead of duplicating or monkey-patching them.
@@ -19,6 +20,7 @@ Last updated: 2026-06-21
 - Domain layer: `app/server/domain/*`
   - Owns Pydantic and domain request-response schemas and typed contracts.
   - Clinical extraction schemas used by orchestration live under `app/server/domain/clinical/`.
+  - Drug resolution decision schemas live in `app/server/domain/clinical/drug_resolution.py`.
   - Clinical claim envelopes live in `app/server/domain/clinical/claims.py` and are attached to per-drug DILI assessments for source and limitation review.
 - Runtime state: `app/server/services/runtime/state.py`
   - Internal job state only. It is not a public domain contract and must not be imported by endpoints.
@@ -58,7 +60,8 @@ Last updated: 2026-06-21
 - Strict structured LLM parsing rejects prose-contaminated JSON and logs only sanitized repair diagnostics.
 - Extracted drugs and diseases must carry source evidence, confidence, attribution, and current or diagnostic status where available.
 - Hepatic pattern handling resolves explicit source-provided values separately from calculated R-ratio values and flags conflicts instead of silently overwriting the calculated score.
-- LiverTox and RxNav matching preserve raw mentions, candidates, rejected candidates, origins, confidence, status, and warning issues for missing, ambiguous, low-confidence, or unvalidated matches.
+- LiverTox and RxNav matching preserve raw mentions, candidates, rejected candidates, origins, confidence, status, `DrugResolutionDecision`, accepted RxCUI, accepted LiverTox monograph identity, review flags, and warning issues for missing, ambiguous, low-confidence, or unvalidated matches.
+- Resolution statuses are `accepted_exact_livertox`, `accepted_rxnav_validated`, `accepted_livertox_without_rxnav`, `ambiguous_requires_review`, `missing_rxnav`, `missing_livertox`, and `rejected_false_positive`.
 - Persisted audit artifacts include section extraction audit, extraction strategy decisions, hepatic pattern resolution, and match audit details.
 - Successful clinical jobs require database persistence. If the serializer cannot return a persisted session id, the workflow fails with a service dependency error rather than returning an unpersisted success.
 

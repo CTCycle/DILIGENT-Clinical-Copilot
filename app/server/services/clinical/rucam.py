@@ -204,6 +204,17 @@ class RucamScoreEstimator:
     ) -> list[str]:
         if not isinstance(resolved_item, dict):
             return []
+        status = str(resolved_item.get("match_status") or "").strip().lower()
+        if status in {
+            "ambiguous",
+            "ambiguous_match",
+            "ambiguous_requires_review",
+            "missing",
+            "missing_match",
+            "missing_livertox",
+            "rejected_false_positive",
+        }:
+            return []
         texts: list[str] = []
         for key in ("matched_livertox_row", "extracted_excerpts", "match_notes"):
             raw = resolved_item.get(key)

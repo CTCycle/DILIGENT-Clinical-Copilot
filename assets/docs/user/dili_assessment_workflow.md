@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-06-03
+Last updated: 2026-06-23
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -66,6 +66,18 @@ Review for:
 - mention of confounders and alternative causes
 - consistency between conclusion and supplied evidence
 - unsupported assumptions or invented facts
+- drug-resolution review flags for ambiguous, missing, or unvalidated RxNav/LiverTox matches
+
+Drug matching statuses can include:
+- `accepted_exact_livertox`
+- `accepted_rxnav_validated`
+- `accepted_livertox_without_rxnav`
+- `ambiguous_requires_review`
+- `missing_rxnav`
+- `missing_livertox`
+- `rejected_false_positive`
+
+Ambiguous matches require review and are not treated as authoritative LiverTox evidence. A LiverTox excerpt indicates available monograph text, not automatic proof that the drug identity is clinically correct.
 
 If the report is incomplete or wrong:
 1. Add missing clinical details.
