@@ -8,6 +8,7 @@ from services.clinical.drug_resolution.normalizer import NormalizedDrugMention
 from services.text.normalization import normalize_drug_query_name
 
 
+###############################################################################
 class RxNavCandidateResolver:
     BROAD_CATEGORIES = {"vitamins", "minerals", "trace elements"}
     FORM_SUFFIX_TOKENS = {
@@ -30,9 +31,11 @@ class RxNavCandidateResolver:
     }
     ALLOWED_TERM_TYPES = {"IN", "MIN", "PIN", "SCD", "SBD", "GPCK", "BPCK"}
 
+    # -------------------------------------------------------------------------
     def __init__(self, matcher: Any | None) -> None:
         self.matcher = matcher
 
+    # -------------------------------------------------------------------------
     def build_candidates(
         self, mention: NormalizedDrugMention
     ) -> list[RxNavResolutionCandidate]:
@@ -69,6 +72,7 @@ class RxNavCandidateResolver:
             candidates.append(self._candidate_from_payload(payload, "guarded_prefix_catalog_match"))
         return candidates[:4]
 
+    # -------------------------------------------------------------------------
     def allow_catalog_prefix_match(
         self,
         suffix_tokens: list[str],
@@ -84,6 +88,7 @@ class RxNavCandidateResolver:
         term_type = coerce_text(entry.get("term_type"))
         return term_type is None or term_type.upper() in self.ALLOWED_TERM_TYPES
 
+    # -------------------------------------------------------------------------
     def _candidate_from_payload(
         self,
         payload: tuple[dict[str, Any], bool, str],
@@ -112,6 +117,7 @@ class RxNavCandidateResolver:
             rejected_reason=None if rxcui else "catalog row has no RXCUI",
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _classify_alias(entry: dict[str, Any], matched_value: str) -> str:
         normalized = normalize_drug_query_name(matched_value)
