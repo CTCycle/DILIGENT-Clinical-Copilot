@@ -875,7 +875,6 @@ def test_preparation_expands_regimen_into_multiple_components() -> None:
         if candidate["canonical_name"] in {"dabrafenib", "trametinib"}:
             assert "dabrafenib|trametinib" in candidate["regimen_group_ids"]
 
-
 ###############################################################################
 def test_catalog_retry_resolves_ambiguous_match_via_catalog_alias() -> None:
     """When an alias matches multiple LiverTox records, the catalog-backed
@@ -920,6 +919,7 @@ def test_catalog_retry_resolves_ambiguous_match_via_catalog_alias() -> None:
     assert result.reason in {"exact_canonical", "exact_alias_ranked", "exact_alias", "normalized_exact_ranked"}
 
 
+###############################################################################
 def test_ambiguous_retry_preserves_original_when_catalog_does_not_help() -> None:
     """When catalog aliases still cannot resolve an ambiguous match,
     the original ambiguous result is preserved with all candidates."""

@@ -9,6 +9,7 @@ from services.clinical.matches_core import LiverToxMatcher
 from services.clinical.preparation import ClinicalKnowledgePreparation
 
 
+###############################################################################
 def test_prepare_inputs_exposes_resolution_audit_payload() -> None:
     frame = pd.DataFrame(
         [

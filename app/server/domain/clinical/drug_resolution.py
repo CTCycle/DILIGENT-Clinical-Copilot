@@ -26,6 +26,7 @@ DrugDecisionStatus = Literal[
 ]
 
 
+###############################################################################
 class RxNavResolutionCandidate(BaseModel):
     rxcui: str | None = None
     name: str
@@ -39,6 +40,7 @@ class RxNavResolutionCandidate(BaseModel):
     rejected_reason: str | None = None
 
 
+###############################################################################
 class LiverToxResolutionCandidate(BaseModel):
     nbk_id: str | None = None
     drug_name: str
@@ -51,6 +53,7 @@ class LiverToxResolutionCandidate(BaseModel):
     rejected_reason: str | None = None
 
 
+###############################################################################
 class DrugResolutionDecision(BaseModel):
     extracted_name: str
     normalized_extracted_name: str

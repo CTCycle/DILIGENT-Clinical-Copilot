@@ -23,7 +23,10 @@ from services.clinical.matches_core import LiverToxMatcher
 CacheLookupFn = Callable[[str], dict[str, Any] | None]
 
 
+###############################################################################
 class DrugResolutionService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         matcher: LiverToxMatcher,
@@ -37,6 +40,7 @@ class DrugResolutionService:
         self.livertox_resolver = LiverToxCandidateResolver(matcher)
         self.policy = DrugResolutionPolicy()
 
+    # -------------------------------------------------------------------------
     def resolve(self, drugs: PatientDrugs) -> dict[str, dict[str, Any]]:
         resolved: dict[str, dict[str, Any]] = {}
         for mention in self.normalizer.normalize_entries(drugs):
@@ -72,6 +76,7 @@ class DrugResolutionService:
             )
         return resolved
 
+    # -------------------------------------------------------------------------
     def _try_cache(
         self,
         mention: NormalizedDrugMention,
@@ -149,6 +154,7 @@ class DrugResolutionService:
             excerpts=excerpts,
         )
 
+    # -------------------------------------------------------------------------
     def _accepted_livertox_evidence(
         self,
         decision: Any,
@@ -164,6 +170,7 @@ class DrugResolutionService:
         item = mapping[0]
         return item.get("matched_livertox_row"), list(item.get("extracted_excerpts") or [])
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _merge_payload(
         existing: dict[str, Any] | None,

@@ -8,6 +8,7 @@ from services.clinical.drug_identity import DrugIdentityResolver
 from services.text.normalization import canonicalize_drug_query, normalize_drug_query_name
 
 
+###############################################################################
 @dataclass(slots=True)
 class NormalizedDrugMention:
     extracted_name: str
@@ -22,9 +23,11 @@ class NormalizedDrugMention:
     regimen_components: list[str] = field(default_factory=list)
 
 
+###############################################################################
 class DrugMentionNormalizer:
     """Normalize extracted drug entries and split regimen components once."""
 
+    # -------------------------------------------------------------------------
     def normalize_entries(self, drugs: PatientDrugs) -> list[NormalizedDrugMention]:
         mentions: list[NormalizedDrugMention] = []
         seen: set[tuple[str, str | None, bool]] = set()
@@ -45,6 +48,7 @@ class DrugMentionNormalizer:
                 mentions.append(mention)
         return mentions
 
+    # -------------------------------------------------------------------------
     def _normalize_entry(self, entry: DrugEntry) -> NormalizedDrugMention | None:
         raw_name = (entry.name or "").strip()
         if not raw_name:
@@ -81,6 +85,7 @@ class DrugMentionNormalizer:
             extraction_metadata=[metadata] if metadata else [],
         )
 
+    # -------------------------------------------------------------------------
     def _expand_components(
         self, mention: NormalizedDrugMention
     ) -> list[NormalizedDrugMention]:
@@ -121,6 +126,7 @@ class DrugMentionNormalizer:
             )
         return expanded
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _merge_mentions(
         mentions: list[NormalizedDrugMention],
