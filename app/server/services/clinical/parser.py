@@ -684,12 +684,17 @@ class DrugsParser:
         last_wrong_output = ""
         last_errors: list[str] = []
         max_attempts = 2
+        deterministic_reference = (
+            self.extract_drugs_from_anamnesis_deterministic(source_text)
+            if source == "anamnesis"
+            else self.extract_drugs_from_therapy_deterministic(source_text)
+        )
         for attempt in range(1, max_attempts + 1):
             if attempt > 1:
                 user_prompt = (
                     "Retry the extraction. The previous output was rejected by semantic validation.\n"
-                    "Return only entries that are explicit medications in the source text. "
-                    "Do not extract lab values, biopsy/pathology prose, diseases, dates, or units as drugs.\n\n"
+                    "Return every explicit medication exposure in the source text, with exact evidence for each entry. "
+                    "Do not extract lab values, biopsy/pathology prose, diagnoses, staging, dates, or units as drugs.\n\n"
                     f"Validation errors:\n- {'; '.join(last_errors)}\n\n"
                     f"Previous wrong output:\n{last_wrong_output}\n\n"
                     f"Source text:\n{source_text}"
@@ -735,21 +740,88 @@ class DrugsParser:
                     if line.strip()
                 )
                 or self.has_medication_context_signal(source_text)
-                or bool(
-                    self.extract_drugs_from_anamnesis_deterministic(source_text).entries
-                    if source == "anamnesis"
-                    else self.extract_drugs_from_therapy_deterministic(
-                        source_text
-                    ).entries
-                )
+                or bool(deterministic_reference.entries)
+            )
+            missing_grounded = self.find_missing_grounded_reference_entries(
+                filtered_candidates,
+                deterministic_reference.entries,
+                source_text=source_text,
             )
             if filtered_candidates or not source_has_medication_signal:
+                if missing_grounded and attempt < max_attempts:
+                    last_errors = self.describe_missing_reference_entries(
+                        missing_grounded
+                    )
+                    continue
                 self.emit_progress(progress_callback, 1.0)
-                return PatientDrugs(entries=filtered_candidates)
+                merged_candidates = (
+                    [*filtered_candidates, *missing_grounded]
+                    if missing_grounded
+                    else filtered_candidates
+                )
+                return PatientDrugs(
+                    entries=self.deduplicate_drug_entries(merged_candidates)
+                )
             last_errors = [
                 "The model returned no valid medication entries despite medication-like source evidence."
             ]
         raise RuntimeError("LLM drug extraction produced no semantically valid entries")
+
+    # -------------------------------------------------------------------------
+    def find_missing_grounded_reference_entries(
+        self,
+        llm_entries: list[DrugEntry],
+        reference_entries: list[DrugEntry],
+        *,
+        source_text: str,
+    ) -> list[DrugEntry]:
+        missing: list[DrugEntry] = []
+        llm_names = {normalize_token(entry.name) for entry in llm_entries}
+        llm_evidence = {
+            self.normalize_filter_key(entry.evidence or "")
+            for entry in llm_entries
+            if entry.evidence
+        }
+        for reference in reference_entries:
+            grounded = self.attach_source_grounding(
+                reference,
+                source_text=source_text,
+                historical_flag=bool(reference.historical_flag),
+                require_medication_syntax=False,
+            )
+            if grounded is None:
+                continue
+            normalized_name = normalize_token(grounded.name)
+            normalized_evidence = self.normalize_filter_key(grounded.evidence or "")
+            if normalized_name in llm_names:
+                continue
+            if any(
+                normalized_name and llm_name and llm_name in normalized_name
+                for llm_name in llm_names
+            ):
+                continue
+            if normalized_evidence and normalized_evidence in llm_evidence:
+                continue
+            if any(
+                normalized_evidence
+                and evidence
+                and evidence in normalized_evidence
+                for evidence in llm_evidence
+            ):
+                continue
+            missing.append(grounded)
+        return missing
+
+    # -------------------------------------------------------------------------
+    def describe_missing_reference_entries(self, entries: list[DrugEntry]) -> list[str]:
+        messages: list[str] = []
+        for entry in entries[:10]:
+            evidence = (entry.evidence or entry.name or "").strip()
+            if evidence:
+                messages.append(f"Missing explicit medication evidence: {evidence}")
+        if len(entries) > 10:
+            messages.append(f"Missing {len(entries) - 10} additional medication entries.")
+        return messages or ["Medication-like source evidence was omitted."]
 
     # -------------------------------------------------------------------------
     def extract_drugs_from_anamnesis_rule_based(
@@ -884,7 +956,7 @@ class DrugsParser:
             cleaned_anamnesis
         )
 
-        merged_entries: list[DrugEntry] = []
+        fallback_entries: list[DrugEntry] = []
         for entry in deterministic_result.entries:
             grounded = self.attach_source_grounding(
                 entry,
@@ -892,7 +964,8 @@ class DrugsParser:
                 historical_flag=True,
                 require_medication_syntax=False,
             )
-            merged_entries.append(grounded or entry)
+            fallback_entries.append(grounded or entry)
+        merged_entries: list[DrugEntry] = list(fallback_entries)
         raw_llm_entries = 0
         llm_input_text = cleaned_anamnesis.strip()
         if llm_input_text:
@@ -904,9 +977,7 @@ class DrugsParser:
                     progress_callback=progress_callback,
                 )
                 raw_llm_entries = len(structured.entries)
-                merged_entries = self.deduplicate_drug_entries(
-                    [*merged_entries, *structured.entries]
-                )
+                merged_entries = self.deduplicate_drug_entries(structured.entries)
             except Exception as exc:
                 logger.warning(
                     "Anamnesis LLM enrichment failed; keeping deterministic extraction only: %s",

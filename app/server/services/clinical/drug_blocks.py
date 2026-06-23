@@ -14,7 +14,7 @@ class DrugBlock:
     end: int
 
 
-BULLET_RE = re.compile(r"(?m)^[ \t]*(?:[-*•]|\d+[.)])[ \t]+")
+BULLET_RE = re.compile(r"(?m)^[ \t]*(?:[-*•■]|\d+[.)])[ \t]*")
 UPPER_TOKEN_RE = re.compile(r"^[A-ZÀ-ÖØ-Þ][\wÀ-ÖØ-öø-ÿ'/-]+")
 
 ###############################################################################

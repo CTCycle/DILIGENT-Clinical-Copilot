@@ -2,27 +2,51 @@ from __future__ import annotations
 
 DRUG_EXTRACTION_PROMPT = """
 Extract structured drug regimens from free-text clinical notes. Return only data
-that validates against the provided JSON schema.
+that validates against the provided JSON schema. Completeness matters: scan every
+line and every bullet before answering.
 
 Rules:
 - One entry per drug explicitly present in the input; never fabricate drugs.
+- Extract brand names, generic names, fixed combinations, oncology regimens,
+  biologics, hormones, supplements, vitamins, and minerals when they are stated
+  as medication exposure.
+- Extract medication names from narrative therapy phrases such as "therapy with",
+  "terapia con", "protocol with", "started on", and equivalent non-English
+  wording, even when no dose is provided.
+- Do not extract diagnoses, tumor staging, lab markers, procedures, dates, units,
+  symptoms, or scoring systems as drugs.
 - Preserve original drug names, dosage, and administration mode except for whitespace.
+- For every entry, include exact source `evidence` copied from the input and
+  `source_span` character offsets when possible.
 - `daytime_administration` is four numeric slots: morning, midday, afternoon, night.
   Fill missing mentioned slots with 0; use decimals for half doses; use [] when no
   schedule is stated.
 - Capture therapy start/suspension status and dates when stated; keep ISO dates unchanged.
 - If therapy is explicitly not started, set `therapy_start_status` to false.
+- Set `source` to "therapy", `historical_flag` to false, `attribution` to
+  "patient", and `current_status` to "current" unless the text explicitly states
+  otherwise.
 - Use null for missing scalar fields and [] for missing schedules.
+- Before returning, verify that each medication-like line or bullet has either
+  a corresponding entry or is truly not a medication.
 
 Return a JSON object matching `PatientDrugs` with an `entries` array.
 """
 
 ANAMNESIS_DRUG_EXTRACTION_PROMPT = """
 Extract drug mentions from free-text patient anamnesis/medical history.
+Completeness matters: scan every line, bullet, and narrative treatment phrase
+before answering.
 
 Rules:
 - Extract every drug name mentioned, including previous treatments, allergies, and
   medication history; never fabricate drugs.
+- Extract medication exposure from phrases such as "therapy with", "terapia con",
+  "protocol with", "started on", "treated with", "allergy to", and equivalent
+  non-English wording, even when dose or schedule is absent.
+- Extract brand names, generic names, fixed combinations, oncology regimens,
+  biologics, hormones, supplements, vitamins, and minerals when they are stated
+  as medication exposure.
 - Use the drug name as written.
 - Capture dosage, administration mode, start date/status, and suspension date/status
   only when stated.
@@ -33,8 +57,12 @@ Rules:
 - Classify `confidence` as high, moderate, or low based on source grounding.
 - Classify `attribution` as patient, family_history, allergy, negated, or unclear.
 - Classify `current_status` as current, past, suspected, ruled_out, or unclear.
+- Do not extract diagnoses, tumor staging, lab markers, procedures, dates, units,
+  symptoms, or scoring systems as drugs.
 - Do not treat family-history, allergy-only, negated, or ruled-out mentions as
   active patient conditions unless the text explicitly says they apply to the patient.
+- Before returning, verify that each medication-like line or phrase has either
+  a corresponding entry or is truly not a medication.
 
 Return a JSON object matching `PatientDrugs` with an `entries` array.
 """
