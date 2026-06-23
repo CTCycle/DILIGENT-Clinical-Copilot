@@ -874,3 +874,78 @@ def test_preparation_expands_regimen_into_multiple_components() -> None:
             assert "binimetinib|encorafenib" in candidate["regimen_group_ids"]
         if candidate["canonical_name"] in {"dabrafenib", "trametinib"}:
             assert "dabrafenib|trametinib" in candidate["regimen_group_ids"]
+
+
+###############################################################################
+def test_catalog_retry_resolves_ambiguous_match_via_catalog_alias() -> None:
+    """When an alias matches multiple LiverTox records, the catalog-backed
+    retry provides a more specific alias that resolves the ambiguity."""
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0501",
+                "drug_name": "DrugA",
+                "excerpt": "DrugA excerpt.",
+                "synonyms": "CommonName",
+                "ingredient": "DrugA",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0502",
+                "drug_name": "DrugB",
+                "excerpt": "DrugB excerpt.",
+                "synonyms": "CommonName",
+                "ingredient": "DrugB",
+                "brand_name": "",
+            },
+        ]
+    )
+    catalog = pd.DataFrame(
+        [
+            {
+                "rxcui": "500",
+                "term_type": "SCD",
+                "raw_name": "DrugA 500 MG Oral Tablet",
+                "name": "DrugA oral",
+                "brand_names": "",
+                "synonyms": '["DrugA", "CommonName"]',
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame, drugs_catalog_df=catalog)
+    result = matcher.match_drug_names(["CommonName"])[0]
+
+    assert result.status == "matched"
+    assert result.matched_name == "DrugA"
+    assert result.reason in {"exact_canonical", "exact_alias_ranked", "exact_alias", "normalized_exact_ranked"}
+
+
+def test_ambiguous_retry_preserves_original_when_catalog_does_not_help() -> None:
+    """When catalog aliases still cannot resolve an ambiguous match,
+    the original ambiguous result is preserved with all candidates."""
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0601",
+                "drug_name": "DrugAlpha",
+                "excerpt": "DrugAlpha excerpt.",
+                "synonyms": "SharedName",
+                "ingredient": "DrugAlpha",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0602",
+                "drug_name": "DrugBeta",
+                "excerpt": "DrugBeta excerpt.",
+                "synonyms": "SharedName",
+                "ingredient": "DrugBeta",
+                "brand_name": "",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+    result = matcher.match_drug_names(["SharedName"])[0]
+
+    assert result.status == "ambiguous"
+    assert "DrugAlpha" in result.candidate_names
+    assert "DrugBeta" in result.candidate_names

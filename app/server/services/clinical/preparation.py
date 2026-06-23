@@ -144,7 +144,15 @@ class ClinicalKnowledgePreparation:
         if not hasattr(getattr(self.livertox_matcher, "lookup", None), "match_alias_exact_all"):
             resolved_drugs = await self.prepare_inputs_legacy(drugs)
         else:
-            resolver = DrugResolutionService(self.livertox_matcher)
+            cache_lookup = (
+                lambda key: self.serializer.load_livertox_match_from_db_cache(
+                    normalized_drug_key=key,
+                )
+            )
+            resolver = DrugResolutionService(
+                self.livertox_matcher,
+                cache_lookup=cache_lookup,
+            )
             resolved_drugs = await asyncio.to_thread(resolver.resolve, drugs)
         if not resolved_drugs:
             logger.info("No drugs detected for input preparation")

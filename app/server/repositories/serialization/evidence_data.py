@@ -865,3 +865,84 @@ def upsert_high_confidence_kb_match_cache(
     existing.invalidated_at = None
     existing.invalidation_reason = None
     existing.updated_at = now
+
+###############################################################################
+CACHED_MATCH_MIN_CONFIDENCE = 0.95
+
+
+def load_livertox_match_from_db_cache(
+    self,
+    *,
+    normalized_drug_key: str,
+) -> dict[str, Any] | None:
+    if not normalized_drug_key:
+        return None
+    db_session = self.session_factory()
+    try:
+        cache = db_session.scalar(
+            select(KbMatchCache)
+            .where(
+                KbMatchCache.normalized_drug_key == normalized_drug_key,
+                KbMatchCache.invalidated_at.is_(None),
+                KbMatchCache.confidence >= CACHED_MATCH_MIN_CONFIDENCE,
+                KbMatchCache.livertox_monograph_key.isnot(None),
+            )
+            .order_by(KbMatchCache.confidence.desc(), KbMatchCache.updated_at.desc())
+            .limit(1)
+        )
+        if cache is None or cache.drug_id is None:
+            return None
+
+        drug = db_session.get(Drug, int(cache.drug_id))
+        if drug is None:
+            cache.invalidated_at = datetime.utcnow()
+            cache.invalidation_reason = "matched_drug_deleted"
+            return None
+
+        if (
+            cache.rxnorm_rxcui
+            and self.get_drug_by_rxcui(db_session, cache.rxnorm_rxcui) is None
+        ):
+            cache.invalidated_at = datetime.utcnow()
+            cache.invalidation_reason = "rxnorm_code_no_longer_resolves"
+            return None
+
+        monograph = db_session.scalar(
+            select(LiverToxMonograph).where(
+                LiverToxMonograph.monograph_key == cache.livertox_monograph_key,
+            )
+        )
+        if monograph is None:
+            cache.invalidated_at = datetime.utcnow()
+            cache.invalidation_reason = "livertox_monograph_identity_changed"
+            return None
+
+        evidence = {}
+        if cache.evidence_json:
+            try:
+                evidence = json.loads(cache.evidence_json)
+            except (json.JSONDecodeError, TypeError):
+                evidence = {}
+
+        return {
+            "drug_id": int(cache.drug_id),
+            "drug_name": drug.canonical_name,
+            "normalized_drug_name": drug.canonical_name_norm,
+            "nbk_id": monograph.nbk_id,
+            "monograph_key": str(monograph.monograph_key),
+            "excerpt": monograph.excerpt,
+            "likelihood_score": monograph.likelihood_score,
+            "reference_count": monograph.reference_count,
+            "agent_classification": monograph.agent_classification,
+            "primary_classification": monograph.primary_classification,
+            "secondary_classification": monograph.secondary_classification,
+            "confidence": float(cache.confidence),
+            "rxnorm_rxcui": cache.rxnorm_rxcui,
+            "source": cache.source,
+            "evidence": evidence,
+        }
+    except Exception:
+        db_session.rollback()
+        raise
+    finally:
+        db_session.close()
