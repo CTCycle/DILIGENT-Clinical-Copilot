@@ -40,6 +40,11 @@ from domain.clinical.extras import (
     HepatoxPreparedInputs,
     LabExtractionPayload,
 )
+from domain.clinical.drug_resolution import (
+    DrugResolutionDecision,
+    LiverToxResolutionCandidate,
+    RxNavResolutionCandidate,
+)
 from domain.clinical.language import LanguageDetectionResult
 from domain.clinical.matching import (
     AliasCacheEntry,
@@ -97,6 +102,9 @@ __all__ = [
     "CandidateSelectionResult",
     "HepatoxPreparedInputs",
     "LabExtractionPayload",
+    "DrugResolutionDecision",
+    "LiverToxResolutionCandidate",
+    "RxNavResolutionCandidate",
     "LlmClinicalSectionTextDraft",
     "MonographRecord",
     "RevisedDiliAssessment",

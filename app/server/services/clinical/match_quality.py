@@ -20,7 +20,11 @@ def classify_match_evidence(
     notes = {note.lower() for note in normalized_notes}
     warnings: list[str] = []
 
-    if ambiguous_match or normalized_status in {"ambiguous", "ambiguous_match"}:
+    if ambiguous_match or normalized_status in {
+        "ambiguous",
+        "ambiguous_match",
+        "ambiguous_requires_review",
+    }:
         return {
             "evidence_quality": "ambiguous_match",
             "evidence_warnings": [
@@ -28,7 +32,13 @@ def classify_match_evidence(
             ],
         }
 
-    if normalized_status in {"missing", "missing_match"}:
+    if normalized_status == "rejected_false_positive":
+        return {
+            "evidence_quality": "rejected_false_positive",
+            "evidence_warnings": ["Extracted text was rejected as a non-drug match."],
+        }
+
+    if normalized_status in {"missing", "missing_match", "missing_livertox"}:
         return {
             "evidence_quality": "missing_match",
             "evidence_warnings": ["No local RxNav/LiverTox match was found."],
@@ -47,7 +57,12 @@ def classify_match_evidence(
     ):
         warnings.append("Drug match is not a direct canonical match.")
         quality = "weak_alias_or_class_match"
-    elif normalized_status == "matched_with_excerpt":
+    elif normalized_status in {
+        "matched_with_excerpt",
+        "accepted_exact_livertox",
+        "accepted_rxnav_validated",
+        "accepted_livertox_without_rxnav",
+    }:
         quality = "direct_match_with_excerpt"
     elif normalized_status in {"matched", "matched_no_excerpt", "match"}:
         quality = "direct_match_no_excerpt" if missing_livertox else "direct_match"
