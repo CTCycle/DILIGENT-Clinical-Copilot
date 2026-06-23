@@ -19,6 +19,32 @@ from services.clinical.match_quality import classify_match_evidence
 from services.clinical.preparation import HepatoxPreparedInputs
 from services.text.normalization import normalize_drug_query_name
 
+CLAIM_EVIDENCE_QUOTE_MAX_LENGTH = 1000
+CLAIM_EVIDENCE_TRUNCATION_MARKER = " [truncated]"
+
+
+###############################################################################
+def claim_safe_evidence_quote(value: str | None) -> str | None:
+    stripped = str(value).strip() if value is not None else ""
+    if not stripped:
+        return None
+    if len(stripped) <= CLAIM_EVIDENCE_QUOTE_MAX_LENGTH:
+        return stripped
+
+    marker = CLAIM_EVIDENCE_TRUNCATION_MARKER
+    target_length = CLAIM_EVIDENCE_QUOTE_MAX_LENGTH - len(marker)
+    truncated = stripped[:target_length].rstrip()
+    boundary = max(
+        truncated.rfind("\n"),
+        truncated.rfind(". "),
+        truncated.rfind("; "),
+        truncated.rfind(", "),
+        truncated.rfind(" "),
+    )
+    if boundary >= 200:
+        truncated = truncated[:boundary].rstrip(" .,;\n")
+    return f"{truncated}{marker}"
+
 ###############################################################################
 class AnalysisRunner:
     """Orchestrates the top-level analysis workflow — runs the full drug assessment pipeline."""
@@ -38,12 +64,13 @@ class AnalysisRunner:
         evidence_warnings: list[str],
     ) -> DrugClinicalNarrative:
         claims: list[ClinicalClaim] = []
-        if excerpts:
+        evidence_quote = claim_safe_evidence_quote(excerpts[0] if excerpts else None)
+        if evidence_quote is not None:
             claims.append(
                 ClinicalClaim(
                     claim=f"{drug_name} has source-text evidence in the clinical record.",
                     source="source_text",
-                    evidence_quote=excerpts[0],
+                    evidence_quote=evidence_quote,
                     confidence="high",
                     requires_review=False,
                 )

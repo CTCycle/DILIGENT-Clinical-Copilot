@@ -214,7 +214,14 @@ class ReportFinalizer:
     @staticmethod
     def should_render_as_matched_drug(entry: DrugClinicalAssessment) -> bool:
         status = (entry.match_status or "").strip().lower()
-        return status in {"matched", "matched_with_excerpt", "matched_no_excerpt"}
+        return status in {
+            "accepted_exact_livertox",
+            "accepted_livertox_without_rxnav",
+            "accepted_rxnav_validated",
+            "matched",
+            "matched_with_excerpt",
+            "matched_no_excerpt",
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod
