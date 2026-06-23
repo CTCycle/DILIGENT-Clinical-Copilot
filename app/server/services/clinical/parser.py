@@ -78,6 +78,7 @@ class DrugsParser:
     TRAILING_ROUTE_TOKEN_RE = re.compile(r"$^")
     START_EVENT_RE = re.compile(r"$^")
     SUSPENSION_EVENT_RE = re.compile(r"$^")
+    DRUG_FORM_SUFFIX_RE = re.compile(r"$^")
     NON_DRUG_EXACT_NAMES = NON_DRUG_EXACT_NAMES
     NON_DRUG_PREFIXES = NON_DRUG_PREFIXES
     NON_DRUG_CONTAINS = NON_DRUG_CONTAINS
@@ -161,6 +162,7 @@ class DrugsParser:
         self.SUSPENSION_EVENT_RE = build_suspension_event_re()
         self._lab_measurement_name_re = self._build_lab_measurement_pattern()
         self._lab_marker_name_re = self._build_lab_marker_pattern()
+        self.DRUG_FORM_SUFFIX_RE = self._build_drug_form_suffix_re()
 
     # -------------------------------------------------------------------------
     def _load_embedded_aliases(self) -> tuple[tuple[str, str], ...]:
@@ -268,6 +270,24 @@ class DrugsParser:
         if not escaped:
             return self.LAB_MARKER_NAME_RE
         return re.compile(r"\b(?:" + "|".join(escaped) + r")\b", re.IGNORECASE)
+
+    # -------------------------------------------------------------------------
+    def _build_drug_form_suffix_re(self) -> re.Pattern[str]:
+        snapshot = get_reference_catalog_snapshot()
+        values = list(
+            snapshot.values("clinical_extraction", "drug_form_suffixes")
+        )
+        if not values:
+            return self.DRUG_FORM_SUFFIX_RE
+        escaped = [re.escape(value.strip()) for value in values if value.strip()]
+        return re.compile(
+            r"\s+(?:" + "|".join(escaped) + r")\s*$",
+            re.IGNORECASE,
+        )
+
+    # -------------------------------------------------------------------------
+    def _strip_drug_form_suffixes(self, name: str) -> str:
+        return self.DRUG_FORM_SUFFIX_RE.sub("", name)
 
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
@@ -1289,12 +1309,7 @@ class DrugsParser:
             return None
         normalized = re.sub(r"\s+", " ", raw_text).strip(" \t,;:.-")
         normalized = re.sub(r"\s*\(=\s*$", "", normalized).strip(" \t,;:.-")
-        normalized = re.sub(
-            r"\s+(?:flac|flacone|cpr|caps|sacc|ml)\s*$",
-            "",
-            normalized,
-            flags=re.IGNORECASE,
-        ).strip(" \t,;:.-")
+        normalized = self._strip_drug_form_suffixes(normalized).strip(" \t,;:.-")
         if not normalized:
             return None
         if len(normalized.split()) > 8:
@@ -1379,13 +1394,12 @@ class DrugsParser:
             return True
         if len(tokens) <= 3 and tokens[:2] == ["terapie", "eseguite"]:
             return True
-        if any(char.isdigit() for char in normalized):
-            # Guardrail: numeric-heavy fragments that look like lab measurements
-            # are frequently LLM extraction artefacts, not medication names.
-            if self._lab_measurement_name_re.search(normalized) is not None:
-                return True
-            if self._lab_marker_name_re.search(normalized) is not None:
-                return True
+        # Guardrail: fragments that look like lab measurements or markers
+        # are frequently LLM extraction artefacts, not medication names.
+        if self._lab_measurement_name_re.search(normalized) is not None:
+            return True
+        if self._lab_marker_name_re.search(normalized) is not None:
+            return True
         return False
 
     # -------------------------------------------------------------------------

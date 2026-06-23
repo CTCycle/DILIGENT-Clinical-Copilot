@@ -15,7 +15,23 @@ Rules:
   wording, even when no dose is provided.
 - Do not extract diagnoses, tumor staging, lab markers, procedures, dates, units,
   symptoms, or scoring systems as drugs.
-- Preserve original drug names, dosage, and administration mode except for whitespace.
+- Reject standalone clinical discourse markers, therapy-status labels (e.g.
+  started, suspended, ongoing, stopped, in corso, sospeso, interrotto), and list
+  enumerations — any word or phrase that describes therapy state rather than
+  names an active substance.
+- Reject list markers or numbered items (e.g. "1.", "2.", bullet lines that are
+  section headings rather than drug entries).
+- Strip trailing dosage-form and administration-form suffixes from end of drug
+  names (e.g. tablet, capsule, cpr, caps, solution for injection, compresse,
+  fiale, sol iniet, cpr rivestite, gocce, sciroppo, polvere) — keep only the
+  active substance name.
+- Strip trailing manufacturer identifiers from end of drug names (e.g. Mepha,
+  Sandoz, Helvepharm, Streuli, Nobel, Sandoz, Inc, GmbH, SPA).
+- For combination products expressed with '/', '+', 'plus', or 'and' between
+  active substances, extract as a single entry with the full combination name
+  rather than splitting into separate components.
+- Lab value names and measurements (e.g. CRP, GGT, ASAT, ALAT, ALT, AST, ALP,
+  bilirubin, INR with or without numeric values) are NOT drugs.
 - For every entry, include exact source `evidence` copied from the input and
   `source_span` character offsets when possible.
 - `daytime_administration` is four numeric slots: morning, midday, afternoon, night.
@@ -59,6 +75,23 @@ Rules:
 - Classify `current_status` as current, past, suspected, ruled_out, or unclear.
 - Do not extract diagnoses, tumor staging, lab markers, procedures, dates, units,
   symptoms, or scoring systems as drugs.
+- Reject standalone clinical discourse markers, therapy-status labels (e.g.
+  started, suspended, ongoing, stopped, in corso, sospeso, interrotto), and list
+  enumerations — any word or phrase that describes therapy state rather than
+  names an active substance.
+- Reject list markers or numbered items that are section headings rather than
+  drug entries.
+- Strip trailing dosage-form and administration-form suffixes from end of drug
+  names (e.g. tablet, capsule, cpr, caps, solution for injection, compresse,
+  fiale, sol iniet, gocce, sciroppo, polvere) — keep only the active substance
+  name.
+- Strip trailing manufacturer identifiers from end of drug names (e.g. Mepha,
+  Sandoz, Helvepharm, Streuli, Nobel, Inc, GmbH, SPA).
+- For combination products expressed with '/', '+', 'plus', or 'and' between
+  active substances, extract as a single entry with the full combination name
+  rather than splitting into separate components.
+- Lab value names and measurements (e.g. CRP, GGT, ASAT, ALAT, ALT, AST, ALP,
+  bilirubin, INR with or without numeric values) are NOT drugs.
 - Do not treat family-history, allergy-only, negated, or ruled-out mentions as
   active patient conditions unless the text explicitly says they apply to the patient.
 - Before returning, verify that each medication-like line or phrase has either
