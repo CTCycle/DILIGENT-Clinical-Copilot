@@ -770,6 +770,17 @@ class DataSerializer:
         )
 
     # -------------------------------------------------------------------------
+    def load_livertox_match_from_db_cache(
+        self,
+        *,
+        normalized_drug_key: str,
+    ) -> dict[str, Any] | None:
+        return evidence_data.load_livertox_match_from_db_cache(
+            self,
+            normalized_drug_key=normalized_drug_key,
+        )
+
+    # -------------------------------------------------------------------------
     def persist_session_result_payload(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
