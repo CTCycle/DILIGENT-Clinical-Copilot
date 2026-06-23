@@ -8,6 +8,7 @@ from common.utils.text_utils import coerce_text
 from services.text.normalization import canonicalize_drug_query, normalize_drug_query_name
 
 
+###############################################################################
 @dataclass(frozen=True)
 class DrugIdentityCandidate:
     source_label: str
@@ -18,14 +19,17 @@ class DrugIdentityCandidate:
     notes: tuple[str, ...] = field(default_factory=tuple)
 
 
+###############################################################################
 class DrugIdentityResolver:
     """Resolve extracted labels to local, source-backed drug identity candidates."""
 
     BROAD_CATALOG_MATCHES = {"vitamins", "minerals", "trace elements"}
 
+    # -------------------------------------------------------------------------
     def __init__(self, matcher: Any | None = None) -> None:
         self.matcher = matcher
 
+    # -------------------------------------------------------------------------
     def resolve(self, source_label: str) -> list[DrugIdentityCandidate]:
         label = (source_label or "").strip()
         if not label:
@@ -55,6 +59,7 @@ class DrugIdentityResolver:
             self._add_matcher_candidates(candidates, label)
         return self._dedupe(candidates)
 
+    # -------------------------------------------------------------------------
     def _add_matcher_candidates(
         self,
         candidates: list[DrugIdentityCandidate],
@@ -98,6 +103,7 @@ class DrugIdentityResolver:
                 notes=(note,),
             )
 
+    # -------------------------------------------------------------------------
     def _catalog_values(
         self,
         lookup: Any,
@@ -126,11 +132,13 @@ class DrugIdentityResolver:
                     )
         return values
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _is_real_catalog_value(value: Any) -> bool:
         text = coerce_text(value)
         return bool(text and text.casefold() != "nan")
 
+    # -------------------------------------------------------------------------
     def _find_catalog_matches(
         self,
         lookup: Any,
@@ -153,6 +161,7 @@ class DrugIdentityResolver:
         matches.sort(key=lambda item: item[0], reverse=True)
         return [payload for _score, payload in matches[:4]]
 
+    # -------------------------------------------------------------------------
     def _livertox_values(
         self,
         lookup: Any,
@@ -191,6 +200,7 @@ class DrugIdentityResolver:
                 )
         return values
 
+    # -------------------------------------------------------------------------
     def _query_reductions(self, label: str) -> list[str]:
         canonical = canonicalize_drug_query(label)
         values = [canonical] if canonical else []
@@ -204,6 +214,7 @@ class DrugIdentityResolver:
             values.append(tokens[0][:-1])
         return [value for value in dict.fromkeys(values) if value]
 
+    # -------------------------------------------------------------------------
     def _add_candidate(
         self,
         candidates: list[DrugIdentityCandidate],
@@ -229,6 +240,7 @@ class DrugIdentityResolver:
             )
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _dedupe(
         candidates: list[DrugIdentityCandidate],
@@ -243,6 +255,7 @@ class DrugIdentityResolver:
             key=lambda item: (-item.confidence, item.kind, item.normalized_candidate),
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def split_components(value: str) -> list[str]:
         text = (value or "").strip()
@@ -267,6 +280,7 @@ class DrugIdentityResolver:
         ]
         return parts or [text]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _is_name_component(value: str) -> bool:
         normalized = normalize_drug_query_name(value)

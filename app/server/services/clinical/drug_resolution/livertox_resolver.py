@@ -7,11 +7,15 @@ from services.clinical.matches_core import LiverToxMatcher
 from services.text.normalization import canonicalize_drug_query, normalize_drug_query_name
 
 
+###############################################################################
 class LiverToxCandidateResolver:
+
+    # -------------------------------------------------------------------------
     def __init__(self, matcher: LiverToxMatcher) -> None:
         self.matcher = matcher
         self.identity_resolver = DrugIdentityResolver(matcher)
 
+    # -------------------------------------------------------------------------
     def build_candidates(
         self,
         mention: NormalizedDrugMention,
@@ -68,6 +72,7 @@ class LiverToxCandidateResolver:
                     )
         return self._dedupe(candidates)
 
+    # -------------------------------------------------------------------------
     def _candidate_queries(
         self,
         mention: NormalizedDrugMention,
@@ -89,6 +94,7 @@ class LiverToxCandidateResolver:
                 self._add_query_variants(queries, identity.canonical_candidate)
         return list(dict.fromkeys(query for query in queries if query))
 
+    # -------------------------------------------------------------------------
     def _add_query_variants(self, queries: list[str], value: str | None) -> None:
         canonical = canonicalize_drug_query(value)
         if not canonical:
@@ -97,6 +103,7 @@ class LiverToxCandidateResolver:
         for reduced in self._query_reductions(canonical):
             queries.append(reduced)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _query_reductions(value: str) -> list[str]:
         reductions: list[str] = []
@@ -108,6 +115,7 @@ class LiverToxCandidateResolver:
                 reductions.append(reduced)
         return reductions
 
+    # -------------------------------------------------------------------------
     def _exact_alias_matches(self, query: str) -> list:
         lookup = getattr(self.matcher, "lookup", None)
         if lookup is None or not hasattr(lookup, "match_alias_exact_all"):
@@ -117,6 +125,7 @@ class LiverToxCandidateResolver:
             return []
         return lookup.match_alias_exact_all(canonical)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _dedupe(
         candidates: list[LiverToxResolutionCandidate],

@@ -22,7 +22,6 @@ from services.text.normalization import normalize_drug_query_name
 CLAIM_EVIDENCE_QUOTE_MAX_LENGTH = 1000
 CLAIM_EVIDENCE_TRUNCATION_MARKER = " [truncated]"
 
-
 ###############################################################################
 def claim_safe_evidence_quote(value: str | None) -> str | None:
     stripped = str(value).strip() if value is not None else ""

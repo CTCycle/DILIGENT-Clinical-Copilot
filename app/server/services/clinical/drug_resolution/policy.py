@@ -8,6 +8,7 @@ from domain.clinical.drug_resolution import (
 from services.clinical.drug_resolution.normalizer import NormalizedDrugMention
 
 
+###############################################################################
 class DrugResolutionPolicy:
     FALSE_POSITIVE_TOKENS = {
         "alt",
@@ -23,6 +24,7 @@ class DrugResolutionPolicy:
         "therapy",
     }
 
+    # -------------------------------------------------------------------------
     def decide(
         self,
         mention: NormalizedDrugMention,
@@ -87,6 +89,7 @@ class DrugResolutionPolicy:
             requires_review=False,
         )
 
+    # -------------------------------------------------------------------------
     def _accepted_rxnav(
         self, candidates: list[RxNavResolutionCandidate]
     ) -> RxNavResolutionCandidate | None:
@@ -100,6 +103,7 @@ class DrugResolutionPolicy:
             return viable[0]
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _accepted_livertox(
         mention: NormalizedDrugMention,
@@ -120,6 +124,7 @@ class DrugResolutionPolicy:
             return viable[0]
         return None
 
+    # -------------------------------------------------------------------------
     def _base_decision(
         self,
         mention: NormalizedDrugMention,
@@ -164,6 +169,7 @@ class DrugResolutionPolicy:
             requires_human_review=requires_review,
         )
 
+    # -------------------------------------------------------------------------
     def _is_false_positive(self, mention: NormalizedDrugMention) -> bool:
         tokens = set(mention.normalized_name.split())
         return bool(tokens & self.FALSE_POSITIVE_TOKENS) and len(tokens) <= 3
