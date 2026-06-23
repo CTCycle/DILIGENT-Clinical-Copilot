@@ -15,6 +15,7 @@ from domain.clinical.entities import (
 from domain.clinical.extras import HepatoxPreparedInputs
 from repositories.serialization.data import DataSerializer
 from services.clinical.knowledge import ClinicalKnowledgeComposer
+from services.clinical.drug_identity import DrugIdentityResolver
 from services.clinical.match_resolution import (
     DrugEvidenceMatchResult,
     conservative_fuzzy_livertox_match,
@@ -30,7 +31,7 @@ from services.text.normalization import (
 ###############################################################################
 class ClinicalKnowledgePreparation:
     REGIMEN_SEPARATOR_RE = re.compile(
-        r"(?:\s*\+\s*|\s*/\s*|\s+\bplus\b\s+|\s+\band\b\s+)", re.IGNORECASE
+        r"(?:\s*\+\s*|\s+\bplus\b\s+|\s+\band\b\s+)", re.IGNORECASE
     )
 
     # -------------------------------------------------------------------------
@@ -136,12 +137,12 @@ class ClinicalKnowledgePreparation:
         progress_callback: Callable[[float], None] | None = None,
     ) -> HepatoxPreparedInputs | None:
         self.emit_progress(progress_callback, 0.0)
+        self.emit_progress(progress_callback, 0.2)
+        if not await self.ensure_livertox_matcher() or self.livertox_matcher is None:
+            return None
         drug_candidates = self.build_drug_candidates(drugs)
         if not drug_candidates:
             logger.info("No drugs detected for input preparation")
-            return None
-        self.emit_progress(progress_callback, 0.2)
-        if not await self.ensure_livertox_matcher() or self.livertox_matcher is None:
             return None
         self.emit_progress(progress_callback, 0.35)
 
@@ -339,39 +340,34 @@ class ClinicalKnowledgePreparation:
             "extraction_metadata": [],
             "regimen_group_ids": [],
             "regimen_components": [],
+            "identity_candidates": [],
         }
 
     # -------------------------------------------------------------------------
     def build_drug_candidates(self, drugs: PatientDrugs) -> list[dict[str, Any]]:
         ordered: list[dict[str, Any]] = []
         by_key: dict[str, dict[str, Any]] = {}
+        resolver = DrugIdentityResolver(self.livertox_matcher)
         for entry in drugs.entries:
             base_candidate = self.normalize_drug_entry(entry)
             if base_candidate is None:
                 continue
+            for resolved_candidate in resolver.resolve(
+                str(base_candidate.get("raw_mentions", [""])[0])
+            ):
+                candidate = {
+                    **base_candidate,
+                    "lookup_key": resolved_candidate.normalized_candidate,
+                    "canonical_name": resolved_candidate.canonical_candidate,
+                    "normalized_name": resolved_candidate.normalized_candidate,
+                    "identity_kind": resolved_candidate.kind,
+                    "identity_confidence": resolved_candidate.confidence,
+                    "identity_notes": list(resolved_candidate.notes),
+                    "source_label": resolved_candidate.source_label,
+                }
+                self.add_candidate(candidate, by_key, ordered)
             for candidate in self.expand_regimen_candidate(base_candidate):
-                key = candidate["lookup_key"]
-                existing = by_key.get(key)
-                if existing is None:
-                    by_key[key] = candidate
-                    ordered.append(candidate)
-                    continue
-                for origin in candidate["origins"]:
-                    if origin not in existing["origins"]:
-                        existing["origins"].append(origin)
-                for raw_mention in candidate["raw_mentions"]:
-                    if raw_mention not in existing["raw_mentions"]:
-                        existing["raw_mentions"].append(raw_mention)
-                for regimen_group in candidate.get("regimen_group_ids", []):
-                    if regimen_group not in existing["regimen_group_ids"]:
-                        existing["regimen_group_ids"].append(regimen_group)
-                for regimen_component in candidate.get("regimen_components", []):
-                    if regimen_component not in existing["regimen_components"]:
-                        existing["regimen_components"].append(regimen_component)
-                if candidate["extraction_metadata"]:
-                    existing["extraction_metadata"].extend(
-                        candidate["extraction_metadata"]
-                    )
+                self.add_candidate(candidate, by_key, ordered)
         for candidate in ordered:
             candidate["origins"] = sorted(
                 dict.fromkeys(candidate["origins"]),
@@ -384,10 +380,50 @@ class ClinicalKnowledgePreparation:
             candidate["regimen_components"] = list(
                 dict.fromkeys(candidate.get("regimen_components", []))
             )
+            candidate["identity_notes"] = list(
+                dict.fromkeys(candidate.get("identity_notes", []))
+            )
             candidate["extraction_metadata"] = self.compact_entry_metadata(
                 candidate["extraction_metadata"]
             )
         return ordered
+
+    # -------------------------------------------------------------------------
+    def add_candidate(
+        self,
+        candidate: dict[str, Any],
+        by_key: dict[str, dict[str, Any]],
+        ordered: list[dict[str, Any]],
+    ) -> None:
+        key = candidate["lookup_key"]
+        existing = by_key.get(key)
+        if existing is None:
+            by_key[key] = candidate
+            ordered.append(candidate)
+            return
+        for origin in candidate["origins"]:
+            if origin not in existing["origins"]:
+                existing["origins"].append(origin)
+        for raw_mention in candidate["raw_mentions"]:
+            if raw_mention not in existing["raw_mentions"]:
+                existing["raw_mentions"].append(raw_mention)
+        for regimen_group in candidate.get("regimen_group_ids", []):
+            if regimen_group not in existing["regimen_group_ids"]:
+                existing["regimen_group_ids"].append(regimen_group)
+        for regimen_component in candidate.get("regimen_components", []):
+            if regimen_component not in existing["regimen_components"]:
+                existing["regimen_components"].append(regimen_component)
+        if candidate["extraction_metadata"]:
+            existing["extraction_metadata"].extend(candidate["extraction_metadata"])
+        if candidate.get("identity_confidence", 0) > existing.get(
+            "identity_confidence", 0
+        ):
+            existing["identity_kind"] = candidate.get("identity_kind")
+            existing["identity_confidence"] = candidate.get("identity_confidence")
+        for note in candidate.get("identity_notes", []):
+            existing.setdefault("identity_notes", [])
+            if note not in existing["identity_notes"]:
+                existing["identity_notes"].append(note)
 
     # -------------------------------------------------------------------------
     def normalize_drug_entry(self, entry: DrugEntry) -> dict[str, Any] | None:
@@ -426,6 +462,10 @@ class ClinicalKnowledgePreparation:
             "extraction_metadata": [metadata] if metadata else [],
             "regimen_group_ids": [],
             "regimen_components": [],
+            "identity_kind": "extracted_label",
+            "identity_confidence": 0.5,
+            "identity_notes": ["raw_extracted_label"],
+            "source_label": raw_name,
         }
 
     # -------------------------------------------------------------------------
@@ -478,16 +518,7 @@ class ClinicalKnowledgePreparation:
 
     # -------------------------------------------------------------------------
     def split_regimen_components(self, value: str) -> list[str]:
-        text = (value or "").strip()
-        if not text:
-            return []
-        if not self.REGIMEN_SEPARATOR_RE.search(text):
-            return [text]
-        parts = [
-            part.strip(" \t,;:.") for part in self.REGIMEN_SEPARATOR_RE.split(text)
-        ]
-        components = [part for part in parts if part]
-        return components or [text]
+        return DrugIdentityResolver.split_components(value)
 
     # -------------------------------------------------------------------------
     def compact_entry_metadata(
@@ -545,6 +576,7 @@ class ClinicalKnowledgePreparation:
             payload.setdefault("extraction_metadata", [])
             payload.setdefault("regimen_group_ids", [])
             payload.setdefault("regimen_components", [])
+            payload.setdefault("identity_candidates", [])
             for origin in candidate.get("origins", []):
                 if origin not in payload["origins"]:
                     payload["origins"].append(origin)
@@ -561,6 +593,16 @@ class ClinicalKnowledgePreparation:
                 payload.get("extraction_metadata", [])
                 + candidate.get("extraction_metadata", [])
             )
+            identity_payload = {
+                "source_label": candidate.get("source_label"),
+                "canonical_candidate": candidate.get("canonical_name"),
+                "normalized_candidate": candidate.get("normalized_name"),
+                "kind": candidate.get("identity_kind"),
+                "confidence": candidate.get("identity_confidence"),
+                "notes": candidate.get("identity_notes", []),
+            }
+            if identity_payload not in payload["identity_candidates"]:
+                payload["identity_candidates"].append(identity_payload)
 
     # -------------------------------------------------------------------------
     def normalize_excerpt_list(self, excerpts: Any) -> list[str]:

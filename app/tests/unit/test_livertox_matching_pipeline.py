@@ -163,6 +163,165 @@ def test_duplicate_drugs_from_sources_are_merged_by_canonical_name() -> None:
     assert candidates[0]["origins"] == ["therapy", "anamnesis"]
 
 ###############################################################################
+def test_preparation_resolves_catalog_identity_candidates_before_livertox_lookup() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0901",
+                "drug_name": "Prednisone",
+                "excerpt": "Prednisone excerpt.",
+                "synonyms": "",
+                "ingredient": "Prednisone",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0902",
+                "drug_name": "Abiraterone",
+                "excerpt": "Abiraterone excerpt.",
+                "synonyms": "",
+                "ingredient": "Abiraterone",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0903",
+                "drug_name": "Tamsulosin",
+                "excerpt": "Tamsulosin excerpt.",
+                "synonyms": "",
+                "ingredient": "Tamsulosin",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0904",
+                "drug_name": "Leuprolide",
+                "excerpt": "Leuprolide excerpt.",
+                "synonyms": "Leuprorelin",
+                "ingredient": "Leuprolide",
+                "brand_name": "",
+            },
+        ]
+    )
+    catalog = pd.DataFrame(
+        [
+            {
+                "rxcui": "1",
+                "term_type": "SCD",
+                "raw_name": "prednisone 1 MG Oral Tablet",
+                "name": "prednisone oral",
+                "brand_names": "",
+                "synonyms": '["Prednisone", "Prednisone Oral", "Oral"]',
+            },
+            {
+                "rxcui": "2",
+                "term_type": "SCD",
+                "raw_name": "abiraterone acetate 250 MG Oral Tablet",
+                "name": "abiraterone acetate oral",
+                "brand_names": "Zytiga",
+                "synonyms": '["Abiraterone Acetate", "Zytiga", "Oral"]',
+            },
+            {
+                "rxcui": "3",
+                "term_type": "SBD",
+                "raw_name": "tamsulosin hydrochloride 0.4 MG Oral Capsule",
+                "name": "tamsulosin hydrochloride oral",
+                "brand_names": "Pradif T",
+                "synonyms": '["Tamsulosin", "Pradif T", "Oral"]',
+            },
+            {
+                "rxcui": "4",
+                "term_type": "SCD",
+                "raw_name": "leuprolide acetate Prefilled Syringe",
+                "name": "leuprolide acetate prefilled syringe",
+                "brand_names": "Lupron",
+                "synonyms": '["Leuprolide Acetate", "Leuprorelin", "Prefilled Syringe"]',
+            },
+        ]
+    )
+    preparation = ClinicalKnowledgePreparation()
+    preparation.livertox_matcher = LiverToxMatcher(frame, drugs_catalog_df=catalog)
+    drugs = PatientDrugs(
+        entries=[
+            DrugEntry(name="Prednisone TrialCo", source="therapy"),
+            DrugEntry(name="Abiraterone TrialPharm", source="therapy"),
+            DrugEntry(name="Pradif T", source="therapy"),
+            DrugEntry(name="leuprorelina", source="therapy"),
+        ]
+    )
+
+    candidates = preparation.build_drug_candidates(drugs)
+    canonical_names = {candidate["canonical_name"] for candidate in candidates}
+
+    assert "prednisone" in canonical_names
+    assert "abiraterone" in canonical_names
+    assert "tamsulosin" in canonical_names
+    assert "leuprolide" in canonical_names
+    assert any(
+        candidate["identity_kind"] in {"catalog_ingredient", "livertox_primary"}
+        for candidate in candidates
+    )
+
+###############################################################################
+def test_component_splitting_keeps_units_and_drops_noise() -> None:
+    preparation = ClinicalKnowledgePreparation()
+
+    assert preparation.split_regimen_components("Trialmed 4500 IU/ml") == [
+        "Trialmed 4500 IU per ml"
+    ]
+    assert preparation.split_regimen_components("Trialmed 500/800") == [
+        "Trialmed 500/800"
+    ]
+    assert preparation.split_regimen_components("Alphamed + Betamed") == [
+        "Alphamed",
+        "Betamed",
+    ]
+    assert preparation.split_regimen_components("Alphamed-Betamed") == [
+        "Alphamed",
+        "Betamed",
+    ]
+
+###############################################################################
+def test_catalog_alias_quality_rejects_formulation_pollution() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK1001",
+                "drug_name": "Diazepam",
+                "excerpt": "Diazepam excerpt.",
+                "synonyms": "",
+                "ingredient": "Diazepam",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK1002",
+                "drug_name": "Cholecalciferol",
+                "excerpt": "Cholecalciferol excerpt.",
+                "synonyms": "",
+                "ingredient": "Cholecalciferol",
+                "brand_name": "",
+            },
+        ]
+    )
+    catalog = pd.DataFrame(
+        [
+            {
+                "rxcui": "10",
+                "term_type": "SCD",
+                "raw_name": "diazepam 5 MG Oral Tablet",
+                "name": "diazepam oral",
+                "brand_names": "",
+                "synonyms": '["Oral", "Tablet", "Diazepam Oral"]',
+            }
+        ]
+    )
+    matcher = LiverToxMatcher(frame, drugs_catalog_df=catalog)
+
+    cholecalciferol = matcher.match_drug_names(["Cholecalciferol"])[0]
+    calcium = matcher.match_drug_names(["Calcium Carbonate"])[0]
+
+    assert cholecalciferol.status == "matched"
+    assert cholecalciferol.matched_name == "Cholecalciferol"
+    assert calcium.matched_name != "Diazepam"
+
+###############################################################################
 def test_prepare_inputs_handles_empty_drugs_without_crashing() -> None:
     preparation = ClinicalKnowledgePreparation()
 
