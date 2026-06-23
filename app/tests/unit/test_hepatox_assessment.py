@@ -22,6 +22,7 @@ from domain.clinical import (
     PatientLabTimeline,
     RucamComponentAssessment,
 )
+from services.clinical.analysis_runner import AnalysisRunner
 from services.clinical.hepatox_core import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
@@ -401,6 +402,52 @@ def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() 
 
     assert payload["match_status"] == "matched_with_excerpt"
     assert payload["matched_livertox_row"]["drug_name"] == "Piperacillin"
+
+###############################################################################
+def test_build_drug_assessment_base_attaches_claim_narrative_for_matched_drug() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation.rag_support = type(
+        "FakeRagSupport",
+        (),
+        {
+            "select_excerpt": staticmethod(
+                lambda excerpts: excerpts[0] if excerpts else None
+            )
+        },
+    )()
+    resolved = {
+        "abiraterone": {
+            "normalized_name": "abiraterone",
+            "match_status": "matched_with_excerpt",
+            "missing_livertox": False,
+            "matched_livertox_row": {"drug_name": "Abiraterone"},
+            "extracted_excerpts": ["Abiraterone has been linked to liver injury."],
+            "raw_mentions": ["Abiraterone"],
+        }
+    }
+
+    entry, knowledge_prompt, excerpts = asyncio.run(
+        AnalysisRunner.build_drug_assessment_base(
+            drug_entry=DrugEntry(
+                name="Abiraterone",
+                source="therapy",
+                therapy_start_date="2024-05-31",
+            ),
+            resolved_drugs=resolved,
+            visit_date=date(2025, 2, 18),
+            pattern_summary="cholestatic",
+            rucam_by_key={},
+            consultation=consultation,
+        )
+    )
+
+    assert entry.drug_name == "Abiraterone"
+    assert entry.match_status == "matched_with_excerpt"
+    assert entry.narrative is not None
+    assert entry.claims
+    assert entry.claims[0].source == "source_text"
+    assert entry.claims[0].evidence_quote == excerpts[0]
+    assert knowledge_prompt == ""
 
 ###############################################################################
 def test_unresolved_mentions_include_rucam_summary_when_available() -> None:

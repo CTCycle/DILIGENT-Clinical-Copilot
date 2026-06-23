@@ -454,7 +454,7 @@ class AnalysisRunner:
             suspension=suspension,
             rucam=rucam,
         )
-        entry.narrative = self.build_clinical_narrative(
+        entry.narrative = AnalysisRunner.build_clinical_narrative(
             drug_name=drug_entry.name,
             excerpts=excerpts_list,
             rucam=rucam,
