@@ -94,6 +94,8 @@ _Catalog inspection view for curated drug records, update status, and maintenanc
 ## 5. Desktop Packaging (Tauri)
 The desktop shell lives in `app/src-tauri`, while the frontend stays in `app/client`.
 
+Versioned desktop content in `app/src-tauri` is limited to source code, configuration, icons, capabilities, and required build metadata such as `Cargo.toml`, `Cargo.lock`, `build.rs`, and `tauri.conf.json`.
+
 Build Windows desktop artifacts:
 ```cmd
 release\tauri\build_with_tauri.bat
@@ -103,7 +105,9 @@ Generated outputs:
 - `release/windows/installers`
 - `release/windows/portable`
 
-The packaged Windows release currently exports an NSIS `.exe` installer under `release/windows/installers`.
+Generated desktop outputs are not committed to Git. Keep `app/src-tauri/target`, `app/src-tauri/bundle`, `app/src-tauri/gen`, and packaged desktop binaries or archives out of the repository.
+
+Desktop binaries such as `.exe` installers are published as release artifacts, not tracked in the repository. The packaged Windows release currently exports an NSIS `.exe` installer under `release/windows/installers`.
 
 ## 6. Setup and Maintenance
 Run:
