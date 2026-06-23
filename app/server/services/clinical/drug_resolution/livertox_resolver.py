@@ -1,28 +1,23 @@
 from __future__ import annotations
 
 from domain.clinical.drug_resolution import LiverToxResolutionCandidate
+from services.clinical.drug_identity import DrugIdentityResolver
 from services.clinical.drug_resolution.normalizer import NormalizedDrugMention
 from services.clinical.matches_core import LiverToxMatcher
+from services.text.normalization import canonicalize_drug_query, normalize_drug_query_name
 
 
 class LiverToxCandidateResolver:
     def __init__(self, matcher: LiverToxMatcher) -> None:
         self.matcher = matcher
+        self.identity_resolver = DrugIdentityResolver(matcher)
 
     def build_candidates(
         self,
         mention: NormalizedDrugMention,
         rxnav_names: list[str],
     ) -> list[LiverToxResolutionCandidate]:
-        queries = list(
-            dict.fromkeys(
-                [
-                    mention.canonical_name,
-                    mention.normalized_name,
-                    *[name for name in rxnav_names if name],
-                ]
-            )
-        )
+        queries = self._candidate_queries(mention, rxnav_names)
         candidates: list[LiverToxResolutionCandidate] = []
         for query in queries:
             exact_alias_matches = self._exact_alias_matches(query)
@@ -72,6 +67,46 @@ class LiverToxCandidateResolver:
                         )
                     )
         return self._dedupe(candidates)
+
+    def _candidate_queries(
+        self,
+        mention: NormalizedDrugMention,
+        rxnav_names: list[str],
+    ) -> list[str]:
+        queries: list[str] = []
+        seed_values = [
+            mention.extracted_name,
+            mention.canonical_name,
+            mention.normalized_name,
+            *mention.raw_mentions,
+            *rxnav_names,
+        ]
+        for value in seed_values:
+            self._add_query_variants(queries, value)
+            if len(self._exact_alias_matches(canonicalize_drug_query(value))) > 1:
+                continue
+            for identity in self.identity_resolver.resolve(value or ""):
+                self._add_query_variants(queries, identity.canonical_candidate)
+        return list(dict.fromkeys(query for query in queries if query))
+
+    def _add_query_variants(self, queries: list[str], value: str | None) -> None:
+        canonical = canonicalize_drug_query(value)
+        if not canonical:
+            return
+        queries.append(canonical)
+        for reduced in self._query_reductions(canonical):
+            queries.append(reduced)
+
+    @staticmethod
+    def _query_reductions(value: str) -> list[str]:
+        reductions: list[str] = []
+        tokens = normalize_drug_query_name(value).split()
+        while len(tokens) > 1:
+            tokens = tokens[:-1]
+            reduced = canonicalize_drug_query(" ".join(tokens))
+            if reduced:
+                reductions.append(reduced)
+        return reductions
 
     def _exact_alias_matches(self, query: str) -> list:
         lookup = getattr(self.matcher, "lookup", None)

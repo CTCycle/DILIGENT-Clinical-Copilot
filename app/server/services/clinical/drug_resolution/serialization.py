@@ -13,9 +13,13 @@ def decision_to_payload(
     matched_row: dict[str, Any] | None,
     excerpts: list[str],
 ) -> dict[str, Any]:
+    accepted_candidate = next(
+        (candidate for candidate in decision.livertox_candidates if candidate.accepted),
+        None,
+    )
     normalized_lookup = (
-        decision.livertox_candidates[0].normalized_name
-        if decision.accepted_livertox_name and decision.livertox_candidates
+        accepted_candidate.normalized_name
+        if decision.accepted_livertox_name and accepted_candidate is not None
         else mention.normalized_name
     )
     missing_livertox = decision.decision_status in {

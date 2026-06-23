@@ -15,8 +15,45 @@ def test_source_text_evidence_produces_high_confidence_claim() -> None:
     )
 
     assert narrative.claims[0].source == "source_text"
+    assert (
+        narrative.claims[0].evidence_quote
+        == "Patient started amoxicillin before ALT increase."
+    )
     assert narrative.claims[0].confidence == "high"
     assert narrative.claims[0].requires_review is False
+
+###############################################################################
+def test_long_source_text_evidence_is_truncated_for_claim_quote() -> None:
+    long_excerpt = "OVERVIEW " + ("Abiraterone liver injury evidence. " * 80)
+
+    narrative = AnalysisRunner.build_clinical_narrative(
+        drug_name="Abiraterone",
+        excerpts=[long_excerpt],
+        rucam=None,
+        missing_livertox=False,
+        evidence_warnings=[],
+    )
+
+    evidence_quote = narrative.claims[0].evidence_quote
+    assert evidence_quote is not None
+    assert len(evidence_quote) <= 1000
+    assert evidence_quote.endswith("[truncated]")
+    assert long_excerpt.startswith(evidence_quote.removesuffix(" [truncated]"))
+
+###############################################################################
+def test_blank_source_text_evidence_falls_back_to_review_claim() -> None:
+    narrative = AnalysisRunner.build_clinical_narrative(
+        drug_name="Abiraterone",
+        excerpts=["   \n\t  "],
+        rucam=None,
+        missing_livertox=False,
+        evidence_warnings=[],
+    )
+
+    assert narrative.claims[0].source == "unknown"
+    assert narrative.claims[0].evidence_quote is None
+    assert narrative.claims[0].confidence == "low"
+    assert narrative.claims[0].requires_review is True
 
 ###############################################################################
 def test_missing_evidence_claim_requires_review_and_renders_warning() -> None:
