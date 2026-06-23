@@ -121,7 +121,7 @@ def test_extract_drugs_from_anamnesis_sets_historical_tags() -> None:
         [
             PatientDrugs(
                 entries=[
-                    DrugEntry(name="Aspirin", dosage="100 mg"),
+                    DrugEntry(name="Aspirin", dosage="100 mg", evidence="aspirin"),
                     DrugEntry(name="Historical Name\nmultiline", dosage="200 mg"),
                 ]
             )
@@ -170,7 +170,7 @@ def test_extract_drugs_from_anamnesis_rule_fallback_recovers_drug_lines() -> Non
 def test_extract_drugs_from_anamnesis_sends_long_input_as_single_chunk() -> None:
     client = FakeStructuredClient(
         [
-            PatientDrugs(entries=[DrugEntry(name="Aspirin")]),
+            PatientDrugs(entries=[]),
         ]
     )
     parser = DrugsParser(client=client)
@@ -180,8 +180,8 @@ def test_extract_drugs_from_anamnesis_sends_long_input_as_single_chunk() -> None
 
     parsed = asyncio.run(parser.extract_drugs_from_anamnesis(long_text))
 
-    assert client.call_count == 1
-    assert [entry.name for entry in parsed.entries] == ["Aspirin"]
+    assert client.call_count == 2
+    assert parsed.entries == []
 
 ###############################################################################
 def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
@@ -209,14 +209,80 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
     parser = DrugsParser(client=fake_client)
 
     parsed = asyncio.run(
-        parser.extract_drugs_from_anamnesis("History includes oncology treatment.")
+        parser.extract_drugs_from_anamnesis(
+            "History includes oncology treatment. "
+            "Nozione di terapia antibiotica con Co-Amoxicillina."
+        )
     )
 
     assert [entry.name for entry in parsed.entries] == [
-        "Pemetrexed",
-        "Benziodiazepine",
         "Co-Amoxicillina",
     ]
+
+###############################################################################
+def test_extract_drugs_from_anamnesis_rejects_grounded_non_medication_entities() -> None:
+    client = RecordingSequenceStructuredClient(
+        [
+            PatientDrugs(
+                entries=[
+                    DrugEntry(
+                        name="Adenocarcinoma",
+                        evidence="Adenocarcinoma prostatico",
+                    )
+                ]
+            ),
+            PatientDrugs(entries=[]),
+        ]
+    )
+    parser = DrugsParser(client=client)
+
+    parsed = asyncio.run(
+        parser.extract_drugs_from_anamnesis(
+            "Adenocarcinoma prostatico in follow-up oncologico."
+        )
+    )
+
+    assert client.call_count == 1
+    assert parsed.entries == []
+
+###############################################################################
+def test_extract_drugs_from_anamnesis_accepts_medication_syntax_without_dose() -> None:
+    client = FakeStructuredClient(
+        [
+            PatientDrugs(
+                entries=[
+                    DrugEntry(
+                        name="Olaparib",
+                        evidence="Terapia con Olaparib",
+                    )
+                ]
+            )
+        ]
+    )
+    parser = DrugsParser(client=client)
+
+    parsed = asyncio.run(
+        parser.extract_drugs_from_anamnesis(
+            "Nel 2024 terapia con Olaparib, successivamente sospesa."
+        )
+    )
+
+    assert [entry.name for entry in parsed.entries] == ["Olaparib"]
+    assert parsed.entries[0].source_span is not None
+
+###############################################################################
+def test_alias_normalized_drug_keeps_source_grounding() -> None:
+    parser = DrugsParser(client=FakeStructuredClient([PatientDrugs(entries=[])]))
+
+    parsed = asyncio.run(
+        parser.extract_drugs_from_anamnesis(
+            "Nozione di terapia antibiotica con co-amoxi dal 18.02."
+        )
+    )
+
+    assert [entry.name for entry in parsed.entries] == ["Co-Amoxicillina"]
+    assert parsed.entries[0].evidence == "co-amoxi"
+    assert parsed.entries[0].source_span is not None
 
 ###############################################################################
 def test_extract_drugs_from_anamnesis_llm_failure_uses_rule_fallback() -> None:

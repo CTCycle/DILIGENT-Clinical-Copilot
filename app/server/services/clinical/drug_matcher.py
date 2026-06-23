@@ -166,6 +166,18 @@ class DrugMatcher:
             return stage3_result
 
         spelling = self.lookup.match_authoritative_spelling_candidates(normalized_query)
+        if not spelling:
+            alias_spelling: list[tuple[MonographRecord, float, list[str]]] = []
+            for alias, _from_catalog in alias_entries:
+                normalized_alias = self.lookup.normalize_name(alias)
+                if not normalized_alias or normalized_alias == normalized_query:
+                    continue
+                alias_spelling.extend(
+                    self.lookup.match_authoritative_spelling_candidates(
+                        normalized_alias
+                    )
+                )
+            spelling = self.lookup.dedupe_stage_matches(alias_spelling)
         if len(spelling) == 1:
             record, confidence, notes = spelling[0]
             return self.lookup.create_matched_result(

@@ -790,8 +790,40 @@ class DrugNameService:
             candidate = segment.strip(" -")
             if candidate:
                 variants.add(candidate)
+                variants.update(DrugNameService.strip_trailing_brand_like_tokens(candidate))
         result = sorted(variants, key=str.casefold)
         return result
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def strip_trailing_brand_like_tokens(value: str) -> set[str]:
+        tokens = normalize_whitespace(value).split()
+        if len(tokens) < 2:
+            return set()
+        variants: set[str] = set()
+        trimmed = list(tokens)
+        removed = 0
+        while len(trimmed) > 1 and removed < 2:
+            token = trimmed[-1].strip(" .,:;")
+            if not DrugNameService.is_brand_like_suffix_token(token):
+                break
+            trimmed.pop()
+            removed += 1
+            candidate = normalize_whitespace(" ".join(trimmed))
+            if candidate:
+                variants.add(candidate)
+        return variants
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def is_brand_like_suffix_token(token: str) -> bool:
+        if not token:
+            return False
+        if token.isupper() and len(token) <= 4:
+            return True
+        if any(char.isdigit() for char in token) and len(token) <= 6:
+            return True
+        return bool(re.fullmatch(r"[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ]{2,}", token))
 
     # -------------------------------------------------------------------------
     def collect_tokens(self, primary: str, synonyms: list[str]) -> set[str]:
