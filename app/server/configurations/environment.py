@@ -44,10 +44,6 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
         return env_path if env_path.exists() else None
 
 ###############################################################################
-def initialize_environment() -> Path | None:
-    return ensure_environment_loaded()
-
-###############################################################################
 def get_dotenv_injected_keys() -> set[str]:
     return set(_runtime_state().dotenv_injected_keys)
 

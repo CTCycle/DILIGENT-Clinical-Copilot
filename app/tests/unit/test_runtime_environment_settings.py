@@ -8,6 +8,7 @@ from common import paths
 from configurations import environment
 from configurations.startup import (
     get_server_settings,
+    initialize_environment,
     reset_app_settings_cache,
 )
 from configurations.management import build_settings_payload_from_json
@@ -25,7 +26,7 @@ def test_initialize_environment_loads_dotenv_with_override_precedence(
     monkeypatch.setenv("FASTAPI_HOST", "127.0.0.1")
     environment.reset_environment_bootstrap_for_tests()
 
-    environment.initialize_environment()
+    initialize_environment()
 
     assert environment.get_dotenv_injected_keys()
     assert "DILIGENT_TAURI_MODE" in environment.get_dotenv_injected_keys()
