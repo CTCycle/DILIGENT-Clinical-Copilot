@@ -18,6 +18,7 @@ import {
 } from '../../core/models/types';
 import {
   fetchClinicalSectionTemplate,
+  fetchClinicalJobStatus,
   cancelClinicalJob,
   pollClinicalJobStatus,
   resolvePollIntervalMs,
@@ -28,6 +29,7 @@ import { MarkdownRendererService } from '../../core/services/markdown-renderer.s
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const STALL_THRESHOLD_MS = 600_000;
+const POLL_WATCHDOG_MIN_STALE_MS = 15_000;
 const SECTION_REVIEW_WARNING_CODES = new Set([
   'section_extraction_confidence_needs_review',
   'section_extraction_requires_review',
@@ -68,9 +70,13 @@ export class DiliAgentPageComponent implements OnDestroy {
   readonly clinicalInputTemplate = signal('');
 
   private lastProgressUpdateTimestamp = 0;
+  private lastPollResponseTimestamp = 0;
   private lastProgressSignature = '';
   private jobStartedAt = 0;
+  private pollIntervalMs = 1000;
   private poller: { stop: () => void } | null = null;
+  private pollWatchdogTimer: ReturnType<typeof globalThis.setInterval> | null = null;
+  private pollRecoveryInFlight = false;
   private runActionLockTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private runControlDebounceTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private runControlDebounced = false;
@@ -188,6 +194,7 @@ export class DiliAgentPageComponent implements OnDestroy {
     this.revokeObjectUrl();
     this.jobStartedAt = 0;
     this.lastProgressUpdateTimestamp = 0;
+    this.lastPollResponseTimestamp = 0;
     this.lastProgressSignature = '';
     this.stateService.updateDiliAgent({
       message: '',
@@ -217,6 +224,11 @@ export class DiliAgentPageComponent implements OnDestroy {
       this.poller.stop();
       this.poller = null;
     }
+    if (this.pollWatchdogTimer !== null) {
+      globalThis.clearInterval(this.pollWatchdogTimer);
+      this.pollWatchdogTimer = null;
+    }
+    this.pollRecoveryInFlight = false;
   }
 
   private onPollingError(pollError: string): void {
@@ -262,6 +274,7 @@ export class DiliAgentPageComponent implements OnDestroy {
         : null;
     const resolvedProgress = typeof status.progress === 'number' ? status.progress : 0;
     const now = Date.now();
+    this.lastPollResponseTimestamp = now;
 
     if (this.jobStartedAt === 0) {
       this.jobStartedAt = now;
@@ -324,12 +337,55 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   private startPolling(jobIdToPoll: string, intervalMs: number): void {
     this.stopPoller();
+    this.pollIntervalMs = Math.max(intervalMs, 250);
+    this.lastPollResponseTimestamp = Date.now();
     this.poller = pollClinicalJobStatus(
       jobIdToPoll,
-      intervalMs,
+      this.pollIntervalMs,
       (status) => this.onJobStatusUpdate(status),
       (message) => this.onPollingError(message),
     );
+    this.schedulePollWatchdog();
+  }
+
+  private schedulePollWatchdog(): void {
+    if (this.pollWatchdogTimer !== null) {
+      globalThis.clearInterval(this.pollWatchdogTimer);
+    }
+    this.pollWatchdogTimer = globalThis.setInterval(() => {
+      void this.recoverPollingIfStale();
+    }, Math.max(5000, this.pollIntervalMs));
+  }
+
+  private async recoverPollingIfStale(): Promise<void> {
+    if (this.pollRecoveryInFlight || !this.vm.isRunning || !this.vm.jobId) {
+      return;
+    }
+    const staleThresholdMs = Math.max(POLL_WATCHDOG_MIN_STALE_MS, this.pollIntervalMs * 6);
+    const lastResponseAgeMs = this.lastPollResponseTimestamp > 0
+      ? Date.now() - this.lastPollResponseTimestamp
+      : staleThresholdMs + 1;
+    if (lastResponseAgeMs < staleThresholdMs) {
+      return;
+    }
+
+    this.pollRecoveryInFlight = true;
+    const jobId = this.vm.jobId;
+    try {
+      const status = await fetchClinicalJobStatus(
+        jobId,
+        `watchdog-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        Math.min(30, Math.max(5, Math.ceil((this.pollIntervalMs / 1000) * 4))),
+      );
+      this.onJobStatusUpdate(status);
+      if (!isTerminalJobStatus(status.status) && this.vm.jobId === jobId) {
+        this.startPolling(jobId, this.pollIntervalMs);
+      }
+    } catch {
+      // Keep the current UI state and allow the regular poll loop to continue retrying.
+    } finally {
+      this.pollRecoveryInFlight = false;
+    }
   }
 
   private async executeRunSession(): Promise<void> {
