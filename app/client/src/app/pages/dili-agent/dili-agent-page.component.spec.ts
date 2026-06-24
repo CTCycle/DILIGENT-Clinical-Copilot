@@ -131,4 +131,47 @@ describe('DiliAgentPageComponent', () => {
       'Local model extraction can take several minutes.',
     );
   });
+
+  it('recovers stale polling by fetching the latest job status snapshot', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          job_id: 'job-123',
+          job_type: 'clinical',
+          status: 'completed',
+          progress: 100,
+          result: {
+            report: 'Recovered final report',
+            progress_message: 'Step 15/15: Auditing artifacts and saving session results...',
+          },
+          error: null,
+          version: 42,
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    );
+
+    component.stateService.updateDiliAgent({
+      isRunning: true,
+      jobStatus: 'running',
+      jobId: 'job-123',
+      jobStage: 'therapy_extraction',
+      jobStageMessage: 'Parsing therapy section',
+      jobProgress: 23,
+    });
+    (component as unknown as { pollIntervalMs: number }).pollIntervalMs = 1000;
+    (component as unknown as { lastPollResponseTimestamp: number }).lastPollResponseTimestamp =
+      Date.now() - 20_000;
+
+    await (component as unknown as { recoverPollingIfStale: () => Promise<void> }).recoverPollingIfStale();
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(component.vm.isRunning).toBeFalsy();
+    expect(component.vm.jobStatus).toBe('completed');
+    expect(component.vm.jobProgress).toBe(100);
+    expect(component.vm.message).toContain('Recovered final report');
+  });
 });
