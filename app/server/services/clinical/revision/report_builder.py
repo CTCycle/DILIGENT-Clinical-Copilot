@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, Protocol
 
+from common.utils.text_utils import unique_preserve_order
 from domain.clinical.revision import RevisionFinalReportPayload
 
 ###############################################################################
@@ -19,18 +20,6 @@ class ReviewerInstructionProfileLike(Protocol):
             "unknown",
         ]
     ]
-
-###############################################################################
-def _unique_preserve_order(values: list[str]) -> list[str]:
-    seen: set[str] = set()
-    unique: list[str] = []
-    for value in values:
-        cleaned = str(value or "").strip()
-        if not cleaned or cleaned in seen:
-            continue
-        seen.add(cleaned)
-        unique.append(cleaned)
-    return unique
 
 ###############################################################################
 def build_revision_final_report_payload(
@@ -69,5 +58,5 @@ def build_revision_final_report_payload(
         ),
         comparison_outcome=comparison_outcome,
         changed_focus_areas=changed_focus_areas,
-        warnings=_unique_preserve_order(warnings),
+        warnings=unique_preserve_order(warnings),
     )

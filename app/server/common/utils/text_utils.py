@@ -114,5 +114,18 @@ def try_parse_json(value: str) -> Any:
         return None
     try:
         return json.loads(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
+
+
+###############################################################################
+def unique_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        cleaned = str(value or "").strip()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        unique.append(cleaned)
+    return unique

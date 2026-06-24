@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import re
-import sys
-from contextlib import nullcontext
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -29,8 +27,6 @@ async def download_file(
     progress_start: float = 0.0,
     progress_span: float = 0.0,
 ) -> None:
-    _ = sys
-    _ = nullcontext
     await livertox_common.download_file(
         client,
         url,

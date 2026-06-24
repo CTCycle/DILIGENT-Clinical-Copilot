@@ -120,4 +120,5 @@ __all__ = [
     "coerce_positive_int",
     "extract_positive_int",
     "coerce_str",
+    "coerce_str_or_none",
 ]

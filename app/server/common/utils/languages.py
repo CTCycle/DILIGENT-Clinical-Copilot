@@ -15,11 +15,6 @@ MISSING_VISIT_LABEL_BY_LANGUAGE: dict[str, str] = {
     "es": "No proporcionada",
 }
 
-LANGUAGE_HINTS: dict[str, set[str]] = {}
-LANGUAGE_FUNCTION_HINTS: dict[str, set[str]] = {}
-LANGUAGE_PHRASE_HINTS: dict[str, tuple[str, ...]] = {}
-LANGUAGE_DIACRITIC_HINTS: dict[str, set[str]] = {}
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def _catalog_language_hints() -> dict[str, set[str]]:

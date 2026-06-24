@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, Protocol
 
+from common.utils.text_utils import unique_preserve_order
 from domain.clinical.revision import (
     RevisionFinalReportPayload,
     RevisionQaValidationPayload,
@@ -35,18 +36,6 @@ class ReviewerInstructionProfileLike(Protocol):
             "other",
         ]
     ]
-
-###############################################################################
-def _unique_preserve_order(values: list[str]) -> list[str]:
-    seen: set[str] = set()
-    unique: list[str] = []
-    for value in values:
-        cleaned = str(value or "").strip()
-        if not cleaned or cleaned in seen:
-            continue
-        seen.add(cleaned)
-        unique.append(cleaned)
-    return unique
 
 ###############################################################################
 def build_revision_qa_validation_payload(
@@ -156,8 +145,8 @@ def build_revision_qa_validation_payload(
                 else:
                     unaddressed_items.append("entity:missing_data")
 
-    addressed_items = _unique_preserve_order(addressed_items)
-    unaddressed_items = _unique_preserve_order(unaddressed_items)
+    addressed_items = unique_preserve_order(addressed_items)
+    unaddressed_items = unique_preserve_order(unaddressed_items)
     if unaddressed_items:
         warnings.append(
             "Some reviewer-requested sections or entities could not be verified as addressed."
@@ -182,7 +171,7 @@ def build_revision_qa_validation_payload(
             "Revision QA could not confirm a persisted final report or QA audit."
         )
 
-    deduped_warnings = _unique_preserve_order(warnings)
+    deduped_warnings = unique_preserve_order(warnings)
     return RevisionQaValidationPayload(
         status=status,
         version_status=version_status,
