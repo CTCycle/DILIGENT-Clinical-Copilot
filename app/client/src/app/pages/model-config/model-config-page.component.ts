@@ -118,7 +118,6 @@ export class ModelConfigPageComponent implements OnInit {
   readonly rerankerProfileOptions = RERANKER_PROFILE_OPTIONS;
 
   readonly isLoading = signal(true);
-  readonly hasLoadedConfig = signal(false);
   readonly isSaving = signal(false);
   readonly localModels = signal<ModelConfigStateResponse['local_models']>([]);
   readonly cloudChoices = signal(CLOUD_MODEL_CHOICES);
@@ -210,7 +209,12 @@ export class ModelConfigPageComponent implements OnInit {
 
   readonly ragPipelineEnabled = computed(() => this.previewRagPipelineEnabled());
   readonly reasoningEnabled = computed(() => this.previewReasoningEnabled());
-  readonly currentRagModelLabel = computed(() => this.ragModel() || 'Not vectorized');
+  readonly currentRagModelLabel = computed(() => {
+    if (this.isLoading() && !this.ragModel()) {
+      return 'Loading RAG model...';
+    }
+    return this.ragModel() || 'Not vectorized';
+  });
   readonly ragSettingsValidationMessage = computed(() => {
     const draft = this.draftRagSettings();
     if (draft.retrieval_candidate_count < 1) {
@@ -234,6 +238,9 @@ export class ModelConfigPageComponent implements OnInit {
 
   readonly lastSavedLabel = computed(() => {
     const updatedAt = this.lastUpdatedAt();
+    if (this.isLoading() && !updatedAt) {
+      return 'Loading...';
+    }
     if (!updatedAt) {
       return 'Not saved in this session';
     }
@@ -245,6 +252,9 @@ export class ModelConfigPageComponent implements OnInit {
   });
 
   readonly selectedModelDescription = computed(() => {
+    if (this.isLoading() && !this.localModels().length) {
+      return 'Loading model details...';
+    }
     const draft = this.draftConfig();
     const selectedNames = [draft.clinicalModel, draft.textExtractionModel].filter((name) => !!name);
     const modelMap = new Map(this.localModels().map((model) => [model.name, model.description || '']));
@@ -335,7 +345,6 @@ export class ModelConfigPageComponent implements OnInit {
       this.statusMessage.set(formatUnknownError(error, 'Unable to load model settings.'));
     } finally {
       this.isLoading.set(false);
-      this.hasLoadedConfig.set(true);
     }
   }
 
