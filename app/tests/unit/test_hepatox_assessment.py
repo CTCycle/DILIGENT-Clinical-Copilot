@@ -479,6 +479,50 @@ def test_build_drug_assessment_base_attaches_claim_narrative_for_matched_drug() 
     assert knowledge_prompt == ""
 
 ###############################################################################
+def test_build_drug_assessment_base_normalizes_oversized_match_reason() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation.rag_support = type(
+        "FakeRagSupport",
+        (),
+        {
+            "select_excerpt": staticmethod(
+                lambda excerpts: excerpts[0] if excerpts else None
+            )
+        },
+    )()
+    reasons = [
+        "cache_hit_previous_match",
+        "identity proposed by configured LLM",
+        "identity accepted only after unique local evidence resolution",
+    ]
+    resolved = {
+        "acetaminophen": {
+            "normalized_name": "acetaminophen",
+            "match_status": "accepted_exact_livertox",
+            "match_reason": "; ".join(reasons),
+            "match_notes": reasons,
+            "missing_livertox": False,
+            "matched_livertox_row": {"drug_name": "Acetaminophen"},
+            "extracted_excerpts": ["Acetaminophen excerpt."],
+            "raw_mentions": ["Acetaminophen"],
+        }
+    }
+
+    entry, _, _ = asyncio.run(
+        AnalysisRunner.build_drug_assessment_base(
+            drug_entry=DrugEntry(name="Acetaminophen", source="therapy"),
+            resolved_drugs=resolved,
+            visit_date=date(2025, 2, 18),
+            pattern_summary="indeterminate",
+            rucam_by_key={},
+            consultation=consultation,
+        )
+    )
+
+    assert entry.match_reason == reasons[0]
+    assert entry.match_notes == reasons
+
+###############################################################################
 def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     section = consultation.render_unresolved_mentions_section(

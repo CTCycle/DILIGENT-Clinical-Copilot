@@ -338,6 +338,13 @@ def test_single_llm_identity_is_accepted_only_after_local_validation() -> None:
     assert payload["missing_livertox"] is False
     assert payload["matched_livertox_row"]
     assert "InternationalName" in payload["raw_mentions"]
+    assert payload["match_reason"] == "Exact normalized LiverTox primary name accepted"
+    assert payload["match_notes"] == [
+        "Exact normalized LiverTox primary name accepted",
+        "identity proposed by configured LLM",
+        "identity accepted only after unique local evidence resolution",
+    ]
+    assert payload["resolution_decision"]["reasons"] == payload["match_notes"]
 
 
 ###############################################################################
