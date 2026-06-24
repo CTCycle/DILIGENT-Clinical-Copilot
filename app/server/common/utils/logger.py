@@ -8,13 +8,8 @@ from typing import Any
 
 from common.paths import LOGS_PATH
 
-# Generate timestamp for the log filename
-###############################################################################
-LOGS_PATH.mkdir(parents=True, exist_ok=True)
-current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-log_filename = str(LOGS_PATH / f"DILIGENT_{current_timestamp}_{os.getpid()}.log")
+_logging_configured: bool = False
 
-# Define logger configuration
 ###############################################################################
 LOG_CONFIG: dict[str, Any] = {
     "version": 1,
@@ -34,55 +29,65 @@ LOG_CONFIG: dict[str, Any] = {
             "level": "INFO",
             "formatter": "minimal",
         },
-        "file": {
-            "class": "logging.FileHandler",
-            "level": "DEBUG",
-            "formatter": "default",
-            "filename": log_filename,
-            "mode": "a",
-            "encoding": "utf-8",
-        },
     },
     "loggers": {
         "matplotlib": {
             "level": "WARNING",
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "propagate": False,
         },
         "httpx": {
             "level": "INFO",
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "propagate": False,
         },
     },
     "root": {
         "level": "DEBUG",
-        "handlers": ["console", "file"],
+        "handlers": ["console"],
     },
 }
 
-
-# override logger configuration and load root logger
 ###############################################################################
-try:
-    logging.config.dictConfig(LOG_CONFIG)
-except ValueError:
-    fallback_config = {
+def configure_logging() -> None:
+    global _logging_configured
+    if _logging_configured:
+        return
+    _logging_configured = True
+
+    LOGS_PATH.mkdir(parents=True, exist_ok=True)
+    current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    log_filename = str(LOGS_PATH / f"DILIGENT_{current_timestamp}_{os.getpid()}.log")
+
+    config = {
         **LOG_CONFIG,
         "handlers": {
-            "console": LOG_CONFIG["handlers"]["console"],
+            **LOG_CONFIG["handlers"],
+            "file": {
+                "class": "logging.FileHandler",
+                "level": "DEBUG",
+                "formatter": "default",
+                "filename": log_filename,
+                "mode": "a",
+                "encoding": "utf-8",
+            },
         },
         "loggers": {
             name: {
-                **config,
-                "handlers": ["console"],
+                **cfg,
+                "handlers": ["console", "file"],
             }
-            for name, config in LOG_CONFIG["loggers"].items()
+            for name, cfg in LOG_CONFIG["loggers"].items()
         },
         "root": {
             **LOG_CONFIG["root"],
-            "handlers": ["console"],
+            "handlers": ["console", "file"],
         },
     }
-    logging.config.dictConfig(fallback_config)
+    try:
+        logging.config.dictConfig(config)
+    except ValueError as exc:
+        logging.config.dictConfig(LOG_CONFIG)
+
+
 logger = logging.getLogger()

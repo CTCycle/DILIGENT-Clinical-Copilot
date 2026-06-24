@@ -13,7 +13,7 @@ from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, OpenAIError
 
 from common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from common.utils.logger import logger
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from repositories.serialization.access_keys import AccessKeySerializer
 from services.llm.structured import (

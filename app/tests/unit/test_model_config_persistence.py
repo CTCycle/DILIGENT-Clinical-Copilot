@@ -6,7 +6,7 @@ from typing import Any
 
 from domain.model_configs import ModelConfigUpdateRequest
 import services.llm.model_config as model_config_module
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from domain.model_configs import ModelConfigSnapshot, OpenAIConnectivityCheckRequest
 from services.llm.cloud import LLMError
 from services.llm.model_config import ModelConfigService

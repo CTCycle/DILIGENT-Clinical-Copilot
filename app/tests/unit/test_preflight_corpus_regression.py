@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from domain.clinical.entities import ClinicalSessionRequest
 from domain.clinical.robustness import FactGraph, ReportMetadata
 from services.runtime.jobs import get_job_manager

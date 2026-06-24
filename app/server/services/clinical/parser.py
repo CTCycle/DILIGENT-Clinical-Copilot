@@ -13,7 +13,7 @@ from common.utils.patterns import (
     FORM_TOKENS,
     UNIT_TOKENS,
 )
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     DrugEntry,

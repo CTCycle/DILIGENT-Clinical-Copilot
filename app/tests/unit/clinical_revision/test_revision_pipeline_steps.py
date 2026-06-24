@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import configurations.llm_configs as llm_configs_module
+import services.llm.runtime_config as runtime_config_module
 from domain.clinical import ClinicalSessionRequest
 from repositories.schemas.models import Base
 from repositories.serialization.data import DataSerializer
@@ -178,11 +178,11 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
             stop_check,
         ):
             captured_entrypoint["method"] = "process_revision_patient"
-            captured_runtime["clinical_model"] = llm_configs_module.LLMRuntimeConfig.get_clinical_model()
-            captured_runtime["text_extraction_model"] = llm_configs_module.LLMRuntimeConfig.get_text_extraction_model()
-            captured_runtime["use_cloud_models"] = llm_configs_module.LLMRuntimeConfig.is_cloud_enabled()
-            captured_runtime["cloud_provider"] = llm_configs_module.LLMRuntimeConfig.get_llm_provider()
-            captured_runtime["cloud_model"] = llm_configs_module.LLMRuntimeConfig.get_cloud_model()
+            captured_runtime["clinical_model"] = runtime_config_module.LLMRuntimeConfig.get_clinical_model()
+            captured_runtime["text_extraction_model"] = runtime_config_module.LLMRuntimeConfig.get_text_extraction_model()
+            captured_runtime["use_cloud_models"] = runtime_config_module.LLMRuntimeConfig.is_cloud_enabled()
+            captured_runtime["cloud_provider"] = runtime_config_module.LLMRuntimeConfig.get_llm_provider()
+            captured_runtime["cloud_model"] = runtime_config_module.LLMRuntimeConfig.get_cloud_model()
             captured_revision_context["focus_context"] = revision_focus_context
             captured_revision_context["instruction_profile"] = session_metadata.get("instruction_profile")
             persisted_session_id = serializer.save_clinical_session(
@@ -362,7 +362,7 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
         lambda jobs: FakeClinicalService(),
     )
     monkeypatch.setattr(
-        llm_configs_module,
+        runtime_config_module,
         "ModelConfigSerializer",
         FakeModelConfigSerializer,
     )
@@ -404,9 +404,9 @@ def test_run_revision_job_persists_step_lifecycle(monkeypatch) -> None:
     )
     assert isinstance(captured_revision_context["instruction_profile"], dict)
     assert FakeModelConfigSerializer.save_calls == 0
-    assert llm_configs_module.LLMRuntimeConfig.get_clinical_model() == "baseline-clinical"
-    assert llm_configs_module.LLMRuntimeConfig.get_text_extraction_model() == "baseline-extraction"
-    assert llm_configs_module.LLMRuntimeConfig.is_cloud_enabled() is False
+    assert runtime_config_module.LLMRuntimeConfig.get_clinical_model() == "baseline-clinical"
+    assert runtime_config_module.LLMRuntimeConfig.get_text_extraction_model() == "baseline-extraction"
+    assert runtime_config_module.LLMRuntimeConfig.is_cloud_enabled() is False
     steps = service.list_revision_steps(pipeline_run_id)
     assert [step["step_name"] for step in steps] == [
         "load_source_version",

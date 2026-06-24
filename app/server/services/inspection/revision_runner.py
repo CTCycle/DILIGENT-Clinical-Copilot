@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from domain.inspection import (
     ReviewerInstructionProfile,
     ReviewerInstructionTrace,
