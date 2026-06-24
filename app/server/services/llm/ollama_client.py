@@ -276,6 +276,18 @@ class OllamaClient:
         return ollama_residency.handle_prefetch_task_done(self, task)
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def log_prefetch_skipped_for_residency_plan(
+        *,
+        active_model: str,
+        plan: dict[str, Any],
+    ) -> None:
+        return ollama_residency.log_prefetch_skipped_for_residency_plan(
+            active_model=active_model,
+            plan=plan,
+        )
+
+    # -------------------------------------------------------------------------
     async def prefetch_model(
         self,
         *,

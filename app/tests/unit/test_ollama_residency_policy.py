@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.ollama_client import OllamaClient
+from services.llm.ollama_runtime import OllamaError
 
 ###############################################################################
 def test_evaluate_dual_residency_plan_checks_ram_and_vram(monkeypatch) -> None:
@@ -93,3 +94,101 @@ def test_resolve_policy_keep_alive_uses_dual_setting(monkeypatch) -> None:
     asyncio.run(client.close())
 
     assert keep_alive == "8h"
+
+###############################################################################
+def test_maybe_prefetch_target_model_prefetches_only_when_dual_safe(
+    monkeypatch,
+) -> None:
+    client = OllamaClient(base_url="http://127.0.0.1:11434")
+    started: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        client,
+        "get_cached_residency_plan",
+        AsyncMock(
+            return_value={
+                "models": ["clinical-model", "text-model"],
+                "dual_residency": True,
+                "available_ram": 20,
+                "required_ram": 10,
+                "available_vram": 16,
+                "required_vram": 8,
+            }
+        ),
+    )
+
+    async def fake_prefetch_model(*, model: str, keep_alive: str) -> None:
+        started.append((model, keep_alive))
+
+    monkeypatch.setattr(client, "prefetch_model", fake_prefetch_model)
+
+    async def run() -> None:
+        await client.maybe_prefetch_target_model(active_model="clinical-model")
+        await asyncio.sleep(0)
+
+    asyncio.run(run())
+    asyncio.run(client.close())
+
+    assert started == [("text-model", client.residency_dual_keep_alive)]
+
+###############################################################################
+def test_maybe_prefetch_target_model_skips_when_dual_unsafe(monkeypatch) -> None:
+    client = OllamaClient(base_url="http://127.0.0.1:11434")
+    started: list[str] = []
+    monkeypatch.setattr(
+        client,
+        "get_cached_residency_plan",
+        AsyncMock(
+            return_value={
+                "models": ["clinical-model", "text-model"],
+                "dual_residency": False,
+                "available_ram": 4,
+                "required_ram": 10,
+                "available_vram": 2,
+                "required_vram": 8,
+            }
+        ),
+    )
+
+    async def fake_prefetch_model(*, model: str, keep_alive: str) -> None:
+        _ = keep_alive
+        started.append(model)
+
+    monkeypatch.setattr(client, "prefetch_model", fake_prefetch_model)
+
+    asyncio.run(client.maybe_prefetch_target_model(active_model="clinical-model"))
+    asyncio.run(client.close())
+
+    assert started == []
+    assert client.residency_usage_history[-1][1] == "clinical-model"
+
+###############################################################################
+def test_prefetch_model_oom_is_non_fatal(monkeypatch) -> None:
+    client = OllamaClient(base_url="http://127.0.0.1:11434")
+    monkeypatch.setattr(client, "ensure_model_ready", AsyncMock(return_value=None))
+
+    ###############################################################################
+    class FakeHttpClient:
+
+        # -------------------------------------------------------------------------
+        async def post(self, path: str, json: dict) -> object:
+            assert path == "/api/chat"
+            assert json["model"] == "text-model"
+            return object()
+
+        # -------------------------------------------------------------------------
+        async def aclose(self) -> None:
+            return None
+
+    client.client = FakeHttpClient()  # type: ignore[assignment]
+    monkeypatch.setattr(
+        client,
+        "raise_for_status",
+        lambda response: (_ for _ in ()).throw(
+            OllamaError(
+                "Ollama HTTP 500: llama-server reported out-of-memory during startup"
+            )
+        ),
+    )
+
+    asyncio.run(client.prefetch_model(model="text-model", keep_alive="30m"))
+    asyncio.run(client.close())
