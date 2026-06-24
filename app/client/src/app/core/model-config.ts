@@ -1,5 +1,6 @@
 import { CLOUD_MODEL_CHOICES, DEFAULT_SETTINGS } from "./constants";
 import {
+  LocalModelCard,
   CloudProvider,
   ModelConfigStateResponse,
   RuntimeSettings,
@@ -62,8 +63,8 @@ export function buildRuntimeSettingsFromConfig(
     payload.cloud_model,
     cloudChoices,
   );
-  const resolvedClinicalModel = payload.clinical_model || DEFAULT_SETTINGS.clinicalModel;
-  const resolvedtextExtractionModel = payload.text_extraction_model || DEFAULT_SETTINGS.textExtractionModel;
+  const resolvedClinicalModel = payload.clinical_model ?? "";
+  const resolvedtextExtractionModel = payload.text_extraction_model ?? "";
   return {
     ...previous,
     useCloudServices: payload.use_cloud_services,
@@ -74,6 +75,36 @@ export function buildRuntimeSettingsFromConfig(
     temperature: payload.cloud_temperature ?? payload.ollama_temperature,
     reasoning: payload.ollama_reasoning,
   };
+}
+
+function recommendedLocalModelName(
+  localModels: LocalModelCard[],
+): string {
+  const installed = localModels.filter((model) => model.available_in_ollama);
+  const recommended = installed.find(
+    (model) => model.recommended_for_local_extraction,
+  );
+  if (recommended) {
+    return recommended.name;
+  }
+  return installed[0]?.name || "";
+}
+
+export function resolveLocalDraftModel(
+  candidate: string | null | undefined,
+  localModels: LocalModelCard[],
+): string {
+  const normalized = (candidate || "").trim();
+  if (!normalized) {
+    return recommendedLocalModelName(localModels);
+  }
+  const installed = localModels.find(
+    (model) => model.available_in_ollama && model.name === normalized,
+  );
+  if (installed) {
+    return installed.name;
+  }
+  return recommendedLocalModelName(localModels);
 }
 
 

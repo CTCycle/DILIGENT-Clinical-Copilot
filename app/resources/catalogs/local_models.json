@@ -166,6 +166,16 @@
       "description": "EXAONE Deep 32B reasoning model for high-capability local inference."
     },
     {
+      "name": "qwen3.5:2b",
+      "family": "qwen3.5",
+      "description": "Qwen 3.5 2B open model for fast local structured extraction and lightweight reasoning."
+    },
+    {
+      "name": "qwen3.5:9b",
+      "family": "qwen3.5",
+      "description": "Qwen 3.5 9B open model for stronger local structured extraction and clinical parsing."
+    },
+    {
       "name": "qwen3:0.6b",
       "family": "qwen3",
       "description": "Qwen3 0.6B open model in the Qwen3 dense and MoE family."

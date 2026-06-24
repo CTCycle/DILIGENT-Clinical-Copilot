@@ -37,6 +37,7 @@ import { ModelRoleActionButtonComponent } from './components/model-role-action-b
 import {
   MODEL_FILTERS,
   modelMatchesFilters,
+  normalizeDraftForLocalRuntime,
   resolveDraftFromSettings,
 } from './model-catalog';
 import {
@@ -482,10 +483,16 @@ export class ModelConfigPageComponent implements OnInit {
   }
 
   handleCloudSwitchChange(value: boolean): void {
-    this.draftConfig.update((previous) => ({ ...previous, useCloudServices: value }));
     if (!value) {
-      void this.loadModelConfig(false, true);
+      this.draftConfig.update((previous) =>
+        normalizeDraftForLocalRuntime(
+          { ...previous, useCloudServices: false },
+          this.localModels(),
+        ),
+      );
+      return;
     }
+    this.draftConfig.update((previous) => ({ ...previous, useCloudServices: true }));
   }
 
   handleRagPipelineChange(enabled: boolean): void {
@@ -743,6 +750,16 @@ export class ModelConfigPageComponent implements OnInit {
 
   modelStatus(model: ModelConfigStateResponse['local_models'][number]): string {
     return model.available_in_ollama ? 'Installed' : 'Not installed';
+  }
+
+  localRecommendationLabel(model: ModelConfigStateResponse['local_models'][number]): string | null {
+    if (!model.recommended_for_local_extraction) {
+      return null;
+    }
+    if (model.recommended_rank === 0) {
+      return 'Recommended fast extractor';
+    }
+    return 'Recommended backup extractor';
   }
 
   selectedClinicalModel(): string {

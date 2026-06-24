@@ -4,7 +4,10 @@ import json
 import re
 from typing import Any, NoReturn
 
-from common.catalogs.model_choices import get_text_extraction_model_choices
+from common.catalogs.model_choices import (
+    get_all_cloud_model_names,
+    get_text_extraction_model_choices,
+)
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.ollama_runtime import OllamaError
@@ -25,13 +28,14 @@ async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
 
     fallbacks: list[str] = []
     if available:
-        for name in get_text_extraction_model_choices():
-            if name in available and name not in preferred and name not in fallbacks:
-                fallbacks.append(name)
-    else:
-        for name in get_text_extraction_model_choices():
+        for name in sorted(available, key=str.casefold):
             if name not in preferred and name not in fallbacks:
                 fallbacks.append(name)
+    for name in get_text_extraction_model_choices():
+        if available and name not in available:
+            continue
+        if name not in preferred and name not in fallbacks:
+            fallbacks.append(name)
 
     return fallbacks
 
@@ -95,14 +99,32 @@ def build_structured_messages(
 
 ###############################################################################
 async def resolve_text_extraction_models(self, model: str) -> list[str]:
+    available = set()
+    try:
+        available = await self.get_cached_models()
+    except OllamaError:
+        available = set()
     preferred: list[str] = []
+    cloud_model_names = get_all_cloud_model_names()
     for candidate in (
         (model or "").strip(),
         (self.default_model or "").strip(),
         (LLMRuntimeConfig.get_text_extraction_model() or "").strip(),
     ):
+        if not candidate or candidate in preferred:
+            continue
+        if available:
+            if candidate in available:
+                preferred.append(candidate)
+            continue
+        if candidate in cloud_model_names:
+            continue
         if candidate and candidate not in preferred:
             preferred.append(candidate)
+    if available:
+        for candidate in sorted(available, key=str.casefold):
+            if candidate not in preferred:
+                preferred.append(candidate)
     if not preferred:
         preferred = await self.collect_structured_fallbacks([])
     return preferred
@@ -191,6 +213,35 @@ def build_repair_messages(
     ]
 
 ###############################################################################
+def build_compact_repair_messages(
+    *,
+    text: str,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "Return only valid JSON data. Do not return JSON schema, explanations, "
+                "keys like $defs, title, type, properties, required, or $ref."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                "The previous reply looked like a schema or wrapper instead of data.\n"
+                "Return only the final JSON data object for the extraction.\n\n"
+                f"Previous reply:\n{text}"
+            ),
+        },
+    ]
+
+###############################################################################
+def looks_like_schema_echo(text: str) -> bool:
+    lowered = text.casefold()
+    schema_markers = ('"$defs"', '"properties"', '"required"', '"title"', '"type"', '"$ref"')
+    return sum(1 for marker in schema_markers if marker in lowered) >= 3
+
+###############################################################################
 async def call_with_structured_models(
     self,
     *,
@@ -277,6 +328,8 @@ async def parse_with_repairs(
                 format_instructions=format_instructions,
                 text=text,
             )
+            if looks_like_schema_echo(text):
+                repair_messages = self.build_compact_repair_messages(text=text)
             try:
                 raw = await self.chat(
                     model=active_model,

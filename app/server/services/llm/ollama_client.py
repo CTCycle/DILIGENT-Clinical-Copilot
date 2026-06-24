@@ -754,6 +754,19 @@ class OllamaClient:
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def build_compact_repair_messages(
+        *,
+        text: str,
+    ) -> list[dict[str, str]]:
+        return ollama_structured.build_compact_repair_messages(text=text)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def looks_like_schema_echo(text: str) -> bool:
+        return ollama_structured.looks_like_schema_echo(text)
+
+    # -------------------------------------------------------------------------
     async def call_with_structured_models(
         self,
         *,

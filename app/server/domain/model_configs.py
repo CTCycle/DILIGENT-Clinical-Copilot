@@ -25,6 +25,8 @@ class LocalModelCard(BaseModel):
     family: str
     description: str
     available_in_ollama: bool
+    recommended_for_local_extraction: bool = False
+    recommended_rank: int | None = None
 
 ###############################################################################
 class ModelConfigUpdateRequest(BaseModel):

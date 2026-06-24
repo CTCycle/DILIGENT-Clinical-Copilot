@@ -60,6 +60,7 @@ class ModelConfigSnapshotStore(Protocol):
 class ModelConfigService:
     _OLLAMA_WARNING_COOLDOWN_SECONDS = 120.0
     _OPENAI_CONNECTIVITY_FALLBACK_MODEL = "gpt-4.1-mini"
+    _FAST_LOCAL_EXTRACTION_MODELS = ("qwen3.5:2b", "qwen3.5:9b")
 
     # -------------------------------------------------------------------------
     def __init__(self, serializer: ModelConfigSnapshotStore | None = None) -> None:
@@ -101,6 +102,17 @@ class ModelConfigService:
         snapshot = self.ensure_defaults()
         fields_set = payload.model_fields_set
         local_roles_updated = self._local_roles_updated(fields_set)
+        target_use_cloud_models = (
+            bool(payload.use_cloud_services)
+            if "use_cloud_services" in fields_set
+            else bool(snapshot.use_cloud_models)
+        )
+        should_refresh_local_availability = (
+            not target_use_cloud_models
+            or local_roles_updated
+            or ("use_cloud_services" in fields_set and not target_use_cloud_models)
+        )
+        available_local_model_names = await self.list_available_ollama_models()
         local_model_names = await self._build_local_model_names(
             snapshot=snapshot,
             refresh_from_ollama=local_roles_updated,
@@ -110,6 +122,7 @@ class ModelConfigService:
             snapshot=snapshot,
             fields_set=fields_set,
             local_model_names=local_model_names,
+            available_local_model_names=available_local_model_names,
         )
 
         if updates:
@@ -117,7 +130,7 @@ class ModelConfigService:
 
         should_check_local_availability = (
             not snapshot.use_cloud_models
-        ) or local_roles_updated
+        ) or local_roles_updated or should_refresh_local_availability
         local_models = await self.list_local_model_cards(
             selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
             include_ollama_availability=should_check_local_availability,
@@ -212,6 +225,7 @@ class ModelConfigService:
         snapshot: ModelConfigSnapshot,
         fields_set: set[str],
         local_model_names: set[str],
+        available_local_model_names: set[str],
     ) -> dict[str, Any]:
         updates: dict[str, Any] = {}
         target_use_cloud_models = (
@@ -228,6 +242,7 @@ class ModelConfigService:
             payload=payload,
             fields_set=fields_set,
             local_model_names=local_model_names,
+            available_local_model_names=available_local_model_names,
             use_cloud_models=target_use_cloud_models,
             cloud_provider=provider,
             active_cloud_model=(
@@ -262,6 +277,7 @@ class ModelConfigService:
         payload: ModelConfigUpdateRequest,
         fields_set: set[str],
         local_model_names: set[str],
+        available_local_model_names: set[str],
         use_cloud_models: bool,
         cloud_provider: str,
         active_cloud_model: str | None,
@@ -272,6 +288,7 @@ class ModelConfigService:
                 role_name="clinical",
                 model_name=self.normalize_optional_text(payload.clinical_model),
                 local_model_names=local_model_names,
+                available_local_model_names=available_local_model_names,
                 use_cloud_models=use_cloud_models,
                 cloud_provider=cloud_provider,
                 active_cloud_model=active_cloud_model,
@@ -283,6 +300,7 @@ class ModelConfigService:
                 role_name="text_extraction",
                 model_name=self.normalize_optional_text(payload.text_extraction_model),
                 local_model_names=local_model_names,
+                available_local_model_names=available_local_model_names,
                 use_cloud_models=use_cloud_models,
                 cloud_provider=cloud_provider,
                 active_cloud_model=active_cloud_model,
@@ -433,6 +451,7 @@ class ModelConfigService:
         role_name: str,
         model_name: str | None,
         local_model_names: set[str],
+        available_local_model_names: set[str],
         use_cloud_models: bool,
         cloud_provider: str,
         active_cloud_model: str | None,
@@ -456,6 +475,10 @@ class ModelConfigService:
         if model_name not in local_model_names:
             raise ServiceValidationError(
                 f"Model '{model_name}' is not supported for role '{role_name}'.",
+            )
+        if model_name not in available_local_model_names:
+            raise ServiceValidationError(
+                f"Install local Ollama model '{model_name}' before using it for role '{role_name}'.",
             )
         return model_name
 
@@ -535,6 +558,51 @@ class ModelConfigService:
         return f"Installed local Ollama model from the {family} family."
 
     # -------------------------------------------------------------------------
+    @classmethod
+    def local_recommendation_rank(cls, model_name: str) -> int | None:
+        try:
+            return cls._FAST_LOCAL_EXTRACTION_MODELS.index(model_name)
+        except ValueError:
+            return None
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def build_local_model_card(
+        cls,
+        *,
+        name: str,
+        family: str,
+        description: str,
+        available_in_ollama: bool,
+    ) -> LocalModelCard:
+        recommendation_rank = cls.local_recommendation_rank(name)
+        return LocalModelCard(
+            name=name,
+            family=family,
+            description=description,
+            available_in_ollama=available_in_ollama,
+            recommended_for_local_extraction=recommendation_rank is not None,
+            recommended_rank=recommendation_rank,
+        )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def sort_local_model_cards(
+        cls,
+        cards: list[LocalModelCard],
+    ) -> list[LocalModelCard]:
+        return sorted(
+            cards,
+            key=lambda card: (
+                0 if card.available_in_ollama else 1,
+                card.recommended_rank
+                if card.recommended_rank is not None
+                else len(cls._FAST_LOCAL_EXTRACTION_MODELS),
+                card.name.casefold(),
+            ),
+        )
+
+    # -------------------------------------------------------------------------
     async def list_available_ollama_models(self) -> set[str]:
         try:
             async with OllamaClient() as client:
@@ -578,7 +646,7 @@ class ModelConfigService:
             else set()
         )
         cards = [
-            LocalModelCard(
+            self.build_local_model_card(
                 name=name,
                 family=family,
                 description=description,
@@ -597,7 +665,7 @@ class ModelConfigService:
             key=str.casefold,
         )
         cards.extend(
-            LocalModelCard(
+            self.build_local_model_card(
                 name=model_name,
                 family="custom",
                 description=self.describe_local_model(model_name),
@@ -605,7 +673,7 @@ class ModelConfigService:
             )
             for model_name in extra_models
         )
-        return cards
+        return self.sort_local_model_cards(cards)
 
     # -------------------------------------------------------------------------
     def build_response(
