@@ -22,3 +22,11 @@ def get_text_extraction_model_choices() -> list[str]:
 ###############################################################################
 def get_clinical_model_choices() -> list[str]:
     return CatalogLoader.get_string_list("llm_models.json", "clinical_model_choices")
+
+###############################################################################
+def get_all_cloud_model_names() -> set[str]:
+    return {
+        model_name
+        for values in get_cloud_model_choices().values()
+        for model_name in values
+    }

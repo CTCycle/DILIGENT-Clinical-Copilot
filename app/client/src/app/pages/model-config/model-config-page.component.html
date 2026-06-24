@@ -187,6 +187,9 @@
                         </svg>
                         <span>
                           <strong>{{ model.name }}</strong>
+                          @if (localRecommendationLabel(model); as recommendation) {
+                            <small class="model-config-model-note">{{ recommendation }}</small>
+                          }
                         </span>
                       </div>
                     </td>

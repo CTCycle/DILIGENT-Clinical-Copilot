@@ -52,6 +52,10 @@ def build_failed_session_payload(
         "ollama_temperature": (LLMRuntimeConfig.get_ollama_temperature()),
         "cloud_temperature": (LLMRuntimeConfig.get_cloud_temperature()),
         "ollama_reasoning": bool(LLMRuntimeConfig.is_ollama_reasoning_enabled()),
+        "resolved_runtime": {},
+        "stage_elapsed_ms": {},
+        "fallback_reasons": {},
+        "structured_failure_kind": {},
     }
     return {
         "patient_name": payload.name,
@@ -94,6 +98,10 @@ def build_failed_session_payload(
             "relevant_drugs": [],
             "excluded_drugs": [],
             "unresolved_drugs": [],
+            "resolved_runtime": {},
+            "stage_elapsed_ms": {},
+            "fallback_reasons": {},
+            "structured_failure_kind": {},
             "structured_case": {},
             "section_extraction": None,
             "runtime_settings": runtime_settings,
@@ -394,6 +402,7 @@ async def execute_clinical_job(
     report_mode: str = "faithful_only",
 ) -> dict[str, Any]:
     service.apply_persisted_runtime_configuration()
+    service.reset_runtime_diagnostics()
     ensure_not_cancelled = partial(
         ensure_clinical_job_not_cancelled,
         job_manager=service.job_manager,

@@ -1,5 +1,5 @@
 # Model Setup
-Last updated: 2026-06-03
+Last updated: 2026-06-24
 
 ## Configure Models
 Open **Model Configurations** from the sidebar.
@@ -39,3 +39,8 @@ Recommended workflow:
 7. Confirm the active-key indicator is shown.
 
 Do not paste keys into screenshots, chat messages, issue reports, or shared logs.
+
+## Local Model Notes
+- Local runtime saves only installed Ollama models for clinical and extraction roles.
+- If you switch from cloud to local mode, cloud-only role selections are cleared automatically.
+- When installed, `qwen3.5:2b` is the preferred fast local extractor and `qwen3.5:9b` is the recommended stronger backup option for bounded extraction tests.

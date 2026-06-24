@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Protocol
 
 from common.utils.logger import logger
 from domain.clinical.entities import (
@@ -21,17 +21,42 @@ from domain.clinical.extras import HepatoxPreparedInputs
 from services.retrieval.query import DILIQueryBuilder
 
 ###############################################################################
+class ClinicalSessionExtractionOwner(Protocol):
+    drugs_parser: Any
+    disease_extractor: Any
+    lab_extractor: Any
+    pattern_analyzer: Any
+    rucam_estimator: Any
+    input_preparator: Any
+    latest_lab_extraction_audit: Any
+
+    note_stage_runtime: Callable[..., None]
+    emit_progress: Callable[..., None]
+    build_stage_progress_callback: Callable[..., Any]
+    _resolve_runtime_timeout: Callable[..., float]
+    run_stop_check: Callable[..., None]
+    note_stage_elapsed: Callable[..., None]
+    classify_extraction_failure: Callable[..., tuple[str, str]]
+    append_warning_issue: Callable[..., None]
+    note_stage_fallback: Callable[..., None]
+    classify_structured_failure_kind: Callable[..., str]
+    build_fallback_therapy_drugs: Callable[..., PatientDrugs]
+    append_knowledge_base_unavailable_issue: Callable[..., None]
+
+
+###############################################################################
 class ClinicalSessionExtractionPipelineMixin:
 
     # -------------------------------------------------------------------------
     async def extract_therapy_drugs(
-        self,
+        self: ClinicalSessionExtractionOwner,
         *,
         cleaned_therapy_text: str,
         issues: list[PipelineIssue],
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
     ) -> PatientDrugs:
+        self.note_stage_runtime("therapy_extraction")
         self.emit_progress(progress_callback, stage="therapy_extraction", value=16.0)
         therapy_progress_callback = self.build_stage_progress_callback(
             progress_callback,
@@ -53,12 +78,14 @@ class ClinicalSessionExtractionPipelineMixin:
             )
             self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
+            self.note_stage_elapsed("therapy_extraction", elapsed)
             logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
             logger.info(
                 "Detected %s drugs from therapy list", len(therapy_drugs.entries)
             )
         except Exception as exc:
             elapsed = time.perf_counter() - start_time
+            self.note_stage_elapsed("therapy_extraction", elapsed)
             logger.warning(
                 (
                     "Therapy drugs extraction failed after %.4f seconds; "
@@ -81,6 +108,12 @@ class ClinicalSessionExtractionPipelineMixin:
                 message=issue_message,
                 field="drugs",
             )
+            self.note_stage_fallback(
+                "therapy_extraction",
+                issue_code=issue_code,
+                issue_message=issue_message,
+                structured_failure_kind=self.classify_structured_failure_kind(exc),
+            )
             therapy_drugs = self.build_fallback_therapy_drugs(cleaned_therapy_text)
         self.emit_progress(progress_callback, stage="therapy_extraction", value=23.0)
         self.run_stop_check(stop_check)
@@ -88,13 +121,14 @@ class ClinicalSessionExtractionPipelineMixin:
 
     # -------------------------------------------------------------------------
     async def extract_anamnesis_drugs(
-        self,
+        self: ClinicalSessionExtractionOwner,
         *,
         anamnesis_text: str,
         issues: list[PipelineIssue],
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
     ) -> PatientDrugs:
+        self.note_stage_runtime("anamnesis_extraction")
         self.emit_progress(progress_callback, stage="anamnesis_extraction", value=23.0)
         anamnesis_progress_callback = self.build_stage_progress_callback(
             progress_callback,
@@ -116,12 +150,14 @@ class ClinicalSessionExtractionPipelineMixin:
             )
             self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
+            self.note_stage_elapsed("anamnesis_extraction", elapsed)
             logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
             logger.info(
                 "Detected %s drugs from anamnesis", len(anamnesis_drugs.entries)
             )
         except Exception as exc:
             elapsed = time.perf_counter() - start_time
+            self.note_stage_elapsed("anamnesis_extraction", elapsed)
             logger.warning(
                 (
                     "Anamnesis drugs extraction failed after %.4f seconds "
@@ -146,6 +182,12 @@ class ClinicalSessionExtractionPipelineMixin:
                 message=issue_message,
                 field="anamnesis",
             )
+            self.note_stage_fallback(
+                "anamnesis_extraction",
+                issue_code=issue_code,
+                issue_message=issue_message,
+                structured_failure_kind=self.classify_structured_failure_kind(exc),
+            )
             anamnesis_drugs = PatientDrugs(entries=[])
         self.emit_progress(progress_callback, stage="anamnesis_extraction", value=30.0)
         self.run_stop_check(stop_check)
@@ -153,13 +195,14 @@ class ClinicalSessionExtractionPipelineMixin:
 
     # -------------------------------------------------------------------------
     async def extract_disease_context(
-        self,
+        self: ClinicalSessionExtractionOwner,
         *,
         anamnesis_text: str,
         issues: list[PipelineIssue],
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
     ) -> PatientDiseaseContext:
+        self.note_stage_runtime("anamnesis_disease_extraction")
         self.emit_progress(
             progress_callback, stage="anamnesis_disease_extraction", value=38.0
         )
@@ -186,6 +229,7 @@ class ClinicalSessionExtractionPipelineMixin:
                 )
                 self.run_stop_check(stop_check)
                 elapsed = time.perf_counter() - start_time
+                self.note_stage_elapsed("anamnesis_disease_extraction", elapsed)
                 logger.info(
                     "Anamnesis disease extraction required %.4f seconds", elapsed
                 )
@@ -243,6 +287,13 @@ class ClinicalSessionExtractionPipelineMixin:
                     message=issue_message,
                     field="anamnesis",
                 )
+                self.note_stage_elapsed("anamnesis_disease_extraction", elapsed)
+                self.note_stage_fallback(
+                    "anamnesis_disease_extraction",
+                    issue_code=issue_code,
+                    issue_message=issue_message,
+                    structured_failure_kind="llm_timeout",
+                )
                 disease_context = PatientDiseaseContext(entries=[])
                 self.emit_progress(
                     progress_callback, stage="anamnesis_disease_extraction", value=46.0
@@ -251,6 +302,7 @@ class ClinicalSessionExtractionPipelineMixin:
                 return disease_context
             except Exception as exc:
                 elapsed = time.perf_counter() - start_time
+                self.note_stage_elapsed("anamnesis_disease_extraction", elapsed)
                 logger.warning(
                     (
                         "Anamnesis disease extraction failed after %.4f seconds "
@@ -275,6 +327,12 @@ class ClinicalSessionExtractionPipelineMixin:
                     message=issue_message,
                     field="anamnesis",
                 )
+                self.note_stage_fallback(
+                    "anamnesis_disease_extraction",
+                    issue_code=issue_code,
+                    issue_message=issue_message,
+                    structured_failure_kind=self.classify_structured_failure_kind(exc),
+                )
                 disease_context = PatientDiseaseContext(entries=[])
                 self.emit_progress(
                     progress_callback, stage="anamnesis_disease_extraction", value=46.0
@@ -285,13 +343,14 @@ class ClinicalSessionExtractionPipelineMixin:
 
     # -------------------------------------------------------------------------
     async def extract_lab_timeline(
-        self,
+        self: ClinicalSessionExtractionOwner,
         *,
         payload: PatientData,
         issues: list[PipelineIssue],
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
     ) -> tuple[PatientLabTimeline, LiverInjuryOnsetContext | None]:
+        self.note_stage_runtime("anamnesis_lab_extraction")
         self.emit_progress(
             progress_callback, stage="anamnesis_lab_extraction", value=46.0
         )
@@ -328,10 +387,12 @@ class ClinicalSessionExtractionPipelineMixin:
                 self.latest_lab_extraction_audit = None
             self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
+            self.note_stage_elapsed("anamnesis_lab_extraction", elapsed)
             logger.info("Anamnesis lab extraction required %.4f seconds", elapsed)
             logger.info("Detected %s timeline lab entries", len(lab_timeline.entries))
         except Exception as exc:
             elapsed = time.perf_counter() - start_time
+            self.note_stage_elapsed("anamnesis_lab_extraction", elapsed)
             logger.warning(
                 (
                     "Anamnesis lab extraction failed after %.4f seconds "
@@ -355,6 +416,12 @@ class ClinicalSessionExtractionPipelineMixin:
                 code=issue_code,
                 message=issue_message,
                 field="anamnesis",
+            )
+            self.note_stage_fallback(
+                "anamnesis_lab_extraction",
+                issue_code=issue_code,
+                issue_message=issue_message,
+                structured_failure_kind=self.classify_structured_failure_kind(exc),
             )
             # Deterministic fallback: recover lab markers directly from text
             # so pattern estimation can still proceed when LLM extraction fails.
@@ -404,7 +471,7 @@ class ClinicalSessionExtractionPipelineMixin:
 
     # -------------------------------------------------------------------------
     def assess_pattern(
-        self,
+        self: ClinicalSessionExtractionOwner,
         *,
         lab_timeline: PatientLabTimeline,
         validation_bundle: Any,
@@ -452,7 +519,7 @@ class ClinicalSessionExtractionPipelineMixin:
 
     # -------------------------------------------------------------------------
     def estimate_rucam(
-        self,
+        self: ClinicalSessionExtractionOwner,
         *,
         payload: PatientData,
         analysis_drugs: PatientDrugs,
@@ -504,7 +571,7 @@ class ClinicalSessionExtractionPipelineMixin:
 
     # -------------------------------------------------------------------------
     def build_rag_query(
-        self,
+        self: ClinicalSessionExtractionOwner,
         *,
         payload: PatientData,
         analysis_drugs: PatientDrugs,
@@ -529,7 +596,7 @@ class ClinicalSessionExtractionPipelineMixin:
 
     # -------------------------------------------------------------------------
     async def run_livertox_lookup(
-        self,
+        self: ClinicalSessionExtractionOwner,
         *,
         all_detected_drugs: PatientDrugs,
         structured_context: str,
@@ -564,7 +631,7 @@ class ClinicalSessionExtractionPipelineMixin:
 
     # -------------------------------------------------------------------------
     def reestimate_rucam_with_livertox(
-        self,
+        self: ClinicalSessionExtractionOwner,
         *,
         payload: PatientData,
         analysis_drugs: PatientDrugs,

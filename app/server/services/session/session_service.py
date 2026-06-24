@@ -118,6 +118,66 @@ class ClinicalSessionService(
         self.model_config_service = ModelConfigService(
             serializer=ModelConfigSerializer()
         )
+        self.reset_runtime_diagnostics()
+
+    # -------------------------------------------------------------------------
+    def reset_runtime_diagnostics(self) -> None:
+        self.resolved_runtime: dict[str, dict[str, str | None]] = {}
+        self.stage_elapsed_ms: dict[str, int] = {}
+        self.fallback_reasons: dict[str, dict[str, str | None]] = {}
+        self.structured_failure_kind: dict[str, str] = {}
+
+    # -------------------------------------------------------------------------
+    def note_stage_runtime(
+        self,
+        stage: str,
+        *,
+        purpose: str = "parser",
+    ) -> None:
+        provider, model = LLMRuntimeConfig.resolve_provider_and_model(
+            "clinical" if purpose == "clinical" else "parser"
+        )
+        self.resolved_runtime[stage] = {"provider": provider, "model": model}
+
+    # -------------------------------------------------------------------------
+    def note_stage_elapsed(self, stage: str, elapsed_seconds: float) -> None:
+        self.stage_elapsed_ms[stage] = max(0, int(round(float(elapsed_seconds) * 1000)))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def classify_structured_failure_kind(exc: Exception) -> str:
+        lowered = str(exc).casefold()
+        if "timed out" in lowered:
+            return "llm_timeout"
+        if (
+            "file does not exist" in lowered
+            or "not found" in lowered
+            or "no local text extraction models were found" in lowered
+        ):
+            return "missing_model"
+        if (
+            "structured parsing failed" in lowered
+            or "validation error" in lowered
+            or '"$defs"' in lowered
+            or '"properties"' in lowered
+        ):
+            return "structured_parse_failed"
+        return "llm_runtime_error"
+
+    # -------------------------------------------------------------------------
+    def note_stage_fallback(
+        self,
+        stage: str,
+        *,
+        issue_code: str,
+        issue_message: str,
+        structured_failure_kind: str,
+    ) -> None:
+        self.fallback_reasons[stage] = {
+            "issue_code": issue_code,
+            "message": issue_message,
+        }
+        self.structured_failure_kind[stage] = structured_failure_kind
 
     # -------------------------------------------------------------------------
     @staticmethod

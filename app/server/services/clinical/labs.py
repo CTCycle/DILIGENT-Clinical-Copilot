@@ -7,6 +7,8 @@ from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any, Literal
 
+from pydantic import BaseModel, Field
+
 from common.prompts.extraction import CLINICAL_LAB_EXTRACTION_PROMPT
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
@@ -38,6 +40,25 @@ VALUE_UNIT_RE = re.compile(
     re.IGNORECASE,
 )
 SINGLE_VALUE_MARKERS = frozenset({"CR", "EGFR", "INR", "ALB"})
+
+###############################################################################
+class LocalLabEntryDraft(BaseModel):
+    marker_name: str = Field(..., min_length=1, max_length=40)
+    value_text: str | float | int | None = Field(default=None)
+    unit: str | None = Field(default=None, max_length=50)
+    sample_date: str | None = Field(default=None, max_length=120)
+    evidence: str | None = Field(default=None, max_length=500)
+
+###############################################################################
+class LocalOnsetContextDraft(BaseModel):
+    onset_date: str | None = Field(default=None, max_length=120)
+    onset_basis: str | None = Field(default=None, max_length=200)
+    evidence: str | None = Field(default=None, max_length=500)
+
+###############################################################################
+class LocalLabExtractionPayload(BaseModel):
+    entries: list[LocalLabEntryDraft] = Field(default_factory=list)
+    onset_context: LocalOnsetContextDraft | None = Field(default=None)
 
 ###############################################################################
 def _load_marker_aliases() -> dict[str, tuple[str, ...]]:
@@ -638,6 +659,72 @@ class ClinicalLabExtractor:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def is_local_runtime(provider: str | None) -> bool:
+        return (provider or "").strip().lower() == "ollama"
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def local_system_prompt() -> str:
+        return (
+            "Extract only grounded liver-related lab entries from the source. Return "
+            "compact JSON data only with marker names, values, units, dates, and evidence."
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_local_payload(
+        parsed: LocalLabExtractionPayload,
+    ) -> LabExtractionPayload:
+        def sanitize_optional_text(
+            value: str | float | int | None,
+            *,
+            max_length: int,
+        ) -> str | None:
+            if value is None:
+                return None
+            text = re.sub(r"\s+", " ", str(value)).strip()
+            if not text:
+                return None
+            return text[:max_length]
+
+        onset_context = None
+        if parsed.onset_context is not None:
+            onset_basis = (parsed.onset_context.onset_basis or "unknown").strip().lower()
+            if onset_basis not in {
+                "first_symptom",
+                "first_abnormal_lab",
+                "visit_proxy",
+                "unknown",
+            }:
+                onset_basis = "unknown"
+            onset_context = LiverInjuryOnsetContext(
+                onset_date=sanitize_optional_text(
+                    parsed.onset_context.onset_date,
+                    max_length=120,
+                ),
+                onset_basis=onset_basis,
+                evidence=sanitize_optional_text(
+                    parsed.onset_context.evidence,
+                    max_length=500,
+                ),
+            )
+        return LabExtractionPayload(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name=entry.marker_name,
+                    value_text=sanitize_optional_text(entry.value_text, max_length=100),
+                    unit=sanitize_optional_text(entry.unit, max_length=50),
+                    sample_date=sanitize_optional_text(entry.sample_date, max_length=120),
+                    evidence=sanitize_optional_text(entry.evidence, max_length=500),
+                    source="laboratory_analysis",
+                )
+                for entry in parsed.entries
+            ],
+            onset_context=onset_context,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def has_explicit_lab_signal(text: str) -> bool:
         lowered = (text or "").casefold()
         if not lowered:
@@ -710,20 +797,35 @@ class ClinicalLabExtractor:
         parsed: LabExtractionPayload | None = None
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for lab extraction")
+        active_provider = self.forced_provider or self.client_provider or "ollama"
+        use_local_schema = self.is_local_runtime(active_provider)
+        schema: type[LabExtractionPayload] | type[LocalLabExtractionPayload] = (
+            LocalLabExtractionPayload if use_local_schema else LabExtractionPayload
+        )
+        system_prompt = (
+            self.local_system_prompt()
+            if use_local_schema
+            else CLINICAL_LAB_EXTRACTION_PROMPT.strip()
+        )
         request_timeout_s = self.resolve_request_timeout_s()
         for attempt in range(1, self.extraction_retry_attempts + 1):
             try:
-                parsed = await asyncio.wait_for(
+                raw_parsed = await asyncio.wait_for(
                     self.client.llm_structured_call(
                         model=self.model,
-                        system_prompt=CLINICAL_LAB_EXTRACTION_PROMPT.strip(),
+                        system_prompt=system_prompt,
                         user_prompt=user_prompt,
-                        schema=LabExtractionPayload,
+                        schema=schema,
                         temperature=self.temperature,
                         use_json_mode=True,
                         max_repair_attempts=1,
                     ),
                     timeout=request_timeout_s,
+                )
+                parsed = (
+                    self.normalize_local_payload(raw_parsed)
+                    if use_local_schema
+                    else raw_parsed
                 )
                 break
             except Exception as exc:
