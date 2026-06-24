@@ -21,6 +21,7 @@ from services.text.normalization import normalize_drug_query_name
 
 CLAIM_EVIDENCE_QUOTE_MAX_LENGTH = 1000
 CLAIM_EVIDENCE_TRUNCATION_MARKER = " [truncated]"
+MATCH_REASON_MAX_LENGTH = 100
 
 ###############################################################################
 def claim_safe_evidence_quote(value: str | None) -> str | None:
@@ -43,6 +44,30 @@ def claim_safe_evidence_quote(value: str | None) -> str | None:
     if boundary >= 200:
         truncated = truncated[:boundary].rstrip(" .,;\n")
     return f"{truncated}{marker}"
+
+###############################################################################
+def normalize_match_reason(
+    value: Any,
+    notes: list[str],
+) -> tuple[str | None, list[str]]:
+    raw_reason = str(value).strip() if value is not None else ""
+    normalized_notes = list(notes)
+    if not raw_reason:
+        return None, normalized_notes
+
+    reason_parts = [
+        part.strip()
+        for part in raw_reason.split(";")
+        if part.strip()
+    ]
+    for part in reason_parts:
+        if part not in normalized_notes:
+            normalized_notes.append(part)
+
+    primary_reason = reason_parts[0] if reason_parts else raw_reason
+    if len(primary_reason) > MATCH_REASON_MAX_LENGTH:
+        primary_reason = primary_reason[:MATCH_REASON_MAX_LENGTH].rstrip()
+    return primary_reason or None, normalized_notes
 
 ###############################################################################
 class AnalysisRunner:
@@ -433,10 +458,13 @@ class AnalysisRunner:
                 match_confidence = float(match_confidence)
             except TypeError, ValueError:
                 match_confidence = None
-        match_reason = livertox_data.get("match_reason")
+        match_reason, match_notes = normalize_match_reason(
+            livertox_data.get("match_reason"),
+            match_notes,
+        )
         match_quality = classify_match_evidence(
             match_status=match_status,
-            match_reason=str(match_reason) if match_reason is not None else None,
+            match_reason=match_reason,
             match_confidence=match_confidence,
             match_notes=match_notes,
             missing_livertox=missing_livertox,
@@ -473,9 +501,7 @@ class AnalysisRunner:
             ambiguous_match=ambiguous_match,
             match_status=match_status,
             match_confidence=match_confidence,
-            match_reason=str(match_reason).strip()
-            if match_reason is not None
-            else None,
+            match_reason=match_reason,
             match_notes=match_notes,
             evidence_quality=match_quality["evidence_quality"],
             evidence_warnings=match_quality["evidence_warnings"],

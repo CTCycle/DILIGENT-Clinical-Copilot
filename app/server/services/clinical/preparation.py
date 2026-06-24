@@ -305,7 +305,14 @@ RxNav and LiverTox evidence before accepting it.
             decision_reasons = list(decision.get("reasons") or [])
             decision_reasons.extend(payload["match_notes"])
             decision["reasons"] = list(dict.fromkeys(decision_reasons))
-            payload["match_reason"] = "; ".join(decision["reasons"])
+            payload["match_reason"] = next(
+                (
+                    str(reason).strip()
+                    for reason in decision["reasons"]
+                    if str(reason).strip()
+                ),
+                None,
+            )
 
     # -------------------------------------------------------------------------
     @staticmethod

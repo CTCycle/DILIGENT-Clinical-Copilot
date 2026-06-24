@@ -15,6 +15,10 @@ def decision_to_payload(
     matched_row: dict[str, Any] | None,
     excerpts: list[str],
 ) -> dict[str, Any]:
+    primary_reason = next(
+        (str(reason).strip() for reason in decision.reasons if str(reason).strip()),
+        None,
+    )
     accepted_candidate = next(
         (candidate for candidate in decision.livertox_candidates if candidate.accepted),
         None,
@@ -37,7 +41,7 @@ def decision_to_payload(
         "matched_livertox_row": matched_row,
         "extracted_excerpts": excerpts,
         "match_confidence": decision.confidence,
-        "match_reason": "; ".join(decision.reasons),
+        "match_reason": primary_reason,
         "match_status": decision.decision_status,
         "match_notes": decision.reasons,
         "match_candidates": [
