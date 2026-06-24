@@ -117,7 +117,7 @@
       "key": "default",
       "locale": "und",
       "priority": 100,
-      "values": ["and", "or", "with", "without", "tablet", "tablets", "capsule", "solution", "mg", "ml", "cpr", "gtt", "estratto", "secco", "lingual"],
+      "values": ["and", "or", "with", "without", "tablet", "tablets", "capsule", "capsules", "solution", "mg", "ml", "cpr", "gtt", "estratto", "secco", "lingual", "retard", "ret", "sr", "xl", "xr", "cr", "er", "ir", "forte", "caps", "sir", "drag", "gran", "polv", "per", "os", "sc", "s.c.", "iv", "im", "inhal", "inh"],
       "metadata": {"case_sensitive": false, "match_mode": "token"}
     },
     {

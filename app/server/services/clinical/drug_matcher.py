@@ -86,7 +86,19 @@ class DrugMatcher:
                     ", ".join(match.candidate_names),
                 )
             else:
-                logger.warning("No LiverTox match for '%s'", raw_name)
+                alias_count = len(alias_entries) + len(
+                    self.lookup.resolve_alias_candidates(
+                        raw_name, normalized_query, include_catalog=True
+                    )
+                )
+                if alias_count > 0:
+                    logger.error(
+                        "Silent miss: '%s' has %d alias candidate(s) but no match resolved",
+                        raw_name,
+                        alias_count,
+                    )
+                else:
+                    logger.warning("No LiverTox match for '%s'", raw_name)
         return results
 
     # -------------------------------------------------------------------------

@@ -604,6 +604,7 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
     boundaries = _selected_heading_boundaries(raw_text)
     offsets = _line_char_offsets(raw_text)
     sections: dict[str, ClinicalRawSection] = {}
+    seen_heading_lines: dict[str, int] = {}
     unresolved_boundaries: list[tuple[HeadingBoundary, int, int, str]] = []
     malformed_sections: list[str] = []
 
@@ -627,7 +628,15 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
         content = raw_text[body_start:body_end]
         if not content.strip():
             if heading is not None:
-                malformed_sections.append(f"empty:{heading.canonical_key}")
+                first_line = seen_heading_lines.get(heading.canonical_key)
+                if first_line is not None:
+                    malformed_sections.append(
+                        f"duplicate:{heading.canonical_key}:{first_line}:"
+                        f"{heading.line_start}:{heading.raw_heading}"
+                    )
+                else:
+                    seen_heading_lines[heading.canonical_key] = heading.line_start
+                    malformed_sections.append(f"empty:{heading.canonical_key}")
             continue
         if heading is None:
             unresolved_boundaries.append((boundary, body_start, body_end, content))
@@ -648,9 +657,20 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
                 verbatim_coherent=True,
             ),
         )
-        if heading.canonical_key in sections:
-            malformed_sections.append(f"duplicate:{heading.canonical_key}")
+        if (
+            heading.canonical_key in seen_heading_lines
+            or heading.canonical_key in sections
+        ):
+            first_line = seen_heading_lines.get(
+                heading.canonical_key,
+                sections[heading.canonical_key].line_start,
+            )
+            malformed_sections.append(
+                f"duplicate:{heading.canonical_key}:{first_line}:"
+                f"{heading.line_start}:{heading.raw_heading}"
+            )
             continue
+        seen_heading_lines[heading.canonical_key] = heading.line_start
         sections[heading.canonical_key] = ClinicalRawSection(
             canonical_key=heading.canonical_key,
             raw_heading=heading.raw_heading,
@@ -767,8 +787,14 @@ def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSectio
         issue for issue in result.malformed_sections if issue.startswith("duplicate:")
     ]
     if duplicate_errors:
+        parts = duplicate_errors[0].split(":", 4)
+        key = parts[1] if len(parts) > 1 else "unknown"
+        first_line = parts[2] if len(parts) > 2 else "unknown"
+        duplicate_line = parts[3] if len(parts) > 3 else "unknown"
+        heading = parts[4] if len(parts) > 4 else key
         raise ValueError(
-            f"Duplicate section heading for '{duplicate_errors[0].split(':', 1)[1]}'."
+            f"Duplicate heading '{heading}' found at lines {first_line} and "
+            f"{duplicate_line}. Remove one duplicate and re-run."
         )
     return result.sections
 
