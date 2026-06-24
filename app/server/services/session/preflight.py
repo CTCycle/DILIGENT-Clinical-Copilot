@@ -5,7 +5,7 @@ from inspect import isawaitable
 from typing import Any, cast
 
 from common.exceptions import ServiceValidationError
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
     ClinicalSessionRequest,

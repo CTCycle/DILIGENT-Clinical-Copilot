@@ -8,6 +8,7 @@ from typing import Any
 
 from common import paths
 from common.constants import TRUTHY_ENV_VALUES
+from common.utils.logger import configure_logging
 from configurations.environment import (
     ensure_environment_loaded,
     reset_environment_bootstrap_for_tests,
@@ -81,6 +82,7 @@ def tauri_mode_enabled() -> bool:
 
 ###############################################################################
 def initialize_settings() -> None:
+    configure_logging()
     get_server_settings()
 
 

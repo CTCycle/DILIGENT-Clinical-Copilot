@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from services.llm.cloud import CloudLLMClient, LLMError
 from services.llm.ollama_client import OllamaClient

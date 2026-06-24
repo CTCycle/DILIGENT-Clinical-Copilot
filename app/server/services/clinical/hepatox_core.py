@@ -9,7 +9,7 @@ from collections.abc import Callable, Sequence
 from datetime import date
 from typing import Any
 
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     DrugClinicalAssessment,
@@ -38,8 +38,6 @@ from services.clinical import hepatox_scoring
 from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
 from services.clinical.rag_support import RagSupportService
 from services.clinical.report_finalizer import ReportFinalizer
-
-__all__ = ["HepatoxConsultation"]
 
 from services.clinical.hepatox_constants import (  # noqa: E402
     BIBLIOGRAPHY_LINE_RE,

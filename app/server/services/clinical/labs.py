@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from common.prompts.extraction import CLINICAL_LAB_EXTRACTION_PROMPT
 from common.utils.logger import logger
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalLabEntry,

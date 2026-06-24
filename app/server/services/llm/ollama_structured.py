@@ -6,7 +6,7 @@ from typing import Any, NoReturn
 
 from common.catalogs.model_choices import get_text_extraction_model_choices
 from common.utils.logger import logger
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.ollama_runtime import OllamaError
 from services.llm.structured import (
     StructuredOutputParser,

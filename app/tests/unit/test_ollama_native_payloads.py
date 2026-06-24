@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.ollama_client import OllamaClient
 import services.llm.ollama_chat as ollama_chat
 

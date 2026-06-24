@@ -14,7 +14,7 @@ from typing import Any
 import httpx
 
 from common.utils.logger import logger
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.ollama_runtime import OllamaError
 
 ###############################################################################

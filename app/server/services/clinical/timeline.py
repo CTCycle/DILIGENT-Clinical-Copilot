@@ -8,7 +8,7 @@ from typing import Any
 from common.catalogs.model_choices import get_cloud_model_choices
 from common.prompts.timeline import PATIENT_TIMELINE_EXTRACTION_PROMPT
 from common.utils.logger import logger
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.patient_timeline import (
     PatientTimeline,

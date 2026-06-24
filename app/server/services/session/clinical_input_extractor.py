@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Callable
 from typing import Any
 
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalSectionExtractionResult,

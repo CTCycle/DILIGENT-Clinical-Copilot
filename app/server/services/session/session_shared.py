@@ -7,7 +7,7 @@ from functools import partial
 from typing import Any
 
 from common.utils.logger import logger
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
     ClinicalSectionExtractionResult,

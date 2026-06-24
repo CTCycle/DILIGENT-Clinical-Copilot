@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.model_config import ModelConfigService
 
 ###############################################################################

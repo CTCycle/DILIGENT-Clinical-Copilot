@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 import pytest
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from domain.clinical.entities import ClinicalSessionRequest
 from services.runtime.jobs import get_job_manager
 from services.session import preflight as preflight_module
