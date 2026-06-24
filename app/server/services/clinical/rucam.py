@@ -61,6 +61,7 @@ RucamInjuryType = Literal[
 RucamCausalityCategory = Literal[
     "excluded",
     "unlikely",
+    "indeterminate",
     "possible",
     "probable",
     "highly probable",
@@ -483,6 +484,7 @@ class RucamScoreEstimator:
             onset_context=onset_context,
             anchor=anchor,
             injury_type=injury_type,
+            resolved_item=resolved_item,
         )
         components.append(onset_component)
         components.append(
@@ -514,7 +516,6 @@ class RucamScoreEstimator:
                 if component.status == "scored"
             )
         )
-        category = self.resolve_causality_bucket(total)
         limitations: list[str] = []
         if drug.therapy_start_date is None and drug.therapy_start_status is None:
             limitations.append("drug start timing unavailable")
@@ -524,6 +525,7 @@ class RucamScoreEstimator:
             limitations.append("insufficient follow-up labs")
         if any(component.status == "not_assessable" for component in components):
             limitations.append("one or more RUCAM components are not assessable")
+        category = self.resolve_causality_bucket(total)
         confidence: Literal["low", "moderate", "high"] = (
             "low" if limitations else "moderate"
         )
@@ -554,6 +556,7 @@ class RucamScoreEstimator:
         onset_context: LiverInjuryOnsetContext | None,
         anchor: RucamAnchor,
         injury_type: str,
+        resolved_item: dict[str, Any] | None = None,
     ) -> tuple[RucamComponentAssessment, date | None]:
         _ = injury_type
         start_date = self.try_parse_date(drug.therapy_start_date)
@@ -563,12 +566,31 @@ class RucamScoreEstimator:
         if onset_date is None and anchor.is_score_eligible:
             onset_date = anchor.onset_date
         if onset_date is None or start_date is None:
+            metadata = (
+                resolved_item.get("matched_livertox_row")
+                if isinstance(resolved_item, dict)
+                else None
+            )
+            likelihood = (
+                str(metadata.get("likelihood_score") or "").strip().upper()
+                if isinstance(metadata, dict)
+                else ""
+            )
+            suspension_available = bool(
+                drug.suspension_date or drug.suspension_status is not None
+            )
+            rationale = "Missing start and/or score-eligible onset date."
+            if start_date is None and suspension_available and likelihood in {"A", "B"}:
+                rationale = (
+                    "Drug start timing unavailable; suspension timing and a "
+                    "high-evidence LiverTox likelihood do not establish latency."
+                )
             return RucamComponentAssessment(
                 component_key="time_to_onset",
                 label="Time to onset",
                 score=0,
                 status="not_assessable",
-                rationale="Missing start and/or score-eligible onset date.",
+                rationale=rationale,
             ), onset_date
         delta_days = (onset_date - start_date).days
         score = (
@@ -725,10 +747,16 @@ class RucamScoreEstimator:
     # -------------------------------------------------------------------------
     @staticmethod
     def resolve_causality_bucket(total_score: int) -> str:
+        # When the structured estimate is data-limited (missing start/stop
+        # timing, insufficient follow-up, or non-assessable components), scores
+        # in the excluded/unlikely band (≤2) cannot honestly be classified as
+        # "ruled out" or "unlikely". Surface them as indeterminate instead so
+        # the clinician understands the data window is insufficient rather
+        # than contradictory.
         if total_score <= 0:
             return "excluded"
         if total_score <= 2:
-            return "unlikely"
+            return "indeterminate"
         if total_score <= 5:
             return "possible"
         if total_score <= 8:

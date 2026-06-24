@@ -93,7 +93,9 @@ def _map_missing_keys(keys: list[str]) -> list[str]:
 
 ###############################################################################
 def _map_malformed_issue(issue: str) -> str:
-    prefix, _, canonical_key = issue.partition(":")
+    parts = issue.split(":", 2)
+    prefix = parts[0] if parts else ""
+    canonical_key = parts[1] if len(parts) > 1 else ""
     payload_key = _map_canonical_key(canonical_key)
     if not prefix or not payload_key:
         return issue

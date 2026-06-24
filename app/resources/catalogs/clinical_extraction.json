@@ -106,6 +106,21 @@
     },
     {
       "domain": "clinical_extraction",
+      "category": "drug_dosage_units",
+      "key": "form_units",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "cpr",
+        "caps"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
       "category": "drug_route_terms",
       "key": "iv",
       "locale": "und",
@@ -169,6 +184,8 @@
         "daily",
         "bid",
         "tid",
+        "qid",
+        "q8h",
         "qhs",
         "die",
         "volta/die"
@@ -204,8 +221,10 @@
       "values": [
         "dal",
         "da",
+        "dall",
         "in riserva",
-        "se"
+        "se",
+        "peso"
       ],
       "metadata": {
         "case_sensitive": false,

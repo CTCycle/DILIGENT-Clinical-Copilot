@@ -49,7 +49,20 @@
         "mepha",
         "sandoz",
         "helvepharm",
-        "nobel"
+        "nobel",
+        "pfizer",
+        "mylan",
+        "biomed",
+        "roche",
+        "novartis",
+        "sanofi",
+        "teva",
+        "bayer",
+        "vifor",
+        "ratiopharm",
+        "zentiva",
+        "actavis",
+        "glycomed"
       ],
       "metadata": {
         "case_sensitive": false,
@@ -276,6 +289,24 @@
       "metadata": {
         "case_sensitive": false,
         "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "inn_suffixes",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "mab", "nib", "nol", "mide", "zole", "prazole", "statin",
+        "pril", "sartan", "olol", "dipine", "triptan", "coxib",
+        "navir", "oxacin", "mycin", "cycline", "caine", "tidine",
+        "parib", "tinib", "lisib", "grel", "rifa", "vir", "cox",
+        "entan", "uridine", "glitazone", "floxacin", "trexate", "sulfon"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "suffix"
       }
     }
   ]

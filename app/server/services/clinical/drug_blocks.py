@@ -16,6 +16,9 @@ class DrugBlock:
 
 BULLET_RE = re.compile(r"(?m)^[ \t]*(?:[-*•■]|\d+[.)])[ \t]*")
 UPPER_TOKEN_RE = re.compile(r"^[A-ZÀ-ÖØ-Þ][\wÀ-ÖØ-öø-ÿ'/-]+")
+_MAX_BLOCK_WORDS = 8
+_MAX_BLOCK_CHARS = 80
+_SENTENCE_BOUNDARY_RE = re.compile(r"[.;:]")
 
 ###############################################################################
 @lru_cache(maxsize=1)
@@ -25,26 +28,6 @@ def _metadata_re() -> re.Pattern[str]:
     terms.extend(snapshot.values("clinical_extraction", "drug_dosage_units"))
     terms.extend(snapshot.values("clinical_extraction", "drug_frequency_terms"))
     terms.extend(snapshot.values("clinical_extraction", "drug_route_terms"))
-    terms.extend(
-        [
-            "mg",
-            "g",
-            "mcg",
-            "ug",
-            "ml",
-            "cpr",
-            "caps",
-            "ev",
-            "iv",
-            "po",
-            "per os",
-            "oral",
-            "bid",
-            "tid",
-            "qid",
-            "q8h",
-        ]
-    )
     escaped = [re.escape(term) for term in terms if term.strip()]
     if not escaped:
         return re.compile(r"$^")
@@ -58,11 +41,10 @@ def _metadata_re() -> re.Pattern[str]:
 def _continuation_prefix_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
     terms = list(snapshot.values("clinical_extraction", "drug_continuation_markers"))
-    terms.extend(["dal", "da", "dall", "se", "in riserva"])
     escaped = [re.escape(term) + r"\b" for term in terms if term.strip()]
     prefix_body = "|".join(escaped) if escaped else r"$^"
     return re.compile(
-        r"^(?:" + prefix_body + r"|peso\b|\d+(?:[.,]\d+)?\s*kg\b)",
+        r"^(?:" + prefix_body + r"|\d+(?:[.,]\d+)?\s*kg\b)",
         re.IGNORECASE,
     )
 
@@ -76,7 +58,7 @@ def _regimen_split_re() -> re.Pattern[str]:
         if value
     ]
     if not separators:
-        separators = ["plus"]
+        return re.compile(r"$^")
     separator_map = {
         "semicolon": r";",
         "plus": r"\+|\s+plus\s+",
@@ -99,6 +81,18 @@ def _likely_drug_start(value: str) -> bool:
     return bool(_metadata_re().search(text))
 
 ###############################################################################
+def _truncate_at_sentence_boundary(text: str) -> str:
+    """Truncate overlong extraction blocks at their first sentence boundary."""
+    if not text:
+        return text
+    if len(text) < _MAX_BLOCK_CHARS and len(text.split()) < _MAX_BLOCK_WORDS:
+        return text
+    boundary = _SENTENCE_BOUNDARY_RE.search(text)
+    if boundary:
+        return text[: boundary.start()].rstrip()
+    return text[:_MAX_BLOCK_CHARS].rstrip()
+
+###############################################################################
 def isolate_drug_blocks(text: str) -> list[DrugBlock]:
     source = text or ""
     if not source.strip():
@@ -113,9 +107,9 @@ def isolate_drug_blocks(text: str) -> list[DrugBlock]:
                 if index + 1 < len(bullet_matches)
                 else len(source)
             )
-            raw = source[start:end].strip()
+            raw = _truncate_at_sentence_boundary(source[start:end].strip())
             if raw:
-                blocks.append(DrugBlock(text=raw, start=start, end=end))
+                blocks.append(DrugBlock(text=raw, start=start, end=start + len(raw)))
         return blocks or [DrugBlock(text=source.strip(), start=0, end=len(source))]
 
     lines = [line.strip() for line in source.splitlines() if line.strip()]
@@ -139,7 +133,9 @@ def isolate_drug_blocks(text: str) -> list[DrugBlock]:
                 ):
                     blocks.append(
                         DrugBlock(
-                            text="\n".join(current_lines),
+                            text=_truncate_at_sentence_boundary(
+                                "\n".join(current_lines)
+                            ),
                             start=current_start,
                             end=current_end,
                         )
@@ -154,7 +150,7 @@ def isolate_drug_blocks(text: str) -> list[DrugBlock]:
         if current_lines and current_start is not None and current_end is not None:
             blocks.append(
                 DrugBlock(
-                    text="\n".join(current_lines),
+                    text=_truncate_at_sentence_boundary("\n".join(current_lines)),
                     start=current_start,
                     end=current_end,
                 )
@@ -174,7 +170,10 @@ def isolate_drug_blocks(text: str) -> list[DrugBlock]:
                 pos = source.find(part, cursor)
                 if pos < 0:
                     continue
-                blocks.append(DrugBlock(text=part, start=pos, end=pos + len(part)))
+                truncated = _truncate_at_sentence_boundary(part)
+                blocks.append(
+                    DrugBlock(text=truncated, start=pos, end=pos + len(truncated))
+                )
                 cursor = pos + len(part)
             if blocks:
                 return blocks
@@ -190,9 +189,13 @@ def isolate_drug_blocks(text: str) -> list[DrugBlock]:
             pos = source.find(part, cursor)
             if pos < 0:
                 continue
-            blocks.append(DrugBlock(text=part.strip(), start=pos, end=pos + len(part)))
+            truncated = _truncate_at_sentence_boundary(part.strip())
+            blocks.append(
+                DrugBlock(text=truncated, start=pos, end=pos + len(truncated))
+            )
             cursor = pos + len(part)
         if blocks:
             return blocks
 
-    return [DrugBlock(text=source.strip(), start=0, end=len(source))]
+    raw = _truncate_at_sentence_boundary(source.strip())
+    return [DrugBlock(text=raw, start=0, end=len(raw))]
