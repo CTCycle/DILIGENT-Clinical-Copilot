@@ -11,7 +11,8 @@ NON_DRUG_PREFIXES = tuple(
     _snapshot.values("clinical_extraction", "drug_non_name_prefixes", key="default")
 )
 NON_DRUG_CONTAINS = tuple(
-    _snapshot.values("clinical_extraction", "drug_non_name_contains", key="default")
+    list(_snapshot.values("clinical_extraction", "drug_non_name_contains", key="default"))
+    + ["obesita"]
 )
 WEEKDAY_TOKENS = set(
     _snapshot.values("clinical_extraction", "weekday_terms", key="default")
