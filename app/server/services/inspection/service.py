@@ -11,6 +11,7 @@ from typing import Any, Literal
 from common.constants import DOCUMENT_SUPPORTED_EXTENSIONS
 from common.paths import VECTOR_DB_PATH
 from common.utils.logger import logger
+from common.utils.text_utils import unique_preserve_order
 from configurations.startup import get_server_settings
 from domain.inspection import (
     InspectionJobPhase,
@@ -497,19 +498,6 @@ class DataInspectionService(
         }
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _unique_preserve_order(values: list[str]) -> list[str]:
-        seen: set[str] = set()
-        unique: list[str] = []
-        for value in values:
-            cleaned = str(value or "").strip()
-            if not cleaned or cleaned in seen:
-                continue
-            seen.add(cleaned)
-            unique.append(cleaned)
-        return unique
-
-    # -------------------------------------------------------------------------
     @classmethod
     def detect_prompt_injection_flags(
         cls,
@@ -545,7 +533,7 @@ class DataInspectionService(
         for needle, flag in indicators:
             if needle in combined_text:
                 detections.append(flag)
-        return cls._unique_preserve_order(detections)
+        return unique_preserve_order(detections)
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -628,10 +616,10 @@ class DataInspectionService(
         if "qa" in target_sections or "source_evidence" in target_entities:
             routed_steps.append("qa_validate_revision")
 
-        mentioned_dates = cls._unique_preserve_order(
+        mentioned_dates = unique_preserve_order(
             [match.group(0) for match in re.finditer(r"\b\d{4}-\d{2}-\d{2}\b", summary)]
         )
-        mentioned_lab_values = cls._unique_preserve_order(
+        mentioned_lab_values = unique_preserve_order(
             [
                 match.group(0)
                 for match in re.finditer(
@@ -641,7 +629,7 @@ class DataInspectionService(
                 )
             ]
         )
-        extra_data = cls._unique_preserve_order(
+        extra_data = unique_preserve_order(
             [selected_text.strip()] if str(selected_text or "").strip() else []
         )
         ambiguities = (
@@ -670,7 +658,7 @@ class DataInspectionService(
             selected_text=selected_text,
         )
         if prompt_injection_flags:
-            safety_or_quality_concerns = cls._unique_preserve_order(
+            safety_or_quality_concerns = unique_preserve_order(
                 safety_or_quality_concerns
                 + [
                     "Potential prompt-injection or instruction-redirection content detected in untrusted revision inputs."
@@ -681,8 +669,8 @@ class DataInspectionService(
             user_intent="revision_request",
             main_goal=summary[:200] or None,
             instruction_summary=summary,
-            target_sections=cls._unique_preserve_order(target_sections),  # type: ignore[arg-type]
-            target_entities=cls._unique_preserve_order(target_entities),  # type: ignore[arg-type]
+            target_sections=unique_preserve_order(target_sections),  # type: ignore[arg-type]
+            target_entities=unique_preserve_order(target_entities),  # type: ignore[arg-type]
             mentioned_drugs=[],
             mentioned_diseases=[],
             mentioned_lab_values=mentioned_lab_values,
@@ -694,7 +682,7 @@ class DataInspectionService(
             safety_or_quality_concerns=safety_or_quality_concerns,
             prompt_injection_flags=prompt_injection_flags,
             pipeline_routing_decision={
-                "generate_revision": cls._unique_preserve_order(target_sections),
+                "generate_revision": unique_preserve_order(target_sections),
                 "resolve_revision_extraction": ["therapy", "anamnesis"],
                 "validate_anamnesis_drugs": ["anamnesis"],
                 "extract_missing_anamnesis_drugs": ["anamnesis"],
@@ -711,8 +699,8 @@ class DataInspectionService(
             instruction_id=uuid.uuid4().hex,
             raw_instruction_text=summary,
             normalized_instruction_summary=summary,
-            routed_pipeline_steps=cls._unique_preserve_order(routed_steps),
-            affected_entities=cls._unique_preserve_order(target_entities),
+            routed_pipeline_steps=unique_preserve_order(routed_steps),
+            affected_entities=unique_preserve_order(target_entities),
             applied=True,
             ignored=False,
             prompt_injection_detected=bool(prompt_injection_flags),

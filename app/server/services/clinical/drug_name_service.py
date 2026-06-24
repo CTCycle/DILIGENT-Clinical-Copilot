@@ -10,7 +10,7 @@ from services.text.normalization import (
     canonicalize_drug_query,
     normalize_drug_query_name,
 )
-from services.text.synonyms import (
+from common.utils.text_utils import (
     extract_synonym_strings,
     parse_synonym_list,
     split_synonym_variants,

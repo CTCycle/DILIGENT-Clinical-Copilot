@@ -39,34 +39,19 @@ from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
 from services.clinical.rag_support import RagSupportService
 from services.clinical.report_finalizer import ReportFinalizer
 
-__all__ = ["HepatotoxicityPatternAnalyzer", "HepatoxConsultation"]
+__all__ = ["HepatoxConsultation"]
 
-###############################################################################
-NOT_AVAILABLE_TEXT = "Not available"
-REDUNDANT_REPORT_LINE_RE = re.compile(
-    r"generated\s+report.*?(drug[- ]induced\s+liver\s+injury|\bdili\b)",
-    re.IGNORECASE,
+from services.clinical.hepatox_constants import (  # noqa: E402
+    BIBLIOGRAPHY_LINE_RE,
+    DRIFT_SECTION_LINE_RE,
+    LIVERTOX_TITLE_LINE_RE,
+    NOT_AVAILABLE_TEXT,
+    RATE_LIMIT_WAIT_HINT_RE,
+    REDUNDANT_REPORT_LINE_RE,
+    REPORT_LABEL_LINE_RE,
+    STRUCTURED_DILI_SECTION_LINE_RE,
 )
-LIVERTOX_TITLE_LINE_RE = re.compile(
-    r"^\s*\*{0,2}[^*\n]+?\s*-\s*LiverTox score\b.*\*{0,2}\s*$",
-    re.IGNORECASE,
-)
-REPORT_LABEL_LINE_RE = re.compile(r"^\s*\*{0,2}\s*Report\s*\*{0,2}\s*$", re.IGNORECASE)
-BIBLIOGRAPHY_LINE_RE = re.compile(
-    r"^\s*\*{0,2}\s*Bibliography source\s*\*{0,2}\s*:\s*LiverTox\s*$",
-    re.IGNORECASE,
-)
-DRIFT_SECTION_LINE_RE = re.compile(
-    r"^\s*(medication|assessment|plan)\s*$", re.IGNORECASE
-)
-STRUCTURED_DILI_SECTION_LINE_RE = re.compile(
-    r"^\s*#{0,6}\s*\*{0,2}\s*Structured\s+DILI\s+Assessment\s+Report\s*\*{0,2}\s*$",
-    re.IGNORECASE,
-)
-RATE_LIMIT_WAIT_HINT_RE = re.compile(
-    r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
-    re.IGNORECASE,
-)
+
 
 ###############################################################################
 class HepatoxConsultation:
@@ -134,30 +119,25 @@ class HepatoxConsultation:
         self.rag_support = RagSupportService(self)
 
     # -------------------------------------------------------------------------
-    def _analysis_runner(self) -> AnalysisRunner:
-        if not hasattr(self, "analysis_runner"):
-            self.analysis_runner = AnalysisRunner(self)
-        return self.analysis_runner
-
-    # -------------------------------------------------------------------------
-    def _drug_analysis(self) -> DrugAnalysisService:
-        if not hasattr(self, "drug_analysis"):
-            self._analysis_runner()
-            self._rag_support()
-            self.drug_analysis = DrugAnalysisService(self)
-        return self.drug_analysis
-
-    # -------------------------------------------------------------------------
-    def _report_finalizer(self) -> ReportFinalizer:
-        if not hasattr(self, "report_finalizer"):
-            self.report_finalizer = ReportFinalizer(self)
-        return self.report_finalizer
-
-    # -------------------------------------------------------------------------
-    def _rag_support(self) -> RagSupportService:
-        if not hasattr(self, "rag_support"):
-            self.rag_support = RagSupportService(self)
-        return self.rag_support
+    def __getattr__(self, name: str) -> Any:
+        if name == "analysis_runner":
+            runner = AnalysisRunner(self)
+            object.__setattr__(self, "analysis_runner", runner)
+            return runner
+        if name == "drug_analysis":
+            service = DrugAnalysisService(self)
+            object.__setattr__(self, "drug_analysis", service)
+            return service
+        if name == "report_finalizer":
+            finalizer = ReportFinalizer(self)
+            object.__setattr__(self, "report_finalizer", finalizer)
+            return finalizer
+        if name == "rag_support":
+            support = RagSupportService(self)
+            object.__setattr__(self, "rag_support", support)
+            return support
+        msg = f"'{type(self).__name__}' object has no attribute '{name}'"
+        raise AttributeError(msg)
 
     # -------------------------------------------------------------------------
     async def run_analysis(
@@ -170,7 +150,7 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
-        return await self._analysis_runner().run_analysis(
+        return await self.analysis_runner.run_analysis(
             prepared_inputs=prepared_inputs,
             visit_date=visit_date,
             report_language=report_language,
@@ -190,7 +170,7 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
-        return await self._analysis_runner().run_revision_analysis(
+        return await self.analysis_runner.run_revision_analysis(
             prepared_inputs=prepared_inputs,
             visit_date=visit_date,
             report_language=report_language,
@@ -212,7 +192,7 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> PatientDrugClinicalReport:
-        return await self._analysis_runner().compile_clinical_assessment(
+        return await self.analysis_runner.compile_clinical_assessment(
             resolved_drugs,
             clinical_context=clinical_context,
             visit_date=visit_date,
@@ -236,7 +216,7 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> PatientDrugClinicalReport:
-        return await self._analysis_runner().compile_revision_clinical_assessment(
+        return await self.analysis_runner.compile_revision_clinical_assessment(
             resolved_drugs,
             clinical_context=clinical_context,
             visit_date=visit_date,
@@ -272,7 +252,7 @@ class HepatoxConsultation:
         coroutine: Any,
         semaphore: asyncio.Semaphore,
     ) -> tuple[int, Any]:
-        return await self._analysis_runner().execute_bounded_job(
+        return await self.analysis_runner.execute_bounded_job(
             index, coroutine, semaphore
         )
 
@@ -290,7 +270,7 @@ class HepatoxConsultation:
         rag_query: dict[str, str] | None,
         rucam_by_key: dict[str, DrugRucamAssessment],
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
-        return await self._analysis_runner().prepare_drug_assessment(
+        return await self.analysis_runner.prepare_drug_assessment(
             idx=idx,
             drug_entry=drug_entry,
             resolved_drugs=resolved_drugs,
@@ -316,7 +296,7 @@ class HepatoxConsultation:
         rag_query: dict[str, str] | None,
         rucam_by_key: dict[str, DrugRucamAssessment],
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
-        return await self._analysis_runner().prepare_revision_drug_assessment(
+        return await self.analysis_runner.prepare_revision_drug_assessment(
             idx=idx,
             drug_entry=drug_entry,
             resolved_drugs=resolved_drugs,
@@ -336,7 +316,7 @@ class HepatoxConsultation:
         normalized_key: str,
         resolved_drugs: dict[str, dict[str, Any]],
     ) -> dict[str, Any]:
-        return self._analysis_runner().resolve_livertox_data_for_entry(
+        return self.analysis_runner.resolve_livertox_data_for_entry(
             raw_name=raw_name,
             normalized_key=normalized_key,
             resolved_drugs=resolved_drugs,
@@ -377,29 +357,29 @@ class HepatoxConsultation:
                     "No additional documents provided "
                     f"(reason: RAG retrieval unavailable: {exc})."
                 )
-        return await self._rag_support().fetch_rag_documents(rag_query, drug_name)
+        return await self.rag_support.fetch_rag_documents(rag_query, drug_name)
 
     # -------------------------------------------------------------------------
     def record_rag_retrieval_issue(self, *, drug_name: str, error: Exception) -> None:
-        self._rag_support().record_rag_retrieval_issue(drug_name=drug_name, error=error)
+        self.rag_support.record_rag_retrieval_issue(drug_name=drug_name, error=error)
 
     # -------------------------------------------------------------------------
     def ensure_similarity_search(self) -> bool:
-        return self._rag_support().ensure_similarity_search()
+        return self.rag_support.ensure_similarity_search()
 
     # -------------------------------------------------------------------------
     def select_excerpt(self, excerpts: list[str]) -> str | None:
-        return self._rag_support().select_excerpt(excerpts)
+        return self.rag_support.select_excerpt(excerpts)
 
     # -------------------------------------------------------------------------
     def search_supporting_documents(self, query_text: str | Any) -> str | None:
-        return self._rag_support().search_supporting_documents(query_text)
+        return self.rag_support.search_supporting_documents(query_text)
 
     # -------------------------------------------------------------------------
     def format_similarity_fragment(
         self, index: int, record: dict[str, Any]
     ) -> str | None:
-        return self._rag_support().format_similarity_fragment(index, record)
+        return self.rag_support.format_similarity_fragment(index, record)
 
     # -------------------------------------------------------------------------
     def format_similarity_header(
@@ -409,7 +389,7 @@ class HepatoxConsultation:
         distance: Any,
         rerank_score: Any = None,
     ) -> str:
-        return self._rag_support().format_similarity_header(
+        return self.rag_support.format_similarity_header(
             index, distance=distance, rerank_score=rerank_score
         )
 
@@ -720,7 +700,7 @@ class HepatoxConsultation:
         source_text: str,
         report_language: str,
     ) -> str:
-        return await self._rag_support().repair_language_once(
+        return await self.rag_support.repair_language_once(
             source_text=source_text, report_language=report_language
         )
 
@@ -744,7 +724,7 @@ class HepatoxConsultation:
         knowledge_prompt: str = "No supplemental knowledge prompt available.",
         report_language: str = "en",
     ) -> str:
-        return await self._drug_analysis().request_drug_analysis(
+        return await self.drug_analysis.request_drug_analysis(
             drug_name=drug_name,
             canonical_name=canonical_name,
             origins=origins,
@@ -782,7 +762,7 @@ class HepatoxConsultation:
         knowledge_prompt: str = "No supplemental knowledge prompt available.",
         report_language: str = "en",
     ) -> str:
-        return await self._drug_analysis().request_revision_drug_analysis(
+        return await self.drug_analysis.request_revision_drug_analysis(
             drug_name=drug_name,
             canonical_name=canonical_name,
             origins=origins,
@@ -812,13 +792,13 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     def extract_rate_limit_wait_hint_seconds(self, exc: Exception) -> float | None:
-        return self._rag_support().extract_rate_limit_wait_hint_seconds(exc)
+        return self.rag_support.extract_rate_limit_wait_hint_seconds(exc)
 
     # -------------------------------------------------------------------------
     def retry_backoff_seconds(
         self, attempt: int, *, exc: Exception | None = None
     ) -> float:
-        return self._analysis_runner().retry_backoff_seconds(attempt, exc=exc)
+        return self.analysis_runner.retry_backoff_seconds(attempt, exc=exc)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -844,7 +824,7 @@ class HepatoxConsultation:
         clinical_context: str | None,
         report_language: str,
     ) -> str | None:
-        return await self._report_finalizer()._build_and_finalize_report(
+        return await self.report_finalizer._build_and_finalize_report(
             entries,
             clinical_context=clinical_context,
             report_language=report_language,
@@ -859,7 +839,7 @@ class HepatoxConsultation:
         clinical_context: str | None,
         report_language: str,
     ) -> str | None:
-        return await self._report_finalizer()._build_and_finalize_report(
+        return await self.report_finalizer._build_and_finalize_report(
             entries,
             clinical_context=clinical_context,
             report_language=report_language,
@@ -868,7 +848,7 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     def should_render_as_matched_drug(self, entry: DrugClinicalAssessment) -> bool:
-        return self._report_finalizer().should_render_as_matched_drug(entry)
+        return self.report_finalizer.should_render_as_matched_drug(entry)
 
     # -------------------------------------------------------------------------
     def render_matched_drug_section(
@@ -1108,7 +1088,7 @@ class HepatoxConsultation:
         multi_drug_report: str,
         report_language: str,
     ) -> str | None:
-        return await self._report_finalizer().generate_conclusion(
+        return await self.report_finalizer.generate_conclusion(
             clinical_context=clinical_context,
             multi_drug_report=multi_drug_report,
             report_language=report_language,
@@ -1122,7 +1102,7 @@ class HepatoxConsultation:
         multi_drug_report: str,
         report_language: str,
     ) -> str | None:
-        return await self._report_finalizer().generate_revision_conclusion(
+        return await self.report_finalizer.generate_revision_conclusion(
             clinical_context=clinical_context,
             multi_drug_report=multi_drug_report,
             report_language=report_language,
