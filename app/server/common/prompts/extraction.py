@@ -13,12 +13,18 @@ Rules:
 - Extract medication names from narrative therapy phrases such as "therapy with",
   "terapia con", "protocol with", "started on", and equivalent non-English
   wording, even when no dose is provided.
+- When a drug name contains parenthesized content (e.g. herbal mixtures with
+  component lists, combination formulations), keep the full parenthesized name
+  intact — do not truncate at the opening parenthesis.
 - Do not extract diagnoses, tumor staging, lab markers, procedures, dates, units,
   symptoms, or scoring systems as drugs.
 - Reject standalone clinical discourse markers, therapy-status labels (e.g.
   started, suspended, ongoing, stopped, in corso, sospeso, interrotto), and list
   enumerations — any word or phrase that describes therapy state rather than
   names an active substance.
+- Reject entire bullet lines that describe scheduling notes, reservation
+  instructions ("in riserva", "max 3 volte/die"), or status changes of a
+  previously listed drug — do not create a new drug entry from these.
 - Reject list markers or numbered items (e.g. "1.", "2.", bullet lines that are
   section headings rather than drug entries).
 - Strip trailing dosage-form and administration-form suffixes from end of drug
@@ -79,8 +85,15 @@ Rules:
   started, suspended, ongoing, stopped, in corso, sospeso, interrotto), and list
   enumerations — any word or phrase that describes therapy state rather than
   names an active substance.
+- Reject clinical syndrome names, differential-diagnosis acronyms, and
+  disease-abbreviation markers (e.g. DRESS, SJS, DILI, sepsis, PAC) when they
+  appear in narrative context unrelated to a specific drug exposure.
 - Reject list markers or numbered items that are section headings rather than
   drug entries.
+- Reject full narrative phrases that describe a clinical event, surgical
+  procedure, or care plan (e.g. "annullata sostituzione nefrostomia prevista
+  per il"), rather than extracting a word from the middle of such phrases as
+  a drug name.
 - Strip trailing dosage-form and administration-form suffixes from end of drug
   names (e.g. tablet, capsule, cpr, caps, solution for injection, compresse,
   fiale, sol iniet, gocce, sciroppo, polvere) — keep only the active substance

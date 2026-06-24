@@ -1424,6 +1424,21 @@ class DrugsParser:
             return True
         if self._lab_marker_name_re.search(normalized) is not None:
             return True
+        # Guardrail: multi-word fragments whose tokens are all-lowercase
+        # in the original text are clinical narrative fragments rather than
+        # drug names. Drug names almost always contain at least one
+        # capitalized token in Italian clinical text.
+        if len(tokens) >= 3:
+            original_tokens = value.split()
+            has_uppercase_token = any(
+                tok and tok[0].isupper() for tok in original_tokens
+            )
+            if not has_uppercase_token:
+                func_word_count = sum(
+                    1 for tok in tokens if tok in self.FUNCTION_WORD_NAMES
+                )
+                if func_word_count >= 2:
+                    return True
         return False
 
     # -------------------------------------------------------------------------
