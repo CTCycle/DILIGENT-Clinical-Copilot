@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from domain.clinical.drug_resolution import DrugResolutionDecision
-from services.clinical.drug_resolution.normalizer import NormalizedDrugMention
-
+from domain.clinical.drug_resolution import (
+    DrugResolutionDecision,
+    NormalizedDrugMention,
+)
 
 ###############################################################################
 def decision_to_payload(

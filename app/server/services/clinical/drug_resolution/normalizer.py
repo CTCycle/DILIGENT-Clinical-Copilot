@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field, replace
-from functools import lru_cache
-from typing import Any, Literal, Protocol
+from dataclasses import replace
+from typing import Any
 
 from common.utils.logger import logger
+from domain.clinical.drug_resolution import NormalizedDrugMention
 from domain.clinical.entities import DrugEntry, PatientDrugs
-from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.drug_identity import DrugIdentityResolver
 from services.text.normalization import canonicalize_drug_query, normalize_drug_query_name
 
@@ -17,55 +16,8 @@ _MAX_DRUG_NAME_CHARS = 80
 _SENTENCE_BOUNDARY_RE = re.compile(r"[.;:]\s")
 
 ###############################################################################
-@lru_cache(maxsize=1)
-def _inn_suffix_re() -> re.Pattern[str]:
-    suffixes = get_reference_catalog_snapshot().values(
-        "drug_matching",
-        "inn_suffixes",
-        key="default",
-    )
-    escaped = sorted(
-        {re.escape(value.strip()) for value in suffixes if value.strip()},
-        key=len,
-        reverse=True,
-    )
-    if not escaped:
-        return re.compile(r"$^")
-    return re.compile(r"(?:" + "|".join(escaped) + r")$", re.IGNORECASE)
-
-###############################################################################
-class DrugAliasLookup(Protocol):
-    def canonicalize_query(self, value: str) -> str: ...
-
-    def match_alias_exact_all(self, canonical_query: str) -> list[Any]: ...
-
-    def match_primary_all(self, canonical_query: str) -> list[Any]: ...
-
-    def match_normalized_all(self, normalized_query: str) -> list[Any]: ...
-
-
-###############################################################################
-@dataclass(slots=True)
-class NormalizedDrugMention:
-    extracted_name: str
-    canonical_name: str
-    normalized_name: str
-    source: Literal["therapy", "anamnesis", "unknown"]
-    raw_mentions: list[str]
-    origins: list[str]
-    extraction_metadata: list[dict[str, Any]]
-    regimen_group_id: str | None = None
-    is_regimen_parent: bool = False
-    regimen_components: list[str] = field(default_factory=list)
-
-
-###############################################################################
 class DrugMentionNormalizer:
     """Normalize extracted drug entries and split regimen components once."""
-
-    # -------------------------------------------------------------------------
-    def __init__(self, alias_lookup: DrugAliasLookup | None = None) -> None:
-        self.alias_lookup = alias_lookup
 
     # -------------------------------------------------------------------------
     def normalize_entries(self, drugs: PatientDrugs) -> list[NormalizedDrugMention]:
@@ -97,13 +49,6 @@ class DrugMentionNormalizer:
         normalized_name = normalize_drug_query_name(canonical_name or raw_name)
         if not normalized_name:
             return None
-        # Hard-reject gate: drop suspected non-drug tokens that slipped past
-        # the upstream structured/deterministic extraction. Generalizable:
-        # rejects names that exceed reasonable bounds OR contain a sentence
-        # boundary OR (after catalog alias lookup) have zero alias overlap
-        # and no universal INN pharmaceutical suffix pattern. This does NOT
-        # hardcode Italian stopwords; it uses lexical structure + the live
-        # catalog as the truth set + universal INN patterns.
         if not self._looks_like_drug_candidate(normalized_name, raw_name):
             logger.info(
                 "Dropping suspected non-drug mention '%s' (normalized='%s')",
@@ -143,18 +88,7 @@ class DrugMentionNormalizer:
     def _looks_like_drug_candidate(
         self, normalized_name: str, raw_name: str
     ) -> bool:
-        """Hard-reject gate for suspected non-drug tokens.
-
-        Generalizable by design (no hardcoded Italian stoplists):
-          1. Reject names that exceed reasonable drug-name bounds (word count,
-             character length) — catches truncated clinical-sentence fragments
-             such as 'Paziente nota per abuso di etile (circa'.
-          2. Reject names containing an internal sentence boundary — drug names
-             do not contain '. ' / '; ' / ': '.
-          3. Accept names present in the live alias/primary catalog.
-          4. Accept a catalog-missing name only when it matches a universal INN
-             pharmaceutical suffix (-mab, -mide, -zole, -statin, ...).
-        """
+        """Admit plausible medication labels without requiring catalog recognition."""
         if not normalized_name or len(normalized_name) < _MIN_DRUG_NAME_LENGTH:
             return False
         if len(normalized_name) > _MAX_DRUG_NAME_CHARS:
@@ -164,16 +98,7 @@ class DrugMentionNormalizer:
             return False
         if _SENTENCE_BOUNDARY_RE.search(raw_name):
             return False
-        if _inn_suffix_re().search(normalized_name):
-            return True
-        if self.alias_lookup is None:
-            return True
-        canonical = self.alias_lookup.canonicalize_query(normalized_name)
-        return bool(
-            self.alias_lookup.match_alias_exact_all(canonical)
-            or self.alias_lookup.match_primary_all(canonical)
-            or self.alias_lookup.match_normalized_all(normalized_name)
-        )
+        return any(character.isalpha() for character in normalized_name)
 
     # -------------------------------------------------------------------------
     def _expand_components(

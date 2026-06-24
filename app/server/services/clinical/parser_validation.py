@@ -6,6 +6,7 @@ from typing import Any
 from services.catalogs.runtime import get_reference_catalog_snapshot
 
 
+###############################################################################
 @lru_cache(maxsize=1)
 def _get_parser_validation_data() -> dict[str, Any]:
     snapshot = get_reference_catalog_snapshot()
@@ -37,6 +38,7 @@ def _get_parser_validation_data() -> dict[str, Any]:
     }
 
 
+###############################################################################
 def __getattr__(name: str) -> Any:
     data = _get_parser_validation_data()
     if name in data:
