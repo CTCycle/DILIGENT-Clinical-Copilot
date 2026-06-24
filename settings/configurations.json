@@ -32,7 +32,7 @@
     "clinical_llm_timeout": 3600.0,
     "livertox_llm_timeout": 3600.0,
     "minimum_llm_timeout": 5.0,
-    "cloud_llm_timeout_cap": 30.0,
+    "cloud_llm_timeout_cap": 300.0,
     "local_llm_timeout_cap": 45.0,
     "ollama_server_start_timeout": 15.0,
     "livertox_download_timeout": 30.0,
