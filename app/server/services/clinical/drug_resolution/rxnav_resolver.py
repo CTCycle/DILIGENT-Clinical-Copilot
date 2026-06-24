@@ -4,42 +4,37 @@ from typing import Any
 
 from common.utils.text_utils import coerce_text
 from domain.clinical.drug_resolution import RxNavResolutionCandidate
+from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.drug_resolution.normalizer import NormalizedDrugMention
 from services.text.normalization import normalize_drug_query_name
 
 
 ###############################################################################
 class RxNavCandidateResolver:
-    BROAD_CATEGORIES = {"vitamins", "minerals", "trace elements"}
-    FORM_SUFFIX_TOKENS = {
-        "capsule",
-        "delayed",
-        "dose",
-        "extended",
-        "gel",
-        "injection",
-        "mg",
-        "ml",
-        "oral",
-        "prefilled",
-        "release",
-        "route",
-        "schedule",
-        "suspension",
-        "syringe",
-        "tablet",
-    }
-    ALLOWED_TERM_TYPES = {"IN", "MIN", "PIN", "SCD", "SBD", "GPCK", "BPCK"}
 
     # -------------------------------------------------------------------------
     def __init__(self, matcher: Any | None) -> None:
         self.matcher = matcher
+        snapshot = get_reference_catalog_snapshot()
+        self.broad_categories = set(
+            snapshot.values("drug_matching", "broad_drug_categories")
+        )
+        self.form_suffix_tokens = set(
+            snapshot.values("drug_matching", "rxnav_form_suffix_tokens")
+        )
+        self.allowed_term_types = {
+            value.upper()
+            for value in snapshot.values(
+                "drug_matching",
+                "rxnav_allowed_term_types",
+            )
+        }
 
     # -------------------------------------------------------------------------
     def build_candidates(
         self, mention: NormalizedDrugMention
     ) -> list[RxNavResolutionCandidate]:
-        if mention.normalized_name in self.BROAD_CATEGORIES:
+        if mention.normalized_name in self.broad_categories:
             return [
                 RxNavResolutionCandidate(
                     rxcui=None,
@@ -81,12 +76,12 @@ class RxNavCandidateResolver:
         entry, _matched_is_synonym, _matched_value = payload
         if not suffix_tokens:
             return False
-        if any(token not in self.FORM_SUFFIX_TOKENS for token in suffix_tokens):
+        if any(token not in self.form_suffix_tokens for token in suffix_tokens):
             return False
         if not coerce_text(entry.get("rxcui")):
             return False
         term_type = coerce_text(entry.get("term_type"))
-        return term_type is None or term_type.upper() in self.ALLOWED_TERM_TYPES
+        return term_type is None or term_type.upper() in self.allowed_term_types
 
     # -------------------------------------------------------------------------
     def _candidate_from_payload(

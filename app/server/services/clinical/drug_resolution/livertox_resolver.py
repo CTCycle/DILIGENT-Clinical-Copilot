@@ -104,11 +104,13 @@ class LiverToxCandidateResolver:
             queries.append(reduced)
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _query_reductions(value: str) -> list[str]:
+    def _query_reductions(self, value: str) -> list[str]:
         reductions: list[str] = []
         tokens = normalize_drug_query_name(value).split()
-        while len(tokens) > 1:
+        while (
+            len(tokens) > 1
+            and tokens[-1] in self.identity_resolver.reducible_suffixes
+        ):
             tokens = tokens[:-1]
             reduced = canonicalize_drug_query(" ".join(tokens))
             if reduced:

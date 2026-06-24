@@ -1041,7 +1041,37 @@ class HepatoxConsultation:
                 if entry.rucam is not None
                 else phrase("rucam_not_calculated", report_language)
             )
-            lines.append(f"- **{label}**: {reason} {rucam_summary}.")
+            technical_context = self.build_fallback_technical_note(
+                entry,
+                report_language=report_language,
+            )
+            clinical_context = (
+                reason
+                if technical_context.strip() == reason.strip()
+                else f"{technical_context} {reason}"
+            )
+            if report_language.lower().startswith("it"):
+                recommendation = (
+                    "Il farmaco deve rimanere nella diagnosi differenziale solo in base "
+                    "alla cronologia clinica disponibile; prima di attribuire causalità "
+                    "sono necessari verifica dell'esposizione, andamento dopo sospensione "
+                    "e revisione delle cause alternative."
+                )
+            else:
+                recommendation = (
+                    "The drug should remain in the differential diagnosis only to the "
+                    "extent supported by the available timeline; exposure verification, "
+                    "the course after withdrawal, and competing-cause review are required "
+                    "before causality is assigned."
+                )
+            lines.extend(
+                [
+                    f"### {label}",
+                    "",
+                    f"{clinical_context} {rucam_summary}. {recommendation}",
+                    "",
+                ]
+            )
         return "\n".join(lines).strip()
 
     # -------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 from common.utils.text_utils import coerce_text
+from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.text.normalization import canonicalize_drug_query, normalize_drug_query_name
 
 
@@ -23,11 +24,16 @@ class DrugIdentityCandidate:
 class DrugIdentityResolver:
     """Resolve extracted labels to local, source-backed drug identity candidates."""
 
-    BROAD_CATALOG_MATCHES = {"vitamins", "minerals", "trace elements"}
-
     # -------------------------------------------------------------------------
     def __init__(self, matcher: Any | None = None) -> None:
         self.matcher = matcher
+        snapshot = get_reference_catalog_snapshot()
+        self.broad_catalog_matches = set(
+            snapshot.values("drug_matching", "broad_drug_categories")
+        )
+        self.reducible_suffixes = set(
+            snapshot.values("drug_matching", "safe_query_reduction_suffixes")
+        )
 
     # -------------------------------------------------------------------------
     def resolve(self, source_label: str) -> list[DrugIdentityCandidate]:
@@ -83,7 +89,7 @@ class DrugIdentityResolver:
             for livertox_value, livertox_kind, livertox_confidence, livertox_note in (
                 self._livertox_values(lookup, value)
             ):
-                if livertox_value.casefold() in self.BROAD_CATALOG_MATCHES:
+                if livertox_value.casefold() in self.broad_catalog_matches:
                     continue
                 self._add_candidate(
                     candidates,
@@ -198,6 +204,32 @@ class DrugIdentityResolver:
                         f"livertox_spelling_from='{normalized}'",
                     )
                 )
+        canonical = canonicalize_drug_query(label)
+        tokens = canonical.split()
+        while len(tokens) > 1:
+            tokens = tokens[:-1]
+            normalized_prefix = normalize_drug_query_name(" ".join(tokens))
+            primary_keys = set(
+                lookup.require_data().primary_index.get(normalized_prefix, [])
+            )
+            exact_primary = [
+                record
+                for record, _confidence, _notes in lookup.match_normalized_all(
+                    normalized_prefix
+                )
+                if record.stable_key in primary_keys
+                and record.normalized_name == normalized_prefix
+            ]
+            if len(exact_primary) == 1:
+                values.append(
+                    (
+                        exact_primary[0].drug_name,
+                        "livertox_primary",
+                        0.88,
+                        f"livertox_primary_prefix_from='{canonical}'",
+                    )
+                )
+                break
         return values
 
     # -------------------------------------------------------------------------
@@ -205,13 +237,9 @@ class DrugIdentityResolver:
         canonical = canonicalize_drug_query(label)
         values = [canonical] if canonical else []
         tokens = canonical.split()
-        if len(tokens) > 4:
-            return [value for value in dict.fromkeys(values) if value]
-        while len(tokens) > 1:
+        while len(tokens) > 1 and tokens[-1] in self.reducible_suffixes:
             tokens = tokens[:-1]
             values.append(" ".join(tokens))
-        if len(tokens) == 1 and tokens[0].endswith("a") and len(tokens[0]) > 7:
-            values.append(tokens[0][:-1])
         return [value for value in dict.fromkeys(values) if value]
 
     # -------------------------------------------------------------------------

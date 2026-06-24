@@ -9,6 +9,7 @@ from domain.clinical.entities import (
     DrugEntry,
     PatientDiseaseContext,
 )
+from services.catalogs.runtime import get_reference_catalog_snapshot
 
 __all__ = [
     "DATE_SEQUENCE_RE",
@@ -172,54 +173,10 @@ CARCINOMA_PHRASE_RE = re.compile(
     re.IGNORECASE,
 )
 NON_DRUG_TOKENS = frozenset(
-    {
-        "dal",
-        "al",
-        "alla",
-        "all",
-        "con",
-        "senza",
-        "schema",
-        "protocollo",
-        "terapia",
-        "chemioterapia",
-        "secondo",
-        "linea",
-        "ultima",
-        "somministrazione",
-        "entrambi",
-        "sola",
-        "weekly",
-        "pd",
-        "pfi",
-        "mrcp",
-        "pet",
-        "ct",
-        "tc",
-        "eco",
-        "labor",
-        "bil",
-        "alp",
-        "alt",
-        "ast",
-        "pcr",
-        "high",
-        "grade",
-        "figo",
-        "stato",
-        "diagnosi",
-        "nozione",
-        "previsto",
-        "nega",
-        "paziente",
-        "carcinosi",
-        "carcinoma",
-        "sludge",
-        "magnetic",
-        "resonance",
-        "cholangio",
-        "pancreatography",
-    }
+    get_reference_catalog_snapshot().values(
+        "clinical_extraction",
+        "deterministic_non_drug_tokens",
+    )
 )
 
 ###############################################################################

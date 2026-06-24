@@ -414,11 +414,14 @@ class AnalysisRunner:
             if raw_match_status is not None
             else None
         )
-        match_candidates = [
-            str(candidate).strip()
-            for candidate in livertox_data.get("match_candidates", [])
-            if str(candidate).strip()
-        ]
+        match_candidates = []
+        for candidate in livertox_data.get("match_candidates", []):
+            if isinstance(candidate, dict):
+                candidate_name = str(candidate.get("drug_name") or "").strip()
+            else:
+                candidate_name = str(candidate).strip()
+            if candidate_name and candidate_name not in match_candidates:
+                match_candidates.append(candidate_name)
         match_notes = [
             str(note).strip()
             for note in livertox_data.get("match_notes", [])
