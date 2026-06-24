@@ -171,7 +171,7 @@ class ClinicalSessionService(
             requested = local_cap_s
         if requested is None:
             return base
-        return max(base, max(float(requested), minimum_timeout_s))
+        return min(base, max(float(requested), minimum_timeout_s))
 
     # -------------------------------------------------------------------------
     def apply_persisted_runtime_configuration(self) -> None:

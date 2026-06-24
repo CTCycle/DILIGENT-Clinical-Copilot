@@ -1,6 +1,6 @@
 {
   "manifest": "clinical_extraction",
-  "version": 1,
+  "version": 2,
   "description": "Deterministic text reference data used by clinical extraction services.",
   "entries": [
     {
@@ -186,6 +186,7 @@
       "priority": 100,
       "values": [
         "farmaci non assunti",
+        "non assunti",
         "farmaci non in uso",
         "not taking"
       ],
@@ -819,6 +820,8 @@
       "priority": 100,
       "values": [
         "in riserva",
+        "il lunedi",
+        "ulteriore ciclo originariamente previsto il",
         "al bisogno",
         "se necessario",
         "dopo",
@@ -845,7 +848,10 @@
       "priority": 100,
       "values": [
         "ulteriore ciclo",
-        "eventuale inizio"
+        "eventuale inizio",
+        "farmaci non assunti",
+        "non assume",
+        "nessuna terapia"
       ],
       "metadata": {
         "case_sensitive": false,
@@ -860,6 +866,7 @@
       "priority": 100,
       "values": [
         "originariamente previsto",
+        "peso della paziente",
         "biopsia",
         "cutaneo",
         "dermo ipodermica",
@@ -899,6 +906,26 @@
         "friday",
         "saturday",
         "sunday"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "deterministic_non_drug_tokens",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "dal", "al", "alla", "all", "con", "senza", "schema", "protocollo",
+        "terapia", "chemioterapia", "secondo", "linea", "ultima",
+        "somministrazione", "entrambi", "sola", "weekly", "pd", "pfi",
+        "mrcp", "pet", "ct", "tc", "eco", "labor", "bil", "alp", "alt",
+        "ast", "pcr", "high", "grade", "figo", "stato", "diagnosi",
+        "nozione", "previsto", "nega", "paziente", "carcinosi", "carcinoma",
+        "sludge", "magnetic", "resonance", "cholangio", "pancreatography"
       ],
       "metadata": {
         "case_sensitive": false,

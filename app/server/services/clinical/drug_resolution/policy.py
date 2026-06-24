@@ -5,24 +5,21 @@ from domain.clinical.drug_resolution import (
     LiverToxResolutionCandidate,
     RxNavResolutionCandidate,
 )
+from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.drug_resolution.normalizer import NormalizedDrugMention
 
 
 ###############################################################################
 class DrugResolutionPolicy:
-    FALSE_POSITIVE_TOKENS = {
-        "alt",
-        "ast",
-        "bilirubin",
-        "cholestasis",
-        "creatinine",
-        "diagnosis",
-        "disease",
-        "ggt",
-        "laboratory",
-        "rialzo",
-        "therapy",
-    }
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.false_positive_tokens = set(
+            get_reference_catalog_snapshot().values(
+                "drug_matching",
+                "false_positive_drug_tokens",
+            )
+        )
 
     # -------------------------------------------------------------------------
     def decide(
@@ -172,4 +169,4 @@ class DrugResolutionPolicy:
     # -------------------------------------------------------------------------
     def _is_false_positive(self, mention: NormalizedDrugMention) -> bool:
         tokens = set(mention.normalized_name.split())
-        return bool(tokens & self.FALSE_POSITIVE_TOKENS) and len(tokens) <= 3
+        return bool(tokens & self.false_positive_tokens) and len(tokens) <= 3

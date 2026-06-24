@@ -137,7 +137,11 @@ def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) ->
 ###############################################################################
 def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) -> None:
     fake_settings = SimpleNamespace(
-        runtime=SimpleNamespace(clinical_llm_timeout=5400.0),
+        runtime=SimpleNamespace(
+            clinical_llm_timeout=5400.0,
+            cloud_llm_timeout_cap=30.0,
+            local_llm_timeout_cap=45.0,
+        ),
     )
     for module in (
         "services.session.session_service",
@@ -154,7 +158,7 @@ def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) ->
 
     resolved = ClinicalSessionService._resolve_consultation_timeout()
 
-    assert resolved == 5400.0
+    assert resolved == 30.0
 
 ###############################################################################
 def test_run_revision_consultation_uses_revision_analysis_entrypoint(

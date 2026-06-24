@@ -4,6 +4,7 @@ import asyncio
 
 import pandas as pd
 from domain.clinical import DrugEntry, PatientDrugs
+from services.clinical.drug_identity import DrugIdentityResolver
 from services.clinical.matches_core import LiverToxMatcher
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.text.normalization import normalize_drug_query_name
@@ -718,6 +719,38 @@ def test_matcher_keeps_unsafe_multilingual_fallbacks_unresolved() -> None:
     assert esomeprazolo.matched_name != "Naproxen"
     assert insulin.status in {"missing", "ambiguous"}
     assert insulin.matched_name != "Folic Acid"
+
+###############################################################################
+def test_identity_resolution_does_not_manufacture_prefix_or_stem_queries() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0503",
+                "drug_name": "Diazepam",
+                "excerpt": "Diazepam excerpt.",
+                "synonyms": "thyroid; levothyroxine",
+                "ingredient": "Diazepam",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0504",
+                "drug_name": "Morphine",
+                "excerpt": "Morphine excerpt.",
+                "synonyms": "morphin",
+                "ingredient": "Morphine",
+                "brand_name": "",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+    resolver = DrugIdentityResolver(matcher)
+
+    levothyroxine = resolver.resolve("levothyroxine sodium")
+    morfina = resolver.resolve("morfina")
+
+    assert all(candidate.canonical_candidate != "levothyroxine" for candidate in levothyroxine)
+    assert all(candidate.canonical_candidate != "morphin" for candidate in morfina)
+    assert all(candidate.canonical_candidate != "diazepam" for candidate in levothyroxine)
 
 ###############################################################################
 def test_known_italian_drug_aliases_normalize_before_matching() -> None:

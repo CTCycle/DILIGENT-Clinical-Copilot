@@ -6,7 +6,6 @@ from typing import Any
 from domain.clinical.drug_resolution import (
     DrugResolutionDecision,
     LiverToxResolutionCandidate,
-    RxNavResolutionCandidate,
 )
 from domain.clinical.entities import PatientDrugs
 from services.clinical.drug_resolution.livertox_resolver import LiverToxCandidateResolver
@@ -43,7 +42,8 @@ class DrugResolutionService:
     # -------------------------------------------------------------------------
     def resolve(self, drugs: PatientDrugs) -> dict[str, dict[str, Any]]:
         resolved: dict[str, dict[str, Any]] = {}
-        for mention in self.normalizer.normalize_entries(drugs):
+        mentions = self.normalizer.normalize_entries(drugs)
+        for mention in mentions:
             cached = self._try_cache(mention)
             if cached is not None:
                 resolved[cached["lookup_key"]] = self._merge_payload(
@@ -57,6 +57,11 @@ class DrugResolutionService:
             livertox_candidates = self.livertox_resolver.build_candidates(
                 mention,
                 rxnav_names,
+            )
+            livertox_candidates = self._exclude_cross_mention_candidates(
+                mention,
+                mentions,
+                livertox_candidates,
             )
             decision = self.policy.decide(
                 mention,
@@ -75,6 +80,36 @@ class DrugResolutionService:
                 payload,
             )
         return resolved
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _exclude_cross_mention_candidates(
+        mention: NormalizedDrugMention,
+        all_mentions: list[NormalizedDrugMention],
+        candidates: list[LiverToxResolutionCandidate],
+    ) -> list[LiverToxResolutionCandidate]:
+        current_tokens = set(mention.normalized_name.split())
+        other_token_sets = [
+            set(other.normalized_name.split())
+            for other in all_mentions
+            if other.normalized_name != mention.normalized_name
+        ]
+        filtered: list[LiverToxResolutionCandidate] = []
+        for candidate in candidates:
+            candidate_tokens = set(candidate.normalized_name.split())
+            belongs_to_other_mention = any(
+                other_tokens
+                and (
+                    other_tokens <= candidate_tokens
+                    or candidate_tokens <= other_tokens
+                )
+                for other_tokens in other_token_sets
+            )
+            related_to_current = bool(current_tokens & candidate_tokens)
+            if belongs_to_other_mention and not related_to_current:
+                continue
+            filtered.append(candidate)
+        return filtered
 
     # -------------------------------------------------------------------------
     def _try_cache(

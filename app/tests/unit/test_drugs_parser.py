@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from domain.clinical import DrugEntry
+from domain.clinical import DrugEntry, PatientDrugs
 from services.clinical.parser import DrugsParser
 
 ###############################################################################
@@ -13,6 +13,31 @@ class FailingStructuredClient:
     async def llm_structured_call(self, **kwargs: Any):
         _ = kwargs
         raise AssertionError("LLM should not be called for deterministic therapy lines")
+
+###############################################################################
+class ConcurrentStructuredClient:
+    def __init__(self) -> None:
+        self.active_calls = 0
+        self.max_active_calls = 0
+
+    async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
+        line = str(kwargs["user_prompt"]).splitlines()[-1]
+        self.active_calls += 1
+        self.max_active_calls = max(self.max_active_calls, self.active_calls)
+        await asyncio.sleep(0.01)
+        self.active_calls -= 1
+        return PatientDrugs(entries=[DrugEntry(name=line)])
+
+###############################################################################
+def test_llm_line_extraction_is_bounded_concurrent_and_ordered() -> None:
+    client = ConcurrentStructuredClient()
+    parser = DrugsParser(client=client)
+    lines = [f"Drug {index}" for index in range(7)]
+
+    parsed = asyncio.run(parser.llm_extract_drugs(lines))
+
+    assert [entry.name for entry in parsed.entries] == lines
+    assert client.max_active_calls == parser.MAX_CONCURRENT_LINE_EXTRACTIONS
 
 ###############################################################################
 def test_extract_drugs_from_therapy_parses_schedule_route_and_dates() -> None:

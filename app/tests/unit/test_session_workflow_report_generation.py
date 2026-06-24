@@ -20,6 +20,7 @@ from services.session.document_normalizer import DocumentNormalizer
 from services.session.session_shared import build_failed_session_payload
 from services.session.session_workflow import process_single_patient_workflow
 from services.session.workflow_shared import ClinicalPersistenceError
+from services.session.session_service import ClinicalSessionService
 
 ###############################################################################
 class FakePatternAnalyzer:
@@ -287,3 +288,18 @@ def test_failed_session_payload_omits_raw_clinical_text_and_base64_image() -> No
         "drugs": len(payload.drugs or ""),
         "laboratory_analysis": len(payload.laboratory_analysis or ""),
     }
+
+###############################################################################
+def test_runtime_timeout_respects_provider_cap(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: True,
+    )
+
+    timeout = ClinicalSessionService._resolve_runtime_timeout(
+        base_timeout_s=180.0,
+        cloud_cap_s=30.0,
+        local_cap_s=45.0,
+    )
+
+    assert timeout == 30.0

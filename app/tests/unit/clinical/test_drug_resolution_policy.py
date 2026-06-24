@@ -293,6 +293,27 @@ def test_false_positive_lab_text_is_rejected_before_matching() -> None:
 
 
 ###############################################################################
+def test_candidates_from_another_extracted_drug_do_not_contaminate_mention() -> None:
+    resolved = _resolver().resolve(
+        PatientDrugs(
+            entries=[
+                DrugEntry(name="Levothyroxine sodium"),
+                DrugEntry(name="Diazepam"),
+            ]
+        )
+    )
+
+    levothyroxine = resolved["levothyroxine sodium"]
+    candidate_names = {
+        candidate["normalized_name"]
+        for candidate in levothyroxine["livertox_candidates"]
+    }
+
+    assert "diazepam" not in candidate_names
+    assert "diazepam oral" not in candidate_names
+
+
+###############################################################################
 # DB match-cache integration tests
 
 

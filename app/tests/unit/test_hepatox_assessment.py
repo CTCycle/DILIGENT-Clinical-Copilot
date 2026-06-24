@@ -507,6 +507,27 @@ def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
     assert "UnknownX" in section
     assert "No matching drug record found in the local knowledge base." in section
     assert "Structured RUCAM score: 3 (possible)." in section
+    assert "### UnknownX" in section
+    assert "before causality is assigned" in section
+
+
+###############################################################################
+def test_unresolved_candidate_details_render_names_without_raw_payloads() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    section = consultation.render_unresolved_mentions_section(
+        [
+            DrugClinicalAssessment(
+                drug_name="Diazepam",
+                match_status="ambiguous_match",
+                ambiguous_match=True,
+                match_candidates=["Diazepam oral", "Diazepam intravenous"],
+            )
+        ]
+    )
+
+    assert section is not None
+    assert "Diazepam oral, Diazepam intravenous" in section
+    assert "{'drug_name':" not in section
 
 ###############################################################################
 def test_sanitize_renderable_body_removes_structured_dili_section() -> None:

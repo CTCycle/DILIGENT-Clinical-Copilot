@@ -395,8 +395,13 @@ class ClinicalSessionConsultationMixin:
     # -------------------------------------------------------------------------
     @classmethod
     def _resolve_consultation_timeout(cls) -> float:
-        configured = float(get_server_settings().runtime.clinical_llm_timeout)
-        return cls._resolve_runtime_timeout(base_timeout_s=configured)
+        runtime = get_server_settings().runtime
+        configured = float(runtime.clinical_llm_timeout)
+        return cls._resolve_runtime_timeout(
+            base_timeout_s=configured,
+            cloud_cap_s=float(runtime.cloud_llm_timeout_cap),
+            local_cap_s=float(runtime.local_llm_timeout_cap),
+        )
 
     # -------------------------------------------------------------------------
     def apply_persisted_runtime_configuration(self) -> None:
