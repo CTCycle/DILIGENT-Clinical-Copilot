@@ -16,6 +16,54 @@ from services.runtime.state import JobState
 ###############################################################################
 class JobErrorSanitizer:
 
+    LOCAL_MODEL_MEMORY_MESSAGE = (
+        "Local model could not be loaded due to insufficient memory. "
+        "Choose a smaller local model or free memory and retry."
+    )
+    LOCAL_MODEL_UNAVAILABLE_MESSAGE = (
+        "Local model runtime is unavailable. Start Ollama, verify the selected "
+        "model is installed, and retry."
+    )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def classify_llm_runtime_failure(message: str) -> str | None:
+        lowered = message.casefold()
+        if any(
+            token in lowered
+            for token in (
+                "out-of-memory",
+                "out of memory",
+                "cudamalloc",
+                "failed to allocate",
+                "cuda out of memory",
+            )
+        ):
+            return JobErrorSanitizer.LOCAL_MODEL_MEMORY_MESSAGE
+        if any(
+            token in lowered
+            for token in (
+                "ollama request failed",
+                "failed to request ollama",
+                "all connection attempts failed",
+                "connection refused",
+                "ollama server exited",
+                "ollama executable not found",
+                "model ",
+            )
+        ) and any(
+            token in lowered
+            for token in (
+                "ollama",
+                "not found",
+                "connection",
+                "unavailable",
+                "executable",
+            )
+        ):
+            return JobErrorSanitizer.LOCAL_MODEL_UNAVAILABLE_MESSAGE
+        return None
+
     # -------------------------------------------------------------------------
     @staticmethod
     def can_show_exception_message(message: str) -> bool:
@@ -30,6 +78,9 @@ class JobErrorSanitizer:
     # -------------------------------------------------------------------------
     @classmethod
     def build_safe_job_error_message(cls, exc: Exception) -> str:
+        classified = cls.classify_llm_runtime_failure(str(exc))
+        if classified:
+            return classified
         if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
             return "Operation timed out. Please retry."
         if isinstance(exc, FileNotFoundError):

@@ -68,6 +68,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   readonly clinicalInputTemplate = signal('');
 
   private lastProgressUpdateTimestamp = 0;
+  private lastProgressSignature = '';
   private jobStartedAt = 0;
   private poller: { stop: () => void } | null = null;
   private runActionLockTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -187,6 +188,7 @@ export class DiliAgentPageComponent implements OnDestroy {
     this.revokeObjectUrl();
     this.jobStartedAt = 0;
     this.lastProgressUpdateTimestamp = 0;
+    this.lastProgressSignature = '';
     this.stateService.updateDiliAgent({
       message: '',
       exportUrl: null,
@@ -223,6 +225,7 @@ export class DiliAgentPageComponent implements OnDestroy {
     this.stateService.updateDiliAgent({
       message: formatErrorMessage(pollError),
       exportUrl: null,
+      jobStatus: 'failed',
       jobStage: null,
       jobStageMessage: null,
       isStarting: false,
@@ -263,7 +266,16 @@ export class DiliAgentPageComponent implements OnDestroy {
     if (this.jobStartedAt === 0) {
       this.jobStartedAt = now;
     }
-    this.lastProgressUpdateTimestamp = now;
+    const progressSignature = [
+      status.status,
+      resolvedProgress.toFixed(2),
+      stage ?? '',
+      stageMessage ?? '',
+    ].join('|');
+    if (this.lastProgressSignature !== progressSignature) {
+      this.lastProgressSignature = progressSignature;
+      this.lastProgressUpdateTimestamp = now;
+    }
 
     this.stateService.updateDiliAgent({
       jobProgress: terminalStatus ? 100 : resolvedProgress,
@@ -431,6 +443,7 @@ export class DiliAgentPageComponent implements OnDestroy {
       jobStage: null,
       jobStageMessage: null,
       isStarting: false,
+      isRunning: false,
     });
   }
 
@@ -529,8 +542,15 @@ export class DiliAgentPageComponent implements OnDestroy {
     const stalledSinceMs = this.lastProgressUpdateTimestamp > 0 ? Date.now() - this.lastProgressUpdateTimestamp : 0;
     const stalled = this.jobStartedAt > 0 && stalledSinceMs >= STALL_THRESHOLD_MS;
     const stallSuffix = stalled ? ' — this step is taking longer than expected, analysis is still running' : '';
+    const localExtractionSuffix = this.isExtractionStage(this.vm.jobStage)
+      ? ' Local model extraction can take several minutes.'
+      : '';
 
-    return `${baseLabel}${progressSuffix}${elapsedSuffix}${stallSuffix}`;
+    return `${baseLabel}${progressSuffix}${elapsedSuffix}${stallSuffix}${localExtractionSuffix}`;
+  }
+
+  private isExtractionStage(stage: string | null): boolean {
+    return Boolean(stage && stage.includes('extraction'));
   }
 
   get runActionDisabled(): boolean {
