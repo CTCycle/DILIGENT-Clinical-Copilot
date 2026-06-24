@@ -15,12 +15,16 @@ Structured LLM output is validated against Pydantic schemas and semantic guardra
 
 Structured output parsing accepts strict JSON objects only. Prose-wrapped JSON or trailing prose is rejected by default; repair logs include schema name, attempt count, output length, short output hash, and error type, but not raw model output.
 
+For local Ollama extraction, disease and laboratory stages use compact structured payloads and schema-echo repair guards to reduce failure rates on smaller local models while preserving the persisted downstream result shape.
+
 ## Strategy Matrix
 Therapy, anamnesis, disease, and laboratory extraction attempt structured LLM extraction first when a configured provider is available.
 
 - `llm`: structured LLM extraction produced schema-valid, semantically acceptable output.
 - `hybrid`: structured LLM extraction succeeded but direct rule-based evidence is retained for audit or fallback support.
 - `deterministic`: bounded LLM attempts failed or no structured client was available, so direct rule-based parsing was used.
+
+Clinical job result payloads include runtime diagnostics for extraction stages: resolved provider and model, stage elapsed time, fallback reasons, and structured failure kinds when a bounded structured stage falls back.
 
 ## Hepatic Pattern Resolution
 If an explicit hepatic pattern is present in the laboratory source, it becomes the final pattern with source `provided`. The calculated R-ratio pattern is preserved separately. If both exist and differ, the pipeline emits `hepatic_pattern_source_calculation_conflict`.

@@ -4,7 +4,7 @@ import asyncio
 from typing import Any
 
 from domain.clinical import DrugEntry, PatientDrugs
-from services.clinical.parser import DrugsParser
+from services.clinical.parser import DrugsParser, LocalDrugEntryDraft, LocalPatientDrugs
 
 ###############################################################################
 class FailingStructuredClient:
@@ -32,6 +32,26 @@ class ConcurrentStructuredClient:
         return PatientDrugs(entries=[DrugEntry(name=line)])
 
 ###############################################################################
+class RecordingLocalStructuredClient:
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.schemas: list[type[Any]] = []
+
+    # -------------------------------------------------------------------------
+    async def llm_structured_call(self, **kwargs: Any) -> LocalPatientDrugs:
+        self.schemas.append(kwargs["schema"])
+        return LocalPatientDrugs(
+            entries=[
+                LocalDrugEntryDraft(
+                    name="Ciproflax",
+                    dosage="500 mg",
+                    evidence="Ciproflax 500 mg dal 24.01.",
+                )
+            ]
+        )
+
+###############################################################################
 def test_llm_line_extraction_is_bounded_concurrent_and_ordered() -> None:
     client = ConcurrentStructuredClient()
     parser = DrugsParser(client=client)
@@ -41,6 +61,19 @@ def test_llm_line_extraction_is_bounded_concurrent_and_ordered() -> None:
 
     assert [entry.name for entry in parsed.entries] == lines
     assert client.max_active_calls == parser.MAX_CONCURRENT_LINE_EXTRACTIONS
+
+###############################################################################
+def test_llm_line_extraction_uses_local_compact_schema_for_ollama() -> None:
+    client = RecordingLocalStructuredClient()
+    parser = DrugsParser(client=client)
+    parser.forced_provider = "ollama"
+
+    parsed = asyncio.run(parser.llm_extract_drugs(["Ciproflax 500 mg dal 24.01."]))
+
+    assert client.schemas == [LocalPatientDrugs]
+    assert len(parsed.entries) == 1
+    assert parsed.entries[0].name == "Ciproflax"
+    assert parsed.entries[0].dosage == "500 mg"
 
 ###############################################################################
 def test_extract_drugs_from_therapy_parses_schedule_route_and_dates() -> None:

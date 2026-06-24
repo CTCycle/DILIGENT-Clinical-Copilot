@@ -15,6 +15,8 @@ export type LocalModelCard = {
   description: string;
   family: string;
   available_in_ollama: boolean;
+  recommended_for_local_extraction: boolean;
+  recommended_rank: number | null;
 };
 
 export type RagSettings = {

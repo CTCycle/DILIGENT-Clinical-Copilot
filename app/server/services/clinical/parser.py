@@ -58,6 +58,25 @@ from services.llm.provider_factory import select_llm_provider
 from services.clinical.extraction_strategy import decide_extraction_strategy
 from common.utils.text_utils import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
+from pydantic import BaseModel, Field
+
+###############################################################################
+class LocalDrugEntryDraft(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    dosage: str | None = Field(default=None, max_length=120)
+    administration_mode: str | None = Field(default=None, max_length=80)
+    route: str | None = Field(default=None, max_length=40)
+    administration_pattern: str | None = Field(default=None, max_length=80)
+    therapy_start_status: bool | None = Field(default=None)
+    therapy_start_date: str | None = Field(default=None, max_length=40)
+    suspension_status: bool | None = Field(default=None)
+    suspension_date: str | None = Field(default=None, max_length=40)
+    evidence: str | None = Field(default=None, max_length=500)
+    current_status: str | None = Field(default=None, max_length=40)
+
+###############################################################################
+class LocalPatientDrugs(BaseModel):
+    entries: list[LocalDrugEntryDraft] = Field(default_factory=list)
 
 ###############################################################################
 class DrugsParser:
@@ -289,6 +308,50 @@ class DrugsParser:
     # -------------------------------------------------------------------------
     def _strip_drug_form_suffixes(self, name: str) -> str:
         return self.DRUG_FORM_SUFFIX_RE.sub("", name)
+
+    # -------------------------------------------------------------------------
+    def active_provider_name(self) -> str | None:
+        provider = self.forced_provider or self.client_provider
+        if provider == "injected":
+            return self.forced_provider
+        return provider
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def is_local_runtime(provider: str | None) -> bool:
+        return (provider or "").strip().casefold() == "ollama"
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def local_system_prompt() -> str:
+        return (
+            "Return JSON only. Extract explicit medication mentions only. "
+            "Do not return diseases, lab values, imaging findings, staging, or generic prose. "
+            "Keep fields short and copy evidence verbatim from the source text when possible."
+        )
+
+    # -------------------------------------------------------------------------
+    def normalize_local_drug_entry(self, entry: LocalDrugEntryDraft) -> DrugEntry:
+        current_status = (entry.current_status or "").strip().casefold() or None
+        if current_status not in {"current", "past", "suspected", "ruled_out", "unclear"}:
+            current_status = None
+        return DrugEntry(
+            name=entry.name,
+            dosage=entry.dosage,
+            administration_mode=entry.administration_mode,
+            route=entry.route,
+            administration_pattern=entry.administration_pattern,
+            suspension_status=entry.suspension_status,
+            suspension_date=entry.suspension_date,
+            therapy_start_status=entry.therapy_start_status,
+            therapy_start_date=entry.therapy_start_date,
+            evidence=entry.evidence,
+            current_status=cast(
+                Literal["current", "past", "suspected", "ruled_out", "unclear"]
+                | None,
+                current_status,
+            ),
+        )
 
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
@@ -623,10 +686,21 @@ class DrugsParser:
         if not lines:
             return PatientDrugs(entries=[])
 
+        use_local_schema = self.is_local_runtime(self.active_provider_name())
+        schema_model = LocalPatientDrugs if use_local_schema else PatientDrugs
         single_entry_prompt = (
-            f"{DRUG_EXTRACTION_PROMPT.strip()}\n\n"
-            "For this task, return a PatientDrugs object whose `entries` array contains "
-            "exactly one DrugEntry describing the drug provided in the user prompt."
+            (
+                self.local_system_prompt()
+                if use_local_schema
+                else DRUG_EXTRACTION_PROMPT.strip()
+            )
+            + "\n\n"
+            + (
+                "Return an `entries` array with exactly one medication entry for the provided source line."
+                if use_local_schema
+                else "For this task, return a PatientDrugs object whose `entries` array contains "
+                "exactly one DrugEntry describing the drug provided in the user prompt."
+            )
         )
 
         total_lines = max(len(lines), 1)
@@ -639,7 +713,7 @@ class DrugsParser:
         async def extract_line(line: str) -> list[DrugEntry]:
             nonlocal completed
             async with semaphore:
-                parsed = await asyncio.wait_for(
+                raw_parsed = await asyncio.wait_for(
                     self.client.llm_structured_call(
                         model=self.model,
                         system_prompt=single_entry_prompt,
@@ -647,12 +721,22 @@ class DrugsParser:
                             "Extract the structured representation for the following drug entry:\n"
                             f"{line}"
                         ),
-                        schema=PatientDrugs,
+                        schema=schema_model,
                         temperature=self.temperature,
                         use_json_mode=True,
                         max_repair_attempts=1,
                     ),
                     timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
+                )
+                parsed = (
+                    PatientDrugs(
+                        entries=[
+                            self.normalize_local_drug_entry(entry)
+                            for entry in raw_parsed.entries
+                        ]
+                    )
+                    if use_local_schema
+                    else raw_parsed
                 )
             async with progress_lock:
                 completed += 1
@@ -708,10 +792,16 @@ class DrugsParser:
             return PatientDrugs(entries=entries)
 
         source_text = self.clean_text(text)
+        use_local_schema = self.is_local_runtime(self.active_provider_name())
+        schema_model = LocalPatientDrugs if use_local_schema else PatientDrugs
         prompt = (
-            ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip()
-            if source == "anamnesis"
-            else DRUG_EXTRACTION_PROMPT.strip()
+            self.local_system_prompt()
+            if use_local_schema
+            else (
+                ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip()
+                if source == "anamnesis"
+                else DRUG_EXTRACTION_PROMPT.strip()
+            )
         )
         user_prompt = (
             "Extract all drugs mentioned in the following patient anamnesis:\n\n"
@@ -736,17 +826,27 @@ class DrugsParser:
                     f"Previous wrong output:\n{last_wrong_output}\n\n"
                     f"Source text:\n{source_text}"
                 )
-            parsed = await asyncio.wait_for(
+            raw_parsed = await asyncio.wait_for(
                 self.client.llm_structured_call(
                     model=self.model,
                     system_prompt=prompt,
                     user_prompt=user_prompt,
-                    schema=PatientDrugs,
+                    schema=schema_model,
                     temperature=self.temperature,
                     use_json_mode=True,
                     max_repair_attempts=1,
                 ),
                 timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
+            )
+            parsed = (
+                PatientDrugs(
+                    entries=[
+                        self.normalize_local_drug_entry(entry)
+                        for entry in raw_parsed.entries
+                    ]
+                )
+                if use_local_schema
+                else raw_parsed
             )
             last_wrong_output = parsed.model_dump_json()
             normalized_candidates = [

@@ -4,6 +4,9 @@ import asyncio
 from datetime import datetime
 from typing import Any
 
+import pytest
+
+from common.exceptions import ServiceValidationError
 from domain.model_configs import ModelConfigUpdateRequest
 import services.llm.model_config as model_config_module
 from services.llm.runtime_config import LLMRuntimeConfig
@@ -134,6 +137,73 @@ def test_model_config_service_normalizes_stale_local_roles_in_cloud_mode() -> No
     assert response.text_extraction_model == "gpt-4.1-mini"
     assert serializer.snapshot.clinical_model == "gpt-4.1-mini"
     assert serializer.snapshot.text_extraction_model == "gpt-4.1-mini"
+
+###############################################################################
+def test_model_config_service_rejects_uninstalled_local_models(monkeypatch) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="qwen3.5:2b",
+            text_extraction_model="qwen3.5:2b",
+            use_cloud_models=False,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
+            updated_at=datetime.now(),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+
+    async def fake_list_available_ollama_models() -> set[str]:
+        return {"qwen3.5:2b"}
+
+    monkeypatch.setattr(
+        service,
+        "list_available_ollama_models",
+        fake_list_available_ollama_models,
+    )
+
+    payload = ModelConfigUpdateRequest(
+        use_cloud_services=False,
+        clinical_model="gpt-oss:20b",
+        text_extraction_model="qwen3.5:2b",
+    )
+
+    with pytest.raises(ServiceValidationError, match="Install local Ollama model"):
+        asyncio.run(service.update_state(payload))
+
+###############################################################################
+def test_model_config_service_prioritizes_recommended_installed_local_models(
+    monkeypatch,
+) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="qwen3.5:2b",
+            text_extraction_model="qwen3.5:9b",
+            use_cloud_models=False,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
+            updated_at=datetime.now(),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+
+    async def fake_list_available_ollama_models() -> set[str]:
+        return {"qwen3.5:2b", "qwen3.5:9b", "gpt-oss:20b"}
+
+    monkeypatch.setattr(
+        service,
+        "list_available_ollama_models",
+        fake_list_available_ollama_models,
+    )
+
+    response = asyncio.run(service.get_state(include_local_availability=True))
+
+    assert response.local_models[0].name == "qwen3.5:2b"
+    assert response.local_models[0].recommended_for_local_extraction is True
+    assert response.local_models[1].name == "qwen3.5:9b"
 
 ###############################################################################
 def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) -> None:

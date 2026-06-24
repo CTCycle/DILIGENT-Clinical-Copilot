@@ -1,5 +1,7 @@
 {
   "text_extraction_model_choices": [
+    "qwen3.5:2b",
+    "qwen3.5:9b",
     "qwen3:1.7b",
     "qwen3:8b",
     "qwen3:14b",
@@ -10,6 +12,8 @@
     "phi3:medium"
   ],
   "clinical_model_choices": [
+    "qwen3.5:2b",
+    "qwen3.5:9b",
     "gpt-oss:20b",
     "llama3.1:8b",
     "llama3.1:70b",

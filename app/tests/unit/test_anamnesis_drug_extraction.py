@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from domain.clinical import DrugEntry, PatientDrugs
-from services.clinical.parser import DrugsParser
+from services.clinical.parser import DrugsParser, LocalDrugEntryDraft, LocalPatientDrugs
 
 ###############################################################################
 class RecordingStructuredClient:
@@ -55,6 +55,26 @@ class RecordingSequenceStructuredClient:
         if self.responses:
             return self.responses.pop(0)
         return schema(entries=[])
+
+###############################################################################
+class RecordingLocalSectionClient:
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.schemas: list[type[Any]] = []
+
+    # -------------------------------------------------------------------------
+    async def llm_structured_call(self, **kwargs: Any) -> LocalPatientDrugs:
+        self.schemas.append(kwargs["schema"])
+        return LocalPatientDrugs(
+            entries=[
+                LocalDrugEntryDraft(
+                    name="Pembrolizumab",
+                    evidence="Pembrolizumab",
+                    current_status="past",
+                )
+            ]
+        )
 
 ###############################################################################
 class AlwaysFailingStructuredClient:
@@ -136,6 +156,25 @@ def test_extract_drugs_from_anamnesis_sets_historical_tags() -> None:
     assert len(parsed.entries) == 1
     entry = parsed.entries[0]
     assert entry.name == "Trialmed"
+    assert entry.source == "anamnesis"
+    assert entry.historical_flag is True
+
+###############################################################################
+def test_extract_drugs_from_anamnesis_uses_local_compact_schema_for_ollama() -> None:
+    client = RecordingLocalSectionClient()
+    parser = DrugsParser(client=client)
+    parser.forced_provider = "ollama"
+
+    parsed = asyncio.run(
+        parser.extract_drugs_from_anamnesis(
+            "Terapia precedente con Pembrolizumab sospesa successivamente."
+        )
+    )
+
+    assert LocalPatientDrugs in client.schemas
+    assert len(parsed.entries) == 1
+    entry = parsed.entries[0]
+    assert entry.name == "Pembrolizumab"
     assert entry.source == "anamnesis"
     assert entry.historical_flag is True
     assert entry.temporal_classification == "temporal_uncertain"

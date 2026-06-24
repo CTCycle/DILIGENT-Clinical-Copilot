@@ -6,6 +6,8 @@ import unicodedata
 from collections.abc import Callable
 from typing import Any
 
+from pydantic import BaseModel, Field
+
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
@@ -24,6 +26,17 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     r"please\s+try\s+again\s+in\s+(\d+(?:\.\d+)?)s",
     re.IGNORECASE,
 )
+
+###############################################################################
+class LocalDiseaseContextEntry(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    evidence: str | None = Field(default=None, max_length=500)
+    chronic: bool | None = Field(default=None)
+    hepatic_related: bool | None = Field(default=None)
+
+###############################################################################
+class LocalPatientDiseaseContext(BaseModel):
+    entries: list[LocalDiseaseContextEntry] = Field(default_factory=list)
 
 ###############################################################################
 class DiseaseExtractor:
@@ -286,6 +299,50 @@ class DiseaseExtractor:
         return min(2.0, 0.5 * (2 ** (normalized_attempt - 1)))
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def is_local_runtime(provider: str | None) -> bool:
+        return (provider or "").strip().lower() == "ollama"
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def local_system_prompt() -> str:
+        return (
+            "Extract only clinically relevant diseases or conditions explicitly supported "
+            "by the source. Return compact JSON data only."
+        )
+
+    # -------------------------------------------------------------------------
+    def normalize_local_entries(
+        self,
+        entries: list[LocalDiseaseContextEntry],
+        source_text: str,
+    ) -> list[DiseaseContextEntry]:
+        normalized_entries: list[DiseaseContextEntry] = []
+        for entry in entries:
+            normalized = self.normalize_entry(
+                DiseaseContextEntry(
+                    name=entry.name,
+                    occurrence_time=None,
+                    timeline=None,
+                    severity=None,
+                    diagnosis_status=None,
+                    symptoms=None,
+                    clinical_context=None,
+                    chronic=entry.chronic,
+                    hepatic_related=entry.hepatic_related,
+                    evidence=entry.evidence,
+                    source_span=None,
+                    confidence="moderate",
+                    attribution="patient",
+                )
+            )
+            if normalized is not None:
+                normalized_entries.append(
+                    self.validate_entry_evidence(normalized, source_text)
+                )
+        return normalized_entries
+
+    # -------------------------------------------------------------------------
     async def extract_diseases_from_anamnesis(
         self,
         anamnesis: str | None,
@@ -307,6 +364,8 @@ class DiseaseExtractor:
                 raise RuntimeError(
                     "LLM client is not initialized for disease extraction"
                 )
+            active_provider = self.forced_provider or self.client_provider or "ollama"
+            use_local_schema = self.is_local_runtime(active_provider)
             candidate_text = self.format_expected_candidates(deterministic_candidates)
             user_prompt = (
                 "Extract diseases from this full anamnesis text, with temporal and hepatic metadata.\n"
@@ -333,12 +392,22 @@ class DiseaseExtractor:
                         f"Source text:\n{cleaned}"
                     )
                 try:
+                    schema = (
+                        LocalPatientDiseaseContext
+                        if use_local_schema
+                        else PatientDiseaseContext
+                    )
+                    system_prompt = (
+                        self.local_system_prompt()
+                        if use_local_schema
+                        else ANAMNESIS_DISEASE_EXTRACTION_PROMPT.strip()
+                    )
                     parsed = await asyncio.wait_for(
                         self.client.llm_structured_call(
                             model=self.model,
-                            system_prompt=ANAMNESIS_DISEASE_EXTRACTION_PROMPT.strip(),
+                            system_prompt=system_prompt,
                             user_prompt=user_prompt,
-                            schema=PatientDiseaseContext,
+                            schema=schema,
                             temperature=self.temperature,
                             use_json_mode=True,
                             max_repair_attempts=1,
@@ -362,13 +431,18 @@ class DiseaseExtractor:
                     await asyncio.sleep(delay)
                     continue
                 last_wrong_output = parsed.model_dump_json()
-                normalized_entries: list[DiseaseContextEntry] = []
-                for entry in parsed.entries:
-                    normalized = self.normalize_entry(entry)
-                    if normalized is not None:
-                        normalized_entries.append(
-                            self.validate_entry_evidence(normalized, cleaned)
-                        )
+                if use_local_schema:
+                    normalized_entries = self.normalize_local_entries(
+                        list(parsed.entries), cleaned
+                    )
+                else:
+                    normalized_entries = []
+                    for entry in parsed.entries:
+                        normalized = self.normalize_entry(entry)
+                        if normalized is not None:
+                            normalized_entries.append(
+                                self.validate_entry_evidence(normalized, cleaned)
+                            )
                 deduplicated = self.deduplicate_entries(normalized_entries)
                 feedback, missing_candidates = self.validate_disease_coverage(
                     deduplicated,

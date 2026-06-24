@@ -536,6 +536,10 @@ async def process_single_patient_workflow(
         "section_extraction": section_extraction.model_dump()
         if section_extraction is not None
         else None,
+        "resolved_runtime": dict(service.resolved_runtime),
+        "stage_elapsed_ms": dict(service.stage_elapsed_ms),
+        "fallback_reasons": dict(service.fallback_reasons),
+        "structured_failure_kind": dict(service.structured_failure_kind),
         "runtime_settings": {
             "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
             "llm_provider": LLMRuntimeConfig.get_llm_provider(),
@@ -546,6 +550,10 @@ async def process_single_patient_workflow(
             "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
             "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
             "use_rag": bool(payload.use_rag),
+            "resolved_runtime": dict(service.resolved_runtime),
+            "stage_elapsed_ms": dict(service.stage_elapsed_ms),
+            "fallback_reasons": dict(service.fallback_reasons),
+            "structured_failure_kind": dict(service.structured_failure_kind),
         },
         "manual_review_required": faithfulness_audit.manual_review_required,
         "blocking_issues": faithfulness_audit.blocking_issues,

@@ -3,7 +3,13 @@ from __future__ import annotations
 import asyncio
 
 from domain.clinical.entities import PatientData
-from services.clinical.labs import ClinicalLabExtractor, LabExtractionPayload
+from services.clinical.labs import (
+    ClinicalLabExtractor,
+    LabExtractionPayload,
+    LocalLabEntryDraft,
+    LocalLabExtractionPayload,
+    LocalOnsetContextDraft,
+)
 
 ###############################################################################
 class _FakeClient:
@@ -57,3 +63,29 @@ def test_missing_uln_does_not_fabricate_pattern() -> None:
     )
     timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
     assert extractor.calculate_hepatic_pattern_from_lab_timeline(timeline) is None
+
+###############################################################################
+def test_normalize_local_payload_accepts_numeric_value_text() -> None:
+    parsed = LocalLabExtractionPayload(
+        entries=[
+            LocalLabEntryDraft(
+                marker_name="ALT",
+                value_text=37,
+                unit="U/L",
+                sample_date="2025-01-28",
+                evidence="ALAT 37 U/L.",
+            )
+        ],
+        onset_context=LocalOnsetContextDraft(
+            onset_date="2025-01-28",
+            onset_basis="long descriptive basis that should normalize to unknown",
+            evidence="clinical note",
+        ),
+    )
+
+    normalized = ClinicalLabExtractor.normalize_local_payload(parsed)
+
+    assert normalized.entries[0].value_text == "37"
+    assert normalized.entries[0].unit == "U/L"
+    assert normalized.onset_context is not None
+    assert normalized.onset_context.onset_basis == "unknown"

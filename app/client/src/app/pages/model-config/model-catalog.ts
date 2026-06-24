@@ -1,5 +1,10 @@
 import { LocalModelCard, RuntimeSettings } from '../../core/models/types';
-import { resolveCloudChoices, resolveCloudModel, resolveProvider } from '../../core/model-config';
+import {
+  resolveCloudChoices,
+  resolveCloudModel,
+  resolveLocalDraftModel,
+  resolveProvider,
+} from '../../core/model-config';
 import { DraftRuntimeConfig, ModelFilterKey } from './model-config.types';
 
 export type ModelFilterOption = {
@@ -64,8 +69,20 @@ export function resolveDraftFromSettings(runtimeSettings: RuntimeSettings): Draf
     useCloudServices: runtimeSettings.useCloudServices,
     provider,
     cloudModel,
-    clinicalModel: runtimeSettings.clinicalModel,
-    textExtractionModel: runtimeSettings.textExtractionModel,
+    clinicalModel: runtimeSettings.clinicalModel || '',
+    textExtractionModel: runtimeSettings.textExtractionModel || '',
     temperature: runtimeSettings.temperature,
+  };
+}
+
+export function normalizeDraftForLocalRuntime(
+  draft: DraftRuntimeConfig,
+  localModels: LocalModelCard[],
+): DraftRuntimeConfig {
+  return {
+    ...draft,
+    useCloudServices: false,
+    clinicalModel: resolveLocalDraftModel(draft.clinicalModel, localModels),
+    textExtractionModel: resolveLocalDraftModel(draft.textExtractionModel, localModels),
   };
 }
