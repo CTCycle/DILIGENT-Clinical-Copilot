@@ -3,12 +3,7 @@
     <p class="lede">Configure local and cloud model behavior, retrieval settings, reasoning defaults, and provider credentials for accurate, reliable clinical analysis across the full workflow.</p>
   </header>
 
-  @if (!hasLoadedConfig()) {
-    <section class="model-config-loading-state" role="status" aria-live="polite">
-      Loading model configuration...
-    </section>
-  } @else {
-    <div class="model-config-preview-a-layout">
+  <div class="model-config-preview-a-layout">
       <div class="model-config-workspace">
         <section class="model-config-control-rail" aria-label="Runtime and retrieval controls">
           <div class="model-config-runtime-card">
@@ -403,7 +398,6 @@
         </div>
       </aside>
     </div>
-  }
 
   <app-status-message [message]="statusMessage()" [tone]="statusTone()"></app-status-message>
 

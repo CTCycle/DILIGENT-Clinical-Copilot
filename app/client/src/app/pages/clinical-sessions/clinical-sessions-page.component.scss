@@ -312,21 +312,25 @@
 }
 
 .clinical-session-editor-toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(108px, auto) minmax(0, 1fr) auto;
+  grid-auto-rows: var(--control-height-sm);
   align-items: center;
   gap: var(--space-sm);
-  flex-wrap: wrap;
+  min-height: calc(var(--control-height-sm) + var(--space-sm));
   margin-bottom: var(--space-md);
   padding: 0 0 var(--space-sm);
   border-bottom: 1px solid var(--color-divider);
   background: transparent;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 .clinical-session-toolbar-group {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -345,7 +349,13 @@
 }
 
 .clinical-session-toolbar-group-standalone {
-  margin-left: auto;
+  justify-self: end;
+}
+
+.clinical-session-toolbar-group-editing {
+  height: var(--control-height-sm);
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .clinical-session-editor-toolbar button {
@@ -389,6 +399,12 @@
 .clinical-session-editor-toolbar .btn {
   min-height: var(--control-height-sm);
   padding: var(--space-xs) var(--space-md);
+}
+
+.clinical-session-editor-toolbar .clinical-session-save-icon-button {
+  width: var(--control-height-sm);
+  min-width: var(--control-height-sm);
+  padding: 4px;
 }
 
 .clinical-session-editor-toolbar button:disabled {
@@ -1608,6 +1624,20 @@
   color: #e7f0f2;
 }
 
+:host-context([data-theme="dark"]) .clinical-session-json-template {
+  background: #102231;
+  border-color: rgba(123, 151, 168, 0.34);
+  color: #e7f0f2;
+}
+
+:host-context([data-theme="dark"]) .clinical-session-json-template summary {
+  color: #e7f0f2;
+}
+
+:host-context([data-theme="dark"]) .clinical-session-json-template pre {
+  color: #b8c9ce;
+}
+
 :host-context([data-theme="dark"]) .clinical-session-toolbar-group {
   background: transparent;
   border-color: transparent;
@@ -1772,6 +1802,17 @@
   .clinical-session-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .clinical-session-editor-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .clinical-session-toolbar-group-standalone {
+    margin-left: 0;
+    justify-self: auto;
   }
 
   .clinical-sessions-layout {
