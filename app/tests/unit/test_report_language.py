@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from domain.clinical.entities import DrugRucamAssessment
+from services.clinical.hepatox_scoring import is_materially_in_report_language
 from services.clinical.report_language import (
     SUPPORTED_REPORT_LANGUAGE_CODES,
     phrase,
@@ -50,3 +51,9 @@ def test_unsupported_language_code_resolves_to_english() -> None:
 def test_missing_phrase_key_raises_deterministic_error() -> None:
     with pytest.raises(KeyError):
         phrase("missing_key", "en")
+
+###############################################################################
+def test_material_report_language_detection_executes_for_non_english() -> None:
+    assert is_materially_in_report_language(
+        "La valutazione clinica richiede monitoraggio epatico.", "it"
+    )

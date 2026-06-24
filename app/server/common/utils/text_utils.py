@@ -117,7 +117,6 @@ def try_parse_json(value: str) -> Any:
     except (TypeError, ValueError):
         return None
 
-
 ###############################################################################
 def unique_preserve_order(values: list[str]) -> list[str]:
     seen: set[str] = set()

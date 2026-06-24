@@ -76,7 +76,7 @@
     "catalog_index_limit": 75000,
     "spelling_confidence": 0.94,
     "spelling_min_query_length": 6,
-    "spelling_short_name_length": 10,
+    "spelling_short_name_length": 8,
     "spelling_short_max_distance": 1,
     "spelling_long_max_distance": 2
   }

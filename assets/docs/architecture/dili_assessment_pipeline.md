@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-06-23
+Last updated: 2026-06-24
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -31,6 +31,10 @@ If no explicit pattern exists, the calculated value is used. If neither is avail
 Drug matching uses a first-class local resolution decision layer. Extracted mentions are normalized once, regimen parents and components are preserved separately, RxNav candidates are built from the persisted RxNorm-backed catalog, LiverTox candidates are built from local monographs, and a deterministic policy decides whether a match can be accepted automatically.
 
 LiverTox and RxNav matching keeps raw extracted name, normalized name, matched LiverTox name, RxNorm RXCUI when available, RxNav validation status, match status, confidence, reason, candidates, rejected candidates, origins, raw mentions, extraction metadata, and the full `DrugResolutionDecision`.
+
+Candidate admission is intentionally high recall: structurally plausible medication labels are not discarded merely because they lack an exact local alias or recognized INN suffix. Exact, alias, normalized, structured ingredient/brand, and bounded unique spelling resolution run before a match is declared missing.
+
+When a plausible mention remains unresolved, the configured parser model may propose generic names or active ingredients in one structured batch. These proposals are candidate generation only. Every proposed identity is re-run through the local RxNav/LiverTox resolver, and no LiverTox evidence is accepted unless the local policy produces a unique accepted match. Unvalidated or ambiguous proposals remain unresolved and auditable.
 
 Resolution statuses are:
 - `accepted_exact_livertox`

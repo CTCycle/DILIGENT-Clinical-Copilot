@@ -3,11 +3,10 @@ from __future__ import annotations
 from domain.clinical.drug_resolution import (
     DrugResolutionDecision,
     LiverToxResolutionCandidate,
+    NormalizedDrugMention,
     RxNavResolutionCandidate,
 )
 from services.catalogs.runtime import get_reference_catalog_snapshot
-from services.clinical.drug_resolution.normalizer import NormalizedDrugMention
-
 
 ###############################################################################
 class DrugResolutionPolicy:

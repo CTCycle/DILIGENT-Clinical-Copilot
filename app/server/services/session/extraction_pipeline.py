@@ -525,6 +525,11 @@ class ClinicalSessionExtractionPipelineMixin:
             clinical_context=structured_context,
             pattern_score=pattern_score,
             progress_callback=livertox_progress_callback,
+            identity_resolution_client=getattr(self.drugs_parser, "client", None),
+            identity_resolution_model=getattr(self.drugs_parser, "model", None),
+            identity_resolution_temperature=float(
+                getattr(self.drugs_parser, "temperature", 0.0)
+            ),
         )
         self.run_stop_check(stop_check)
         if prepared_inputs is None and all_detected_drugs.entries:

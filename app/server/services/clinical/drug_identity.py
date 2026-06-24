@@ -1,24 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import re
 from typing import Any
 
 from common.utils.text_utils import coerce_text
+from domain.clinical.drug_resolution import DrugIdentityCandidate
 from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.text.normalization import canonicalize_drug_query, normalize_drug_query_name
-
-
-###############################################################################
-@dataclass(frozen=True)
-class DrugIdentityCandidate:
-    source_label: str
-    canonical_candidate: str
-    normalized_candidate: str
-    kind: str
-    confidence: float
-    notes: tuple[str, ...] = field(default_factory=tuple)
-
 
 ###############################################################################
 class DrugIdentityResolver:

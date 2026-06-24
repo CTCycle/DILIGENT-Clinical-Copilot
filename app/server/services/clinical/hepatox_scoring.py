@@ -1,16 +1,8 @@
 from __future__ import annotations
 
+import re
+
 from services.catalogs.runtime import get_reference_catalog_snapshot
-from services.clinical.hepatox_constants import (
-    BIBLIOGRAPHY_LINE_RE,
-    DRIFT_SECTION_LINE_RE,
-    LIVERTOX_TITLE_LINE_RE,
-    NOT_AVAILABLE_TEXT,
-    RATE_LIMIT_WAIT_HINT_RE,
-    REDUNDANT_REPORT_LINE_RE,
-    REPORT_LABEL_LINE_RE,
-    STRUCTURED_DILI_SECTION_LINE_RE,
-)
 
 ###############################################################################
 def is_materially_in_report_language(text: str, report_language: str) -> bool:

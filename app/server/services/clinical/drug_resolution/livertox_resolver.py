@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from domain.clinical.drug_resolution import LiverToxResolutionCandidate
+from domain.clinical.drug_resolution import (
+    LiverToxResolutionCandidate,
+    NormalizedDrugMention,
+)
 from services.clinical.drug_identity import DrugIdentityResolver
-from services.clinical.drug_resolution.normalizer import NormalizedDrugMention
 from services.clinical.matches_core import LiverToxMatcher
 from services.text.normalization import canonicalize_drug_query, normalize_drug_query_name
-
 
 ###############################################################################
 class LiverToxCandidateResolver:

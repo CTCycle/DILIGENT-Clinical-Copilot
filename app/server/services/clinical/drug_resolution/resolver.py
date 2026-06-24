@@ -6,13 +6,11 @@ from typing import Any
 from domain.clinical.drug_resolution import (
     DrugResolutionDecision,
     LiverToxResolutionCandidate,
+    NormalizedDrugMention,
 )
 from domain.clinical.entities import PatientDrugs
 from services.clinical.drug_resolution.livertox_resolver import LiverToxCandidateResolver
-from services.clinical.drug_resolution.normalizer import (
-    DrugMentionNormalizer,
-    NormalizedDrugMention,
-)
+from services.clinical.drug_resolution.normalizer import DrugMentionNormalizer
 from services.clinical.drug_resolution.policy import DrugResolutionPolicy
 from services.clinical.drug_resolution.rxnav_resolver import RxNavCandidateResolver
 from services.clinical.drug_resolution.serialization import decision_to_payload
@@ -20,7 +18,6 @@ from services.clinical.matches_core import LiverToxMatcher
 
 
 CacheLookupFn = Callable[[str], dict[str, Any] | None]
-
 
 ###############################################################################
 class DrugResolutionService:
@@ -34,7 +31,7 @@ class DrugResolutionService:
     ) -> None:
         self.matcher = matcher
         self.cache_lookup = cache_lookup
-        self.normalizer = DrugMentionNormalizer(matcher.lookup)
+        self.normalizer = DrugMentionNormalizer()
         self.rxnav_resolver = RxNavCandidateResolver(matcher)
         self.livertox_resolver = LiverToxCandidateResolver(matcher)
         self.policy = DrugResolutionPolicy()

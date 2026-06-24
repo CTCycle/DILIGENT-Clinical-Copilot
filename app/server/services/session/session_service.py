@@ -32,16 +32,14 @@ from repositories.serialization.model_configs import (
 )
 from services.clinical.disease import DiseaseExtractor
 from services.clinical.drug_blocks import isolate_drug_blocks
-from services.clinical.hepatox_core import (
-    HepatotoxicityPatternAnalyzer,
-    HepatoxConsultation,
-)
+from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.job_progress import (
     StageProgressFractionCallback,
 )
 from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.language import ClinicalLanguageDetector
 from services.clinical.parser import DrugsParser
+from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.clinical.rucam import RucamScoreEstimator
 from services.clinical.validation import (

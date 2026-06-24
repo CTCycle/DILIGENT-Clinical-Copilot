@@ -41,8 +41,12 @@ from domain.clinical.extras import (
     LabExtractionPayload,
 )
 from domain.clinical.drug_resolution import (
+    DrugIdentityCandidate,
+    DrugIdentityProposal,
+    DrugIdentityProposalBatch,
     DrugResolutionDecision,
     LiverToxResolutionCandidate,
+    NormalizedDrugMention,
     RxNavResolutionCandidate,
 )
 from domain.clinical.language import LanguageDetectionResult
@@ -102,8 +106,12 @@ __all__ = [
     "CandidateSelectionResult",
     "HepatoxPreparedInputs",
     "LabExtractionPayload",
+    "DrugIdentityCandidate",
+    "DrugIdentityProposal",
+    "DrugIdentityProposalBatch",
     "DrugResolutionDecision",
     "LiverToxResolutionCandidate",
+    "NormalizedDrugMention",
     "RxNavResolutionCandidate",
     "LlmClinicalSectionTextDraft",
     "MonographRecord",

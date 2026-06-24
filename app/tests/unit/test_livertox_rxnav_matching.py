@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 
 import pandas as pd
-from domain.clinical.entities import DrugEntry
+from domain.clinical import DrugEntry, PatientDrugs
 from services.clinical.match_resolution import conservative_fuzzy_livertox_match
+from services.clinical.matches_core import LiverToxMatcher
 from services.clinical.preparation import ClinicalKnowledgePreparation
 
 ###############################################################################
@@ -48,14 +49,17 @@ def test_conservative_fuzzy_livertox_match_high_threshold() -> None:
     )
 
 ###############################################################################
-def test_resolve_livertox_match_for_drug_direct() -> None:
+def test_prepare_inputs_resolves_direct_livertox_alias() -> None:
     prep = ClinicalKnowledgePreparation()
-    from services.clinical.matches_core import LiverToxMatcher
-
     prep.livertox_matcher = LiverToxMatcher(_build_livertox_df())
-    result = asyncio.run(
-        prep.resolve_livertox_match_for_drug(DrugEntry(name="Tylenol"))
+    prepared = asyncio.run(
+        prep.prepare_inputs(
+            PatientDrugs(entries=[DrugEntry(name="Tylenol")]),
+            clinical_context="",
+            pattern_score=None,
+        )
     )
-    assert result is not None
-    assert result.matched_livertox_name == "Acetaminophen"
-    assert result.match_strategy == "direct_livertox"
+    assert prepared is not None
+    payload = next(iter(prepared.resolved_drugs.values()))
+    assert payload["accepted_livertox_name"] == "Acetaminophen"
+    assert payload["decision_status"] == "accepted_livertox_without_rxnav"

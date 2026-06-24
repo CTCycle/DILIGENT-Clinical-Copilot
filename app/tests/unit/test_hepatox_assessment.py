@@ -23,10 +23,8 @@ from domain.clinical import (
     RucamComponentAssessment,
 )
 from services.clinical.analysis_runner import AnalysisRunner
-from services.clinical.hepatox_core import (
-    HepatotoxicityPatternAnalyzer,
-    HepatoxConsultation,
-)
+from services.clinical.hepatox_core import HepatoxConsultation
+from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
 
 ###############################################################################
 class FlakyChatClient:
@@ -372,7 +370,7 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
 
     assert report is not None
     assert "**Valium - LiverTox score D**" in report
-    assert "No matching LiverTox record available." in report
+    assert "Matched drug record found, but no local LiverTox excerpt is available." in report
 
 ###############################################################################
 def test_finalize_patient_report_renders_accepted_resolution_status_as_matched() -> None:
@@ -509,7 +507,6 @@ def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
     assert "Structured RUCAM score: 3 (possible)." in section
     assert "### UnknownX" in section
     assert "before causality is assigned" in section
-
 
 ###############################################################################
 def test_unresolved_candidate_details_render_names_without_raw_payloads() -> None:

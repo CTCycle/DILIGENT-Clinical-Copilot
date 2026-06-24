@@ -5,6 +5,7 @@ import asyncio
 import pandas as pd
 from domain.clinical import DrugEntry, PatientDrugs
 from services.clinical.drug_identity import DrugIdentityResolver
+from services.clinical.drug_resolution import DrugResolutionService
 from services.clinical.matches_core import LiverToxMatcher
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.text.normalization import normalize_drug_query_name
@@ -149,7 +150,6 @@ def test_excerpt_attached_only_for_valid_match_confidence() -> None:
 
 ###############################################################################
 def test_duplicate_drugs_from_sources_are_merged_by_canonical_name() -> None:
-    preparation = ClinicalKnowledgePreparation()
     drugs = PatientDrugs(
         entries=[
             DrugEntry(name="Acetaminophen 500 mg", source="therapy"),
@@ -157,11 +157,14 @@ def test_duplicate_drugs_from_sources_are_merged_by_canonical_name() -> None:
         ]
     )
 
-    candidates = preparation.build_drug_candidates(drugs)
+    resolved = DrugResolutionService(LiverToxMatcher(build_livertox_df())).resolve(
+        drugs
+    )
 
-    assert len(candidates) == 1
-    assert candidates[0]["canonical_name"] == "acetaminophen"
-    assert candidates[0]["origins"] == ["therapy", "anamnesis"]
+    assert len(resolved) == 1
+    payload = next(iter(resolved.values()))
+    assert payload["accepted_livertox_name"] == "Acetaminophen"
+    assert payload["origins"] == ["therapy", "anamnesis"]
 
 ###############################################################################
 def test_preparation_resolves_catalog_identity_candidates_before_livertox_lookup() -> None:
@@ -237,8 +240,6 @@ def test_preparation_resolves_catalog_identity_candidates_before_livertox_lookup
             },
         ]
     )
-    preparation = ClinicalKnowledgePreparation()
-    preparation.livertox_matcher = LiverToxMatcher(frame, drugs_catalog_df=catalog)
     drugs = PatientDrugs(
         entries=[
             DrugEntry(name="Prednisone TrialCo", source="therapy"),
@@ -248,33 +249,28 @@ def test_preparation_resolves_catalog_identity_candidates_before_livertox_lookup
         ]
     )
 
-    candidates = preparation.build_drug_candidates(drugs)
-    canonical_names = {candidate["canonical_name"] for candidate in candidates}
+    resolved = DrugResolutionService(
+        LiverToxMatcher(frame, drugs_catalog_df=catalog)
+    ).resolve(drugs)
+    canonical_names = {
+        payload["accepted_livertox_name"] for payload in resolved.values()
+    }
 
-    assert "prednisone" in canonical_names
-    assert "abiraterone" in canonical_names
-    assert "tamsulosin" in canonical_names
-    assert "leuprolide" in canonical_names
-    assert any(
-        candidate["identity_kind"] in {"catalog_ingredient", "livertox_primary"}
-        for candidate in candidates
-    )
+    assert {"Prednisone", "Abiraterone", "Tamsulosin", "Leuprolide"} <= canonical_names
 
 ###############################################################################
 def test_component_splitting_keeps_units_and_drops_noise() -> None:
-    preparation = ClinicalKnowledgePreparation()
-
-    assert preparation.split_regimen_components("Trialmed 4500 IU/ml") == [
+    assert DrugIdentityResolver.split_components("Trialmed 4500 IU/ml") == [
         "Trialmed 4500 IU per ml"
     ]
-    assert preparation.split_regimen_components("Trialmed 500/800") == [
+    assert DrugIdentityResolver.split_components("Trialmed 500/800") == [
         "Trialmed 500/800"
     ]
-    assert preparation.split_regimen_components("Alphamed + Betamed") == [
+    assert DrugIdentityResolver.split_components("Alphamed + Betamed") == [
         "Alphamed",
         "Betamed",
     ]
-    assert preparation.split_regimen_components("Alphamed-Betamed") == [
+    assert DrugIdentityResolver.split_components("Alphamed-Betamed") == [
         "Alphamed",
         "Betamed",
     ]
@@ -885,7 +881,6 @@ def test_mapping_classifies_matched_no_excerpt_separately_from_missing_match() -
 
 ###############################################################################
 def test_preparation_expands_regimen_into_multiple_components() -> None:
-    preparation = ClinicalKnowledgePreparation()
     drugs = PatientDrugs(
         entries=[
             DrugEntry(name="Encorafenib + Binimetinib", source="therapy"),
@@ -893,8 +888,10 @@ def test_preparation_expands_regimen_into_multiple_components() -> None:
         ]
     )
 
-    candidates = preparation.build_drug_candidates(drugs)
-    canonical_names = {candidate["canonical_name"] for candidate in candidates}
+    resolved = DrugResolutionService(LiverToxMatcher(build_livertox_df())).resolve(
+        drugs
+    )
+    canonical_names = {payload["canonical_name"] for payload in resolved.values()}
 
     assert "encorafenib binimetinib" in canonical_names
     assert "dabrafenib trametinib" in canonical_names
@@ -902,11 +899,11 @@ def test_preparation_expands_regimen_into_multiple_components() -> None:
     assert "binimetinib" in canonical_names
     assert "dabrafenib" in canonical_names
     assert "trametinib" in canonical_names
-    for candidate in candidates:
-        if candidate["canonical_name"] in {"encorafenib", "binimetinib"}:
-            assert "binimetinib|encorafenib" in candidate["regimen_group_ids"]
-        if candidate["canonical_name"] in {"dabrafenib", "trametinib"}:
-            assert "dabrafenib|trametinib" in candidate["regimen_group_ids"]
+    for payload in resolved.values():
+        if payload["canonical_name"] in {"encorafenib", "binimetinib"}:
+            assert "binimetinib|encorafenib" in payload["regimen_group_ids"]
+        if payload["canonical_name"] in {"dabrafenib", "trametinib"}:
+            assert "dabrafenib|trametinib" in payload["regimen_group_ids"]
 
 ###############################################################################
 def test_catalog_retry_resolves_ambiguous_match_via_catalog_alias() -> None:
@@ -950,7 +947,6 @@ def test_catalog_retry_resolves_ambiguous_match_via_catalog_alias() -> None:
     assert result.status == "matched"
     assert result.matched_name == "DrugA"
     assert result.reason in {"exact_canonical", "exact_alias_ranked", "exact_alias", "normalized_exact_ranked"}
-
 
 ###############################################################################
 def test_ambiguous_retry_preserves_original_when_catalog_does_not_help() -> None:

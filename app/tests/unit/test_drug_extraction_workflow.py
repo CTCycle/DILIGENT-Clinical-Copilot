@@ -5,24 +5,6 @@ from services.clinical.drug_resolution.normalizer import DrugMentionNormalizer
 from services.clinical.parser import DrugsParser
 from services.session.preflight import LocalModelBatchPreflightResult
 
-
-class _EmptyAliasLookup:
-    @staticmethod
-    def canonicalize_query(value: str) -> str:
-        return value
-
-    @staticmethod
-    def match_alias_exact_all(canonical_query: str) -> list:
-        return []
-
-    @staticmethod
-    def match_primary_all(canonical_query: str) -> list:
-        return []
-
-    @staticmethod
-    def match_normalized_all(normalized_query: str) -> list:
-        return []
-
 ###############################################################################
 def test_anamnesis_and_therapy_source_fields_are_preserved() -> None:
     parser = DrugsParser(client=None)
@@ -99,24 +81,27 @@ def test_source_differences_prevent_cross_section_collapse() -> None:
     # Current pipeline keeps section-specific origin and must not collapse these two.
     assert len(deduped) == 2
 
-
 ###############################################################################
-def test_non_drug_tokens_are_rejected_without_language_specific_stopwords() -> None:
-    normalizer = DrugMentionNormalizer(_EmptyAliasLookup())
+def test_structural_gate_does_not_require_catalog_recognition() -> None:
+    normalizer = DrugMentionNormalizer()
     for value in (
         "Ecografia Addome",
         "Adiuvante",
         "Effettuata",
         "Inizio",
         "Introdotto",
-        "Paziente nota per abuso di etile (circa",
     ):
-        assert normalizer._normalize_entry(DrugEntry(name=value)) is None
-
+        assert normalizer._normalize_entry(DrugEntry(name=value)) is not None
+    assert (
+        normalizer._normalize_entry(
+            DrugEntry(name="Paziente nota per abuso di etile circa ogni giorno")
+        )
+        is None
+    )
 
 ###############################################################################
 def test_novel_inn_suffix_candidate_remains_for_missing_livertox_resolution() -> None:
-    normalizer = DrugMentionNormalizer(_EmptyAliasLookup())
+    normalizer = DrugMentionNormalizer()
     mention = normalizer._normalize_entry(DrugEntry(name="Trialzumab"))
     assert mention is not None
     assert mention.normalized_name == "trialzumab"

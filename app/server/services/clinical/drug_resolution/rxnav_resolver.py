@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from common.utils.text_utils import coerce_text
-from domain.clinical.drug_resolution import RxNavResolutionCandidate
+from domain.clinical.drug_resolution import (
+    NormalizedDrugMention,
+    RxNavResolutionCandidate,
+)
 from services.catalogs.runtime import get_reference_catalog_snapshot
-from services.clinical.drug_resolution.normalizer import NormalizedDrugMention
 from services.text.normalization import normalize_drug_query_name
-
 
 ###############################################################################
 class RxNavCandidateResolver:
