@@ -11,7 +11,7 @@ from domain.clinical.entities import (
     ClinicalSessionRequest,
 )
 from domain.clinical.extras import HepatoxPreparedInputs
-from services.runtime.jobs import get_job_manager
+from services.runtime.jobs import JobErrorSanitizer, get_job_manager
 from services.session.factory import build_clinical_session_service
 from services.session.session_service import ClinicalSessionService
 from services.session.session_workflow import start_clinical_job_workflow
@@ -133,6 +133,52 @@ def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) ->
     resolved = ClinicalSessionService._resolve_runtime_timeout(base_timeout_s=7200.0)
 
     assert resolved == 7200.0
+
+###############################################################################
+def test_resolve_runtime_timeout_does_not_apply_local_cap(monkeypatch) -> None:
+    fake_settings = SimpleNamespace(
+        runtime=SimpleNamespace(
+            minimum_llm_timeout=5.0,
+        ),
+    )
+    monkeypatch.setattr(
+        "services.session.session_service.get_server_settings",
+        lambda: fake_settings,
+    )
+    monkeypatch.setattr(
+        "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: False,
+    )
+
+    resolved = ClinicalSessionService._resolve_runtime_timeout(
+        base_timeout_s=3600.0,
+        cloud_cap_s=300.0,
+        local_cap_s=45.0,
+    )
+
+    assert resolved == 3600.0
+
+###############################################################################
+def test_job_error_sanitizer_reports_local_model_oom_safely() -> None:
+    error = RuntimeError(
+        "LLM call failed: Ollama HTTP 500: llama-server reported out-of-memory "
+        "during startup: cudaMalloc failed: out of memory"
+    )
+
+    message = JobErrorSanitizer.build_safe_job_error_message(error)
+
+    assert message == JobErrorSanitizer.LOCAL_MODEL_MEMORY_MESSAGE
+
+###############################################################################
+def test_extraction_failure_classification_reports_schema_error() -> None:
+    code, message = ClinicalSessionService.classify_extraction_failure(
+        RuntimeError("Structured parsing failed: validation error"),
+        fallback_code="therapy_extraction_fallback",
+        fallback_message="fallback",
+    )
+
+    assert code == "structured_extraction_schema_invalid"
+    assert "required schema" in message
 
 ###############################################################################
 def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) -> None:

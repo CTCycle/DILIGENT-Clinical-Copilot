@@ -65,4 +65,70 @@ describe('DiliAgentPageComponent', () => {
 
     expect(component.preflightReviewAcknowledged()).toBeTruthy();
   });
+
+  it('stops the spinner and displays a failed clinical job error', () => {
+    component.stateService.updateDiliAgent({
+      isRunning: true,
+      jobStatus: 'running',
+      jobId: 'job-123',
+    });
+
+    (component as unknown as {
+      onJobStatusUpdate: (status: {
+        job_id: string;
+        job_type: string;
+        status: 'failed';
+        progress: number;
+        result: null;
+        error: string;
+      }) => void;
+    }).onJobStatusUpdate({
+      job_id: 'job-123',
+      job_type: 'clinical',
+      status: 'failed',
+      progress: 23,
+      result: null,
+      error: 'Local model could not be loaded due to insufficient memory.',
+    });
+
+    expect(component.showSpinner).toBeFalsy();
+    expect(component.vm.isRunning).toBeFalsy();
+    expect(component.vm.jobStatus).toBe('failed');
+    expect(component.vm.message).toContain('Local model could not be loaded');
+  });
+
+  it('marks polling failure as failed and stops the spinner', () => {
+    component.stateService.updateDiliAgent({
+      isRunning: true,
+      jobStatus: 'running',
+      jobId: 'job-123',
+    });
+
+    (component as unknown as { onPollingError: (message: string) => void }).onPollingError(
+      'Polling failed after repeated attempts.',
+    );
+
+    expect(component.showSpinner).toBeFalsy();
+    expect(component.vm.isRunning).toBeFalsy();
+    expect(component.vm.jobStatus).toBe('failed');
+    expect(component.vm.message).toContain('Polling failed');
+  });
+
+  it('keeps stop action and explanatory spinner text during long extraction', () => {
+    component.stateService.updateDiliAgent({
+      isRunning: true,
+      jobStatus: 'running',
+      jobId: 'job-123',
+      jobStage: 'therapy_extraction',
+      jobStageMessage: 'Parsing therapy section',
+      jobProgress: 23,
+    });
+
+    expect(component.showSpinner).toBeTruthy();
+    expect(component.runActionLabel).toBe('Stop analysis');
+    expect(component.runActionDisabled).toBeFalsy();
+    expect(component.spinnerStatusLabel).toContain(
+      'Local model extraction can take several minutes.',
+    );
+  });
 });

@@ -67,13 +67,18 @@ class ClinicalSessionExtractionPipelineMixin:
                 elapsed,
                 exc,
             )
-            self.append_warning_issue(
-                issues,
-                code="therapy_extraction_fallback",
-                message=(
+            issue_code, issue_message = self.classify_extraction_failure(
+                exc,
+                fallback_code="therapy_extraction_fallback",
+                fallback_message=(
                     "Therapy extraction via LLM was unavailable; "
                     "the analysis continued using the raw therapy list."
                 ),
+            )
+            self.append_warning_issue(
+                issues,
+                code=issue_code,
+                message=issue_message,
                 field="drugs",
             )
             therapy_drugs = self.build_fallback_therapy_drugs(cleaned_therapy_text)
@@ -127,13 +132,18 @@ class ClinicalSessionExtractionPipelineMixin:
                 timeout_s,
                 exc,
             )
-            self.append_warning_issue(
-                issues,
-                code="anamnesis_extraction_failed",
-                message=(
+            issue_code, issue_message = self.classify_extraction_failure(
+                exc,
+                fallback_code="anamnesis_extraction_failed",
+                fallback_message=(
                     "Drug extraction from anamnesis was unavailable; "
                     "the analysis continued without historical drug mentions."
                 ),
+            )
+            self.append_warning_issue(
+                issues,
+                code=issue_code,
+                message=issue_message,
                 field="anamnesis",
             )
             anamnesis_drugs = PatientDrugs(entries=[])
@@ -219,13 +229,18 @@ class ClinicalSessionExtractionPipelineMixin:
                     elapsed,
                     timeout_s,
                 )
-                self.append_warning_issue(
-                    issues,
-                    code="anamnesis_disease_extraction_timeout",
-                    message=(
+                issue_code, issue_message = self.classify_extraction_failure(
+                    TimeoutError("Anamnesis disease extraction timed out"),
+                    fallback_code="anamnesis_disease_extraction_timeout",
+                    fallback_message=(
                         "Disease extraction from anamnesis timed out; "
                         "the analysis continued without structured disease timeline."
                     ),
+                )
+                self.append_warning_issue(
+                    issues,
+                    code=issue_code,
+                    message=issue_message,
                     field="anamnesis",
                 )
                 disease_context = PatientDiseaseContext(entries=[])
@@ -246,13 +261,18 @@ class ClinicalSessionExtractionPipelineMixin:
                     timeout_s,
                     exc,
                 )
-                self.append_warning_issue(
-                    issues,
-                    code="anamnesis_disease_extraction_failed",
-                    message=(
+                issue_code, issue_message = self.classify_extraction_failure(
+                    exc,
+                    fallback_code="anamnesis_disease_extraction_failed",
+                    fallback_message=(
                         "Disease extraction from anamnesis was unavailable; "
                         "the analysis continued without structured disease timeline."
                     ),
+                )
+                self.append_warning_issue(
+                    issues,
+                    code=issue_code,
+                    message=issue_message,
                     field="anamnesis",
                 )
                 disease_context = PatientDiseaseContext(entries=[])
@@ -322,13 +342,18 @@ class ClinicalSessionExtractionPipelineMixin:
                 timeout_s,
                 exc,
             )
-            self.append_warning_issue(
-                issues,
-                code="anamnesis_lab_extraction_failed",
-                message=(
+            issue_code, issue_message = self.classify_extraction_failure(
+                exc,
+                fallback_code="anamnesis_lab_extraction_failed",
+                fallback_message=(
                     "Longitudinal lab extraction from anamnesis was unavailable; "
                     "the analysis continued with deterministic lab parsing fallback."
                 ),
+            )
+            self.append_warning_issue(
+                issues,
+                code=issue_code,
+                message=issue_message,
                 field="anamnesis",
             )
             # Deterministic fallback: recover lab markers directly from text

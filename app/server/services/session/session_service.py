@@ -49,6 +49,7 @@ from services.clinical.validation import (
 )
 from services.llm.model_config import ModelConfigService
 from services.runtime.jobs import (
+    JobErrorSanitizer,
     JobManager,
 )
 from services.session.clinical_input_extractor import (
@@ -166,7 +167,7 @@ class ClinicalSessionService(
         if LLMRuntimeConfig.is_cloud_enabled():
             requested = cloud_cap_s
         else:
-            requested = local_cap_s
+            requested = None
         if requested is None:
             return base
         return min(base, max(float(requested), minimum_timeout_s))
@@ -483,6 +484,33 @@ class ClinicalSessionService(
                 field=field,
             )
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def classify_extraction_failure(
+        exc: Exception,
+        *,
+        fallback_code: str,
+        fallback_message: str,
+    ) -> tuple[str, str]:
+        raw_message = str(exc)
+        lowered = raw_message.casefold()
+        runtime_message = JobErrorSanitizer.classify_llm_runtime_failure(raw_message)
+        if runtime_message == JobErrorSanitizer.LOCAL_MODEL_MEMORY_MESSAGE:
+            return "local_model_memory_exhausted", runtime_message
+        if runtime_message == JobErrorSanitizer.LOCAL_MODEL_UNAVAILABLE_MESSAGE:
+            return "local_model_unavailable", runtime_message
+        if isinstance(exc, TimeoutError) or "timed out" in lowered:
+            return (
+                "local_model_extraction_timeout",
+                "Local model extraction timed out; the analysis continued with available fallback data.",
+            )
+        if "structured parsing failed" in lowered or "validation error" in lowered:
+            return (
+                "structured_extraction_schema_invalid",
+                "Structured model output did not match the required schema; the analysis continued with validated fallback data.",
+            )
+        return fallback_code, fallback_message
 
     # -------------------------------------------------------------------------
     @staticmethod

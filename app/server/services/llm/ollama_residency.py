@@ -331,6 +331,36 @@ def format_prefetch_error(exc: Exception) -> str:
     return message or type(exc).__name__
 
 ###############################################################################
+def _format_bytes(value: Any) -> str:
+    try:
+        parsed = int(value)
+    except TypeError:
+        parsed = 0
+    if parsed <= 0:
+        return "unknown"
+    gib = parsed / 1_073_741_824
+    return f"{gib:.1f} GiB"
+
+###############################################################################
+def log_prefetch_skipped_for_residency_plan(
+    *,
+    active_model: str,
+    plan: dict[str, Any],
+) -> None:
+    logger.info(
+        (
+            "Skipping Ollama predictive prefetch after active model '%s': "
+            "dual residency is not safe for local hardware "
+            "(available_ram=%s required_ram=%s available_vram=%s required_vram=%s)."
+        ),
+        active_model,
+        _format_bytes(plan.get("available_ram")),
+        _format_bytes(plan.get("required_ram")),
+        _format_bytes(plan.get("available_vram")),
+        _format_bytes(plan.get("required_vram")),
+    )
+
+###############################################################################
 async def prefetch_model(
     self,
     *,
@@ -383,15 +413,21 @@ async def maybe_prefetch_target_model(self, *, active_model: str) -> None:
         return
     self.record_target_usage(active_model)
 
-    if bool(plan.get("dual_residency")):
-        candidate = next((name for name in models if name != active_model), None)
-        keep_alive = self.residency_dual_keep_alive
-    else:
-        candidate = self.predict_next_target_model(
-            current_model=active_model,
-            target_models=models,
-        )
-        keep_alive = self.residency_single_keep_alive
+    if not bool(plan.get("dual_residency")):
+        if len(models) >= 2:
+            skip_log_key = f"__skip_prefetch__:{active_model}"
+            now = time.monotonic()
+            last_run = self.prefetch_last_run_by_model.get(skip_log_key, 0.0)
+            if (now - last_run) >= self.residency_prefetch_cooldown_s:
+                self.prefetch_last_run_by_model[skip_log_key] = now
+                self.log_prefetch_skipped_for_residency_plan(
+                    active_model=active_model,
+                    plan=plan,
+                )
+        return
+
+    candidate = next((name for name in models if name != active_model), None)
+    keep_alive = self.residency_dual_keep_alive
     if not candidate:
         return
 
