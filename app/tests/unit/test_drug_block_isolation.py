@@ -33,3 +33,13 @@ def test_sentence_style_therapy_list_splits_into_blocks() -> None:
         "Nitrofurantoin (Furadantin retard) started 2024-01-02.",
         "Ceftriaxone started 2024-01-03.",
     ]
+
+
+###############################################################################
+def test_overlong_block_is_truncated_at_sentence_boundary() -> None:
+    text = (
+        "Nitrofurantoin 100 mg twice daily. "
+        "Paziente nota per abuso di etile con follow-up clinico."
+    )
+    blocks = isolate_drug_blocks(text)
+    assert [block.text for block in blocks] == ["Nitrofurantoin 100 mg twice daily"]

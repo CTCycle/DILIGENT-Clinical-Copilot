@@ -48,6 +48,22 @@ def test_duplicate_competing_headings_fail() -> None:
             "Therapy:\nT1\nCurrent medications:\nT2\nAnamnesis:\nA\nLaboratory history:\nL"
         )
 
+
+###############################################################################
+def test_duplicate_heading_error_reports_both_line_numbers() -> None:
+    text = (
+        "## Anamnesis\nhistory\n"
+        "## Therapy\nfirst drug\n"
+        "## Therapy\nsecond drug\n"
+        "## Laboratory Analysis\nALT 200 U/L\n"
+    )
+    with pytest.raises(
+        ValueError,
+        match=r"Duplicate heading '## Therapy' found at lines 3 and 5",
+    ):
+        extract_required_dili_sections(text)
+
+
 ###############################################################################
 def test_source_validation_rejects_fabrication() -> None:
     sections = _extract("## Anamnesis\nReal history\n## Therapy\nReal drugs 400mg\n## Laboratory history\nALT 45")

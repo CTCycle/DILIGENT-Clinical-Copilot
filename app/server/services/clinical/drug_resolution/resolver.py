@@ -34,7 +34,7 @@ class DrugResolutionService:
     ) -> None:
         self.matcher = matcher
         self.cache_lookup = cache_lookup
-        self.normalizer = DrugMentionNormalizer()
+        self.normalizer = DrugMentionNormalizer(matcher.lookup)
         self.rxnav_resolver = RxNavCandidateResolver(matcher)
         self.livertox_resolver = LiverToxCandidateResolver(matcher)
         self.policy = DrugResolutionPolicy()
