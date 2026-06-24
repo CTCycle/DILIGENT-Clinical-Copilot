@@ -48,7 +48,6 @@ def test_duplicate_competing_headings_fail() -> None:
             "Therapy:\nT1\nCurrent medications:\nT2\nAnamnesis:\nA\nLaboratory history:\nL"
         )
 
-
 ###############################################################################
 def test_duplicate_heading_error_reports_both_line_numbers() -> None:
     text = (
@@ -62,7 +61,6 @@ def test_duplicate_heading_error_reports_both_line_numbers() -> None:
         match=r"Duplicate heading '## Therapy' found at lines 3 and 5",
     ):
         extract_required_dili_sections(text)
-
 
 ###############################################################################
 def test_source_validation_rejects_fabrication() -> None:

@@ -99,6 +99,10 @@ class DrugNameService:
         candidate_keys: set[str] = set()
         for candidate, _record, _original, _is_primary in data.variant_catalog:
             candidate_keys.add(candidate)
+        candidate_keys.update(data.primary_index)
+        candidate_keys.update(data.synonym_index)
+        candidate_keys.update(data.brand_index)
+        candidate_keys.update(data.ingredient_index)
         candidate_keys.update(self.lookup.catalog_global_index.keys())
 
         close_keys = [

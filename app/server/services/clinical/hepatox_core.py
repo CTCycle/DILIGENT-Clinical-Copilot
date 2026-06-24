@@ -35,7 +35,6 @@ from services.text.normalization import normalize_drug_query_name
 from services.clinical.analysis_runner import AnalysisRunner
 from services.clinical.drug_analysis import DrugAnalysisService
 from services.clinical import hepatox_scoring
-from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
 from services.clinical.rag_support import RagSupportService
 from services.clinical.report_finalizer import ReportFinalizer
 
@@ -44,12 +43,10 @@ from services.clinical.hepatox_constants import (  # noqa: E402
     DRIFT_SECTION_LINE_RE,
     LIVERTOX_TITLE_LINE_RE,
     NOT_AVAILABLE_TEXT,
-    RATE_LIMIT_WAIT_HINT_RE,
     REDUNDANT_REPORT_LINE_RE,
     REPORT_LABEL_LINE_RE,
     STRUCTURED_DILI_SECTION_LINE_RE,
 )
-
 
 ###############################################################################
 class HepatoxConsultation:
@@ -988,10 +985,9 @@ class HepatoxConsultation:
                 report_language=report_language,
             )
         if entry.missing_livertox:
-            return self.build_missing_excerpt_paragraph(
-                entry,
-                report_language=report_language,
-            )
+            if entry.matched_livertox_row:
+                return phrase("matched_no_excerpt", report_language)
+            return phrase("livertox_missing", report_language)
         return self.build_error_paragraph(entry, report_language=report_language)
 
     # -------------------------------------------------------------------------
@@ -1075,7 +1071,9 @@ class HepatoxConsultation:
         if status == "matched_no_excerpt":
             return phrase("matched_no_excerpt", report_language)
         if entry.missing_livertox:
-            return phrase("matched_no_excerpt", report_language)
+            if entry.matched_livertox_row:
+                return phrase("matched_no_excerpt", report_language)
+            return phrase("livertox_missing", report_language)
         return phrase("deterministic_section_unavailable", report_language)
 
     # -------------------------------------------------------------------------

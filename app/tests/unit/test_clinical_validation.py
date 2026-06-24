@@ -11,7 +11,7 @@ from domain.clinical import (
     PatientDrugs,
     PatientLabTimeline,
 )
-from services.clinical.hepatox_core import HepatotoxicityPatternAnalyzer
+from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
 from services.clinical.validation import (
     build_validation_bundle,
     ensure_required_sections,

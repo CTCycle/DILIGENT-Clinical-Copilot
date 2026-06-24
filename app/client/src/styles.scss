@@ -4813,6 +4813,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .report-shell.is-full-page .report-content {
   height: calc(100vh - 72px);
+  max-height: none;
+  resize: none;
 }
 
 .report-shell.is-full-page .inspection-excerpt-text {

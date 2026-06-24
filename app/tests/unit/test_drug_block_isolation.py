@@ -34,7 +34,6 @@ def test_sentence_style_therapy_list_splits_into_blocks() -> None:
         "Ceftriaxone started 2024-01-03.",
     ]
 
-
 ###############################################################################
 def test_overlong_block_is_truncated_at_sentence_boundary() -> None:
     text = (

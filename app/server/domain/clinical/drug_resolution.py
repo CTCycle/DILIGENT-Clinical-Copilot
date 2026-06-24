@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Literal
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 RxNavValidationStatus = Literal[
@@ -27,6 +28,32 @@ DrugDecisionStatus = Literal[
 
 
 ###############################################################################
+@dataclass(frozen=True)
+class DrugIdentityCandidate:
+    source_label: str
+    canonical_candidate: str
+    normalized_candidate: str
+    kind: str
+    confidence: float
+    notes: tuple[str, ...] = field(default_factory=tuple)
+
+
+###############################################################################
+@dataclass(slots=True)
+class NormalizedDrugMention:
+    extracted_name: str
+    canonical_name: str
+    normalized_name: str
+    source: Literal["therapy", "anamnesis", "unknown"]
+    raw_mentions: list[str]
+    origins: list[str]
+    extraction_metadata: list[dict[str, Any]]
+    regimen_group_id: str | None = None
+    is_regimen_parent: bool = False
+    regimen_components: list[str] = field(default_factory=list)
+
+
+###############################################################################
 class RxNavResolutionCandidate(BaseModel):
     rxcui: str | None = None
     name: str
@@ -39,7 +66,6 @@ class RxNavResolutionCandidate(BaseModel):
     accepted: bool = False
     rejected_reason: str | None = None
 
-
 ###############################################################################
 class LiverToxResolutionCandidate(BaseModel):
     nbk_id: str | None = None
@@ -51,7 +77,6 @@ class LiverToxResolutionCandidate(BaseModel):
     reason: str
     accepted: bool = False
     rejected_reason: str | None = None
-
 
 ###############################################################################
 class DrugResolutionDecision(BaseModel):
@@ -72,3 +97,48 @@ class DrugResolutionDecision(BaseModel):
     confidence: float | None = None
     reasons: list[str] = Field(default_factory=list)
     requires_human_review: bool
+
+
+###############################################################################
+class DrugIdentityProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    original_mention: str = Field(..., min_length=1, max_length=200)
+    proposed_canonical_name: str | None = Field(default=None, max_length=200)
+    ingredients: list[str] = Field(default_factory=list, max_length=8)
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    rationale: str = Field(..., min_length=1, max_length=500)
+
+    # -------------------------------------------------------------------------
+    @field_validator(
+        "original_mention",
+        "proposed_canonical_name",
+        "rationale",
+        mode="before",
+    )
+    @classmethod
+    def strip_text_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = str(value).strip()
+        return stripped or None
+
+    # -------------------------------------------------------------------------
+    @field_validator("ingredients", mode="before")
+    @classmethod
+    def normalize_ingredients(cls, value: object) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        cleaned: list[str] = []
+        for item in value:
+            text = str(item).strip()
+            if text and text not in cleaned:
+                cleaned.append(text)
+        return cleaned
+
+
+###############################################################################
+class DrugIdentityProposalBatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    proposals: list[DrugIdentityProposal] = Field(default_factory=list, max_length=50)

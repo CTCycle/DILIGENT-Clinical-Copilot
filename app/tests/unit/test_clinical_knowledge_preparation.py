@@ -3,8 +3,11 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import pandas as pd
+
 from domain.clinical import DrugEntry, PatientDrugs
 from services.clinical.knowledge import ClinicalKnowledgeComposer
+from services.clinical.matches_core import LiverToxMatcher
 from services.clinical.preparation import ClinicalKnowledgePreparation
 
 ###############################################################################
@@ -32,6 +35,15 @@ class SerializerStub:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def load_livertox_match_from_db_cache(
+        *,
+        normalized_drug_key: str,
+    ) -> None:
+        _ = normalized_drug_key
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def to_int(value: Any) -> int | None:
         try:
             return int(value)
@@ -39,31 +51,22 @@ class SerializerStub:
             return None
 
 ###############################################################################
-class MatcherStub:
-
-    # -------------------------------------------------------------------------
-    def match_drug_names(self, names: list[str]) -> list[dict[str, Any]]:
-        _ = names
-        return []
-
-    # -------------------------------------------------------------------------
-    def build_drugs_to_excerpt_mapping(
-        self,
-        names: list[str],
-        matches: list[dict[str, Any]],
-    ) -> dict[str, dict[str, Any]]:
-        _ = matches
-        return {
-            names[0].lower(): {
-                "drug_name": names[0],
-                "canonical_drug_name": names[0].lower(),
-                "normalized_drug_name": names[0].lower(),
-                "matched_livertox_row": {"drug_id": 101, "drug_name": "Acetaminophen"},
-                "extracted_excerpts": ["LiverTox excerpt."],
-                "match_status": "matched_with_excerpt",
-                "match_reason": "exact",
-            }
-        }
+def build_matcher(*, excerpt: str = "LiverTox excerpt.") -> LiverToxMatcher:
+    return LiverToxMatcher(
+        pd.DataFrame(
+            [
+                {
+                    "drug_id": 101,
+                    "nbk_id": "NBK101",
+                    "drug_name": "Acetaminophen",
+                    "excerpt": excerpt,
+                    "synonyms": "Paracetamol",
+                    "ingredient": "Acetaminophen",
+                    "brand_name": "Tylenol",
+                }
+            ]
+        )
+    )
 
 ###############################################################################
 def test_prepare_inputs_enriches_resolved_drugs_with_knowledge() -> None:
@@ -72,7 +75,7 @@ def test_prepare_inputs_enriches_resolved_drugs_with_knowledge() -> None:
     preparation.knowledge_composer = ClinicalKnowledgeComposer(
         serializer=preparation.serializer  # type: ignore[arg-type]
     )
-    preparation.livertox_matcher = MatcherStub()  # type: ignore[assignment]
+    preparation.livertox_matcher = build_matcher()
 
     prepared = asyncio.run(
         preparation.prepare_inputs(
@@ -96,7 +99,7 @@ def test_prepare_inputs_handles_missing_livertox_monographs() -> None:
     preparation.knowledge_composer = ClinicalKnowledgeComposer(
         serializer=preparation.serializer  # type: ignore[arg-type]
     )
-    preparation.livertox_matcher = MatcherStub()  # type: ignore[assignment]
+    preparation.livertox_matcher = build_matcher(excerpt="")
 
     prepared = asyncio.run(
         preparation.prepare_inputs(

@@ -173,7 +173,6 @@ def test_visit_proxy_anchor_is_not_score_eligible() -> None:
     assert anchor.source == "visit_proxy"
     assert anchor.is_score_eligible is False
 
-
 ###############################################################################
 def test_suspension_only_high_likelihood_timing_is_not_scored_incompatible() -> None:
     estimator = RucamScoreEstimator()
@@ -197,7 +196,6 @@ def test_suspension_only_high_likelihood_timing_is_not_scored_incompatible() -> 
     assert component.score == 0
     assert component.status == "not_assessable"
     assert "do not establish latency" in (component.rationale or "")
-
 
 ###############################################################################
 def test_low_positive_rucam_scores_are_indeterminate() -> None:

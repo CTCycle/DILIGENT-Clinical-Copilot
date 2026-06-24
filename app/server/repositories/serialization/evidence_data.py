@@ -869,7 +869,6 @@ def upsert_high_confidence_kb_match_cache(
 ###############################################################################
 CACHED_MATCH_MIN_CONFIDENCE = 0.95
 
-
 ###############################################################################
 def load_livertox_match_from_db_cache(
     self,

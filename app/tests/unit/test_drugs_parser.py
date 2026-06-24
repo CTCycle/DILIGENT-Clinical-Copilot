@@ -16,10 +16,13 @@ class FailingStructuredClient:
 
 ###############################################################################
 class ConcurrentStructuredClient:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.active_calls = 0
         self.max_active_calls = 0
 
+    # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
         line = str(kwargs["user_prompt"]).splitlines()[-1]
         self.active_calls += 1
