@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-06-04
+Last updated: 2026-06-24
 
 ## Recommended Local Startup
 On Windows, use:
@@ -15,6 +15,7 @@ The launcher:
 - builds frontend dist if missing
 - starts the backend via `uv run ... uvicorn`
 - starts the frontend preview server
+- recreates a stale backend virtual environment when the repository has moved
 
 Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
 
@@ -22,7 +23,8 @@ Use this launcher as the default startup path for local development, Codex sessi
 From repository root:
 
 ```powershell
-app/server/.venv/Scripts/python.exe -m uvicorn app:app --app-dir app --host 127.0.0.1 --port 7690 --log-level info
+Set-Location app/server
+./.venv/Scripts/python.exe -m uvicorn app:app --host 127.0.0.1 --port 7690 --log-level info
 ```
 
 Alternative runtime-managed path:
