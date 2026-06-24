@@ -1,6 +1,6 @@
 {
   "manifest": "drug_matching",
-  "version": 1,
+  "version": 2,
   "description": "Deterministic text reference data used by drug matching services.",
   "entries": [
     {
@@ -137,6 +137,115 @@
       "metadata": {
         "case_sensitive": false,
         "match_mode": "token"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "broad_drug_categories",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "vitamins",
+        "minerals",
+        "trace elements"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "safe_query_reduction_suffixes",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "capsule",
+        "capsules",
+        "compresse",
+        "compressa",
+        "oral",
+        "tablet",
+        "tablets"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "false_positive_drug_tokens",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "alt",
+        "ast",
+        "bilirubin",
+        "cholestasis",
+        "creatinine",
+        "diagnosis",
+        "disease",
+        "ggt",
+        "laboratory",
+        "rialzo",
+        "therapy"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "rxnav_form_suffix_tokens",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "capsule",
+        "delayed",
+        "dose",
+        "extended",
+        "gel",
+        "injection",
+        "mg",
+        "ml",
+        "oral",
+        "prefilled",
+        "release",
+        "route",
+        "schedule",
+        "suspension",
+        "syringe",
+        "tablet"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "rxnav_allowed_term_types",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "IN",
+        "MIN",
+        "PIN",
+        "SCD",
+        "SBD",
+        "GPCK",
+        "BPCK"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact"
       }
     },
     {

@@ -61,6 +61,7 @@ from services.text.vocabulary import get_text_normalization_snapshot
 
 ###############################################################################
 class DrugsParser:
+    MAX_CONCURRENT_LINE_EXTRACTIONS = 4
     LLM_CLIENT_NOT_INITIALIZED_ERROR = (
         "LLM client is not initialized for drug extraction"
     )
@@ -347,9 +348,10 @@ class DrugsParser:
 
     # -------------------------------------------------------------------------
     def conservative_prepare_drug_section_text(self, text: str | None) -> str:
-        prepared = self.clean_text(text)
-        if not prepared:
+        if not text:
             return ""
+        prepared = unicodedata.normalize("NFKC", text)
+        prepared = prepared.replace("\r\n", "\n").replace("\r", "\n")
         return "\n".join(
             line.rstrip() for line in prepared.split("\n") if line.rstrip()
         )
@@ -382,6 +384,14 @@ class DrugsParser:
         if not cleaned:
             return PatientDrugs(entries=[])
         self.emit_progress(progress_callback, 0.0)
+        deterministic = self.extract_drugs_from_therapy_deterministic(cleaned)
+        if deterministic.entries and not deterministic.unresolved_lines:
+            combined = self._attach_therapy_evidence_spans(
+                deterministic.entries,
+                cleaned,
+            )
+            self.emit_progress(progress_callback, 1.0)
+            return PatientDrugs(entries=self.deduplicate_drug_entries(combined))
         try:
             structured = await self.llm_extract_drugs_from_section(
                 cleaned,
@@ -619,34 +629,41 @@ class DrugsParser:
             "exactly one DrugEntry describing the drug provided in the user prompt."
         )
 
-        entries: list[DrugEntry] = []
         total_lines = max(len(lines), 1)
         bounded_start = min(1.0, max(0.0, float(progress_start)))
         bounded_span = max(0.0, float(progress_span))
-        for index, line in enumerate(lines, start=1):
-            # Request a deterministic parse for each drug-sized chunk
-            parsed = await asyncio.wait_for(
-                self.client.llm_structured_call(
-                    model=self.model,
-                    system_prompt=single_entry_prompt,
-                    user_prompt=(
-                        "Extract the structured representation for the following drug entry:\n"
-                        f"{line}"
-                    ),
-                    schema=PatientDrugs,
-                    temperature=self.temperature,
-                    use_json_mode=True,
-                    max_repair_attempts=1,
-                ),
-                timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
-            )
-            entries.extend(parsed.entries)
-            self.emit_progress(
-                progress_callback,
-                bounded_start + ((index / total_lines) * bounded_span),
-            )
+        semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_LINE_EXTRACTIONS)
+        completed = 0
+        progress_lock = asyncio.Lock()
 
-        return PatientDrugs(entries=entries)
+        async def extract_line(line: str) -> list[DrugEntry]:
+            nonlocal completed
+            async with semaphore:
+                parsed = await asyncio.wait_for(
+                    self.client.llm_structured_call(
+                        model=self.model,
+                        system_prompt=single_entry_prompt,
+                        user_prompt=(
+                            "Extract the structured representation for the following drug entry:\n"
+                            f"{line}"
+                        ),
+                        schema=PatientDrugs,
+                        temperature=self.temperature,
+                        use_json_mode=True,
+                        max_repair_attempts=1,
+                    ),
+                    timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
+                )
+            async with progress_lock:
+                completed += 1
+                self.emit_progress(
+                    progress_callback,
+                    bounded_start + ((completed / total_lines) * bounded_span),
+                )
+            return parsed.entries
+
+        results = await asyncio.gather(*(extract_line(line) for line in lines))
+        return PatientDrugs(entries=[entry for result in results for entry in result])
 
     # -------------------------------------------------------------------------
     async def llm_extract_drugs_from_section(
@@ -1307,6 +1324,7 @@ class DrugsParser:
         raw_text = str(value)
         if "\n" in raw_text or "\r" in raw_text:
             return None
+        raw_text = self.BULLET_RE.sub("", raw_text)
         normalized = re.sub(r"\s+", " ", raw_text).strip(" \t,;:.-")
         normalized = re.sub(r"\s*\(=\s*$", "", normalized).strip(" \t,;:.-")
         normalized = self._strip_drug_form_suffixes(normalized).strip(" \t,;:.-")
@@ -1391,6 +1409,12 @@ class DrugsParser:
         if tokens and all(token in weekday_tokens for token in tokens):
             return True
         if tokens and all(token in self._non_drug_tokens for token in tokens):
+            return True
+        if tokens and all(
+            token in self._non_drug_tokens
+            or not any(character.isalpha() for character in token)
+            for token in tokens
+        ):
             return True
         if len(tokens) <= 3 and tokens[:2] == ["terapie", "eseguite"]:
             return True
