@@ -320,7 +320,7 @@
                 <option value="pre">Code block</option>
               </select>
             </div>
-            <div class="clinical-session-toolbar-group">
+            <div class="clinical-session-toolbar-group clinical-session-toolbar-group-editing">
               <button type="button" (click)="runEditorCommand('undo')" aria-label="Undo">↶</button>
               <button type="button" (click)="runEditorCommand('redo')" aria-label="Redo">↷</button>
               <button type="button" (click)="runEditorCommand('bold')" aria-label="Bold"><strong>B</strong></button>
@@ -340,12 +340,13 @@
               <button type="button" (click)="removeSelection()" aria-label="Remove selected text">✖</button>
               <button
                 type="button"
-                class="btn btn-primary"
+                class="btn btn-primary clinical-session-save-icon-button"
                 [disabled]="revisionBusy()"
                 (click)="saveManualReportEdit()"
                 aria-label="Save manual report edit"
+                title="Save manual report edit"
               >
-                Save manual report edit
+                <svg lucideSave size="16"></svg>
               </button>
             </div>
           </div>

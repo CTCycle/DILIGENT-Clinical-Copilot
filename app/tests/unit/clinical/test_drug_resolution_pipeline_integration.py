@@ -152,7 +152,6 @@ def test_brand_qualified_duplicate_mentions_are_merged() -> None:
     payload = next(iter(prepared.resolved_drugs.values()))
     assert payload["raw_mentions"] == ["Pregabalin", "Pregabalin Pfizer"]
 
-
 ###############################################################################
 def test_catalog_missing_medication_label_reaches_resolution_policy() -> None:
     preparation = ClinicalKnowledgePreparation()
@@ -185,7 +184,6 @@ def test_catalog_missing_medication_label_reaches_resolution_policy() -> None:
     assert payload["decision_status"] == "missing_livertox"
     assert payload["resolution_decision"]
 
-
 ###############################################################################
 def test_two_edit_international_spelling_resolves_uniquely() -> None:
     preparation = ClinicalKnowledgePreparation()
@@ -217,10 +215,10 @@ def test_two_edit_international_spelling_resolves_uniquely() -> None:
     assert payload["accepted_livertox_name"] == "Loop Diuretics"
     assert payload["extracted_excerpts"] == ["Loop diuretic excerpt."]
 
-
 ###############################################################################
 class IdentityClientStub:
 
+    # -------------------------------------------------------------------------
     def __init__(self, batch: DrugIdentityProposalBatch) -> None:
         self.batch = batch
         self.calls = 0
@@ -230,7 +228,6 @@ class IdentityClientStub:
         assert kwargs["schema"] is DrugIdentityProposalBatch
         self.calls += 1
         return self.batch
-
 
 ###############################################################################
 def test_llm_combination_identity_candidates_remain_ambiguous() -> None:
@@ -288,7 +285,6 @@ def test_llm_combination_identity_candidates_remain_ambiguous() -> None:
     assert set(payload["match_candidates"]) == {"Valerian", "Hops"}
     assert payload["accepted_livertox_name"] is None
 
-
 ###############################################################################
 def test_single_llm_identity_is_accepted_only_after_local_validation() -> None:
     client = IdentityClientStub(
@@ -345,7 +341,6 @@ def test_single_llm_identity_is_accepted_only_after_local_validation() -> None:
         "identity accepted only after unique local evidence resolution",
     ]
     assert payload["resolution_decision"]["reasons"] == payload["match_notes"]
-
 
 ###############################################################################
 def test_unvalidated_llm_identity_remains_unresolved() -> None:

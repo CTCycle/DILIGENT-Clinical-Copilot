@@ -10,6 +10,7 @@ import {
   LucideHeartPulse,
   LucideImage,
   LucidePill,
+  LucideSave,
   LucideTrash2,
 } from '@lucide/angular';
 
@@ -103,6 +104,7 @@ type RevisionProvider = 'ollama' | CloudProvider;
     LucideHeartPulse,
     LucideImage,
     LucidePill,
+    LucideSave,
     LucideTrash2,
   ],
   templateUrl: './clinical-sessions-page.component.html',

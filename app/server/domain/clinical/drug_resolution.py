@@ -26,7 +26,6 @@ DrugDecisionStatus = Literal[
     "rejected_false_positive",
 ]
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class DrugIdentityCandidate:
@@ -36,7 +35,6 @@ class DrugIdentityCandidate:
     kind: str
     confidence: float
     notes: tuple[str, ...] = field(default_factory=tuple)
-
 
 ###############################################################################
 @dataclass(slots=True)
@@ -51,7 +49,6 @@ class NormalizedDrugMention:
     regimen_group_id: str | None = None
     is_regimen_parent: bool = False
     regimen_components: list[str] = field(default_factory=list)
-
 
 ###############################################################################
 class RxNavResolutionCandidate(BaseModel):
@@ -98,7 +95,6 @@ class DrugResolutionDecision(BaseModel):
     reasons: list[str] = Field(default_factory=list)
     requires_human_review: bool
 
-
 ###############################################################################
 class DrugIdentityProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -135,7 +131,6 @@ class DrugIdentityProposal(BaseModel):
             if text and text not in cleaned:
                 cleaned.append(text)
         return cleaned
-
 
 ###############################################################################
 class DrugIdentityProposalBatch(BaseModel):
