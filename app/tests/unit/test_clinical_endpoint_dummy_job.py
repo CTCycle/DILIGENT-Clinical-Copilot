@@ -6,7 +6,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 import app as server_app_module
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from domain.clinical.robustness import ClinicalInputPreflightResult
 from services.runtime.jobs import JobManager
 from services.session.session_service import ClinicalSessionService

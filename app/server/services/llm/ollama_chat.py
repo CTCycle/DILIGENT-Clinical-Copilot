@@ -14,7 +14,7 @@ import httpx
 
 from common.utils.logger import logger
 from common.utils.types import extract_positive_int
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from services.llm.ollama_residency import (
     get_available_memory_bytes,

@@ -12,7 +12,7 @@ from common.utils.languages import (
     resolve_supported_language_code,
 )
 from common.utils.logger import logger
-from configurations.llm_configs import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig
 from domain.clinical.entities import (
     ClinicalLabEntry,
     ClinicalSectionExtractionResult,

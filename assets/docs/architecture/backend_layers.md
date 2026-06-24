@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-06-23
+Last updated: 2026-06-24
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -17,6 +17,9 @@ Last updated: 2026-06-23
   - `app/server/services/text/vocabulary.py` provides cache-facing text normalization business access and does not manage SQLAlchemy sessions directly.
   - `app/server/services/llm/ollama_runtime.py` owns canonical Ollama runtime aliases, errors, environment helpers, message normalization, and exception mapping. Ollama service modules must import these definitions instead of duplicating or monkey-patching them.
   - `app/server/services/llm/structured.py` owns strict JSON object extraction, schema validation, and bounded one-repair structured-output adaptation helpers for provider responses.
+  - `app/server/services/llm/runtime_config.py` (formerly `configurations/llm_configs.py`) provides read access to persisted and overridden model configuration, reconciling database-backed settings with runtime defaults and per-run overrides. The configurations layer does not depend on repositories; this class lives in services to bridge both configuration and persistence.
+  - `app/server/services/clinical/hepatox_constants.py` is the single source of truth for shared hepatox report regex patterns, used by both `hepatox_core.py` and `hepatox_scoring.py`.
+  - Shared list deduplication `unique_preserve_order` lives in `common/utils/text_utils.py` instead of being triplicated across service modules.
 - Domain layer: `app/server/domain/*`
   - Owns Pydantic and domain request-response schemas and typed contracts.
   - Clinical extraction schemas used by orchestration live under `app/server/domain/clinical/`.
@@ -32,11 +35,12 @@ Last updated: 2026-06-23
 - Config and common layers: `app/server/configurations/*`, `app/server/common/*`
   - Own runtime settings, constants, environment bootstrap, logging, and shared security helpers.
   - Provider-key cryptography lives under `app/server/common/security/cryptography.py`.
-  - Shared pure-utility modules (text normalization, chunking, seed terms, embedding model specs) live under `app/server/common/utils/` (`text_utils.py`, `chunking.py`, `seed_terms.py`, `embedding_model.py`) and are the canonical single source of truth — service modules import from here rather than duplicating logic.
+  - Shared pure-utility modules (text normalization, chunking, seed terms, embedding model specs, list deduplication) live under `app/server/common/utils/` (`text_utils.py`, `chunking.py`, `seed_terms.py`, `embedding_model.py`) and are the canonical single source of truth — service modules import from here rather than duplicating logic.
   - Endpoint-layer request validation lives in `app/server/api/session_validation.py`.
   - Catalog snapshot provider (`common/catalogs/provider.py`) provides cross-layer access to reference catalog data through a registered provider pattern — service-layer runtime (`services/catalogs/runtime.py`) registers itself as the provider during import.
   - Catalog manifest loading (`common/catalogs/manifest_loader.py`) handles file I/O for catalog JSON manifests, decoupled from persistence logic.
   - Constants that depend on external catalog files (e.g., `CLOUD_MODEL_CHOICES`) are exposed as lazy accessor functions (`get_cloud_model_choices()`) to avoid import-time I/O side effects.
+  - Logger configuration (`common/utils/logger.py`) defers file handler setup and `dictConfig` calls until `configure_logging()` is invoked during `initialize_settings()`, avoiding import-time side effects and global logging reconfiguration.
 
 ## Frontend Boundaries
 - `app/client/src/app/pages/*`
