@@ -10,28 +10,47 @@ class DiliPhenotypeClassifier:
         lowered = source_text.lower()
         primary_pattern = patterns[0].pattern if patterns else "indeterminate"
         candidates: list[str] = []
-        if "encephalopathy" in lowered or "acute liver failure" in lowered:
+        basis: list[str] = [f"R-ratio pattern: {primary_pattern}"]
+
+        if "acute liver failure" in lowered or "encephalopathy" in lowered:
             candidates.append("acute_liver_failure")
+            basis.append("acute liver failure or encephalopathy terms present")
         if re.search(r"rash|eosinoph|fever", lowered):
             candidates.append("immunoallergic_hepatitis")
+            basis.append("hypersensitivity features present")
         if re.search(r"\bana\b|smooth muscle|autoimmune|igg", lowered):
             candidates.append("autoimmune_like_hepatitis")
-        if "lactic acidosis" in lowered or "microvesicular" in lowered:
-            candidates.append("acute_fatty_liver_with_lactic_acidosis")
-        if re.search(r"persistent|chronic|six months|6 months", lowered):
-            candidates.append("chronic_hepatitis")
+            basis.append("autoimmune features present")
+        if re.search(r"microvesicular|lactic acidosis|steatos", lowered):
+            candidates.append("microvesicular_steatosis_or_lactic_acidosis")
+            basis.append("steatotic or lactic-acidosis features present")
+        if re.search(r"vanishing bile duct|ductopen", lowered):
+            candidates.append("vanishing_bile_duct_syndrome")
+            basis.append("ductopenia-related features present")
+        if re.search(r"persistent|chronic|6 months|six months", lowered):
+            if primary_pattern in {"cholestatic", "mixed"}:
+                candidates.append("chronic_cholestatic_injury")
+            else:
+                candidates.append("chronic_hepatitis_like_injury")
+            basis.append("persistent injury terms present")
+
         if primary_pattern == "hepatocellular":
-            candidates.append("acute_hepatitis")
-        elif primary_pattern in {"cholestatic", "mixed"}:
-            candidates.append("cholestatic_hepatitis")
+            candidates.append("acute_hepatocellular_injury")
+        elif primary_pattern == "cholestatic":
+            candidates.extend(["acute_cholestatic_injury", "bland_cholestasis"])
+        elif primary_pattern == "mixed":
+            candidates.append("mixed_hepatocellular_cholestatic_injury")
+
+        unique_candidates = list(dict.fromkeys(candidates))
+        missing_data = [
+            name
+            for name in ("biopsy", "imaging", "autoimmune markers", "follow-up over 6 months")
+            if name not in lowered
+        ]
         return DiliPhenotypeAssessment(
-            candidates=list(dict.fromkeys(candidates)),
-            primary_candidate=candidates[0] if candidates else None,
-            deterministic_basis=[f"R-ratio pattern: {primary_pattern}"],
-            missing_data=[
-                name
-                for name in ("imaging", "biopsy", "autoimmune_markers", "encephalopathy")
-                if name.replace("_", " ") not in lowered
-            ],
+            candidates=unique_candidates,
+            primary_candidate=unique_candidates[0] if unique_candidates else None,
+            deterministic_basis=basis,
+            missing_data=missing_data,
             requires_review=True,
         )

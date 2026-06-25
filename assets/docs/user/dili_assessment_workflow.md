@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-06-25
+Last updated: 2026-06-26
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -70,6 +70,20 @@ Review for:
 - consistency between conclusion and supplied evidence
 - unsupported assumptions or invented facts
 - drug-resolution review flags for ambiguous, missing, or unvalidated RxNav/LiverTox matches
+- explicit missing-data statements rather than silent negatives
+- the twelve acceptance-question answers and their supporting quotes
+
+The authoritative report is the rendered structured DILI dossier. If the run
+also captures an LLM clinical summary, treat that text as audit-only supporting
+commentary and verify it against the dossier before reuse.
+
+The structured dossier explicitly reports:
+- longitudinal exposure and lab timeline events
+- dose changes, restart or rechallenge mentions, and dechallenge direction
+- Hy's Law state and why it is or is not met
+- competing-cause states as `excluded`, `not_excluded`, `unknown`, or `missing_data`
+- supportive RUCAM component evidence
+- DILIN-like overall causality reasoning
 
 Drug matching statuses can include:
 - `accepted_exact_livertox`

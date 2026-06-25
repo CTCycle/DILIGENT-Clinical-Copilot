@@ -95,9 +95,15 @@ class DiliHysLawAssessment(BaseModel):
     cholestasis_excluded: bool | None = None
     alternative_causes_excluded: bool | None = None
     exposure_timing_compatible: bool | None = None
+    same_episode: bool | None = None
+    baseline_aminotransferase_multiple: float | None = None
+    baseline_bilirubin_multiple: float | None = None
+    initial_cholestasis_present: bool | None = None
+    compatible_exposures: list[str] = Field(default_factory=list)
     signal_context: Literal["individual_patient_risk_flag", "clinical_trial_signal"] = (
         "individual_patient_risk_flag"
     )
+    evidence: list[ClinicalEvidenceQuote] = Field(default_factory=list)
     rationale: list[str] = Field(default_factory=list)
 
 
@@ -148,6 +154,13 @@ class DilinLikeCausalityAssessment(BaseModel):
     rationale: list[str] = Field(default_factory=list)
 
 
+class DiliAcceptanceQuestion(BaseModel):
+    question: str
+    answer: str
+    supporting_evidence: list[ClinicalEvidenceQuote] = Field(default_factory=list)
+    missing_data_statement: str | None = None
+
+
 class DrugIdentityResolution(BaseModel):
     raw_mention: str
     source_section: str | None = None
@@ -191,6 +204,7 @@ class DiliEvidenceBundle(BaseModel):
     hys_law: DiliHysLawAssessment
     severity: DiliSeverityAssessment
     evidence: list[ClinicalEvidenceQuote] = Field(default_factory=list)
+    acceptance_questions: list[DiliAcceptanceQuestion] = Field(default_factory=list)
     source_hierarchy: list[str] = Field(
         default_factory=lambda: ["AASLD", "LiverTox", "FDA", "DILIN/RUCAM"]
     )

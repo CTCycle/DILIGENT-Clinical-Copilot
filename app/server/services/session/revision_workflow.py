@@ -37,6 +37,7 @@ from domain.clinical.revision import (
     RevisionFinalizationOutputs,
 )
 from domain.clinical.robustness import NormalizedDocument
+from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.clinical.language import ClinicalLanguageDetector
 from services.clinical.report_language import phrase
@@ -1368,7 +1369,17 @@ async def process_revision_patient_workflow(
     revision_snapshot_context = revision_consultation_execution.inputs.snapshot_context
     consultation_analysis_drugs = revision_consultation_execution.inputs.analysis_drugs
     clinical_session = revision_consultation_execution.clinical_session
-    final_report = revision_consultation_execution.final_report
+    llm_clinical_summary = revision_consultation_execution.final_report
+    dili_evidence_bundle = DiliEvidenceBuilder().build(
+        payload=payload,
+        drugs=consultation_analysis_drugs,
+        labs=lab_timeline,
+        resolved_drugs=(
+            prepared_inputs.resolved_drugs if prepared_inputs is not None else None
+        ),
+        rucam_bundle=rucam_bundle,
+    )
+    final_report = DiliEvidenceBuilder.render(dili_evidence_bundle)
 
     fact_graph = build_fact_graph(
         extraction_artifact=extraction_artifact,
@@ -1499,6 +1510,8 @@ async def process_revision_patient_workflow(
         "rucam_assessments": [item.model_dump() for item in rucam_bundle.entries],
         "lab_timeline": [entry.model_dump() for entry in lab_timeline.entries],
         "onset_context": onset_context.model_dump() if onset_context else None,
+        "dili_evidence_bundle": dili_evidence_bundle.model_dump(),
+        "llm_clinical_summary": llm_clinical_summary,
         "detected_input_language": language_result.detected_input_language,
         "report_language": language_result.report_language,
         "relevant_drugs": effective_candidate_selection.relevant,
@@ -1594,6 +1607,8 @@ async def process_revision_patient_workflow(
             "fact_graph": fact_graph.model_dump(),
             "fact_graph_validation": fact_graph_validation.model_dump(),
             "generated_report": generated_report,
+            "dili_evidence_bundle": dili_evidence_bundle.model_dump(),
+            "llm_clinical_summary": llm_clinical_summary,
             "report_metadata": report_metadata.model_dump(),
             "faithfulness_audit": faithfulness_audit.model_dump(),
             "discrepancy_report": faithfulness_audit.discrepancy_report,
@@ -1665,6 +1680,7 @@ async def process_revision_patient_workflow(
                 "clinical_model": getattr(clinical_session, "llm_model", None),
                 "total_duration": global_elapsed,
                 "final_report": final_report,
+                "llm_clinical_summary": llm_clinical_summary,
                 "detected_drugs": detected_drugs,
                 "matched_drugs": matched_drugs_payload,
                 "issues": serialized_issues,
