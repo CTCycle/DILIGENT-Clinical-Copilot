@@ -43,7 +43,6 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 - `GET /api/inspection/sessions/{session_id}`
 - `GET /api/inspection/sessions/{session_id}/versions`
 - `GET /api/inspection/sessions/{session_id}/versions/{version_id}`
-- `GET /api/inspection/sessions/{session_id}/versions/{left_version_id}/compare/{right_version_id}`
 - `PUT /api/inspection/sessions/{session_id}`
 - `PUT /api/inspection/sessions/{session_id}/report`
 - `GET /api/inspection/sessions/{session_id}/manual-edits`
@@ -91,3 +90,4 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 ## Notes
 - Clinical and inspection workflows rely on job polling for long-running work.
 - Research has no active route inventory in the current architecture source and should not be documented as an active API surface until implemented.
+

@@ -24,17 +24,7 @@ import {
   ClinicalSessionDetail,
   ManualReportEditRequest,
   ManualReportEditResponse,
-  ClinicalSessionRevisionRequest,
   ClinicalSessionUpdateRequest,
-  RevisionArtifactListResponse,
-  RevisionEntityListResponse,
-  RevisionClinicalReviewActionListResponse,
-  RevisionClinicalReviewUpdateRequest,
-  RevisionClinicalReviewUpdateResponse,
-  RevisionPipelineRun,
-  RevisionPipelineStepListResponse,
-  SessionVersionComparisonResponse,
-  SessionVersionListResponse,
 } from "../models/types";
 import { buildQueryString, requestJson } from "./http-api";
 
@@ -66,73 +56,6 @@ export async function fetchClinicalSessionDetail(
   );
 }
 
-export async function fetchClinicalSessionVersions(
-  sessionId: number,
-): Promise<SessionVersionListResponse> {
-  return requestJson<SessionVersionListResponse>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions`,
-    { method: "GET" },
-  );
-}
-
-export async function fetchClinicalSessionVersionComparison(
-  sessionId: number,
-  leftVersionId: number,
-  rightVersionId: number,
-): Promise<SessionVersionComparisonResponse> {
-  return requestJson<SessionVersionComparisonResponse>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(leftVersionId))}/compare/${encodeURIComponent(String(rightVersionId))}`,
-    { method: "GET" },
-  );
-}
-
-export async function fetchClinicalSessionRevisionArtifacts(
-  sessionId: number,
-  versionId: number,
-): Promise<RevisionArtifactListResponse> {
-  return requestJson<RevisionArtifactListResponse>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/artifacts`,
-    { method: "GET" },
-  );
-}
-
-export async function fetchClinicalSessionRevisionEntities(
-  sessionId: number,
-  versionId: number,
-): Promise<RevisionEntityListResponse> {
-  return requestJson<RevisionEntityListResponse>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/entities`,
-    { method: "GET" },
-  );
-}
-
-export async function fetchClinicalSessionRevisionReviews(
-  sessionId: number,
-  versionId: number,
-): Promise<RevisionClinicalReviewActionListResponse> {
-  return requestJson<RevisionClinicalReviewActionListResponse>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/reviews`,
-    { method: "GET" },
-  );
-}
-
-export async function updateClinicalSessionRevisionClinicalReview(
-  sessionId: number,
-  versionId: number,
-  payload: RevisionClinicalReviewUpdateRequest,
-): Promise<RevisionClinicalReviewUpdateResponse> {
-  return requestJson<RevisionClinicalReviewUpdateResponse>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/clinical-review`,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-}
-
 export async function updateClinicalSession(
   sessionId: number,
   payload: ClinicalSessionUpdateRequest,
@@ -146,67 +69,6 @@ export async function updateClinicalSession(
       },
       body: JSON.stringify(payload),
     },
-  );
-}
-
-export async function startClinicalSessionRevisionJob(
-  sessionId: number,
-  payload: ClinicalSessionRevisionRequest,
-): Promise<JobStartResponse> {
-  return requestJson<JobStartResponse>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/revision/jobs`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-}
-
-export async function fetchClinicalSessionRevisionJobStatus(
-  jobId: string,
-): Promise<InspectionUpdateJobStatusResponse> {
-  return requestJson<InspectionUpdateJobStatusResponse>(
-    `${API_BASE_URL}/inspection/sessions/revision/jobs/${encodeURIComponent(jobId)}`,
-    { method: "GET" },
-  );
-}
-
-export async function cancelClinicalSessionRevisionJob(
-  jobId: string,
-): Promise<JobCancelResponse> {
-  return requestJson<JobCancelResponse>(
-    `${API_BASE_URL}/inspection/sessions/revision/jobs/${encodeURIComponent(jobId)}`,
-    { method: "DELETE" },
-  );
-}
-
-export async function fetchClinicalSessionRevisionPipelineRun(
-  pipelineRunId: string,
-): Promise<RevisionPipelineRun> {
-  return requestJson<RevisionPipelineRun>(
-    `${API_BASE_URL}/inspection/sessions/revision/pipeline-runs/${encodeURIComponent(pipelineRunId)}`,
-    { method: "GET" },
-  );
-}
-
-export async function fetchClinicalSessionRevisionPipelineSteps(
-  pipelineRunId: string,
-): Promise<RevisionPipelineStepListResponse> {
-  return requestJson<RevisionPipelineStepListResponse>(
-    `${API_BASE_URL}/inspection/sessions/revision/pipeline-runs/${encodeURIComponent(pipelineRunId)}/steps`,
-    { method: "GET" },
-  );
-}
-
-export async function retryClinicalSessionRevisionPipelineRun(
-  pipelineRunId: string,
-): Promise<JobStartResponse> {
-  return requestJson<JobStartResponse>(
-    `${API_BASE_URL}/inspection/sessions/revision/pipeline-runs/${encodeURIComponent(pipelineRunId)}/retry`,
-    { method: "POST" },
   );
 }
 

@@ -758,6 +758,26 @@ def create_drug_suspension_context() -> DrugSuspensionContext:
     )
 
 ###############################################################################
+class RagDocumentReference(BaseModel):
+    file_name: str = Field(..., min_length=1, max_length=500)
+    page_start: int | None = Field(default=None, ge=1)
+    page_end: int | None = Field(default=None, ge=1)
+    document_title: str | None = Field(default=None, max_length=500)
+    section_title: str | None = Field(default=None, max_length=500)
+    chunk_id: str | None = Field(default=None, max_length=500)
+
+    # -------------------------------------------------------------------------
+    @model_validator(mode="after")
+    def normalize_page_range(self) -> "RagDocumentReference":
+        if (
+            self.page_start is not None
+            and self.page_end is not None
+            and self.page_end < self.page_start
+        ):
+            self.page_end = self.page_start
+        return self
+
+###############################################################################
 class DrugClinicalAssessment(BaseModel):
     drug_name: str = Field(..., min_length=1, max_length=200)
     canonical_name: str | None = Field(default=None, max_length=200)
@@ -781,6 +801,7 @@ class DrugClinicalAssessment(BaseModel):
     claims: list[ClinicalClaim] = Field(default_factory=list)
     narrative: DrugClinicalNarrative | None = Field(default=None)
     paragraph: str | None = Field(default=None)
+    rag_references: list[RagDocumentReference] = Field(default_factory=list)
 
     # -------------------------------------------------------------------------
     @field_validator("paragraph", mode="before")

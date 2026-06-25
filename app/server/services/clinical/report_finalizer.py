@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 from typing import Any
 
 from common.prompts.clinical_assessment import (
@@ -10,7 +11,7 @@ from common.prompts.clinical_assessment import (
     LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
 )
 from common.utils.logger import logger
-from domain.clinical.entities import DrugClinicalAssessment
+from domain.clinical.entities import DrugClinicalAssessment, RagDocumentReference
 from services.clinical.report_language import (
     report_heading,
 )
@@ -76,6 +77,12 @@ class ReportFinalizer:
             if conclusion:
                 heading = report_heading("report_section_summary", report_language)
                 combined_report = f"{combined_report}\n\n## {heading}\n\n{conclusion}"
+        bibliography = self.build_rag_bibliography_section(
+            entries,
+            report_language=report_language,
+        )
+        if bibliography:
+            combined_report = f"{combined_report}\n\n{bibliography}"
         return combined_report
 
     # -------------------------------------------------------------------------
@@ -229,3 +236,72 @@ class ReportFinalizer:
         return get_text_normalization_snapshot().knowledge_source_references.get(
             "livertox", "LiverTox"
         )
+
+    # -------------------------------------------------------------------------
+    def build_rag_bibliography_section(
+        self,
+        entries: list[DrugClinicalAssessment],
+        *,
+        report_language: str,
+    ) -> str | None:
+        grouped_pages: dict[str, set[int]] = defaultdict(set)
+        grouped_missing: set[str] = set()
+
+        for entry in entries:
+            for reference in entry.rag_references:
+                file_name = reference.file_name.strip()
+                if not file_name:
+                    continue
+                page_values = self.expand_reference_pages(reference)
+                if page_values:
+                    grouped_pages[file_name].update(page_values)
+                    continue
+                grouped_missing.add(file_name)
+
+        rendered_lines: list[str] = []
+        for file_name in sorted(grouped_pages, key=str.casefold):
+            rendered_lines.append(
+                self.format_bibliography_reference(
+                    file_name=file_name,
+                    pages=sorted(grouped_pages[file_name]),
+                )
+            )
+        missing_only = sorted(
+            (file_name for file_name in grouped_missing if file_name not in grouped_pages),
+            key=str.casefold,
+        )
+        rendered_lines.extend(
+            f"- {file_name}, page not available" for file_name in missing_only
+        )
+        if not rendered_lines:
+            return None
+
+        heading = report_heading("bibliography", report_language)
+        return "\n".join([f"## {heading}", "", *rendered_lines]).strip()
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def expand_reference_pages(reference: RagDocumentReference) -> list[int]:
+        if reference.page_start is None:
+            return []
+        page_end = reference.page_end or reference.page_start
+        if page_end < reference.page_start:
+            page_end = reference.page_start
+        return list(range(reference.page_start, page_end + 1))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def format_bibliography_reference(*, file_name: str, pages: list[int]) -> str:
+        page_segments: list[str] = []
+        start = end = pages[0]
+        for page in pages[1:]:
+            if page == end + 1:
+                end = page
+                continue
+            page_segments.append(
+                str(start) if start == end else f"{start}-{end}"
+            )
+            start = end = page
+        page_segments.append(str(start) if start == end else f"{start}-{end}")
+        page_label = "p." if len(page_segments) == 1 and "-" not in page_segments[0] else "pp."
+        return f"- {file_name}, {page_label} {', '.join(page_segments)}"

@@ -32,7 +32,7 @@ class DrugAnalysisService:
         extraction_metadata: list[dict[str, Any]],
         livertox_status: str,
         excerpt: str,
-        rag_documents: str | None,
+        rag_context: str | None,
         clinical_context: str,
         suspension: DrugSuspensionContext,
         visit_date: date | None,
@@ -54,8 +54,8 @@ class DrugAnalysisService:
         visit_date_anchor = consultation.format_visit_date_anchor(visit_date)
         score, metadata_block = consultation.prepare_metadata_prompt(metadata)
         retrieved_documents_block = (
-            f"Retrieved documents:\n{rag_documents.strip()}"
-            if rag_documents and rag_documents.strip()
+            f"Retrieved documents:\n{rag_context.strip()}"
+            if rag_context and rag_context.strip()
             else ""
         )
         origin_block = ", ".join(origins) if origins else "unknown"
@@ -153,7 +153,7 @@ class DrugAnalysisService:
         extraction_metadata: list[dict[str, Any]],
         livertox_status: str,
         excerpt: str,
-        rag_documents: str | None,
+        rag_context: str | None,
         clinical_context: str,
         suspension: DrugSuspensionContext,
         visit_date: date | None,
@@ -170,7 +170,7 @@ class DrugAnalysisService:
             extraction_metadata=extraction_metadata,
             livertox_status=livertox_status,
             excerpt=excerpt,
-            rag_documents=rag_documents,
+            rag_context=rag_context,
             clinical_context=clinical_context,
             suspension=suspension,
             visit_date=visit_date,
@@ -193,7 +193,7 @@ class DrugAnalysisService:
         extraction_metadata: list[dict[str, Any]],
         livertox_status: str,
         excerpt: str,
-        rag_documents: str | None,
+        rag_context: str | None,
         clinical_context: str,
         suspension: DrugSuspensionContext,
         visit_date: date | None,
@@ -210,7 +210,7 @@ class DrugAnalysisService:
             extraction_metadata=extraction_metadata,
             livertox_status=livertox_status,
             excerpt=excerpt,
-            rag_documents=rag_documents,
+            rag_context=rag_context,
             clinical_context=clinical_context,
             suspension=suspension,
             visit_date=visit_date,

@@ -16,7 +16,6 @@ from domain.inspection import (
     SessionListFilters,
     SessionStatus,
     SessionUpdateRequest,
-    SessionVersionComparisonResponse,
     SessionVersionDetailResponse,
     SessionVersionListResponse,
 )
@@ -117,31 +116,6 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
         return SessionVersionDetailResponse(**payload)
 
     # -------------------------------------------------------------------------
-    def compare_session_versions(
-        self,
-        session_id: int,
-        left_version_id: int,
-        right_version_id: int,
-    ) -> SessionVersionComparisonResponse:
-        try:
-            payload = self.service.compare_session_versions(
-                session_id,
-                left_version_id=left_version_id,
-                right_version_id=right_version_id,
-            )
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=str(exc),
-            ) from exc
-        if payload is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session version comparison target not found.",
-            )
-        return SessionVersionComparisonResponse(**payload)
-
-    # -------------------------------------------------------------------------
     def list_manual_edits(self, session_id: int) -> list[ManualReportEditAudit]:
         payload = self.service.list_manual_report_edits(session_id)
         return [ManualReportEditAudit(**row) for row in payload]
@@ -205,13 +179,6 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
             self.get_session_version,
             methods=["GET"],
             response_model=SessionVersionDetailResponse,
-            status_code=status.HTTP_200_OK,
-        )
-        self.router.add_api_route(
-            "/sessions/{session_id}/versions/{left_version_id}/compare/{right_version_id}",
-            self.compare_session_versions,
-            methods=["GET"],
-            response_model=SessionVersionComparisonResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

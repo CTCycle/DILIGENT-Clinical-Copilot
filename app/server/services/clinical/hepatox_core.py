@@ -37,7 +37,7 @@ from services.text.normalization import normalize_drug_query_name
 from services.clinical.analysis_runner import AnalysisRunner
 from services.clinical.drug_analysis import DrugAnalysisService
 from services.clinical import hepatox_scoring
-from services.clinical.rag_support import RagSupportService
+from services.clinical.rag_support import RagRetrievalBundle, RagSupportService
 from services.clinical.report_finalizer import ReportFinalizer
 
 from services.clinical.hepatox_constants import (  # noqa: E402
@@ -327,7 +327,7 @@ class HepatoxConsultation:
     # -------------------------------------------------------------------------
     async def fetch_rag_documents(
         self, rag_query: dict[str, str] | None, drug_name: str
-    ) -> str | None:
+    ) -> RagRetrievalBundle | None:
         if (
             type(self).search_supporting_documents
             is not HepatoxConsultation.search_supporting_documents
@@ -350,10 +350,7 @@ class HepatoxConsultation:
                 )
             except Exception as exc:
                 self.record_rag_retrieval_issue(drug_name=drug_name, error=exc)
-                return (
-                    "No additional documents provided "
-                    f"(reason: RAG retrieval unavailable: {exc})."
-                )
+                return None
         return await self.rag_support.fetch_rag_documents(rag_query, drug_name)
 
     # -------------------------------------------------------------------------
@@ -369,7 +366,9 @@ class HepatoxConsultation:
         return self.rag_support.select_excerpt(excerpts)
 
     # -------------------------------------------------------------------------
-    def search_supporting_documents(self, query_text: str | Any) -> str | None:
+    def search_supporting_documents(
+        self, query_text: str | Any
+    ) -> RagRetrievalBundle | None:
         return self.rag_support.search_supporting_documents(query_text)
 
     # -------------------------------------------------------------------------
@@ -711,7 +710,7 @@ class HepatoxConsultation:
         extraction_metadata: list[dict[str, Any]],
         livertox_status: str,
         excerpt: str,
-        rag_documents: str | None,
+        rag_context: str | None,
         clinical_context: str,
         suspension: DrugSuspensionContext,
         visit_date: date | None,
@@ -728,7 +727,7 @@ class HepatoxConsultation:
             extraction_metadata=extraction_metadata,
             livertox_status=livertox_status,
             excerpt=excerpt,
-            rag_documents=rag_documents,
+            rag_context=rag_context,
             clinical_context=clinical_context,
             suspension=suspension,
             visit_date=visit_date,
@@ -749,7 +748,7 @@ class HepatoxConsultation:
         extraction_metadata: list[dict[str, Any]],
         livertox_status: str,
         excerpt: str,
-        rag_documents: str | None,
+        rag_context: str | None,
         clinical_context: str,
         suspension: DrugSuspensionContext,
         visit_date: date | None,
@@ -766,7 +765,7 @@ class HepatoxConsultation:
             extraction_metadata=extraction_metadata,
             livertox_status=livertox_status,
             excerpt=excerpt,
-            rag_documents=rag_documents,
+            rag_context=rag_context,
             clinical_context=clinical_context,
             suspension=suspension,
             visit_date=visit_date,

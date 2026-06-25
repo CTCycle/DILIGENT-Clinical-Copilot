@@ -61,7 +61,7 @@ copy /Y settings\.env.local.tauri.example settings\.env
 
 See `assets/docs/runtime/modes.md` for full runtime and packaging details.
 
-Clinical job execution is process-local. Persisted clinical sessions, revision runs, and revision draft shells remain durable, but in-memory job ids are not durable across backend restarts.
+Clinical job execution is process-local. Persisted clinical sessions remain durable, but in-memory job ids are not durable across backend restarts.
 
 ## 4. Using the Application
 Typical workflow:
@@ -69,7 +69,7 @@ Typical workflow:
 2. Choose model/provider settings and optionally enable RAG/web search.
 3. Run analysis and review the generated report.
 4. Use Data Inspection to explore current knowledge base.
-5. Explore past sessions to modify and revise them.
+5. Explore past sessions and apply manual report edits.
 
 Detailed user journeys and feature guidance are documented in `assets/docs/user/getting_started.md`, `assets/docs/user/dili_assessment_workflow.md`, and `assets/docs/user/sessions_timeline_and_data.md`.
 
@@ -152,5 +152,6 @@ Equivalent PowerShell runners:
 
 ## 9. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.
+
 
 

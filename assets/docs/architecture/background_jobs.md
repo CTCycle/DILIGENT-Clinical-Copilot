@@ -49,9 +49,6 @@ Each job tracks:
 - `rag_update`
   - Start: `POST /api/inspection/rag/jobs`
   - Poll or cancel: `GET|DELETE /api/inspection/rag/jobs/{job_id}`
-- `session_revision`
-  - Start: `POST /api/inspection/sessions/{session_id}/revision/jobs`
-  - Poll or cancel: `GET|DELETE /api/inspection/sessions/revision/jobs/{job_id}`
 
 ## Polling Contract
 1. Start endpoints return `JobStartResponse` with `job_id`, `status`, and `poll_interval`.
@@ -97,3 +94,7 @@ If a runner does not check stop requests, cancellation is delayed.
 3. Publish interim progress or result updates.
 4. Expose start, poll, and cancel routes.
 5. Prevent conflicting duplicates where needed with `is_job_running(job_type)`.
+
+## Disabled Scaffolds
+- Session revision routes remain registered only as rewrite scaffolding and return 501 Not Implemented until a replacement workflow is implemented.
+

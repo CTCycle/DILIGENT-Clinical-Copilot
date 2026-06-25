@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 import re
 import threading
+from dataclasses import dataclass
 from typing import Any
 
 from common.utils.logger import logger
-from domain.clinical.entities import PipelineIssue
+from domain.clinical.entities import PipelineIssue, RagDocumentReference
 from services.retrieval.embeddings import (
     EmbeddingModelMismatchError,
     SimilaritySearch,
@@ -17,6 +18,13 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
     re.IGNORECASE,
 )
+
+###############################################################################
+@dataclass(frozen=True)
+class RagRetrievalBundle:
+    context_text: str | None
+    references: tuple[RagDocumentReference, ...]
+
 
 ###############################################################################
 class RagSupportService:
@@ -31,7 +39,7 @@ class RagSupportService:
     # -------------------------------------------------------------------------
     async def fetch_rag_documents(
         self, rag_query: dict[str, str] | None, drug_name: str
-    ) -> str | None:
+    ) -> RagRetrievalBundle | None:
         if not rag_query:
             return None
         normalized_key = normalize_drug_query_name(drug_name)
@@ -57,7 +65,7 @@ class RagSupportService:
                 exc,
             )
             self.record_rag_retrieval_issue(drug_name=drug_name, error=exc)
-            return f"No additional documents provided (reason: RAG retrieval unavailable: {exc})."
+            return None
 
     # -------------------------------------------------------------------------
     def record_rag_retrieval_issue(self, *, drug_name: str, error: Exception) -> None:
@@ -123,7 +131,9 @@ class RagSupportService:
         return truncated.strip()
 
     # -------------------------------------------------------------------------
-    def search_supporting_documents(self, query_text: str | Any) -> str | None:
+    def search_supporting_documents(
+        self, query_text: str | Any
+    ) -> RagRetrievalBundle | None:
         if not isinstance(query_text, str):
             return None
         normalized = query_text.strip()
@@ -144,13 +154,30 @@ class RagSupportService:
         if not results:
             return None
         fragments: list[str] = []
+        references: list[RagDocumentReference] = []
+        seen_references: set[tuple[str, int | None, int | None]] = set()
         for index, record in enumerate(results, start=1):
             fragment = self.format_similarity_fragment(index, record)
             if fragment:
                 fragments.append(fragment)
+            reference = self.build_document_reference(record)
+            if reference is None:
+                continue
+            dedupe_key = (
+                reference.file_name.casefold(),
+                reference.page_start,
+                reference.page_end,
+            )
+            if dedupe_key in seen_references:
+                continue
+            seen_references.add(dedupe_key)
+            references.append(reference)
         if not fragments:
             return None
-        return "\n".join(fragments)
+        return RagRetrievalBundle(
+            context_text="\n".join(fragments),
+            references=tuple(references),
+        )
 
     # -------------------------------------------------------------------------
     async def repair_language_once(
@@ -214,6 +241,63 @@ class RagSupportService:
             rerank_score=record.get("rerank_score"),
         )
         return f"{header}\n{text}"
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_document_reference(record: dict[str, Any]) -> RagDocumentReference | None:
+        metadata = record.get("metadata")
+        metadata_dict = metadata if isinstance(metadata, dict) else {}
+        file_name = (
+            str(
+                record.get("file_name")
+                or metadata_dict.get("source_file_name")
+                or metadata_dict.get("file_name")
+                or metadata_dict.get("source_relative_path")
+                or record.get("source")
+                or ""
+            ).strip()
+        )
+        if not file_name:
+            return None
+
+        page_number = RagSupportService._coerce_page_number(record.get("page_number"))
+        page_start = RagSupportService._coerce_page_number(
+            metadata_dict.get("page_start")
+        )
+        page_end = RagSupportService._coerce_page_number(metadata_dict.get("page_end"))
+        if page_number is not None:
+            page_start = page_start or page_number
+            page_end = page_end or page_number
+
+        return RagDocumentReference(
+            file_name=file_name,
+            page_start=page_start,
+            page_end=page_end,
+            document_title=RagSupportService._coerce_optional_text(
+                record.get("document_title") or metadata_dict.get("document_title")
+            ),
+            section_title=RagSupportService._coerce_optional_text(
+                record.get("section_title") or metadata_dict.get("section_title")
+            ),
+            chunk_id=RagSupportService._coerce_optional_text(
+                record.get("chunk_id") or metadata_dict.get("chunk_id")
+            ),
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _coerce_page_number(value: Any) -> int | None:
+        try:
+            parsed = int(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed >= 1 else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _coerce_optional_text(value: Any) -> str | None:
+        stripped = str(value).strip() if value is not None else ""
+        return stripped or None
 
     # -------------------------------------------------------------------------
     @staticmethod

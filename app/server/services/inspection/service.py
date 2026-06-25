@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import uuid
 from datetime import UTC, date, datetime
 from functools import partial
 from pathlib import Path
@@ -13,11 +12,7 @@ from common.paths import VECTOR_DB_PATH
 from common.utils.logger import logger
 from common.utils.text_utils import unique_preserve_order
 from configurations.startup import get_server_settings
-from domain.inspection import (
-    InspectionJobPhase,
-    ReviewerInstructionProfile,
-    ReviewerInstructionTrace,
-)
+from domain.inspection import InspectionJobPhase
 from domain.patient_timeline import PatientTimeline
 from repositories.serialization.data import DataSerializer
 from repositories.serialization.document_serializer import DocumentSerializer
@@ -26,12 +21,6 @@ from services.retrieval.settings import build_effective_rag_settings
 from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection.normalization import (
     extract_lab_marker as extract_lab_marker_value,
-)
-from services.clinical.revision.helpers import (
-    build_revision_section_validation as build_revision_section_validation_value,
-)
-from services.clinical.revision.helpers import (
-    extract_revision_drug_names as extract_revision_drug_names_value,
 )
 from services.inspection.normalization import (
     first_iso_date as first_iso_date_value,
@@ -56,14 +45,8 @@ from services.inspection.timeline import (
     list_session_timelines as list_session_timelines_value,
 )
 from services.inspection.update_config import InspectionUpdateConfigMixin
-from services.inspection.revision_diff import InspectionRevisionDiffMixin
-from services.inspection.revision_decisions import InspectionRevisionDecisionsMixin
-from services.inspection.revision_runner import InspectionRevisionRunnerMixin
-from services.inspection.revision_runner_support import (
-    REVISION_STEP_SEQUENCE as REVISION_STEP_SEQUENCE_VALUE,
-)
+from services.inspection.revision_scaffold import InspectionRevisionScaffoldMixin
 from services.runtime.jobs import JobManager
-from services.text.normalization import normalize_drug_query_name
 
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
@@ -71,16 +54,13 @@ UpdateTarget = Literal["rxnav", "livertox", "rag"]
 ###############################################################################
 class DataInspectionService(
     InspectionUpdateConfigMixin,
-    InspectionRevisionDiffMixin,
-    InspectionRevisionDecisionsMixin,
-    InspectionRevisionRunnerMixin,
+    InspectionRevisionScaffoldMixin,
 ):
     RXNAV_JOB_TYPE = "rxnav_update"
     LIVERTOX_JOB_TYPE = "livertox_update"
     RAG_JOB_TYPE = "rag_update"
     REVISION_JOB_TYPE = "session_revision"
     RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"
-    REVISION_STEP_SEQUENCE = REVISION_STEP_SEQUENCE_VALUE
     UPDATE_PHASES: dict[UpdateTarget, list[PhaseStep]] = {
         "rxnav": [
             ("configuration_accepted", 1, 7, "Configuration accepted"),
@@ -132,32 +112,6 @@ class DataInspectionService(
             report_job_progress=self._report_job_progress_for_runner,
             write_rag_manifest=self._write_rag_manifest_for_runner,
         )
-        self.reconcile_process_local_revision_runs()
-
-    # -------------------------------------------------------------------------
-    def reconcile_process_local_revision_runs(self) -> None:
-        try:
-            running_runs = self.serializer.list_revision_runs_by_status("running")
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "Unable to reconcile process-local revision runs: error_type=%s",
-                type(exc).__name__,
-            )
-            return
-        for run in running_runs:
-            pipeline_run_id = str(run.get("pipeline_run_id") or "").strip()
-            if not pipeline_run_id:
-                continue
-            self.serializer.fail_revision_run(
-                pipeline_run_id=pipeline_run_id,
-                error={
-                    "code": "revision_job_process_lost",
-                    "message": (
-                        "Revision job state is process-local and was lost during "
-                        "backend restart. Retry the draft revision if needed."
-                    ),
-                },
-            )
 
     # -------------------------------------------------------------------------
     def list_sessions(
@@ -210,58 +164,6 @@ class DataInspectionService(
         return self.serializer.list_manual_report_edits(session_id)
 
     # -------------------------------------------------------------------------
-    def compare_session_versions(
-        self,
-        session_id: int,
-        *,
-        left_version_id: int,
-        right_version_id: int,
-    ) -> dict[str, Any] | None:
-        left_detail = self.get_session_version_detail(
-            session_id,
-            version_id=left_version_id,
-        )
-        right_detail = self.get_session_version_detail(
-            session_id,
-            version_id=right_version_id,
-        )
-        if left_detail is None or right_detail is None:
-            return None
-
-        left_version = left_detail.get("version") or {}
-        right_version = right_detail.get("version") or {}
-        if int(left_version.get("root_session_id") or 0) != int(
-            right_version.get("root_session_id") or 0
-        ):
-            raise ValueError("Versions do not belong to the same session lineage.")
-
-        left_entities = self._resolve_version_comparison_entities(
-            version_id=left_version_id,
-            detail=left_detail,
-        )
-        right_entities = self._resolve_version_comparison_entities(
-            version_id=right_version_id,
-            detail=right_detail,
-        )
-        entity_diff = self._build_version_entity_diff(
-            left_entities=left_entities,
-            right_entities=right_entities,
-        )
-        return {
-            "left_version": left_version,
-            "right_version": right_version,
-            **entity_diff,
-            "report_text_diff": self._build_report_text_diff(
-                left_text=self._extract_version_report_text(left_detail),
-                right_text=self._extract_version_report_text(right_detail),
-            ),
-            "qa_summary": self._build_revision_qa_summary(
-                left_detail=left_detail,
-                right_detail=right_detail,
-            ),
-        }
-
-    # -------------------------------------------------------------------------
     def update_session(
         self,
         session_id: int,
@@ -307,442 +209,6 @@ class DataInspectionService(
             edited_by=edited_by,
             metadata=metadata,
         )
-
-    # -------------------------------------------------------------------------
-    def build_revision_audit(
-        self,
-        *,
-        source_detail: dict[str, Any],
-        result_payload: dict[str, Any],
-        selected_text: str | None,
-        revision_instruction: str | None,
-        effective_overrides: dict[str, Any],
-    ) -> dict[str, Any]:
-        source_payload_value = source_detail.get("result_payload")
-        source_payload: dict[str, Any]
-        if isinstance(source_payload_value, dict):
-            source_payload = source_payload_value
-        else:
-            source_payload = {}
-        original_detected = self.extract_revision_drug_names(source_payload)
-        revised_detected = self.extract_revision_drug_names(result_payload)
-        original_keys = {
-            normalize_drug_query_name(name) for name in original_detected if name
-        }
-        revised_keys = {
-            normalize_drug_query_name(name) for name in revised_detected if name
-        }
-        new_drug_keys = sorted(key for key in revised_keys - original_keys if key)
-        removed_drug_keys = sorted(key for key in original_keys - revised_keys if key)
-        section_extraction = result_payload.get("section_extraction")
-        source_sections_value = source_detail.get("sections")
-        source_sections: dict[str, Any]
-        if isinstance(source_sections_value, dict):
-            source_sections = source_sections_value
-        else:
-            source_sections = {}
-        extracted_sections: dict[str, Any]
-        if isinstance(section_extraction, dict):
-            extracted_sections = section_extraction
-        else:
-            extracted_sections = {}
-        section_validation = self.build_revision_section_validation(
-            source_sections=source_sections,
-            extracted_sections=extracted_sections,
-            selected_text=selected_text,
-        )
-        parser_cross_validation = {
-            "rerun_completed": True,
-            "source_scope": "selected_text" if selected_text else "full_session",
-            "selected_text_length": len(selected_text or ""),
-            "section_extraction_available": isinstance(section_extraction, dict),
-            "sections": section_validation["sections"],
-            "missing_sections_after_revision": section_validation[
-                "missing_sections_after_revision"
-            ],
-            "changed_sections_after_revision": section_validation[
-                "changed_sections_after_revision"
-            ],
-        }
-        matched_drugs = result_payload.get("matched_drugs")
-        rucam_assessments = result_payload.get("rucam_assessments")
-        return {
-            "source_session_id": source_detail.get("session_id"),
-            "source_version": source_detail.get("version"),
-            "focused_selection": bool(selected_text),
-            "revision_instruction": revision_instruction,
-            "model_overrides": effective_overrides,
-            "parser_cross_validation": parser_cross_validation,
-            "original_detected_drugs": original_detected,
-            "revised_detected_drugs": revised_detected,
-            "newly_identified_drugs": new_drug_keys,
-            "previously_identified_drugs_missing_after_revision": removed_drug_keys,
-            "drug_analysis_rerun": isinstance(rucam_assessments, list),
-            "livertox_retrieval_rerun": isinstance(matched_drugs, list),
-            "conclusion_action": (
-                "generated_new_conclusion_for_new_drugs"
-                if new_drug_keys
-                else "improved_existing_conclusion"
-            ),
-        }
-
-    # -------------------------------------------------------------------------
-    def build_revision_section_validation(
-        self,
-        *,
-        source_sections: dict[str, Any],
-        extracted_sections: dict[str, Any],
-        selected_text: str | None,
-    ) -> dict[str, Any]:
-        return build_revision_section_validation_value(
-            source_sections=source_sections,
-            extracted_sections=extracted_sections,
-            selected_text=selected_text,
-        )
-
-    # -------------------------------------------------------------------------
-    def extract_revision_drug_names(self, payload: dict[str, Any]) -> list[str]:
-        return extract_revision_drug_names_value(payload)
-
-    # -------------------------------------------------------------------------
-    def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
-        return self.serializer.get_revision_run(pipeline_run_id)
-
-    # -------------------------------------------------------------------------
-    def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
-        return self.serializer.list_revision_steps(pipeline_run_id)
-
-    # -------------------------------------------------------------------------
-    def list_revision_artifacts(
-        self,
-        *,
-        revision_version_id: int,
-    ) -> list[dict[str, Any]]:
-        return self.serializer.list_revision_artifacts_for_version(
-            revision_version_id=revision_version_id
-        )
-
-    # -------------------------------------------------------------------------
-    def list_revision_entities(
-        self,
-        *,
-        revision_version_id: int,
-    ) -> list[dict[str, Any]]:
-        return self.serializer.list_revision_entities_for_version(
-            revision_version_id=revision_version_id
-        )
-
-    # -------------------------------------------------------------------------
-    def list_revision_reviews(
-        self,
-        *,
-        revision_version_id: int,
-    ) -> list[dict[str, Any]]:
-        return self.serializer.list_revision_reviews_for_version(
-            revision_version_id=revision_version_id
-        )
-
-    # -------------------------------------------------------------------------
-    def update_revision_clinical_review(
-        self,
-        session_id: int,
-        *,
-        version_id: int,
-        clinical_review_status: str,
-        reviewer_note: str | None,
-        reviewed_by: str | None,
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any] | None:
-        detail = self.get_session_version_detail(session_id, version_id=version_id)
-        if detail is None:
-            return None
-        review_action = self.serializer.record_revision_review_action(
-            revision_version_id=version_id,
-            clinical_review_status=clinical_review_status,
-            reviewer_note=reviewer_note,
-            reviewed_by=reviewed_by,
-            metadata=metadata or {},
-        )
-        if review_action is None:
-            return None
-        refreshed = self.get_session_version_detail(session_id, version_id=version_id)
-        if refreshed is None:
-            return None
-        return {
-            "version": refreshed["version"],
-            "review_action": review_action,
-        }
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _build_revision_run_configuration(
-        *,
-        selected_text: str | None,
-        revision_instruction: str | None,
-        model_overrides: dict[str, Any],
-        metadata: dict[str, Any],
-    ) -> dict[str, Any]:
-        selected_focus_text = str(selected_text or "").strip() or None
-        focus_instruction = str(revision_instruction or "").strip() or None
-        effective_overrides = {
-            key: value
-            for key, value in (model_overrides or {}).items()
-            if value is not None
-        }
-        return {
-            "selected_text": selected_focus_text,
-            "selected_text_present": bool(selected_focus_text),
-            "revision_instruction": focus_instruction,
-            "model_overrides": effective_overrides,
-            "metadata": metadata or {},
-        }
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def detect_prompt_injection_flags(
-        cls,
-        *,
-        instruction_text: str,
-        selected_text: str | None = None,
-    ) -> list[str]:
-        combined_text = "\n".join(
-            part.strip()
-            for part in [instruction_text, str(selected_text or "")]
-            if str(part or "").strip()
-        ).casefold()
-        detections: list[str] = []
-        indicators: list[tuple[str, str]] = [
-            ("ignore previous", "ignore_previous_instructions"),
-            ("ignore all previous", "ignore_previous_instructions"),
-            ("ignore system", "override_system_prompt_attempt"),
-            ("ignore developer", "override_developer_prompt_attempt"),
-            ("system prompt", "system_prompt_reference"),
-            ("developer message", "developer_message_reference"),
-            ("tool instruction", "tool_instruction_reference"),
-            ("change the schema", "schema_override_attempt"),
-            ("override schema", "schema_override_attempt"),
-            ("change the routing", "routing_override_attempt"),
-            ("override routing", "routing_override_attempt"),
-            ("disable qa", "qa_disable_attempt"),
-            ("skip qa", "qa_disable_attempt"),
-            ("change the model", "model_override_attempt"),
-            ("override model", "model_override_attempt"),
-            ("do not follow your instructions", "instruction_bypass_attempt"),
-            ("instead follow", "instruction_redirection_attempt"),
-        ]
-        for needle, flag in indicators:
-            if needle in combined_text:
-                detections.append(flag)
-        return unique_preserve_order(detections)
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def analyze_reviewer_instructions(
-        cls,
-        *,
-        raw_instruction_text: str,
-        selected_text: str | None = None,
-    ) -> tuple[ReviewerInstructionProfile, ReviewerInstructionTrace]:
-        normalized_instruction = normalize_text_value(raw_instruction_text)
-        summary = str(normalized_instruction or "").strip()
-        lowered = summary.casefold()
-
-        target_sections: list[str] = []
-        target_entities: list[str] = []
-        routed_steps: list[str] = [
-            "generate_revision",
-            "resolve_revision_extraction",
-            "validate_anamnesis_drugs",
-            "extract_missing_anamnesis_drugs",
-            "revise_labs_timeline",
-            "reconcile_revision_candidates",
-            "merge_revision_snapshot",
-            "rebuild_final_report",
-            "qa_validate_revision",
-            "persist_revision",
-            "finalize_revision_version",
-        ]
-
-        section_keywords: list[tuple[str, str]] = [
-            ("anamnes", "anamnesis"),
-            ("history", "anamnesis"),
-            ("therap", "therapy"),
-            ("drug", "therapy"),
-            ("medication", "therapy"),
-            ("lab", "labs"),
-            ("timeline", "labs"),
-            ("livertox", "livertox_matching"),
-            ("match", "livertox_matching"),
-            ("rucam", "dili_assessment"),
-            ("causal", "dili_assessment"),
-            ("report", "final_report"),
-            ("wording", "final_report"),
-            ("qa", "qa"),
-            ("consisten", "qa"),
-        ]
-        for keyword, section in section_keywords:
-            if keyword in lowered:
-                target_sections.append(section)
-
-        entity_keywords: list[tuple[str, str]] = [
-            ("drug", "drugs"),
-            ("medication", "drugs"),
-            ("disease", "diseases"),
-            ("diagnos", "diseases"),
-            ("lab", "labs"),
-            ("timeline", "labs"),
-            ("wording", "report_wording"),
-            ("report", "report_wording"),
-            ("source", "source_evidence"),
-            ("evidence", "source_evidence"),
-            ("match", "matching_errors"),
-            ("causal", "causality_reasoning"),
-            ("missing", "missing_data"),
-            ("ambigu", "ambiguity_resolution"),
-        ]
-        for keyword, entity in entity_keywords:
-            if keyword in lowered:
-                target_entities.append(entity)
-
-        if not target_sections:
-            target_sections.append("unknown")
-        if not target_entities:
-            target_entities.append("other")
-
-        if any(
-            section in target_sections for section in {"anamnesis", "therapy", "labs"}
-        ):
-            routed_steps.append("preprocess_input")
-        if "qa" in target_sections or "source_evidence" in target_entities:
-            routed_steps.append("qa_validate_revision")
-
-        mentioned_dates = unique_preserve_order(
-            [match.group(0) for match in re.finditer(r"\b\d{4}-\d{2}-\d{2}\b", summary)]
-        )
-        mentioned_lab_values = unique_preserve_order(
-            [
-                match.group(0)
-                for match in re.finditer(
-                    r"\b(?:ALT|AST|ALP|bilirubin|bilirubina)\b[^.;,\n]{0,20}\d+(?:\.\d+)?",
-                    summary,
-                    re.IGNORECASE,
-                )
-            ]
-        )
-        extra_data = unique_preserve_order(
-            [selected_text.strip()] if str(selected_text or "").strip() else []
-        )
-        ambiguities = (
-            ["Reviewer instruction contains ambiguity markers."]
-            if any(
-                token in lowered for token in ("maybe", "unclear", "check", "verify")
-            )
-            else []
-        )
-        constraints = (
-            ["Limit changes to the explicitly targeted scope."]
-            if any(
-                token in lowered for token in ("only", "do not", "don't", "must not")
-            )
-            else []
-        )
-        safety_or_quality_concerns = (
-            ["Reviewer requested evidence or consistency validation."]
-            if any(
-                token in lowered for token in ("evidence", "source", "consistent", "qa")
-            )
-            else []
-        )
-        prompt_injection_flags = cls.detect_prompt_injection_flags(
-            instruction_text=summary,
-            selected_text=selected_text,
-        )
-        if prompt_injection_flags:
-            safety_or_quality_concerns = unique_preserve_order(
-                safety_or_quality_concerns
-                + [
-                    "Potential prompt-injection or instruction-redirection content detected in untrusted revision inputs."
-                ]
-            )
-
-        profile = ReviewerInstructionProfile(
-            user_intent="revision_request",
-            main_goal=summary[:200] or None,
-            instruction_summary=summary,
-            target_sections=unique_preserve_order(target_sections),  # type: ignore[arg-type]
-            target_entities=unique_preserve_order(target_entities),  # type: ignore[arg-type]
-            mentioned_drugs=[],
-            mentioned_diseases=[],
-            mentioned_lab_values=mentioned_lab_values,
-            mentioned_dates=mentioned_dates,
-            extra_data=extra_data,
-            ambiguities=ambiguities,
-            constraints=constraints,
-            reviewer_assumptions=[],
-            safety_or_quality_concerns=safety_or_quality_concerns,
-            prompt_injection_flags=prompt_injection_flags,
-            pipeline_routing_decision={
-                "generate_revision": unique_preserve_order(target_sections),
-                "resolve_revision_extraction": ["therapy", "anamnesis"],
-                "validate_anamnesis_drugs": ["anamnesis"],
-                "extract_missing_anamnesis_drugs": ["anamnesis"],
-                "revise_labs_timeline": ["labs"],
-                "reconcile_revision_candidates": ["therapy", "anamnesis"],
-                "merge_revision_snapshot": ["therapy", "anamnesis", "labs"],
-                "rebuild_final_report": ["final_report"],
-                "qa_validate_revision": ["qa"],
-                "persist_revision": ["artifacts"],
-                "finalize_revision_version": ["status_transition"],
-            },
-        )
-        trace = ReviewerInstructionTrace(
-            instruction_id=uuid.uuid4().hex,
-            raw_instruction_text=summary,
-            normalized_instruction_summary=summary,
-            routed_pipeline_steps=unique_preserve_order(routed_steps),
-            affected_entities=unique_preserve_order(target_entities),
-            applied=True,
-            ignored=False,
-            prompt_injection_detected=bool(prompt_injection_flags),
-            prompt_injection_flags=prompt_injection_flags,
-            evidence_addressed=extra_data,
-            qa_validation_result="pending",
-        )
-        return profile, trace
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def build_revision_instruction_context(
-        *,
-        selected_text: str | None,
-        instruction_profile: ReviewerInstructionProfile | None,
-    ) -> str | None:
-        chunks: list[str] = []
-        if str(selected_text or "").strip():
-            chunks.append(
-                f"Reviewer-selected source excerpt:\n{str(selected_text).strip()}"
-            )
-        if instruction_profile is not None:
-            chunks.append(
-                "Reviewer instruction summary:\n"
-                f"{instruction_profile.instruction_summary}"
-            )
-            if instruction_profile.target_sections:
-                chunks.append(
-                    "Target sections:\n"
-                    + ", ".join(instruction_profile.target_sections)
-                )
-            if instruction_profile.target_entities:
-                chunks.append(
-                    "Target entities:\n"
-                    + ", ".join(instruction_profile.target_entities)
-                )
-            if instruction_profile.constraints:
-                chunks.append(
-                    "Constraints:\n" + "; ".join(instruction_profile.constraints)
-                )
-        context = "\n\n".join(chunk for chunk in chunks if chunk.strip())
-        return context or None
 
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
@@ -1128,26 +594,6 @@ class DataInspectionService(
     ) -> dict[str, Any] | None:
         payload = self.jobs.get_job_status(job_id)
         if payload is None:
-            if expected_type == self.REVISION_JOB_TYPE:
-                return {
-                    "job_id": job_id,
-                    "job_type": expected_type,
-                    "scope_key": None,
-                    "status": "failed",
-                    "progress": 0.0,
-                    "result": {
-                        "recoverable": True,
-                        "recovery_action": "reload_revision_run_and_retry",
-                    },
-                    "error": (
-                        "Revision job state is process-local and is no longer "
-                        "available. Reload the revision run and retry if it remains "
-                        "draft."
-                    ),
-                    "created_at": None,
-                    "completed_at": None,
-                    "version": None,
-                }
             return None
         job_type = str(payload.get("job_type") or "")
         if job_type != expected_type:

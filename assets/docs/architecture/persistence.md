@@ -10,30 +10,28 @@ Last updated: 2026-06-21
 ## Persisted Clinical Session Contract
 - `clinical_sessions` is the single source of truth for session records, versioning, revision parentage, and session metadata.
 - New sessions default to `version=1`.
-- Revised sessions store `original_session_id` and an incremented `version`.
-- Revision lineage and review state are stored additively in:
-  - `clinical_session_versions`
-  - `clinical_session_revision_runs`
-  - `clinical_session_revision_steps`
-  - `clinical_session_revision_artifacts`
-  - `clinical_session_revision_entities`
-  - `clinical_session_revision_reviews`
-  - `clinical_session_manual_edits`
-- Revision step and artifact persistence includes reviewer-instruction analysis outputs such as the normalized instruction profile and routing trace, explicit source-preprocessing mode records showing whether persisted source sections were reused or raw text was reparsed, source-version deterministic extraction reuse metadata for therapy/anamnesis/disease artifacts, source-version structured artifact reuse metadata for disease context, lab timeline, and onset context, source-version LiverTox match reuse-or-refresh provenance, source-version prior-assessment provenance for revised DILI assessments, explicit revision extraction-bundle outputs, revision entity-pipeline stage payloads, revision analysis and lookup drug-name selections, explicit revision candidate-reconciliation outputs for promoted drugs, the derived consultation-only revision entity snapshot context, revision consultation drug-name selections, a dedicated revision consultation execution payload including fallback, consultation-model, analysis-entrypoint, drug-analysis-entrypoint, report-finalization-entrypoint, conclusion-entrypoint, synthesis-mode, and revision-prompt provenance, a dedicated revision finalization execution payload, explicit final-report rebuild payloads, revision QA validation payloads, and report-comparison artifacts for each target version.
-- First-class revised drugs, diseases, lab timeline entries, revision-aware LiverTox decisions, and revised DILI assessment records are also stored in `clinical_session_revision_entities` so the revision pipeline can preserve active entity outputs separately from the generic session payload.
-- `clinical_session_revision_entities` rows now carry per-entity schema names such as `revised_drug_entry`, `revised_disease_entry`, `revised_lab_entry`, `revision_livertox_decision`, and `revised_dili_assessment`; repository persistence validates each payload against strict domain schemas before writing those rows.
-- Patient timeline history is persisted only in `clinical_session_timelines`; session result payloads are not a timeline read source.
+- Revised sessions store original_session_id and an incremented ersion.
+- Historical revision tables may remain in local databases:
+  - clinical_session_versions
+  - clinical_session_revision_runs
+  - clinical_session_revision_steps
+  - clinical_session_revision_artifacts
+  - clinical_session_revision_entities
+  - clinical_session_revision_reviews
+  - clinical_session_manual_edits
+- Manual edit history remains active through clinical_session_manual_edits.
+- The current runtime does not execute or read the previous session revision pipeline.
+- Patient timeline history is persisted only in clinical_session_timelines; session result payloads are not a timeline read source.
 - Evidence-locked DILI artifacts are persisted inside the database-backed session result payload:
-  - `normalized_document`
-  - `extraction_artifact`
-  - `fact_graph`
-  - `faithfulness_audit`
+  - 
+ormalized_document
+  - xtraction_artifact
+  - act_graph
+  - aithfulness_audit
   - generated report metadata
   - discrepancy report
-  - `run_bundle_index`
-- Successful clinical and revision workflows require persistence. Serializer failures, missing persisted ids, or failed upserts are treated as service dependency failures rather than silent in-memory success.
-- Revision payload lineage uses `revision_kind`, `source_session_id`, `source_version_id`, `revision_version_id`, and `pipeline_run_id`; `execution_mode` is not persisted as the revision discriminator.
-- Revision run records are durable, but job worker state is process-local. Startup reconciliation marks stale `running` revision runs as failed/recoverable so a backend restart does not leave a completed-looking broken revision.
+  - un_bundle_index
+- Successful clinical workflows require persistence. Serializer failures, missing persisted ids, or failed upserts are treated as service dependency failures rather than silent in-memory success.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
 
 ## Reference Catalog Persistence
@@ -60,3 +58,4 @@ app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-resee
 ## Access Key Persistence
 - Encrypted provider keys are persisted in database tables.
 - Encryption material is seeded and managed through shared security helpers.
+
