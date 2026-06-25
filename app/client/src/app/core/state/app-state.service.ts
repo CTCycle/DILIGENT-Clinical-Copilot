@@ -9,7 +9,7 @@ export type PageId = 'dili-agent' | 'clinical-sessions' | 'data-inspection' | 'm
 export type ThemeMode = 'light' | 'dark';
 
 const DEFAULT_PAGE: PageId = 'dili-agent';
-const DILI_AGENT_PERSISTED_STATE_KEY = 'dili-agent-state-v1';
+const DILI_AGENT_PERSISTED_STATE_KEY = 'dili-agent-state-v2';
 const PAGE_PATHS: Record<PageId, string> = {
   'dili-agent': '/',
   'clinical-sessions': '/clinical-sessions',
@@ -52,6 +52,9 @@ export interface DiliAgentState {
   isRunning: boolean;
   isPulling: boolean;
   isExpanded: boolean;
+  jobStartedAtMs: number | null;
+  jobLastProgressAtMs: number | null;
+  pollIntervalMs: number | null;
 }
 
 export interface AppState {
@@ -64,8 +67,17 @@ type PersistedDiliAgentState = {
   settings: RuntimeSettings;
   form: ClinicalFormState;
   message: string;
+  jobId: string | null;
+  jobProgress: number;
   jobStatus: JobStatus | null;
+  jobStage: string | null;
+  jobStageMessage: string | null;
+  isStarting: boolean;
+  isRunning: boolean;
   isExpanded: boolean;
+  jobStartedAtMs: number | null;
+  jobLastProgressAtMs: number | null;
+  pollIntervalMs: number | null;
 };
 
 const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
@@ -82,10 +94,30 @@ const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
   isRunning: false,
   isPulling: false,
   isExpanded: false,
+  jobStartedAtMs: null,
+  jobLastProgressAtMs: null,
+  pollIntervalMs: null,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function isJobStatus(value: unknown): value is JobStatus | null {
+  return value === null
+    || value === 'pending'
+    || value === 'running'
+    || value === 'completed'
+    || value === 'failed'
+    || value === 'cancelled';
+}
+
+function readFiniteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function readOptionalString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
 }
 
 function readPersistedDiliAgentState(): Partial<DiliAgentState> | null {
@@ -108,23 +140,32 @@ function readPersistedDiliAgentState(): Partial<DiliAgentState> | null {
     const settings = persistedState.settings;
     const form = persistedState.form;
     const message = persistedState.message;
+    const jobId = persistedState.jobId;
+    const jobProgress = persistedState.jobProgress;
     const jobStatus = persistedState.jobStatus;
+    const jobStage = persistedState.jobStage;
+    const jobStageMessage = persistedState.jobStageMessage;
+    const isStarting = persistedState.isStarting;
+    const isRunning = persistedState.isRunning;
     const isExpanded = persistedState.isExpanded;
+    const jobStartedAtMs = persistedState.jobStartedAtMs;
+    const jobLastProgressAtMs = persistedState.jobLastProgressAtMs;
+    const pollIntervalMs = persistedState.pollIntervalMs;
 
     if (
       !settings ||
       !form ||
       typeof message !== 'string' ||
-      (jobStatus !== null &&
-        jobStatus !== 'pending' &&
-        jobStatus !== 'running' &&
-        jobStatus !== 'completed' &&
-        jobStatus !== 'failed' &&
-        jobStatus !== 'cancelled') ||
-      typeof isExpanded !== 'boolean'
+      !isJobStatus(jobStatus) ||
+      (jobId !== null && typeof jobId !== 'string') ||
+      typeof isExpanded !== 'boolean' ||
+      typeof isStarting !== 'boolean' ||
+      typeof isRunning !== 'boolean'
     ) {
       return null;
     }
+
+    const normalizedJobProgress = readFiniteNumber(jobProgress) ?? (jobStatus === 'completed' ? 100 : 0);
 
     return {
       settings: {
@@ -136,14 +177,17 @@ function readPersistedDiliAgentState(): Partial<DiliAgentState> | null {
         ...form,
       },
       message,
+      jobId,
+      jobProgress: normalizedJobProgress,
       jobStatus,
+      jobStage: readOptionalString(jobStage),
+      jobStageMessage: readOptionalString(jobStageMessage),
+      isStarting,
+      isRunning,
       isExpanded,
-      isRunning: false,
-      isStarting: false,
-      jobId: null,
-      jobProgress: jobStatus === 'completed' ? 100 : 0,
-      jobStage: null,
-      jobStageMessage: null,
+      jobStartedAtMs: readFiniteNumber(jobStartedAtMs),
+      jobLastProgressAtMs: readFiniteNumber(jobLastProgressAtMs),
+      pollIntervalMs: readFiniteNumber(pollIntervalMs),
       exportUrl: null,
     };
   } catch {
@@ -160,8 +204,17 @@ function writePersistedDiliAgentState(state: DiliAgentState): void {
     settings: state.settings,
     form: state.form,
     message: state.message,
+    jobId: state.jobId,
+    jobProgress: state.jobProgress,
     jobStatus: state.jobStatus,
+    jobStage: state.jobStage,
+    jobStageMessage: state.jobStageMessage,
+    isStarting: state.isStarting,
+    isRunning: state.isRunning,
     isExpanded: state.isExpanded,
+    jobStartedAtMs: state.jobStartedAtMs,
+    jobLastProgressAtMs: state.jobLastProgressAtMs,
+    pollIntervalMs: state.pollIntervalMs,
   };
 
   try {

@@ -382,6 +382,132 @@ def test_dili_run_burst_click_submits_single_job(
     assert submission_count == 1
 
 ###############################################################################
+def test_dili_progress_polling_survives_navigation(
+    page: Page, base_url: str
+):
+    page.goto(base_url)
+    _fill_required_dili_fields(page)
+
+    def start_navigation_resume_job(route: Route) -> None:
+        route.fulfill(
+            status=202,
+            content_type="application/json",
+            body=(
+                '{"job_id":"nav-resume","job_type":"clinical","status":"running",'
+                '"message":"Clinical analysis started","poll_interval":0.5}'
+            ),
+        )
+
+    status_call_count = 0
+
+    def serve_navigation_resume_status(route: Route) -> None:
+        nonlocal status_call_count
+        status_call_count += 1
+        if status_call_count == 1:
+            body = (
+                '{"job_id":"nav-resume","job_type":"clinical","status":"running",'
+                '"progress":18,"result":{"progress_stage":"drugs.extracting",'
+                '"progress_message":"Extracting therapy and medication data"},'
+                '"error":null,"created_at":1,"completed_at":null,"version":1}'
+            )
+        elif status_call_count in (2, 3):
+            body = (
+                '{"job_id":"nav-resume","job_type":"clinical","status":"running",'
+                '"progress":62,"result":{"progress_stage":"retrieval.evidence",'
+                '"progress_message":"Gathering grounded evidence"},'
+                '"error":null,"created_at":1,"completed_at":null,"version":2}'
+            )
+        else:
+            body = (
+                '{"job_id":"nav-resume","job_type":"clinical","status":"completed",'
+                '"progress":100,"result":{"report":"Navigation recovery completed.",'
+                '"progress_stage":"completed","progress_message":"Clinical analysis completed."},'
+                '"error":null,"created_at":1,"completed_at":2,"version":3}'
+            )
+        route.fulfill(status=200, content_type="application/json", body=body)
+
+    page.route("**/api/clinical/jobs", start_navigation_resume_job)
+    page.route("**/api/clinical/jobs/nav-resume**", serve_navigation_resume_status)
+    try:
+        page.get_by_role("button", name="Run DILI analysis").click()
+        expect(page.locator(".spinner-label")).to_contain_text(
+            "Extracting therapy and medication data"
+        )
+        page.get_by_role("tab", name="Model Configurations").click()
+        expect(page).to_have_url(re.compile(r"/model-config/?$"))
+        page.wait_for_timeout(900)
+        page.get_by_role("tab", name="DILI Agent").click()
+        expect(page).to_have_url(re.compile(r"/?$"))
+        expect(page.locator(".spinner-label")).to_contain_text("Gathering grounded evidence")
+        expect(page.locator(".spinner-label")).to_contain_text("62%")
+        expect(page.locator(".inspection-excerpt-text")).to_contain_text(
+            "Navigation recovery completed."
+        )
+    finally:
+        page.unroute("**/api/clinical/jobs/nav-resume**", serve_navigation_resume_status)
+        page.unroute("**/api/clinical/jobs", start_navigation_resume_job)
+
+###############################################################################
+def test_dili_progress_polling_survives_refresh(page: Page, base_url: str):
+    page.goto(base_url)
+    _fill_required_dili_fields(page)
+
+    def start_refresh_resume_job(route: Route) -> None:
+        route.fulfill(
+            status=202,
+            content_type="application/json",
+            body=(
+                '{"job_id":"refresh-resume","job_type":"clinical","status":"running",'
+                '"message":"Clinical analysis started","poll_interval":0.5}'
+            ),
+        )
+
+    status_call_count = 0
+
+    def serve_refresh_resume_status(route: Route) -> None:
+        nonlocal status_call_count
+        status_call_count += 1
+        if status_call_count == 1:
+            body = (
+                '{"job_id":"refresh-resume","job_type":"clinical","status":"running",'
+                '"progress":14,"result":{"progress_stage":"drugs.extracting",'
+                '"progress_message":"Extracting therapy and medication data"},'
+                '"error":null,"created_at":1,"completed_at":null,"version":1}'
+            )
+        elif status_call_count in (2, 3):
+            body = (
+                '{"job_id":"refresh-resume","job_type":"clinical","status":"running",'
+                '"progress":57,"result":{"progress_stage":"retrieval.evidence",'
+                '"progress_message":"Collecting supporting evidence"},'
+                '"error":null,"created_at":1,"completed_at":null,"version":2}'
+            )
+        else:
+            body = (
+                '{"job_id":"refresh-resume","job_type":"clinical","status":"completed",'
+                '"progress":100,"result":{"report":"Refresh recovery completed.",'
+                '"progress_stage":"completed","progress_message":"Clinical analysis completed."},'
+                '"error":null,"created_at":1,"completed_at":2,"version":3}'
+            )
+        route.fulfill(status=200, content_type="application/json", body=body)
+
+    page.route("**/api/clinical/jobs", start_refresh_resume_job)
+    page.route("**/api/clinical/jobs/refresh-resume**", serve_refresh_resume_status)
+    try:
+        page.get_by_role("button", name="Run DILI analysis").click()
+        expect(page.locator(".spinner-label")).to_contain_text(
+            "Extracting therapy and medication data"
+        )
+        page.reload()
+        expect(page.locator(".spinner-label")).to_contain_text("Collecting supporting evidence")
+        expect(page.locator(".spinner-label")).to_contain_text("57%")
+        expect(page.locator(".inspection-excerpt-text")).to_contain_text(
+            "Refresh recovery completed."
+        )
+    finally:
+        page.unroute("**/api/clinical/jobs/refresh-resume**", serve_refresh_resume_status)
+        page.unroute("**/api/clinical/jobs", start_refresh_resume_job)
+
+###############################################################################
 def test_dili_submit_accepts_variant_section_headings(
     page: Page, base_url: str
 ) -> None:
