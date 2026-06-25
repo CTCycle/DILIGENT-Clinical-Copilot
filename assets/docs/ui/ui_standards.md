@@ -32,4 +32,4 @@ Last updated: 2026-06-17
 | Reuse existing tokens before adding a new value. | Add near-duplicate colors, radii, or fractional font sizes for one screen. |
 | Preserve current workflow and information architecture. | Redesign a page when a token or spacing polish is enough. |
 | Keep dense data tables and timeline canvases horizontally scrollable. | Force dense content into narrow columns that clip controls. |
-| Store validation notes and screenshots in `QA/`. | Scatter audit artifacts across source folders. |
+| Store validation notes and screenshots in `assets/QA/`. | Scatter audit artifacts across source folders. |
