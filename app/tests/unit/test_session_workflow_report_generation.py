@@ -216,10 +216,13 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
         ),
     )
 
+    assert result["final_report"].startswith("# Structured DILI causality dossier")
+    assert "## 14. Manual review requirements" in result["final_report"]
     assert (
-        result["final_report"]
-        == "Relazione narrativa con discussione farmacologica e sintesi finale."
+        "Relazione narrativa con discussione farmacologica e sintesi finale."
+        in result["final_report"]
     )
+    assert result["dili_evidence_bundle"]["manual_review_required"] is True
     assert result["final_report"] in result["report"]
     assert "## Report Clinico" in result["pipeline_artifacts"]["generated_report"]
     assert (

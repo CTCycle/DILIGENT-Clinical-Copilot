@@ -64,6 +64,24 @@ from domain.clinical.revision import (
 )
 from domain.clinical.rucam import RucamAnchor
 from domain.clinical.validation import ValidationMessageBundle
+from domain.clinical.dili import (
+    ClinicalDataCompleteness,
+    ClinicalEvidenceQuote,
+    DiliCompetingCause,
+    DiliDifferentialAssessment,
+    DiliEvidenceBundle,
+    DiliHysLawAssessment,
+    DiliInjuryPattern,
+    DiliPhenotypeAssessment,
+    DiliRucamAssessment,
+    DiliRucamComponent,
+    DiliSeverityAssessment,
+    DiliTimeline,
+    DiliTimelineEvent,
+    DilinLikeCausalityAssessment,
+    DrugExposureAssessment,
+    DrugIdentityResolution,
+)
 
 __all__ = [
     "Comparator",
@@ -121,4 +139,20 @@ __all__ = [
     "RevisedLabPayload",
     "RevisionLiverToxDecision",
     "create_drug_suspension_context",
+    "ClinicalDataCompleteness",
+    "ClinicalEvidenceQuote",
+    "DiliCompetingCause",
+    "DiliDifferentialAssessment",
+    "DiliEvidenceBundle",
+    "DiliHysLawAssessment",
+    "DiliInjuryPattern",
+    "DiliPhenotypeAssessment",
+    "DiliRucamAssessment",
+    "DiliRucamComponent",
+    "DiliSeverityAssessment",
+    "DiliTimeline",
+    "DiliTimelineEvent",
+    "DilinLikeCausalityAssessment",
+    "DrugExposureAssessment",
+    "DrugIdentityResolution",
 ]
