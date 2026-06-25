@@ -10,7 +10,7 @@ from repositories.serialization.document_chunker import DocumentChunker
 from repositories.serialization.document_serializer import DocumentSerializer
 
 
-TEST_TMP_ROOT = Path("QA/tmp/test-document-chunking")
+TEST_TMP_ROOT = Path("assets/QA/tmp/test-document-chunking")
 
 ###############################################################################
 def make_workspace_temp_dir() -> Path:

@@ -21,7 +21,7 @@ app/src-tauri/**/*.7z
 app/src-tauri/**/*.tar.gz
 release/windows/
 runtimes/**
-QA/**
+assets/QA/**
 .playwright-mcp/
 
 # Python
