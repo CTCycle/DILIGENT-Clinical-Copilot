@@ -549,8 +549,12 @@ class AnalysisRunner:
             entry.missing_livertox = True
             entry.paragraph = consultation.build_missing_excerpt_paragraph(entry)
             return entry, None
-        rag_documents = await consultation.rag_support.fetch_rag_documents(
+        rag_bundle = await consultation.rag_support.fetch_rag_documents(
             rag_query, drug_entry.name or ""
+        )
+        rag_context = rag_bundle.context_text if rag_bundle is not None else None
+        entry.rag_references = (
+            list(rag_bundle.references) if rag_bundle is not None else []
         )
         job = consultation.drug_analysis.request_drug_analysis(
             drug_name=drug_entry.name,
@@ -559,7 +563,7 @@ class AnalysisRunner:
             extraction_metadata=entry.extraction_metadata,
             livertox_status="matched",
             excerpt=excerpt,
-            rag_documents=rag_documents or None,
+            rag_context=rag_context,
             clinical_context=normalized_context,
             suspension=entry.suspension,
             visit_date=visit_date,
@@ -601,8 +605,12 @@ class AnalysisRunner:
             entry.missing_livertox = True
             entry.paragraph = consultation.build_missing_excerpt_paragraph(entry)
             return entry, None
-        rag_documents = await consultation.rag_support.fetch_rag_documents(
+        rag_bundle = await consultation.rag_support.fetch_rag_documents(
             rag_query, drug_entry.name or ""
+        )
+        rag_context = rag_bundle.context_text if rag_bundle is not None else None
+        entry.rag_references = (
+            list(rag_bundle.references) if rag_bundle is not None else []
         )
         job = consultation.drug_analysis.request_revision_drug_analysis(
             drug_name=drug_entry.name,
@@ -611,7 +619,7 @@ class AnalysisRunner:
             extraction_metadata=entry.extraction_metadata,
             livertox_status="matched",
             excerpt=excerpt,
-            rag_documents=rag_documents or None,
+            rag_context=rag_context,
             clinical_context=normalized_context,
             suspension=entry.suspension,
             visit_date=visit_date,
