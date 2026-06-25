@@ -68,7 +68,11 @@ Additional rules:
 - Missing in-memory revision job status returns a recoverable failed status instead of a bare not-found response so the frontend can reload the persisted revision run and offer retry when the draft shell is still valid.
 - Clinical and session revision jobs must persist their successful result payloads before returning completion. Persistence failures move the job to failed state with sanitized error metadata.
 
-Frontend polling is implemented in `app/client/src/app/core/services/api.ts` and stops on terminal states.
+Frontend polling is implemented through app-lifetime tracker services such as
+`app/client/src/app/core/services/dili-job-tracker.service.ts` and stops on
+terminal states. Active DILI job linkage is persisted in session storage so the
+UI can reattach after route navigation or a same-session page refresh while the
+backend worker is still running.
 
 ## Cancellation Rules
 - Pending jobs can be marked `cancelled` immediately.
