@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-06-24
+Last updated: 2026-06-26
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -25,6 +25,7 @@ Last updated: 2026-06-24
   - Clinical extraction schemas used by orchestration live under `app/server/domain/clinical/`.
   - Drug resolution decision schemas live in `app/server/domain/clinical/drug_resolution.py`.
   - Clinical claim envelopes live in `app/server/domain/clinical/claims.py` and are attached to per-drug DILI assessments for source and limitation review.
+  - Deterministic DILI adjudication contracts live in `app/server/domain/clinical/dili.py`, including timeline events, Hy's Law state, componentized RUCAM, DILIN-like causality, and acceptance-question evidence payloads.
 - Runtime state: `app/server/services/runtime/state.py`
   - Internal job state only. It is not a public domain contract and must not be imported by endpoints.
 - Repository layer: `app/server/repositories/*`
@@ -67,6 +68,7 @@ Last updated: 2026-06-24
 - LiverTox and RxNav matching preserve raw mentions, candidates, rejected candidates, origins, confidence, status, `DrugResolutionDecision`, accepted RxCUI, accepted LiverTox monograph identity, review flags, and warning issues for missing, ambiguous, low-confidence, or unvalidated matches.
 - Resolution statuses are `accepted_exact_livertox`, `accepted_rxnav_validated`, `accepted_livertox_without_rxnav`, `ambiguous_requires_review`, `missing_rxnav`, `missing_livertox`, and `rejected_false_positive`.
 - Persisted audit artifacts include section extraction audit, extraction strategy decisions, hepatic pattern resolution, and match audit details.
+- Persisted clinical results include a rendered deterministic `dili_evidence_bundle` dossier as the authoritative `final_report`; any LLM consultation output is stored separately as non-authoritative audit summary text.
 - Successful clinical jobs require database persistence. If the serializer cannot return a persisted session id, the workflow fails with a service dependency error rather than returning an unpersisted success.
 
 ### `POST /api/clinical/validate-input`
@@ -93,6 +95,7 @@ Last updated: 2026-06-24
 - `app/server/services/clinical/revision/qa.py`
 - `app/server/repositories/serialization/data.py`
 - Revision jobs persist source-loading, reviewer-instruction analysis, runtime preparation, source preprocessing that prefers persisted source-version sections before reparsing raw text, deterministic source-artifact reuse for therapy/anamnesis/disease extraction when the selected source version already stores those artifacts, source-version structured artifact reuse for disease context, lab timeline, and onset context when those artifacts already exist, generation, revision-stage entity checkpoints (`resolve_revision_extraction`, `validate_anamnesis_drugs`, `extract_missing_anamnesis_drugs`, `revise_labs_timeline`, `reconcile_revision_candidates`, `merge_revision_snapshot`), revision-specific analysis and lookup drug inputs derived from the staged anamnesis additions, a dedicated `ClinicalSessionService.run_revision_consultation(...)` execution path with consultation metadata and selected-drug inputs derived from the merged revision snapshot, a dedicated consultation-engine entrypoint (`HepatoxConsultation.run_revision_analysis(...)`) underneath that service boundary, revision-specific drug-analysis/conclusion composition entrypoints (`request_revision_drug_analysis(...)`, `finalize_revision_patient_report(...)`, `generate_revision_conclusion(...)`) with comparison-aware synthesis guidance and dedicated revision prompt templates, revision-aware candidate classification reconciliation for promoted drugs, a dedicated revision finalization stage that owns post-consultation report shaping and audit summaries, source-version LiverTox match reuse or refresh decisions with provenance, revised DILI reassessment handling that can reference prior source-version per-drug assessments, final-report rebuild through `services/clinical/revision/report_builder.py`, revision QA validation through `services/clinical/revision/qa.py`, artifact/entity persistence, and final version-state transitions through revision run and step tables.
+- Revision jobs rebuild and persist the same deterministic `dili_evidence_bundle` contract used by first-run workflows so acceptance-question answers, timeline logic, Hy's Law state, RUCAM support, and causality categories stay aligned across initial and revised reports.
 - Revision result payloads identify lineage through `revision_kind`, `source_session_id`, `source_version_id`, `revision_version_id`, and `pipeline_run_id`; `execution_mode` is not a revision contract.
 - First-class revision entities are strict domain schemas under `app/server/domain/clinical/revision.py`; repository persistence validates revised drugs, diseases, lab entries, LiverTox decisions, and revised DILI assessments against those schemas before writing `clinical_session_revision_entities`.
 

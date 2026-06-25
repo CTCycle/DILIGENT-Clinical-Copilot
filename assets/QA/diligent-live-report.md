@@ -1,0 +1,136 @@
+- banner:
+  - img "Diligent logo"
+  - generic: DILIGENT Clinical Copilot
+  - navigation "Main navigation":
+    - tablist "Main navigation tabs":
+      - tab "DILI Agent" [selected]:
+        - generic: DILI Agent
+      - tab "Clinical Sessions":
+        - generic: Clinical Sessions
+      - tab "Data Inspection":
+        - generic: Data Inspection
+      - tab "Model Configurations":
+        - generic: Model Configurations
+  - button "Switch to light theme":
+- main:
+  - heading "Clinical Input" [level=3]:
+    - text: Clinical Input
+  - textbox "Clinical Input":
+    - /placeholder: "Provide plain text with 3 clearly titled and separated sections.\n\n## Anamnesis\nDiagnoses, symptoms, clinical conditions, disease timeline, previous therapies, relevant history.\n\n## Therapy\nCurrent and past drugs, dosage, route, start date or timing, suspension status. Bullet lists allowed.\n\n## Laboratory history\nALT, ALP, bilirubin, GGT, AST, INR, dates, units, ULN values, hepatic pattern (if known), RUCAM score (if already calculated).\n\nEquivalent headings are accepted. Anamnesis aliases: anamnesi, anamnesis, medical history. Therapy aliases: drugs, farmaci, terapia, therapy. Laboratory aliases: esami di laboratorio, lab results, laboratory analysis."
+    - text: "## Anamnesis 54-year-old adult with fatigue, nausea, pruritus, dark urine, and jaundice. Viral hepatitis A, B, and C serologies negative. Autoimmune hepatitis workup pending. No alcohol misuse documented. No biliary obstruction documented. ## Therapy Amoxicillin-clavulanate 875/125 mg orally twice daily started 2026-05-01 and stopped 2026-05-12 after symptoms worsened. No rechallenge performed. Atorvastatin chronic long-term therapy for several years without recent dose change. ## Laboratory history 2026-05-10 ALT 420 U/L (ULN 40), AST 280 U/L (ULN 40), ALP 150 U/L (ULN 120), total bilirubin 1.8 mg/dL (ULN 1.0). 2026-05-14 ALT 680 U/L (ULN 40), AST 390 U/L (ULN 40), ALP 170 U/L (ULN 120), total bilirubin 3.4 mg/dL (ULN 1.0), INR 1.2. 2026-05-21 ALT 320 U/L (ULN 40), AST 150 U/L (ULN 40), ALP 160 U/L (ULN 120), total bilirubin 2.1 mg/dL (ULN 1.0). Hepatic pattern not explicitly provided."
+  - complementary:
+    - button "Upload patient profile image":
+      - generic: V
+    - heading "Validation Case A" [level=3]
+    - paragraph: "Recorded: 14 maggio 2026"
+    - generic: Patient Name
+    - textbox "Patient Name":
+      - /placeholder: e.g., Marco Rossi
+      - text: Validation Case A
+    - generic: Visit Date
+    - textbox "Visit Date": 2026-05-14
+    - button "Run DILI analysis"
+    - button "Clear all"
+  - paragraph: DILI Assessment
+  - button "Copy"
+  - button "Expand"
+  - button "Download report"
+  - article:
+    - heading "Clinical Visit Summary" [level=1]
+    - list:
+      - strong: "Patient:"
+      - text: Validation Case A
+      - strong: "Visit date:"
+      - text: 14 May 2026
+    - heading "Anamnesis" [level=2]
+    - paragraph: 54-year-old adult with fatigue, nausea, pruritus, dark urine, and jaundice. Viral hepatitis A, B, and C serologies negative. Autoimmune hepatitis workup pending. No alcohol misuse documented. No biliary obstruction documented.
+    - heading "Hepatotoxicity Pattern" [level=2]
+    - list:
+      - strong: "Classification:"
+      - text: hepatocellular
+      - strong: "R-score:"
+      - text: "8.40"
+    - heading "Current Drugs" [level=2]
+    - list:
+      - listitem: Amoxicillin-clavulanate 875/125 mg orally twice daily started 2026-05-01 and stopped 2026-05-12 after symptoms worsened. No rechallenge performed.
+      - listitem: Atorvastatin chronic long-term therapy for several years without recent dose change.
+    - paragraph:
+      - strong: "Detected drugs (1):"
+      - text: Amoxicillin-clavulanate
+    - heading "Historical Drug Mentions" [level=2]
+    - list:
+      - strong: "Historical mentions (0):"
+      - text: None detected
+    - heading "Estimated RUCAM" [level=2]
+    - list:
+      - strong: Amoxicillin-clavulanate
+      - text: ": score None (not assessable, confidence low)"
+    - heading "Warnings" [level=2]
+    - list:
+      - listitem: Parser batch preflight denied concurrent extraction; using sequential extraction for local runtime safety.
+    - heading "Clinical Report" [level=2]
+    - heading "Structured DILI causality dossier" [level=1]
+    - heading "1. Case completeness and missing data" [level=2]
+    - list:
+      - listitem: "Missing: ebv_cmv_hsv, first_symptom_date, ischemic_hypoxic, masld_mash_nash, overdose_or_toxin, sepsis_shock_cardiac_failure, supplement_otc_recreational_occupational"
+    - heading "2. Liver injury pattern and severity" [level=2]
+    - list:
+      - listitem: "Pattern: hepatocellular; R=8.4 (ALT 420.0/40.0 ULN; ALP 150.0/120.0 ULN)"
+      - listitem: "Severity: 2_moderate (S)"
+    - heading "3. Timeline summary" [level=2]
+    - list:
+      - listitem: "First abnormal test: 2026-05-10"
+      - listitem: "First symptom: missing"
+      - listitem: "Jaundice/bilirubin timing: 2026-05-14"
+      - listitem: "Dechallenge: no_follow_up"
+    - heading "4. Competing-cause assessment" [level=2]
+    - list:
+      - listitem: "viral_hepatitis_a_b_c_d_e: excluded"
+      - listitem: "ebv_cmv_hsv: missing_data"
+      - listitem: "autoimmune_hepatitis: excluded"
+      - listitem: "alcoholic_hepatitis: excluded"
+      - listitem: "masld_mash_nash: missing_data"
+      - listitem: "biliary_obstruction_gallstones: excluded"
+      - listitem: "ischemic_hypoxic: missing_data"
+      - listitem: "sepsis_shock_cardiac_failure: missing_data"
+      - listitem: "overdose_or_toxin: missing_data"
+      - listitem: "supplement_otc_recreational_occupational: missing_data"
+      - listitem: "pre_existing_chronic_liver_disease: excluded"
+    - heading "5. Drug exposure table" [level=2]
+    - list:
+      - listitem: "Amoxicillin-clavulanate: identity=Amoxicillin-Clavulanate; start=2026-05-01 and stopped 2026-05-12 after symptoms worsened; stop=2026-05-12 after symptoms worsened; rechallenge=unknown"
+    - heading "6. Per-drug identity resolution" [level=2]
+    - list:
+      - listitem: "Amoxicillin-clavulanate: Exact normalized LiverTox primary name accepted"
+    - heading "7. Per-drug causality assessment" [level=2]
+    - list:
+      - listitem: "Amoxicillin-clavulanate: possible"
+    - heading "8. RUCAM components" [level=2]
+    - heading "Amoxicillin-clavulanate" [level=3]
+    - list:
+      - listitem: "Total: None; category: not assessable"
+      - listitem: "rucam: not_assessable; score=None; evidence=missing; date=missing"
+    - heading "9. DILIN-like causality category" [level=2]
+    - list:
+      - listitem: "Amoxicillin-clavulanate: possible"
+    - heading "10. Hy's Law status" [level=2]
+    - list:
+      - listitem: possible. This is a risk signal, not a diagnosis.
+    - heading "11. Dechallenge/rechallenge" [level=2]
+    - list:
+      - listitem: "Dechallenge: no_follow_up"
+      - listitem: "Amoxicillin-clavulanate rechallenge: unknown; rechallenge is never recommended."
+    - heading "12. Knowledge base and RAG evidence" [level=2]
+    - list:
+      - listitem: "Source hierarchy: AASLD, LiverTox, FDA, DILIN/RUCAM."
+    - heading "13. Clinical limitations" [level=2]
+    - list:
+      - listitem: RUCAM is structured support and is not dispositive.
+      - listitem: Missing or unresolved competing causes prevent definitive attribution.
+    - heading "14. Acceptance questions" [level=2]
+    - list:
+      - listitem: Manual hepatology review required.
+      - listitem: What is the latency from first compatible exposure to first liver injury signal? -> 2026-05-10
+      - listitem: Did the injury improve, persist, or worsen after discontinuation? -> no_follow_up
+    - paragraph: "Missing-data note: Dechallenge cannot be graded honestly when follow-up after discontinuation is incomplete. - What is the liver injury pattern at the first qualifying episode? -> hepatocellular - Which clinically conservative phenotype candidates are supported? -> autoimmune_like_hepatitis, chronic_hepatitis_like_injury, acute_hepatocellular_injury Missing-data note: Phenotype remains limited by missing biopsy, imaging, autoimmune markers, or long follow-up. - Are mandatory alternative causes excluded? -> no Missing-data note: One or more mandatory competing causes are unresolved or not excluded. - Does the episode satisfy Hy's Law requirements? -> possible Missing-data note: Hy's Law is not assessable or only possible when same-episode timing, cholestasis exclusion, alternatives, or exposure compatibility remain incomplete. - What is the severity grade? -> 2_moderate (S) - Is any rechallenge documented, and was it positive? -> unknown Missing-data note: Absent evidence is treated as unknown, never as negative, and rechallenge is never recommended. - Is the suspect-drug identity reliable enough for adjudication? -> Amoxicillin-Clavulanate - What prior LiverTox likelihood supports the exposure? -> A - What is the supportive RUCAM conclusion? -> not assessable Missing-data note: RUCAM remains supportive only and is not assessable when criteria-level evidence is missing. - What is the overall DILIN-like causality category? -> possible Missing-data note: Overall causality stays limited when timing, identity, phenotype match, source quality, or competing-cause exclusion are incomplete."
+- generic "RAG requires Ollama"

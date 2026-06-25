@@ -92,9 +92,15 @@ def test_structured_dossier_preserves_missing_competing_causes() -> None:
 
     assert bundle.patterns[0].pattern == "hepatocellular"
     assert bundle.hys_law.status == "possible"
+    assert bundle.hys_law.same_episode is True
     assert bundle.exposures[0].livertox_likelihood == "A"
     assert bundle.exposures[0].rucam.components[0].evidence_quote
     assert "ebv_cmv_hsv" in bundle.differential.unresolved_causes
+    assert len(bundle.acceptance_questions) == 12
+    assert any(
+        question.question.startswith("Does the episode satisfy Hy's Law")
+        for question in bundle.acceptance_questions
+    )
     assert bundle.manual_review_required is True
 
 

@@ -377,7 +377,7 @@ async def process_single_patient_workflow(
         _PROGRESS_SEQUENCE[13][0],
     )
 
-    clinical_session, final_report = await service.run_consultation(
+    clinical_session, llm_clinical_summary = await service.run_consultation(
         payload=payload,
         analysis_drugs=analysis_drugs,
         prepared_inputs=prepared_inputs,
@@ -399,10 +399,7 @@ async def process_single_patient_workflow(
         rucam_bundle=rucam_bundle,
     )
     structured_dili_report = DiliEvidenceBuilder.render(dili_evidence_bundle)
-    if final_report:
-        final_report = f"{structured_dili_report}\n\n---\n\n## LLM clinical summary\n\n{final_report}"
-    else:
-        final_report = structured_dili_report
+    final_report = structured_dili_report
 
     fact_graph = build_fact_graph(
         extraction_artifact=extraction_artifact,
@@ -506,6 +503,7 @@ async def process_single_patient_workflow(
         "lab_timeline": [entry.model_dump() for entry in lab_timeline.entries],
         "onset_context": onset_context.model_dump() if onset_context else None,
         "dili_evidence_bundle": dili_evidence_bundle.model_dump(),
+        "llm_clinical_summary": llm_clinical_summary,
         "detected_input_language": language_result.detected_input_language,
         "report_language": language_result.report_language,
         "relevant_drugs": effective_candidate_selection.relevant,
@@ -617,6 +615,7 @@ async def process_single_patient_workflow(
                 ),
             },
             "dili_evidence_bundle": dili_evidence_bundle.model_dump(),
+            "llm_clinical_summary": llm_clinical_summary,
             "deterministic_extraction": {
                 "therapy": {
                     "entries": [
@@ -643,6 +642,7 @@ async def process_single_patient_workflow(
             "fact_graph": fact_graph.model_dump(),
             "fact_graph_validation": fact_graph_validation.model_dump(),
             "generated_report": generated_report,
+            "llm_clinical_summary": llm_clinical_summary,
             "report_metadata": report_metadata.model_dump(),
             "faithfulness_audit": faithfulness_audit.model_dump(),
             "discrepancy_report": faithfulness_audit.discrepancy_report,
@@ -682,6 +682,7 @@ async def process_single_patient_workflow(
                 "clinical_model": getattr(clinical_session, "llm_model", None),
                 "total_duration": global_elapsed,
                 "final_report": final_report,
+                "llm_clinical_summary": llm_clinical_summary,
                 "detected_drugs": detected_drugs,
                 "matched_drugs": matched_drugs_payload,
                 "issues": serialized_issues,
