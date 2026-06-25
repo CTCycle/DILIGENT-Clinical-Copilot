@@ -9,6 +9,7 @@ import {
   resolvePageIdFromPath,
   resolvePathFromPage,
 } from './core/state/app-state.service';
+import { DiliJobTrackerService } from './core/services/dili-job-tracker.service';
 import { NavSidebarComponent } from './components/nav-sidebar/nav-sidebar.component';
 
 @Component({
@@ -19,10 +20,12 @@ import { NavSidebarComponent } from './components/nav-sidebar/nav-sidebar.compon
 })
 export class App {
   readonly stateService = inject(AppStateService);
+  private readonly diliJobTracker = inject(DiliJobTrackerService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
+    void this.diliJobTracker;
     this.router.events
       .pipe(
         filter((event): event is NavigationEnd => event instanceof NavigationEnd),

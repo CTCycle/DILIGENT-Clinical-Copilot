@@ -3,33 +3,20 @@ import { Component, ElementRef, HostListener, OnDestroy, ViewChild, computed, ef
 import { FormsModule } from '@angular/forms';
 
 import { DEFAULT_FORM_STATE, REPORT_EXPORT_FILENAME } from '../../core/constants';
+import { ClinicalInputPreflightIssue, JobStatus } from '../../core/models/types';
+import { validateClinicalInput, fetchClinicalSectionTemplate } from '../../core/services/clinical-api';
+import { DiliJobTrackerService } from '../../core/services/dili-job-tracker.service';
+import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { AppStateService } from '../../core/state/app-state.service';
 import {
   buildClinicalPayload,
   createDownloadUrl,
-  formatErrorMessage,
   formatUnknownError,
   normalizeVisitDateInput,
 } from '../../core/utils';
-import {
-  ClinicalInputPreflightIssue,
-  JobStatus,
-  JobStatusResponse,
-} from '../../core/models/types';
-import {
-  fetchClinicalSectionTemplate,
-  fetchClinicalJobStatus,
-  cancelClinicalJob,
-  pollClinicalJobStatus,
-  resolvePollIntervalMs,
-  startClinicalJob,
-  validateClinicalInput,
-} from '../../core/services/clinical-api';
-import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const STALL_THRESHOLD_MS = 600_000;
-const POLL_WATCHDOG_MIN_STALE_MS = 15_000;
 const SECTION_REVIEW_WARNING_CODES = new Set([
   'section_extraction_confidence_needs_review',
   'section_extraction_requires_review',
@@ -58,6 +45,7 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   readonly stateService = inject(AppStateService);
   private readonly markdownRenderer = inject(MarkdownRendererService);
+  private readonly diliJobTracker = inject(DiliJobTrackerService);
 
   readonly isCancelling = signal(false);
   readonly isRunActionLocked = signal(false);
@@ -69,14 +57,6 @@ export class DiliAgentPageComponent implements OnDestroy {
   readonly renderedReport = computed(() => this.markdownRenderer.render(this.finalReportMarkdown()));
   readonly clinicalInputTemplate = signal('');
 
-  private lastProgressUpdateTimestamp = 0;
-  private lastPollResponseTimestamp = 0;
-  private lastProgressSignature = '';
-  private jobStartedAt = 0;
-  private pollIntervalMs = 1000;
-  private poller: { stop: () => void } | null = null;
-  private pollWatchdogTimer: ReturnType<typeof globalThis.setInterval> | null = null;
-  private pollRecoveryInFlight = false;
   private runActionLockTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private runControlDebounceTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private runControlDebounced = false;
@@ -103,13 +83,11 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.stopPoller();
     this.clearRunActionLock();
     if (this.runControlDebounceTimer !== null) {
       globalThis.clearTimeout(this.runControlDebounceTimer);
       this.runControlDebounceTimer = null;
     }
-    this.revokeObjectUrl();
   }
 
   handleFormChange<K extends keyof typeof this.vm.form>(key: K, value: (typeof this.vm.form)[K]): void {
@@ -126,7 +104,7 @@ export class DiliAgentPageComponent implements OnDestroy {
       currentMessage !== '[ERROR] Clinical analysis failed.';
 
     if (shouldClearStaleOutput && this.vm.exportUrl) {
-      this.revokeObjectUrl();
+      this.diliJobTracker.revokeCurrentExportUrl();
     }
     this.stateService.updateDiliAgent({
       form: {
@@ -142,6 +120,9 @@ export class DiliAgentPageComponent implements OnDestroy {
             jobStatus: null,
             jobStage: null,
             jobStageMessage: null,
+            jobStartedAtMs: null,
+            jobLastProgressAtMs: null,
+            pollIntervalMs: null,
           }
         : {}),
     });
@@ -154,8 +135,7 @@ export class DiliAgentPageComponent implements OnDestroy {
         this.clinicalInputTemplate.set(response.template.trim());
         return;
       }
-    }
-    catch {}
+    } catch {}
     this.clinicalInputTemplate.set(CLINICAL_INPUT_TEMPLATE_FALLBACK);
   }
 
@@ -184,29 +164,6 @@ export class DiliAgentPageComponent implements OnDestroy {
     reader.readAsDataURL(file);
   }
 
-  private revokeObjectUrl(): void {
-    if (this.vm.exportUrl) {
-      URL.revokeObjectURL(this.vm.exportUrl);
-    }
-  }
-
-  private resetOutputs(): void {
-    this.revokeObjectUrl();
-    this.jobStartedAt = 0;
-    this.lastProgressUpdateTimestamp = 0;
-    this.lastPollResponseTimestamp = 0;
-    this.lastProgressSignature = '';
-    this.stateService.updateDiliAgent({
-      message: '',
-      exportUrl: null,
-      jobId: null,
-      jobProgress: 0,
-      jobStatus: null,
-      jobStage: null,
-      jobStageMessage: null,
-    });
-  }
-
   private clearPreflightReviewState(): void {
     this.preflightReviewAcknowledged.set(false);
     this.preflightReviewMessages.set([]);
@@ -217,32 +174,6 @@ export class DiliAgentPageComponent implements OnDestroy {
       .filter((issue) => SECTION_REVIEW_WARNING_CODES.has(issue.code))
       .map((issue) => issue.message.trim())
       .filter(Boolean);
-  }
-
-  private stopPoller(): void {
-    if (this.poller) {
-      this.poller.stop();
-      this.poller = null;
-    }
-    if (this.pollWatchdogTimer !== null) {
-      globalThis.clearInterval(this.pollWatchdogTimer);
-      this.pollWatchdogTimer = null;
-    }
-    this.pollRecoveryInFlight = false;
-  }
-
-  private onPollingError(pollError: string): void {
-    this.stopPoller();
-    this.isCancelling.set(false);
-    this.stateService.updateDiliAgent({
-      message: formatErrorMessage(pollError),
-      exportUrl: null,
-      jobStatus: 'failed',
-      jobStage: null,
-      jobStageMessage: null,
-      isStarting: false,
-      isRunning: false,
-    });
   }
 
   private clearRunActionLock(): void {
@@ -262,147 +193,20 @@ export class DiliAgentPageComponent implements OnDestroy {
     }, Math.max(500, windowMs));
   }
 
-  private onJobStatusUpdate(status: JobStatusResponse): void {
-    const terminalStatus = isTerminalJobStatus(status.status);
-    const stage =
-      status.result && typeof status.result.progress_stage === 'string'
-        ? status.result.progress_stage
-        : null;
-    const stageMessage =
-      status.result && typeof status.result.progress_message === 'string'
-        ? status.result.progress_message
-        : null;
-    const resolvedProgress = typeof status.progress === 'number' ? status.progress : 0;
-    const now = Date.now();
-    this.lastPollResponseTimestamp = now;
-
-    if (this.jobStartedAt === 0) {
-      this.jobStartedAt = now;
-    }
-    const progressSignature = [
-      status.status,
-      resolvedProgress.toFixed(2),
-      stage ?? '',
-      stageMessage ?? '',
-    ].join('|');
-    if (this.lastProgressSignature !== progressSignature) {
-      this.lastProgressSignature = progressSignature;
-      this.lastProgressUpdateTimestamp = now;
-    }
-
-    this.stateService.updateDiliAgent({
-      jobProgress: terminalStatus ? 100 : resolvedProgress,
-      jobStatus: status.status,
-      jobStage: stage,
-      jobStageMessage: stageMessage,
-      isStarting: false,
-      isRunning: !terminalStatus,
-    });
-
-    if (!terminalStatus) {
-      return;
-    }
-
-    this.stopPoller();
-    this.isCancelling.set(false);
-
-    if (status.status === 'completed') {
-      const report = typeof status.result?.report === 'string' ? status.result.report : '';
-      const newExportUrl = report ? createDownloadUrl(report, REPORT_EXPORT_FILENAME) : null;
-      this.stateService.updateDiliAgent({
-        message: report || '[INFO] Clinical analysis completed.',
-        exportUrl: newExportUrl,
-        jobStage: 'completed',
-        jobStageMessage: 'Clinical analysis completed.',
-      });
-    } else if (status.status === 'failed') {
-      const errorMessage = status.error
-        ? formatErrorMessage(status.error)
-        : '[ERROR] Clinical analysis failed.';
-      this.stateService.updateDiliAgent({
-        message: errorMessage,
-        exportUrl: null,
-        jobStage: 'failed',
-        jobStageMessage: 'Clinical analysis failed.',
-      });
-    } else if (status.status === 'cancelled') {
-      this.stateService.updateDiliAgent({
-        message: '[INFO] Clinical analysis cancelled.',
-        exportUrl: null,
-        jobStage: 'cancelled',
-        jobStageMessage: 'Clinical analysis cancelled.',
-      });
-    }
-  }
-
-  private startPolling(jobIdToPoll: string, intervalMs: number): void {
-    this.stopPoller();
-    this.pollIntervalMs = Math.max(intervalMs, 250);
-    this.lastPollResponseTimestamp = Date.now();
-    this.poller = pollClinicalJobStatus(
-      jobIdToPoll,
-      this.pollIntervalMs,
-      (status) => this.onJobStatusUpdate(status),
-      (message) => this.onPollingError(message),
-    );
-    this.schedulePollWatchdog();
-  }
-
-  private schedulePollWatchdog(): void {
-    if (this.pollWatchdogTimer !== null) {
-      globalThis.clearInterval(this.pollWatchdogTimer);
-    }
-    this.pollWatchdogTimer = globalThis.setInterval(() => {
-      void this.recoverPollingIfStale();
-    }, Math.max(5000, this.pollIntervalMs));
-  }
-
-  private async recoverPollingIfStale(): Promise<void> {
-    if (this.pollRecoveryInFlight || !this.vm.isRunning || !this.vm.jobId) {
-      return;
-    }
-    const staleThresholdMs = Math.max(POLL_WATCHDOG_MIN_STALE_MS, this.pollIntervalMs * 6);
-    const lastResponseAgeMs = this.lastPollResponseTimestamp > 0
-      ? Date.now() - this.lastPollResponseTimestamp
-      : staleThresholdMs + 1;
-    if (lastResponseAgeMs < staleThresholdMs) {
-      return;
-    }
-
-    this.pollRecoveryInFlight = true;
-    const jobId = this.vm.jobId;
-    try {
-      const status = await fetchClinicalJobStatus(
-        jobId,
-        `watchdog-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        Math.min(30, Math.max(5, Math.ceil((this.pollIntervalMs / 1000) * 4))),
-      );
-      this.onJobStatusUpdate(status);
-      if (!isTerminalJobStatus(status.status) && this.vm.jobId === jobId) {
-        this.startPolling(jobId, this.pollIntervalMs);
-      }
-    } catch {
-      // Keep the current UI state and allow the regular poll loop to continue retrying.
-    } finally {
-      this.pollRecoveryInFlight = false;
-    }
-  }
-
   private async executeRunSession(): Promise<void> {
     if (this.vm.isStarting || this.vm.isRunning || this.isRunActionLocked()) {
       return;
     }
+
     this.lockRunAction();
     this.isCancelling.set(false);
-    this.stateService.updateDiliAgent({ isStarting: true, isRunning: true });
-    this.resetOutputs();
-    this.stopPoller();
 
     try {
       const payload = buildClinicalPayload(this.vm.form, this.vm.settings);
       const preflight = await validateClinicalInput(payload);
       if (!preflight.ready) {
         this.clearPreflightReviewState();
+        this.diliJobTracker.clearJobState();
         this.stateService.updateDiliAgent({
           isStarting: false,
           isRunning: false,
@@ -410,6 +214,7 @@ export class DiliAgentPageComponent implements OnDestroy {
         });
         return;
       }
+
       const reviewWarnings = this.collectReviewRequiredWarnings(preflight.non_blocking_issues);
       if (reviewWarnings.length && !this.preflightReviewAcknowledged()) {
         this.preflightReviewMessages.set(reviewWarnings);
@@ -423,20 +228,11 @@ export class DiliAgentPageComponent implements OnDestroy {
       if (!reviewWarnings.length) {
         this.clearPreflightReviewState();
       }
+
       const preflightWarningSummary = preflight.non_blocking_issues.length
         ? `[WARN] ${preflight.non_blocking_issues.map((issue) => issue.message).join(' ')}`
         : null;
-      const startResult = await startClinicalJob(payload);
-      this.stateService.updateDiliAgent({
-        jobId: startResult.job_id,
-        jobProgress: 0,
-        jobStatus: startResult.status,
-        jobStage: 'session_initialization',
-        jobStageMessage: preflightWarningSummary ?? 'Starting clinical analysis',
-        isStarting: false,
-      });
-      const intervalMs = resolvePollIntervalMs(startResult.poll_interval);
-      this.startPolling(startResult.job_id, intervalMs);
+      await this.diliJobTracker.startSession(payload, preflightWarningSummary);
     } catch (error) {
       this.stateService.updateDiliAgent({
         message: formatUnknownError(error, 'Unexpected error'),
@@ -452,7 +248,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   async runSession(): Promise<void> {
     const message = this.validationMessage();
     if (message) {
-      this.resetOutputs();
+      this.diliJobTracker.clearJobState();
       this.stateService.updateDiliAgent({
         isRunning: false,
         message,
@@ -473,10 +269,7 @@ export class DiliAgentPageComponent implements OnDestroy {
     this.lockRunAction(5000);
     this.isCancelling.set(true);
     try {
-      await cancelClinicalJob(this.vm.jobId);
-      this.stateService.updateDiliAgent({
-        message: '[INFO] Cancellation requested. Waiting for worker shutdown...',
-      });
+      await this.diliJobTracker.cancelSession();
     } catch (error) {
       this.stateService.updateDiliAgent({
         message: formatUnknownError(error, 'Failed to request cancellation.'),
@@ -487,19 +280,10 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   clearAll(): void {
-    this.revokeObjectUrl();
     this.clearPreflightReviewState();
+    this.diliJobTracker.clearJobState();
     this.stateService.updateDiliAgent({
       form: { ...DEFAULT_FORM_STATE },
-      message: '',
-      exportUrl: null,
-      jobId: null,
-      jobProgress: 0,
-      jobStatus: null,
-      jobStage: null,
-      jobStageMessage: null,
-      isStarting: false,
-      isRunning: false,
     });
   }
 
@@ -584,7 +368,7 @@ export class DiliAgentPageComponent implements OnDestroy {
       ? `... ${this.vm.jobProgress.toFixed(0)}%`
       : '...';
 
-    const elapsedMs = this.jobStartedAt > 0 ? Date.now() - this.jobStartedAt : 0;
+    const elapsedMs = this.vm.jobStartedAtMs ? Date.now() - this.vm.jobStartedAtMs : 0;
     let elapsedSuffix = '';
     if (elapsedMs >= 1000) {
       const totalSeconds = Math.floor(elapsedMs / 1000);
@@ -595,9 +379,9 @@ export class DiliAgentPageComponent implements OnDestroy {
         : ` (${seconds}s)`;
     }
 
-    const stalledSinceMs = this.lastProgressUpdateTimestamp > 0 ? Date.now() - this.lastProgressUpdateTimestamp : 0;
-    const stalled = this.jobStartedAt > 0 && stalledSinceMs >= STALL_THRESHOLD_MS;
-    const stallSuffix = stalled ? ' — this step is taking longer than expected, analysis is still running' : '';
+    const stalledSinceMs = this.vm.jobLastProgressAtMs ? Date.now() - this.vm.jobLastProgressAtMs : 0;
+    const stalled = Boolean(this.vm.jobStartedAtMs) && stalledSinceMs >= STALL_THRESHOLD_MS;
+    const stallSuffix = stalled ? ' - this step is taking longer than expected, analysis is still running' : '';
     const localExtractionSuffix = this.isExtractionStage(this.vm.jobStage)
       ? ' Local model extraction can take several minutes.'
       : '';
