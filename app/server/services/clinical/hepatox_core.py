@@ -24,6 +24,8 @@ from domain.clinical.entities import (
 )
 from services.clinical.preparation import HepatoxPreparedInputs
 from services.clinical.report_language import (
+    evidence_quality_label,
+    limitation_label,
     phrase,
     report_heading,
     rucam_summary_text,
@@ -865,17 +867,15 @@ class HepatoxConsultation:
             if rucam is not None
             else phrase("rucam_not_calculated", report_language)
         )
-        evidence_lines = self.render_evidence_quality_lines(
+        clinical_commentary = self.render_clinical_commentary(
             entry,
             report_language=report_language,
         )
-        claim_review_lines = self.render_claim_review_lines(entry)
         report_label = phrase("report_label", report_language)
         bibliography_label = phrase("bibliography_source", report_language)
         return (
             f"**{title}**\n\n"
-            f"{evidence_lines}\n\n"
-            f"{claim_review_lines}\n\n"
+            f"{clinical_commentary}\n\n"
             f"**RUCAM**: {localized_rucam}\n\n"
             f"**{report_label}**\n\n"
             f"{body}\n\n"
@@ -884,12 +884,15 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def render_evidence_quality_lines(
+    def render_clinical_commentary(
         entry: DrugClinicalAssessment,
         *,
         report_language: str = "en",
     ) -> str:
-        quality = entry.evidence_quality or phrase("unknown", report_language)
+        quality = evidence_quality_label(
+            entry.evidence_quality or phrase("unknown", report_language),
+            report_language,
+        )
         matched_name = ""
         if isinstance(entry.matched_livertox_row, dict):
             matched_name = str(
@@ -900,33 +903,51 @@ class HepatoxConsultation:
             or entry.canonical_name
             or phrase("not_available", report_language)
         )
-        warnings = (
-            "; ".join(entry.evidence_warnings)
-            if entry.evidence_warnings
-            else phrase("none", report_language)
-        )
-        return (
-            f"**{phrase('evidence_match', report_language)}**: {quality}. "
-            f"{phrase('matched_local_record', report_language)}: {target}. "
-            f"{phrase('warnings', report_language)}: {warnings}."
-        )
+        segments = [
+            phrase(
+                "commentary_evidence_match",
+                report_language,
+                quality=quality,
+                target=target,
+            )
+        ]
+        if entry.evidence_warnings:
+            segments.append(
+                phrase(
+                    "commentary_evidence_warnings",
+                    report_language,
+                    warnings="; ".join(entry.evidence_warnings[:3]),
+                )
+            )
+        else:
+            segments.append(phrase("commentary_no_evidence_warnings", report_language))
 
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def render_claim_review_lines(entry: DrugClinicalAssessment) -> str:
         review_claims = [claim for claim in entry.claims if claim.requires_review]
         limitations = list(entry.narrative.limitations if entry.narrative else [])
-        if not review_claims and not limitations:
-            return "**Claim review**: no unsupported structured claims identified."
-        parts: list[str] = []
-        if review_claims:
-            parts.append(
-                "review required for "
-                + "; ".join(claim.claim for claim in review_claims[:3])
+        rucam = entry.rucam
+        if rucam is not None and rucam.total_score is None:
+            segments.append(
+                phrase("commentary_rucam_not_assessable", report_language)
             )
         if limitations:
-            parts.append("limitations: " + "; ".join(limitations[:3]))
-        return "**Claim review**: " + " ".join(parts) + "."
+            segments.append(
+                phrase(
+                    "commentary_limitations",
+                    report_language,
+                    limitations="; ".join(
+                        limitation_label(item, report_language)
+                        for item in limitations[:3]
+                    ),
+                )
+            )
+        if review_claims or limitations:
+            segments.append(phrase("commentary_review_required", report_language))
+        else:
+            segments.append(phrase("commentary_no_review_required", report_language))
+        return (
+            f"**{phrase('clinical_commentary', report_language)}**: "
+            + " ".join(segments)
+        )
 
     # -------------------------------------------------------------------------
     def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:

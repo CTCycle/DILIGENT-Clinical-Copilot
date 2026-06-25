@@ -5,6 +5,28 @@ from domain.clinical.entities import DrugRucamAssessment
 
 SUPPORTED_REPORT_LANGUAGE_CODES = ("en", "it", "es", "fr", "de", "pt")
 
+_EVIDENCE_QUALITY_LABELS = {
+    "direct_match_with_excerpt": {
+        "en": "direct local match with supporting excerpt",
+        "it": "corrispondenza locale diretta con estratto di supporto",
+        "es": "coincidencia local directa con extracto de apoyo",
+        "fr": "correspondance locale directe avec extrait justificatif",
+        "de": "direkter lokaler Treffer mit unterstützendem Auszug",
+        "pt": "correspondência local direta com excerto de suporte",
+    },
+}
+
+_LIMITATION_LABELS = {
+    "onset anchor not score-eligible": {
+        "en": "the onset anchor is not eligible for scoring",
+        "it": "l'ancoraggio temporale dell'esordio non è idoneo al punteggio",
+        "es": "el anclaje temporal del inicio no es apto para puntuación",
+        "fr": "le repère temporel de début n'est pas admissible au score",
+        "de": "der zeitliche Beginn ist nicht für die Bewertung geeignet",
+        "pt": "o marco temporal de início não é elegível para pontuação",
+    },
+}
+
 _PHRASES = {
     "en": {
         "case_summary": "Case summary",
@@ -40,10 +62,14 @@ _PHRASES = {
         "deterministic_section_unavailable": "Could not produce a deterministic matched-drug section.",
         "report_label": "Report",
         "bibliography_source": "Bibliography source",
-        "evidence_match": "Evidence match",
-        "matched_local_record": "Matched local record",
-        "warnings": "Warnings",
-        "none": "None",
+        "clinical_commentary": "Clinical commentary",
+        "commentary_evidence_match": "Local evidence match: {quality}; matched record: {target}.",
+        "commentary_evidence_warnings": "Evidence warnings: {warnings}.",
+        "commentary_no_evidence_warnings": "No evidence warnings were identified.",
+        "commentary_rucam_not_assessable": "RUCAM causality is not assessable from the available criteria.",
+        "commentary_limitations": "Main limitations: {limitations}.",
+        "commentary_review_required": "Clinical review is required.",
+        "commentary_no_review_required": "No additional structured-claim review is required.",
         "not_available": "not available",
         "unknown": "unknown",
         "narrative_fallback": "Final report generated in fallback mode because clinical synthesis was unavailable. Manual specialist review is required.",
@@ -82,10 +108,14 @@ _PHRASES = {
         "deterministic_section_unavailable": "Impossibile produrre una sezione deterministica per il farmaco associato.",
         "report_label": "Report",
         "bibliography_source": "Fonte bibliografica",
-        "evidence_match": "Corrispondenza evidenza",
-        "matched_local_record": "Record locale associato",
-        "warnings": "Avvisi",
-        "none": "Nessuno",
+        "clinical_commentary": "Commento clinico",
+        "commentary_evidence_match": "Corrispondenza con evidenza locale: {quality}; record associato: {target}.",
+        "commentary_evidence_warnings": "Avvisi sull'evidenza: {warnings}.",
+        "commentary_no_evidence_warnings": "Non sono stati identificati avvisi sull'evidenza.",
+        "commentary_rucam_not_assessable": "La causalità RUCAM non è valutabile con i criteri disponibili.",
+        "commentary_limitations": "Limiti principali: {limitations}.",
+        "commentary_review_required": "È richiesta una revisione clinica.",
+        "commentary_no_review_required": "Non è richiesta ulteriore revisione delle affermazioni strutturate.",
         "not_available": "non disponibile",
         "unknown": "sconosciuta",
         "narrative_fallback": "Report finale generato in modalità di fallback perché la sintesi clinica non era disponibile. È richiesta revisione specialistica manuale.",
@@ -124,10 +154,14 @@ _PHRASES = {
         "deterministic_section_unavailable": "No fue posible generar una sección determinista del fármaco.",
         "report_label": "Informe",
         "bibliography_source": "Fuente bibliográfica",
-        "evidence_match": "Coincidencia de evidencia",
-        "matched_local_record": "Registro local coincidente",
-        "warnings": "Advertencias",
-        "none": "Ninguna",
+        "clinical_commentary": "Comentario clínico",
+        "commentary_evidence_match": "Coincidencia con evidencia local: {quality}; registro asociado: {target}.",
+        "commentary_evidence_warnings": "Advertencias de evidencia: {warnings}.",
+        "commentary_no_evidence_warnings": "No se identificaron advertencias de evidencia.",
+        "commentary_rucam_not_assessable": "La causalidad RUCAM no puede evaluarse con los criterios disponibles.",
+        "commentary_limitations": "Limitaciones principales: {limitations}.",
+        "commentary_review_required": "Se requiere revisión clínica.",
+        "commentary_no_review_required": "No se requiere revisión adicional de afirmaciones estructuradas.",
         "not_available": "no disponible",
         "unknown": "desconocida",
         "narrative_fallback": "Informe final generado en modo de respaldo porque la síntesis clínica no estaba disponible. Se requiere revisión manual por especialista.",
@@ -166,10 +200,14 @@ _PHRASES = {
         "deterministic_section_unavailable": "Impossible de produire une section déterministe pour le médicament associé.",
         "report_label": "Rapport",
         "bibliography_source": "Source bibliographique",
-        "evidence_match": "Correspondance des preuves",
-        "matched_local_record": "Enregistrement local correspondant",
-        "warnings": "Avertissements",
-        "none": "Aucun",
+        "clinical_commentary": "Commentaire clinique",
+        "commentary_evidence_match": "Correspondance avec les preuves locales : {quality} ; dossier associé : {target}.",
+        "commentary_evidence_warnings": "Avertissements sur les preuves : {warnings}.",
+        "commentary_no_evidence_warnings": "Aucun avertissement sur les preuves n'a été identifié.",
+        "commentary_rucam_not_assessable": "La causalité RUCAM ne peut pas être évaluée avec les critères disponibles.",
+        "commentary_limitations": "Principales limites : {limitations}.",
+        "commentary_review_required": "Une revue clinique est requise.",
+        "commentary_no_review_required": "Aucune revue supplémentaire des affirmations structurées n'est requise.",
         "not_available": "non disponible",
         "unknown": "inconnue",
         "narrative_fallback": "Rapport final généré en mode de repli car la synthèse clinique n'était pas disponible. Une revue spécialisée manuelle est requise.",
@@ -208,10 +246,14 @@ _PHRASES = {
         "deterministic_section_unavailable": "Ein deterministischer Abschnitt zum zugeordneten Arzneimittel konnte nicht erstellt werden.",
         "report_label": "Bericht",
         "bibliography_source": "Bibliografiequelle",
-        "evidence_match": "Evidenzabgleich",
-        "matched_local_record": "Zugeordneter lokaler Eintrag",
-        "warnings": "Warnhinweise",
-        "none": "Keine",
+        "clinical_commentary": "Klinischer Kommentar",
+        "commentary_evidence_match": "Abgleich mit lokaler Evidenz: {quality}; zugeordneter Eintrag: {target}.",
+        "commentary_evidence_warnings": "Evidenzwarnungen: {warnings}.",
+        "commentary_no_evidence_warnings": "Es wurden keine Evidenzwarnungen festgestellt.",
+        "commentary_rucam_not_assessable": "Die RUCAM-Kausalität ist anhand der verfügbaren Kriterien nicht beurteilbar.",
+        "commentary_limitations": "Wesentliche Einschränkungen: {limitations}.",
+        "commentary_review_required": "Eine klinische Prüfung ist erforderlich.",
+        "commentary_no_review_required": "Keine zusätzliche Prüfung strukturierter Aussagen erforderlich.",
         "not_available": "nicht verfügbar",
         "unknown": "unbekannt",
         "narrative_fallback": "Abschlussbericht im Fallback-Modus erstellt, weil die klinische Synthese nicht verfügbar war. Eine manuelle fachärztliche Prüfung ist erforderlich.",
@@ -250,10 +292,14 @@ _PHRASES = {
         "deterministic_section_unavailable": "Não foi possível produzir uma seção determinística para o fármaco associado.",
         "report_label": "Relatório",
         "bibliography_source": "Fonte bibliográfica",
-        "evidence_match": "Correspondência da evidência",
-        "matched_local_record": "Registro local correspondente",
-        "warnings": "Avisos",
-        "none": "Nenhum",
+        "clinical_commentary": "Comentário clínico",
+        "commentary_evidence_match": "Correspondência com evidência local: {quality}; registro associado: {target}.",
+        "commentary_evidence_warnings": "Avisos de evidência: {warnings}.",
+        "commentary_no_evidence_warnings": "Nenhum aviso de evidência foi identificado.",
+        "commentary_rucam_not_assessable": "A causalidade RUCAM não pode ser avaliada com os critérios disponíveis.",
+        "commentary_limitations": "Principais limitações: {limitations}.",
+        "commentary_review_required": "É necessária revisão clínica.",
+        "commentary_no_review_required": "Não é necessária revisão adicional das afirmações estruturadas.",
         "not_available": "não disponível",
         "unknown": "desconhecida",
         "narrative_fallback": "Relatório final gerado em modo de fallback porque a síntese clínica não estava disponível. É necessária revisão manual por especialista.",
@@ -274,6 +320,18 @@ def phrase(key: str, language: str, **values: object) -> str:
     if key not in table:
         raise KeyError(f"Missing phrase key: {key}")
     return table[key].format(**values)
+
+###############################################################################
+def evidence_quality_label(value: str, language: str) -> str:
+    lang = resolve_report_language(language)
+    labels = _EVIDENCE_QUALITY_LABELS.get((value or "").strip())
+    return labels.get(lang, labels["en"]) if labels else value
+
+###############################################################################
+def limitation_label(value: str, language: str) -> str:
+    lang = resolve_report_language(language)
+    labels = _LIMITATION_LABELS.get((value or "").strip().casefold())
+    return labels.get(lang, labels["en"]) if labels else value
 
 ###############################################################################
 def rucam_summary_text(assessment: DrugRucamAssessment, language: str) -> str:

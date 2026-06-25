@@ -26,3 +26,32 @@
   padding-left: 1.1rem;
   color: var(--color-text-secondary);
 }
+
+.rag-readiness-content {
+  display: grid;
+  gap: 0.875rem;
+}
+
+.rag-readiness-content p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+}
+
+.rag-readiness-model {
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.rag-readiness-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.625rem;
+}
+
+.rag-readiness-actions .btn {
+  width: auto;
+  flex: 1 1 auto;
+}

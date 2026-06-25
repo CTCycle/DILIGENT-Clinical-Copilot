@@ -46,6 +46,7 @@ from services.security.access_keys import AccessKeyService
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.preflight import check_parser_batch_capacity
+from services.retrieval.readiness import check_rag_readiness
 from services.session.robust_pipeline import (
     audit_report,
     build_extraction_artifact,
@@ -708,6 +709,18 @@ def start_clinical_job_workflow(
     if not preflight.ready:
         raise ServiceValidationError(
             [issue.model_dump() for issue in preflight.blocking_issues]
+        )
+    rag_readiness = check_rag_readiness(requested=request_payload.use_rag)
+    if request_payload.use_rag and not rag_readiness.available:
+        raise ServiceValidationError(
+            [
+                {
+                    "severity": "blocking",
+                    "code": rag_readiness.reason_code or "rag_unavailable",
+                    "message": rag_readiness.message or "RAG is unavailable.",
+                    "field": "use_rag",
+                }
+            ]
         )
     if LLMRuntimeConfig.is_cloud_enabled():
         provider = LLMRuntimeConfig.get_llm_provider().strip().lower()

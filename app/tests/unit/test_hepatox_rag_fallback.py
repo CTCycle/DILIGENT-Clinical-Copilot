@@ -33,3 +33,14 @@ def test_fetch_rag_documents_degrades_when_embedding_backend_fails() -> None:
     assert issue.code == "rag_retrieval_unavailable"
     assert issue.field == "rag"
     assert "Nivolumab" in issue.raw_line
+
+    asyncio.run(
+        consultation.fetch_rag_documents(
+            {"Amoxicillin": "amoxicillin dili"},
+            "Amoxicillin",
+        )
+    )
+
+    assert len(consultation.pipeline_issues) == 1
+    assert "2 drugs" in consultation.pipeline_issues[0].message
+    assert "Nivolumab, Amoxicillin" in consultation.pipeline_issues[0].message

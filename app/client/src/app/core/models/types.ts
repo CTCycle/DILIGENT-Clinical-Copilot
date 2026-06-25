@@ -118,6 +118,16 @@ export type ClinicalInputPreflightResponse = {
   runtime_settings: Record<string, unknown>;
   extraction_quality: Record<string, unknown>;
   deterministic_diagnostics: Record<string, unknown>;
+  rag_readiness?: RagReadiness | null;
+};
+
+export type RagReadiness = {
+  requested: boolean;
+  available: boolean;
+  backend: string;
+  model?: string | null;
+  reason_code?: string | null;
+  message?: string | null;
 };
 
 export type ApiResult = {

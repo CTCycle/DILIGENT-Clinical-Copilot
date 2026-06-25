@@ -149,3 +149,42 @@
     </div>
   </section>
 </main>
+
+<app-modal-shell
+  [isOpen]="ragReadinessDialog() !== null"
+  title="RAG requires Ollama"
+  titleId="rag-readiness-title"
+  ariaLabelledBy="rag-readiness-title"
+  ariaDescribedBy="rag-readiness-description"
+  dialogClassName="modal-container rag-readiness-modal"
+  closeLabel="Cancel RAG readiness check"
+  [footer]="true"
+  (close)="closeRagReadinessDialog()"
+>
+  <section class="rag-readiness-content">
+    <p id="rag-readiness-description">
+      {{ ragReadinessDialog()?.message }}
+    </p>
+    @if (ragReadinessDialog()?.model) {
+      <p class="rag-readiness-model">
+        Required embedding model: <strong>{{ ragReadinessDialog()?.model }}</strong>
+      </p>
+    }
+    <p>
+      Start the Ollama server and retry to use the existing RAG index, or continue
+      this assessment with RAG disabled. The saved RAG preference will not change.
+    </p>
+  </section>
+
+  <div modal-footer class="rag-readiness-actions">
+    <button class="btn btn-primary" type="button" (click)="retryRagReadiness()">
+      Retry
+    </button>
+    <button class="btn btn-secondary" type="button" (click)="runWithoutRag()">
+      Run without RAG
+    </button>
+    <button class="btn btn-secondary" type="button" (click)="closeRagReadinessDialog()">
+      Cancel
+    </button>
+  </div>
+</app-modal-shell>
