@@ -66,7 +66,7 @@ Clinical preflight reports whether the configured RAG embedding backend is ready
 
 If Ollama is unavailable, the DILI Agent offers three explicit choices: retry after starting Ollama, run the pending assessment once without RAG, or cancel. Running without RAG does not change the saved model configuration. Job submission repeats the readiness check to prevent a stale successful preflight from starting a RAG-enabled job after the dependency becomes unavailable.
 
-If retrieval becomes unavailable after a job starts, the report continues safely without supporting RAG documents and records one aggregated pipeline warning listing the affected drugs.
+If retrieval becomes unavailable after a job starts, the report continues safely without supporting RAG documents and records one aggregated pipeline warning listing the affected drugs.`r`n`r`nWhen RAG is enabled, retrieved text is used only as hidden model context. The final report bibliography lists compact references to retrieved documents by filename and page number only.
 
 ## Failure Modes
 - Missing required sections block structural preprocessing.
@@ -76,8 +76,9 @@ If retrieval becomes unavailable after a job starts, the report continues safely
 - Ambiguous drug matches are included for review but are not used as authoritative LiverTox evidence.
 - Broad categories and rejected false-positive extracted text remain audit-only and do not become concrete drug matches.
 - LLM structured output failures fall back to direct deterministic parsing after bounded retries.
-- Session persistence is mandatory for successful clinical and revision jobs. Persistence write failures raise a service dependency error instead of returning an apparently successful unpersisted report.
+- Session persistence is mandatory for successful clinical jobs. Persistence write failures raise a service dependency error instead of returning an apparently successful unpersisted report.
 - Failed job payloads omit raw clinical input and patient image content; job-level errors expose generic failure text plus sanitized failure metadata.
 
 ## Testing Matrix
 Regression fixtures under `app/tests/fixtures/dili_pipeline_audit` cover clean, noisy, incomplete, and adversarial clinical documents, including duplicate headings, ambiguous headings, structured and unstructured therapy, structured and noisy laboratories, hepatic-pattern conflicts, family-history disease mentions, allergy-only drug mentions, negated diagnoses, combination therapy, brand/generic variants, and missing LiverTox matches.
+

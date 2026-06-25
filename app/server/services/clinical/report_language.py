@@ -70,6 +70,7 @@ _PHRASES = {
         "commentary_limitations": "Main limitations: {limitations}.",
         "commentary_review_required": "Clinical review is required.",
         "commentary_no_review_required": "No additional structured-claim review is required.",
+        "none": "None",
         "not_available": "not available",
         "unknown": "unknown",
         "narrative_fallback": "Final report generated in fallback mode because clinical synthesis was unavailable. Manual specialist review is required.",
