@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-06-15
+Last updated: 2026-06-25
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
@@ -18,6 +18,8 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 - `POST /api/clinical/jobs`
 - `GET /api/clinical/jobs/{job_id}`
 - `DELETE /api/clinical/jobs/{job_id}`
+
+`POST /api/clinical/validate-input` includes optional `rag_readiness` metadata when evaluating a submission. It reports whether RAG was requested, whether the configured embedding backend is available, the backend and model names, and a user-safe reason when retrieval cannot start.
 
 ## Model Catalog And Pull Routes
 - `GET /api/models/list`

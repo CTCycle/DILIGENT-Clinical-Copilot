@@ -80,7 +80,6 @@ class LocalPatientDrugs(BaseModel):
 
 ###############################################################################
 class DrugsParser:
-    MAX_CONCURRENT_LINE_EXTRACTIONS = 4
     LLM_CLIENT_NOT_INITIALIZED_ERROR = (
         "LLM client is not initialized for drug extraction"
     )
@@ -442,14 +441,6 @@ class DrugsParser:
         if not cleaned:
             return PatientDrugs(entries=[])
         self.emit_progress(progress_callback, 0.0)
-        deterministic = self.extract_drugs_from_therapy_deterministic(cleaned)
-        if deterministic.entries and not deterministic.unresolved_lines:
-            combined = self._attach_therapy_evidence_spans(
-                deterministic.entries,
-                cleaned,
-            )
-            self.emit_progress(progress_callback, 1.0)
-            return PatientDrugs(entries=self.deduplicate_drug_entries(combined))
         try:
             structured = await self.llm_extract_drugs_from_section(
                 cleaned,
@@ -515,33 +506,25 @@ class DrugsParser:
                 and not self.is_non_therapy_line(block.text.strip())
             ]
         )
-        parsed_entries = self._attach_therapy_evidence_spans(
-            deterministic.entries,
-            cleaned,
-        )
-        if not deterministic.unresolved_lines:
-            decision = decide_extraction_strategy(
-                section="therapy",
-                meaningful_line_count=meaningful_line_count,
-                parsed_line_count=len(parsed_entries),
-                unresolved_line_count=0,
-                evidence_span_count=sum(
-                    1 for entry in parsed_entries if entry.source_span
-                ),
+        structured_succeeded = False
+        try:
+            structured = await self.llm_extract_drugs_from_section(
+                cleaned,
+                source="therapy",
+                historical_flag=False,
+                progress_callback=progress_callback,
             )
-            return {
-                "patient_drugs": PatientDrugs(
-                    entries=self.deduplicate_drug_entries(parsed_entries)
-                ),
-                "strategy": decision.strategy,
-                "decision": decision.model_dump(),
-                "unresolved_lines": [],
-                "warnings": [],
-            }
-        combined = await self.extract_drugs_from_therapy_hybrid(
-            cleaned,
-            progress_callback=progress_callback,
-        )
+            combined = structured.entries
+            structured_succeeded = True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Therapy audit LLM extraction failed; using deterministic fallback: %s",
+                exc,
+            )
+            combined = await self.extract_drugs_from_therapy_hybrid(
+                cleaned,
+                progress_callback=progress_callback,
+            )
         entries = self._attach_therapy_evidence_spans(combined, cleaned)
         decision = decide_extraction_strategy(
             section="therapy",
@@ -552,6 +535,15 @@ class DrugsParser:
             unresolved_line_count=len(deterministic.unresolved_lines),
             evidence_span_count=sum(1 for entry in entries if entry.source_span),
         )
+        if structured_succeeded:
+            decision = decision.model_copy(
+                update={
+                    "strategy": "llm",
+                    "reasons": [
+                        "complete therapy corpus processed by structured LLM extraction"
+                    ],
+                }
+            )
         return {
             "patient_drugs": PatientDrugs(
                 entries=self.deduplicate_drug_entries(entries)
@@ -664,84 +656,6 @@ class DrugsParser:
             unresolved_lines=[line for _, line in fallback],
             regimen_lines=[],
         )
-
-    # -------------------------------------------------------------------------
-    async def llm_extract_drugs(
-        self,
-        lines: list[str],
-        *,
-        progress_callback: Callable[[float], None] | None = None,
-        progress_start: float = 0.0,
-        progress_span: float = 1.0,
-    ) -> PatientDrugs:
-        if self.client is None:
-            raise RuntimeError(self.LLM_CLIENT_NOT_INITIALIZED_ERROR)
-
-        if not lines:
-            return PatientDrugs(entries=[])
-
-        use_local_schema = self.is_local_runtime(self.active_provider_name())
-        schema_model = LocalPatientDrugs if use_local_schema else PatientDrugs
-        single_entry_prompt = (
-            (
-                self.local_system_prompt()
-                if use_local_schema
-                else DRUG_EXTRACTION_PROMPT.strip()
-            )
-            + "\n\n"
-            + (
-                "Return an `entries` array with exactly one medication entry for the provided source line."
-                if use_local_schema
-                else "For this task, return a PatientDrugs object whose `entries` array contains "
-                "exactly one DrugEntry describing the drug provided in the user prompt."
-            )
-        )
-
-        total_lines = max(len(lines), 1)
-        bounded_start = min(1.0, max(0.0, float(progress_start)))
-        bounded_span = max(0.0, float(progress_span))
-        semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_LINE_EXTRACTIONS)
-        completed = 0
-        progress_lock = asyncio.Lock()
-
-        async def extract_line(line: str) -> list[DrugEntry]:
-            nonlocal completed
-            async with semaphore:
-                raw_parsed = await asyncio.wait_for(
-                    self.client.llm_structured_call(
-                        model=self.model,
-                        system_prompt=single_entry_prompt,
-                        user_prompt=(
-                            "Extract the structured representation for the following drug entry:\n"
-                            f"{line}"
-                        ),
-                        schema=schema_model,
-                        temperature=self.temperature,
-                        use_json_mode=True,
-                        max_repair_attempts=1,
-                    ),
-                    timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
-                )
-                parsed = (
-                    PatientDrugs(
-                        entries=[
-                            self.normalize_local_drug_entry(entry)
-                            for entry in raw_parsed.entries
-                        ]
-                    )
-                    if use_local_schema
-                    else raw_parsed
-                )
-            async with progress_lock:
-                completed += 1
-                self.emit_progress(
-                    progress_callback,
-                    bounded_start + ((completed / total_lines) * bounded_span),
-                )
-            return parsed.entries
-
-        results = await asyncio.gather(*(extract_line(line) for line in lines))
-        return PatientDrugs(entries=[entry for result in results for entry in result])
 
     # -------------------------------------------------------------------------
     async def llm_extract_drugs_from_section(
@@ -1489,6 +1403,13 @@ class DrugsParser:
             return True
         if normalized in self.FUNCTION_WORD_NAMES:
             return True
+        if re.fullmatch(
+            r"(?:(?:ultima\s+dose\s+)?ricevut[oaie]?|interrott[oaie]?|"
+            r"iniziat[oaie]?|sospes[oaie]?|ultima?(?:\s+dose)?|termine)"
+            r"(?:\s+(?:il|dal|al))?",
+            normalized,
+        ):
+            return True
         if normalized in non_drug_exact:
             return True
         if any(normalized.startswith(prefix) for prefix in self.NON_DRUG_PREFIXES):
@@ -1534,6 +1455,28 @@ class DrugsParser:
                 if func_word_count >= 2:
                     return True
         return False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def is_truncated_compound_name(
+        raw_name: str,
+        *,
+        source_text: str,
+        name_start: int,
+        name_end: int,
+    ) -> bool:
+        if len(raw_name.split()) != 1 or name_start < 0:
+            return False
+        line_end = source_text.find("\n", name_end)
+        if line_end < 0:
+            line_end = len(source_text)
+        trailing = source_text[name_end:line_end]
+        return bool(
+            re.match(
+                r"\s+[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'-]{1,}(?:\s|$)",
+                trailing,
+            )
+        )
 
     # -------------------------------------------------------------------------
     def derive_temporal_classification(self, entry: DrugEntry) -> str:
@@ -1644,6 +1587,13 @@ class DrugsParser:
         )
         raw_name = (entry.name or "").strip()
         name_start, name_end = self.find_grounded_name_span(raw_name, source_text)
+        if self.is_truncated_compound_name(
+            raw_name,
+            source_text=source_text,
+            name_start=name_start,
+            name_end=name_end,
+        ):
+            return None
         if evidence_start < 0 and name_start < 0:
             return None
         anchor_start = evidence_start if evidence_start >= 0 else name_start

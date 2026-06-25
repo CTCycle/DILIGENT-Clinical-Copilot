@@ -177,6 +177,17 @@ class ClinicalInputPreflightIssue(BaseModel):
     field: str | None = None
 
 ###############################################################################
+class RagReadiness(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requested: bool
+    available: bool
+    backend: str
+    model: str | None = None
+    reason_code: str | None = None
+    message: str | None = None
+
+###############################################################################
 class ClinicalInputPreflightResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -186,3 +197,4 @@ class ClinicalInputPreflightResult(BaseModel):
     runtime_settings: dict[str, Any] = Field(default_factory=dict)
     extraction_quality: dict[str, Any] = Field(default_factory=dict)
     deterministic_diagnostics: dict[str, Any] = Field(default_factory=dict)
+    rag_readiness: RagReadiness | None = None

@@ -78,8 +78,13 @@ def test_italian_clinician_report_wrappers_do_not_use_english_labels() -> None:
 
     assert "**Report**" in rendered
     assert "**Fonte bibliografica**" in rendered
-    assert "**Corrispondenza evidenza**" in rendered
-    assert "Record locale associato" in rendered
+    assert "**Commento clinico**" in rendered
+    assert "Corrispondenza con evidenza locale" in rendered
+    assert "record associato" in rendered
+    assert "Claim review" not in rendered
+    assert "Corrispondenza evidenza" not in rendered
     assert "Evidence match" not in rendered
     assert "Matched local record" not in rendered
     assert "Bibliography source" not in rendered
+    assert rendered.index("**Commento clinico**") < rendered.index("**RUCAM**")
+    assert rendered.index("**RUCAM**") < rendered.index("**Report**")

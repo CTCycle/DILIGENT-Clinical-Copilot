@@ -2,8 +2,14 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnDestroy, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import { DEFAULT_FORM_STATE, REPORT_EXPORT_FILENAME } from '../../core/constants';
-import { ClinicalInputPreflightIssue, JobStatus } from '../../core/models/types';
+import {
+  ClinicalInputPreflightIssue,
+  ClinicalRequestPayload,
+  JobStatus,
+  RagReadiness,
+} from '../../core/models/types';
 import { validateClinicalInput, fetchClinicalSectionTemplate } from '../../core/services/clinical-api';
 import { DiliJobTrackerService } from '../../core/services/dili-job-tracker.service';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
@@ -36,7 +42,7 @@ function isTerminalJobStatus(status: JobStatus | null): boolean {
 
 @Component({
   selector: 'app-dili-agent-page',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ModalShellComponent],
   templateUrl: './dili-agent-page.component.html',
   styleUrl: './dili-agent-page.component.scss',
 })
@@ -52,6 +58,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   readonly preflightReviewAcknowledged = signal(false);
   readonly preflightReviewMessages = signal<string[]>([]);
   readonly preflightReviewNoticeVisible = computed(() => this.preflightReviewMessages().length > 0);
+  readonly ragReadinessDialog = signal<RagReadiness | null>(null);
   readonly todayIso = todayIso;
   readonly finalReportMarkdown = computed(() => this.stateService.state().diliAgent.message || this.reportBody);
   readonly renderedReport = computed(() => this.markdownRenderer.render(this.finalReportMarkdown()));
@@ -60,6 +67,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   private runActionLockTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private runControlDebounceTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private runControlDebounced = false;
+  private pendingRagPayload: ClinicalRequestPayload | null = null;
 
   constructor() {
     void this.loadClinicalSectionTemplate();
@@ -169,6 +177,30 @@ export class DiliAgentPageComponent implements OnDestroy {
     this.preflightReviewMessages.set([]);
   }
 
+  closeRagReadinessDialog(): void {
+    this.ragReadinessDialog.set(null);
+    this.pendingRagPayload = null;
+    this.clearRunActionLock();
+  }
+
+  async retryRagReadiness(): Promise<void> {
+    this.ragReadinessDialog.set(null);
+    this.pendingRagPayload = null;
+    this.clearRunActionLock();
+    await this.executeRunSession();
+  }
+
+  async runWithoutRag(): Promise<void> {
+    const payload = this.pendingRagPayload;
+    this.ragReadinessDialog.set(null);
+    this.pendingRagPayload = null;
+    this.clearRunActionLock();
+    if (!payload) {
+      return;
+    }
+    await this.executeRunSession({ ...payload, use_rag: false });
+  }
+
   private collectReviewRequiredWarnings(issues: ClinicalInputPreflightIssue[]): string[] {
     return issues
       .filter((issue) => SECTION_REVIEW_WARNING_CODES.has(issue.code))
@@ -193,7 +225,7 @@ export class DiliAgentPageComponent implements OnDestroy {
     }, Math.max(500, windowMs));
   }
 
-  private async executeRunSession(): Promise<void> {
+  private async executeRunSession(payloadOverride?: ClinicalRequestPayload): Promise<void> {
     if (this.vm.isStarting || this.vm.isRunning || this.isRunActionLocked()) {
       return;
     }
@@ -202,7 +234,7 @@ export class DiliAgentPageComponent implements OnDestroy {
     this.isCancelling.set(false);
 
     try {
-      const payload = buildClinicalPayload(this.vm.form, this.vm.settings);
+      const payload = payloadOverride ?? buildClinicalPayload(this.vm.form, this.vm.settings);
       const preflight = await validateClinicalInput(payload);
       if (!preflight.ready) {
         this.clearPreflightReviewState();
@@ -211,6 +243,20 @@ export class DiliAgentPageComponent implements OnDestroy {
           isStarting: false,
           isRunning: false,
           message: `[ERROR] ${preflight.blocking_issues.map((issue) => issue.message).join(' ')}`,
+        });
+        return;
+      }
+      if (
+        payload.use_rag
+        && preflight.rag_readiness?.requested
+        && !preflight.rag_readiness.available
+      ) {
+        this.pendingRagPayload = payload;
+        this.ragReadinessDialog.set(preflight.rag_readiness);
+        this.stateService.updateDiliAgent({
+          isStarting: false,
+          isRunning: false,
+          message: '',
         });
         return;
       }
@@ -280,6 +326,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   clearAll(): void {
+    this.closeRagReadinessDialog();
     this.clearPreflightReviewState();
     this.diliJobTracker.clearJobState();
     this.stateService.updateDiliAgent({

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import threading
 from typing import Any
 
 from common.utils.logger import logger
@@ -24,6 +25,8 @@ class RagSupportService:
     # -------------------------------------------------------------------------
     def __init__(self, consultation: Any) -> None:
         self.consultation = consultation
+        self._retrieval_issue_lock = threading.Lock()
+        self._retrieval_failed_drugs: list[str] = []
 
     # -------------------------------------------------------------------------
     async def fetch_rag_documents(
@@ -58,19 +61,40 @@ class RagSupportService:
 
     # -------------------------------------------------------------------------
     def record_rag_retrieval_issue(self, *, drug_name: str, error: Exception) -> None:
-        issue = PipelineIssue(
-            severity="warning",
-            code="rag_retrieval_unavailable",
-            message=(
-                "Internal RAG retrieval was unavailable for "
-                f"{drug_name}; analysis continued without supporting documents."
-            ),
-            field="rag",
-            raw_line=f"{drug_name}: {error}",
-        )
-        if not hasattr(self.consultation, "pipeline_issues"):
-            self.consultation.pipeline_issues = []
-        self.consultation.pipeline_issues.append(issue)
+        with self._retrieval_issue_lock:
+            if drug_name not in self._retrieval_failed_drugs:
+                self._retrieval_failed_drugs.append(drug_name)
+            failed_names = ", ".join(self._retrieval_failed_drugs)
+            count = len(self._retrieval_failed_drugs)
+            message = (
+                "Internal RAG retrieval became unavailable; analysis continued "
+                f"without supporting documents for {count} drug"
+                f"{'s' if count != 1 else ''}: {failed_names}."
+            )
+            raw_line = f"{failed_names}: {error}"
+            if not hasattr(self.consultation, "pipeline_issues"):
+                self.consultation.pipeline_issues = []
+            existing = next(
+                (
+                    issue
+                    for issue in self.consultation.pipeline_issues
+                    if issue.code == "rag_retrieval_unavailable"
+                ),
+                None,
+            )
+            if existing is not None:
+                existing.message = message
+                existing.raw_line = raw_line
+                return
+            self.consultation.pipeline_issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="rag_retrieval_unavailable",
+                    message=message,
+                    field="rag",
+                    raw_line=raw_line,
+                )
+            )
 
     # -------------------------------------------------------------------------
     def ensure_similarity_search(self) -> bool:

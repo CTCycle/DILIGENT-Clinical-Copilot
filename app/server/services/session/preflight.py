@@ -16,6 +16,7 @@ from domain.clinical.robustness import (
 )
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.llm.provider_factory import select_llm_provider
+from services.retrieval.readiness import check_rag_readiness
 from services.security.access_keys import AccessKeyService
 from services.session.robust_pipeline import build_extraction_artifact
 from services.session.text_section_parser import parse_initial_text_sections
@@ -148,9 +149,10 @@ def validate_clinical_input_preflight(
 ) -> ClinicalInputPreflightResult:
     blocking: list[ClinicalInputPreflightIssue] = []
     non_blocking: list[ClinicalInputPreflightIssue] = []
+    service.apply_persisted_runtime_configuration()
     runtime_settings = _runtime_settings()
     deterministic_diagnostics: dict[str, Any] = {}
-    service.apply_persisted_runtime_configuration()
+    rag_readiness = check_rag_readiness(requested=request_payload.use_rag)
     _validate_ui_metadata(request_payload, blocking)
     _validate_provider_key(blocking)
     _validate_requested_provider(request_payload, blocking, runtime_settings)
@@ -172,6 +174,7 @@ def validate_clinical_input_preflight(
             runtime_settings,
             extraction_quality,
             deterministic_diagnostics,
+            rag_readiness,
         )
     livertox_rows, _ = service.serializer.list_livertox_catalog(
         search=None,
@@ -408,6 +411,7 @@ def validate_clinical_input_preflight(
         runtime_settings,
         extraction_quality,
         deterministic_diagnostics,
+        rag_readiness,
     )
 
 ###############################################################################
@@ -523,6 +527,7 @@ def _result(
     runtime_settings: dict[str, Any],
     extraction_quality: dict[str, Any],
     deterministic_diagnostics: dict[str, Any],
+    rag_readiness: Any,
 ) -> ClinicalInputPreflightResult:
     return ClinicalInputPreflightResult(
         ready=not blocking,
@@ -531,6 +536,7 @@ def _result(
         runtime_settings=runtime_settings,
         extraction_quality=extraction_quality,
         deterministic_diagnostics=deterministic_diagnostics,
+        rag_readiness=rag_readiness,
     )
 
 

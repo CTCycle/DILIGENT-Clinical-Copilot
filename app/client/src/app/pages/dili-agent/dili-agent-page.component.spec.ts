@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 
+import { ClinicalRequestPayload } from '../../core/models/types';
 import { DiliAgentPageComponent } from './dili-agent-page.component';
 
 describe('DiliAgentPageComponent', () => {
@@ -84,5 +85,49 @@ describe('DiliAgentPageComponent', () => {
     expect(component.spinnerStatusLabel).toContain(
       'Local model extraction can take several minutes.',
     );
+  });
+
+  it('renders the Ollama RAG readiness dialog', () => {
+    component.ragReadinessDialog.set({
+      requested: true,
+      available: false,
+      backend: 'ollama',
+      model: 'nomic-embed-text:latest',
+      reason_code: 'rag_ollama_unavailable',
+      message: 'Start Ollama and retry.',
+    });
+
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('RAG requires Ollama');
+    expect(fixture.nativeElement.textContent).toContain('Run without RAG');
+    expect(fixture.nativeElement.textContent).toContain('nomic-embed-text:latest');
+  });
+
+  it('disables RAG only for the pending run', async () => {
+    const internal = component as unknown as {
+      executeRunSession: (payload?: ClinicalRequestPayload) => Promise<void>;
+      pendingRagPayload: ClinicalRequestPayload | null;
+    };
+    const executeSpy = vi
+      .spyOn(internal, 'executeRunSession')
+      .mockResolvedValue();
+    component.stateService.updateDiliAgent({
+      form: { ...component.vm.form, useRag: true },
+    });
+    internal.pendingRagPayload = {
+      name: null,
+      visit_date: null,
+      clinical_input: 'clinical input',
+      selected_model_providers: ['openai'],
+      use_rag: true,
+    };
+
+    await component.runWithoutRag();
+
+    expect(executeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ use_rag: false }),
+    );
+    expect(component.vm.form.useRag).toBe(true);
   });
 });

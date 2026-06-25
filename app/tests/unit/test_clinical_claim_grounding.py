@@ -84,7 +84,7 @@ def test_missing_evidence_claim_requires_review_and_renders_warning() -> None:
     assert narrative.claims[0].confidence == "low"
     assert narrative.claims[0].requires_review is True
     assert all(claim.confidence != "high" for claim in narrative.claims)
-    rendered = HepatoxConsultation.render_claim_review_lines(entry)
-    assert "Claim review" in rendered
-    assert "review required" in rendered
+    rendered = HepatoxConsultation.render_clinical_commentary(entry)
+    assert "Clinical commentary" in rendered
+    assert "Clinical review is required" in rendered
     assert "insufficient follow-up labs" in rendered
