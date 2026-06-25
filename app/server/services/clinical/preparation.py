@@ -98,7 +98,7 @@ RxNav and LiverTox evidence before accepting it.
         model: str | None,
         temperature: float,
     ) -> dict[str, dict[str, Any]]:
-        unresolved = self.collect_unresolved_mentions(drugs, resolved_drugs)
+        unresolved = self.collect_identity_fallback_mentions(drugs, resolved_drugs)
         if (
             not unresolved
             or llm_client is None
@@ -171,6 +171,7 @@ RxNav and LiverTox evidence before accepting it.
                 "source": "llm_candidate_local_validation",
                 "original_mention": proposal.original_mention,
                 "proposed_canonical_name": proposal.proposed_canonical_name,
+                "alternate_names": proposal.alternate_names,
                 "ingredients": proposal.ingredients,
                 "confidence": proposal.confidence,
                 "rationale": proposal.rationale,
@@ -205,7 +206,7 @@ RxNav and LiverTox evidence before accepting it.
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def collect_unresolved_mentions(
+    def collect_identity_fallback_mentions(
         drugs: PatientDrugs,
         resolved_drugs: dict[str, dict[str, Any]],
     ) -> dict[str, tuple[DrugEntry, dict[str, Any]]]:
@@ -216,7 +217,20 @@ RxNav and LiverTox evidence before accepting it.
         }
         unresolved: dict[str, tuple[DrugEntry, dict[str, Any]]] = {}
         for payload in resolved_drugs.values():
-            if payload.get("decision_status") != "missing_livertox":
+            decision_status = str(payload.get("decision_status") or "")
+            confidence = payload.get("match_confidence")
+            low_confidence = (
+                isinstance(confidence, int | float) and float(confidence) < 0.75
+            )
+            if (
+                decision_status
+                not in {
+                    "missing_livertox",
+                    "missing_rxnav",
+                    "ambiguous_requires_review",
+                }
+                and not low_confidence
+            ):
                 continue
             raw_mentions = payload.get("raw_mentions") or []
             for raw_mention in raw_mentions:
@@ -231,6 +245,7 @@ RxNav and LiverTox evidence before accepting it.
     def proposal_candidate_names(proposal: Any) -> list[str]:
         values = [
             proposal.proposed_canonical_name,
+            *proposal.alternate_names,
             *proposal.ingredients,
         ]
         candidates: list[str] = []

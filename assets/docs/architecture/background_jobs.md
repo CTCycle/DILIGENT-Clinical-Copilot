@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-06-21
+Last updated: 2026-06-25
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -61,6 +61,7 @@ Each job tracks:
 Additional rules:
 - Clinical status responses are explicitly non-cacheable through `Cache-Control: no-store`.
 - Clients should treat `version` as monotonic and ignore out-of-order older snapshots.
+- Clinical progress snapshots expose canonical granular stage keys such as `drugs.extracting`, `retrieval.evidence`, `report.generating`, `session.saving`, and terminal `completed`; generic internal wrapper stages are not persisted as the user-facing stage.
 - Inspection update jobs may include `phase`, `step_index`, `step_count`, `progress_message`, and `summary`.
 - Inspection update runners use cooperative cancellation and progress callbacks consistently across `rxnav`, `livertox`, and `rag`.
 - Session revision jobs reprocess the persisted session text, create a new session version, and persist a `revision_audit` payload with parser cross-validation, selected-focus context, user instructions, detected-drug diffs, model overrides, and conclusion action metadata.

@@ -173,5 +173,8 @@ describe('DiliAgentPageComponent', () => {
     expect(component.vm.jobStatus).toBe('completed');
     expect(component.vm.jobProgress).toBe(100);
     expect(component.vm.message).toContain('Recovered final report');
+    expect(component.vm.jobStage).toBe('completed');
+    expect(component.vm.jobStageMessage).toBe('Clinical analysis completed.');
+    expect(component.vm.exportUrl).toBeTruthy();
   });
 });
