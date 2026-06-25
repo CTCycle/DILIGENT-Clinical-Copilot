@@ -18,6 +18,7 @@ CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
     "rucam.refined": "Step 13/15: Re-estimating RUCAM scores with retrieved evidence...",
     "report.generating": "Step 14/15: Generating clinical consultation report...",
     "session.saving": "Step 15/15: Auditing artifacts and saving session results...",
+    "completed": "Clinical analysis completed.",
     "session_initialization": "Step 1/15: Validating required local data and visit metadata...",
     "therapy_extraction": "Step 4/15: Parsing DRUGS and ANAMNESIS sections for current and historical medication exposures...",
     "anamnesis_extraction": "Step 4/15: Parsing DRUGS and ANAMNESIS sections for current and historical medication exposures...",

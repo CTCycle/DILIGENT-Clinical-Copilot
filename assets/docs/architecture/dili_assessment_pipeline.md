@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-06-24
+Last updated: 2026-06-25
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -12,6 +12,8 @@ Aggregate section confidence is the minimum confidence across required extracted
 Drug, disease, and laboratory extraction use provider-agnostic structured LLM calls for both cloud and local providers. The active runtime provider and model are resolved from persisted model configuration.
 
 Structured LLM output is validated against Pydantic schemas and semantic guardrails. Invalid or contaminated output is retried with the rejected output and validation feedback. If bounded LLM attempts fail, the pipeline falls back to direct rule-based parsers and records fallback warnings.
+
+Therapy fallback remains full-section and context-aware: unresolved deterministic spans trigger structured extraction against the complete therapy block, and accepted entries must be grounded in the original source text.
 
 Structured output parsing accepts strict JSON objects only. Prose-wrapped JSON or trailing prose is rejected by default; repair logs include schema name, attempt count, output length, short output hash, and error type, but not raw model output.
 
@@ -38,7 +40,9 @@ LiverTox and RxNav matching keeps raw extracted name, normalized name, matched L
 
 Candidate admission is intentionally high recall: structurally plausible medication labels are not discarded merely because they lack an exact local alias or recognized INN suffix. Exact, alias, normalized, structured ingredient/brand, and bounded unique spelling resolution run before a match is declared missing.
 
-When a plausible mention remains unresolved, the configured parser model may propose generic names or active ingredients in one structured batch. These proposals are candidate generation only. Every proposed identity is re-run through the local RxNav/LiverTox resolver, and no LiverTox evidence is accepted unless the local policy produces a unique accepted match. Unvalidated or ambiguous proposals remain unresolved and auditable.
+Before candidate selection and downstream RUCAM, retrieval, matching, and consultation, therapy and anamnesis mentions are deduplicated by normalized identity. Raw section entries remain available for audit, while the deduplicated artifact records origins, raw mentions, evidence snippets, and the selected clinical entry.
+
+When a plausible mention remains unresolved, ambiguous, or low-confidence, the configured parser model may propose generic names, alternate names, or active ingredients in one structured batch. These proposals are candidate generation only. Every proposed identity is re-run through the local RxNav/LiverTox resolver, and no LiverTox evidence is accepted unless the local policy produces a unique accepted match. Unvalidated or ambiguous proposals remain unresolved and auditable.
 
 Resolution statuses are:
 - `accepted_exact_livertox`

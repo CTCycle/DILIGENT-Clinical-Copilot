@@ -99,11 +99,6 @@ class DrugsParser:
     START_EVENT_RE = re.compile(r"$^")
     SUSPENSION_EVENT_RE = re.compile(r"$^")
     DRUG_FORM_SUFFIX_RE = re.compile(r"$^")
-    NON_DRUG_EXACT_NAMES = NON_DRUG_EXACT_NAMES
-    NON_DRUG_PREFIXES = NON_DRUG_PREFIXES
-    NON_DRUG_CONTAINS = NON_DRUG_CONTAINS
-    WEEKDAY_TOKENS = WEEKDAY_TOKENS
-    NON_THERAPY_LINE_PREFIXES = NON_THERAPY_LINE_PREFIXES
     LAB_MEASUREMENT_NAME_RE = re.compile(r"\b(?:u/l|ui/l|mg/dl|uln)\b", re.IGNORECASE)
     LAB_MARKER_NAME_RE = re.compile(r"\b(?:alt|ast|alp|bilirubin|inr)\b", re.IGNORECASE)
     MEDICATION_CONTEXT_RE = re.compile(
@@ -627,31 +622,30 @@ class DrugsParser:
 
         fallback_lines = [line for _, line in fallback]
         try:
-            structured = await self.llm_extract_drugs(
-                fallback_lines,
+            structured = await self.llm_extract_drugs_from_section(
+                cleaned,
+                source="therapy",
+                historical_flag=False,
                 progress_callback=progress_callback,
-                progress_start=0.2,
-                progress_span=0.8,
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(
-                "Therapy LLM extraction failed for %s unresolved fragments; using deterministic entries only: %s",
+                "Contextual therapy LLM extraction failed for %s unresolved spans; using deterministic entries only: %s",
                 len(fallback_lines),
                 exc,
             )
             structured = PatientDrugs(entries=[])
 
         llm_entries: list[DrugEntry] = []
-        for index, entry in enumerate(structured.entries):
-            raw_line = fallback_lines[index] if index < len(fallback_lines) else ""
-            post_processed = self.post_process_llm_entry(
+        for entry in structured.entries:
+            grounded = self.validate_llm_drug_entry_grounding(
                 entry,
-                raw_line=raw_line,
+                source_text=cleaned,
                 source="therapy",
                 historical_flag=False,
             )
-            if post_processed is not None:
-                llm_entries.append(post_processed)
+            if grounded is not None:
+                llm_entries.append(grounded)
         return self.deduplicate_drug_entries([*deterministic_entries, *llm_entries])
 
     # -------------------------------------------------------------------------

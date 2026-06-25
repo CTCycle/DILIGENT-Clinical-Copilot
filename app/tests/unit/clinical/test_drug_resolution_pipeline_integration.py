@@ -292,8 +292,9 @@ def test_single_llm_identity_is_accepted_only_after_local_validation() -> None:
             proposals=[
                 DrugIdentityProposal(
                     original_mention="InternationalName",
-                    proposed_canonical_name="Acetaminophen",
-                    ingredients=["Acetaminophen"],
+                    proposed_canonical_name=None,
+                    alternate_names=["Acetaminophen"],
+                    ingredients=[],
                     confidence=0.98,
                     rationale="International generic synonym.",
                 )

@@ -312,8 +312,8 @@ export class DiliAgentPageComponent implements OnDestroy {
       this.stateService.updateDiliAgent({
         message: report || '[INFO] Clinical analysis completed.',
         exportUrl: newExportUrl,
-        jobStage: null,
-        jobStageMessage: null,
+        jobStage: 'completed',
+        jobStageMessage: 'Clinical analysis completed.',
       });
     } else if (status.status === 'failed') {
       const errorMessage = status.error
@@ -322,15 +322,15 @@ export class DiliAgentPageComponent implements OnDestroy {
       this.stateService.updateDiliAgent({
         message: errorMessage,
         exportUrl: null,
-        jobStage: null,
-        jobStageMessage: null,
+        jobStage: 'failed',
+        jobStageMessage: 'Clinical analysis failed.',
       });
     } else if (status.status === 'cancelled') {
       this.stateService.updateDiliAgent({
         message: '[INFO] Clinical analysis cancelled.',
         exportUrl: null,
-        jobStage: null,
-        jobStageMessage: null,
+        jobStage: 'cancelled',
+        jobStageMessage: 'Clinical analysis cancelled.',
       });
     }
   }
