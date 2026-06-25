@@ -416,6 +416,7 @@ class RucamScoreEstimator:
                     score=source.score,
                     status="scored",
                     evidence=source.evidence,
+                    evidence_date=drug.suspension_date or drug.therapy_start_date,
                     rationale=phrase("rucam_source_reported", report_language),
                 )
             ],
@@ -590,6 +591,7 @@ class RucamScoreEstimator:
                 label="Time to onset",
                 score=0,
                 status="not_assessable",
+                evidence_date=drug.therapy_start_date or anchor.onset_date.isoformat() if anchor.onset_date else None,
                 rationale=rationale,
             ), onset_date
         delta_days = (onset_date - start_date).days
@@ -605,6 +607,8 @@ class RucamScoreEstimator:
             label="Time to onset",
             score=score,
             status="scored",
+            evidence_date=onset_date.isoformat(),
+            evidence=f"{drug.therapy_start_date or 'missing start'} -> {onset_date.isoformat()}",
             rationale=f"Latency: {delta_days} days.",
         ), onset_date
 
@@ -623,6 +627,7 @@ class RucamScoreEstimator:
                 label="Course after withdrawal",
                 score=0,
                 status="not_assessable",
+                evidence_date=onset_date.isoformat() if onset_date else None,
                 rationale="No onset date or withdrawal status available.",
             )
         _ = injury_type
@@ -637,6 +642,7 @@ class RucamScoreEstimator:
                 label="Course after withdrawal",
                 score=0,
                 status="not_assessable",
+                evidence_date=onset_date.isoformat(),
                 rationale="No follow-up labs after onset/withdrawal.",
             )
         return RucamComponentAssessment(
@@ -644,6 +650,7 @@ class RucamScoreEstimator:
             label="Course after withdrawal",
             score=1,
             status="scored",
+            evidence_date=dated[-1][0].isoformat(),
             rationale="Follow-up labs available after withdrawal context.",
         )
 
@@ -659,6 +666,7 @@ class RucamScoreEstimator:
             label="Risk factors",
             score=score,
             status="scored",
+            evidence=text[:300] or None,
         )
 
     # -------------------------------------------------------------------------
@@ -676,6 +684,7 @@ class RucamScoreEstimator:
             label="Concomitant drugs",
             score=-1 if other else 0,
             status="scored",
+            evidence=", ".join(d.name for d in other[:5]) or None,
         )
 
     # -------------------------------------------------------------------------
@@ -694,6 +703,7 @@ class RucamScoreEstimator:
                 label="Non-drug causes",
                 score=-3,
                 status="scored",
+                evidence=hepatic_entries[0].evidence or hepatic_entries[0].name,
             )
         clues = len(EXCLUSION_RE.findall(text))
         if clues == 0:
@@ -702,6 +712,7 @@ class RucamScoreEstimator:
                 label="Non-drug causes",
                 score=0,
                 status="not_assessable",
+                evidence=text[:300] or None,
                 rationale="No explicit exclusion workup evidence.",
             )
         return RucamComponentAssessment(
@@ -709,6 +720,7 @@ class RucamScoreEstimator:
             label="Non-drug causes",
             score=2 if clues >= 2 else 1,
             status="scored",
+            evidence=text[:300] or None,
         )
 
     # -------------------------------------------------------------------------
@@ -729,19 +741,45 @@ class RucamScoreEstimator:
             label="Previous hepatotoxicity of the drug",
             score=score,
             status="scored",
+            evidence=token or None,
         )
 
     # -------------------------------------------------------------------------
     def score_rechallenge(
         self, *, payload: PatientData, drug: DrugEntry
     ) -> RucamComponentAssessment:
-        _ = payload
-        _ = drug
+        text = " ".join(
+            item.strip()
+            for item in (payload.anamnesis or "", payload.drugs or "", drug.evidence or "")
+            if item
+        )
+        lowered = text.lower()
+        if "rechallenge positive" in lowered or "recurred after restart" in lowered:
+            return RucamComponentAssessment(
+                component_key="rechallenge",
+                label="Rechallenge",
+                score=3,
+                status="scored",
+                evidence=text[:500],
+                evidence_date=drug.suspension_date or drug.therapy_start_date,
+                rationale="Intentional or inadvertent positive rechallenge language is present.",
+            )
+        if "rechallenge" in lowered or "restarted" in lowered or "resumed" in lowered:
+            return RucamComponentAssessment(
+                component_key="rechallenge",
+                label="Rechallenge",
+                score=0,
+                status="not_assessable",
+                evidence=text[:500],
+                evidence_date=drug.suspension_date or drug.therapy_start_date,
+                rationale="Re-exposure language is present but the biochemical response is unclear.",
+            )
         return RucamComponentAssessment(
             component_key="rechallenge",
             label="Rechallenge",
             score=0,
             status="not_assessable",
+            rationale="No reliable rechallenge evidence.",
         )
 
     # -------------------------------------------------------------------------

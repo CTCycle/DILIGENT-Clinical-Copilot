@@ -66,6 +66,7 @@ from domain.clinical.rucam import RucamAnchor
 from domain.clinical.validation import ValidationMessageBundle
 from domain.clinical.dili import (
     ClinicalDataCompleteness,
+    DiliAcceptanceQuestion,
     ClinicalEvidenceQuote,
     DiliCompetingCause,
     DiliDifferentialAssessment,
@@ -140,6 +141,7 @@ __all__ = [
     "RevisionLiverToxDecision",
     "create_drug_suspension_context",
     "ClinicalDataCompleteness",
+    "DiliAcceptanceQuestion",
     "ClinicalEvidenceQuote",
     "DiliCompetingCause",
     "DiliDifferentialAssessment",

@@ -523,10 +523,11 @@ class RucamComponentAssessment(BaseModel):
     score: int = Field(default=0)
     status: Literal["scored", "not_assessable", "excluded"] = Field(default="scored")
     evidence: str | None = Field(default=None, max_length=1000)
+    evidence_date: str | None = Field(default=None, max_length=40)
     rationale: str | None = Field(default=None, max_length=2000)
 
     # -------------------------------------------------------------------------
-    @field_validator("component_key", "label", "evidence", "rationale", mode="before")
+    @field_validator("component_key", "label", "evidence", "evidence_date", "rationale", mode="before")
     @classmethod
     def strip_component_fields(cls, value: str | None) -> str | None:
         if value is None:

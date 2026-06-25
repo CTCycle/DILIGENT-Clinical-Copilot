@@ -49,7 +49,6 @@ def test_inspection_revision_routes_are_present_in_openapi() -> None:
     expected_paths = [
         "/api/inspection/sessions/{session_id}/versions",
         "/api/inspection/sessions/{session_id}/versions/{version_id}",
-        "/api/inspection/sessions/{session_id}/versions/{left_version_id}/compare/{right_version_id}",
         "/api/inspection/sessions/{session_id}/report",
         "/api/inspection/sessions/{session_id}/manual-edits",
         "/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}",

@@ -73,7 +73,10 @@ class CloudLLMClient:
                 "Authorization": f"Bearer {provider_access_key}",
                 "Content-Type": "application/json",
             }
-            _openai_http_client = httpx.AsyncClient(trust_env=False)
+            _openai_http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(self.timeout_s),
+                trust_env=False,
+            )
             self.openai_client = AsyncOpenAI(
                 api_key=provider_access_key,
                 base_url=self.base_url,

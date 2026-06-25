@@ -217,18 +217,19 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
     )
 
     assert result["final_report"].startswith("# Structured DILI causality dossier")
-    assert "## 14. Manual review requirements" in result["final_report"]
-    assert (
-        "Relazione narrativa con discussione farmacologica e sintesi finale."
-        in result["final_report"]
-    )
+    assert "## 14. Acceptance questions" in result["final_report"]
     assert result["dili_evidence_bundle"]["manual_review_required"] is True
+    assert result["llm_clinical_summary"] == "Relazione narrativa con discussione farmacologica e sintesi finale."
     assert result["final_report"] in result["report"]
     assert "## Report Clinico" in result["pipeline_artifacts"]["generated_report"]
     assert (
         "### Esposizione ai Farmaci" in result["pipeline_artifacts"]["generated_report"]
     )
     assert result["pipeline_artifacts"]["generated_report"] != result["final_report"]
+    assert (
+        result["pipeline_artifacts"]["llm_clinical_summary"]
+        == "Relazione narrativa con discussione farmacologica e sintesi finale."
+    )
     assert result["extraction_metadata"]["hepatic_pattern"]["source"] == "provided"
     assert result["extraction_metadata"]["hepatic_pattern"]["value"] == "cholestatic"
     assert (

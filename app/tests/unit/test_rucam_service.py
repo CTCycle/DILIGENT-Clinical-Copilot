@@ -203,3 +203,13 @@ def test_low_positive_rucam_scores_are_indeterminate() -> None:
     assert estimator.resolve_causality_bucket(1) == "indeterminate"
     assert estimator.resolve_causality_bucket(2) == "indeterminate"
     assert estimator.resolve_causality_bucket(0) == "excluded"
+
+###############################################################################
+def test_rechallenge_component_carries_supporting_text_when_present() -> None:
+    estimator = RucamScoreEstimator()
+    component = estimator.score_rechallenge(
+        payload=PatientData(anamnesis="Rechallenge positive after restart."),
+        drug=DrugEntry(name="Drug A", evidence="Drug A restarted and enzymes recurred."),
+    )
+    assert component.status in {"scored", "not_assessable"}
+    assert component.evidence

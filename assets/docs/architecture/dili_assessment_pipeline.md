@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-06-25
+Last updated: 2026-06-26
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -53,8 +53,30 @@ separate from patient-specific causality. Missing follow-up is represented as
 missing, not as a negative dechallenge or rechallenge.
 
 The deterministic dossier provides the FDA-style fourteen-section report
-structure. The LLM receives or follows that dossier only as a summarization
-layer and must not add unsupported clinical facts.
+structure. The bundle also carries twelve acceptance-question answers with
+supporting quotes and explicit missing-data statements so the final
+adjudication can be audited directly.
+
+The persisted `final_report` is the rendered deterministic dossier. Any LLM
+clinical synthesis is stored separately as audit-only summary text and is not
+allowed to introduce unsupported clinical facts into the authoritative report.
+
+Longitudinal adjudication is clinically conservative by default: dose changes,
+restart or rechallenge mentions, first symptoms, bilirubin or jaundice timing,
+marker-specific peaks, dechallenge direction, recovery versus persistence, and
+worsening after discontinuation remain explicit timeline events or missing-data
+statements instead of being inferred as negatives.
+
+Mandatory competing causes use explicit four-state outputs:
+- `excluded`
+- `not_excluded`
+- `unknown`
+- `missing_data`
+
+Hy's Law evaluation is same-episode aware and records baseline multiples,
+initial cholestasis, alternative-cause exclusion, exposure compatibility, and
+individual-patient versus trial-signal context. Rechallenge remains a safety
+signal only; the workflow never recommends rechallenge.
 
 ## Match Audit
 Drug matching uses a first-class local resolution decision layer. Extracted mentions are normalized once, regimen parents and components are preserved separately, RxNav candidates are built from the persisted RxNorm-backed catalog, LiverTox candidates are built from local monographs, and a deterministic policy decides whether a match can be accepted automatically.
