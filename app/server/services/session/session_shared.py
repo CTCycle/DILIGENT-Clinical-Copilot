@@ -484,6 +484,7 @@ async def execute_clinical_job(
             ),
         )
         raise
+    report_progress(stage="completed", progress=100.0)
     return result
 
 ###############################################################################
@@ -502,8 +503,11 @@ def report_clinical_job_progress(
 ) -> None:
     ensure_clinical_job_not_cancelled(job_manager=job_manager, job_id=job_id)
     bounded = min(100.0, max(0.0, float(progress)))
+    effective_stage = (
+        detail if detail in CLINICAL_PROGRESS_MESSAGES else stage
+    )
     message = CLINICAL_PROGRESS_MESSAGES.get(
-        detail or stage, stage.replace("_", " ").strip()
+        effective_stage, effective_stage.replace("_", " ").strip()
     )
     job_manager.update_progress(job_id, bounded)
     snapshot = job_manager.get_job_status(job_id)
@@ -516,7 +520,7 @@ def report_clinical_job_progress(
     job_manager.update_result(
         job_id,
         {
-            "progress_stage": stage,
+            "progress_stage": effective_stage,
             "progress_message": message,
             "progress_elapsed": elapsed_seconds,
         },

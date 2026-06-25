@@ -24,12 +24,17 @@ from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
     ClinicalSessionRequest,
     PatientData,
+    PatientDrugs,
     PipelineIssue,
 )
 from domain.clinical.robustness import NormalizedDocument
 from domain.jobs import JobStartResponse
 from services.clinical.candidate_selection import select_relevant_candidates
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
+from services.clinical.drug_deduplication import (
+    build_deduplication_audit,
+    deduplicate_detected_drugs,
+)
 from services.clinical.language import ClinicalLanguageDetector
 from services.clinical.pattern_resolution import (
     HepaticPatternResolutionInput,
@@ -268,9 +273,14 @@ async def process_single_patient_workflow(
         _PROGRESS_SEQUENCE[8][1],
         _PROGRESS_SEQUENCE[8][0],
     )
+    deduplicated_drugs = deduplicate_detected_drugs(
+        therapy_drugs,
+        anamnesis_drugs,
+        payload.visit_date,
+    )
     candidate_selection = select_relevant_candidates(
-        therapy_drugs=therapy_drugs,
-        anamnesis_drugs=anamnesis_drugs,
+        therapy_drugs=deduplicated_drugs,
+        anamnesis_drugs=PatientDrugs(entries=[]),
         visit_date=payload.visit_date,
     )
 
@@ -509,6 +519,11 @@ async def process_single_patient_workflow(
             "anamnesis_diseases": [
                 entry.model_dump() for entry in disease_context.entries
             ],
+            "deduplicated_analysis_drugs": build_deduplication_audit(
+                therapy_drugs,
+                anamnesis_drugs,
+                deduplicated_drugs,
+            ),
         },
         "deterministic_extraction": {
             "therapy": {
@@ -536,10 +551,12 @@ async def process_single_patient_workflow(
         "section_extraction": section_extraction.model_dump()
         if section_extraction is not None
         else None,
-        "resolved_runtime": dict(service.resolved_runtime),
-        "stage_elapsed_ms": dict(service.stage_elapsed_ms),
-        "fallback_reasons": dict(service.fallback_reasons),
-        "structured_failure_kind": dict(service.structured_failure_kind),
+        "resolved_runtime": dict(getattr(service, "resolved_runtime", {})),
+        "stage_elapsed_ms": dict(getattr(service, "stage_elapsed_ms", {})),
+        "fallback_reasons": dict(getattr(service, "fallback_reasons", {})),
+        "structured_failure_kind": dict(
+            getattr(service, "structured_failure_kind", {})
+        ),
         "runtime_settings": {
             "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
             "llm_provider": LLMRuntimeConfig.get_llm_provider(),
@@ -550,10 +567,12 @@ async def process_single_patient_workflow(
             "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
             "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
             "use_rag": bool(payload.use_rag),
-            "resolved_runtime": dict(service.resolved_runtime),
-            "stage_elapsed_ms": dict(service.stage_elapsed_ms),
-            "fallback_reasons": dict(service.fallback_reasons),
-            "structured_failure_kind": dict(service.structured_failure_kind),
+            "resolved_runtime": dict(getattr(service, "resolved_runtime", {})),
+            "stage_elapsed_ms": dict(getattr(service, "stage_elapsed_ms", {})),
+            "fallback_reasons": dict(getattr(service, "fallback_reasons", {})),
+            "structured_failure_kind": dict(
+                getattr(service, "structured_failure_kind", {})
+            ),
         },
         "manual_review_required": faithfulness_audit.manual_review_required,
         "blocking_issues": faithfulness_audit.blocking_issues,

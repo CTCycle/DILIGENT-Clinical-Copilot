@@ -122,9 +122,10 @@ def test_clinical_jobs_endpoint_completes_dummy_three_drug_assessment(
         assert source_text.count("Atorvastatin") == 1
         progress_callback = kwargs.get("progress_callback")
         if progress_callback is not None:
-            progress_callback("therapy_extraction", 16.0, "drugs.extracting")
-            progress_callback("therapy_extraction", 23.0, "drugs.extracting")
-            progress_callback("report_composition", 99.0, "session.saving")
+            progress_callback("clinical", 16.0, "drugs.extracting")
+            progress_callback("clinical", 82.0, "retrieval.evidence")
+            progress_callback("clinical", 94.0, "report.generating")
+            progress_callback("clinical", 99.0, "session.saving")
         return {
             "detected_drugs": ["Amoxicillin", "Ibuprofen", "Atorvastatin"],
             "matched_drugs": [],
@@ -154,6 +155,8 @@ def test_clinical_jobs_endpoint_completes_dummy_three_drug_assessment(
     assert terminal["progress"] == 100.0
     result = terminal["result"]
     assert result is not None
-    assert result["progress_message"] == "Step 15/15: Auditing artifacts and saving session results..."
+    assert result["progress_stage"] == "completed"
+    assert result["progress_message"] == "Clinical analysis completed."
+    assert result["progress_stage"] != "clinical"
     assert result["detected_drugs"] == ["Amoxicillin", "Ibuprofen", "Atorvastatin"]
     assert len(result["detected_drugs"]) == 3

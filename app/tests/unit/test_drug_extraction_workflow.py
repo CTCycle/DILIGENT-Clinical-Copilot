@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from domain.clinical.entities import DrugEntry
+import asyncio
+
+from domain.clinical.entities import DrugEntry, PatientDrugs
+from services.clinical.deterministic_extraction import DeterministicDrugExtractionResult
 from services.clinical.drug_resolution.normalizer import DrugMentionNormalizer
 from services.clinical.parser import DrugsParser
 from services.session.preflight import LocalModelBatchPreflightResult
@@ -105,3 +108,44 @@ def test_novel_inn_suffix_candidate_remains_for_missing_livertox_resolution() ->
     mention = normalizer._normalize_entry(DrugEntry(name="Trialzumab"))
     assert mention is not None
     assert mention.normalized_name == "trialzumab"
+
+
+def test_therapy_hybrid_fallback_uses_complete_block_context(monkeypatch) -> None:
+    class StructuredClientStub:
+        async def llm_structured_call(self, **kwargs: object) -> object:
+            raise AssertionError("Patched section extractor should be used")
+
+    parser = DrugsParser(client=StructuredClientStub())
+    source = "Amoxicillin/clavulanate 875/125 mg\ncontinued twice daily."
+    monkeypatch.setattr(
+        parser,
+        "extract_drugs_from_therapy_deterministic",
+        lambda cleaned: DeterministicDrugExtractionResult(
+            entries=[],
+            unresolved_lines=["Amoxicillin/clavulanate 875/125 mg"],
+            regimen_lines=[],
+        ),
+    )
+    captured: dict[str, str] = {}
+
+    async def fake_section_extract(
+        source_text: str,
+        **kwargs: object,
+    ) -> PatientDrugs:
+        captured["source_text"] = source_text
+        return PatientDrugs(
+            entries=[
+                DrugEntry(
+                    name="Amoxicillin/clavulanate",
+                    source="therapy",
+                    evidence="Amoxicillin/clavulanate",
+                    source_span=[0, 23],
+                )
+            ]
+        )
+
+    monkeypatch.setattr(parser, "llm_extract_drugs_from_section", fake_section_extract)
+    entries = asyncio.run(parser.extract_drugs_from_therapy_hybrid(source))
+
+    assert captured["source_text"] == source
+    assert [entry.name for entry in entries] == ["Amoxicillin/clavulanate"]

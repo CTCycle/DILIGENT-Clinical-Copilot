@@ -101,6 +101,7 @@ class DrugIdentityProposal(BaseModel):
 
     original_mention: str = Field(..., min_length=1, max_length=200)
     proposed_canonical_name: str | None = Field(default=None, max_length=200)
+    alternate_names: list[str] = Field(default_factory=list, max_length=12)
     ingredients: list[str] = Field(default_factory=list, max_length=8)
     confidence: float = Field(..., ge=0.0, le=1.0)
     rationale: str = Field(..., min_length=1, max_length=500)
@@ -120,7 +121,7 @@ class DrugIdentityProposal(BaseModel):
         return stripped or None
 
     # -------------------------------------------------------------------------
-    @field_validator("ingredients", mode="before")
+    @field_validator("alternate_names", "ingredients", mode="before")
     @classmethod
     def normalize_ingredients(cls, value: object) -> list[str]:
         if not isinstance(value, list):

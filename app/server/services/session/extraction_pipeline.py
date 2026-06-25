@@ -57,10 +57,10 @@ class ClinicalSessionExtractionPipelineMixin:
         stop_check: Callable[[], None] | None,
     ) -> PatientDrugs:
         self.note_stage_runtime("therapy_extraction")
-        self.emit_progress(progress_callback, stage="therapy_extraction", value=16.0)
+        self.emit_progress(progress_callback, stage="drugs.extracting", value=16.0)
         therapy_progress_callback = self.build_stage_progress_callback(
             progress_callback,
-            stage="therapy_extraction",
+            stage="drugs.extracting",
             start_value=16.0,
             end_value=23.0,
         )
@@ -115,7 +115,7 @@ class ClinicalSessionExtractionPipelineMixin:
                 structured_failure_kind=self.classify_structured_failure_kind(exc),
             )
             therapy_drugs = self.build_fallback_therapy_drugs(cleaned_therapy_text)
-        self.emit_progress(progress_callback, stage="therapy_extraction", value=23.0)
+        self.emit_progress(progress_callback, stage="drugs.extracting", value=23.0)
         self.run_stop_check(stop_check)
         return therapy_drugs
 
@@ -129,10 +129,10 @@ class ClinicalSessionExtractionPipelineMixin:
         stop_check: Callable[[], None] | None,
     ) -> PatientDrugs:
         self.note_stage_runtime("anamnesis_extraction")
-        self.emit_progress(progress_callback, stage="anamnesis_extraction", value=23.0)
+        self.emit_progress(progress_callback, stage="drugs.extracting", value=23.0)
         anamnesis_progress_callback = self.build_stage_progress_callback(
             progress_callback,
-            stage="anamnesis_extraction",
+            stage="drugs.extracting",
             start_value=23.0,
             end_value=30.0,
         )
@@ -189,7 +189,7 @@ class ClinicalSessionExtractionPipelineMixin:
                 structured_failure_kind=self.classify_structured_failure_kind(exc),
             )
             anamnesis_drugs = PatientDrugs(entries=[])
-        self.emit_progress(progress_callback, stage="anamnesis_extraction", value=30.0)
+        self.emit_progress(progress_callback, stage="drugs.extracting", value=30.0)
         self.run_stop_check(stop_check)
         return anamnesis_drugs
 
@@ -204,11 +204,11 @@ class ClinicalSessionExtractionPipelineMixin:
     ) -> PatientDiseaseContext:
         self.note_stage_runtime("anamnesis_disease_extraction")
         self.emit_progress(
-            progress_callback, stage="anamnesis_disease_extraction", value=38.0
+            progress_callback, stage="diseases.extracting", value=38.0
         )
         disease_progress_callback = self.build_stage_progress_callback(
             progress_callback,
-            stage="anamnesis_disease_extraction",
+            stage="diseases.extracting",
             start_value=38.0,
             end_value=46.0,
         )
@@ -237,7 +237,7 @@ class ClinicalSessionExtractionPipelineMixin:
                     "Detected %s diseases from anamnesis", len(disease_context.entries)
                 )
                 self.emit_progress(
-                    progress_callback, stage="anamnesis_disease_extraction", value=46.0
+                    progress_callback, stage="diseases.extracting", value=46.0
                 )
                 self.run_stop_check(stop_check)
                 return disease_context
@@ -246,7 +246,7 @@ class ClinicalSessionExtractionPipelineMixin:
                 if attempt < max_attempts:
                     self.emit_progress(
                         progress_callback,
-                        stage="anamnesis_disease_extraction",
+                        stage="diseases.extracting",
                         value=38.0,
                         detail="diseases.extracting",
                     )
@@ -296,7 +296,7 @@ class ClinicalSessionExtractionPipelineMixin:
                 )
                 disease_context = PatientDiseaseContext(entries=[])
                 self.emit_progress(
-                    progress_callback, stage="anamnesis_disease_extraction", value=46.0
+                    progress_callback, stage="diseases.extracting", value=46.0
                 )
                 self.run_stop_check(stop_check)
                 return disease_context
@@ -335,7 +335,7 @@ class ClinicalSessionExtractionPipelineMixin:
                 )
                 disease_context = PatientDiseaseContext(entries=[])
                 self.emit_progress(
-                    progress_callback, stage="anamnesis_disease_extraction", value=46.0
+                    progress_callback, stage="diseases.extracting", value=46.0
                 )
                 self.run_stop_check(stop_check)
                 return disease_context
@@ -352,11 +352,11 @@ class ClinicalSessionExtractionPipelineMixin:
     ) -> tuple[PatientLabTimeline, LiverInjuryOnsetContext | None]:
         self.note_stage_runtime("anamnesis_lab_extraction")
         self.emit_progress(
-            progress_callback, stage="anamnesis_lab_extraction", value=46.0
+            progress_callback, stage="labs.extracting", value=46.0
         )
         lab_progress_callback = self.build_stage_progress_callback(
             progress_callback,
-            stage="anamnesis_lab_extraction",
+            stage="labs.extracting",
             start_value=46.0,
             end_value=54.0,
         )
@@ -464,7 +464,7 @@ class ClinicalSessionExtractionPipelineMixin:
             onset_context = None
             self.latest_lab_extraction_audit = None
         self.emit_progress(
-            progress_callback, stage="anamnesis_lab_extraction", value=54.0
+            progress_callback, stage="labs.extracting", value=54.0
         )
         self.run_stop_check(stop_check)
         return lab_timeline, onset_context
