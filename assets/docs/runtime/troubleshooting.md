@@ -106,8 +106,8 @@ Get-NetTCPConnection -LocalPort 7690 -ErrorAction SilentlyContinue
 2. Validate whether the database copy is readable before replacing anything:
 
 ```powershell
-Copy-Item -LiteralPath app/resources/database.db -Destination QA/database-recovery-check.db -Force
-app/server/.venv/Scripts/python.exe -c "import sqlite3; c=sqlite3.connect('QA/database-recovery-check.db'); print(c.execute('select count(*) from sqlite_master').fetchone()[0]); c.close()"
+Copy-Item -LiteralPath app/resources/database.db -Destination assets/QAdatabase-recovery-check.db -Force
+app/server/.venv/Scripts/python.exe -c "import sqlite3; c=sqlite3.connect('assets/QA/database-recovery-check.db'); print(c.execute('select count(*) from sqlite_master').fetchone()[0]); c.close()"
 ```
 
 3. If a reset is acceptable, remove `app/resources/database.db` and `app/resources/database.db-journal`, then let startup recreate the embedded SQLite database or restore a known-readable copy.
