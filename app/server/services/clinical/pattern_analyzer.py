@@ -38,9 +38,9 @@ class HepatotoxicityPatternCalculator:
 
         classification = DEFAULT_DILI_CLASSIFICATION
         if r_score is not None:
-            if r_score > R_SCORE_HEPATOCELLULAR_THRESHOLD:
+            if r_score >= R_SCORE_HEPATOCELLULAR_THRESHOLD:
                 classification = "hepatocellular"
-            elif r_score < R_SCORE_CHOLESTATIC_THRESHOLD:
+            elif r_score <= R_SCORE_CHOLESTATIC_THRESHOLD:
                 classification = "cholestatic"
             else:
                 classification = "mixed"

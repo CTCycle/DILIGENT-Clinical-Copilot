@@ -31,6 +31,7 @@ from domain.clinical.robustness import NormalizedDocument
 from domain.jobs import JobStartResponse
 from services.clinical.candidate_selection import select_relevant_candidates
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
+from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.clinical.drug_deduplication import (
     build_deduplication_audit,
     deduplicate_detected_drugs,
@@ -388,6 +389,20 @@ async def process_single_patient_workflow(
         progress_callback=progress_callback,
         stop_check=stop_check,
     )
+    dili_evidence_bundle = DiliEvidenceBuilder().build(
+        payload=payload,
+        drugs=analysis_drugs,
+        labs=lab_timeline,
+        resolved_drugs=(
+            prepared_inputs.resolved_drugs if prepared_inputs is not None else None
+        ),
+        rucam_bundle=rucam_bundle,
+    )
+    structured_dili_report = DiliEvidenceBuilder.render(dili_evidence_bundle)
+    if final_report:
+        final_report = f"{structured_dili_report}\n\n---\n\n## LLM clinical summary\n\n{final_report}"
+    else:
+        final_report = structured_dili_report
 
     fact_graph = build_fact_graph(
         extraction_artifact=extraction_artifact,
@@ -490,6 +505,7 @@ async def process_single_patient_workflow(
         "rucam_assessments": [item.model_dump() for item in rucam_bundle.entries],
         "lab_timeline": [entry.model_dump() for entry in lab_timeline.entries],
         "onset_context": onset_context.model_dump() if onset_context else None,
+        "dili_evidence_bundle": dili_evidence_bundle.model_dump(),
         "detected_input_language": language_result.detected_input_language,
         "report_language": language_result.report_language,
         "relevant_drugs": effective_candidate_selection.relevant,
@@ -600,6 +616,7 @@ async def process_single_patient_workflow(
                     else 0
                 ),
             },
+            "dili_evidence_bundle": dili_evidence_bundle.model_dump(),
             "deterministic_extraction": {
                 "therapy": {
                     "entries": [

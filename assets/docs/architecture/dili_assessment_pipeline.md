@@ -33,6 +33,29 @@ If an explicit hepatic pattern is present in the laboratory source, it becomes t
 
 If no explicit pattern exists, the calculated value is used. If neither is available, the final value is `indeterminate` with source `undetermined`.
 
+The structured adjudication layer calculates R ratio at the first qualifying
+paired ALT/ALP date and at the peak ALT date. Boundary values follow LiverTox:
+`R >= 5` is hepatocellular, `R <= 2` is cholestatic, and values between 2 and
+5 are mixed.
+
+## Structured DILI Adjudication
+The final report is generated from a persisted `DiliEvidenceBundle` before any
+LLM summary. The bundle contains case completeness, longitudinal exposure and
+laboratory events, first and peak R-ratio assessments, deterministic phenotype
+candidates, a mandatory competing-cause checklist, Hy's Law status, explicit
+severity grade, conservative drug identity resolution, per-drug componentized
+RUCAM, and a separate DILIN-like causality category.
+
+The clinical source hierarchy is AASLD, LiverTox, FDA DILI guidance, then
+DILIN/RUCAM. RUCAM is supportive and never treated as dispositive. LiverTox
+likelihood describes the drug's prior hepatotoxic potential and is kept
+separate from patient-specific causality. Missing follow-up is represented as
+missing, not as a negative dechallenge or rechallenge.
+
+The deterministic dossier provides the FDA-style fourteen-section report
+structure. The LLM receives or follows that dossier only as a summarization
+layer and must not add unsupported clinical facts.
+
 ## Match Audit
 Drug matching uses a first-class local resolution decision layer. Extracted mentions are normalized once, regimen parents and components are preserved separately, RxNav candidates are built from the persisted RxNorm-backed catalog, LiverTox candidates are built from local monographs, and a deterministic policy decides whether a match can be accepted automatically.
 
