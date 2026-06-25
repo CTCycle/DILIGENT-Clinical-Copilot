@@ -6,6 +6,7 @@ import pytest
 
 from common.exceptions import ServiceValidationError
 from domain.clinical.entities import ClinicalSessionRequest
+from domain.clinical.robustness import RagReadiness
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 from services.session.preflight import validate_clinical_input_preflight
@@ -168,3 +169,32 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     assert result.deterministic_diagnostics["anamnesis"]["drug_count"] >= 3
     assert result.deterministic_diagnostics["diseases"]["disease_count"] >= 2
     assert result.extraction_quality["timed_drug_count"] >= 1
+
+###############################################################################
+def test_job_start_rechecks_rag_readiness_before_submission(monkeypatch) -> None:
+    service = _build_service()
+    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
+    monkeypatch.setattr(
+        service,
+        "validate_clinical_input",
+        lambda req: type("P", (), {"ready": True, "blocking_issues": []})(),
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.check_rag_readiness",
+        lambda requested: RagReadiness(
+            requested=requested,
+            available=False,
+            backend="ollama",
+            model="nomic-embed-text:latest",
+            reason_code="rag_ollama_unavailable",
+            message="Start Ollama and retry.",
+        ),
+    )
+    request = ClinicalSessionRequest(
+        clinical_input=_valid_input(),
+        visit_date=date(2025, 1, 15),
+        use_rag=True,
+    )
+
+    with pytest.raises(ServiceValidationError, match="Start Ollama and retry"):
+        start_clinical_job_workflow(service, request)

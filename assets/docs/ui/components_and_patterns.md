@@ -1,5 +1,5 @@
 # Components And Patterns
-Last updated: 2026-06-03
+Last updated: 2026-06-25
 
 ## Page Layout Patterns
 - DILI page uses a responsive grid through `.stitch-dili-grid` and a sticky sidebar on desktop.
@@ -19,6 +19,7 @@ Last updated: 2026-06-03
 ### Modals
 - Use `ModalShellComponent`.
 - Keep close actions consistent.
+- RAG dependency failures use a blocking decision modal with retry, run-without-RAG, and cancel actions. The run-without-RAG action applies only to the pending assessment.
 
 ### Navigation
 - Sidebar and tab patterns must support keyboard navigation.

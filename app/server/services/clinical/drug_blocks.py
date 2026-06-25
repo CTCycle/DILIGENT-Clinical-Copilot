@@ -18,7 +18,7 @@ BULLET_RE = re.compile(r"(?m)^[ \t]*(?:[-*•■]|\d+[.)])[ \t]*")
 UPPER_TOKEN_RE = re.compile(r"^[A-ZÀ-ÖØ-Þ][\wÀ-ÖØ-öø-ÿ'/-]+")
 _MAX_BLOCK_WORDS = 8
 _MAX_BLOCK_CHARS = 80
-_SENTENCE_BOUNDARY_RE = re.compile(r"[.;:]")
+_SENTENCE_BOUNDARY_RE = re.compile(r"(?<!\d)[;:]|(?<!\d)\.(?=\s|$)")
 
 ###############################################################################
 @lru_cache(maxsize=1)

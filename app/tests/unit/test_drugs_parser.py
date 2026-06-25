@@ -7,29 +7,24 @@ from domain.clinical import DrugEntry, PatientDrugs
 from services.clinical.parser import DrugsParser, LocalDrugEntryDraft, LocalPatientDrugs
 
 ###############################################################################
-class FailingStructuredClient:
-
-    # -------------------------------------------------------------------------
-    async def llm_structured_call(self, **kwargs: Any):
-        _ = kwargs
-        raise AssertionError("LLM should not be called for deterministic therapy lines")
-
-###############################################################################
-class ConcurrentStructuredClient:
+class RecordingCorpusStructuredClient:
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
-        self.active_calls = 0
-        self.max_active_calls = 0
+        self.user_prompts: list[str] = []
 
     # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
-        line = str(kwargs["user_prompt"]).splitlines()[-1]
-        self.active_calls += 1
-        self.max_active_calls = max(self.max_active_calls, self.active_calls)
-        await asyncio.sleep(0.01)
-        self.active_calls -= 1
-        return PatientDrugs(entries=[DrugEntry(name=line)])
+        self.user_prompts.append(str(kwargs["user_prompt"]))
+        return PatientDrugs(
+            entries=[
+                DrugEntry(
+                    name="Cardiomed",
+                    dosage="100 mg",
+                    evidence="Cardiomed 100 mg cpr\n1-0-0-0",
+                )
+            ]
+        )
 
 ###############################################################################
 class RecordingLocalStructuredClient:
@@ -52,23 +47,85 @@ class RecordingLocalStructuredClient:
         )
 
 ###############################################################################
-def test_llm_line_extraction_is_bounded_concurrent_and_ordered() -> None:
-    client = ConcurrentStructuredClient()
-    parser = DrugsParser(client=client)
-    lines = [f"Drug {index}" for index in range(7)]
+class MultilineStructuredClient:
 
-    parsed = asyncio.run(parser.llm_extract_drugs(lines))
-
-    assert [entry.name for entry in parsed.entries] == lines
-    assert client.max_active_calls == parser.MAX_CONCURRENT_LINE_EXTRACTIONS
+    # -------------------------------------------------------------------------
+    async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
+        source = str(kwargs["user_prompt"])
+        if "patient anamnesis" in source:
+            return PatientDrugs(
+                entries=[
+                    DrugEntry(
+                        name="Bactrim",
+                        evidence="Bactrim: terapia iniziata il 04.02.2025",
+                    ),
+                    DrugEntry(name="interrotta il", evidence="interrotta il"),
+                    DrugEntry(name="ricevuta il", evidence="ricevuta il"),
+                    DrugEntry(name="termine", evidence="termine"),
+                ]
+            )
+        return PatientDrugs(
+            entries=[
+                DrugEntry(name="Bactrim", evidence="Bactrim forte 800/160 mg"),
+                DrugEntry(name="Huo Ma Ren", evidence="Huo Ma Ren 30"),
+                DrugEntry(name="Hou", evidence="Hou Po 6"),
+                DrugEntry(name="Hou Po", evidence="Hou Po 6"),
+            ]
+        )
 
 ###############################################################################
-def test_llm_line_extraction_uses_local_compact_schema_for_ollama() -> None:
+def test_therapy_extraction_uses_complete_multiline_corpus_once() -> None:
+    client = RecordingCorpusStructuredClient()
+    parser = DrugsParser(client=client)
+    source = "Cardiomed 100 mg cpr\n1-0-0-0"
+
+    parsed = asyncio.run(parser.extract_drugs_from_therapy(source))
+
+    assert [entry.name for entry in parsed.entries] == ["Cardiomed"]
+    assert len(client.user_prompts) == 1
+    assert source in client.user_prompts[0]
+
+###############################################################################
+def test_multiline_corpus_rejects_truncated_and_status_fragments() -> None:
+    parser = DrugsParser(client=MultilineStructuredClient())
+    therapy = """
+    Bactrim forte 800/160 mg cpr
+    1-0-0-1 per os
+    Huo Ma Ren 30
+    Hou Po 6
+    0-0-0-0
+    """
+    anamnesis = """
+    Bactrim: terapia iniziata il 04.02.2025 e
+    interrotta il 09.02.2025.
+    Ultima dose ricevuta il 31.01.2025.
+    Terapia a lungo termine.
+    """
+
+    therapy_result = asyncio.run(parser.extract_drugs_from_therapy(therapy))
+    anamnesis_result = asyncio.run(parser.extract_drugs_from_anamnesis(anamnesis))
+
+    therapy_names = [entry.name for entry in therapy_result.entries]
+    anamnesis_names = [entry.name for entry in anamnesis_result.entries]
+    assert "Bactrim" in therapy_names
+    assert "Huo Ma Ren" in therapy_names
+    assert "Hou Po" in therapy_names
+    assert "Hou" not in therapy_names
+    assert anamnesis_names == ["Bactrim"]
+
+###############################################################################
+def test_whole_section_extraction_uses_local_compact_schema_for_ollama() -> None:
     client = RecordingLocalStructuredClient()
     parser = DrugsParser(client=client)
     parser.forced_provider = "ollama"
 
-    parsed = asyncio.run(parser.llm_extract_drugs(["Ciproflax 500 mg dal 24.01."]))
+    parsed = asyncio.run(
+        parser.llm_extract_drugs_from_section(
+            "Ciproflax 500 mg dal 24.01.",
+            source="therapy",
+            historical_flag=False,
+        )
+    )
 
     assert client.schemas == [LocalPatientDrugs]
     assert len(parsed.entries) == 1
@@ -201,6 +258,32 @@ def test_extract_drugs_from_therapy_does_not_parse_iso_dates_as_schedule() -> No
     assert entry.suspension_date == "2026-02-16"
 
 ###############################################################################
+def test_fragment_guard_rejects_multiline_status_and_truncated_compound_names() -> None:
+    parser = DrugsParser(client=object())
+
+    assert parser.normalize_entry(
+        DrugEntry(name="interrotta il"),
+        source="anamnesis",
+        historical_flag=True,
+    ) is None
+    assert parser.normalize_entry(
+        DrugEntry(name="ricevuta il"),
+        source="anamnesis",
+        historical_flag=True,
+    ) is None
+    assert parser.normalize_entry(
+        DrugEntry(name="termine"),
+        source="anamnesis",
+        historical_flag=True,
+    ) is None
+    assert parser.attach_source_grounding(
+        DrugEntry(name="Hou"),
+        source_text="Hou Po 6\nDa Huang 15",
+        historical_flag=False,
+        require_medication_syntax=False,
+    ) is None
+
+###############################################################################
 def test_extract_drugs_from_therapy_skips_non_assumed_drug_line() -> None:
     parser = DrugsParser(client=object())
     therapy_text = """
@@ -239,7 +322,7 @@ def test_extract_drugs_from_therapy_keeps_continuation_lines_with_drug_blocks() 
 def test_extract_drugs_from_therapy_uses_rules_before_llm_for_structured_blocks() -> (
     None
 ):
-    parser = DrugsParser(client=FailingStructuredClient())
+    parser = DrugsParser(client=object())
     therapy_text = """
     ■Fortecortin 4 mg cpr
     [cpr]
@@ -269,7 +352,7 @@ def test_extract_drugs_from_therapy_uses_rules_before_llm_for_structured_blocks(
 
 ###############################################################################
 def test_extract_drugs_from_therapy_splits_reserve_drugs_without_bullets() -> None:
-    parser = DrugsParser(client=FailingStructuredClient())
+    parser = DrugsParser(client=object())
     therapy_text = """
     Imodium lingual 2 mg cpr orodisp
     [cpr]

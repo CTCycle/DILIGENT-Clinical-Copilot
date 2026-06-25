@@ -13,7 +13,7 @@ Drug, disease, and laboratory extraction use provider-agnostic structured LLM ca
 
 Structured LLM output is validated against Pydantic schemas and semantic guardrails. Invalid or contaminated output is retried with the rejected output and validation feedback. If bounded LLM attempts fail, the pipeline falls back to direct rule-based parsers and records fallback warnings.
 
-Therapy fallback remains full-section and context-aware: unresolved deterministic spans trigger structured extraction against the complete therapy block, and accepted entries must be grounded in the original source text.
+Therapy extraction is always full-section and context-aware when a structured model is available. The complete normalized therapy corpus is submitted in one structured request so medication names, schedules, and continuation lines remain associated across line breaks. Deterministic extraction is retained as a grounding reference and failure fallback, not as a reason to skip corpus-level extraction.
 
 Structured output parsing accepts strict JSON objects only. Prose-wrapped JSON or trailing prose is rejected by default; repair logs include schema name, attempt count, output length, short output hash, and error type, but not raw model output.
 
@@ -58,6 +58,15 @@ An available LiverTox excerpt means evidence text is available for the accepted 
 Pipeline issues are emitted for missing LiverTox matches, ambiguous LiverTox matches, low-confidence matches, and unvalidated RxNav aliases.
 
 Per-drug clinical assessments carry claim envelopes and narrative limits. Claim review output distinguishes source-text claims, RUCAM-linked claims, unsupported or unknown-source claims, and generated limitations so report consumers can see which statements require review.
+
+The rendered per-drug report consolidates evidence-match status, the matched local record, evidence warnings, claim-review requirements, and RUCAM limitations into one localized clinical commentary. The structured claim and evidence fields remain unchanged in persisted audit data.
+
+## RAG Readiness
+Clinical preflight reports whether the configured RAG embedding backend is ready. When the active vector index depends on Ollama embeddings, Ollama and the configured embedding model must be available before a RAG-enabled job starts.
+
+If Ollama is unavailable, the DILI Agent offers three explicit choices: retry after starting Ollama, run the pending assessment once without RAG, or cancel. Running without RAG does not change the saved model configuration. Job submission repeats the readiness check to prevent a stale successful preflight from starting a RAG-enabled job after the dependency becomes unavailable.
+
+If retrieval becomes unavailable after a job starts, the report continues safely without supporting RAG documents and records one aggregated pipeline warning listing the affected drugs.
 
 ## Failure Modes
 - Missing required sections block structural preprocessing.
