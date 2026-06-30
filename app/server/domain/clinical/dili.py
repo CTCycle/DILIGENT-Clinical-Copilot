@@ -205,6 +205,7 @@ class DiliEvidenceBundle(BaseModel):
     hys_law: DiliHysLawAssessment
     severity: DiliSeverityAssessment
     evidence: list[ClinicalEvidenceQuote] = Field(default_factory=list)
+    rag_references: list[dict[str, Any]] = Field(default_factory=list)
     acceptance_questions: list[DiliAcceptanceQuestion] = Field(default_factory=list)
     source_hierarchy: list[str] = Field(
         default_factory=lambda: ["AASLD", "LiverTox", "FDA", "DILIN/RUCAM"]

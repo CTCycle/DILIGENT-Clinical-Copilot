@@ -336,3 +336,24 @@ def test_report_has_required_fda_style_sections() -> None:
     for section_number in range(1, 15):
         assert f"## {section_number}." in report
     assert "Manual hepatology review required" in report
+
+
+def test_report_renders_compact_rag_bibliography_when_references_exist() -> None:
+    bundle = DiliEvidenceBuilder().build(
+        payload=PatientData(drugs="Drug A"),
+        drugs=PatientDrugs(entries=[DrugEntry(name="Drug A")]),
+        labs=PatientLabTimeline(entries=[]),
+        resolved_drugs=None,
+        rucam_bundle=PatientRucamAssessmentBundle(entries=[]),
+        rag_references=[
+            {"file_name": "guideline.pdf", "page_start": 2, "page_end": 3},
+            {"file_name": "guideline.pdf", "page_start": 3, "page_end": 3},
+            {"file_name": "livertox.pdf"},
+        ],
+    )
+
+    report = DiliEvidenceBuilder.render(bundle)
+
+    assert "- RAG bibliography:" in report
+    assert "  - guideline.pdf, p. 2, 3" in report
+    assert "  - livertox.pdf, page not available" in report
