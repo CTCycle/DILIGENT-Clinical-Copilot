@@ -186,6 +186,98 @@ def test_structured_dossier_preserves_missing_competing_causes() -> None:
     assert bundle.manual_review_required is True
 
 
+def test_acceptance_questions_use_ranked_primary_suspect_not_first_drug() -> None:
+    bundle = DiliEvidenceBuilder().build(
+        payload=PatientData(
+            anamnesis="HAV negative. Autoimmune hepatitis excluded.",
+            drugs=(
+                "Drug A started 2025-01-01. "
+                "Drug B started 2026-01-01 and stopped 2026-01-20."
+            ),
+            laboratory_analysis="ALT 300 U/L (ULN 40), ALP 120 U/L (ULN 120).",
+        ),
+        drugs=PatientDrugs(
+            entries=[
+                DrugEntry(
+                    name="Drug A",
+                    source="therapy",
+                    therapy_start_date="2025-01-01",
+                    evidence="Drug A started 2025-01-01.",
+                ),
+                DrugEntry(
+                    name="Drug B",
+                    source="therapy",
+                    therapy_start_date="2026-01-01",
+                    suspension_date="2026-01-20",
+                    evidence="Drug B started 2026-01-01 and stopped 2026-01-20.",
+                ),
+            ]
+        ),
+        labs=PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=300,
+                    upper_limit_normal=40,
+                    sample_date="2026-01-15",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALP",
+                    value=120,
+                    upper_limit_normal=120,
+                    sample_date="2026-01-15",
+                    source="laboratory_analysis",
+                ),
+            ]
+        ),
+        resolved_drugs={
+            "drug a": {
+                "decision_status": "accepted_exact_livertox",
+                "accepted_livertox_name": "Drug A",
+                "match_confidence": 1.0,
+                "matched_livertox_row": {"likelihood_score": "E"},
+            },
+            "drug b": {
+                "decision_status": "accepted_exact_livertox",
+                "accepted_livertox_name": "Drug B",
+                "match_confidence": 1.0,
+                "matched_livertox_row": {"likelihood_score": "A"},
+            },
+        },
+        rucam_bundle=PatientRucamAssessmentBundle(
+            entries=[
+                DrugRucamAssessment(
+                    drug_name="Drug A",
+                    total_score=1,
+                    causality_category="unlikely",
+                    components=[],
+                ),
+                DrugRucamAssessment(
+                    drug_name="Drug B",
+                    total_score=7,
+                    causality_category="probable",
+                    components=[
+                        RucamComponentAssessment(
+                            component_key="time_to_onset",
+                            label="Time to onset",
+                            score=2,
+                            evidence="Drug B latency compatible.",
+                        )
+                    ],
+                ),
+            ]
+        ),
+    )
+
+    answers = {question.question: question.answer for question in bundle.acceptance_questions}
+
+    assert bundle.exposures[0].drug_name == "Drug A"
+    assert answers["Is the suspect-drug identity reliable enough for adjudication?"] == "Drug B"
+    assert answers["What prior LiverTox likelihood supports the exposure?"] == "A"
+    assert answers["What is the supportive RUCAM conclusion?"] == "probable"
+
+
 def test_report_has_required_fda_style_sections() -> None:
     bundle = DiliEvidenceBuilder().build(
         payload=PatientData(drugs="Drug A"),
