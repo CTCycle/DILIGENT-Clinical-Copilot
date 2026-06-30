@@ -248,13 +248,176 @@ class DiliEvidenceBuilder:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def compose_clinical_report(
+        *,
+        clinical_narrative: str | None,
+        generated_report: str | None,
+        bundle: DiliEvidenceBundle,
+        fallback_text: str,
+    ) -> str:
+        body = (clinical_narrative or "").strip()
+        if not body:
+            body = (generated_report or "").strip()
+        if not body:
+            body = fallback_text.strip()
+        user_summary = DiliEvidenceBuilder.render_user_summary(bundle)
+        if user_summary:
+            return f"{body}\n\n---\n\n{user_summary}".strip()
+        return body
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def render_user_summary(bundle: DiliEvidenceBundle) -> str:
+        pattern = bundle.patterns[0] if bundle.patterns else None
+        lines = [
+            "## DILI adjudication summary",
+            "",
+            "- DILI remains an exclusion-based assessment; structured adjudication data are retained for audit and hepatology review.",
+            (
+                f"- Liver injury pattern: {pattern.pattern if pattern else 'indeterminate'}; "
+                f"R ratio: {pattern.r_ratio if pattern and pattern.r_ratio is not None else 'not assessable'}."
+            ),
+            f"- Severity: {bundle.severity.grade} ({bundle.severity.symptom_flag}).",
+            f"- Hy's Law status: {bundle.hys_law.status}; this is a risk signal, not a diagnosis.",
+        ]
+        if bundle.exposures:
+            lines.extend(["", "### Per-drug causality"])
+            for exposure in bundle.exposures:
+                category = (
+                    exposure.causality.category
+                    if exposure.causality is not None
+                    else "unassessable"
+                )
+                identity = exposure.identity.accepted_identity or "identity unresolved"
+                rucam = (
+                    exposure.rucam.category
+                    if exposure.rucam is not None
+                    else "RUCAM not assessable"
+                )
+                lines.append(
+                    f"- {exposure.drug_name}: {category}; {identity}; supportive RUCAM: {rucam}."
+                )
+        missing_groups = DiliEvidenceBuilder._group_missing_fields(
+            bundle.completeness.missing_fields
+        )
+        if missing_groups:
+            lines.extend(["", "### Clinically relevant missing data"])
+            for group, items in missing_groups.items():
+                lines.append(f"- {group}: {'; '.join(items)}.")
+        lines.extend(
+            [
+                "",
+                "### Clinical limitations",
+                "- RUCAM is structured support and is not dispositive.",
+                "- Missing or unresolved competing causes prevent definitive attribution.",
+                "- Manual hepatology review is required before clinical reuse.",
+            ]
+        )
+        return "\n".join(lines)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _group_missing_fields(fields: list[str]) -> dict[str, list[str]]:
+        grouped: dict[str, list[str]] = {}
+        for raw_field in fields:
+            group, label = DiliEvidenceBuilder._format_missing_field(raw_field)
+            if not label:
+                continue
+            grouped.setdefault(group, [])
+            if label not in grouped[group]:
+                grouped[group].append(label)
+        return grouped
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _format_missing_field(raw_field: str) -> tuple[str, str]:
+        field = str(raw_field or "").strip()
+        if not field:
+            return "", ""
+        lower_field = field.casefold()
+        if ":" in field:
+            drug_name, key = [part.strip() for part in field.split(":", 1)]
+            normalized_key = key.replace(" ", "_").replace("-", "_").casefold()
+            compact_key = normalized_key.replace("_", "")
+            if "drug_start_date" in normalized_key or "drugstartdate" in compact_key:
+                return "Exposure timing", f"{drug_name}: start date not documented"
+            if "drug_stop_date" in normalized_key or "drugstopdate" in compact_key:
+                return "Exposure timing", f"{drug_name}: stop date not documented"
+            return "Exposure timing", (
+                f"{drug_name}: {DiliEvidenceBuilder._humanize_key(key)} not documented"
+            )
+        if "paired alt and alp" in lower_field:
+            return (
+                "Liver chemistry timing",
+                "paired ALT and ALP values with ULN are unavailable",
+            )
+        timeline_labels = {
+            "first_abnormal_liver_test_date": "first abnormal liver-test date not documented",
+            "first_symptom_date": "first symptom date not documented",
+            "jaundice_or_bilirubin_timing": "jaundice or bilirubin timing not documented",
+            "jaundice_or_bilirubin_rise_date": "jaundice or bilirubin rise date not documented",
+        }
+        if lower_field in timeline_labels:
+            return "Liver chemistry timing", timeline_labels[lower_field]
+        competing_causes = {
+            "viral_hepatitis_a_b_c_d_e": "viral hepatitis A-E not excluded",
+            "viralhepatitisabcde": "viral hepatitis A-E not excluded",
+            "ebv_cmv_hsv": "EBV, CMV, or HSV not excluded",
+            "ebvcmvhsv": "EBV, CMV, or HSV not excluded",
+            "autoimmune_hepatitis": "autoimmune hepatitis not excluded",
+            "autoimmunehepatitis": "autoimmune hepatitis not excluded",
+            "alcoholic_hepatitis": "alcoholic hepatitis not excluded",
+            "alcoholichepatitis": "alcoholic hepatitis not excluded",
+            "masld_mash_nash": "MASLD, MASH, or NASH not excluded",
+            "masldmashnash": "MASLD, MASH, or NASH not excluded",
+            "biliary_obstruction_gallstones": "biliary obstruction or gallstones not excluded",
+            "biliaryobstructiongallstones": "biliary obstruction or gallstones not excluded",
+            "ischemic_hypoxic": "ischemic or hypoxic hepatitis not excluded",
+            "ischemichypoxic": "ischemic or hypoxic hepatitis not excluded",
+            "sepsis_shock_cardiac_failure": "sepsis, shock, or cardiac failure not excluded",
+            "sepsisshockcardiacfailure": "sepsis, shock, or cardiac failure not excluded",
+            "overdose_or_toxin": "overdose or toxin exposure not excluded",
+            "overdoseortoxin": "overdose or toxin exposure not excluded",
+            "supplement_otc_recreational_occupational": "supplement, OTC, recreational, or occupational exposure not excluded",
+            "supplementotcrecreationaloccupational": "supplement, OTC, recreational, or occupational exposure not excluded",
+            "preexisting_chronic_liver_disease": "pre-existing chronic liver disease not excluded",
+            "preexistingchronicliverdisease": "pre-existing chronic liver disease not excluded",
+        }
+        if lower_field in competing_causes:
+            return "Alternative cause exclusion", competing_causes[lower_field]
+        return "Clinical context and follow-up", (
+            f"{DiliEvidenceBuilder._humanize_key(field)} not documented"
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _humanize_key(value: str) -> str:
+        compact = str(value or "").strip().replace("_", " ").replace("-", " ")
+        compact = " ".join(compact.split())
+        replacements = {
+            "drug start date": "start date",
+            "drug stop date": "stop date",
+            "uln": "ULN",
+            "alt": "ALT",
+            "alp": "ALP",
+            "ebv": "EBV",
+            "cmv": "CMV",
+            "hsv": "HSV",
+            "otc": "OTC",
+        }
+        words = []
+        for word in compact.split(" "):
+            words.append(replacements.get(word.casefold(), word))
+        return " ".join(words)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def render(bundle: DiliEvidenceBundle) -> str:
         pattern = bundle.patterns[0] if bundle.patterns else None
         lines = [
             "# Structured DILI causality dossier",
             "",
             "## 1. Case completeness and missing data",
-            f"- Missing: {', '.join(bundle.completeness.missing_fields) or 'none documented'}",
             "## 2. Liver injury pattern and severity",
             (
                 f"- Pattern: {pattern.pattern}; R={pattern.r_ratio if pattern and pattern.r_ratio is not None else 'not assessable'} "
@@ -269,6 +432,19 @@ class DiliEvidenceBuilder:
             f"- Dechallenge: {bundle.timeline.dechallenge_status}",
             "## 4. Competing-cause assessment",
         ]
+        missing_groups = DiliEvidenceBuilder._group_missing_fields(
+            bundle.completeness.missing_fields
+        )
+        if missing_groups:
+            insertion_index = lines.index("## 2. Liver injury pattern and severity")
+            missing_lines = [
+                f"- {group}: {'; '.join(items)}."
+                for group, items in missing_groups.items()
+            ]
+            lines[insertion_index:insertion_index] = missing_lines
+        else:
+            insertion_index = lines.index("## 2. Liver injury pattern and severity")
+            lines.insert(insertion_index, "- Missing data: none documented")
         lines.extend(f"- {item.cause}: {item.status}" for item in bundle.differential.causes)
         lines.extend(["## 5. Drug exposure table", ""])
         for exposure in bundle.exposures:

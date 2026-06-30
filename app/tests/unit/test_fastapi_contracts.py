@@ -6,12 +6,6 @@ from fastapi.routing import APIRoute
 from app import app
 
 ###############################################################################
-def test_openapi_schema_generation_succeeds() -> None:
-    schema = app.openapi()
-    assert "paths" in schema
-    assert "/api/health" in schema["paths"]
-
-###############################################################################
 def test_health_route_uses_response_model() -> None:
     schema = app.openapi()
     response = schema["paths"]["/api/health"]["get"]["responses"]["200"]

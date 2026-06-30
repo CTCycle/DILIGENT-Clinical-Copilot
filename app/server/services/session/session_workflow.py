@@ -71,6 +71,24 @@ from services.session.workflow_shared import (
 _CLOUD_PROVIDERS = {"openai", "gemini"}
 
 ###############################################################################
+def _validate_requested_provider_matches_runtime(
+    request_payload: ClinicalSessionRequest,
+) -> None:
+    selected = {
+        item.strip().lower()
+        for item in request_payload.selected_model_providers
+        if item and item.strip()
+    }
+    if not selected:
+        return
+    provider, _ = LLMRuntimeConfig.resolve_provider_and_model("clinical")
+    provider = (provider or LLMRuntimeConfig.get_llm_provider()).strip().lower()
+    if provider and provider not in selected:
+        raise ServiceValidationError(
+            "The active runtime provider must match the requested provider exactly."
+        )
+
+###############################################################################
 async def process_single_patient_workflow(
     service: Any,
     payload: PatientData,
@@ -399,7 +417,7 @@ async def process_single_patient_workflow(
         rucam_bundle=rucam_bundle,
     )
     structured_dili_report = DiliEvidenceBuilder.render(dili_evidence_bundle)
-    final_report = structured_dili_report
+    dili_user_summary = DiliEvidenceBuilder.render_user_summary(dili_evidence_bundle)
 
     fact_graph = build_fact_graph(
         extraction_artifact=extraction_artifact,
@@ -449,8 +467,12 @@ async def process_single_patient_workflow(
             )
             for issue in faithfulness_audit.blocking_issues
         )
-    if not final_report:
-        final_report = phrase("narrative_fallback", report_language)
+    final_report = DiliEvidenceBuilder.compose_clinical_report(
+        clinical_narrative=llm_clinical_summary,
+        generated_report=generated_report,
+        bundle=dili_evidence_bundle,
+        fallback_text=phrase("narrative_fallback", report_language),
+    )
 
     patient_label = payload.name or "Unknown patient"
     report_language_key = resolve_supported_language_code(report_language)
@@ -642,6 +664,8 @@ async def process_single_patient_workflow(
             "fact_graph": fact_graph.model_dump(),
             "fact_graph_validation": fact_graph_validation.model_dump(),
             "generated_report": generated_report,
+            "structured_dili_report": structured_dili_report,
+            "dili_user_summary": dili_user_summary,
             "llm_clinical_summary": llm_clinical_summary,
             "report_metadata": report_metadata.model_dump(),
             "faithfulness_audit": faithfulness_audit.model_dump(),
@@ -723,11 +747,8 @@ def start_clinical_job_workflow(
         raise ServiceConflictError("Clinical analysis is already in progress")
 
     service.apply_persisted_runtime_configuration()
-    preflight = service.validate_clinical_input(request_payload)
-    if not preflight.ready:
-        raise ServiceValidationError(
-            [issue.model_dump() for issue in preflight.blocking_issues]
-        )
+    _validate_requested_provider_matches_runtime(request_payload)
+    service.validate_assessment_prerequisites_without_llm(request_payload)
     rag_readiness = check_rag_readiness(requested=request_payload.use_rag)
     if request_payload.use_rag and not rag_readiness.available:
         raise ServiceValidationError(

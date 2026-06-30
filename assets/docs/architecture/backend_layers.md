@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-06-26
+Last updated: 2026-06-30
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -68,7 +68,7 @@ Last updated: 2026-06-26
 - LiverTox and RxNav matching preserve raw mentions, candidates, rejected candidates, origins, confidence, status, `DrugResolutionDecision`, accepted RxCUI, accepted LiverTox monograph identity, review flags, and warning issues for missing, ambiguous, low-confidence, or unvalidated matches.
 - Resolution statuses are `accepted_exact_livertox`, `accepted_rxnav_validated`, `accepted_livertox_without_rxnav`, `ambiguous_requires_review`, `missing_rxnav`, `missing_livertox`, and `rejected_false_positive`.
 - Persisted audit artifacts include section extraction audit, extraction strategy decisions, hepatic pattern resolution, and match audit details.
-- Persisted clinical results include a rendered deterministic `dili_evidence_bundle` dossier as the authoritative `final_report`; any LLM consultation output is stored separately as non-authoritative audit summary text.
+- Persisted clinical results include a readable `final_report` that uses the per-drug clinical consultation narrative and appends a concise deterministic DILI adjudication summary. The full rendered deterministic dossier is persisted separately as `pipeline_artifacts.structured_dili_report`, while `dili_evidence_bundle` remains the structured audit contract.
 - Successful clinical jobs require database persistence. If the serializer cannot return a persisted session id, the workflow fails with a service dependency error rather than returning an unpersisted success.
 
 ### `POST /api/clinical/validate-input`

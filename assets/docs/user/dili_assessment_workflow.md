@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-06-26
+Last updated: 2026-06-30
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -73,9 +73,10 @@ Review for:
 - explicit missing-data statements rather than silent negatives
 - the twelve acceptance-question answers and their supporting quotes
 
-The authoritative report is the rendered structured DILI dossier. If the run
-also captures an LLM clinical summary, treat that text as audit-only supporting
-commentary and verify it against the dossier before reuse.
+The main report is a readable clinical DILI evaluation with per-drug narrative
+commentary and a concise deterministic adjudication summary. The full structured
+DILI dossier is retained as an audit artifact in the session result payload and
+should be used to verify the clinical narrative before reuse.
 
 The structured dossier explicitly reports:
 - longitudinal exposure and lab timeline events
