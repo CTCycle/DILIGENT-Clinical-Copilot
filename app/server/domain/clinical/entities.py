@@ -133,7 +133,7 @@ class PatientData(BaseModel):
             return None
         today = date.today()
         if value > today:
-            raise ValueError("visit_date cannot be in the future")
+            return today
         return value
 
     # -------------------------------------------------------------------------
@@ -202,18 +202,6 @@ class ClinicalSessionRequest(BaseModel):
             if cleaned:
                 normalized.append(cleaned)
         return normalized
-
-    # -------------------------------------------------------------------------
-    @field_validator("visit_date", mode="before")
-    @classmethod
-    def coerce_visit_date(cls, value: Any) -> date | None:
-        return PatientData.coerce_visit_date(value)
-
-    # -------------------------------------------------------------------------
-    @field_validator("visit_date")
-    @classmethod
-    def validate_visit_date(cls, value: date | None) -> date | None:
-        return PatientData.validate_visit_date(value)
 
 ###############################################################################
 class ClinicalSectionTemplateResponse(BaseModel):

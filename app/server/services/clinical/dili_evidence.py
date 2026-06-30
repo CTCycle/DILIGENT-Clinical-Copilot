@@ -5,14 +5,12 @@ from domain.clinical.dili import (
     ClinicalEvidenceQuote,
     DiliAcceptanceQuestion,
     DiliEvidenceBundle,
-    DrugExposureAssessment,
 )
 from domain.clinical.entities import (
     PatientData,
     PatientDrugs,
     PatientLabTimeline,
     PatientRucamAssessmentBundle,
-    RagDocumentReference,
 )
 from services.clinical.dili_causality import DiliCausalityEngine
 from services.clinical.dili_differential import DiliDifferentialEngine
@@ -33,7 +31,6 @@ class DiliEvidenceBuilder:
         labs: PatientLabTimeline,
         resolved_drugs: dict[str, dict] | None,
         rucam_bundle: PatientRucamAssessmentBundle,
-        rag_references: list[dict] | None = None,
     ) -> DiliEvidenceBundle:
         source_text = "\n".join(
             item
@@ -67,10 +64,7 @@ class DiliEvidenceBuilder:
                 resolved_map.get(normalize_drug_query_name(drug.name), {}),
                 rucam_map.get(normalize_drug_query_name(drug.name)),
                 differential,
-                timeline.drug_dechallenge_statuses.get(
-                    drug.name,
-                    timeline.dechallenge_status,
-                ),
+                timeline.dechallenge_status,
                 primary_pattern,
                 timeline.first_abnormal_liver_test_date,
             )
@@ -114,7 +108,6 @@ class DiliEvidenceBuilder:
             hys_law=hys_law,
             severity=severity,
             evidence=evidence,
-            rag_references=rag_references or [],
             acceptance_questions=acceptance_questions,
             manual_review_required=True,
         )
@@ -131,7 +124,7 @@ class DiliEvidenceBuilder:
         exposures,
     ) -> list[DiliAcceptanceQuestion]:
         first_pattern = patterns[0] if patterns else None
-        top_exposure = self._primary_suspect(exposures, differential.all_major_causes_excluded)
+        top_exposure = exposures[0] if exposures else None
         questions: list[DiliAcceptanceQuestion] = [
             self._question(
                 "What is the latency from first compatible exposure to first liver injury signal?",
@@ -248,86 +241,6 @@ class DiliEvidenceBuilder:
             missing_data_statement=missing_data_statement,
         )
 
-    @classmethod
-    def _primary_suspect(
-        cls,
-        exposures: list[DrugExposureAssessment],
-        competing_causes_complete: bool,
-    ) -> DrugExposureAssessment | None:
-        if not exposures:
-            return None
-        return max(
-            exposures,
-            key=lambda exposure: cls._suspect_rank(exposure, competing_causes_complete),
-        )
-
-    @staticmethod
-    def _suspect_rank(
-        exposure: DrugExposureAssessment,
-        competing_causes_complete: bool,
-    ) -> tuple[int, int, int, int, int, int, str]:
-        identity_score = 1 if exposure.identity.accepted_identity else 0
-        temporal_score = (
-            1
-            if exposure.causality
-            and exposure.causality.temporal_compatibility == "compatible"
-            else 0
-        )
-        rucam_score = DiliEvidenceBuilder._rucam_rank(exposure)
-        livertox_score = DiliEvidenceBuilder._livertox_rank(exposure.livertox_likelihood)
-        dechallenge_score = DiliEvidenceBuilder._dechallenge_rank(exposure)
-        competing_score = 1 if competing_causes_complete else 0
-        stable_name = exposure.drug_name.lower()
-        return (
-            identity_score,
-            temporal_score,
-            rucam_score,
-            livertox_score,
-            dechallenge_score,
-            competing_score,
-            stable_name,
-        )
-
-    @staticmethod
-    def _rucam_rank(exposure: DrugExposureAssessment) -> int:
-        if exposure.rucam is None:
-            return 0
-        if exposure.rucam.total_score is not None:
-            return exposure.rucam.total_score
-        category = (exposure.rucam.category or "").lower()
-        return {
-            "excluded": -2,
-            "unlikely": -1,
-            "possible": 2,
-            "probable": 4,
-            "highly_probable": 6,
-        }.get(category, 0)
-
-    @staticmethod
-    def _livertox_rank(likelihood: str | None) -> int:
-        normalized = (likelihood or "").upper()
-        return {
-            "A": 5,
-            "B": 4,
-            "C": 3,
-            "D": 2,
-            "E": 0,
-            "E*": 0,
-            "T": 1,
-            "T*": 1,
-        }.get(normalized, 0)
-
-    @staticmethod
-    def _dechallenge_rank(exposure: DrugExposureAssessment) -> int:
-        if exposure.rechallenge_status == "positive":
-            return 3
-        detail = exposure.causality.dechallenge_rechallenge if exposure.causality else ""
-        if "resolved_to_baseline" in detail:
-            return 2
-        if "improving_after_stop" in detail:
-            return 1
-        return 0
-
     @staticmethod
     def render(bundle: DiliEvidenceBundle) -> str:
         pattern = bundle.patterns[0] if bundle.patterns else None
@@ -397,7 +310,6 @@ class DiliEvidenceBuilder:
                 ],
                 "## 12. Knowledge base and RAG evidence",
                 "- Source hierarchy: AASLD, LiverTox, FDA, DILIN/RUCAM.",
-                *DiliEvidenceBuilder._render_rag_references(bundle.rag_references),
                 "## 13. Clinical limitations",
                 "- RUCAM is structured support and is not dispositive.",
                 "- Missing or unresolved competing causes prevent definitive attribution.",
@@ -410,31 +322,3 @@ class DiliEvidenceBuilder:
             if question.missing_data_statement:
                 lines.append(f"  Missing-data note: {question.missing_data_statement}")
         return "\n".join(lines)
-
-    @staticmethod
-    def _render_rag_references(references: list[dict]) -> list[str]:
-        normalized = [
-            RagDocumentReference.model_validate(item)
-            for item in references
-            if isinstance(item, dict)
-        ]
-        if not normalized:
-            return ["- RAG bibliography: no retrieved document references."]
-        grouped: dict[str, set[int | None]] = {}
-        for reference in normalized:
-            pages = grouped.setdefault(reference.file_name, set())
-            if reference.page_start is None:
-                pages.add(None)
-                continue
-            page_end = reference.page_end or reference.page_start
-            pages.update(range(reference.page_start, page_end + 1))
-        lines = ["- RAG bibliography:"]
-        for file_name in sorted(grouped):
-            pages = grouped[file_name]
-            if pages == {None}:
-                lines.append(f"  - {file_name}, page not available")
-                continue
-            numbered_pages = sorted(page for page in pages if page is not None)
-            page_text = ", ".join(str(page) for page in numbered_pages)
-            lines.append(f"  - {file_name}, p. {page_text}")
-        return lines

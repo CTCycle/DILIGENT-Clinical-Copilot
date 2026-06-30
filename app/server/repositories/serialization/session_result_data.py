@@ -737,7 +737,9 @@ def persist_session_labs(
         "INR": "inr",
         "ALB": "albumin",
     }
-    observation_index = 0
+    # DB schema enforces one lab row per (session_id, lab_code), so collapse
+    # repeated timeline points of the same marker into a single persisted row.
+    rows_by_lab_code: dict[str, tuple[str | None, str | None]] = {}
     for item in timeline_raw:
         if not isinstance(item, dict):
             continue
@@ -753,24 +755,23 @@ def persist_session_labs(
         upper_limit_raw = self.normalize_string(
             item.get("upper_limit_normal")
         ) or self.normalize_string(item.get("upper_limit_text"))
-        sample_date_raw = self.normalize_string(item.get("sample_date"))
-        unit_raw = self.normalize_string(item.get("unit"))
-        source = self.normalize_string(item.get("source"))
-        if value_raw is None and upper_limit_raw is None and sample_date_raw is None:
+        if value_raw is None and upper_limit_raw is None:
             continue
+        existing_value_raw, existing_upper_limit_raw = rows_by_lab_code.get(
+            lab_code, (None, None)
+        )
+        merged_value_raw = existing_value_raw or value_raw
+        merged_upper_limit_raw = existing_upper_limit_raw or upper_limit_raw
+        rows_by_lab_code[lab_code] = (merged_value_raw, merged_upper_limit_raw)
+    for lab_code, (value_raw, upper_limit_raw) in rows_by_lab_code.items():
         db_session.add(
             ClinicalSessionLab(
                 session_id=session_id,
                 lab_code=lab_code,
-                observation_index=observation_index,
-                sample_date_raw=sample_date_raw,
                 value_raw=value_raw,
-                unit_raw=unit_raw,
                 upper_limit_raw=upper_limit_raw,
-                source=source,
             )
         )
-        observation_index += 1
 
 ###############################################################################
 def persist_session_drugs(
