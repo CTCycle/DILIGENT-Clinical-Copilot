@@ -25,7 +25,6 @@ class RagRetrievalBundle:
     context_text: str | None
     references: tuple[RagDocumentReference, ...]
 
-
 ###############################################################################
 class RagSupportService:
     """RAG document retrieval, similarity search, and language repair utilities."""

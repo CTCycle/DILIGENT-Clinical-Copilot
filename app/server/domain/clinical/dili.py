@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 EvidenceStatus = Literal["excluded", "not_excluded", "unknown", "missing_data"]
 
 
+###############################################################################
 class ClinicalEvidenceQuote(BaseModel):
     claim: str
     quote: str | None = None
@@ -16,6 +17,7 @@ class ClinicalEvidenceQuote(BaseModel):
     confidence: Literal["low", "moderate", "high"] = "moderate"
 
 
+###############################################################################
 class ClinicalDataCompleteness(BaseModel):
     complete_fields: list[str] = Field(default_factory=list)
     missing_fields: list[str] = Field(default_factory=list)
@@ -23,6 +25,7 @@ class ClinicalDataCompleteness(BaseModel):
     reasons: list[str] = Field(default_factory=list)
 
 
+###############################################################################
 class DiliTimelineEvent(BaseModel):
     event_type: str
     event_date: str | None = None
@@ -33,6 +36,7 @@ class DiliTimelineEvent(BaseModel):
     evidence: ClinicalEvidenceQuote | None = None
 
 
+###############################################################################
 class DiliTimeline(BaseModel):
     events: list[DiliTimelineEvent] = Field(default_factory=list)
     first_abnormal_liver_test_date: str | None = None
@@ -53,6 +57,7 @@ class DiliTimeline(BaseModel):
     missing_fields: list[str] = Field(default_factory=list)
 
 
+###############################################################################
 class DiliInjuryPattern(BaseModel):
     assessment_point: Literal["first_qualifying", "peak"]
     alt: float | None = None
@@ -67,6 +72,7 @@ class DiliInjuryPattern(BaseModel):
     evidence: list[ClinicalEvidenceQuote] = Field(default_factory=list)
 
 
+###############################################################################
 class DiliPhenotypeAssessment(BaseModel):
     candidates: list[str] = Field(default_factory=list)
     primary_candidate: str | None = None
@@ -75,6 +81,7 @@ class DiliPhenotypeAssessment(BaseModel):
     requires_review: bool = True
 
 
+###############################################################################
 class DiliCompetingCause(BaseModel):
     cause: str
     status: EvidenceStatus
@@ -82,12 +89,14 @@ class DiliCompetingCause(BaseModel):
     rationale: str
 
 
+###############################################################################
 class DiliDifferentialAssessment(BaseModel):
     causes: list[DiliCompetingCause] = Field(default_factory=list)
     all_major_causes_excluded: bool = False
     unresolved_causes: list[str] = Field(default_factory=list)
 
 
+###############################################################################
 class DiliHysLawAssessment(BaseModel):
     status: Literal["meets_criteria", "possible", "not_met", "not_assessable"]
     aminotransferase_threshold_met: bool | None = None
@@ -107,6 +116,7 @@ class DiliHysLawAssessment(BaseModel):
     rationale: list[str] = Field(default_factory=list)
 
 
+###############################################################################
 class DiliSeverityAssessment(BaseModel):
     grade: Literal[
         "1_mild",
@@ -121,6 +131,7 @@ class DiliSeverityAssessment(BaseModel):
     rationale: list[str] = Field(default_factory=list)
 
 
+###############################################################################
 class DiliRucamComponent(BaseModel):
     component: str
     score: int | None = None
@@ -130,6 +141,7 @@ class DiliRucamComponent(BaseModel):
     rationale: str | None = None
 
 
+###############################################################################
 class DiliRucamAssessment(BaseModel):
     drug_name: str
     total_score: int | None = None
@@ -139,6 +151,7 @@ class DiliRucamAssessment(BaseModel):
     is_supportive_not_dispositive: bool = True
 
 
+###############################################################################
 class DilinLikeCausalityAssessment(BaseModel):
     drug_name: str
     category: Literal[
@@ -154,6 +167,7 @@ class DilinLikeCausalityAssessment(BaseModel):
     rationale: list[str] = Field(default_factory=list)
 
 
+###############################################################################
 class DiliAcceptanceQuestion(BaseModel):
     question: str
     answer: str
@@ -161,6 +175,7 @@ class DiliAcceptanceQuestion(BaseModel):
     missing_data_statement: str | None = None
 
 
+###############################################################################
 class DrugIdentityResolution(BaseModel):
     raw_mention: str
     source_section: str | None = None
@@ -178,6 +193,7 @@ class DrugIdentityResolution(BaseModel):
     is_negated: bool = False
 
 
+###############################################################################
 class DrugExposureAssessment(BaseModel):
     drug_name: str
     identity: DrugIdentityResolution
@@ -194,6 +210,7 @@ class DrugExposureAssessment(BaseModel):
     rucam: DiliRucamAssessment | None = None
 
 
+###############################################################################
 class DiliEvidenceBundle(BaseModel):
     completeness: ClinicalDataCompleteness
     timeline: DiliTimeline

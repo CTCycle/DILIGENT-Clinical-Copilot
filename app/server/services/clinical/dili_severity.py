@@ -11,7 +11,10 @@ SYMPTOM_RE = re.compile(
 )
 
 
+###############################################################################
 class DiliSeverityGrader:
+
+    # -------------------------------------------------------------------------
     def assess(self, labs: PatientLabTimeline, source_text: str) -> DiliSeverityAssessment:
         lowered = source_text.lower()
         bilirubin_peak = self._peak_multiple(labs, {"BILIRUBIN", "TBIL"})
@@ -44,6 +47,7 @@ class DiliSeverityGrader:
             rationale=rationale,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _peak_multiple(labs: PatientLabTimeline, markers: set[str]) -> float | None:
         values = [
@@ -56,6 +60,7 @@ class DiliSeverityGrader:
         ]
         return max(values) if values else None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _peak_value(labs: PatientLabTimeline, markers: set[str]) -> float | None:
         values = [
@@ -65,6 +70,7 @@ class DiliSeverityGrader:
         ]
         return max(values) if values else None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _supporting_evidence(labs: PatientLabTimeline) -> list[ClinicalEvidenceQuote]:
         evidence: list[ClinicalEvidenceQuote] = []

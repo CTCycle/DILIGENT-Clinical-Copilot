@@ -4,12 +4,14 @@ import asyncio
 
 from services.llm import ollama_structured
 
-
 ###############################################################################
 def test_resolve_text_extraction_models_prefers_live_installed_models() -> None:
+
+    ###############################################################################
     class FakeClient:
         default_model = "gpt-4.1-mini"
 
+        # -------------------------------------------------------------------------
         async def get_cached_models(self) -> set[str]:
             return {"qwen3.5:2b", "qwen3.5:9b"}
 
@@ -18,7 +20,6 @@ def test_resolve_text_extraction_models_prefers_live_installed_models() -> None:
     )
 
     assert models == ["qwen3.5:2b", "qwen3.5:9b"]
-
 
 ###############################################################################
 def test_looks_like_schema_echo_detects_schema_payload() -> None:
@@ -29,22 +30,28 @@ def test_looks_like_schema_echo_detects_schema_payload() -> None:
 
     assert ollama_structured.looks_like_schema_echo(schema_like) is True
 
-
 ###############################################################################
 def test_parse_with_repairs_uses_compact_repair_messages_for_schema_echo() -> None:
+
+    ###############################################################################
     class FakeParser:
+
+        # -------------------------------------------------------------------------
         def __init__(self) -> None:
             self.calls = 0
 
+        # -------------------------------------------------------------------------
         def parse(self, text: str) -> dict[str, str]:
             self.calls += 1
             if self.calls == 1:
                 raise ValueError("schema echo")
             return {"ok": text}
 
+    ###############################################################################
     class FakeClient:
         captured_messages: list[dict[str, str]] | None = None
 
+        # -------------------------------------------------------------------------
         async def chat(self, **kwargs):
             self.captured_messages = kwargs["messages"]
             return '{"entries":[]}'
