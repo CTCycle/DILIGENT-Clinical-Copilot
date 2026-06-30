@@ -5,17 +5,15 @@ from domain.clinical.entities import ClinicalLabEntry, PatientLabTimeline
 
 
 class DiliPatternEngine:
-    DEFAULT_ULN = {"ALT": 40.0, "ALP": 120.0}
-
     @staticmethod
     def _value(entry: ClinicalLabEntry) -> float | None:
         return float(entry.value) if entry.value is not None else None
 
-    @classmethod
-    def _uln(cls, entry: ClinicalLabEntry) -> float | None:
+    @staticmethod
+    def _uln(entry: ClinicalLabEntry) -> float | None:
         if entry.upper_limit_normal and entry.upper_limit_normal > 0:
             return float(entry.upper_limit_normal)
-        return cls.DEFAULT_ULN.get(entry.marker_name.upper())
+        return None
 
     @staticmethod
     def classify(r_ratio: float | None) -> str:

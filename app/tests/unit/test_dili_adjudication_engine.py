@@ -20,6 +20,88 @@ def test_r_ratio_boundary_values_follow_livertox_definitions() -> None:
     assert DiliPatternEngine.classify(3.0) == "mixed"
 
 
+def test_dili_pattern_requires_explicit_alt_and_alp_uln() -> None:
+    patterns = DiliPatternEngine().assess(
+        PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=300,
+                    sample_date="2026-01-15",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALP",
+                    value=120,
+                    sample_date="2026-01-15",
+                    source="laboratory_analysis",
+                ),
+            ]
+        )
+    )
+
+    assert patterns[0].pattern == "indeterminate"
+    assert patterns[0].pattern_source == "unavailable"
+    assert patterns[0].r_ratio is None
+    assert patterns[0].alt_uln is None
+    assert patterns[0].alp_uln is None
+
+
+def test_dili_pattern_rejects_partial_uln_for_r_ratio() -> None:
+    patterns = DiliPatternEngine().assess(
+        PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=300,
+                    upper_limit_normal=40,
+                    sample_date="2026-01-15",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALP",
+                    value=120,
+                    sample_date="2026-01-15",
+                    source="laboratory_analysis",
+                ),
+            ]
+        )
+    )
+
+    assert patterns[0].pattern == "indeterminate"
+    assert patterns[0].pattern_source == "unavailable"
+    assert patterns[0].r_ratio is None
+    assert patterns[0].alt_uln == 40
+    assert patterns[0].alp_uln is None
+
+
+def test_dili_pattern_uses_explicit_uln_for_r_ratio() -> None:
+    patterns = DiliPatternEngine().assess(
+        PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=300,
+                    upper_limit_normal=40,
+                    sample_date="2026-01-15",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALP",
+                    value=120,
+                    upper_limit_normal=120,
+                    sample_date="2026-01-15",
+                    source="laboratory_analysis",
+                ),
+            ]
+        )
+    )
+
+    assert patterns[0].pattern == "hepatocellular"
+    assert patterns[0].pattern_source == "calculated"
+    assert patterns[0].r_ratio == 7.5
+
+
 def test_structured_dossier_preserves_missing_competing_causes() -> None:
     bundle = DiliEvidenceBuilder().build(
         payload=PatientData(
