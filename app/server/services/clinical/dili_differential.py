@@ -19,7 +19,7 @@ CAUSE_PATTERNS: dict[str, tuple[str, ...]] = {
     "sepsis_shock_cardiac_failure": ("sepsis", "septic", "shock", "cardiac failure", "heart failure"),
     "overdose_or_toxin": ("overdose", "acetaminophen", "paracetamol", "toxin", "poison"),
     "supplement_otc_recreational_occupational": ("herbal", "supplement", "otc", "recreational", "occupational"),
-    "pre_existing_chronic_liver_disease": ("cirrhos", "chronic liver", "portal hypertension", "hepatitis", "fibrosis"),
+    "pre_existing_chronic_liver_disease": ("cirrhos", "chronic liver", "portal hypertension", "fibrosis"),
 }
 
 EXCLUDED_RE = re.compile(
@@ -74,22 +74,36 @@ class DiliDifferentialEngine:
                 [self._quote(cause, None)],
             )
 
-        idx = lowered.index(matched_phrase)
-        window = source_text[max(0, idx - 120) : idx + 180].strip()
-        window_lower = window.lower()
-        if EXCLUDED_RE.search(window_lower):
-            status = "excluded"
-            rationale = "Explicit exclusion or negative workup is documented."
-        elif PRESENT_RE.search(window_lower):
+        snippets = self._cause_snippets(source_text, phrases)
+        evidence_text = " ".join(snippets[:3]).strip()
+        evidence_lower = evidence_text.lower()
+        if PRESENT_RE.search(evidence_lower):
             status = "not_excluded"
             rationale = "The cause is documented or clinically present, so it remains competing."
-        elif UNKNOWN_RE.search(window_lower):
+        elif UNKNOWN_RE.search(evidence_lower):
             status = "unknown"
             rationale = "The source mentions this cause but leaves the workup or result unresolved."
+        elif EXCLUDED_RE.search(evidence_lower):
+            status = "excluded"
+            rationale = "Explicit exclusion or negative workup is documented."
         else:
             status = "unknown"
             rationale = "The source mentions this cause without a clear exclusion or confirmation."
-        return status, rationale, [self._quote(cause, window or None)]
+        return status, rationale, [self._quote(cause, evidence_text or None)]
+
+    @staticmethod
+    def _cause_snippets(source_text: str, phrases: tuple[str, ...]) -> list[str]:
+        chunks = [
+            item.strip()
+            for item in re.split(r"(?<=[.;:\n])\s+|[\r\n]+", source_text)
+            if item.strip()
+        ]
+        snippets: list[str] = []
+        for chunk in chunks:
+            lowered = chunk.lower()
+            if any(phrase in lowered for phrase in phrases):
+                snippets.append(chunk)
+        return snippets
 
     @staticmethod
     def _quote(cause: str, quote: str | None) -> ClinicalEvidenceQuote:
