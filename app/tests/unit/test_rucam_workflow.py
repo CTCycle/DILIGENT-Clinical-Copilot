@@ -25,6 +25,7 @@ def _inputs():
                 name="Drug A",
                 therapy_start_date="2026-01-01",
                 suspension_status=True,
+                suspension_date="2026-01-20",
             )
         ]
     )

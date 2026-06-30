@@ -12,6 +12,7 @@ from domain.clinical.entities import (
 )
 from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.clinical.dili_pattern import DiliPatternEngine
+from services.clinical.dili_timeline import DiliTimelineEngine
 
 
 def test_r_ratio_boundary_values_follow_livertox_definitions() -> None:
@@ -276,6 +277,51 @@ def test_acceptance_questions_use_ranked_primary_suspect_not_first_drug() -> Non
     assert answers["Is the suspect-drug identity reliable enough for adjudication?"] == "Drug B"
     assert answers["What prior LiverTox likelihood supports the exposure?"] == "A"
     assert answers["What is the supportive RUCAM conclusion?"] == "probable"
+
+
+def test_timeline_tracks_dechallenge_per_drug_stop_date() -> None:
+    timeline = DiliTimelineEngine().build(
+        drugs=[
+            DrugEntry(
+                name="Drug A",
+                therapy_start_date="2025-01-01",
+                suspension_date="2025-01-12",
+            ),
+            DrugEntry(
+                name="Drug B",
+                therapy_start_date="2025-01-01",
+                suspension_date="2025-02-01",
+            ),
+        ],
+        labs=PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=300,
+                    upper_limit_normal=40,
+                    sample_date="2025-01-10",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=220,
+                    upper_limit_normal=40,
+                    sample_date="2025-01-20",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=90,
+                    upper_limit_normal=40,
+                    sample_date="2025-02-15",
+                    source="laboratory_analysis",
+                ),
+            ]
+        ),
+    )
+
+    assert timeline.drug_dechallenge_statuses["Drug A"] == "improving_after_stop"
+    assert timeline.drug_dechallenge_statuses["Drug B"] == "insufficient_interval"
 
 
 def test_report_has_required_fda_style_sections() -> None:
