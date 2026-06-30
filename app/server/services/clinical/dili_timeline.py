@@ -23,7 +23,10 @@ SYMPTOM_RE = re.compile(
 JAUNDICE_RE = re.compile(r"\b(jaundice|icterus|bilirubin)\b", re.IGNORECASE)
 
 
+###############################################################################
 class DiliTimelineEngine:
+
+    # -------------------------------------------------------------------------
     def build(self, drugs: list[DrugEntry], labs: PatientLabTimeline) -> DiliTimeline:
         events: list[DiliTimelineEvent] = []
         missing: list[str] = []
@@ -62,6 +65,7 @@ class DiliTimelineEngine:
             missing_fields=sorted(set(missing)),
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def parse_date(value: str | None) -> date | None:
         if not value:
@@ -78,6 +82,7 @@ class DiliTimelineEngine:
                 continue
         return None
 
+    # -------------------------------------------------------------------------
     def _drug_events(
         self,
         drug: DrugEntry,
@@ -179,6 +184,7 @@ class DiliTimelineEngine:
             )
         return events
 
+    # -------------------------------------------------------------------------
     def _dated_labs(self, labs: PatientLabTimeline) -> list[ClinicalLabEntry]:
         dated = [
             item for item in labs.entries if item.sample_date and item.value is not None
@@ -186,6 +192,7 @@ class DiliTimelineEngine:
         dated.sort(key=lambda item: self.parse_date(item.sample_date) or date.max)
         return dated
 
+    # -------------------------------------------------------------------------
     def _lab_events(self, labs: list[ClinicalLabEntry]) -> list[DiliTimelineEvent]:
         events: list[DiliTimelineEvent] = []
         for lab in labs:
@@ -240,6 +247,7 @@ class DiliTimelineEngine:
                 )
         return events
 
+    # -------------------------------------------------------------------------
     def _first_abnormal_liver_test_date(self, labs: list[ClinicalLabEntry]) -> str | None:
         for lab in labs:
             multiple = self._multiple(lab)
@@ -247,6 +255,7 @@ class DiliTimelineEngine:
                 return lab.sample_date
         return labs[0].sample_date if labs else None
 
+    # -------------------------------------------------------------------------
     def _peak_dates(self, labs: list[ClinicalLabEntry]) -> dict[str, str | None]:
         peak_dates: dict[str, str | None] = {}
         for marker in ("ALT", "AST", "ALP", "GGT", "BILIRUBIN", "TBIL", "INR"):
@@ -262,6 +271,7 @@ class DiliTimelineEngine:
             )
         return peak_dates
 
+    # -------------------------------------------------------------------------
     def _dechallenge(
         self,
         drugs: list[DrugEntry],
@@ -315,11 +325,13 @@ class DiliTimelineEngine:
             return "improving_after_stop", None, last_date
         return "stable_abnormality", None, last_date
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _extract_date_from_text(text: str) -> str | None:
         match = DATE_RE.search(text or "")
         return match.group(1).replace("/", "-").replace(".", "-") if match else None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _multiple(lab: ClinicalLabEntry) -> float | None:
         if lab.value is None or not lab.upper_limit_normal:
@@ -328,6 +340,7 @@ class DiliTimelineEngine:
             return None
         return float(lab.value) / float(lab.upper_limit_normal)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _quote(
         *,
@@ -344,11 +357,13 @@ class DiliTimelineEngine:
             source_kind="patient_record" if quote else "missing",
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _event_sort_key(event: DiliTimelineEvent) -> tuple[date, str]:
         parsed = DiliTimelineEngine.parse_date(event.event_date) or date.max
         return parsed, event.event_type
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _first_event_date(events: list[DiliTimelineEvent], event_type: str) -> str | None:
         dated = [

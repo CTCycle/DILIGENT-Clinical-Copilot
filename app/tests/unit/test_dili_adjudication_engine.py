@@ -14,12 +14,14 @@ from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.clinical.dili_pattern import DiliPatternEngine
 
 
+###############################################################################
 def test_r_ratio_boundary_values_follow_livertox_definitions() -> None:
     assert DiliPatternEngine.classify(5.0) == "hepatocellular"
     assert DiliPatternEngine.classify(2.0) == "cholestatic"
     assert DiliPatternEngine.classify(3.0) == "mixed"
 
 
+###############################################################################
 def test_structured_dossier_preserves_missing_competing_causes() -> None:
     bundle = DiliEvidenceBuilder().build(
         payload=PatientData(
@@ -104,6 +106,7 @@ def test_structured_dossier_preserves_missing_competing_causes() -> None:
     assert bundle.manual_review_required is True
 
 
+###############################################################################
 def test_report_has_required_fda_style_sections() -> None:
     bundle = DiliEvidenceBuilder().build(
         payload=PatientData(drugs="Drug A"),

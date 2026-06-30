@@ -7,6 +7,7 @@ import httpx
 from services.retrieval import readiness
 
 
+###############################################################################
 def _settings(**overrides: object) -> SimpleNamespace:
     values = {
         "use_cloud_embeddings": False,
@@ -19,17 +20,23 @@ def _settings(**overrides: object) -> SimpleNamespace:
     return SimpleNamespace(**values)
 
 
+###############################################################################
 class _Response:
+
+    # -------------------------------------------------------------------------
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
 
+    # -------------------------------------------------------------------------
     def raise_for_status(self) -> None:
         return None
 
+    # -------------------------------------------------------------------------
     def json(self) -> dict[str, object]:
         return self.payload
 
 
+###############################################################################
 def test_rag_readiness_reports_unavailable_ollama(monkeypatch) -> None:
     monkeypatch.setattr(readiness, "build_effective_rag_settings", _settings)
 
@@ -45,6 +52,7 @@ def test_rag_readiness_reports_unavailable_ollama(monkeypatch) -> None:
     assert "Start Ollama" in (result.message or "")
 
 
+###############################################################################
 def test_rag_readiness_accepts_available_embedding_model(monkeypatch) -> None:
     monkeypatch.setattr(readiness, "build_effective_rag_settings", _settings)
     monkeypatch.setattr(
@@ -62,6 +70,7 @@ def test_rag_readiness_accepts_available_embedding_model(monkeypatch) -> None:
     assert result.model == "nomic-embed-text:latest"
 
 
+###############################################################################
 def test_rag_readiness_skips_probe_when_not_requested(monkeypatch) -> None:
     monkeypatch.setattr(readiness, "build_effective_rag_settings", _settings)
     monkeypatch.setattr(

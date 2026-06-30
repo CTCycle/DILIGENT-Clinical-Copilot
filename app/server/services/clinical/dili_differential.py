@@ -36,7 +36,10 @@ UNKNOWN_RE = re.compile(
 )
 
 
+###############################################################################
 class DiliDifferentialEngine:
+
+    # -------------------------------------------------------------------------
     def assess(self, source_text: str) -> DiliDifferentialAssessment:
         lowered = source_text.lower()
         causes: list[DiliCompetingCause] = []
@@ -59,6 +62,7 @@ class DiliDifferentialEngine:
             unresolved_causes=unresolved,
         )
 
+    # -------------------------------------------------------------------------
     def _assess_cause(
         self,
         cause: str,
@@ -91,6 +95,7 @@ class DiliDifferentialEngine:
             rationale = "The source mentions this cause without a clear exclusion or confirmation."
         return status, rationale, [self._quote(cause, window or None)]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _quote(cause: str, quote: str | None) -> ClinicalEvidenceQuote:
         return ClinicalEvidenceQuote(

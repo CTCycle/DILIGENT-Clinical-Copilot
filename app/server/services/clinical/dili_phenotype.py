@@ -5,7 +5,10 @@ import re
 from domain.clinical.dili import DiliInjuryPattern, DiliPhenotypeAssessment
 
 
+###############################################################################
 class DiliPhenotypeClassifier:
+
+    # -------------------------------------------------------------------------
     def assess(self, patterns: list[DiliInjuryPattern], source_text: str) -> DiliPhenotypeAssessment:
         lowered = source_text.lower()
         primary_pattern = patterns[0].pattern if patterns else "indeterminate"
