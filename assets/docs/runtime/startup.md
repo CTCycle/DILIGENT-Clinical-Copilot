@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-06-24
+Last updated: 2026-06-30
 
 ## Recommended Local Startup
 On Windows, use:
