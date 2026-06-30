@@ -12,6 +12,7 @@ from domain.clinical.entities import (
     PatientDrugs,
     PatientLabTimeline,
     PatientRucamAssessmentBundle,
+    RagDocumentReference,
 )
 from services.clinical.dili_causality import DiliCausalityEngine
 from services.clinical.dili_differential import DiliDifferentialEngine
@@ -32,6 +33,7 @@ class DiliEvidenceBuilder:
         labs: PatientLabTimeline,
         resolved_drugs: dict[str, dict] | None,
         rucam_bundle: PatientRucamAssessmentBundle,
+        rag_references: list[dict] | None = None,
     ) -> DiliEvidenceBundle:
         source_text = "\n".join(
             item
@@ -112,6 +114,7 @@ class DiliEvidenceBuilder:
             hys_law=hys_law,
             severity=severity,
             evidence=evidence,
+            rag_references=rag_references or [],
             acceptance_questions=acceptance_questions,
             manual_review_required=True,
         )
@@ -394,6 +397,7 @@ class DiliEvidenceBuilder:
                 ],
                 "## 12. Knowledge base and RAG evidence",
                 "- Source hierarchy: AASLD, LiverTox, FDA, DILIN/RUCAM.",
+                *DiliEvidenceBuilder._render_rag_references(bundle.rag_references),
                 "## 13. Clinical limitations",
                 "- RUCAM is structured support and is not dispositive.",
                 "- Missing or unresolved competing causes prevent definitive attribution.",
@@ -406,3 +410,31 @@ class DiliEvidenceBuilder:
             if question.missing_data_statement:
                 lines.append(f"  Missing-data note: {question.missing_data_statement}")
         return "\n".join(lines)
+
+    @staticmethod
+    def _render_rag_references(references: list[dict]) -> list[str]:
+        normalized = [
+            RagDocumentReference.model_validate(item)
+            for item in references
+            if isinstance(item, dict)
+        ]
+        if not normalized:
+            return ["- RAG bibliography: no retrieved document references."]
+        grouped: dict[str, set[int | None]] = {}
+        for reference in normalized:
+            pages = grouped.setdefault(reference.file_name, set())
+            if reference.page_start is None:
+                pages.add(None)
+                continue
+            page_end = reference.page_end or reference.page_start
+            pages.update(range(reference.page_start, page_end + 1))
+        lines = ["- RAG bibliography:"]
+        for file_name in sorted(grouped):
+            pages = grouped[file_name]
+            if pages == {None}:
+                lines.append(f"  - {file_name}, page not available")
+                continue
+            numbered_pages = sorted(page for page in pages if page is not None)
+            page_text = ", ".join(str(page) for page in numbered_pages)
+            lines.append(f"  - {file_name}, p. {page_text}")
+        return lines
