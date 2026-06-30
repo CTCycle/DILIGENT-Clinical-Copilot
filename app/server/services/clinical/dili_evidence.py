@@ -5,6 +5,7 @@ from domain.clinical.dili import (
     ClinicalEvidenceQuote,
     DiliAcceptanceQuestion,
     DiliEvidenceBundle,
+    DrugExposureAssessment,
 )
 from domain.clinical.entities import (
     PatientData,
@@ -124,7 +125,7 @@ class DiliEvidenceBuilder:
         exposures,
     ) -> list[DiliAcceptanceQuestion]:
         first_pattern = patterns[0] if patterns else None
-        top_exposure = exposures[0] if exposures else None
+        top_exposure = self._primary_suspect(exposures, differential.all_major_causes_excluded)
         questions: list[DiliAcceptanceQuestion] = [
             self._question(
                 "What is the latency from first compatible exposure to first liver injury signal?",
@@ -240,6 +241,86 @@ class DiliEvidenceBuilder:
             supporting_evidence=[item for item in evidence if item is not None],
             missing_data_statement=missing_data_statement,
         )
+
+    @classmethod
+    def _primary_suspect(
+        cls,
+        exposures: list[DrugExposureAssessment],
+        competing_causes_complete: bool,
+    ) -> DrugExposureAssessment | None:
+        if not exposures:
+            return None
+        return max(
+            exposures,
+            key=lambda exposure: cls._suspect_rank(exposure, competing_causes_complete),
+        )
+
+    @staticmethod
+    def _suspect_rank(
+        exposure: DrugExposureAssessment,
+        competing_causes_complete: bool,
+    ) -> tuple[int, int, int, int, int, int, str]:
+        identity_score = 1 if exposure.identity.accepted_identity else 0
+        temporal_score = (
+            1
+            if exposure.causality
+            and exposure.causality.temporal_compatibility == "compatible"
+            else 0
+        )
+        rucam_score = DiliEvidenceBuilder._rucam_rank(exposure)
+        livertox_score = DiliEvidenceBuilder._livertox_rank(exposure.livertox_likelihood)
+        dechallenge_score = DiliEvidenceBuilder._dechallenge_rank(exposure)
+        competing_score = 1 if competing_causes_complete else 0
+        stable_name = exposure.drug_name.lower()
+        return (
+            identity_score,
+            temporal_score,
+            rucam_score,
+            livertox_score,
+            dechallenge_score,
+            competing_score,
+            stable_name,
+        )
+
+    @staticmethod
+    def _rucam_rank(exposure: DrugExposureAssessment) -> int:
+        if exposure.rucam is None:
+            return 0
+        if exposure.rucam.total_score is not None:
+            return exposure.rucam.total_score
+        category = (exposure.rucam.category or "").lower()
+        return {
+            "excluded": -2,
+            "unlikely": -1,
+            "possible": 2,
+            "probable": 4,
+            "highly_probable": 6,
+        }.get(category, 0)
+
+    @staticmethod
+    def _livertox_rank(likelihood: str | None) -> int:
+        normalized = (likelihood or "").upper()
+        return {
+            "A": 5,
+            "B": 4,
+            "C": 3,
+            "D": 2,
+            "E": 0,
+            "E*": 0,
+            "T": 1,
+            "T*": 1,
+        }.get(normalized, 0)
+
+    @staticmethod
+    def _dechallenge_rank(exposure: DrugExposureAssessment) -> int:
+        if exposure.rechallenge_status == "positive":
+            return 3
+        detail = exposure.causality.dechallenge_rechallenge if exposure.causality else ""
+        if "resolved_to_baseline" in detail:
+            return 2
+        if "improving_after_stop" in detail:
+            return 1
+        return 0
 
     @staticmethod
     def render(bundle: DiliEvidenceBundle) -> str:
