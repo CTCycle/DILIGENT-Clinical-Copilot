@@ -171,7 +171,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     rxnav: {
       fetchConfig: () => fetchInspectionRxNavUpdateConfig(),
       start: (overrides) => startInspectionRxNavUpdateJob(overrides),
-      status: (jobId) => fetchInspectionRxNavUpdateJobStatus(jobId),
+      status: (jobId, timeoutSeconds) => fetchInspectionRxNavUpdateJobStatus(jobId, timeoutSeconds),
       cancel: async (jobId) => {
         await cancelInspectionRxNavUpdateJob(jobId);
       },
@@ -182,7 +182,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     livertox: {
       fetchConfig: () => fetchInspectionLiverToxUpdateConfig(),
       start: (overrides) => startInspectionLiverToxUpdateJob(overrides),
-      status: (jobId) => fetchInspectionLiverToxUpdateJobStatus(jobId),
+      status: (jobId, timeoutSeconds) => fetchInspectionLiverToxUpdateJobStatus(jobId, timeoutSeconds),
       cancel: async (jobId) => {
         await cancelInspectionLiverToxUpdateJob(jobId);
       },
@@ -193,7 +193,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     rag: {
       fetchConfig: () => fetchInspectionRagUpdateConfig(),
       start: (overrides) => startInspectionRagUpdateJob(overrides),
-      status: (jobId) => fetchInspectionRagUpdateJobStatus(jobId),
+      status: (jobId, timeoutSeconds) => fetchInspectionRagUpdateJobStatus(jobId, timeoutSeconds),
       cancel: async (jobId) => {
         await cancelInspectionRagUpdateJob(jobId);
       },
