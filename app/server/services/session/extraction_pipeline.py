@@ -43,7 +43,6 @@ class ClinicalSessionExtractionOwner(Protocol):
     build_fallback_therapy_drugs: Callable[..., PatientDrugs]
     append_knowledge_base_unavailable_issue: Callable[..., None]
 
-
 ###############################################################################
 class ClinicalSessionExtractionPipelineMixin:
 

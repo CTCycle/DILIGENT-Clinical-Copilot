@@ -15,7 +15,10 @@ LOW_CONFIDENCE_LIVERTOX = {"", "U", "E", "E*", "X", "UNKNOWN"}
 DIRECT_TOXIN_LIVERTOX = {"T", "T*"}
 
 
+###############################################################################
 class DiliCausalityEngine:
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def rucam(source: DrugRucamAssessment | None, drug_name: str) -> DiliRucamAssessment | None:
         if source is None:
@@ -38,6 +41,7 @@ class DiliCausalityEngine:
             limitations=source.limitations,
         )
 
+    # -------------------------------------------------------------------------
     def exposure(
         self,
         drug: DrugEntry,
@@ -118,6 +122,7 @@ class DiliCausalityEngine:
             rucam=self.rucam(rucam, drug.name),
         )
 
+    # -------------------------------------------------------------------------
     def _identity(self, drug: DrugEntry, resolved: dict, accepted: bool) -> DrugIdentityResolution:
         components = resolved.get("regimen_components") or []
         return DrugIdentityResolution(
@@ -137,6 +142,7 @@ class DiliCausalityEngine:
             is_negated=drug.attribution == "negated",
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _temporal_compatibility(drug: DrugEntry, first_injury_date: str | None) -> str:
         if not drug.therapy_start_date or not first_injury_date:
@@ -150,6 +156,7 @@ class DiliCausalityEngine:
             return "compatible"
         return "incompatible"
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _rechallenge_status(drug: DrugEntry) -> str:
         evidence = (drug.evidence or "").lower()
@@ -159,6 +166,7 @@ class DiliCausalityEngine:
             return "present_unclear"
         return "unknown"
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _signature_match(primary_pattern: str, likelihood: str) -> str:
         if primary_pattern == "indeterminate":

@@ -22,7 +22,10 @@ from services.clinical.dili_timeline import DiliTimelineEngine
 from services.text.normalization import normalize_drug_query_name
 
 
+###############################################################################
 class DiliEvidenceBuilder:
+
+    # -------------------------------------------------------------------------
     def build(
         self,
         *,
@@ -112,6 +115,7 @@ class DiliEvidenceBuilder:
             manual_review_required=True,
         )
 
+    # -------------------------------------------------------------------------
     def _acceptance_questions(
         self,
         *,
@@ -227,6 +231,7 @@ class DiliEvidenceBuilder:
         ]
         return questions
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _question(
         question: str,
@@ -241,6 +246,7 @@ class DiliEvidenceBuilder:
             missing_data_statement=missing_data_statement,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def render(bundle: DiliEvidenceBundle) -> str:
         pattern = bundle.patterns[0] if bundle.patterns else None

@@ -10,7 +10,10 @@ from domain.clinical.entities import DrugEntry, PatientLabTimeline
 from services.clinical.dili_timeline import DiliTimelineEngine
 
 
+###############################################################################
 class HysLawDetector:
+
+    # -------------------------------------------------------------------------
     def assess(
         self,
         *,
@@ -80,6 +83,7 @@ class HysLawDetector:
             ],
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _first_multiple(labs: PatientLabTimeline, markers: set[str]) -> float | None:
         candidates = []
@@ -95,6 +99,7 @@ class HysLawDetector:
         candidates.sort(key=lambda item: item[0])
         return candidates[0][1]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _peak_multiple(labs: PatientLabTimeline, markers: set[str]) -> float | None:
         candidates = [
@@ -107,6 +112,7 @@ class HysLawDetector:
         ]
         return max(candidates) if candidates else None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _same_episode(labs: PatientLabTimeline, timeline: DiliTimeline) -> bool | None:
         first_alt_date = None
@@ -125,6 +131,7 @@ class HysLawDetector:
             return None
         return abs((parsed_bili - parsed_alt).days) <= 14
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _plausible_latency(start_date: str, injury_date: str) -> bool:
         parsed_start = DiliTimelineEngine.parse_date(start_date)
@@ -134,6 +141,7 @@ class HysLawDetector:
         delta = (parsed_injury - parsed_start).days
         return 1 <= delta <= 365
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_evidence(timeline: DiliTimeline) -> list[ClinicalEvidenceQuote]:
         relevant = []

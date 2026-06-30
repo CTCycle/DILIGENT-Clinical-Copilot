@@ -7,10 +7,12 @@ SESSION_REVISION_DISABLED_MESSAGE = (
 )
 
 
+###############################################################################
 class SessionRevisionNotImplementedError(NotImplementedError):
     pass
 
 
+###############################################################################
 class InspectionRevisionScaffoldMixin:
 
     # -------------------------------------------------------------------------
