@@ -54,7 +54,7 @@ const MODEL_BATCH_SIZE = 12;
 const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
   openai: 'OpenAI',
   gemini: 'Gemini',
-  openrouter: 'OpenRouter',
+  brave: 'Brave',
 };
 
 const DEFAULT_RAG_SETTINGS_SECTION: RagSettingsSectionKey = 'general';
@@ -91,7 +91,7 @@ function isCloudProvider(provider: string): provider is CloudProvider {
 }
 
 function resolveProviderLabel(provider: string): string {
-  if (provider === 'openai' || provider === 'gemini' || provider === 'openrouter') {
+  if (provider === 'openai' || provider === 'gemini' || provider === 'brave') {
     return PROVIDER_LABELS[provider];
   }
   return provider;

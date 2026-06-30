@@ -462,7 +462,11 @@ def _validate_requested_provider(
         for item in request_payload.selected_model_providers
         if item and item.strip()
     }
-    provider = str(runtime_settings.get("llm_provider") or "").lower()
+    provider = str(
+        runtime_settings.get("clinical_provider")
+        or runtime_settings.get("llm_provider")
+        or ""
+    ).lower()
     if not selected:
         blocking.append(
             ClinicalInputPreflightIssue(

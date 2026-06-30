@@ -133,6 +133,70 @@ def test_malformed_sections_block_job_start(monkeypatch) -> None:
         start_clinical_job_workflow(service, request)
 
 ###############################################################################
+def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
+    monkeypatch,
+) -> None:
+    service = _build_service()
+    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
+    monkeypatch.setattr(
+        service,
+        "validate_clinical_input",
+        lambda req: (_ for _ in ()).throw(
+            AssertionError("deep preflight should not rerun during job start")
+        ),
+    )
+    monkeypatch.setattr(
+        service,
+        "validate_assessment_prerequisites_without_llm",
+        lambda req: object(),
+    )
+    monkeypatch.setattr(
+        service,
+        "prepare_structured_clinical_input",
+        lambda req: {
+            "normalized_document": object(),
+            "section_extraction": object(),
+            "patient_payload": object(),
+        },
+    )
+    monkeypatch.setattr(
+        service,
+        "ensure_submission_requirements",
+        lambda payload: None,
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.check_rag_readiness",
+        lambda requested: RagReadiness(
+            requested=requested,
+            available=True,
+            backend="ollama",
+            model="dummy-model",
+        ),
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: False,
+    )
+    monkeypatch.setattr(service.job_manager, "is_job_running", lambda *args, **kwargs: False)
+    monkeypatch.setattr(service.job_manager, "start_job", lambda **kwargs: "job-123")
+    monkeypatch.setattr(
+        service.job_manager,
+        "get_job_status",
+        lambda job_id: {"job_id": job_id, "job_type": "clinical", "status": "pending"},
+    )
+
+    request = ClinicalSessionRequest(
+        clinical_input=_valid_input(),
+        visit_date=date(2025, 1, 15),
+        selected_model_providers=["ollama"],
+    )
+
+    result = start_clinical_job_workflow(service, request)
+
+    assert result.job_id == "job-123"
+    assert result.status == "pending"
+
+###############################################################################
 def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     monkeypatch,
 ) -> None:
@@ -147,9 +211,15 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     monkeypatch.setattr(
         "services.session.preflight._validate_provider_key", lambda blocking: None
     )
+    monkeypatch.setattr(
+        "services.session.preflight.LLMRuntimeConfig.resolve_provider_and_model",
+        lambda role: ("ollama", "qwen3.5:2b")
+        if role == "parser"
+        else ("ollama", "gpt-oss:20b"),
+    )
     request = ClinicalSessionRequest(
         visit_date=date(2025, 3, 20),
-        selected_model_providers=["openai"],
+        selected_model_providers=["ollama"],
         clinical_input=(
             "## Anamnesis\n"
             "High grade ovarian serous carcinoma con carcinosi peritoneale.\n"
@@ -171,13 +241,63 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     assert result.extraction_quality["timed_drug_count"] >= 1
 
 ###############################################################################
+def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
+    monkeypatch,
+) -> None:
+    service = _build_service()
+    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
+    monkeypatch.setattr(
+        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+    )
+    monkeypatch.setattr(
+        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+    )
+    monkeypatch.setattr(
+        "services.session.preflight._validate_provider_key", lambda blocking: None
+    )
+    monkeypatch.setattr(
+        "services.session.preflight.LLMRuntimeConfig.get_llm_provider",
+        lambda: "openai",
+    )
+    monkeypatch.setattr(
+        "services.session.preflight.LLMRuntimeConfig.resolve_provider_and_model",
+        lambda role: ("ollama", "qwen3.5:2b")
+        if role == "parser"
+        else ("ollama", "gpt-oss:20b"),
+    )
+
+    request = ClinicalSessionRequest(
+        visit_date=date(2025, 3, 20),
+        selected_model_providers=["ollama"],
+        clinical_input=(
+            "## Anamnesis\n"
+            "The patient reports fatigue, pruritus, dark urine, and poor appetite after medication exposure.\n\n"
+            "## Therapy\n"
+            "Amoxicillin 500 mg three times daily for seven days.\n"
+            "Ibuprofen 400 mg as needed for fever.\n"
+            "Atorvastatin 20 mg nightly as chronic therapy.\n\n"
+            "## Laboratory Analysis\n"
+            "ALT 220 U/L with ULN 50, ALP 180 U/L with ULN 120, total bilirubin 2.4 mg/dL, and INR 1.1.\n"
+        ),
+    )
+
+    result = validate_clinical_input_preflight(service, request)
+
+    assert not any(
+        issue.code == "requested_provider_mismatch"
+        for issue in result.blocking_issues
+    )
+    assert result.runtime_settings["llm_provider"] == "openai"
+    assert result.runtime_settings["clinical_provider"] == "ollama"
+
+###############################################################################
 def test_job_start_rechecks_rag_readiness_before_submission(monkeypatch) -> None:
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
-        "validate_clinical_input",
-        lambda req: type("P", (), {"ready": True, "blocking_issues": []})(),
+        "validate_assessment_prerequisites_without_llm",
+        lambda req: object(),
     )
     monkeypatch.setattr(
         "services.session.session_workflow.check_rag_readiness",

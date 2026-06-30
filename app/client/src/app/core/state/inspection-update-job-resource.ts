@@ -9,6 +9,7 @@ import {
   InspectionUpdateTarget,
   JobStartResponse,
 } from '../models/types';
+import { resolvePollIntervalMs } from '../services/clinical-api';
 import { JobPollingService } from '../services/job-polling.service';
 
 type InspectionUpdateOverridesByTarget = {
@@ -20,7 +21,7 @@ type InspectionUpdateOverridesByTarget = {
 type InspectionUpdateTargetActions<TTarget extends InspectionUpdateTarget> = {
   fetchConfig: () => Promise<InspectionUpdateConfigResponse>;
   start: (overrides: InspectionUpdateOverridesByTarget[TTarget]) => Promise<JobStartResponse>;
-  status: (jobId: string) => Promise<InspectionUpdateJobStatusResponse>;
+  status: (jobId: string, timeoutSeconds?: number) => Promise<InspectionUpdateJobStatusResponse>;
   cancel: (jobId: string) => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -168,6 +169,10 @@ function resolveStartedMessage(started: JobStartResponse): string {
   return message || 'Update running...';
 }
 
+function resolvePollRequestTimeoutSeconds(intervalMs: number): number {
+  return Math.min(30, Math.max(5, Math.ceil((Math.max(intervalMs, 250) / 1000) * 4)));
+}
+
 export class InspectionUpdateJobResource {
   readonly targetState = signal<InspectionUpdateTargetSnapshotMap>({
     rxnav: { running: false, progress: 0, message: '', error: null },
@@ -258,13 +263,14 @@ export class InspectionUpdateJobResource {
       if (!startedJobId) {
         throw new Error('Update job started but no job id was returned.');
       }
+      const intervalMs = resolvePollIntervalMs(started.poll_interval);
       const pollToken = this.beginPolling();
       this.patchTargetState(target, {
         jobId: startedJobId,
         message: resolveStartedMessage(started),
         pollToken,
       });
-      void this.pollUpdateJob(target, startedJobId, pollToken);
+      void this.pollUpdateJob(target, startedJobId, pollToken, intervalMs);
     } catch (error) {
       this.patchTargetState(target, {
         running: false,
@@ -318,13 +324,16 @@ export class InspectionUpdateJobResource {
     target: InspectionUpdateTarget,
     jobId: string,
     pollToken: number,
+    intervalMs: number,
   ): Promise<void> {
     try {
+      const safeIntervalMs = Math.max(intervalMs, 250);
+      const requestTimeoutSeconds = resolvePollRequestTimeoutSeconds(safeIntervalMs);
       await this.jobPolling.run({
-        intervalMs: 1200,
+        intervalMs: safeIntervalMs,
         isCancelled: () => !this.isPollingActive(target, pollToken),
         pollStep: async () => {
-          const status = await this.actions[target].status(jobId);
+          const status = await this.actions[target].status(jobId, requestTimeoutSeconds);
           if (!this.isPollingActive(target, pollToken)) {
             return false;
           }
