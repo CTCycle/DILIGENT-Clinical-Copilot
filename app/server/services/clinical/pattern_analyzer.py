@@ -160,9 +160,9 @@ class HepatotoxicityPatternAnalyzer:
         alp_value = self.parse_entry_value(alp)
         if alt_value is None or alp_value is None:
             return None
-        alt_uln = self.resolve_uln(alt_like, fallback=40.0)
-        alp_uln = self.resolve_uln(alp, fallback=120.0)
-        if alt_uln <= 0 or alp_uln <= 0:
+        alt_uln = self.resolve_uln(alt_like)
+        alp_uln = self.resolve_uln(alp)
+        if alt_uln is None or alp_uln is None:
             return None
         return {
             "alt_value": alt_value,
@@ -203,13 +203,13 @@ class HepatotoxicityPatternAnalyzer:
         return self.parse_marker_value(entry.value_text)
 
     # -------------------------------------------------------------------------
-    def resolve_uln(self, entry: ClinicalLabEntry, *, fallback: float) -> float:
+    def resolve_uln(self, entry: ClinicalLabEntry) -> float | None:
         if entry.upper_limit_normal is not None and entry.upper_limit_normal > 0:
             return float(entry.upper_limit_normal)
         parsed = self.parse_marker_value(entry.upper_limit_text)
         if parsed is not None and parsed > 0:
             return parsed
-        return fallback
+        return None
 
     # -------------------------------------------------------------------------
     def parse_marker_value(self, raw: str | None) -> float | None:
