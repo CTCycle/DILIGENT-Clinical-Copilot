@@ -156,7 +156,7 @@ def validate_clinical_input_preflight(
     _validate_ui_metadata(request_payload, blocking)
     _validate_provider_key(blocking)
     _validate_requested_provider(request_payload, blocking, runtime_settings)
-    _validate_persistence(service, blocking)
+    _validate_persistence(service, non_blocking)
     extraction_quality: dict[str, Any] = {}
     clinical_input = (request_payload.clinical_input or "").strip()
     if not clinical_input:
@@ -486,7 +486,7 @@ def _validate_requested_provider(
 ###############################################################################
 def _validate_persistence(
     service: Any,
-    blocking: list[ClinicalInputPreflightIssue],
+    non_blocking: list[ClinicalInputPreflightIssue],
 ) -> None:
     if not hasattr(service.serializer, "session_factory"):
         return
@@ -494,12 +494,11 @@ def _validate_persistence(
         with service.serializer.session_factory() as db_session:
             db_session.connection()
     except Exception as exc:  # noqa: BLE001
-        blocking.append(
+        non_blocking.append(
             ClinicalInputPreflightIssue(
-                severity="blocking",
+                severity="non_blocking",
                 code="persistence_unavailable",
                 message=f"Session persistence is not writable or reachable: {exc}",
-                field="persistence",
             )
         )
 

@@ -493,7 +493,7 @@ class RucamScoreEstimator:
                 injury_type=injury_type,
                 lab_timeline=lab_timeline,
                 onset_date=onset_date,
-                suspension_date=drug.suspension_date,
+                suspension_status=drug.suspension_status,
             )
         )
         components.append(
@@ -619,85 +619,40 @@ class RucamScoreEstimator:
         injury_type: str,
         lab_timeline: PatientLabTimeline,
         onset_date: date | None,
-        suspension_date: str | None,
+        suspension_status: bool | None,
     ) -> RucamComponentAssessment:
-        withdrawal_date = self.try_parse_date(suspension_date)
-        if onset_date is None or withdrawal_date is None:
+        if onset_date is None or suspension_status is None:
             return RucamComponentAssessment(
                 component_key="course",
                 label="Course after withdrawal",
                 score=0,
                 status="not_assessable",
-                evidence_date=suspension_date
-                or (onset_date.isoformat() if onset_date else None),
-                rationale="No onset date or withdrawal date available.",
+                evidence_date=onset_date.isoformat() if onset_date else None,
+                rationale="No onset date or withdrawal status available.",
             )
         _ = injury_type
-        dated: list[tuple[date, float]] = []
+        dated = []
         for entry in lab_timeline.entries:
             d = self.try_parse_date(entry.sample_date)
-            if (
-                d is not None
-                and entry.value is not None
-                and self._course_marker_matches(injury_type, entry.marker_name)
-            ):
+            if d is not None and d > onset_date and entry.value is not None:
                 dated.append((d, entry.value))
-        baseline = [item for item in dated if item[0] <= withdrawal_date]
-        follow_up = [item for item in dated if item[0] > withdrawal_date]
-        if not baseline or not follow_up:
+        if not dated:
             return RucamComponentAssessment(
                 component_key="course",
                 label="Course after withdrawal",
                 score=0,
                 status="not_assessable",
-                evidence_date=withdrawal_date.isoformat(),
-                rationale=(
-                    "Withdrawal date plus marker-specific baseline and follow-up "
-                    "labs are required for course scoring."
-                ),
+                evidence_date=onset_date.isoformat(),
+                rationale="No follow-up labs after onset/withdrawal.",
             )
-        first_date, first_value = baseline[-1]
-        last_date, last_value = follow_up[-1]
-        if first_value <= 0:
-            fall_fraction = 0.0
-        else:
-            fall_fraction = max(0.0, (first_value - last_value) / first_value)
-        days_after_withdrawal = (last_date - withdrawal_date).days
-        required_days = 30 if injury_type == "hepatocellular" else 180
-        if fall_fraction < 0.5:
-            return RucamComponentAssessment(
-                component_key="course",
-                label="Course after withdrawal",
-                score=0,
-                status="not_assessable",
-                evidence_date=last_date.isoformat(),
-                rationale="No marker-specific fall of at least 50% after withdrawal.",
-            )
-        score = 2 if days_after_withdrawal <= required_days else 1
         return RucamComponentAssessment(
             component_key="course",
             label="Course after withdrawal",
-            score=score,
+            score=1,
             status="scored",
-            evidence_date=last_date.isoformat(),
-            evidence=(
-                f"{first_date.isoformat()} {first_value} -> "
-                f"{last_date.isoformat()} {last_value}"
-            ),
-            rationale=(
-                f"{injury_type} course shows {fall_fraction:.0%} fall "
-                f"{days_after_withdrawal} days after withdrawal."
-            ),
+            evidence_date=dated[-1][0].isoformat(),
+            rationale="Follow-up labs available after withdrawal context.",
         )
-
-    @staticmethod
-    def _course_marker_matches(injury_type: str, marker_name: str) -> bool:
-        marker = marker_name.upper()
-        if injury_type == "hepatocellular":
-            return marker in {"ALT", "AST"}
-        if injury_type in {"cholestatic", "mixed"}:
-            return marker in {"ALP", "GGT", "BILIRUBIN", "TBIL"}
-        return marker in {"ALT", "AST", "ALP", "GGT", "BILIRUBIN", "TBIL"}
 
     # -------------------------------------------------------------------------
     def score_risk_factors(

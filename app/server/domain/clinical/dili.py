@@ -48,7 +48,6 @@ class DiliTimeline(BaseModel):
         "chronic_or_persistent",
         "insufficient_interval",
     ] = "no_follow_up"
-    drug_dechallenge_statuses: dict[str, str] = Field(default_factory=dict)
     recovery_date: str | None = None
     last_abnormal_date: str | None = None
     missing_fields: list[str] = Field(default_factory=list)
@@ -205,7 +204,6 @@ class DiliEvidenceBundle(BaseModel):
     hys_law: DiliHysLawAssessment
     severity: DiliSeverityAssessment
     evidence: list[ClinicalEvidenceQuote] = Field(default_factory=list)
-    rag_references: list[dict[str, Any]] = Field(default_factory=list)
     acceptance_questions: list[DiliAcceptanceQuestion] = Field(default_factory=list)
     source_hierarchy: list[str] = Field(
         default_factory=lambda: ["AASLD", "LiverTox", "FDA", "DILIN/RUCAM"]
