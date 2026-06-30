@@ -18,7 +18,10 @@ from configurations.startup import get_server_settings
 from domain.catalogs import CatalogSeedResult
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.postgres import PostgresRepository
-from repositories.database.sqlite import SQLiteRepository
+from repositories.database.sqlite import (
+    SQLiteRepository,
+    ensure_clinical_session_labs_observation_schema,
+)
 from repositories.database.utils import (
     normalize_postgres_engine,
     validate_postgres_database_name,
@@ -143,6 +146,7 @@ def initialize_sqlite_database(
     if drop_existing:
         Base.metadata.drop_all(repository.engine)
     Base.metadata.create_all(repository.engine)
+    ensure_clinical_session_labs_observation_schema(repository.engine)
     AccessKeyEncryptionMaterialSerializer(
         engine=repository.engine,
         session_factory=sessionmaker(
