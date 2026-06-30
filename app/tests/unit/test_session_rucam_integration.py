@@ -85,6 +85,7 @@ class FakeDrugsParser:
             name="Drug A",
             therapy_start_date="2024-12-20",
             suspension_status=True,
+            suspension_date="2025-01-10",
             source="therapy",
         )
 
@@ -100,6 +101,7 @@ class FakeDrugsParser:
                     name="Drug A",
                     therapy_start_date="2024-12-20",
                     suspension_status=True,
+                    suspension_date="2025-01-10",
                     source="therapy",
                 )
             ]

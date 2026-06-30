@@ -493,7 +493,7 @@ class RucamScoreEstimator:
                 injury_type=injury_type,
                 lab_timeline=lab_timeline,
                 onset_date=onset_date,
-                suspension_status=drug.suspension_status,
+                suspension_date=drug.suspension_date,
             )
         )
         components.append(
@@ -619,22 +619,24 @@ class RucamScoreEstimator:
         injury_type: str,
         lab_timeline: PatientLabTimeline,
         onset_date: date | None,
-        suspension_status: bool | None,
+        suspension_date: str | None,
     ) -> RucamComponentAssessment:
-        if onset_date is None or suspension_status is None:
+        withdrawal_date = self.try_parse_date(suspension_date)
+        if onset_date is None or withdrawal_date is None:
             return RucamComponentAssessment(
                 component_key="course",
                 label="Course after withdrawal",
                 score=0,
                 status="not_assessable",
-                evidence_date=onset_date.isoformat() if onset_date else None,
-                rationale="No onset date or withdrawal status available.",
+                evidence_date=suspension_date
+                or (onset_date.isoformat() if onset_date else None),
+                rationale="No onset date or withdrawal date available.",
             )
         _ = injury_type
         dated = []
         for entry in lab_timeline.entries:
             d = self.try_parse_date(entry.sample_date)
-            if d is not None and d > onset_date and entry.value is not None:
+            if d is not None and d >= withdrawal_date and entry.value is not None:
                 dated.append((d, entry.value))
         if not dated:
             return RucamComponentAssessment(
@@ -642,8 +644,8 @@ class RucamScoreEstimator:
                 label="Course after withdrawal",
                 score=0,
                 status="not_assessable",
-                evidence_date=onset_date.isoformat(),
-                rationale="No follow-up labs after onset/withdrawal.",
+                evidence_date=withdrawal_date.isoformat(),
+                rationale="No follow-up labs after withdrawal.",
             )
         return RucamComponentAssessment(
             component_key="course",

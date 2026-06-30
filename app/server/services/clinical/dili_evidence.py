@@ -65,7 +65,10 @@ class DiliEvidenceBuilder:
                 resolved_map.get(normalize_drug_query_name(drug.name), {}),
                 rucam_map.get(normalize_drug_query_name(drug.name)),
                 differential,
-                timeline.dechallenge_status,
+                timeline.drug_dechallenge_statuses.get(
+                    drug.name,
+                    timeline.dechallenge_status,
+                ),
                 primary_pattern,
                 timeline.first_abnormal_liver_test_date,
             )

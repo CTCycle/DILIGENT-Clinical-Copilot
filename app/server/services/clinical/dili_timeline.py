@@ -41,6 +41,11 @@ class DiliTimelineEngine:
             drugs,
             dated_labs,
         )
+        drug_dechallenge_statuses = {
+            drug.name: self.dechallenge_status_for_drug(drug, dated_labs)
+            for drug in drugs
+            if drug.name
+        }
 
         if first_symptom is None:
             missing.append("first_symptom_date")
@@ -57,6 +62,7 @@ class DiliTimelineEngine:
             jaundice_or_bilirubin_rise_date=bilirubin_event or peak_dates.get("BILIRUBIN"),
             peak_dates=peak_dates,
             dechallenge_status=dechallenge_status,
+            drug_dechallenge_statuses=drug_dechallenge_statuses,
             recovery_date=recovery_date,
             last_abnormal_date=last_abnormal_date,
             missing_fields=sorted(set(missing)),
@@ -314,6 +320,43 @@ class DiliTimelineEngine:
         if last_multiple < first_multiple * 0.5:
             return "improving_after_stop", None, last_date
         return "stable_abnormality", None, last_date
+
+    def dechallenge_status_for_drug(
+        self,
+        drug: DrugEntry,
+        labs: list[ClinicalLabEntry],
+    ) -> str:
+        stop_date = self.parse_date(drug.suspension_date)
+        if stop_date is None:
+            return "no_follow_up"
+        alt_like = [
+            item
+            for item in labs
+            if item.marker_name.upper() in {"ALT", "AST"}
+            and self.parse_date(item.sample_date) is not None
+        ]
+        if len(alt_like) < 2:
+            return "insufficient_interval"
+        after_stop = [
+            item
+            for item in alt_like
+            if (self.parse_date(item.sample_date) or date.min) >= stop_date
+        ]
+        if len(after_stop) < 2:
+            return "insufficient_interval"
+        first_multiple = self._multiple(after_stop[0]) or 0.0
+        last_multiple = self._multiple(after_stop[-1]) or 0.0
+        last_date = self.parse_date(after_stop[-1].sample_date)
+        if last_multiple > first_multiple * 1.2:
+            return "worsening_after_stop"
+        if last_multiple <= 1.0:
+            return "resolved_to_baseline"
+        days_followed = ((last_date or stop_date) - stop_date).days
+        if days_followed >= 180 and last_multiple > 1.0:
+            return "chronic_or_persistent"
+        if last_multiple < first_multiple * 0.5:
+            return "improving_after_stop"
+        return "stable_abnormality"
 
     @staticmethod
     def _extract_date_from_text(text: str) -> str | None:

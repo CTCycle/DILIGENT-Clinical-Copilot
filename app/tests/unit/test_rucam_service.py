@@ -20,7 +20,10 @@ def _base_inputs() -> tuple[PatientData, PatientDrugs, PatientLabTimeline]:
     drugs = PatientDrugs(
         entries=[
             DrugEntry(
-                name="Drug A", therapy_start_date="2025-01-01", suspension_status=True
+                name="Drug A",
+                therapy_start_date="2025-01-01",
+                suspension_status=True,
+                suspension_date="2025-01-10",
             )
         ]
     )
@@ -213,3 +216,41 @@ def test_rechallenge_component_carries_supporting_text_when_present() -> None:
     )
     assert component.status in {"scored", "not_assessable"}
     assert component.evidence
+
+
+###############################################################################
+def test_course_scoring_uses_target_drug_withdrawal_date() -> None:
+    estimator = RucamScoreEstimator()
+    component = estimator.score_course(
+        injury_type="hepatocellular",
+        lab_timeline=PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=300,
+                    upper_limit_normal=40,
+                    sample_date="2025-01-10",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=180,
+                    upper_limit_normal=40,
+                    sample_date="2025-01-20",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=90,
+                    upper_limit_normal=40,
+                    sample_date="2025-02-15",
+                    source="laboratory_analysis",
+                ),
+            ]
+        ),
+        onset_date=estimator.try_parse_date("2025-01-10"),
+        suspension_date="2025-02-01",
+    )
+
+    assert component.status == "scored"
+    assert component.evidence_date == "2025-02-15"
