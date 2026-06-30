@@ -1,8 +1,10 @@
 import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { createServer, request } from 'node:http';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const rootDir = process.cwd();
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(scriptDir, '..');
 const distDir = path.resolve(rootDir, 'dist/browser');
 const staticRoot = distDir;
 const envPath = path.resolve(rootDir, '../../settings/.env');
