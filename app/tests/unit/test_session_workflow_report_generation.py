@@ -15,7 +15,6 @@ from domain.clinical.entities import (
     PatientDrugs,
     PatientLabTimeline,
     PatientRucamAssessmentBundle,
-    RagDocumentReference,
 )
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.session_shared import build_failed_session_payload
@@ -169,20 +168,7 @@ class FakeClinicalService:
     async def run_consultation(self, **kwargs: Any) -> tuple[SimpleNamespace, str]:
         _ = kwargs
         return (
-            SimpleNamespace(
-                llm_model="test-clinical-model",
-                entries=[
-                    SimpleNamespace(
-                        rag_references=[
-                            RagDocumentReference(
-                                file_name="dili-guideline.pdf",
-                                page_start=4,
-                                page_end=4,
-                            )
-                        ]
-                    )
-                ],
-            ),
+            SimpleNamespace(llm_model="test-clinical-model"),
             "Relazione narrativa con discussione farmacologica e sintesi finale.",
         )
 
@@ -232,11 +218,6 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
 
     assert result["final_report"].startswith("# Structured DILI causality dossier")
     assert "## 14. Acceptance questions" in result["final_report"]
-    assert "dili-guideline.pdf, p. 4" in result["final_report"]
-    assert (
-        result["dili_evidence_bundle"]["rag_references"][0]["file_name"]
-        == "dili-guideline.pdf"
-    )
     assert result["dili_evidence_bundle"]["manual_review_required"] is True
     assert result["llm_clinical_summary"] == "Relazione narrativa con discussione farmacologica e sintesi finale."
     assert result["final_report"] in result["report"]

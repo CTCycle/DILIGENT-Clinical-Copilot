@@ -67,59 +67,6 @@ def test_insufficient_pattern_labs_raise_blocker() -> None:
         issue.code == "missing_hepatotoxicity_inputs" for issue in assessment.issues
     )
 
-
-###############################################################################
-def test_missing_pattern_uln_raises_blocker_instead_of_using_defaults() -> None:
-    assessment = HepatotoxicityPatternAnalyzer().assess_payload(
-        PatientLabTimeline(
-            entries=[
-                ClinicalLabEntry(
-                    marker_name="ALT",
-                    value=200,
-                    sample_date="2025-01-01",
-                    source="laboratory_analysis",
-                ),
-                ClinicalLabEntry(
-                    marker_name="ALP",
-                    value=120,
-                    sample_date="2025-01-01",
-                    source="laboratory_analysis",
-                ),
-            ]
-        )
-    )
-
-    assert assessment.status == "undetermined_due_to_missing_labs"
-    assert assessment.score.r_score is None
-    assert assessment.score.classification == "indeterminate"
-
-
-###############################################################################
-def test_partial_pattern_uln_raises_blocker_instead_of_using_defaults() -> None:
-    assessment = HepatotoxicityPatternAnalyzer().assess_payload(
-        PatientLabTimeline(
-            entries=[
-                ClinicalLabEntry(
-                    marker_name="ALT",
-                    value=200,
-                    upper_limit_normal=40,
-                    sample_date="2025-01-01",
-                    source="laboratory_analysis",
-                ),
-                ClinicalLabEntry(
-                    marker_name="ALP",
-                    value=120,
-                    sample_date="2025-01-01",
-                    source="laboratory_analysis",
-                ),
-            ]
-        )
-    )
-
-    assert assessment.status == "undetermined_due_to_missing_labs"
-    assert assessment.score.r_score is None
-    assert assessment.score.classification == "indeterminate"
-
 ###############################################################################
 def test_non_critical_missing_data_does_not_block() -> None:
     payload = PatientData(

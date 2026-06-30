@@ -603,73 +603,6 @@
     },
     {
       "domain": "clinical_extraction",
-      "category": "laboratory_markers",
-      "key": "LDH",
-      "locale": "und",
-      "priority": 100,
-      "values": [
-        "ldh",
-        "lactate dehydrogenase",
-        "lattato deidrogenasi"
-      ],
-      "metadata": {
-        "case_sensitive": false,
-        "match_mode": "phrase"
-      }
-    },
-    {
-      "domain": "clinical_extraction",
-      "category": "laboratory_markers",
-      "key": "CK",
-      "locale": "und",
-      "priority": 100,
-      "values": [
-        "ck",
-        "cpk",
-        "creatine kinase",
-        "creatina chinasi"
-      ],
-      "metadata": {
-        "case_sensitive": false,
-        "match_mode": "phrase"
-      }
-    },
-    {
-      "domain": "clinical_extraction",
-      "category": "laboratory_markers",
-      "key": "PT",
-      "locale": "und",
-      "priority": 100,
-      "values": [
-        "pt",
-        "prothrombin time",
-        "tempo di protrombina"
-      ],
-      "metadata": {
-        "case_sensitive": false,
-        "match_mode": "phrase"
-      }
-    },
-    {
-      "domain": "clinical_extraction",
-      "category": "laboratory_markers",
-      "key": "CRP",
-      "locale": "und",
-      "priority": 100,
-      "values": [
-        "crp",
-        "c reactive protein",
-        "c-reactive protein",
-        "pcr",
-        "proteina c reattiva"
-      ],
-      "metadata": {
-        "case_sensitive": false,
-        "match_mode": "phrase"
-      }
-    },
-    {
-      "domain": "clinical_extraction",
       "category": "laboratory_units",
       "key": "default",
       "locale": "und",
@@ -677,12 +610,7 @@
       "values": [
         "u/l",
         "mg/dl",
-        "umol/l",
-        "ukat/l",
-        "g/l",
-        "seconds",
-        "sec",
-        "x10^9/l"
+        "umol/l"
       ],
       "metadata": {
         "case_sensitive": false,
