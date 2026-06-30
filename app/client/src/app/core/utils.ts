@@ -108,6 +108,13 @@ function extractBase64Payload(dataUrl: string | null): string | null {
   return normalized;
 }
 
+function resolveSelectedModelProviders(settings: RuntimeSettings): string[] {
+  if (settings.useCloudServices) {
+    return settings.provider ? [settings.provider] : [];
+  }
+  return ["ollama"];
+}
+
 export function buildClinicalPayload(
   form: ClinicalFormState,
   settings: RuntimeSettings,
@@ -116,7 +123,7 @@ export function buildClinicalPayload(
     name: sanitizeField(form.patientName),
     visit_date: buildVisitDatePayload(form.visitDate),
     clinical_input: sanitizeField(form.clinicalInput),
-    selected_model_providers: settings.provider ? [settings.provider] : [],
+    selected_model_providers: resolveSelectedModelProviders(settings),
     patient_image_base64: extractBase64Payload(form.patientImageDataUrl),
     use_rag: form.useRag,
   };

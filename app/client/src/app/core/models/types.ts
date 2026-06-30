@@ -42,11 +42,10 @@ export type RagSettings = {
 };
 
 export type ModelConfigStateResponse = {
-  status: "success";
   local_models: LocalModelCard[];
   cloud_model_choices: Partial<Record<CloudProvider, string[]>>;
   use_cloud_services: boolean;
-  llm_provider: CloudProvider;
+  llm_provider: string;
   cloud_model: string | null;
   clinical_model: string | null;
   text_extraction_model: string | null;
@@ -70,7 +69,7 @@ export type ModelConfigUpdateRequest = {
   rag_settings?: Partial<RagSettings>;
 };
 
-export type AccessKeyProvider = "openai" | "gemini" | "openrouter";
+export type AccessKeyProvider = "openai" | "gemini" | "brave";
 
 export type AccessKeyRecord = {
   id: number;

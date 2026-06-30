@@ -29,6 +29,7 @@ import {
 import { buildQueryString, requestJson } from "./http-api";
 
 const TIMELINE_REQUEST_TIMEOUT_SECONDS = 360;
+const INSPECTION_JOB_STATUS_TIMEOUT_SECONDS = 20;
 
 export async function fetchInspectionSessions(
   query: InspectionSessionQuery,
@@ -197,10 +198,12 @@ export async function startInspectionRxNavUpdateJob(
 
 export async function fetchInspectionRxNavUpdateJobStatus(
   jobId: string,
+  timeoutSeconds: number = INSPECTION_JOB_STATUS_TIMEOUT_SECONDS,
 ): Promise<InspectionUpdateJobStatusResponse> {
   return requestJson<InspectionUpdateJobStatusResponse>(
     `${API_BASE_URL}/inspection/rxnav/jobs/${encodeURIComponent(jobId)}`,
     { method: "GET" },
+    timeoutSeconds,
   );
 }
 
@@ -265,10 +268,12 @@ export async function startInspectionLiverToxUpdateJob(
 
 export async function fetchInspectionLiverToxUpdateJobStatus(
   jobId: string,
+  timeoutSeconds: number = INSPECTION_JOB_STATUS_TIMEOUT_SECONDS,
 ): Promise<InspectionUpdateJobStatusResponse> {
   return requestJson<InspectionUpdateJobStatusResponse>(
     `${API_BASE_URL}/inspection/livertox/jobs/${encodeURIComponent(jobId)}`,
     { method: "GET" },
+    timeoutSeconds,
   );
 }
 
@@ -320,10 +325,12 @@ export async function startInspectionRagUpdateJob(
 
 export async function fetchInspectionRagUpdateJobStatus(
   jobId: string,
+  timeoutSeconds: number = INSPECTION_JOB_STATUS_TIMEOUT_SECONDS,
 ): Promise<InspectionUpdateJobStatusResponse> {
   return requestJson<InspectionUpdateJobStatusResponse>(
     `${API_BASE_URL}/inspection/rag/jobs/${encodeURIComponent(jobId)}`,
     { method: "GET" },
+    timeoutSeconds,
   );
 }
 
