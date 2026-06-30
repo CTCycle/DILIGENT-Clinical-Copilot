@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+
+import pytest
 
 from services.llm import ollama_structured
 
@@ -74,3 +77,43 @@ def test_parse_with_repairs_uses_compact_repair_messages_for_schema_echo() -> No
     assert result == {"ok": '{"entries":[]}'}
     assert client.captured_messages is not None
     assert "schema or wrapper instead of data" in client.captured_messages[1]["content"]
+
+
+###############################################################################
+def test_parse_failure_logs_hash_not_raw_ollama_output(caplog) -> None:
+    class FakeParser:
+        def parse(self, text: str) -> dict[str, str]:
+            _ = text
+            raise ValueError("bad json")
+
+    class FakeClient:
+        async def chat(self, **kwargs):
+            _ = kwargs
+            return "Patient Mario Rossi CF RSSMRA fake PHI {not valid json"
+
+        build_repair_messages = staticmethod(ollama_structured.build_repair_messages)
+        build_compact_repair_messages = staticmethod(
+            ollama_structured.build_compact_repair_messages
+        )
+        _coerce_llm_text = staticmethod(ollama_structured._coerce_llm_text)
+
+    caplog.set_level(logging.ERROR)
+    with pytest.raises(RuntimeError):
+        asyncio.run(
+            ollama_structured.parse_with_repairs(
+                FakeClient(),
+                parser=FakeParser(),
+                text="Patient Mario Rossi CF RSSMRA fake PHI {not valid json",
+                active_model="qwen3.5:2b",
+                system_prompt="Return JSON.",
+                format_instructions="Return JSON.",
+                use_json_mode=True,
+                max_repair_attempts=1,
+            )
+        )
+
+    logs = caplog.text
+    assert "Structured parse failed after retries" in logs
+    assert "output_hash=" in logs
+    assert "Mario Rossi" not in logs
+    assert "RSSMRA" not in logs
