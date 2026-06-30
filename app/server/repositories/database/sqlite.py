@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from common.paths import DATABASE_FILE_PATH
 from common.utils.logger import logger
 from domain.settings.configuration import DatabaseSettings
-from repositories.schemas.models import Base
+from repositories.schemas.models import Base, ClinicalSessionLab
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
@@ -35,6 +35,7 @@ class SQLiteRepository:
             expire_on_commit=False,
         )
         Base.metadata.create_all(self.engine)
+        ensure_clinical_session_labs_observation_schema(self.engine)
         AccessKeyEncryptionMaterialSerializer(
             engine=self.engine,
             session_factory=seed_session_factory,
@@ -62,3 +63,44 @@ class SQLiteRepository:
             cursor.execute("PRAGMA journal_mode=MEMORY")
         finally:
             cursor.close()
+
+
+###############################################################################
+def ensure_clinical_session_labs_observation_schema(engine: Engine) -> None:
+    with engine.begin() as connection:
+        rows = connection.execute(
+            sqlalchemy.text("PRAGMA table_info(clinical_session_labs)")
+        ).mappings().all()
+        columns = {str(row["name"]) for row in rows}
+        if not columns or "observation_index" in columns:
+            return
+        connection.execute(
+            sqlalchemy.text(
+                "ALTER TABLE clinical_session_labs "
+                "RENAME TO clinical_session_labs_legacy"
+            )
+        )
+        ClinicalSessionLab.__table__.create(bind=connection)
+        connection.execute(
+            sqlalchemy.text(
+                """
+                INSERT INTO clinical_session_labs (
+                    id,
+                    session_id,
+                    lab_code,
+                    observation_index,
+                    value_raw,
+                    upper_limit_raw
+                )
+                SELECT
+                    id,
+                    session_id,
+                    lab_code,
+                    0,
+                    value_raw,
+                    upper_limit_raw
+                FROM clinical_session_labs_legacy
+                """
+            )
+        )
+        connection.execute(sqlalchemy.text("DROP TABLE clinical_session_labs_legacy"))

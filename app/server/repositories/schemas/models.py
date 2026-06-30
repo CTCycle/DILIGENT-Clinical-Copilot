@@ -804,8 +804,14 @@ class ClinicalSessionLab(Base):
         nullable=False,
     )
     lab_code: Mapped[str] = mapped_column(String, nullable=False)
+    observation_index: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    sample_date_raw: Mapped[str | None] = mapped_column(String)
     value_raw: Mapped[str | None] = mapped_column(String)
+    unit_raw: Mapped[str | None] = mapped_column(String)
     upper_limit_raw: Mapped[str | None] = mapped_column(String)
+    source: Mapped[str | None] = mapped_column(String)
 
     session: Mapped["ClinicalSession"] = relationship(
         "ClinicalSession",
@@ -816,9 +822,16 @@ class ClinicalSessionLab(Base):
         UniqueConstraint(
             "session_id",
             "lab_code",
+            "observation_index",
             name="uq_clinical_session_labs_identity",
         ),
         Index("ix_clinical_session_labs_session_id", "session_id"),
+        Index(
+            "ix_clinical_session_labs_session_code_date",
+            "session_id",
+            "lab_code",
+            "sample_date_raw",
+        ),
     )
 
 ###############################################################################
