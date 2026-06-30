@@ -389,6 +389,7 @@ async def process_single_patient_workflow(
         progress_callback=progress_callback,
         stop_check=stop_check,
     )
+    rag_references = collect_rag_references(clinical_session)
     dili_evidence_bundle = DiliEvidenceBuilder().build(
         payload=payload,
         drugs=analysis_drugs,
@@ -397,6 +398,7 @@ async def process_single_patient_workflow(
             prepared_inputs.resolved_drugs if prepared_inputs is not None else None
         ),
         rucam_bundle=rucam_bundle,
+        rag_references=rag_references,
     )
     structured_dili_report = DiliEvidenceBuilder.render(dili_evidence_bundle)
     final_report = structured_dili_report
@@ -711,6 +713,25 @@ async def process_single_patient_workflow(
         logger.warning("Clinical assessment persistence returned no session id.")
         raise ClinicalPersistenceError()
     return result_payload
+
+
+###############################################################################
+def collect_rag_references(clinical_session: Any) -> list[dict[str, Any]]:
+    references: list[dict[str, Any]] = []
+    entries = getattr(clinical_session, "entries", None)
+    if not isinstance(entries, list):
+        return references
+    for entry in entries:
+        entry_references = getattr(entry, "rag_references", None)
+        if not isinstance(entry_references, list):
+            continue
+        for reference in entry_references:
+            if hasattr(reference, "model_dump"):
+                references.append(reference.model_dump())
+            elif isinstance(reference, dict):
+                references.append(reference)
+    return references
+
 
 ###############################################################################
 def start_clinical_job_workflow(
