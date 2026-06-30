@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from typing import Any, NoReturn
@@ -318,8 +319,14 @@ async def parse_with_repairs(
         except Exception as err:
             if attempt >= max_repair_attempts:
                 logger.error(
-                    "Structured parse failed after retries. Last text: %s",
-                    text,
+                    "Structured parse failed after retries: model=%s "
+                    "output_length=%s output_hash=%s error_type=%s",
+                    active_model,
+                    len(text),
+                    hashlib.sha256(
+                        text.encode("utf-8", errors="replace")
+                    ).hexdigest()[:12],
+                    type(err).__name__,
                 )
                 raise RuntimeError(f"Structured parsing failed: {err}") from err
 
