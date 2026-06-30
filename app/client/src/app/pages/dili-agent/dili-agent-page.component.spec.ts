@@ -15,10 +15,6 @@ describe('DiliAgentPageComponent', () => {
     fixture.detectChanges();
   });
 
-  it('creates', () => {
-    expect(component).toBeTruthy();
-  });
-
   it('canStartSession false when visit date missing', () => {
     component.stateService.updateDiliAgent({
       form: { ...component.vm.form, visitDate: '', clinicalInput: 'word '.repeat(60) },

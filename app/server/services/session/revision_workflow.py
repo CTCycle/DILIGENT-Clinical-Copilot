@@ -1379,7 +1379,8 @@ async def process_revision_patient_workflow(
         ),
         rucam_bundle=rucam_bundle,
     )
-    final_report = DiliEvidenceBuilder.render(dili_evidence_bundle)
+    structured_dili_report = DiliEvidenceBuilder.render(dili_evidence_bundle)
+    dili_user_summary = DiliEvidenceBuilder.render_user_summary(dili_evidence_bundle)
 
     fact_graph = build_fact_graph(
         extraction_artifact=extraction_artifact,
@@ -1429,6 +1430,12 @@ async def process_revision_patient_workflow(
             )
             for issue in faithfulness_audit.blocking_issues
         )
+    final_report = DiliEvidenceBuilder.compose_clinical_report(
+        clinical_narrative=llm_clinical_summary,
+        generated_report=generated_report,
+        bundle=dili_evidence_bundle,
+        fallback_text=phrase("narrative_fallback", report_language),
+    )
 
     revision_finalization_outputs = _finalize_revision_report_outputs(
         report_metadata=report_metadata,
@@ -1608,6 +1615,8 @@ async def process_revision_patient_workflow(
             "fact_graph_validation": fact_graph_validation.model_dump(),
             "generated_report": generated_report,
             "dili_evidence_bundle": dili_evidence_bundle.model_dump(),
+            "structured_dili_report": structured_dili_report,
+            "dili_user_summary": dili_user_summary,
             "llm_clinical_summary": llm_clinical_summary,
             "report_metadata": report_metadata.model_dump(),
             "faithfulness_audit": faithfulness_audit.model_dump(),
