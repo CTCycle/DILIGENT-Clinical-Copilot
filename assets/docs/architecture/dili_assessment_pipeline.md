@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-06-26
+Last updated: 2026-06-30
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -57,9 +57,13 @@ structure. The bundle also carries twelve acceptance-question answers with
 supporting quotes and explicit missing-data statements so the final
 adjudication can be audited directly.
 
-The persisted `final_report` is the rendered deterministic dossier. Any LLM
-clinical synthesis is stored separately as audit-only summary text and is not
-allowed to introduce unsupported clinical facts into the authoritative report.
+The persisted `final_report` is the human-readable clinical DILI report. It
+restores per-drug clinical narrative from the consultation synthesis and appends
+a concise deterministic adjudication summary. The full rendered deterministic
+dossier is persisted separately as `pipeline_artifacts.structured_dili_report`,
+with the unchanged `dili_evidence_bundle` as the authoritative structured audit
+contract. LLM clinical synthesis must remain evidence-bounded and is not allowed
+to introduce unsupported clinical facts.
 
 Longitudinal adjudication is clinically conservative by default: dose changes,
 restart or rechallenge mentions, first symptoms, bilirubin or jaundice timing,

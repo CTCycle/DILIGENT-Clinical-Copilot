@@ -302,11 +302,12 @@ class DiliTimelineEngine:
         if len(after_stop) < 2:
             return "insufficient_interval", None, labs[-1].sample_date if labs else None
 
-        baseline_multiple = max(
-            (self._multiple(item) or 0.0)
+        baseline_multiples = [
+            self._multiple(item) or 0.0
             for item in alt_like
             if (self.parse_date(item.sample_date) or date.min) <= stop_date
-        )
+        ]
+        baseline_multiple = max(baseline_multiples) if baseline_multiples else 0.0
         first_multiple = self._multiple(after_stop[0]) or 0.0
         last_multiple = self._multiple(after_stop[-1]) or 0.0
         last_date = after_stop[-1].sample_date

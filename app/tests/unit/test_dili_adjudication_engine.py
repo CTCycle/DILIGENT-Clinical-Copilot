@@ -119,3 +119,84 @@ def test_report_has_required_fda_style_sections() -> None:
     for section_number in range(1, 15):
         assert f"## {section_number}." in report
     assert "Manual hepatology review required" in report
+
+
+###############################################################################
+def test_user_summary_groups_missing_data_without_raw_field_keys() -> None:
+    bundle = DiliEvidenceBuilder().build(
+        payload=PatientData(drugs="Aldactone\nCefepime"),
+        drugs=PatientDrugs(
+            entries=[
+                DrugEntry(name="Aldactone"),
+                DrugEntry(name="Cefepime", therapy_start_date="2025-02-19"),
+            ]
+        ),
+        labs=PatientLabTimeline(entries=[]),
+        resolved_drugs=None,
+        rucam_bundle=PatientRucamAssessmentBundle(entries=[]),
+    )
+
+    summary = DiliEvidenceBuilder.render_user_summary(bundle)
+    dossier = DiliEvidenceBuilder.render(bundle)
+
+    assert "## DILI adjudication summary" in summary
+    assert "### Clinically relevant missing data" in summary
+    assert "Exposure timing" in summary
+    assert "Aldactone: start date not documented" in summary
+    assert "Cefepime: stop date not documented" in summary
+    assert "Aldactone:drug_start_date" not in summary
+    assert "Aldactone:drug_start_date" not in dossier
+    assert "paired ALT and ALP values with ULN are unavailable" in summary
+    assert DiliEvidenceBuilder._format_missing_field(
+        "Aldactone:drugstartdate"
+    ) == ("Exposure timing", "Aldactone: start date not documented")
+
+
+###############################################################################
+def test_dechallenge_tolerates_missing_pre_stop_labs() -> None:
+    bundle = DiliEvidenceBuilder().build(
+        payload=PatientData(
+            anamnesis="Jaundice started 2026-06-15. Viral hepatitis negative.",
+            drugs=(
+                "Amoxicillin-clavulanate started 2026-06-01 and stopped "
+                "2026-06-14."
+            ),
+            laboratory_analysis="ALT improved after stopping therapy.",
+        ),
+        drugs=PatientDrugs(
+            entries=[
+                DrugEntry(
+                    name="Amoxicillin-clavulanate",
+                    source="therapy",
+                    therapy_start_date="2026-06-01",
+                    suspension_date="2026-06-14",
+                    evidence=(
+                        "Amoxicillin-clavulanate started 2026-06-01 and "
+                        "stopped 2026-06-14."
+                    ),
+                )
+            ]
+        ),
+        labs=PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=620,
+                    upper_limit_normal=40,
+                    sample_date="2026-06-16",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=240,
+                    upper_limit_normal=40,
+                    sample_date="2026-06-22",
+                    source="laboratory_analysis",
+                ),
+            ]
+        ),
+        resolved_drugs=None,
+        rucam_bundle=PatientRucamAssessmentBundle(entries=[]),
+    )
+
+    assert bundle.timeline.dechallenge_status == "improving_after_stop"
