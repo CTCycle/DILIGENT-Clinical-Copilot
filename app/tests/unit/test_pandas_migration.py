@@ -126,7 +126,7 @@ def test_save_clinical_session_persists_raw_result_payload() -> None:
     assert json.loads(result_row.payload_json) == raw_payload
 
 ###############################################################################
-def test_save_clinical_session_deduplicates_labs_per_marker() -> None:
+def test_save_clinical_session_persists_lab_observations() -> None:
     serializer, engine = build_serializer()
     serializer.save_clinical_session(
         {
@@ -138,19 +138,25 @@ def test_save_clinical_session_deduplicates_labs_per_marker() -> None:
                         "marker_name": "ALT",
                         "sample_date": "2025-01-01",
                         "value": "120",
+                        "unit": "U/L",
                         "upper_limit_normal": "40",
+                        "source": "laboratory_analysis",
                     },
                     {
                         "marker_name": "ALT",
                         "sample_date": "2025-01-03",
                         "value": "150",
+                        "unit": "U/L",
                         "upper_limit_normal": "40",
+                        "source": "laboratory_analysis",
                     },
                     {
                         "marker_name": "AST",
                         "sample_date": "2025-01-02",
                         "value": "90",
+                        "unit": "U/L",
                         "upper_limit_normal": "35",
+                        "source": "laboratory_analysis",
                     },
                 ],
             },
@@ -161,14 +167,25 @@ def test_save_clinical_session_deduplicates_labs_per_marker() -> None:
     with factory() as db_session:
         labs = (
             db_session.execute(
-                select(ClinicalSessionLab).order_by(ClinicalSessionLab.lab_code)
+                select(ClinicalSessionLab).order_by(
+                    ClinicalSessionLab.observation_index
+                )
             )
             .scalars()
             .all()
         )
 
-    assert len(labs) == 2
-    assert [row.lab_code for row in labs] == ["alt", "ast"]
+    assert len(labs) == 3
+    assert [row.lab_code for row in labs] == ["alt", "alt", "ast"]
+    assert [row.sample_date_raw for row in labs] == [
+        "2025-01-01",
+        "2025-01-03",
+        "2025-01-02",
+    ]
+    assert [row.value_raw for row in labs] == ["120", "150", "90"]
+    assert [row.unit_raw for row in labs] == ["U/L", "U/L", "U/L"]
+    assert [row.upper_limit_raw for row in labs] == ["40", "40", "35"]
+    assert {row.source for row in labs} == {"laboratory_analysis"}
 
 ###############################################################################
 def test_livertox_data_keeps_internal_dataframe_copies_isolated() -> None:
