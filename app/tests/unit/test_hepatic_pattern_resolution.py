@@ -19,6 +19,23 @@ def test_explicit_pattern_is_preserved_without_overwriting_calculated_value() ->
     assert result.conflict is True
     assert result.warnings[0].code == "hepatic_pattern_source_calculation_conflict"
 
+
+###############################################################################
+def test_explicit_pattern_conflict_keeps_calculation_visible() -> None:
+    result = resolve_hepatic_pattern(
+        HepaticPatternResolutionInput(
+            explicit_pattern="cholestatic",
+            calculated_pattern="hepatocellular",
+            r_score=7.5,
+        )
+    )
+
+    assert result.final_value == "cholestatic"
+    assert result.calculated_value == "hepatocellular"
+    assert result.source == "provided"
+    assert result.conflict is True
+    assert "7.5" in result.warnings[0].message
+
 ###############################################################################
 def test_calculated_and_indeterminate_pattern_resolution() -> None:
     calculated = resolve_hepatic_pattern(
