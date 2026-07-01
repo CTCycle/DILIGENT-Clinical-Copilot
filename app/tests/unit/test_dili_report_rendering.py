@@ -75,11 +75,21 @@ def test_rag_bibliography_section_deduplicates_and_merges_ranges() -> None:
             DrugClinicalAssessment(
                 drug_name="Drug A",
                 rag_references=[
-                    RagDocumentReference(file_name="alpha.pdf", page_start=2, page_end=2),
-                    RagDocumentReference(file_name="alpha.pdf", page_start=3, page_end=3),
-                    RagDocumentReference(file_name="alpha.pdf", page_start=4, page_end=4),
-                    RagDocumentReference(file_name="alpha.pdf", page_start=4, page_end=4),
-                    RagDocumentReference(file_name="alpha.pdf", page_start=7, page_end=7),
+                    RagDocumentReference(
+                        file_name="alpha.pdf", page_start=2, page_end=2
+                    ),
+                    RagDocumentReference(
+                        file_name="alpha.pdf", page_start=3, page_end=3
+                    ),
+                    RagDocumentReference(
+                        file_name="alpha.pdf", page_start=4, page_end=4
+                    ),
+                    RagDocumentReference(
+                        file_name="alpha.pdf", page_start=4, page_end=4
+                    ),
+                    RagDocumentReference(
+                        file_name="alpha.pdf", page_start=7, page_end=7
+                    ),
                 ],
             )
         ],
@@ -113,7 +123,9 @@ def test_rag_bibliography_omits_raw_retrieved_text() -> None:
     finalizer = ReportFinalizer(object())
     entry = DrugClinicalAssessment(
         drug_name="Drug A",
-        extracted_excerpts=["Raw retrieved text that must stay out of the bibliography."],
+        extracted_excerpts=[
+            "Raw retrieved text that must stay out of the bibliography."
+        ],
         rag_references=[
             RagDocumentReference(file_name="alpha.pdf", page_start=9, page_end=9),
         ],

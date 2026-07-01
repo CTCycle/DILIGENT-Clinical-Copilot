@@ -55,4 +55,3 @@ def test_ui_owned_json_keys_are_ignored(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(paths, "CONFIGURATIONS_FILE", config_path)
 
     reset_app_settings_cache()
-

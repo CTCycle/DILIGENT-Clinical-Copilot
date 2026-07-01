@@ -231,9 +231,7 @@ def test_run_revision_consultation_uses_revision_analysis_entrypoint(
 
         # -------------------------------------------------------------------------
         async def run_analysis(self, **kwargs):
-            raise AssertionError(
-                "Revision consultation should not call run_analysis"
-            )
+            raise AssertionError("Revision consultation should not call run_analysis")
 
         # -------------------------------------------------------------------------
         async def run_revision_analysis(self, **kwargs):
@@ -274,7 +272,9 @@ def test_run_revision_consultation_uses_revision_analysis_entrypoint(
     assert final_report == "Revision synthesis report"
     assert payload_metadata["analysis_entrypoint"] == "run_revision_analysis"
     assert payload_metadata["consultation_model"] == "revision-model"
-    assert payload_metadata["drug_analysis_entrypoint"] == "request_revision_drug_analysis"
+    assert (
+        payload_metadata["drug_analysis_entrypoint"] == "request_revision_drug_analysis"
+    )
     assert (
         payload_metadata["report_finalization_entrypoint"]
         == "finalize_revision_patient_report"

@@ -109,7 +109,6 @@ def test_novel_inn_suffix_candidate_remains_for_missing_livertox_resolution() ->
     assert mention is not None
     assert mention.normalized_name == "trialzumab"
 
-
 ###############################################################################
 def test_therapy_hybrid_fallback_uses_complete_block_context(monkeypatch) -> None:
 

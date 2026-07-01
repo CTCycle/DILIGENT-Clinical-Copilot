@@ -45,7 +45,8 @@ def decision_to_payload(
         "match_status": decision.decision_status,
         "match_notes": decision.reasons,
         "match_candidates": [
-            candidate.model_dump(mode="json") for candidate in decision.livertox_candidates
+            candidate.model_dump(mode="json")
+            for candidate in decision.livertox_candidates
         ],
         "chosen_candidate": decision.accepted_livertox_name,
         "rejected_candidates": [
@@ -58,13 +59,16 @@ def decision_to_payload(
         "origins": mention.origins,
         "raw_mentions": mention.raw_mentions,
         "extraction_metadata": mention.extraction_metadata,
-        "regimen_group_ids": [mention.regimen_group_id] if mention.regimen_group_id else [],
+        "regimen_group_ids": [mention.regimen_group_id]
+        if mention.regimen_group_id
+        else [],
         "regimen_components": mention.regimen_components,
         "rxnav_candidates": [
             candidate.model_dump(mode="json") for candidate in decision.rxnav_candidates
         ],
         "livertox_candidates": [
-            candidate.model_dump(mode="json") for candidate in decision.livertox_candidates
+            candidate.model_dump(mode="json")
+            for candidate in decision.livertox_candidates
         ],
         "accepted_rxnav_rxcui": decision.accepted_rxnav_rxcui,
         "accepted_livertox_nbk_id": decision.accepted_livertox_nbk_id,

@@ -9,7 +9,6 @@ from domain.clinical.dili import (
 from domain.clinical.entities import DrugEntry, PatientLabTimeline
 from services.clinical.dili_timeline import DiliTimelineEngine
 
-
 ###############################################################################
 class HysLawDetector:
 
@@ -43,18 +42,30 @@ class HysLawDetector:
             if drug.name
             and drug.therapy_start_date
             and timeline.first_abnormal_liver_test_date
-            and self._plausible_latency(drug.therapy_start_date, timeline.first_abnormal_liver_test_date)
+            and self._plausible_latency(
+                drug.therapy_start_date, timeline.first_abnormal_liver_test_date
+            )
         ]
         exposure_timing_compatible = bool(compatible_exposures) if drugs else None
         signal_context = (
             "clinical_trial_signal"
-            if any(token in source_text.lower() for token in ("trial", "study arm", "randomized"))
+            if any(
+                token in source_text.lower()
+                for token in ("trial", "study arm", "randomized")
+            )
             else "individual_patient_risk_flag"
         )
 
         if None in (amino_met, bilirubin_met, same_episode):
             status = "not_assessable"
-        elif amino_met and bilirubin_met and same_episode and cholestasis_excluded and alternatives and exposure_timing_compatible:
+        elif (
+            amino_met
+            and bilirubin_met
+            and same_episode
+            and cholestasis_excluded
+            and alternatives
+            and exposure_timing_compatible
+        ):
             status = "meets_criteria"
         elif amino_met and bilirubin_met and same_episode:
             status = "possible"
@@ -88,12 +99,18 @@ class HysLawDetector:
     def _first_multiple(labs: PatientLabTimeline, markers: set[str]) -> float | None:
         candidates = []
         for lab in labs.entries:
-            if lab.marker_name.upper() not in markers or lab.value is None or not lab.upper_limit_normal:
+            if (
+                lab.marker_name.upper() not in markers
+                or lab.value is None
+                or not lab.upper_limit_normal
+            ):
                 continue
             parsed = DiliTimelineEngine.parse_date(lab.sample_date)
             if parsed is None:
                 continue
-            candidates.append((parsed, float(lab.value) / float(lab.upper_limit_normal)))
+            candidates.append(
+                (parsed, float(lab.value) / float(lab.upper_limit_normal))
+            )
         if not candidates:
             return None
         candidates.sort(key=lambda item: item[0])
@@ -119,7 +136,11 @@ class HysLawDetector:
         first_bili_date = timeline.jaundice_or_bilirubin_rise_date
         for lab in labs.entries:
             marker = lab.marker_name.upper()
-            if marker not in {"ALT", "AST"} or lab.value is None or not lab.upper_limit_normal:
+            if (
+                marker not in {"ALT", "AST"}
+                or lab.value is None
+                or not lab.upper_limit_normal
+            ):
                 continue
             if float(lab.value) / float(lab.upper_limit_normal) < 3:
                 continue
@@ -146,11 +167,15 @@ class HysLawDetector:
     def _build_evidence(timeline: DiliTimeline) -> list[ClinicalEvidenceQuote]:
         relevant = []
         for event in timeline.events:
-            if event.event_type in {
-                "abnormal_liver_test",
-                "jaundice_or_bilirubin_rise",
-                "drug_start",
-                "drug_stop",
-            } and event.evidence is not None:
+            if (
+                event.event_type
+                in {
+                    "abnormal_liver_test",
+                    "jaundice_or_bilirubin_rise",
+                    "drug_start",
+                    "drug_stop",
+                }
+                and event.evidence is not None
+            ):
                 relevant.append(event.evidence)
         return relevant[:6]

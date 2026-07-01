@@ -13,13 +13,11 @@ from domain.clinical.entities import (
 from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.clinical.dili_pattern import DiliPatternEngine
 
-
 ###############################################################################
 def test_r_ratio_boundary_values_follow_livertox_definitions() -> None:
     assert DiliPatternEngine.classify(5.0) == "hepatocellular"
     assert DiliPatternEngine.classify(2.0) == "cholestatic"
     assert DiliPatternEngine.classify(3.0) == "mixed"
-
 
 ###############################################################################
 def test_structured_dossier_preserves_missing_competing_causes() -> None:
@@ -105,7 +103,6 @@ def test_structured_dossier_preserves_missing_competing_causes() -> None:
     )
     assert bundle.manual_review_required is True
 
-
 ###############################################################################
 def test_report_has_required_fda_style_sections() -> None:
     bundle = DiliEvidenceBuilder().build(
@@ -119,7 +116,6 @@ def test_report_has_required_fda_style_sections() -> None:
     for section_number in range(1, 15):
         assert f"## {section_number}." in report
     assert "Manual hepatology review required" in report
-
 
 ###############################################################################
 def test_user_summary_groups_missing_data_without_raw_field_keys() -> None:
@@ -147,10 +143,10 @@ def test_user_summary_groups_missing_data_without_raw_field_keys() -> None:
     assert "Aldactone:drug_start_date" not in summary
     assert "Aldactone:drug_start_date" not in dossier
     assert "paired ALT and ALP values with ULN are unavailable" in summary
-    assert DiliEvidenceBuilder._format_missing_field(
-        "Aldactone:drugstartdate"
-    ) == ("Exposure timing", "Aldactone: start date not documented")
-
+    assert DiliEvidenceBuilder._format_missing_field("Aldactone:drugstartdate") == (
+        "Exposure timing",
+        "Aldactone: start date not documented",
+    )
 
 ###############################################################################
 def test_dechallenge_tolerates_missing_pre_stop_labs() -> None:
@@ -158,8 +154,7 @@ def test_dechallenge_tolerates_missing_pre_stop_labs() -> None:
         payload=PatientData(
             anamnesis="Jaundice started 2026-06-15. Viral hepatitis negative.",
             drugs=(
-                "Amoxicillin-clavulanate started 2026-06-01 and stopped "
-                "2026-06-14."
+                "Amoxicillin-clavulanate started 2026-06-01 and stopped 2026-06-14."
             ),
             laboratory_analysis="ALT improved after stopping therapy.",
         ),

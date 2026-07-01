@@ -902,7 +902,9 @@ async def _run_revision_consultation(
     revision_consultation_runner = getattr(service, "run_revision_consultation", None)
     if not callable(revision_consultation_runner):
         raise ServiceError("Revision consultation runner is not configured")
-    revision_consultation_runner = cast(Callable[..., Awaitable[Any]], revision_consultation_runner)
+    revision_consultation_runner = cast(
+        Callable[..., Awaitable[Any]], revision_consultation_runner
+    )
     service_payload: dict[str, Any] | None = None
     (
         clinical_session,

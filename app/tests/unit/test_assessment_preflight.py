@@ -177,7 +177,9 @@ def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
         "services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled",
         lambda: False,
     )
-    monkeypatch.setattr(service.job_manager, "is_job_running", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        service.job_manager, "is_job_running", lambda *args, **kwargs: False
+    )
     monkeypatch.setattr(service.job_manager, "start_job", lambda **kwargs: "job-123")
     monkeypatch.setattr(
         service.job_manager,
@@ -213,9 +215,9 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     )
     monkeypatch.setattr(
         "services.session.preflight.LLMRuntimeConfig.resolve_provider_and_model",
-        lambda role: ("ollama", "qwen3.5:2b")
-        if role == "parser"
-        else ("ollama", "gpt-oss:20b"),
+        lambda role: (
+            ("ollama", "qwen3.5:2b") if role == "parser" else ("ollama", "gpt-oss:20b")
+        ),
     )
     request = ClinicalSessionRequest(
         visit_date=date(2025, 3, 20),
@@ -261,9 +263,9 @@ def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
     )
     monkeypatch.setattr(
         "services.session.preflight.LLMRuntimeConfig.resolve_provider_and_model",
-        lambda role: ("ollama", "qwen3.5:2b")
-        if role == "parser"
-        else ("ollama", "gpt-oss:20b"),
+        lambda role: (
+            ("ollama", "qwen3.5:2b") if role == "parser" else ("ollama", "gpt-oss:20b")
+        ),
     )
 
     request = ClinicalSessionRequest(
@@ -284,8 +286,7 @@ def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
     result = validate_clinical_input_preflight(service, request)
 
     assert not any(
-        issue.code == "requested_provider_mismatch"
-        for issue in result.blocking_issues
+        issue.code == "requested_provider_mismatch" for issue in result.blocking_issues
     )
     assert result.runtime_settings["llm_provider"] == "openai"
     assert result.runtime_settings["clinical_provider"] == "ollama"

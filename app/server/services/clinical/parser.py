@@ -288,9 +288,7 @@ class DrugsParser:
     # -------------------------------------------------------------------------
     def _build_drug_form_suffix_re(self) -> re.Pattern[str]:
         snapshot = get_reference_catalog_snapshot()
-        values = list(
-            snapshot.values("clinical_extraction", "drug_form_suffixes")
-        )
+        values = list(snapshot.values("clinical_extraction", "drug_form_suffixes"))
         if not values:
             return self.DRUG_FORM_SUFFIX_RE
         escaped = [re.escape(value.strip()) for value in values if value.strip()]
@@ -327,7 +325,13 @@ class DrugsParser:
     # -------------------------------------------------------------------------
     def normalize_local_drug_entry(self, entry: LocalDrugEntryDraft) -> DrugEntry:
         current_status = (entry.current_status or "").strip().casefold() or None
-        if current_status not in {"current", "past", "suspected", "ruled_out", "unclear"}:
+        if current_status not in {
+            "current",
+            "past",
+            "suspected",
+            "ruled_out",
+            "unclear",
+        }:
             current_status = None
         return DrugEntry(
             name=entry.name,
@@ -341,8 +345,7 @@ class DrugsParser:
             therapy_start_date=entry.therapy_start_date,
             evidence=entry.evidence,
             current_status=cast(
-                Literal["current", "past", "suspected", "ruled_out", "unclear"]
-                | None,
+                Literal["current", "past", "suspected", "ruled_out", "unclear"] | None,
                 current_status,
             ),
         )
@@ -848,9 +851,7 @@ class DrugsParser:
             if normalized_evidence and normalized_evidence in llm_evidence:
                 continue
             if any(
-                normalized_evidence
-                and evidence
-                and evidence in normalized_evidence
+                normalized_evidence and evidence and evidence in normalized_evidence
                 for evidence in llm_evidence
             ):
                 continue
@@ -865,7 +866,9 @@ class DrugsParser:
             if evidence:
                 messages.append(f"Missing explicit medication evidence: {evidence}")
         if len(entries) > 10:
-            messages.append(f"Missing {len(entries) - 10} additional medication entries.")
+            messages.append(
+                f"Missing {len(entries) - 10} additional medication entries."
+            )
         return messages or ["Medication-like source evidence was omitted."]
 
     # -------------------------------------------------------------------------
@@ -1582,9 +1585,7 @@ class DrugsParser:
             return None
         evidence = self.sanitize_text_field(entry.evidence)
         source_fold = source_text.casefold()
-        evidence_start = (
-            source_fold.find(evidence.casefold()) if evidence else -1
-        )
+        evidence_start = source_fold.find(evidence.casefold()) if evidence else -1
         raw_name = (entry.name or "").strip()
         name_start, name_end = self.find_grounded_name_span(raw_name, source_text)
         if self.is_truncated_compound_name(

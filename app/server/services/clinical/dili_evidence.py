@@ -23,7 +23,6 @@ from services.clinical.dili_severity import DiliSeverityGrader
 from services.clinical.dili_timeline import DiliTimelineEngine
 from services.text.normalization import normalize_drug_query_name
 
-
 ###############################################################################
 class DiliEvidenceBuilder:
 
@@ -60,7 +59,8 @@ class DiliEvidenceBuilder:
             for key, value in (resolved_drugs or {}).items()
         }
         rucam_map = {
-            normalize_drug_query_name(item.drug_name): item for item in rucam_bundle.entries
+            normalize_drug_query_name(item.drug_name): item
+            for item in rucam_bundle.entries
         }
         causality = DiliCausalityEngine()
         exposures = [
@@ -79,7 +79,8 @@ class DiliEvidenceBuilder:
             exposure.dose_changes = [
                 event
                 for event in timeline.events
-                if event.drug_name == exposure.drug_name and event.event_type == "dose_change"
+                if event.drug_name == exposure.drug_name
+                and event.event_type == "dose_change"
             ]
 
         missing = list(timeline.missing_fields)
@@ -95,7 +96,11 @@ class DiliEvidenceBuilder:
             severity=severity,
             exposures=exposures,
         )
-        evidence = [quote for question in acceptance_questions for quote in question.supporting_evidence][:12]
+        evidence = [
+            quote
+            for question in acceptance_questions
+            for quote in question.supporting_evidence
+        ][:12]
         return DiliEvidenceBundle(
             completeness=ClinicalDataCompleteness(
                 complete_fields=["drug_exposures", "laboratory_timeline"]
@@ -103,7 +108,10 @@ class DiliEvidenceBuilder:
                 else [],
                 missing_fields=sorted(set(missing)),
                 manual_review_required=True,
-                reasons=["DILI is a diagnosis of exclusion.", "Clinical hepatology review required."],
+                reasons=[
+                    "DILI is a diagnosis of exclusion.",
+                    "Clinical hepatology review required.",
+                ],
             ),
             timeline=timeline,
             patterns=patterns,
@@ -135,100 +143,179 @@ class DiliEvidenceBuilder:
             self._question(
                 "What is the latency from first compatible exposure to first liver injury signal?",
                 timeline.first_abnormal_liver_test_date or "missing",
-                [event.evidence for event in timeline.events if event.event_type in {"drug_start", "abnormal_liver_test"} and event.evidence][:3],
-                "Latency remains uncertain because exposure start or first abnormal liver-test timing is missing." if not timeline.first_abnormal_liver_test_date else None,
+                [
+                    event.evidence
+                    for event in timeline.events
+                    if event.event_type in {"drug_start", "abnormal_liver_test"}
+                    and event.evidence
+                ][:3],
+                "Latency remains uncertain because exposure start or first abnormal liver-test timing is missing."
+                if not timeline.first_abnormal_liver_test_date
+                else None,
             ),
             self._question(
                 "Did the injury improve, persist, or worsen after discontinuation?",
                 timeline.dechallenge_status,
-                [event.evidence for event in timeline.events if event.event_type in {"drug_stop", "abnormal_liver_test"} and event.evidence][:3],
-                "Dechallenge cannot be graded honestly when follow-up after discontinuation is incomplete." if timeline.dechallenge_status in {"no_follow_up", "insufficient_interval"} else None,
+                [
+                    event.evidence
+                    for event in timeline.events
+                    if event.event_type in {"drug_stop", "abnormal_liver_test"}
+                    and event.evidence
+                ][:3],
+                "Dechallenge cannot be graded honestly when follow-up after discontinuation is incomplete."
+                if timeline.dechallenge_status
+                in {"no_follow_up", "insufficient_interval"}
+                else None,
             ),
             self._question(
                 "What is the liver injury pattern at the first qualifying episode?",
                 first_pattern.pattern if first_pattern is not None else "indeterminate",
                 list(first_pattern.evidence[:2]) if first_pattern is not None else [],
-                "Pattern is indeterminate when paired ALT and ALP values with ULN are unavailable." if first_pattern is None or first_pattern.pattern == "indeterminate" else None,
+                "Pattern is indeterminate when paired ALT and ALP values with ULN are unavailable."
+                if first_pattern is None or first_pattern.pattern == "indeterminate"
+                else None,
             ),
             self._question(
                 "Which clinically conservative phenotype candidates are supported?",
                 ", ".join(phenotype.candidates) or "none identified",
                 list((first_pattern.evidence[:1] if first_pattern is not None else [])),
-                "Phenotype remains limited by missing biopsy, imaging, autoimmune markers, or long follow-up." if phenotype.missing_data else None,
+                "Phenotype remains limited by missing biopsy, imaging, autoimmune markers, or long follow-up."
+                if phenotype.missing_data
+                else None,
             ),
             self._question(
                 "Are mandatory alternative causes excluded?",
                 "yes" if differential.all_major_causes_excluded else "no",
                 [item.evidence[0] for item in differential.causes if item.evidence][:4],
-                "One or more mandatory competing causes are unresolved or not excluded." if not differential.all_major_causes_excluded else None,
+                "One or more mandatory competing causes are unresolved or not excluded."
+                if not differential.all_major_causes_excluded
+                else None,
             ),
             self._question(
                 "Does the episode satisfy Hy's Law requirements?",
                 hys_law.status,
                 list(hys_law.evidence[:4]),
-                "Hy's Law is not assessable or only possible when same-episode timing, cholestasis exclusion, alternatives, or exposure compatibility remain incomplete." if hys_law.status != "meets_criteria" else None,
+                "Hy's Law is not assessable or only possible when same-episode timing, cholestasis exclusion, alternatives, or exposure compatibility remain incomplete."
+                if hys_law.status != "meets_criteria"
+                else None,
             ),
             self._question(
                 "What is the severity grade?",
                 f"{severity.grade} ({severity.symptom_flag})",
                 list(severity.evidence[:3]),
-                "Severity is unassessable when the laboratory burden or severe clinical outcomes are not documented." if severity.grade == "unassessable" else None,
+                "Severity is unassessable when the laboratory burden or severe clinical outcomes are not documented."
+                if severity.grade == "unassessable"
+                else None,
             ),
             self._question(
                 "Is any rechallenge documented, and was it positive?",
-                top_exposure.rechallenge_status if top_exposure is not None else "unknown",
-                [ClinicalEvidenceQuote(
-                    claim="rechallenge status",
-                    quote=top_exposure.identity.evidence_quote,
-                    source_section=top_exposure.identity.source_section,
-                    source_kind="patient_record" if top_exposure.identity.evidence_quote else "missing",
-                )] if top_exposure is not None else [],
-                "Absent evidence is treated as unknown, never as negative, and rechallenge is never recommended." if top_exposure is None or top_exposure.rechallenge_status == "unknown" else None,
+                top_exposure.rechallenge_status
+                if top_exposure is not None
+                else "unknown",
+                [
+                    ClinicalEvidenceQuote(
+                        claim="rechallenge status",
+                        quote=top_exposure.identity.evidence_quote,
+                        source_section=top_exposure.identity.source_section,
+                        source_kind="patient_record"
+                        if top_exposure.identity.evidence_quote
+                        else "missing",
+                    )
+                ]
+                if top_exposure is not None
+                else [],
+                "Absent evidence is treated as unknown, never as negative, and rechallenge is never recommended."
+                if top_exposure is None or top_exposure.rechallenge_status == "unknown"
+                else None,
             ),
             self._question(
                 "Is the suspect-drug identity reliable enough for adjudication?",
-                (top_exposure.identity.accepted_identity or "unresolved") if top_exposure is not None else "unresolved",
-                [ClinicalEvidenceQuote(
-                    claim="identity resolution",
-                    quote=top_exposure.identity.identity_reason,
-                    source_section=top_exposure.identity.source_section,
-                    source_kind="patient_record" if top_exposure and top_exposure.identity.identity_reason else "missing",
-                )] if top_exposure is not None else [],
-                "Brand, salt, combination, historical, negated, allergy, or family-history mentions remain unresolved unless locally validated." if top_exposure is None or top_exposure.identity.accepted_identity is None else None,
+                (top_exposure.identity.accepted_identity or "unresolved")
+                if top_exposure is not None
+                else "unresolved",
+                [
+                    ClinicalEvidenceQuote(
+                        claim="identity resolution",
+                        quote=top_exposure.identity.identity_reason,
+                        source_section=top_exposure.identity.source_section,
+                        source_kind="patient_record"
+                        if top_exposure and top_exposure.identity.identity_reason
+                        else "missing",
+                    )
+                ]
+                if top_exposure is not None
+                else [],
+                "Brand, salt, combination, historical, negated, allergy, or family-history mentions remain unresolved unless locally validated."
+                if top_exposure is None
+                or top_exposure.identity.accepted_identity is None
+                else None,
             ),
             self._question(
                 "What prior LiverTox likelihood supports the exposure?",
-                (top_exposure.livertox_likelihood or "unknown") if top_exposure is not None else "unknown",
-                [ClinicalEvidenceQuote(
-                    claim="LiverTox likelihood",
-                    quote=top_exposure.livertox_likelihood,
-                    source_kind="livertox" if top_exposure and top_exposure.livertox_likelihood else "missing",
-                )] if top_exposure is not None else [],
-                "Sparse, unknown, or E-class likelihood grades are treated conservatively and do not upgrade patient-level causality." if top_exposure is None or not top_exposure.livertox_likelihood else None,
+                (top_exposure.livertox_likelihood or "unknown")
+                if top_exposure is not None
+                else "unknown",
+                [
+                    ClinicalEvidenceQuote(
+                        claim="LiverTox likelihood",
+                        quote=top_exposure.livertox_likelihood,
+                        source_kind="livertox"
+                        if top_exposure and top_exposure.livertox_likelihood
+                        else "missing",
+                    )
+                ]
+                if top_exposure is not None
+                else [],
+                "Sparse, unknown, or E-class likelihood grades are treated conservatively and do not upgrade patient-level causality."
+                if top_exposure is None or not top_exposure.livertox_likelihood
+                else None,
             ),
             self._question(
                 "What is the supportive RUCAM conclusion?",
-                top_exposure.rucam.category if top_exposure and top_exposure.rucam else "not_assessable",
+                top_exposure.rucam.category
+                if top_exposure and top_exposure.rucam
+                else "not_assessable",
                 [
                     ClinicalEvidenceQuote(
                         claim=component.component,
                         quote=component.evidence_quote,
                         event_date=component.evidence_date,
-                        source_kind="patient_record" if component.evidence_quote else "missing",
+                        source_kind="patient_record"
+                        if component.evidence_quote
+                        else "missing",
                     )
-                    for component in (top_exposure.rucam.components if top_exposure and top_exposure.rucam else [])
+                    for component in (
+                        top_exposure.rucam.components
+                        if top_exposure and top_exposure.rucam
+                        else []
+                    )
                 ][:4],
-                "RUCAM remains supportive only and is not assessable when criteria-level evidence is missing." if top_exposure is None or top_exposure.rucam is None or top_exposure.rucam.total_score is None else None,
+                "RUCAM remains supportive only and is not assessable when criteria-level evidence is missing."
+                if top_exposure is None
+                or top_exposure.rucam is None
+                or top_exposure.rucam.total_score is None
+                else None,
             ),
             self._question(
                 "What is the overall DILIN-like causality category?",
-                top_exposure.causality.category if top_exposure and top_exposure.causality else "unassessable",
-                [ClinicalEvidenceQuote(
-                    claim="overall causality rationale",
-                    quote="; ".join(top_exposure.causality.rationale),
-                    source_kind="calculated",
-                )] if top_exposure and top_exposure.causality else [],
-                "Overall causality stays limited when timing, identity, phenotype match, source quality, or competing-cause exclusion are incomplete." if top_exposure is None or not top_exposure.causality or top_exposure.causality.category in {"possible", "unlikely", "unassessable"} else None,
+                top_exposure.causality.category
+                if top_exposure and top_exposure.causality
+                else "unassessable",
+                [
+                    ClinicalEvidenceQuote(
+                        claim="overall causality rationale",
+                        quote="; ".join(top_exposure.causality.rationale),
+                        source_kind="calculated",
+                    )
+                ]
+                if top_exposure and top_exposure.causality
+                else [],
+                "Overall causality stays limited when timing, identity, phenotype match, source quality, or competing-cause exclusion are incomplete."
+                if top_exposure is None
+                or not top_exposure.causality
+                or top_exposure.causality.category
+                in {"possible", "unlikely", "unassessable"}
+                else None,
             ),
         ]
         return questions
@@ -448,7 +535,9 @@ class DiliEvidenceBuilder:
         else:
             insertion_index = lines.index("## 2. Liver injury pattern and severity")
             lines.insert(insertion_index, "- Missing data: none documented")
-        lines.extend(f"- {item.cause}: {item.status}" for item in bundle.differential.causes)
+        lines.extend(
+            f"- {item.cause}: {item.status}" for item in bundle.differential.causes
+        )
         lines.extend(["## 5. Drug exposure table", ""])
         for exposure in bundle.exposures:
             lines.append(
@@ -472,7 +561,9 @@ class DiliEvidenceBuilder:
             if item.rucam is None:
                 lines.append("- Not assessable")
             else:
-                lines.append(f"- Total: {item.rucam.total_score}; category: {item.rucam.category}")
+                lines.append(
+                    f"- Total: {item.rucam.total_score}; category: {item.rucam.category}"
+                )
                 lines.extend(
                     f"- {component.component}: {component.status}; score={component.score}; "
                     f"evidence={component.evidence_quote or 'missing'}; date={component.evidence_date or 'missing'}"

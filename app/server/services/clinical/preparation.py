@@ -348,7 +348,9 @@ RxNav and LiverTox evidence before accepting it.
     ) -> None:
         payload.setdefault("identity_candidates", []).append(identity_audit)
         notes = list(payload.get("match_notes") or [])
-        notes.append("LLM identity candidates did not produce a unique local evidence match")
+        notes.append(
+            "LLM identity candidates did not produce a unique local evidence match"
+        )
         payload["match_notes"] = list(dict.fromkeys(notes))
         if multiple_accepted_candidates:
             candidate_names = [

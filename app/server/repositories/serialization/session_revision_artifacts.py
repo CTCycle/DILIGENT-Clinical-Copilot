@@ -273,7 +273,8 @@ def persist_revision_entities(
         safe_pipeline_run_id = str(pipeline_run_id)
         now = datetime.now(UTC)
         db_session.execute(
-            update(ClinicalSessionRevisionEntity).where(
+            update(ClinicalSessionRevisionEntity)
+            .where(
                 ClinicalSessionRevisionEntity.revision_version_id
                 == safe_revision_version_id,
                 ClinicalSessionRevisionEntity.superseded_at.is_(None),

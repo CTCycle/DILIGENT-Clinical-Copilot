@@ -56,11 +56,7 @@ def normalize_match_reason(
     if not raw_reason:
         return None, normalized_notes
 
-    reason_parts = [
-        part.strip()
-        for part in raw_reason.split(";")
-        if part.strip()
-    ]
+    reason_parts = [part.strip() for part in raw_reason.split(";") if part.strip()]
     for part in reason_parts:
         if part not in normalized_notes:
             normalized_notes.append(part)

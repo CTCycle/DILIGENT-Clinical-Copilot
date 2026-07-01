@@ -6,7 +6,10 @@ from typing import Any
 from common.utils.text_utils import coerce_text
 from domain.clinical.drug_resolution import DrugIdentityCandidate
 from services.catalogs.runtime import get_reference_catalog_snapshot
-from services.text.normalization import canonicalize_drug_query, normalize_drug_query_name
+from services.text.normalization import (
+    canonicalize_drug_query,
+    normalize_drug_query_name,
+)
 
 ###############################################################################
 class DrugIdentityResolver:
@@ -65,7 +68,9 @@ class DrugIdentityResolver:
         lookup = getattr(self.matcher, "lookup", None)
         if lookup is None:
             return
-        for value, kind, confidence, note in self._catalog_values(lookup, normalized_label):
+        for value, kind, confidence, note in self._catalog_values(
+            lookup, normalized_label
+        ):
             self._add_candidate(
                 candidates,
                 source_label=candidate_source_label,
@@ -74,9 +79,12 @@ class DrugIdentityResolver:
                 confidence=confidence,
                 notes=(note,),
             )
-            for livertox_value, livertox_kind, livertox_confidence, livertox_note in (
-                self._livertox_values(lookup, value)
-            ):
+            for (
+                livertox_value,
+                livertox_kind,
+                livertox_confidence,
+                livertox_note,
+            ) in self._livertox_values(lookup, value):
                 if livertox_value.casefold() in self.broad_catalog_matches:
                     continue
                 self._add_candidate(
@@ -181,9 +189,11 @@ class DrugIdentityResolver:
             for record, _confidence, notes in lookup.match_normalized_all(normalized):
                 kind = "livertox_alias" if notes else "livertox_primary"
                 values.append((record.drug_name, kind, 0.95, "livertox_exact"))
-            for record, _confidence, _notes in lookup.match_authoritative_spelling_candidates(
-                normalized
-            ):
+            for (
+                record,
+                _confidence,
+                _notes,
+            ) in lookup.match_authoritative_spelling_candidates(normalized):
                 values.append(
                     (
                         record.drug_name,
@@ -279,7 +289,9 @@ class DrugIdentityResolver:
             return []
         numeric_slash = "__NUMERIC_SLASH__"
         protected = text.replace("IU/ml", "IU per ml").replace("IU/ML", "IU per ML")
-        protected = protected.replace("mg/ml", "mg per ml").replace("MG/ML", "MG per ML")
+        protected = protected.replace("mg/ml", "mg per ml").replace(
+            "MG/ML", "MG per ML"
+        )
         protected = re.sub(r"(?<=\d)/(?=\d)", numeric_slash, protected)
         protected = re.sub(r"(?<=[A-Za-z]{4})-(?=[A-Za-z]{4})", " + ", protected)
         if "/" in protected:
@@ -305,4 +317,6 @@ class DrugIdentityResolver:
         tokens = normalized.split()
         if not tokens:
             return False
-        return any(any(char.isalpha() for char in token) and len(token) > 1 for token in tokens)
+        return any(
+            any(char.isalpha() for char in token) and len(token) > 1 for token in tokens
+        )

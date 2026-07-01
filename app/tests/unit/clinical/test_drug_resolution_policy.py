@@ -5,7 +5,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from domain.clinical import DrugEntry, PatientDrugs
-from repositories.schemas.models import Base, Drug, DrugRxnormCode, KbMatchCache, LiverToxMonograph
+from repositories.schemas.models import (
+    Base,
+    Drug,
+    DrugRxnormCode,
+    KbMatchCache,
+    LiverToxMonograph,
+)
 from repositories.serialization.data import DataSerializer
 from services.clinical.drug_resolution import DrugResolutionService
 from services.clinical.matches_core import LiverToxMatcher
@@ -217,7 +223,9 @@ def test_brand_alias_maps_to_rxcui_and_livertox_monograph() -> None:
     assert payload["accepted_livertox_name"] == "Acetaminophen"
 
 ###############################################################################
-def test_catalog_backed_product_labels_resolve_to_livertox_monographs_with_excerpts() -> None:
+def test_catalog_backed_product_labels_resolve_to_livertox_monographs_with_excerpts() -> (
+    None
+):
     expected = {
         "Abirateron Sandoz": "Abiraterone",
         "Prednison Spirig HC": "Corticosteroids",
@@ -252,8 +260,7 @@ def test_combination_product_preserves_parent_and_components() -> None:
     assert parent["accepted_livertox_name"] == "Amoxicillin-Clavulanate"
     assert set(parent["regimen_components"]) == {"amoxicillin", "clavulanate"}
     assert any(
-        item["accepted_livertox_name"] == "Amoxicillin"
-        for item in resolved.values()
+        item["accepted_livertox_name"] == "Amoxicillin" for item in resolved.values()
     )
 
 ###############################################################################
@@ -268,7 +275,10 @@ def test_ambiguous_alias_requires_review() -> None:
 def test_broad_category_is_not_concrete_drug_match() -> None:
     payload = _resolve_one("vitamins")
 
-    assert payload["decision_status"] in {"ambiguous_requires_review", "missing_livertox"}
+    assert payload["decision_status"] in {
+        "ambiguous_requires_review",
+        "missing_livertox",
+    }
     assert payload["accepted_rxnav_rxcui"] is None
     assert payload["accepted_livertox_name"] is None
 
@@ -359,18 +369,14 @@ def test_db_cache_hit_returns_cached_result() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = (
-        lambda key: serializer.load_livertox_match_from_db_cache(
-            normalized_drug_key=key,
-        )
+    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
+        normalized_drug_key=key,
     )
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,
     )
-    resolved = resolver.resolve(
-        PatientDrugs(entries=[DrugEntry(name="Acetaminophen")])
-    )
+    resolved = resolver.resolve(PatientDrugs(entries=[DrugEntry(name="Acetaminophen")]))
     assert resolved
     payload = next(iter(resolved.values()))
 
@@ -408,18 +414,14 @@ def test_db_cache_miss_falls_through_to_pipeline() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = (
-        lambda key: serializer.load_livertox_match_from_db_cache(
-            normalized_drug_key=key,
-        )
+    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
+        normalized_drug_key=key,
     )
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,
     )
-    resolved = resolver.resolve(
-        PatientDrugs(entries=[DrugEntry(name="Acetaminophen")])
-    )
+    resolved = resolver.resolve(PatientDrugs(entries=[DrugEntry(name="Acetaminophen")]))
     assert resolved
     payload = next(iter(resolved.values()))
 
@@ -452,18 +454,14 @@ def test_db_cache_low_confidence_not_used() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = (
-        lambda key: serializer.load_livertox_match_from_db_cache(
-            normalized_drug_key=key,
-        )
+    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
+        normalized_drug_key=key,
     )
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,
     )
-    resolved = resolver.resolve(
-        PatientDrugs(entries=[DrugEntry(name="Acetaminophen")])
-    )
+    resolved = resolver.resolve(PatientDrugs(entries=[DrugEntry(name="Acetaminophen")]))
     assert resolved
     payload = next(iter(resolved.values()))
 
@@ -531,18 +529,14 @@ def test_db_cache_uses_previously_resolved_rxcui() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = (
-        lambda key: serializer.load_livertox_match_from_db_cache(
-            normalized_drug_key=key,
-        )
+    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
+        normalized_drug_key=key,
     )
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,
     )
-    resolved = resolver.resolve(
-        PatientDrugs(entries=[DrugEntry(name="Omeprazole")])
-    )
+    resolved = resolver.resolve(PatientDrugs(entries=[DrugEntry(name="Omeprazole")]))
     assert resolved
     payload = next(iter(resolved.values()))
 

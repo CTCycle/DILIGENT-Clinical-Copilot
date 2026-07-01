@@ -247,8 +247,7 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
 
     parsed = asyncio.run(
         parser.extract_drugs_from_anamnesis(
-            "History includes oncology treatment. "
-            "Rescue therapy with Rescuecin."
+            "History includes oncology treatment. Rescue therapy with Rescuecin."
         )
     )
 
@@ -257,7 +256,9 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
     ]
 
 ###############################################################################
-def test_extract_drugs_from_anamnesis_rejects_grounded_non_medication_entities() -> None:
+def test_extract_drugs_from_anamnesis_rejects_grounded_non_medication_entities() -> (
+    None
+):
     client = RecordingSequenceStructuredClient(
         [
             PatientDrugs(
@@ -325,7 +326,9 @@ def test_extract_drugs_from_therapy_uses_llm_before_rule_fallback() -> None:
     )
     parser = DrugsParser(client=client)
 
-    parsed = asyncio.run(parser.extract_drugs_from_therapy("Cardiomed 100 mg cpr\n1-0-0-0"))
+    parsed = asyncio.run(
+        parser.extract_drugs_from_therapy("Cardiomed 100 mg cpr\n1-0-0-0")
+    )
 
     assert client.call_count == 1
     assert [entry.name for entry in parsed.entries] == ["Cardiomed"]
@@ -358,6 +361,8 @@ def test_extract_drugs_retries_semantically_invalid_llm_output() -> None:
 def test_extract_drugs_from_therapy_falls_back_after_llm_failure() -> None:
     parser = DrugsParser(client=AlwaysFailingStructuredClient())
 
-    parsed = asyncio.run(parser.extract_drugs_from_therapy("Cardiomed 100 mg cpr\n1-0-0-0"))
+    parsed = asyncio.run(
+        parser.extract_drugs_from_therapy("Cardiomed 100 mg cpr\n1-0-0-0")
+    )
 
     assert [entry.name for entry in parsed.entries] == ["Cardiomed"]

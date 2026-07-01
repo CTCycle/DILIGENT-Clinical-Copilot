@@ -925,9 +925,7 @@ class HepatoxConsultation:
         limitations = list(entry.narrative.limitations if entry.narrative else [])
         rucam = entry.rucam
         if rucam is not None and rucam.total_score is None:
-            segments.append(
-                phrase("commentary_rucam_not_assessable", report_language)
-            )
+            segments.append(phrase("commentary_rucam_not_assessable", report_language))
         if limitations:
             segments.append(
                 phrase(
@@ -943,9 +941,8 @@ class HepatoxConsultation:
             segments.append(phrase("commentary_review_required", report_language))
         else:
             segments.append(phrase("commentary_no_review_required", report_language))
-        return (
-            f"**{phrase('clinical_commentary', report_language)}**: "
-            + " ".join(segments)
+        return f"**{phrase('clinical_commentary', report_language)}**: " + " ".join(
+            segments
         )
 
     # -------------------------------------------------------------------------
