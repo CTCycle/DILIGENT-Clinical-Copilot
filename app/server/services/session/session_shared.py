@@ -503,9 +503,7 @@ def report_clinical_job_progress(
 ) -> None:
     ensure_clinical_job_not_cancelled(job_manager=job_manager, job_id=job_id)
     bounded = min(100.0, max(0.0, float(progress)))
-    effective_stage = (
-        detail if detail in CLINICAL_PROGRESS_MESSAGES else stage
-    )
+    effective_stage = detail if detail in CLINICAL_PROGRESS_MESSAGES else stage
     message = CLINICAL_PROGRESS_MESSAGES.get(
         effective_stage, effective_stage.replace("_", " ").strip()
     )

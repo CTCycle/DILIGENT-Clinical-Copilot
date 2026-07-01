@@ -209,7 +209,9 @@ def test_rechallenge_component_carries_supporting_text_when_present() -> None:
     estimator = RucamScoreEstimator()
     component = estimator.score_rechallenge(
         payload=PatientData(anamnesis="Rechallenge positive after restart."),
-        drug=DrugEntry(name="Drug A", evidence="Drug A restarted and enzymes recurred."),
+        drug=DrugEntry(
+            name="Drug A", evidence="Drug A restarted and enzymes recurred."
+        ),
     )
     assert component.status in {"scored", "not_assessable"}
     assert component.evidence

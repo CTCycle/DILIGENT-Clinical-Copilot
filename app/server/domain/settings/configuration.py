@@ -14,6 +14,8 @@ class JobsSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     polling_interval: float = Field(gt=0)
 
+
+###############################################################################
 class DatabaseSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     embedded_database: bool

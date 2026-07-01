@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from common.utils.logger import LOG_CONFIG, configure_logging
+from common.utils.logger import configure_logging
 
 ###############################################################################
 def test_file_logging_is_utf8_safe(tmp_path) -> None:  # type: ignore[no-untyped-def]

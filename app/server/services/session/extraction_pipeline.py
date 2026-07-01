@@ -202,9 +202,7 @@ class ClinicalSessionExtractionPipelineMixin:
         stop_check: Callable[[], None] | None,
     ) -> PatientDiseaseContext:
         self.note_stage_runtime("anamnesis_disease_extraction")
-        self.emit_progress(
-            progress_callback, stage="diseases.extracting", value=38.0
-        )
+        self.emit_progress(progress_callback, stage="diseases.extracting", value=38.0)
         disease_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="diseases.extracting",
@@ -350,9 +348,7 @@ class ClinicalSessionExtractionPipelineMixin:
         stop_check: Callable[[], None] | None,
     ) -> tuple[PatientLabTimeline, LiverInjuryOnsetContext | None]:
         self.note_stage_runtime("anamnesis_lab_extraction")
-        self.emit_progress(
-            progress_callback, stage="labs.extracting", value=46.0
-        )
+        self.emit_progress(progress_callback, stage="labs.extracting", value=46.0)
         lab_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="labs.extracting",
@@ -462,9 +458,7 @@ class ClinicalSessionExtractionPipelineMixin:
             lab_timeline = PatientLabTimeline(entries=normalized_entries)
             onset_context = None
             self.latest_lab_extraction_audit = None
-        self.emit_progress(
-            progress_callback, stage="labs.extracting", value=54.0
-        )
+        self.emit_progress(progress_callback, stage="labs.extracting", value=54.0)
         self.run_stop_check(stop_check)
         return lab_timeline, onset_context
 

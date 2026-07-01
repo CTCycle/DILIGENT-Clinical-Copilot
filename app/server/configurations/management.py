@@ -259,6 +259,8 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
         polling_interval = 1.0
     return JobsSettings(polling_interval=polling_interval)
 
+
+###############################################################################
 def _parse_database_url(url: str | None) -> dict[str, Any]:
     if not url:
         return {}

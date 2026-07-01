@@ -370,10 +370,15 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
 
     assert report is not None
     assert "**Valium - LiverTox score D**" in report
-    assert "Matched drug record found, but no local LiverTox excerpt is available." in report
+    assert (
+        "Matched drug record found, but no local LiverTox excerpt is available."
+        in report
+    )
 
 ###############################################################################
-def test_finalize_patient_report_renders_accepted_resolution_status_as_matched() -> None:
+def test_finalize_patient_report_renders_accepted_resolution_status_as_matched() -> (
+    None
+):
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
 
     async def fake_generate_conclusion(**kwargs):  # type: ignore[no-untyped-def]

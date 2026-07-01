@@ -4,12 +4,13 @@ import re
 
 from domain.clinical.dili import DiliInjuryPattern, DiliPhenotypeAssessment
 
-
 ###############################################################################
 class DiliPhenotypeClassifier:
 
     # -------------------------------------------------------------------------
-    def assess(self, patterns: list[DiliInjuryPattern], source_text: str) -> DiliPhenotypeAssessment:
+    def assess(
+        self, patterns: list[DiliInjuryPattern], source_text: str
+    ) -> DiliPhenotypeAssessment:
         lowered = source_text.lower()
         primary_pattern = patterns[0].pattern if patterns else "indeterminate"
         candidates: list[str] = []
@@ -47,7 +48,12 @@ class DiliPhenotypeClassifier:
         unique_candidates = list(dict.fromkeys(candidates))
         missing_data = [
             name
-            for name in ("biopsy", "imaging", "autoimmune markers", "follow-up over 6 months")
+            for name in (
+                "biopsy",
+                "imaging",
+                "autoimmune markers",
+                "follow-up over 6 months",
+            )
             if name not in lowered
         ]
         return DiliPhenotypeAssessment(

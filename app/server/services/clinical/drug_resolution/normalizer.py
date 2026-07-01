@@ -8,7 +8,10 @@ from common.utils.logger import logger
 from domain.clinical.drug_resolution import NormalizedDrugMention
 from domain.clinical.entities import DrugEntry, PatientDrugs
 from services.clinical.drug_identity import DrugIdentityResolver
-from services.text.normalization import canonicalize_drug_query, normalize_drug_query_name
+from services.text.normalization import (
+    canonicalize_drug_query,
+    normalize_drug_query_name,
+)
 
 _MIN_DRUG_NAME_LENGTH = 3
 _MAX_DRUG_NAME_WORDS = 6
@@ -85,9 +88,7 @@ class DrugMentionNormalizer:
         )
 
     # -------------------------------------------------------------------------
-    def _looks_like_drug_candidate(
-        self, normalized_name: str, raw_name: str
-    ) -> bool:
+    def _looks_like_drug_candidate(self, normalized_name: str, raw_name: str) -> bool:
         """Admit plausible medication labels without requiring catalog recognition."""
         if not normalized_name or len(normalized_name) < _MIN_DRUG_NAME_LENGTH:
             return False
@@ -156,7 +157,9 @@ class DrugMentionNormalizer:
             )
             if current_key != key:
                 continue
-            mention.raw_mentions = list(dict.fromkeys(mention.raw_mentions + incoming.raw_mentions))
+            mention.raw_mentions = list(
+                dict.fromkeys(mention.raw_mentions + incoming.raw_mentions)
+            )
             mention.origins = list(dict.fromkeys(mention.origins + incoming.origins))
             mention.extraction_metadata.extend(incoming.extraction_metadata)
             return

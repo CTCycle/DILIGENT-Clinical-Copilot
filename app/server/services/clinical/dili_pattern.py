@@ -5,7 +5,6 @@ from typing import Literal
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliInjuryPattern
 from domain.clinical.entities import ClinicalLabEntry, PatientLabTimeline
 
-
 ###############################################################################
 class DiliPatternEngine:
     DEFAULT_ULN = {"ALT": 40.0, "ALP": 120.0}
@@ -42,8 +41,12 @@ class DiliPatternEngine:
             buckets.setdefault(entry.sample_date or "undated", []).append(entry)
         calculated: list[DiliInjuryPattern] = []
         for sample_date, entries in buckets.items():
-            alt = next((item for item in entries if item.marker_name.upper() == "ALT"), None)
-            alp = next((item for item in entries if item.marker_name.upper() == "ALP"), None)
+            alt = next(
+                (item for item in entries if item.marker_name.upper() == "ALT"), None
+            )
+            alp = next(
+                (item for item in entries if item.marker_name.upper() == "ALP"), None
+            )
             if alt is None or alp is None:
                 continue
             alt_value, alp_value = self._value(alt), self._value(alp)
@@ -73,7 +76,9 @@ class DiliPatternEngine:
                             claim="R-ratio input",
                             quote=alt.evidence or alp.evidence,
                             source_section="laboratory_analysis",
-                            event_date=None if sample_date == "undated" else sample_date,
+                            event_date=None
+                            if sample_date == "undated"
+                            else sample_date,
                             source_kind="calculated",
                         )
                     ],

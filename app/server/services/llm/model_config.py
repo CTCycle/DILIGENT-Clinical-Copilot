@@ -129,8 +129,10 @@ class ModelConfigService:
             snapshot = self.serializer.save_snapshot(**updates)
 
         should_check_local_availability = (
-            not snapshot.use_cloud_models
-        ) or local_roles_updated or should_refresh_local_availability
+            (not snapshot.use_cloud_models)
+            or local_roles_updated
+            or should_refresh_local_availability
+        )
         local_models = await self.list_local_model_cards(
             selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
             include_ollama_availability=should_check_local_availability,

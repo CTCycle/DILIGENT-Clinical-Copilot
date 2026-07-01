@@ -87,8 +87,10 @@ def test_ensure_context_option_preserves_explicit_num_ctx_and_computes_when_abse
 def test_calculate_context_window_respects_model_context_limit(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
     monkeypatch.setattr(client, "estimate_tokens", lambda text: 5_000)
+
     async def fake_feasible(*a, **kw):
         return None
+
     monkeypatch.setattr(client, "estimate_max_feasible_context", fake_feasible)
 
     async def fake_limit(name: str) -> int | None:
@@ -135,14 +137,12 @@ def test_hardware_aware_context_uses_full(monkeypatch) -> None:
 
     native_limit = 32768
     monkeypatch.setattr(
-        client, "extract_footprint_from_payload", lambda m: (8_000_000_000, 6_000_000_000)
+        client,
+        "extract_footprint_from_payload",
+        lambda m: (8_000_000_000, 6_000_000_000),
     )
-    monkeypatch.setattr(
-        ollama_chat, "get_available_vram_bytes", lambda: 24_000_000_000
-    )
-    monkeypatch.setattr(
-        ollama_chat, "get_available_memory_bytes", lambda: 0
-    )
+    monkeypatch.setattr(ollama_chat, "get_available_vram_bytes", lambda: 24_000_000_000)
+    monkeypatch.setattr(ollama_chat, "get_available_memory_bytes", lambda: 0)
 
     async def fake_show(name: str) -> dict:
         return {**llama_metadata, "context_length": native_limit}
@@ -178,14 +178,12 @@ def test_hardware_aware_context_scales_down(monkeypatch) -> None:
     vram_footprint = 6_000_000_000
     available_vram = 8_000_000_000
     monkeypatch.setattr(
-        client, "extract_footprint_from_payload", lambda m: (8_000_000_000, vram_footprint)
+        client,
+        "extract_footprint_from_payload",
+        lambda m: (8_000_000_000, vram_footprint),
     )
-    monkeypatch.setattr(
-        ollama_chat, "get_available_vram_bytes", lambda: available_vram
-    )
-    monkeypatch.setattr(
-        ollama_chat, "get_available_memory_bytes", lambda: 0
-    )
+    monkeypatch.setattr(ollama_chat, "get_available_vram_bytes", lambda: available_vram)
+    monkeypatch.setattr(ollama_chat, "get_available_memory_bytes", lambda: 0)
 
     async def fake_show(name: str) -> dict:
         return {**llama_metadata, "context_length": native_limit}
@@ -220,6 +218,7 @@ def test_hardware_aware_context_fallback(monkeypatch) -> None:
 
     async def fake_limit(name):
         return None
+
     monkeypatch.setattr(client, "get_model_context_limit", fake_limit)
 
     value = asyncio.run(

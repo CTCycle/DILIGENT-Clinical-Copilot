@@ -16,7 +16,9 @@ RESTART_RE = re.compile(
     r"\b(restart(?:ed)?|resum(?:ed|ption)|reintroduc(?:ed|tion))\b",
     re.IGNORECASE,
 )
-RECHALLENGE_RE = re.compile(r"\b(rechallenge|re[- ]expos(?:e|ure)|re-exposure)\b", re.IGNORECASE)
+RECHALLENGE_RE = re.compile(
+    r"\b(rechallenge|re[- ]expos(?:e|ure)|re-exposure)\b", re.IGNORECASE
+)
 SYMPTOM_RE = re.compile(
     r"\b(jaundice|icterus|pruritus|fatigue|nausea|vomiting|abdominal pain|dark urine|itch(?:ing)?)\b",
     re.IGNORECASE,
@@ -31,7 +33,6 @@ DechallengeStatus = Literal[
     "chronic_or_persistent",
     "insufficient_interval",
 ]
-
 
 ###############################################################################
 class DiliTimelineEngine:
@@ -67,7 +68,8 @@ class DiliTimelineEngine:
             events=events,
             first_abnormal_liver_test_date=first_abnormal,
             first_symptom_date=first_symptom,
-            jaundice_or_bilirubin_rise_date=bilirubin_event or peak_dates.get("BILIRUBIN"),
+            jaundice_or_bilirubin_rise_date=bilirubin_event
+            or peak_dates.get("BILIRUBIN"),
             peak_dates=peak_dates,
             dechallenge_status=dechallenge_status,
             recovery_date=recovery_date,
@@ -223,7 +225,11 @@ class DiliTimelineEngine:
                 )
             )
             multiple = self._multiple(lab)
-            if marker in {"ALT", "AST", "ALP", "BILIRUBIN", "TBIL"} and multiple is not None and multiple > 1:
+            if (
+                marker in {"ALT", "AST", "ALP", "BILIRUBIN", "TBIL"}
+                and multiple is not None
+                and multiple > 1
+            ):
                 events.append(
                     DiliTimelineEvent(
                         event_type="abnormal_liver_test",
@@ -239,7 +245,11 @@ class DiliTimelineEngine:
                         ),
                     )
                 )
-            if marker in {"BILIRUBIN", "TBIL"} and multiple is not None and multiple >= 2:
+            if (
+                marker in {"BILIRUBIN", "TBIL"}
+                and multiple is not None
+                and multiple >= 2
+            ):
                 events.append(
                     DiliTimelineEvent(
                         event_type="jaundice_or_bilirubin_rise",
@@ -258,7 +268,9 @@ class DiliTimelineEngine:
         return events
 
     # -------------------------------------------------------------------------
-    def _first_abnormal_liver_test_date(self, labs: list[ClinicalLabEntry]) -> str | None:
+    def _first_abnormal_liver_test_date(
+        self, labs: list[ClinicalLabEntry]
+    ) -> str | None:
         for lab in labs:
             multiple = self._multiple(lab)
             if multiple is not None and multiple > 1:
@@ -300,7 +312,8 @@ class DiliTimelineEngine:
         alt_like = [
             item
             for item in labs
-            if item.marker_name.upper() in {"ALT", "AST"} and self.parse_date(item.sample_date) is not None
+            if item.marker_name.upper() in {"ALT", "AST"}
+            and self.parse_date(item.sample_date) is not None
         ]
         if len(alt_like) < 2:
             return "insufficient_interval", None, labs[-1].sample_date if labs else None
@@ -328,9 +341,7 @@ class DiliTimelineEngine:
             return "resolved_to_baseline", last_date, last_date
         if baseline_multiple > 0 and last_multiple <= baseline_multiple:
             return "resolved_to_baseline", last_date, last_date
-        days_followed = (
-            (self.parse_date(last_date) or stop_date) - stop_date
-        ).days
+        days_followed = ((self.parse_date(last_date) or stop_date) - stop_date).days
         if days_followed >= 180 and last_multiple > 1.0:
             return "chronic_or_persistent", None, last_date
         if last_multiple < first_multiple * 0.5:
@@ -377,13 +388,20 @@ class DiliTimelineEngine:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _first_event_date(events: list[DiliTimelineEvent], event_type: str) -> str | None:
+    def _first_event_date(
+        events: list[DiliTimelineEvent], event_type: str
+    ) -> str | None:
         dated = [
             event
             for event in events
-            if event.event_type == event_type and DiliTimelineEngine.parse_date(event.event_date)
+            if event.event_type == event_type
+            and DiliTimelineEngine.parse_date(event.event_date)
         ]
         if not dated:
             return None
-        dated.sort(key=lambda event: DiliTimelineEngine.parse_date(event.event_date) or date.max)
+        dated.sort(
+            key=lambda event: (
+                DiliTimelineEngine.parse_date(event.event_date) or date.max
+            )
+        )
         return dated[0].event_date
