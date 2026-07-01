@@ -37,6 +37,23 @@ describe('DiliAgentPageComponent', () => {
     expect(component.canStartSession()).toBeTruthy();
   });
 
+  it('renders and persists the RAG evidence toggle', () => {
+    component.stateService.updateDiliAgent({
+      form: { ...component.vm.form, useRag: false },
+    });
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const toggle = root.querySelector<HTMLInputElement>('#rag-enabled');
+    expect(toggle).not.toBeNull();
+    expect(root.textContent).toContain('Use RAG evidence');
+    toggle!.checked = true;
+    toggle!.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(component.vm.form.useRag).toBe(true);
+  });
+
   it('allows an active run to be stopped even while the start click debounce is still active', () => {
     const stopSessionSpy = vi.spyOn(component, 'stopSession').mockResolvedValue();
     component.stateService.updateDiliAgent({
