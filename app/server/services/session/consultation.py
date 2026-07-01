@@ -198,6 +198,7 @@ class ClinicalSessionConsultationMixin:
             elapsed = time.perf_counter() - start_time
             logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
             if isinstance(drug_assessment, dict):
+                clinical_session.latest_drug_assessment_payload = drug_assessment
                 raw_final_report = drug_assessment.get("final_report")
                 if isinstance(raw_final_report, str):
                     final_report = raw_final_report.strip()
@@ -307,6 +308,7 @@ class ClinicalSessionConsultationMixin:
                 "Hepato-toxicity revision consultation required %.4f seconds", elapsed
             )
             if isinstance(drug_assessment, dict):
+                clinical_session.latest_drug_assessment_payload = drug_assessment
                 raw_final_report = drug_assessment.get("final_report")
                 if isinstance(raw_final_report, str):
                     final_report = raw_final_report.strip()

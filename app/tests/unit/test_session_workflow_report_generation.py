@@ -21,6 +21,7 @@ from services.session.session_shared import build_failed_session_payload
 from services.session.session_workflow import process_single_patient_workflow
 from services.session.workflow_shared import ClinicalPersistenceError
 from services.session.session_service import ClinicalSessionService
+from services.clinical.report_finalizer import ReportFinalizer
 
 ###############################################################################
 class FakePatternAnalyzer:
@@ -250,6 +251,95 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
         result["extraction_metadata"]["rucam"]["source"]
         == "not_calculated_insufficient_data"
     )
+    assert result["pipeline_artifacts"]["rag_reference_audit"] == {
+        "rag_retrieval_enabled": False,
+        "rag_query_keys": [],
+        "retrieved_references_by_drug": {},
+        "retrieved_reference_count": 0,
+        "llm_clinical_summary_has_bibliography": False,
+        "final_report_has_bibliography": False,
+    }
+
+###############################################################################
+def test_workflow_restores_rag_bibliography_from_consultation_references() -> None:
+    class FakeRagClinicalService(FakeClinicalService):
+
+        # ---------------------------------------------------------------------
+        def build_rag_query(self, **kwargs: Any) -> dict[str, str]:
+            _ = kwargs
+            return {
+                "Paracetamolo": "paracetamol hepatocellular DILI LiverTox references"
+            }
+
+        # ---------------------------------------------------------------------
+        async def run_consultation(
+            self, **kwargs: Any
+        ) -> tuple[SimpleNamespace, str]:
+            _ = kwargs
+            clinical_session = SimpleNamespace(
+                llm_model="gpt-4.1-mini",
+                latest_drug_assessment_payload={
+                    "entries": [
+                        {
+                            "drug_name": "Paracetamolo",
+                            "match_status": "accepted_exact_livertox",
+                            "paragraph": "Clinical RAG-supported paragraph.",
+                            "rag_references": [
+                                {
+                                    "file_name": "paracetamol-dili.pdf",
+                                    "page_start": 4,
+                                    "page_end": 5,
+                                }
+                            ],
+                        }
+                    ],
+                    "final_report": "Relazione narrativa senza bibliografia.",
+                },
+            )
+            clinical_session.report_finalizer = ReportFinalizer(clinical_session)
+            return clinical_session, "Relazione narrativa senza bibliografia."
+
+    payload = PatientData(
+        name="Mario Rossi",
+        visit_date=date(2025, 5, 20),
+        anamnesis="Paziente con ittero.",
+        drugs="Paracetamolo 1-0-0-0",
+        laboratory_analysis="ALT 100 U/L, ALP 120 U/L.",
+        use_rag=True,
+    )
+
+    result = asyncio.run(
+        process_single_patient_workflow(
+            FakeRagClinicalService(),
+            payload,
+            normalized_document=DocumentNormalizer().normalize(
+                "Paziente con ittero.\nParacetamolo 1-0-0-0\nALT 100 U/L, ALP 120 U/L."
+            ),
+            report_mode="faithful_only",
+        ),
+    )
+
+    assert "## Bibliografia" in result["final_report"]
+    assert "- paracetamol-dili.pdf, pp. 4-5" in result["final_report"]
+    assert "## Bibliografia" in result["llm_clinical_summary"]
+    audit = result["pipeline_artifacts"]["rag_reference_audit"]
+    assert audit["rag_retrieval_enabled"] is True
+    assert audit["rag_query_keys"] == ["Paracetamolo"]
+    assert audit["retrieved_reference_count"] == 1
+    assert audit["llm_clinical_summary_has_bibliography"] is True
+    assert audit["final_report_has_bibliography"] is True
+    assert audit["retrieved_references_by_drug"] == {
+        "Paracetamolo": [
+            {
+                "file_name": "paracetamol-dili.pdf",
+                "page_start": 4,
+                "page_end": 5,
+                "document_title": None,
+                "section_title": None,
+                "chunk_id": None,
+            }
+        ]
+    }
 
 ###############################################################################
 def test_workflow_fails_when_persistence_returns_no_session_id() -> None:

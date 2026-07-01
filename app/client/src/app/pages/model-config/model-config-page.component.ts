@@ -127,7 +127,6 @@ export class ModelConfigPageComponent implements OnInit {
   readonly statusMessage = signal('');
   readonly openProviderModal = signal<AccessKeyProvider | null>(null);
   readonly modelPullProgress = signal<Record<string, ModelPullProgressState>>({});
-  readonly previewRagPipelineEnabled = signal(true);
   readonly previewReasoningEnabled = signal(true);
   readonly previewTemperatureOverride = signal<number | null>(null);
   readonly previewCloudModelOverrides = signal<Partial<Record<CloudProvider, string>>>({});
@@ -208,7 +207,6 @@ export class ModelConfigPageComponent implements OnInit {
 
   readonly statusTone = computed(() => resolveStatusTone(this.statusMessage()));
 
-  readonly ragPipelineEnabled = computed(() => this.previewRagPipelineEnabled());
   readonly reasoningEnabled = computed(() => this.previewReasoningEnabled());
   readonly currentRagModelLabel = computed(() => {
     if (this.isLoading() && !this.ragModel()) {
@@ -376,7 +374,6 @@ export class ModelConfigPageComponent implements OnInit {
 
   private applyPreviewDefaultState(): void {
     const state = this.appState.state().diliAgent;
-    this.previewRagPipelineEnabled.set(state.form.useRag);
     this.previewReasoningEnabled.set(state.settings.reasoning);
     this.previewTemperatureOverride.set(null);
   }
@@ -493,17 +490,6 @@ export class ModelConfigPageComponent implements OnInit {
       return;
     }
     this.draftConfig.update((previous) => ({ ...previous, useCloudServices: true }));
-  }
-
-  handleRagPipelineChange(enabled: boolean): void {
-    this.previewRagPipelineEnabled.set(enabled);
-    const currentForm = this.appState.state().diliAgent.form;
-    this.appState.updateDiliAgent({
-      form: {
-        ...currentForm,
-        useRag: enabled,
-      },
-    });
   }
 
   openRagSettingsPanel(): void {

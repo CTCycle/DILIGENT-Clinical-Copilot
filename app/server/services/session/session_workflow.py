@@ -23,6 +23,7 @@ from domain.clinical.entities import (
     ClinicalPipelineValidationError,
     ClinicalSectionExtractionResult,
     ClinicalSessionRequest,
+    DrugClinicalAssessment,
     PatientData,
     PatientDrugs,
     PipelineIssue,
@@ -69,6 +70,102 @@ from services.session.workflow_shared import (
 )
 
 _CLOUD_PROVIDERS = {"openai", "gemini"}
+
+###############################################################################
+def _report_contains_rag_bibliography(
+    report_text: str | None,
+    *,
+    report_language: str,
+) -> bool:
+    text = str(report_text or "")
+    if not text.strip():
+        return False
+    heading = f"## {phrase('bibliography', report_language)}"
+    return heading.casefold() in text.casefold()
+
+###############################################################################
+def _clinical_report_entries_with_rag_references(
+    clinical_session: Any,
+) -> list[DrugClinicalAssessment]:
+    raw_payload = getattr(clinical_session, "latest_drug_assessment_payload", None)
+    if not isinstance(raw_payload, dict):
+        return []
+    raw_entries = raw_payload.get("entries")
+    if not isinstance(raw_entries, list):
+        return []
+    entries: list[DrugClinicalAssessment] = []
+    for raw_entry in raw_entries:
+        if not isinstance(raw_entry, dict):
+            continue
+        try:
+            entry = DrugClinicalAssessment.model_validate(raw_entry)
+        except Exception:
+            continue
+        if entry.rag_references:
+            entries.append(entry)
+    return entries
+
+###############################################################################
+def _build_rag_reference_audit(
+    *,
+    payload: PatientData,
+    rag_query: dict[str, str] | None,
+    clinical_session: Any,
+    llm_clinical_summary: str | None,
+    final_report: str | None,
+    report_language: str,
+) -> dict[str, Any]:
+    entries = _clinical_report_entries_with_rag_references(clinical_session)
+    references_by_drug: dict[str, list[dict[str, Any]]] = {}
+    for entry in entries:
+        references_by_drug[entry.drug_name] = [
+            reference.model_dump() for reference in entry.rag_references
+        ]
+    return {
+        "rag_retrieval_enabled": bool(payload.use_rag),
+        "rag_query_keys": sorted((rag_query or {}).keys(), key=str.casefold),
+        "retrieved_references_by_drug": references_by_drug,
+        "retrieved_reference_count": sum(
+            len(references) for references in references_by_drug.values()
+        ),
+        "llm_clinical_summary_has_bibliography": _report_contains_rag_bibliography(
+            llm_clinical_summary,
+            report_language=report_language,
+        ),
+        "final_report_has_bibliography": _report_contains_rag_bibliography(
+            final_report,
+            report_language=report_language,
+        ),
+    }
+
+###############################################################################
+def _ensure_rag_bibliography_in_clinical_summary(
+    *,
+    clinical_session: Any,
+    llm_clinical_summary: str | None,
+    report_language: str,
+) -> str | None:
+    if _report_contains_rag_bibliography(
+        llm_clinical_summary,
+        report_language=report_language,
+    ):
+        return llm_clinical_summary
+    entries = _clinical_report_entries_with_rag_references(clinical_session)
+    if not entries:
+        return llm_clinical_summary
+    finalizer = getattr(clinical_session, "report_finalizer", None)
+    if finalizer is None or not hasattr(finalizer, "build_rag_bibliography_section"):
+        return llm_clinical_summary
+    bibliography = finalizer.build_rag_bibliography_section(
+        entries,
+        report_language=report_language,
+    )
+    if not bibliography:
+        return llm_clinical_summary
+    body = str(llm_clinical_summary or "").strip()
+    if not body:
+        return bibliography
+    return f"{body}\n\n{bibliography}"
 
 ###############################################################################
 def _validate_requested_provider_matches_runtime(
@@ -407,6 +504,11 @@ async def process_single_patient_workflow(
         progress_callback=progress_callback,
         stop_check=stop_check,
     )
+    llm_clinical_summary = _ensure_rag_bibliography_in_clinical_summary(
+        clinical_session=clinical_session,
+        llm_clinical_summary=llm_clinical_summary,
+        report_language=report_language,
+    )
     dili_evidence_bundle = DiliEvidenceBuilder().build(
         payload=payload,
         drugs=analysis_drugs,
@@ -472,6 +574,14 @@ async def process_single_patient_workflow(
         generated_report=generated_report,
         bundle=dili_evidence_bundle,
         fallback_text=phrase("narrative_fallback", report_language),
+    )
+    rag_reference_audit = _build_rag_reference_audit(
+        payload=payload,
+        rag_query=rag_query,
+        clinical_session=clinical_session,
+        llm_clinical_summary=llm_clinical_summary,
+        final_report=final_report,
+        report_language=report_language,
     )
 
     patient_label = payload.name or "Unknown patient"
@@ -666,6 +776,7 @@ async def process_single_patient_workflow(
             "generated_report": generated_report,
             "structured_dili_report": structured_dili_report,
             "dili_user_summary": dili_user_summary,
+            "rag_reference_audit": rag_reference_audit,
             "report_metadata": report_metadata.model_dump(),
             "faithfulness_audit": faithfulness_audit.model_dump(),
             "discrepancy_report": faithfulness_audit.discrepancy_report,

@@ -103,6 +103,16 @@ def test_structural_gate_does_not_require_catalog_recognition() -> None:
     )
 
 ###############################################################################
+def test_demographic_case_opening_is_not_normalized_as_drug() -> None:
+    normalizer = DrugMentionNormalizer()
+    for value in (
+        "58-year-old woman evaluated",
+        "46-year-old man evaluated",
+        "72 year old patient admitted",
+    ):
+        assert normalizer._normalize_entry(DrugEntry(name=value)) is None
+
+###############################################################################
 def test_novel_inn_suffix_candidate_remains_for_missing_livertox_resolution() -> None:
     normalizer = DrugMentionNormalizer()
     mention = normalizer._normalize_entry(DrugEntry(name="Trialzumab"))

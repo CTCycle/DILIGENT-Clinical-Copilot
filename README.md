@@ -5,8 +5,6 @@
 ## 1. Project Overview
 DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (DILI) evaluations with a FastAPI backend and an Angular + TypeScript frontend. It collects anamnesis, medications, and lab values, then coordinates clinical analysis with optional RAG support and session persistence for review.
 
-> **Work in Progress**: This project is under active development and may contain incomplete features or defects.
-
 ![DILIGENT flow schema](assets/figures/diligent-flow.png)
 _Conceptual flow from case intake through guided DILI analysis, session recording, and review._
 
@@ -149,6 +147,10 @@ Equivalent PowerShell runners:
 - `assets/docs/runtime/modes.md`: runtime profiles and packaging.
 - `assets/docs/coding/error_handling.md`: backend and frontend error strategy.
 - `assets/docs/ui/components_and_patterns.md`: frontend structure and interface patterns.
+
+## 10. Development Status
+
+This project is under active development and may contain incomplete features or defects. Tagged releases (currently v2.2.0) are stable for local evaluation.
 
 ## 9. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.
