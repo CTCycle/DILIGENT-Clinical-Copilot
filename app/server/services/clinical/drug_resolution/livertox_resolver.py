@@ -6,7 +6,10 @@ from domain.clinical.drug_resolution import (
 )
 from services.clinical.drug_identity import DrugIdentityResolver
 from services.clinical.matches_core import LiverToxMatcher
-from services.text.normalization import canonicalize_drug_query, normalize_drug_query_name
+from services.text.normalization import (
+    canonicalize_drug_query,
+    normalize_drug_query_name,
+)
 
 ###############################################################################
 class LiverToxCandidateResolver:
@@ -51,7 +54,8 @@ class LiverToxCandidateResolver:
                         nbk_id=match.nbk_id,
                         drug_name=match.record.drug_name,
                         normalized_name=match.record.normalized_name,
-                        monograph_key=match.record.monograph_key or match.record.stable_key,
+                        monograph_key=match.record.monograph_key
+                        or match.record.stable_key,
                         has_excerpt=bool(match.record.excerpt),
                         confidence=match.confidence,
                         reason=match.reason,
@@ -63,7 +67,9 @@ class LiverToxCandidateResolver:
                         LiverToxResolutionCandidate(
                             nbk_id=None,
                             drug_name=candidate_name,
-                            normalized_name=self.matcher.lookup.normalize_name(candidate_name),
+                            normalized_name=self.matcher.lookup.normalize_name(
+                                candidate_name
+                            ),
                             monograph_key=None,
                             has_excerpt=False,
                             confidence=match.confidence,
@@ -109,8 +115,7 @@ class LiverToxCandidateResolver:
         reductions: list[str] = []
         tokens = normalize_drug_query_name(value).split()
         while (
-            len(tokens) > 1
-            and tokens[-1] in self.identity_resolver.reducible_suffixes
+            len(tokens) > 1 and tokens[-1] in self.identity_resolver.reducible_suffixes
         ):
             tokens = tokens[:-1]
             reduced = canonicalize_drug_query(" ".join(tokens))
@@ -137,9 +142,15 @@ class LiverToxCandidateResolver:
         for candidate in candidates:
             key = candidate.monograph_key or candidate.normalized_name
             existing = by_key.get(key)
-            if existing is None or (candidate.confidence or 0) > (existing.confidence or 0):
+            if existing is None or (candidate.confidence or 0) > (
+                existing.confidence or 0
+            ):
                 by_key[key] = candidate
         return sorted(
             by_key.values(),
-            key=lambda item: (item.rejected_reason is not None, -(item.confidence or 0), item.drug_name),
+            key=lambda item: (
+                item.rejected_reason is not None,
+                -(item.confidence or 0),
+                item.drug_name,
+            ),
         )

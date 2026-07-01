@@ -591,7 +591,9 @@ class RucamScoreEstimator:
                 label="Time to onset",
                 score=0,
                 status="not_assessable",
-                evidence_date=drug.therapy_start_date or anchor.onset_date.isoformat() if anchor.onset_date else None,
+                evidence_date=drug.therapy_start_date or anchor.onset_date.isoformat()
+                if anchor.onset_date
+                else None,
                 rationale=rationale,
             ), onset_date
         delta_days = (onset_date - start_date).days
@@ -750,7 +752,11 @@ class RucamScoreEstimator:
     ) -> RucamComponentAssessment:
         text = " ".join(
             item.strip()
-            for item in (payload.anamnesis or "", payload.drugs or "", drug.evidence or "")
+            for item in (
+                payload.anamnesis or "",
+                payload.drugs or "",
+                drug.evidence or "",
+            )
             if item
         )
         lowered = text.lower()

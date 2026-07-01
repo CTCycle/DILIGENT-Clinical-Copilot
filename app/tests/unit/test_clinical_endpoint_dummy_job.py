@@ -145,7 +145,9 @@ def test_clinical_jobs_endpoint_completes_dummy_three_drug_assessment(
     )
 
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
-        start_response = client.post("/api/clinical/jobs", json=dummy_clinical_payload())
+        start_response = client.post(
+            "/api/clinical/jobs", json=dummy_clinical_payload()
+        )
         assert start_response.status_code == 202, start_response.text
         job_id = start_response.json()["job_id"]
 

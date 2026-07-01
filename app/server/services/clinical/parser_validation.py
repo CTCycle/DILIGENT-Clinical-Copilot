@@ -18,7 +18,9 @@ def _get_parser_validation_data() -> dict[str, Any]:
     return {
         "NON_DRUG_EXACT_NAMES": non_drug_exact_names,
         "NON_DRUG_PREFIXES": tuple(
-            snapshot.values("clinical_extraction", "drug_non_name_prefixes", key="default")
+            snapshot.values(
+                "clinical_extraction", "drug_non_name_prefixes", key="default"
+            )
         ),
         "NON_DRUG_CONTAINS": tuple(
             list(

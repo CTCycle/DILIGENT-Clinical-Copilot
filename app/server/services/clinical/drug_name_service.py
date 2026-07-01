@@ -785,7 +785,9 @@ class DrugNameService:
         ]
         if not meaningful_tokens:
             return False
-        if all(len(token) < self.lookup.TOKEN_MIN_LENGTH for token in meaningful_tokens):
+        if all(
+            len(token) < self.lookup.TOKEN_MIN_LENGTH for token in meaningful_tokens
+        ):
             compact_alias = "".join(meaningful_tokens)
             is_compact_alphanumeric_brand = (
                 len(meaningful_tokens) > 1

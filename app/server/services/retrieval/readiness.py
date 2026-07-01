@@ -10,7 +10,6 @@ from services.retrieval.settings import build_effective_rag_settings
 OLLAMA_TAGS_PATH = "/api/tags"
 OLLAMA_READINESS_TIMEOUT_SECONDS = 2.5
 
-
 ###############################################################################
 def check_rag_readiness(*, requested: bool) -> RagReadiness:
     settings = build_effective_rag_settings()
@@ -71,11 +70,15 @@ def check_rag_readiness(*, requested: bool) -> RagReadiness:
             ),
         )
 
-    available_models = {
-        str(item.get("name") or item.get("model") or "").strip()
-        for item in payload.get("models", [])
-        if isinstance(item, dict)
-    } if isinstance(payload, dict) else set()
+    available_models = (
+        {
+            str(item.get("name") or item.get("model") or "").strip()
+            for item in payload.get("models", [])
+            if isinstance(item, dict)
+        }
+        if isinstance(payload, dict)
+        else set()
+    )
     if model not in available_models:
         return RagReadiness(
             requested=True,

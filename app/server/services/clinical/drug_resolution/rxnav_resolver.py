@@ -65,7 +65,9 @@ class RxNavCandidateResolver:
             suffix_tokens = query_tokens[len(key_tokens) :]
             if not self.allow_catalog_prefix_match(suffix_tokens, payload):
                 continue
-            candidates.append(self._candidate_from_payload(payload, "guarded_prefix_catalog_match"))
+            candidates.append(
+                self._candidate_from_payload(payload, "guarded_prefix_catalog_match")
+            )
         return candidates[:4]
 
     # -------------------------------------------------------------------------
@@ -121,7 +123,8 @@ class RxNavCandidateResolver:
         if isinstance(brand_values, str):
             brand_values = [brand_values]
         if normalized and any(
-            normalize_drug_query_name(str(value)) == normalized for value in brand_values
+            normalize_drug_query_name(str(value)) == normalized
+            for value in brand_values
         ):
             return "brand"
         return "ingredient"

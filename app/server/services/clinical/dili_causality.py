@@ -16,13 +16,14 @@ from services.clinical.dili_timeline import DiliTimelineEngine
 LOW_CONFIDENCE_LIVERTOX = {"", "U", "E", "E*", "X", "UNKNOWN"}
 DIRECT_TOXIN_LIVERTOX = {"T", "T*"}
 
-
 ###############################################################################
 class DiliCausalityEngine:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def rucam(source: DrugRucamAssessment | None, drug_name: str) -> DiliRucamAssessment | None:
+    def rucam(
+        source: DrugRucamAssessment | None, drug_name: str
+    ) -> DiliRucamAssessment | None:
         if source is None:
             return None
         return DiliRucamAssessment(
@@ -54,15 +55,23 @@ class DiliCausalityEngine:
         primary_pattern: str,
         first_injury_date: str | None,
     ) -> DrugExposureAssessment:
-        status = str(resolved.get("decision_status") or resolved.get("match_status") or "")
+        status = str(
+            resolved.get("decision_status") or resolved.get("match_status") or ""
+        )
         accepted = status.startswith("accepted_")
         row = resolved.get("matched_livertox_row")
-        likelihood = str(row.get("likelihood_score") or "").strip().upper() if isinstance(row, dict) else ""
+        likelihood = (
+            str(row.get("likelihood_score") or "").strip().upper()
+            if isinstance(row, dict)
+            else ""
+        )
         identity = self._identity(drug, resolved, accepted)
         temporal = self._temporal_compatibility(drug, first_injury_date)
         rechallenge_status = self._rechallenge_status(drug)
         signature = self._signature_match(primary_pattern, likelihood)
-        competing = "complete" if differential.all_major_causes_excluded else "incomplete"
+        competing = (
+            "complete" if differential.all_major_causes_excluded else "incomplete"
+        )
         source_quality = "quoted" if drug.evidence else "limited"
 
         total = 0
@@ -102,7 +111,9 @@ class DiliCausalityEngine:
             start_date=drug.therapy_start_date,
             dose_changes=[],
             stop_date=drug.suspension_date,
-            rechallenge_date=drug.suspension_date if rechallenge_status != "unknown" else None,
+            rechallenge_date=drug.suspension_date
+            if rechallenge_status != "unknown"
+            else None,
             rechallenge_status=rechallenge_status,
             livertox_likelihood=likelihood or None,
             direct_toxin_or_dose_dependent=likelihood in DIRECT_TOXIN_LIVERTOX,
@@ -125,22 +136,31 @@ class DiliCausalityEngine:
         )
 
     # -------------------------------------------------------------------------
-    def _identity(self, drug: DrugEntry, resolved: dict, accepted: bool) -> DrugIdentityResolution:
+    def _identity(
+        self, drug: DrugEntry, resolved: dict, accepted: bool
+    ) -> DrugIdentityResolution:
         components = resolved.get("regimen_components") or []
         return DrugIdentityResolution(
             raw_mention=drug.name,
             source_section=drug.source,
             evidence_quote=drug.evidence,
-            normalized_name=resolved.get("normalized_name") or resolved.get("lookup_key"),
+            normalized_name=resolved.get("normalized_name")
+            or resolved.get("lookup_key"),
             rxnav_candidates=resolved.get("rxnav_candidates") or [],
             livertox_candidates=resolved.get("livertox_candidates") or [],
-            accepted_identity=resolved.get("accepted_livertox_name") if accepted else None,
+            accepted_identity=resolved.get("accepted_livertox_name")
+            if accepted
+            else None,
             identity_confidence=resolved.get("match_confidence"),
             identity_reason=resolved.get("match_reason"),
             rejected_candidates=resolved.get("rejected_candidates") or [],
-            combination_components=list(components) if isinstance(components, list) else [],
-            is_current_exposure=drug.current_status == "current" or drug.historical_flag is False,
-            is_historical_exposure=drug.current_status == "past" or bool(drug.historical_flag),
+            combination_components=list(components)
+            if isinstance(components, list)
+            else [],
+            is_current_exposure=drug.current_status == "current"
+            or drug.historical_flag is False,
+            is_historical_exposure=drug.current_status == "past"
+            or bool(drug.historical_flag),
             is_negated=drug.attribution == "negated",
         )
 
@@ -164,9 +184,16 @@ class DiliCausalityEngine:
         drug: DrugEntry,
     ) -> Literal["positive", "present_unclear", "unknown"]:
         evidence = (drug.evidence or "").lower()
-        if "rechallenge positive" in evidence or "re-exposure with recurrence" in evidence:
+        if (
+            "rechallenge positive" in evidence
+            or "re-exposure with recurrence" in evidence
+        ):
             return "positive"
-        if "rechallenge" in evidence or "restarted" in evidence or "resumed" in evidence:
+        if (
+            "rechallenge" in evidence
+            or "restarted" in evidence
+            or "resumed" in evidence
+        ):
             return "present_unclear"
         return "unknown"
 

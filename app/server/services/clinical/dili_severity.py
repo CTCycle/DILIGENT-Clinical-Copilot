@@ -10,33 +10,51 @@ SYMPTOM_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 ###############################################################################
 class DiliSeverityGrader:
 
     # -------------------------------------------------------------------------
-    def assess(self, labs: PatientLabTimeline, source_text: str) -> DiliSeverityAssessment:
+    def assess(
+        self, labs: PatientLabTimeline, source_text: str
+    ) -> DiliSeverityAssessment:
         lowered = source_text.lower()
         bilirubin_peak = self._peak_multiple(labs, {"BILIRUBIN", "TBIL"})
         inr_peak = self._peak_value(labs, {"INR"})
-        symptom_flag = "S" if SYMPTOM_RE.search(lowered) else "A" if source_text.strip() else "unknown"
+        symptom_flag = (
+            "S"
+            if SYMPTOM_RE.search(lowered)
+            else "A"
+            if source_text.strip()
+            else "unknown"
+        )
         evidence = self._supporting_evidence(labs)
 
         if re.search(r"transplant|death|died|fatal", lowered):
             grade = "5_fatal_or_transplant"
             rationale = ["Death or transplant language is documented."]
-        elif re.search(r"encephalopathy|acute liver failure|multi-organ failure|organ failure", lowered):
+        elif re.search(
+            r"encephalopathy|acute liver failure|multi-organ failure|organ failure",
+            lowered,
+        ):
             grade = "4_severe"
             rationale = ["Severe liver failure features are documented."]
-        elif re.search(r"hospitali[sz]|admitted", lowered) or (inr_peak is not None and inr_peak >= 1.5):
+        elif re.search(r"hospitali[sz]|admitted", lowered) or (
+            inr_peak is not None and inr_peak >= 1.5
+        ):
             grade = "3_moderate_severe"
-            rationale = ["Hospitalization or INR >= 1.5 suggests moderate-severe injury."]
+            rationale = [
+                "Hospitalization or INR >= 1.5 suggests moderate-severe injury."
+            ]
         elif bilirubin_peak is not None and bilirubin_peak >= 2.5:
             grade = "2_moderate"
-            rationale = ["Peak bilirubin is at least 2.5 x ULN without severe failure features."]
+            rationale = [
+                "Peak bilirubin is at least 2.5 x ULN without severe failure features."
+            ]
         elif labs.entries:
             grade = "1_mild"
-            rationale = ["Liver injury is present without bilirubin or severe failure escalation."]
+            rationale = [
+                "Liver injury is present without bilirubin or severe failure escalation."
+            ]
         else:
             grade = "unassessable"
             rationale = ["No laboratory evidence was available for severity grading."]
@@ -81,7 +99,9 @@ class DiliSeverityGrader:
                     quote=lab.evidence or f"{lab.marker_name} {lab.value}",
                     source_section=lab.source,
                     event_date=lab.sample_date,
-                    source_kind="patient_record" if lab.value is not None else "missing",
+                    source_kind="patient_record"
+                    if lab.value is not None
+                    else "missing",
                 )
             )
         return evidence

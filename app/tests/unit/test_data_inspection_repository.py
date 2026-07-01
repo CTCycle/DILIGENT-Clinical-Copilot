@@ -209,7 +209,10 @@ def test_session_report_and_text_use_result_payload_only() -> None:
     )
     assert legacy_detail is not None
     assert legacy_detail["report"] is None
-    assert legacy_detail["session_text"] == "Anamnesis:\nLegacy anamnesis\n\nDrugs:\nibuprofen"
+    assert (
+        legacy_detail["session_text"]
+        == "Anamnesis:\nLegacy anamnesis\n\nDrugs:\nibuprofen"
+    )
 
 ###############################################################################
 def test_catalog_search_and_drug_delete_cleanup() -> None:
@@ -415,7 +418,9 @@ class FailingTimelineExtractor:
         raise RuntimeError("structured extraction failed")
 
 ###############################################################################
-def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced() -> None:
+def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced() -> (
+    None
+):
     serializer, _ = build_serializer()
     save_session(
         serializer,
@@ -455,7 +460,9 @@ def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced(
     assert previews[0]["timeline_id"] == generated.timeline_id
     assert previews[0]["event_count"] == 1
 
-    persisted = serializer.get_session_timeline_record(session_id, int(generated.timeline_id))
+    persisted = serializer.get_session_timeline_record(
+        session_id, int(generated.timeline_id)
+    )
     assert persisted is not None
     assert persisted["timeline_id"] == generated.timeline_id
 

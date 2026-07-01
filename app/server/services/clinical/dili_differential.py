@@ -11,17 +11,62 @@ from domain.clinical.dili import (
 )
 
 CAUSE_PATTERNS: dict[str, tuple[str, ...]] = {
-    "viral_hepatitis_a_b_c_d_e": ("hepatitis a", "hepatitis b", "hepatitis c", "hav", "hbv", "hcv", "hdv", "hev"),
+    "viral_hepatitis_a_b_c_d_e": (
+        "hepatitis a",
+        "hepatitis b",
+        "hepatitis c",
+        "hav",
+        "hbv",
+        "hcv",
+        "hdv",
+        "hev",
+    ),
     "ebv_cmv_hsv": ("ebv", "cmv", "hsv", "epstein-barr", "cytomegal"),
-    "autoimmune_hepatitis": ("autoimmune hepatitis", "ana", "asma", "igg", "smooth muscle"),
+    "autoimmune_hepatitis": (
+        "autoimmune hepatitis",
+        "ana",
+        "asma",
+        "igg",
+        "smooth muscle",
+    ),
     "alcoholic_hepatitis": ("alcohol", "ethanol", "etoh"),
     "masld_mash_nash": ("masld", "mash", "nash", "fatty liver", "steatos"),
-    "biliary_obstruction_gallstones": ("biliary", "gallstone", "choledo", "obstruction", "cholangitis"),
+    "biliary_obstruction_gallstones": (
+        "biliary",
+        "gallstone",
+        "choledo",
+        "obstruction",
+        "cholangitis",
+    ),
     "ischemic_hypoxic": ("ischemi", "hypoxi", "anoxi", "shock liver"),
-    "sepsis_shock_cardiac_failure": ("sepsis", "septic", "shock", "cardiac failure", "heart failure"),
-    "overdose_or_toxin": ("overdose", "acetaminophen", "paracetamol", "toxin", "poison"),
-    "supplement_otc_recreational_occupational": ("herbal", "supplement", "otc", "recreational", "occupational"),
-    "pre_existing_chronic_liver_disease": ("cirrhos", "chronic liver", "portal hypertension", "hepatitis", "fibrosis"),
+    "sepsis_shock_cardiac_failure": (
+        "sepsis",
+        "septic",
+        "shock",
+        "cardiac failure",
+        "heart failure",
+    ),
+    "overdose_or_toxin": (
+        "overdose",
+        "acetaminophen",
+        "paracetamol",
+        "toxin",
+        "poison",
+    ),
+    "supplement_otc_recreational_occupational": (
+        "herbal",
+        "supplement",
+        "otc",
+        "recreational",
+        "occupational",
+    ),
+    "pre_existing_chronic_liver_disease": (
+        "cirrhos",
+        "chronic liver",
+        "portal hypertension",
+        "hepatitis",
+        "fibrosis",
+    ),
 }
 
 EXCLUDED_RE = re.compile(
@@ -37,7 +82,6 @@ UNKNOWN_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 ###############################################################################
 class DiliDifferentialEngine:
 
@@ -47,7 +91,9 @@ class DiliDifferentialEngine:
         causes: list[DiliCompetingCause] = []
         unresolved: list[str] = []
         for cause, phrases in CAUSE_PATTERNS.items():
-            status, rationale, evidence = self._assess_cause(cause, phrases, lowered, source_text)
+            status, rationale, evidence = self._assess_cause(
+                cause, phrases, lowered, source_text
+            )
             causes.append(
                 DiliCompetingCause(
                     cause=cause,
@@ -95,7 +141,11 @@ class DiliDifferentialEngine:
         else:
             status = "unknown"
             rationale = "The source mentions this cause without a clear exclusion or confirmation."
-        return cast(EvidenceStatus, status), rationale, [self._quote(cause, window or None)]
+        return (
+            cast(EvidenceStatus, status),
+            rationale,
+            [self._quote(cause, window or None)],
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -246,16 +246,14 @@ class RagSupportService:
     def build_document_reference(record: dict[str, Any]) -> RagDocumentReference | None:
         metadata = record.get("metadata")
         metadata_dict = metadata if isinstance(metadata, dict) else {}
-        file_name = (
-            str(
-                record.get("file_name")
-                or metadata_dict.get("source_file_name")
-                or metadata_dict.get("file_name")
-                or metadata_dict.get("source_relative_path")
-                or record.get("source")
-                or ""
-            ).strip()
-        )
+        file_name = str(
+            record.get("file_name")
+            or metadata_dict.get("source_file_name")
+            or metadata_dict.get("file_name")
+            or metadata_dict.get("source_relative_path")
+            or record.get("source")
+            or ""
+        ).strip()
         if not file_name:
             return None
 
@@ -288,7 +286,7 @@ class RagSupportService:
     def _coerce_page_number(value: Any) -> int | None:
         try:
             parsed = int(str(value).strip())
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return parsed if parsed >= 1 else None
 

@@ -207,15 +207,29 @@ def test_revision_routes_return_not_implemented() -> None:
         job_id = "job-1"
 
         responses = [
-            client.post(f"/api/inspection/sessions/{session_id}/revision/jobs", json={}),
+            client.post(
+                f"/api/inspection/sessions/{session_id}/revision/jobs", json={}
+            ),
             client.get(f"/api/inspection/sessions/revision/jobs/{job_id}"),
             client.delete(f"/api/inspection/sessions/revision/jobs/{job_id}"),
-            client.get(f"/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}"),
-            client.post(f"/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/retry"),
-            client.get(f"/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/steps"),
-            client.get(f"/api/inspection/sessions/{session_id}/versions/{version_id}/artifacts"),
-            client.get(f"/api/inspection/sessions/{session_id}/versions/{version_id}/entities"),
-            client.get(f"/api/inspection/sessions/{session_id}/versions/{version_id}/reviews"),
+            client.get(
+                f"/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}"
+            ),
+            client.post(
+                f"/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/retry"
+            ),
+            client.get(
+                f"/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/steps"
+            ),
+            client.get(
+                f"/api/inspection/sessions/{session_id}/versions/{version_id}/artifacts"
+            ),
+            client.get(
+                f"/api/inspection/sessions/{session_id}/versions/{version_id}/entities"
+            ),
+            client.get(
+                f"/api/inspection/sessions/{session_id}/versions/{version_id}/reviews"
+            ),
             client.put(
                 f"/api/inspection/sessions/{session_id}/versions/{version_id}/clinical-review",
                 json={"clinical_review_status": "approved_by_human"},

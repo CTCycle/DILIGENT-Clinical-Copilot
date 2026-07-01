@@ -7,16 +7,13 @@ SESSION_REVISION_DISABLED_MESSAGE = (
     "Session revision workflow has been intentionally removed and is pending rewrite."
 )
 
-
 ###############################################################################
 class SessionRevisionNotImplementedError(NotImplementedError):
     pass
 
-
 ###############################################################################
 def raise_session_revision_not_implemented(exception: Exception) -> NoReturn:
     raise exception
-
 
 ###############################################################################
 class InspectionRevisionScaffoldMixin:

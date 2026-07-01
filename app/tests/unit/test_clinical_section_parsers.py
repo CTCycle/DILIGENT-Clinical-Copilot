@@ -64,7 +64,9 @@ def test_duplicate_heading_error_reports_both_line_numbers() -> None:
 
 ###############################################################################
 def test_source_validation_rejects_fabrication() -> None:
-    sections = _extract("## Anamnesis\nReal history\n## Therapy\nReal drugs 400mg\n## Laboratory history\nALT 45")
+    sections = _extract(
+        "## Anamnesis\nReal history\n## Therapy\nReal drugs 400mg\n## Laboratory history\nALT 45"
+    )
     assert sections is not None
     assert sections["anamnesis"] == "Real history"
     assert sections["drugs"] == "Real drugs 400mg"

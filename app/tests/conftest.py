@@ -56,8 +56,7 @@ class WorkspaceTempPathFactory:
     # -------------------------------------------------------------------------
     def mktemp(self, basename: str, numbered: bool = True) -> Path:
         safe_basename = "".join(
-            char if char.isalnum() or char in {"-", "_"} else "_"
-            for char in basename
+            char if char.isalnum() or char in {"-", "_"} else "_" for char in basename
         ).strip("_")
         if not safe_basename:
             safe_basename = "tmp"

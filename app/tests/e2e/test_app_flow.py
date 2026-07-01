@@ -382,9 +382,7 @@ def test_dili_run_burst_click_submits_single_job(
     assert submission_count == 1
 
 ###############################################################################
-def test_dili_progress_polling_survives_navigation(
-    page: Page, base_url: str
-):
+def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
     page.goto(base_url)
     _fill_required_dili_fields(page)
 
@@ -438,13 +436,17 @@ def test_dili_progress_polling_survives_navigation(
         page.wait_for_timeout(900)
         page.get_by_role("tab", name="DILI Agent").click()
         expect(page).to_have_url(re.compile(r"/?$"))
-        expect(page.locator(".spinner-label")).to_contain_text("Gathering grounded evidence")
+        expect(page.locator(".spinner-label")).to_contain_text(
+            "Gathering grounded evidence"
+        )
         expect(page.locator(".spinner-label")).to_contain_text("62%")
         expect(page.locator(".inspection-excerpt-text")).to_contain_text(
             "Navigation recovery completed."
         )
     finally:
-        page.unroute("**/api/clinical/jobs/nav-resume**", serve_navigation_resume_status)
+        page.unroute(
+            "**/api/clinical/jobs/nav-resume**", serve_navigation_resume_status
+        )
         page.unroute("**/api/clinical/jobs", start_navigation_resume_job)
 
 ###############################################################################
@@ -498,13 +500,17 @@ def test_dili_progress_polling_survives_refresh(page: Page, base_url: str):
             "Extracting therapy and medication data"
         )
         page.reload()
-        expect(page.locator(".spinner-label")).to_contain_text("Collecting supporting evidence")
+        expect(page.locator(".spinner-label")).to_contain_text(
+            "Collecting supporting evidence"
+        )
         expect(page.locator(".spinner-label")).to_contain_text("57%")
         expect(page.locator(".inspection-excerpt-text")).to_contain_text(
             "Refresh recovery completed."
         )
     finally:
-        page.unroute("**/api/clinical/jobs/refresh-resume**", serve_refresh_resume_status)
+        page.unroute(
+            "**/api/clinical/jobs/refresh-resume**", serve_refresh_resume_status
+        )
         page.unroute("**/api/clinical/jobs", start_refresh_resume_job)
 
 ###############################################################################
@@ -685,7 +691,9 @@ def test_clinical_sessions_timeline_tab_lists_persisted_timelines(
     items = (
         sessions_payload.get("items") if isinstance(sessions_payload, dict) else None
     )
-    assert isinstance(items, list) and items, "No sessions available for timeline history test."
+    assert isinstance(items, list) and items, (
+        "No sessions available for timeline history test."
+    )
 
     target_session = next(
         (
@@ -697,7 +705,9 @@ def test_clinical_sessions_timeline_tab_lists_persisted_timelines(
         ),
         None,
     )
-    assert isinstance(target_session, dict), "No named session available for timeline history test."
+    assert isinstance(target_session, dict), (
+        "No named session available for timeline history test."
+    )
     session_id = target_session["session_id"]
     patient_name = target_session["patient_name"]
     assert isinstance(session_id, int) and session_id > 0

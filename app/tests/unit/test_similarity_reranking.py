@@ -173,7 +173,9 @@ def test_local_heuristic_reranker_profiles_shift_relative_scores() -> None:
 
     assert lexical_scores[0] > lexical_scores[1]
     assert phrase_scores[0] > phrase_scores[1]
-    assert (phrase_scores[0] - phrase_scores[1]) > (lexical_scores[0] - lexical_scores[1])
+    assert (phrase_scores[0] - phrase_scores[1]) > (
+        lexical_scores[0] - lexical_scores[1]
+    )
 
 ###############################################################################
 def test_search_with_reranking_reorders_and_trims_results() -> None:

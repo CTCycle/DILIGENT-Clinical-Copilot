@@ -15,7 +15,6 @@ from services.runtime.state import JobState
 
 ###############################################################################
 class JobErrorSanitizer:
-
     LOCAL_MODEL_MEMORY_MESSAGE = (
         "Local model could not be loaded due to insufficient memory. "
         "Choose a smaller local model or free memory and retry."

@@ -238,7 +238,14 @@ def build_compact_repair_messages(
 ###############################################################################
 def looks_like_schema_echo(text: str) -> bool:
     lowered = text.casefold()
-    schema_markers = ('"$defs"', '"properties"', '"required"', '"title"', '"type"', '"$ref"')
+    schema_markers = (
+        '"$defs"',
+        '"properties"',
+        '"required"',
+        '"title"',
+        '"type"',
+        '"$ref"',
+    )
     return sum(1 for marker in schema_markers if marker in lowered) >= 3
 
 ###############################################################################

@@ -143,7 +143,8 @@ def start_revision_step(
         attempt_number = int(previous_attempt or 0) + 1
         now = started_at or datetime.now(UTC)
         db_session.execute(
-            update(ClinicalSessionRevisionStep).where(
+            update(ClinicalSessionRevisionStep)
+            .where(
                 ClinicalSessionRevisionStep.pipeline_run_id == safe_pipeline_run_id,
                 ClinicalSessionRevisionStep.step_name == safe_step_name,
                 ClinicalSessionRevisionStep.superseded_at.is_(None),

@@ -261,27 +261,39 @@ def test_extract_drugs_from_therapy_does_not_parse_iso_dates_as_schedule() -> No
 def test_fragment_guard_rejects_multiline_status_and_truncated_compound_names() -> None:
     parser = DrugsParser(client=object())
 
-    assert parser.normalize_entry(
-        DrugEntry(name="interrotta il"),
-        source="anamnesis",
-        historical_flag=True,
-    ) is None
-    assert parser.normalize_entry(
-        DrugEntry(name="ricevuta il"),
-        source="anamnesis",
-        historical_flag=True,
-    ) is None
-    assert parser.normalize_entry(
-        DrugEntry(name="termine"),
-        source="anamnesis",
-        historical_flag=True,
-    ) is None
-    assert parser.attach_source_grounding(
-        DrugEntry(name="Hou"),
-        source_text="Hou Po 6\nDa Huang 15",
-        historical_flag=False,
-        require_medication_syntax=False,
-    ) is None
+    assert (
+        parser.normalize_entry(
+            DrugEntry(name="interrotta il"),
+            source="anamnesis",
+            historical_flag=True,
+        )
+        is None
+    )
+    assert (
+        parser.normalize_entry(
+            DrugEntry(name="ricevuta il"),
+            source="anamnesis",
+            historical_flag=True,
+        )
+        is None
+    )
+    assert (
+        parser.normalize_entry(
+            DrugEntry(name="termine"),
+            source="anamnesis",
+            historical_flag=True,
+        )
+        is None
+    )
+    assert (
+        parser.attach_source_grounding(
+            DrugEntry(name="Hou"),
+            source_text="Hou Po 6\nDa Huang 15",
+            historical_flag=False,
+            require_medication_syntax=False,
+        )
+        is None
+    )
 
 ###############################################################################
 def test_extract_drugs_from_therapy_skips_non_assumed_drug_line() -> None:

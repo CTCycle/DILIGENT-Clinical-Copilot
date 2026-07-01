@@ -47,7 +47,9 @@ class DrugResolutionPolicy:
         for candidate in livertox_candidates:
             candidate.accepted = candidate is accepted_livertox
             if not candidate.accepted and candidate.rejected_reason is None:
-                candidate.rejected_reason = "not selected by deterministic LiverTox policy"
+                candidate.rejected_reason = (
+                    "not selected by deterministic LiverTox policy"
+                )
         if accepted_rxnav is None and rxnav_candidates:
             return self._base_decision(
                 mention,
@@ -58,7 +60,11 @@ class DrugResolutionPolicy:
                 requires_review=True,
             )
         if accepted_livertox is None:
-            status = "missing_livertox" if not livertox_candidates else "ambiguous_requires_review"
+            status = (
+                "missing_livertox"
+                if not livertox_candidates
+                else "ambiguous_requires_review"
+            )
             return self._base_decision(
                 mention,
                 rxnav_candidates,
@@ -107,7 +113,9 @@ class DrugResolutionPolicy:
         mention: NormalizedDrugMention,
         candidates: list[LiverToxResolutionCandidate],
     ) -> LiverToxResolutionCandidate | None:
-        viable = [candidate for candidate in candidates if candidate.rejected_reason is None]
+        viable = [
+            candidate for candidate in candidates if candidate.rejected_reason is None
+        ]
         if not viable:
             return None
         exact = [
@@ -117,7 +125,9 @@ class DrugResolutionPolicy:
         ]
         if len(exact) == 1:
             return exact[0]
-        keys = {candidate.monograph_key or candidate.normalized_name for candidate in viable}
+        keys = {
+            candidate.monograph_key or candidate.normalized_name for candidate in viable
+        }
         if len(keys) == 1:
             return viable[0]
         return None
@@ -161,9 +171,15 @@ class DrugResolutionPolicy:
             accepted_rxnav_rxcui=accepted_rxnav.rxcui if accepted_rxnav else None,
             rxnav_validation_status=rxnav_status,
             livertox_candidates=livertox_candidates,
-            accepted_livertox_nbk_id=accepted_livertox.nbk_id if accepted_livertox else None,
-            accepted_livertox_name=accepted_livertox.drug_name if accepted_livertox else None,
-            accepted_livertox_match_has_excerpt=bool(accepted_livertox and accepted_livertox.has_excerpt),
+            accepted_livertox_nbk_id=accepted_livertox.nbk_id
+            if accepted_livertox
+            else None,
+            accepted_livertox_name=accepted_livertox.drug_name
+            if accepted_livertox
+            else None,
+            accepted_livertox_match_has_excerpt=bool(
+                accepted_livertox and accepted_livertox.has_excerpt
+            ),
             decision_status=status,
             confidence=accepted_livertox.confidence if accepted_livertox else None,
             reasons=reasons,

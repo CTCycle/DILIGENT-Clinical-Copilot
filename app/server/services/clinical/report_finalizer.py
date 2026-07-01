@@ -267,7 +267,11 @@ class ReportFinalizer:
                 )
             )
         missing_only = sorted(
-            (file_name for file_name in grouped_missing if file_name not in grouped_pages),
+            (
+                file_name
+                for file_name in grouped_missing
+                if file_name not in grouped_pages
+            ),
             key=str.casefold,
         )
         rendered_lines.extend(
@@ -298,10 +302,10 @@ class ReportFinalizer:
             if page == end + 1:
                 end = page
                 continue
-            page_segments.append(
-                str(start) if start == end else f"{start}-{end}"
-            )
+            page_segments.append(str(start) if start == end else f"{start}-{end}")
             start = end = page
         page_segments.append(str(start) if start == end else f"{start}-{end}")
-        page_label = "p." if len(page_segments) == 1 and "-" not in page_segments[0] else "pp."
+        page_label = (
+            "p." if len(page_segments) == 1 and "-" not in page_segments[0] else "pp."
+        )
         return f"- {file_name}, {page_label} {', '.join(page_segments)}"

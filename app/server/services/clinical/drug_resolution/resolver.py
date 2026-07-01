@@ -9,7 +9,9 @@ from domain.clinical.drug_resolution import (
     NormalizedDrugMention,
 )
 from domain.clinical.entities import PatientDrugs
-from services.clinical.drug_resolution.livertox_resolver import LiverToxCandidateResolver
+from services.clinical.drug_resolution.livertox_resolver import (
+    LiverToxCandidateResolver,
+)
 from services.clinical.drug_resolution.normalizer import DrugMentionNormalizer
 from services.clinical.drug_resolution.policy import DrugResolutionPolicy
 from services.clinical.drug_resolution.rxnav_resolver import RxNavCandidateResolver
@@ -97,8 +99,7 @@ class DrugResolutionService:
             belongs_to_other_mention = any(
                 other_tokens
                 and (
-                    other_tokens <= candidate_tokens
-                    or candidate_tokens <= other_tokens
+                    other_tokens <= candidate_tokens or candidate_tokens <= other_tokens
                 )
                 for other_tokens in other_token_sets
             )
@@ -120,9 +121,7 @@ class DrugResolutionService:
             return None
 
         has_rxcui = bool(cached.get("rxnorm_rxcui"))
-        exact_name = (
-            cached.get("normalized_drug_name") == mention.normalized_name
-        )
+        exact_name = cached.get("normalized_drug_name") == mention.normalized_name
         if has_rxcui:
             status = "accepted_rxnav_validated"
             rxnav_status = "exact_rxcui"
@@ -135,7 +134,9 @@ class DrugResolutionService:
 
         livertox_candidate = LiverToxResolutionCandidate(
             nbk_id=cached.get("nbk_id"),
-            drug_name=str(cached.get("drug_name") or cached.get("normalized_drug_name") or ""),
+            drug_name=str(
+                cached.get("drug_name") or cached.get("normalized_drug_name") or ""
+            ),
             normalized_name=cached.get("normalized_drug_name") or "",
             monograph_key=cached.get("monograph_key"),
             has_excerpt=bool(cached.get("excerpt")),
@@ -200,7 +201,9 @@ class DrugResolutionService:
         if not mapping:
             return None, []
         item = mapping[0]
-        return item.get("matched_livertox_row"), list(item.get("extracted_excerpts") or [])
+        return item.get("matched_livertox_row"), list(
+            item.get("extracted_excerpts") or []
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -217,11 +220,13 @@ class DrugResolutionService:
             "regimen_components",
         ):
             existing[field_name] = list(
-                dict.fromkeys(existing.get(field_name, []) + incoming.get(field_name, []))
+                dict.fromkeys(
+                    existing.get(field_name, []) + incoming.get(field_name, [])
+                )
             )
-        existing["extraction_metadata"] = (
-            existing.get("extraction_metadata", []) + incoming.get("extraction_metadata", [])
-        )
+        existing["extraction_metadata"] = existing.get(
+            "extraction_metadata", []
+        ) + incoming.get("extraction_metadata", [])
         existing.setdefault("resolution_decisions", [])
         existing["resolution_decisions"].append(incoming["resolution_decision"])
         return existing

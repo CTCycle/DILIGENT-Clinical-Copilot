@@ -167,7 +167,9 @@ def test_duplicate_drugs_from_sources_are_merged_by_canonical_name() -> None:
     assert payload["origins"] == ["therapy", "anamnesis"]
 
 ###############################################################################
-def test_preparation_resolves_catalog_identity_candidates_before_livertox_lookup() -> None:
+def test_preparation_resolves_catalog_identity_candidates_before_livertox_lookup() -> (
+    None
+):
     frame = pd.DataFrame(
         [
             {
@@ -744,9 +746,13 @@ def test_identity_resolution_does_not_manufacture_prefix_or_stem_queries() -> No
     levothyroxine = resolver.resolve("levothyroxine sodium")
     morfina = resolver.resolve("morfina")
 
-    assert all(candidate.canonical_candidate != "levothyroxine" for candidate in levothyroxine)
+    assert all(
+        candidate.canonical_candidate != "levothyroxine" for candidate in levothyroxine
+    )
     assert all(candidate.canonical_candidate != "morphin" for candidate in morfina)
-    assert all(candidate.canonical_candidate != "diazepam" for candidate in levothyroxine)
+    assert all(
+        candidate.canonical_candidate != "diazepam" for candidate in levothyroxine
+    )
 
 ###############################################################################
 def test_known_italian_drug_aliases_normalize_before_matching() -> None:
@@ -946,7 +952,12 @@ def test_catalog_retry_resolves_ambiguous_match_via_catalog_alias() -> None:
 
     assert result.status == "matched"
     assert result.matched_name == "DrugA"
-    assert result.reason in {"exact_canonical", "exact_alias_ranked", "exact_alias", "normalized_exact_ranked"}
+    assert result.reason in {
+        "exact_canonical",
+        "exact_alias_ranked",
+        "exact_alias",
+        "normalized_exact_ranked",
+    }
 
 ###############################################################################
 def test_ambiguous_retry_preserves_original_when_catalog_does_not_help() -> None:

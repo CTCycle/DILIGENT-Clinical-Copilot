@@ -689,7 +689,9 @@ class ClinicalLabExtractor:
 
         onset_context = None
         if parsed.onset_context is not None:
-            raw_onset_basis = (parsed.onset_context.onset_basis or "unknown").strip().lower()
+            raw_onset_basis = (
+                (parsed.onset_context.onset_basis or "unknown").strip().lower()
+            )
             if raw_onset_basis == "first_symptom":
                 onset_basis: Literal[
                     "first_symptom",
@@ -720,7 +722,9 @@ class ClinicalLabExtractor:
                     marker_name=entry.marker_name,
                     value_text=sanitize_optional_text(entry.value_text, max_length=100),
                     unit=sanitize_optional_text(entry.unit, max_length=50),
-                    sample_date=sanitize_optional_text(entry.sample_date, max_length=120),
+                    sample_date=sanitize_optional_text(
+                        entry.sample_date, max_length=120
+                    ),
                     evidence=sanitize_optional_text(entry.evidence, max_length=500),
                     source="laboratory_analysis",
                 )
