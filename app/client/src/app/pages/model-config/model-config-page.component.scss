@@ -107,6 +107,72 @@
   padding: 10px 12px;
 }
 
+.model-config-rag-settings-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  min-height: 128px;
+  padding: 14px;
+  border: 1px solid var(--mc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--mc-surface) 94%, transparent);
+  box-shadow: var(--mc-shadow);
+}
+
+.model-config-rag-settings-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.model-config-rag-settings-card-body {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  color: var(--mc-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.model-config-rag-settings-icon,
+.model-config-rag-settings-btn svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.model-config-rag-settings-icon {
+  width: 30px;
+  height: 30px;
+  color: var(--mc-brand);
+}
+
+.model-config-rag-settings-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--mc-border);
+  border-radius: 8px;
+  background: var(--mc-surface-soft);
+  color: var(--mc-text);
+  cursor: pointer;
+}
+
+.model-config-rag-settings-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.model-config-rag-settings-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .model-config-section-kicker,
 .model-config-panel-heading,
 .model-config-cloud-options h2,

@@ -78,6 +78,20 @@
           </div>
         </div>
 
+        <label class="stitch-dili-rag-toggle" for="rag-enabled">
+          <input
+            id="rag-enabled"
+            type="checkbox"
+            [ngModel]="vm.form.useRag"
+            (ngModelChange)="handleFormChange('useRag', $event)"
+            [disabled]="vm.isRunning || vm.isStarting"
+          />
+          <span>
+            <strong>Use RAG evidence</strong>
+            <small>Retrieve indexed source documents and include compact bibliography references.</small>
+          </span>
+        </label>
+
         <div class="stitch-dili-actions">
           <button
             class="btn btn-primary"

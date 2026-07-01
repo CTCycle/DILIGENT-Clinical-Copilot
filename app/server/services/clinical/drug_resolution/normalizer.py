@@ -17,6 +17,12 @@ _MIN_DRUG_NAME_LENGTH = 3
 _MAX_DRUG_NAME_WORDS = 6
 _MAX_DRUG_NAME_CHARS = 80
 _SENTENCE_BOUNDARY_RE = re.compile(r"[.;:]\s")
+_AGE_SEX_PROSE_RE = re.compile(
+    r"^\s*\d{1,3}\s*[- ]?\s*year\s*[- ]?\s*old\b.*\b("
+    r"man|woman|male|female|patient|evaluated|presented|admitted"
+    r")\b",
+    re.IGNORECASE,
+)
 
 ###############################################################################
 class DrugMentionNormalizer:
@@ -98,6 +104,10 @@ class DrugMentionNormalizer:
         if word_count > _MAX_DRUG_NAME_WORDS:
             return False
         if _SENTENCE_BOUNDARY_RE.search(raw_name):
+            return False
+        if _AGE_SEX_PROSE_RE.search(raw_name) or _AGE_SEX_PROSE_RE.search(
+            normalized_name
+        ):
             return False
         return any(character.isalpha() for character in normalized_name)
 
