@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import NoReturn
+
 from fastapi import APIRouter, Body, HTTPException, status
 
 from api.inspection.common import InspectionJobEndpointMixin
@@ -16,6 +18,7 @@ from domain.inspection import (
 from domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from services.inspection.revision_scaffold import (
     SESSION_REVISION_DISABLED_MESSAGE,
+    raise_session_revision_not_implemented,
 )
 from services.inspection.service import DataInspectionService
 
@@ -33,10 +36,12 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _raise_revision_not_implemented() -> None:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=SESSION_REVISION_DISABLED_MESSAGE,
+    def _raise_revision_not_implemented() -> NoReturn:
+        raise_session_revision_not_implemented(
+            HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail=SESSION_REVISION_DISABLED_MESSAGE,
+            )
         )
 
     # -------------------------------------------------------------------------

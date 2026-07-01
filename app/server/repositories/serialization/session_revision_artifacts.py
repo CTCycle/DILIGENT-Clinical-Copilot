@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from repositories.schemas.models import (
     ClinicalSessionRevisionArtifact,
@@ -273,8 +273,7 @@ def persist_revision_entities(
         safe_pipeline_run_id = str(pipeline_run_id)
         now = datetime.now(UTC)
         db_session.execute(
-            ClinicalSessionRevisionEntity.__table__.update()
-            .where(
+            update(ClinicalSessionRevisionEntity).where(
                 ClinicalSessionRevisionEntity.revision_version_id
                 == safe_revision_version_id,
                 ClinicalSessionRevisionEntity.superseded_at.is_(None),

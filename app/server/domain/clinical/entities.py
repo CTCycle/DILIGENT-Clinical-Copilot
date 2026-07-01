@@ -548,6 +548,7 @@ class DrugRucamAssessment(BaseModel):
     causality_category: Literal[
         "excluded",
         "unlikely",
+        "indeterminate",
         "possible",
         "probable",
         "highly probable",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
+from typing import Literal
 
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliTimeline, DiliTimelineEvent
 from domain.clinical.entities import ClinicalLabEntry, DrugEntry, PatientLabTimeline
@@ -21,6 +22,15 @@ SYMPTOM_RE = re.compile(
     re.IGNORECASE,
 )
 JAUNDICE_RE = re.compile(r"\b(jaundice|icterus|bilirubin)\b", re.IGNORECASE)
+DechallengeStatus = Literal[
+    "no_follow_up",
+    "improving_after_stop",
+    "worsening_after_stop",
+    "stable_abnormality",
+    "resolved_to_baseline",
+    "chronic_or_persistent",
+    "insufficient_interval",
+]
 
 
 ###############################################################################
@@ -276,11 +286,12 @@ class DiliTimelineEngine:
         self,
         drugs: list[DrugEntry],
         labs: list[ClinicalLabEntry],
-    ) -> tuple[str, str | None, str | None]:
+    ) -> tuple[DechallengeStatus, str | None, str | None]:
         stop_dates = sorted(
-            self.parse_date(item.suspension_date)
+            parsed_date
             for item in drugs
-            if self.parse_date(item.suspension_date) is not None
+            for parsed_date in [self.parse_date(item.suspension_date)]
+            if parsed_date is not None
         )
         if not stop_dates:
             return "no_follow_up", None, labs[-1].sample_date if labs else None

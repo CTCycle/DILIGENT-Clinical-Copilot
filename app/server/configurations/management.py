@@ -263,7 +263,9 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
 ###############################################################################
 def _build_deployment_settings(data: dict[str, Any]) -> DeploymentSettings:
     payload = ensure_mapping(data)
-    return DeploymentSettings(mode=coerce_str(payload.get("mode"), "local_single_user"))
+    return DeploymentSettings.model_validate(
+        {"mode": coerce_str(payload.get("mode"), "local_single_user")}
+    )
 
 ###############################################################################
 def _parse_database_url(url: str | None) -> dict[str, Any]:

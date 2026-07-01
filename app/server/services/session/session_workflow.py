@@ -666,7 +666,6 @@ async def process_single_patient_workflow(
             "generated_report": generated_report,
             "structured_dili_report": structured_dili_report,
             "dili_user_summary": dili_user_summary,
-            "llm_clinical_summary": llm_clinical_summary,
             "report_metadata": report_metadata.model_dump(),
             "faithfulness_audit": faithfulness_audit.model_dump(),
             "discrepancy_report": faithfulness_audit.discrepancy_report,

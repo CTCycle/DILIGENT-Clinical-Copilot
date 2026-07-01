@@ -18,6 +18,7 @@ from domain.inspection import (
     SessionUpdateRequest,
     SessionVersionDetailResponse,
     SessionVersionListResponse,
+    SessionVersionSummary,
 )
 from services.inspection.service import DataInspectionService
 
@@ -96,7 +97,9 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
     # -------------------------------------------------------------------------
     def list_session_versions(self, session_id: int) -> SessionVersionListResponse:
         items = self.service.list_session_versions(session_id)
-        return SessionVersionListResponse(items=items)
+        return SessionVersionListResponse(
+            items=[SessionVersionSummary(**item) for item in items]
+        )
 
     # -------------------------------------------------------------------------
     def get_session_version(

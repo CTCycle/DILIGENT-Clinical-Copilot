@@ -152,6 +152,14 @@ RxNav and LiverTox evidence before accepting it.
                     entries=[
                         DrugEntry(
                             name=candidate_name,
+                            dosage=None,
+                            administration_mode=None,
+                            route=None,
+                            administration_pattern=None,
+                            suspension_status=None,
+                            suspension_date=None,
+                            therapy_start_status=None,
+                            therapy_start_date=None,
                             source=original_entry.source,
                         )
                     ]

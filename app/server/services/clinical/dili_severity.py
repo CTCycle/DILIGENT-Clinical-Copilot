@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliSeverityAssessment
-from domain.clinical.entities import ClinicalLabEntry, PatientLabTimeline
+from domain.clinical.entities import PatientLabTimeline
 
 SYMPTOM_RE = re.compile(
     r"\b(jaundice|pruritus|fatigue|nausea|vomiting|abdominal pain|dark urine|itch(?:ing)?)\b",
