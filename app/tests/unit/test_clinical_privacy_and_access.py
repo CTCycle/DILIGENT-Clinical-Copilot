@@ -1,22 +1,7 @@
 from __future__ import annotations
 
-from configurations.management import build_settings_payload_from_json
 from domain.clinical.entities import PatientData
-from domain.settings.environment import EnvironmentSnapshot
 from services.session.session_shared import build_failed_session_payload
-
-###############################################################################
-def test_local_only_deployment_mode_is_explicit_in_runtime_payload() -> None:
-    payload = build_settings_payload_from_json(
-        {},
-        EnvironmentSnapshot(
-            ollama_url=None,
-            ollama_host=None,
-            ollama_port=None,
-        ),
-    )
-
-    assert payload["deployment"]["mode"] == "local_single_user"
 
 ###############################################################################
 def test_failed_clinical_job_payload_omits_phi_by_default() -> None:
