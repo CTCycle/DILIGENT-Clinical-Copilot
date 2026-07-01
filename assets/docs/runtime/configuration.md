@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-06-21
+Last updated: 2026-07-01
 
 ## Primary Runtime Files
 - Active env file: `settings/.env`
@@ -25,7 +25,6 @@ Last updated: 2026-06-21
   - local host and port values
 - `settings/configurations.json`
   - job polling interval
-  - deployment mode, currently `local_single_user`
   - RAG and ingestion settings
   - external timeout and concurrency settings
   - excludes all database mode and connection settings
@@ -33,8 +32,7 @@ Last updated: 2026-06-21
   - canonical deterministic reference catalogs for text normalization, extraction, matching, DILI behavior, language, and security filters
 
 ## Runtime Differences
-- Startup supports only `deployment.mode=local_single_user`. Any other deployment mode fails startup validation until multi-user and server deployment controls are implemented.
-- Local mode serves the frontend from a preview or dev process.
+- Local runs serve the frontend from a preview or dev process.
 - Packaged Tauri mode serves bundled SPA assets from the backend.
 - Startup validates packaged SPA presence before desktop mode serves assets.
 - Runtime resources are bundled under `runtime/` through `tauri.conf.json`.

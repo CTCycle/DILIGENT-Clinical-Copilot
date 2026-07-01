@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-06-30
+Last updated: 2026-07-01
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -116,7 +116,6 @@ Last updated: 2026-06-30
 - Runtime settings come from `settings/.env` and `settings/configurations.json`.
 - Database connection and database-mode values are sourced from `settings/.env`.
 - Runtime settings are accessed through `get_server_settings()`.
-- Supported deployment mode is `local_single_user`; startup validation rejects any other deployment mode until multi-user/server deployment controls exist.
 - Runtime and security helpers use canonical service modules; transitional shims are not maintained.
 - Supported external access-key providers are `openai`, `gemini`, and `brave`.
 - Containerized runtime is not implemented in the current repository.
