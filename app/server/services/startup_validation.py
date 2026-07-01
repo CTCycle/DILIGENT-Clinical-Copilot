@@ -9,11 +9,6 @@ from services.llm.model_config import ModelConfigService
 ###############################################################################
 def run_startup_validations(settings: ServerSettings | None = None) -> None:
     resolved_settings = settings or get_server_settings()
-    if resolved_settings.deployment.mode != "local_single_user":
-        raise RuntimeError(
-            "Only local_single_user deployment mode is supported without authentication."
-        )
-
     if tauri_mode_enabled() and not CLIENT_INDEX_FILE_PATH.is_file():
         raise RuntimeError(
             f"Tauri mode requires a packaged client build at {CLIENT_INDEX_FILE_PATH}."

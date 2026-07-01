@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field
 
 ###############################################################################
@@ -16,12 +14,6 @@ class JobsSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     polling_interval: float = Field(gt=0)
 
-###############################################################################
-class DeploymentSettings(BaseModel):
-    model_config = ConfigDict(frozen=True)
-    mode: Literal["local_single_user"] = "local_single_user"
-
-###############################################################################
 class DatabaseSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     embedded_database: bool
@@ -139,7 +131,6 @@ class SessionPipelineSettings(BaseModel):
 class ServerSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     fastapi: FastAPISettings
-    deployment: DeploymentSettings
     jobs: JobsSettings
     database: DatabaseSettings
     drugs_matcher: DrugsMatcherSettings
