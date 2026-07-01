@@ -115,7 +115,7 @@ class DrugIdentityResolver:
             ):
                 value = coerce_text(entry.get(field_name))
                 if self._is_real_catalog_value(value):
-                    values.append((value, kind, 0.82, f"catalog_{field_name}"))
+                    values.append((str(value), kind, 0.82, f"catalog_{field_name}"))
             for brand in entry.get("brand_names", []) or []:
                 if self._is_real_catalog_value(brand):
                     values.append((str(brand), "catalog_brand", 0.78, "catalog_brand"))

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from domain.clinical.drug_resolution import (
+    DrugDecisionStatus,
     DrugResolutionDecision,
     LiverToxResolutionCandidate,
     NormalizedDrugMention,
+    RxNavValidationStatus,
     RxNavResolutionCandidate,
 )
 from services.catalogs.runtime import get_reference_catalog_snapshot
@@ -127,20 +129,23 @@ class DrugResolutionPolicy:
         rxnav_candidates: list[RxNavResolutionCandidate],
         livertox_candidates: list[LiverToxResolutionCandidate],
         *,
-        status: str,
+        status: DrugDecisionStatus,
         reasons: list[str],
         requires_review: bool,
         accepted_rxnav: RxNavResolutionCandidate | None = None,
         accepted_livertox: LiverToxResolutionCandidate | None = None,
     ) -> DrugResolutionDecision:
-        rxnav_status = "no_rxnav_match"
+        rxnav_status: RxNavValidationStatus = "no_rxnav_match"
         if accepted_rxnav is not None:
-            rxnav_status = {
-                "brand": "brand_to_rxcui",
-                "ingredient": "ingredient_to_rxcui",
-                "alias": "alias_to_rxcui",
-                "name": "exact_rxcui",
-            }.get(accepted_rxnav.alias_kind or "", "alias_to_rxcui")
+            alias_kind = accepted_rxnav.alias_kind or ""
+            if alias_kind == "brand":
+                rxnav_status = "brand_to_rxcui"
+            elif alias_kind == "ingredient":
+                rxnav_status = "ingredient_to_rxcui"
+            elif alias_kind == "name":
+                rxnav_status = "exact_rxcui"
+            else:
+                rxnav_status = "alias_to_rxcui"
         elif rxnav_candidates:
             rxnav_status = "ambiguous_rxnav"
         elif status in {"accepted_exact_livertox", "accepted_livertox_without_rxnav"}:
@@ -159,7 +164,7 @@ class DrugResolutionPolicy:
             accepted_livertox_nbk_id=accepted_livertox.nbk_id if accepted_livertox else None,
             accepted_livertox_name=accepted_livertox.drug_name if accepted_livertox else None,
             accepted_livertox_match_has_excerpt=bool(accepted_livertox and accepted_livertox.has_excerpt),
-            decision_status=status,  # type: ignore[arg-type]
+            decision_status=status,
             confidence=accepted_livertox.confidence if accepted_livertox else None,
             reasons=reasons,
             requires_human_review=requires_review,

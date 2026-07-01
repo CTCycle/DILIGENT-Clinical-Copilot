@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import re
+from typing import cast
 
 from domain.clinical.dili import (
     ClinicalEvidenceQuote,
     DiliCompetingCause,
     DiliDifferentialAssessment,
+    EvidenceStatus,
 )
 
 CAUSE_PATTERNS: dict[str, tuple[str, ...]] = {
@@ -69,7 +71,7 @@ class DiliDifferentialEngine:
         phrases: tuple[str, ...],
         lowered: str,
         source_text: str,
-    ) -> tuple[str, str, list[ClinicalEvidenceQuote]]:
+    ) -> tuple[EvidenceStatus, str, list[ClinicalEvidenceQuote]]:
         matched_phrase = next((phrase for phrase in phrases if phrase in lowered), None)
         if matched_phrase is None:
             return (
@@ -93,7 +95,7 @@ class DiliDifferentialEngine:
         else:
             status = "unknown"
             rationale = "The source mentions this cause without a clear exclusion or confirmation."
-        return status, rationale, [self._quote(cause, window or None)]
+        return cast(EvidenceStatus, status), rationale, [self._quote(cause, window or None)]
 
     # -------------------------------------------------------------------------
     @staticmethod

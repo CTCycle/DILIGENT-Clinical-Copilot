@@ -707,7 +707,7 @@ class ModelConfigService:
     def resolve_current_rag_model_label() -> str | None:
         settings = build_effective_rag_settings()
         vector_db = LanceVectorDatabase(
-            database_path=VECTOR_DB_PATH,
+            database_path=str(VECTOR_DB_PATH),
             collection_name=settings.vector_collection_name,
             metric=settings.vector_index_metric,
             index_type=settings.vector_index_type,

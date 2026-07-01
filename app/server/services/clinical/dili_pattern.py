@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliInjuryPattern
 from domain.clinical.entities import ClinicalLabEntry, PatientLabTimeline
 
@@ -22,7 +24,9 @@ class DiliPatternEngine:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def classify(r_ratio: float | None) -> str:
+    def classify(
+        r_ratio: float | None,
+    ) -> Literal["hepatocellular", "cholestatic", "mixed", "indeterminate"]:
         if r_ratio is None:
             return "indeterminate"
         if r_ratio >= 5:
@@ -45,7 +49,13 @@ class DiliPatternEngine:
             alt_value, alp_value = self._value(alt), self._value(alp)
             alt_uln, alp_uln = self._uln(alt), self._uln(alp)
             ratio = None
-            if None not in (alt_value, alp_value, alt_uln, alp_uln) and alp_value:
+            if (
+                alt_value is not None
+                and alp_value is not None
+                and alt_uln is not None
+                and alp_uln is not None
+                and alp_value != 0
+            ):
                 ratio = (alt_value / alt_uln) / (alp_value / alp_uln)
             calculated.append(
                 DiliInjuryPattern(
