@@ -37,6 +37,7 @@ build/
 .coverage
 htmlcov/
 __pycache__/
+app/server/uv.lock
 
 # Node / JS
 **/node_modules/
@@ -58,7 +59,6 @@ yarn.lock
 Thumbs.db
 
 # Misc
-Cargo.toml
 *.lock
 *.log
 *.db
@@ -76,6 +76,3 @@ Cargo.toml
 !app/src-tauri/capabilities/**
 !app/src-tauri/icons/
 !app/src-tauri/icons/**
-
-
-
