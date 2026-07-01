@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import re
 from datetime import UTC, date, datetime
 from functools import partial
 from pathlib import Path
@@ -10,7 +8,6 @@ from typing import Any, Literal
 from common.constants import DOCUMENT_SUPPORTED_EXTENSIONS
 from common.paths import VECTOR_DB_PATH
 from common.utils.logger import logger
-from common.utils.text_utils import unique_preserve_order
 from configurations.startup import get_server_settings
 from domain.inspection import InspectionJobPhase
 from domain.patient_timeline import PatientTimeline
@@ -343,7 +340,7 @@ class DataInspectionService(
         try:
             rag_settings = build_effective_rag_settings()
             vector_db = LanceVectorDatabase(
-                database_path=VECTOR_DB_PATH,
+                database_path=str(VECTOR_DB_PATH),
                 collection_name=rag_settings.vector_collection_name,
                 metric=rag_settings.vector_index_metric,
                 index_type=rag_settings.vector_index_type,
@@ -413,7 +410,7 @@ class DataInspectionService(
         rag_settings = build_effective_rag_settings()
         collection_name = str(rag_settings.vector_collection_name)
         vector_db = LanceVectorDatabase(
-            database_path=VECTOR_DB_PATH,
+            database_path=str(VECTOR_DB_PATH),
             collection_name=collection_name,
             metric=rag_settings.vector_index_metric,
             index_type=rag_settings.vector_index_type,

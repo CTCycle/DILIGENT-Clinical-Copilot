@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from domain.clinical.dili import (
     ClinicalDataCompleteness,
     ClinicalEvidenceQuote,
@@ -236,7 +238,7 @@ class DiliEvidenceBuilder:
     def _question(
         question: str,
         answer: str,
-        evidence: list[ClinicalEvidenceQuote | None],
+        evidence: Sequence[ClinicalEvidenceQuote | None],
         missing_data_statement: str | None,
     ) -> DiliAcceptanceQuestion:
         return DiliAcceptanceQuestion(
@@ -414,13 +416,14 @@ class DiliEvidenceBuilder:
     @staticmethod
     def render(bundle: DiliEvidenceBundle) -> str:
         pattern = bundle.patterns[0] if bundle.patterns else None
+        pattern_name = pattern.pattern if pattern is not None else "indeterminate"
         lines = [
             "# Structured DILI causality dossier",
             "",
             "## 1. Case completeness and missing data",
             "## 2. Liver injury pattern and severity",
             (
-                f"- Pattern: {pattern.pattern}; R={pattern.r_ratio if pattern and pattern.r_ratio is not None else 'not assessable'} "
+                f"- Pattern: {pattern_name}; R={pattern.r_ratio if pattern and pattern.r_ratio is not None else 'not assessable'} "
                 f"(ALT {pattern.alt if pattern else 'NA'}/{pattern.alt_uln if pattern else 'NA'} ULN; "
                 f"ALP {pattern.alp if pattern else 'NA'}/{pattern.alp_uln if pattern else 'NA'} ULN)"
             ),

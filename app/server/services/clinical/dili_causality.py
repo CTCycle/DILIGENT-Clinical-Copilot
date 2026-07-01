@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from domain.clinical.dili import (
     DiliDifferentialAssessment,
     DiliRucamAssessment,
@@ -158,7 +160,9 @@ class DiliCausalityEngine:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _rechallenge_status(drug: DrugEntry) -> str:
+    def _rechallenge_status(
+        drug: DrugEntry,
+    ) -> Literal["positive", "present_unclear", "unknown"]:
         evidence = (drug.evidence or "").lower()
         if "rechallenge positive" in evidence or "re-exposure with recurrence" in evidence:
             return "positive"

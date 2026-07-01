@@ -483,7 +483,7 @@ class SimilaritySearch:
         )
         self.reranker: Reranker | None = None
         self.vector_database = vector_database or LanceVectorDatabase(
-            database_path=VECTOR_DB_PATH,
+            database_path=str(VECTOR_DB_PATH),
             collection_name=rag_settings.vector_collection_name,
             metric=rag_settings.vector_index_metric,
             index_type=rag_settings.vector_index_type,

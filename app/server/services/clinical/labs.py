@@ -689,13 +689,19 @@ class ClinicalLabExtractor:
 
         onset_context = None
         if parsed.onset_context is not None:
-            onset_basis = (parsed.onset_context.onset_basis or "unknown").strip().lower()
-            if onset_basis not in {
-                "first_symptom",
-                "first_abnormal_lab",
-                "visit_proxy",
-                "unknown",
-            }:
+            raw_onset_basis = (parsed.onset_context.onset_basis or "unknown").strip().lower()
+            if raw_onset_basis == "first_symptom":
+                onset_basis: Literal[
+                    "first_symptom",
+                    "first_abnormal_lab",
+                    "visit_proxy",
+                    "unknown",
+                ] = "first_symptom"
+            elif raw_onset_basis == "first_abnormal_lab":
+                onset_basis = "first_abnormal_lab"
+            elif raw_onset_basis == "visit_proxy":
+                onset_basis = "visit_proxy"
+            else:
                 onset_basis = "unknown"
             onset_context = LiverInjuryOnsetContext(
                 onset_date=sanitize_optional_text(

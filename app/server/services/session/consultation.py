@@ -23,7 +23,7 @@ class ClinicalSessionConsultationMixin:
 
     # -------------------------------------------------------------------------
     async def run_consultation(
-        self,
+        self: Any,
         *,
         payload: PatientData,
         analysis_drugs: PatientDrugs,
@@ -52,7 +52,7 @@ class ClinicalSessionConsultationMixin:
 
     # -------------------------------------------------------------------------
     async def run_revision_consultation(
-        self,
+        self: Any,
         *,
         payload: PatientData,
         analysis_drugs: PatientDrugs,
@@ -149,7 +149,7 @@ class ClinicalSessionConsultationMixin:
 
     # -------------------------------------------------------------------------
     async def _run_consultation_internal(
-        self,
+        self: Any,
         *,
         payload: PatientData,
         analysis_drugs: PatientDrugs,
@@ -255,7 +255,7 @@ class ClinicalSessionConsultationMixin:
 
     # -------------------------------------------------------------------------
     async def _run_revision_consultation_internal(
-        self,
+        self: Any,
         *,
         payload: PatientData,
         analysis_drugs: PatientDrugs,
@@ -394,7 +394,7 @@ class ClinicalSessionConsultationMixin:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _resolve_consultation_timeout(cls) -> float:
+    def _resolve_consultation_timeout(cls: type[Any]) -> float:
         runtime = get_server_settings().runtime
         configured = float(runtime.clinical_llm_timeout)
         return cls._resolve_runtime_timeout(
@@ -404,5 +404,5 @@ class ClinicalSessionConsultationMixin:
         )
 
     # -------------------------------------------------------------------------
-    def apply_persisted_runtime_configuration(self) -> None:
+    def apply_persisted_runtime_configuration(self: Any) -> None:
         self.model_config_service.ensure_defaults()

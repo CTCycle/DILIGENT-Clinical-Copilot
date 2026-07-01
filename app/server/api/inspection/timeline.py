@@ -7,6 +7,7 @@ from common.utils.logger import logger
 from domain.patient_timeline import (
     PatientTimeline,
     SessionTimelineListResponse,
+    SessionTimelinePreview,
     SessionTimelineRegenerateRequest,
 )
 from services.inspection.service import DataInspectionService
@@ -50,7 +51,9 @@ class InspectionTimelineEndpoint(InspectionEndpointBase):
     # -------------------------------------------------------------------------
     def list_session_timelines(self, session_id: int) -> SessionTimelineListResponse:
         items = self.service.list_session_timelines(session_id)
-        return SessionTimelineListResponse(items=items)
+        return SessionTimelineListResponse(
+            items=[SessionTimelinePreview(**item) for item in items]
+        )
 
     # -------------------------------------------------------------------------
     def generate_session_timeline(

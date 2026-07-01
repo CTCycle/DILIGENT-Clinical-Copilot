@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import NoReturn
 from typing import Any
 
 SESSION_REVISION_DISABLED_MESSAGE = (
@@ -13,11 +14,18 @@ class SessionRevisionNotImplementedError(NotImplementedError):
 
 
 ###############################################################################
+def raise_session_revision_not_implemented(exception: Exception) -> NoReturn:
+    raise exception
+
+
+###############################################################################
 class InspectionRevisionScaffoldMixin:
 
     # -------------------------------------------------------------------------
-    def raise_session_revision_not_implemented(self) -> None:
-        raise SessionRevisionNotImplementedError(SESSION_REVISION_DISABLED_MESSAGE)
+    def raise_session_revision_not_implemented(self) -> NoReturn:
+        raise_session_revision_not_implemented(
+            SessionRevisionNotImplementedError(SESSION_REVISION_DISABLED_MESSAGE)
+        )
 
     # -------------------------------------------------------------------------
     def start_revision_job(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:

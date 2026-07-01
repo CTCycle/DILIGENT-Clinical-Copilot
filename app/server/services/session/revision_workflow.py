@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from common.exceptions import ServiceError
 from common.utils.languages import (
@@ -65,7 +66,7 @@ from services.session.workflow_shared import (
 )
 
 ###############################################################################
-def _unique_non_empty_names(values: list[str | None]) -> list[str]:
+def _unique_non_empty_names(values: Sequence[str | None]) -> list[str]:
     seen: set[str] = set()
     normalized: list[str] = []
     for value in values:
@@ -754,6 +755,8 @@ def _build_revision_consultation_context(
         if isinstance((session_metadata or {}).get("source_rucam_assessments"), list)
         else []
     )
+    if not isinstance(previous_assessments, list):
+        previous_assessments = []
     assessment_summaries: list[str] = []
     for item in previous_assessments[:5]:
         if not isinstance(item, dict):
@@ -899,6 +902,7 @@ async def _run_revision_consultation(
     revision_consultation_runner = getattr(service, "run_revision_consultation", None)
     if not callable(revision_consultation_runner):
         raise ServiceError("Revision consultation runner is not configured")
+    revision_consultation_runner = cast(Callable[..., Awaitable[Any]], revision_consultation_runner)
     service_payload: dict[str, Any] | None = None
     (
         clinical_session,

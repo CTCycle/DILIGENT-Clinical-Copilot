@@ -86,7 +86,7 @@ def configure_logging() -> None:
     }
     try:
         logging.config.dictConfig(config)
-    except ValueError as exc:
+    except ValueError:
         logging.config.dictConfig(LOG_CONFIG)
 
 

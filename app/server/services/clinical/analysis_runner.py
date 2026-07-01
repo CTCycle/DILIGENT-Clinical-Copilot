@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from datetime import date
-from typing import Any
+from typing import Any, TypeAlias
 
 from common.utils.logger import logger
 from domain.clinical.claims import ClinicalClaim, DrugClinicalNarrative
@@ -22,6 +22,7 @@ from services.text.normalization import normalize_drug_query_name
 CLAIM_EVIDENCE_QUOTE_MAX_LENGTH = 1000
 CLAIM_EVIDENCE_TRUNCATION_MARKER = " [truncated]"
 MATCH_REASON_MAX_LENGTH = 100
+DrugAssessmentBase: TypeAlias = tuple[DrugClinicalAssessment, str, list[str]]
 
 ###############################################################################
 def claim_safe_evidence_quote(value: str | None) -> str | None:
@@ -408,7 +409,7 @@ class AnalysisRunner:
         pattern_summary: str,
         rucam_by_key: dict[str, DrugRucamAssessment],
         consultation: Any,
-    ) -> DrugClinicalAssessment:
+    ) -> DrugAssessmentBase:
         raw_name = drug_entry.name or ""
         normalized_drug_key = normalize_drug_query_name(raw_name)
         livertox_data = consultation.resolve_livertox_data_for_entry(

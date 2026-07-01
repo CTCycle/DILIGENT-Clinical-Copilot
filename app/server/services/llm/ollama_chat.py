@@ -824,6 +824,8 @@ async def estimate_max_feasible_context(
             metadata = await self.show_model(model)
         except OllamaError, OllamaTimeout:
             return None
+    if metadata is None:
+        metadata = {}
     native_limit = self.extract_context_limit(metadata)
     if not native_limit:
         return None
