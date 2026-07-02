@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-07-01
+Last updated: 2026-07-02
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -89,15 +89,15 @@ Last updated: 2026-07-01
 
 ### `POST /api/inspection/sessions/{session_id}/revision/jobs`
 - `app/server/api/data_inspection.py`
+- `app/server/api/inspection/revisions.py`
 - `app/server/services/inspection/service.py`
-- `app/server/services/session/session_service.py`
-- `app/server/services/clinical/revision/report_builder.py`
-- `app/server/services/clinical/revision/qa.py`
+- `app/server/services/inspection/revision_scaffold.py`
+- `app/server/services/inspection/revision_agent.py`
 - `app/server/repositories/serialization/data.py`
-- Revision jobs persist source-loading, reviewer-instruction analysis, runtime preparation, source preprocessing that prefers persisted source-version sections before reparsing raw text, deterministic source-artifact reuse for therapy/anamnesis/disease extraction when the selected source version already stores those artifacts, source-version structured artifact reuse for disease context, lab timeline, and onset context when those artifacts already exist, generation, revision-stage entity checkpoints (`resolve_revision_extraction`, `validate_anamnesis_drugs`, `extract_missing_anamnesis_drugs`, `revise_labs_timeline`, `reconcile_revision_candidates`, `merge_revision_snapshot`), revision-specific analysis and lookup drug inputs derived from the staged anamnesis additions, a dedicated `ClinicalSessionService.run_revision_consultation(...)` execution path with consultation metadata and selected-drug inputs derived from the merged revision snapshot, a dedicated consultation-engine entrypoint (`HepatoxConsultation.run_revision_analysis(...)`) underneath that service boundary, revision-specific drug-analysis/conclusion composition entrypoints (`request_revision_drug_analysis(...)`, `finalize_revision_patient_report(...)`, `generate_revision_conclusion(...)`) with comparison-aware synthesis guidance and dedicated revision prompt templates, revision-aware candidate classification reconciliation for promoted drugs, a dedicated revision finalization stage that owns post-consultation report shaping and audit summaries, source-version LiverTox match reuse or refresh decisions with provenance, revised DILI reassessment handling that can reference prior source-version per-drug assessments, final-report rebuild through `services/clinical/revision/report_builder.py`, revision QA validation through `services/clinical/revision/qa.py`, artifact/entity persistence, and final version-state transitions through revision run and step tables.
-- Revision jobs rebuild and persist the same deterministic `dili_evidence_bundle` contract used by first-run workflows so acceptance-question answers, timeline logic, Hy's Law state, RUCAM support, and causality categories stay aligned across initial and revised reports.
-- Revision result payloads identify lineage through `revision_kind`, `source_session_id`, `source_version_id`, `revision_version_id`, and `pipeline_run_id`; `execution_mode` is not a revision contract.
-- First-class revision entities are strict domain schemas under `app/server/domain/clinical/revision.py`; repository persistence validates revised drugs, diseases, lab entries, LiverTox decisions, and revised DILI assessments against those schemas before writing `clinical_session_revision_entities`.
+- Revision jobs currently implement the revision-agent skeleton only. They create a draft revision version shell, persist a revision run, and execute one single-model `revision_agent_issue_scan` step.
+- The revision agent reviews the persisted session input, sections, generated report, result payload, optional selected text, and user instructions. It produces a structured issue inventory covering missing context, mismatched context, hallucination risk, ambiguity, unsupported claims, chronology gaps, and future tool needs.
+- The skeleton does not rewrite the clinical report, rerun deterministic DILI adjudication, persist revised entities, or execute tools. Future tool routing is represented only as inert `tool_intents` in the issue-scan artifact.
+- Revision result lineage is persisted through `revision_kind`, `source_session_id`, `source_version_id`, `revision_version_id`, and `pipeline_run_id`.
 
 ## Async And Sync Behavior
 - FastAPI handlers are mixed:
