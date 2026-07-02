@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-06-25
+Last updated: 2026-07-02
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
@@ -89,5 +89,6 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 
 ## Notes
 - Clinical and inspection workflows rely on job polling for long-running work.
+- Revision jobs currently expose the revision-agent skeleton: start, status, persisted run, and persisted step/artifact reads are active for issue identification only. Report rewriting, tool execution, and revised entity persistence are not implemented yet.
 - Research has no active route inventory in the current architecture source and should not be documented as an active API surface until implemented.
 
