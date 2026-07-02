@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-06-25
+Last updated: 2026-07-02
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -61,7 +61,7 @@ Additional rules:
 - Clinical progress snapshots expose canonical granular stage keys such as `drugs.extracting`, `retrieval.evidence`, `report.generating`, `session.saving`, and terminal `completed`; generic internal wrapper stages are not persisted as the user-facing stage.
 - Inspection update jobs may include `phase`, `step_index`, `step_count`, `progress_message`, and `summary`.
 - Inspection update runners use cooperative cancellation and progress callbacks consistently across `rxnav`, `livertox`, and `rag`.
-- Session revision jobs reprocess the persisted session text, create a new session version, and persist a `revision_audit` payload with parser cross-validation, selected-focus context, user instructions, detected-drug diffs, model overrides, and conclusion action metadata.
+- Session revision jobs start the revision-agent skeleton. The first implemented step creates a draft revision version, runs one single-model `revision_agent_issue_scan` over the persisted session input, generated report, result payload, optional selected text, and user instructions, and persists the issue inventory as revision step/artifact data.
 - Missing in-memory revision job status returns a recoverable failed status instead of a bare not-found response so the frontend can reload the persisted revision run and offer retry when the draft shell is still valid.
 - Clinical and session revision jobs must persist their successful result payloads before returning completion. Persistence failures move the job to failed state with sanitized error metadata.
 
@@ -95,6 +95,8 @@ If a runner does not check stop requests, cancellation is delayed.
 4. Expose start, poll, and cancel routes.
 5. Prevent conflicting duplicates where needed with `is_job_running(job_type)`.
 
-## Disabled Scaffolds
-- Session revision routes remain registered only as rewrite scaffolding and return 501 Not Implemented until a replacement workflow is implemented.
+## Revision Agent Skeleton
+- Revision routes are active for issue identification only.
+- The revision agent does not rewrite the clinical report, rerun DILI adjudication, or execute tools in the current implementation.
+- Tool use is represented only as proposed `tool_intents` in the persisted issue scan until a tool manifest is added.
 

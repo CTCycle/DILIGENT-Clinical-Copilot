@@ -21,9 +21,11 @@ from repositories.serialization import (
     evidence_aliases,
     evidence_data,
     rxnav_data,
+    session_revision_artifacts,
     session_result_data,
     session_timelines,
     session_revision_data,
+    session_revision_steps,
 )
 
 ###############################################################################
@@ -326,6 +328,121 @@ class DataSerializer:
         session_id: int,
     ) -> dict[str, Any] | None:
         return session_revision_data.get_version_record_for_session(self, session_id)
+
+    # -------------------------------------------------------------------------
+    def create_revision_version_shell(
+        self,
+        session_id: int,
+        *,
+        reviewer_note: str | None,
+        configuration: dict[str, Any],
+        pipeline_run_id: str | None = None,
+        initiated_by: str | None = None,
+    ) -> dict[str, Any] | None:
+        return session_revision_data.create_revision_version_shell(
+            self,
+            session_id,
+            reviewer_note=reviewer_note,
+            configuration=configuration,
+            pipeline_run_id=pipeline_run_id,
+            initiated_by=initiated_by,
+        )
+
+    # -------------------------------------------------------------------------
+    def create_or_update_revision_run(
+        self,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        return session_revision_data.create_or_update_revision_run(self, **kwargs)
+
+    # -------------------------------------------------------------------------
+    def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
+        return session_revision_data.get_revision_run(self, pipeline_run_id)
+
+    # -------------------------------------------------------------------------
+    def get_revision_run_by_job_id(self, job_id: str) -> dict[str, Any] | None:
+        return session_revision_data.get_revision_run_by_job_id(self, job_id)
+
+    # -------------------------------------------------------------------------
+    def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
+        return session_revision_data.list_revision_steps(self, pipeline_run_id)
+
+    # -------------------------------------------------------------------------
+    def fail_revision_run(
+        self,
+        *,
+        pipeline_run_id: str,
+        error: dict[str, Any] | None = None,
+    ) -> None:
+        return session_revision_data.fail_revision_run(
+            self,
+            pipeline_run_id=pipeline_run_id,
+            error=error,
+        )
+
+    # -------------------------------------------------------------------------
+    def start_revision_step(self, **kwargs: Any) -> dict[str, Any]:
+        return session_revision_steps.start_revision_step(self, **kwargs)
+
+    # -------------------------------------------------------------------------
+    def complete_revision_step(self, **kwargs: Any) -> dict[str, Any] | None:
+        return session_revision_steps.complete_revision_step(self, **kwargs)
+
+    # -------------------------------------------------------------------------
+    def fail_revision_step(self, **kwargs: Any) -> dict[str, Any] | None:
+        return session_revision_steps.fail_revision_step(self, **kwargs)
+
+    # -------------------------------------------------------------------------
+    def persist_revision_agent_issue_scan(
+        self,
+        *,
+        pipeline_run_id: str,
+        revision_version_id: int,
+        payload: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        return session_revision_artifacts.persist_revision_agent_issue_scan(
+            self,
+            pipeline_run_id=pipeline_run_id,
+            revision_version_id=revision_version_id,
+            payload=payload,
+        )
+
+    # -------------------------------------------------------------------------
+    def list_revision_artifacts_for_version(
+        self,
+        *,
+        revision_version_id: int,
+    ) -> list[dict[str, Any]]:
+        return session_revision_artifacts.list_revision_artifacts_for_version(
+            self,
+            revision_version_id=revision_version_id,
+        )
+
+    # -------------------------------------------------------------------------
+    def list_revision_entities_for_version(
+        self,
+        *,
+        revision_version_id: int,
+    ) -> list[dict[str, Any]]:
+        return session_revision_artifacts.list_revision_entities_for_version(
+            self,
+            revision_version_id=revision_version_id,
+        )
+
+    # -------------------------------------------------------------------------
+    def list_revision_reviews_for_version(
+        self,
+        *,
+        revision_version_id: int,
+    ) -> list[dict[str, Any]]:
+        return session_revision_steps.list_revision_reviews_for_version(
+            self,
+            revision_version_id=revision_version_id,
+        )
+
+    # -------------------------------------------------------------------------
+    def record_revision_review_action(self, **kwargs: Any) -> dict[str, Any] | None:
+        return session_revision_steps.record_revision_review_action(self, **kwargs)
 
     # -------------------------------------------------------------------------
     def get_next_session_version(self, original_session_id: int) -> int:

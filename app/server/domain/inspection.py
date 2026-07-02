@@ -364,6 +364,55 @@ class ReviewerInstructionTrace(BaseModel):
     qa_validation_result: str | None = None
 
 ###############################################################################
+RevisionIssueCategory = Literal[
+    "missing_context",
+    "mismatched_context",
+    "hallucination_risk",
+    "ambiguity",
+    "unsupported_claim",
+    "chronology_gap",
+    "tool_needed",
+    "other",
+]
+RevisionIssueSeverity = Literal["low", "medium", "high", "critical"]
+RevisionIssueEvidenceStatus = Literal[
+    "supported_by_source",
+    "missing_from_source",
+    "conflicts_with_source",
+    "report_only",
+    "unclear",
+]
+
+###############################################################################
+class RevisionToolIntent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tool_name: str
+    reason: str
+    target: str | None = None
+    proposed_inputs: dict[str, Any] = Field(default_factory=dict)
+
+###############################################################################
+class RevisionIssueFinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    category: RevisionIssueCategory
+    severity: RevisionIssueSeverity
+    affected_report_area: str
+    evidence_status: RevisionIssueEvidenceStatus
+    source_evidence: str | None = None
+    missing_evidence_statement: str | None = None
+    rationale: str
+    recommended_next_action: str
+    tool_intents: list[RevisionToolIntent] = Field(default_factory=list)
+
+###############################################################################
+class RevisionIssueScanResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    summary: str
+    issues: list[RevisionIssueFinding] = Field(default_factory=list)
+    tool_intents: list[RevisionToolIntent] = Field(default_factory=list)
+    limits: list[str] = Field(default_factory=list)
+
+###############################################################################
 class RevisionArtifactResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     revision_version_id: int

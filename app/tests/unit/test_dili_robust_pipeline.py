@@ -199,45 +199,52 @@ def test_audit_blocks_report_without_claim_references() -> None:
     assert audit.outcome == "partially_faithful_with_major_issues"
 
 ###############################################################################
-def test_revision_routes_return_not_implemented() -> None:
+def test_revision_routes_report_missing_resources_without_501() -> None:
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
         session_id = 1
         version_id = 1
         pipeline_run_id = "pipe-1"
         job_id = "job-1"
 
-        responses = [
-            client.post(
+        responses = {
+            "start": client.post(
                 f"/api/inspection/sessions/{session_id}/revision/jobs", json={}
             ),
-            client.get(f"/api/inspection/sessions/revision/jobs/{job_id}"),
-            client.delete(f"/api/inspection/sessions/revision/jobs/{job_id}"),
-            client.get(
+            "status": client.get(f"/api/inspection/sessions/revision/jobs/{job_id}"),
+            "cancel": client.delete(
+                f"/api/inspection/sessions/revision/jobs/{job_id}"
+            ),
+            "run": client.get(
                 f"/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}"
             ),
-            client.post(
+            "retry": client.post(
                 f"/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/retry"
             ),
-            client.get(
+            "steps": client.get(
                 f"/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/steps"
             ),
-            client.get(
+            "artifacts": client.get(
                 f"/api/inspection/sessions/{session_id}/versions/{version_id}/artifacts"
             ),
-            client.get(
+            "entities": client.get(
                 f"/api/inspection/sessions/{session_id}/versions/{version_id}/entities"
             ),
-            client.get(
+            "reviews": client.get(
                 f"/api/inspection/sessions/{session_id}/versions/{version_id}/reviews"
             ),
-            client.put(
+            "review_update": client.put(
                 f"/api/inspection/sessions/{session_id}/versions/{version_id}/clinical-review",
                 json={"clinical_review_status": "approved_by_human"},
             ),
-        ]
+        }
 
-    for response in responses:
-        assert response.status_code == 501
-        assert response.json()["detail"] == (
-            "Session revision workflow has been intentionally removed and is pending rewrite."
-        )
+    assert responses["start"].status_code == 404
+    assert responses["status"].status_code == 404
+    assert responses["cancel"].status_code == 404
+    assert responses["run"].status_code == 404
+    assert responses["retry"].status_code == 404
+    assert responses["steps"].status_code == 404
+    assert responses["artifacts"].status_code == 404
+    assert responses["entities"].status_code == 404
+    assert responses["reviews"].status_code == 404
+    assert responses["review_update"].status_code == 404

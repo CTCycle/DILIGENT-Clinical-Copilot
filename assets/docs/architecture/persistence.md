@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-06-21
+Last updated: 2026-07-02
 
 ## Relational Database
 - SQLAlchemy-backed storage
@@ -11,7 +11,7 @@ Last updated: 2026-06-21
 - `clinical_sessions` is the single source of truth for session records, versioning, revision parentage, and session metadata.
 - New sessions default to `version=1`.
 - Revised sessions store original_session_id and an incremented ersion.
-- Historical revision tables may remain in local databases:
+- Revision tables store the active revision-agent skeleton and may also contain historical local data:
   - clinical_session_versions
   - clinical_session_revision_runs
   - clinical_session_revision_steps
@@ -20,7 +20,8 @@ Last updated: 2026-06-21
   - clinical_session_revision_reviews
   - clinical_session_manual_edits
 - Manual edit history remains active through clinical_session_manual_edits.
-- The current runtime does not execute or read the previous session revision pipeline.
+- The current runtime does not execute or read the previous deterministic session revision pipeline.
+- The active revision skeleton creates draft revision version shells, revision run rows, one `revision_agent_issue_scan` step, and a `revision_agent_issue_scan` pipeline artifact. It does not create revised clinical sessions or revised entity rows yet.
 - Patient timeline history is persisted only in clinical_session_timelines; session result payloads are not a timeline read source.
 - Evidence-locked DILI artifacts are persisted inside the database-backed session result payload:
   - 

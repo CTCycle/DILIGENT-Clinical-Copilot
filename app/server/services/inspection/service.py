@@ -43,6 +43,7 @@ from services.inspection.timeline import (
 )
 from services.inspection.update_config import InspectionUpdateConfigMixin
 from services.inspection.revision_scaffold import InspectionRevisionScaffoldMixin
+from services.inspection.revision_agent import RevisionAgentRunner
 from services.runtime.jobs import JobManager
 
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
@@ -109,6 +110,7 @@ class DataInspectionService(
             report_job_progress=self._report_job_progress_for_runner,
             write_rag_manifest=self._write_rag_manifest_for_runner,
         )
+        self.revision_agent_runner = RevisionAgentRunner(serializer=self.serializer)
 
     # -------------------------------------------------------------------------
     def list_sessions(

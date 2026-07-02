@@ -696,9 +696,23 @@ def create_or_update_revision_run(
             )
             db_session.add(existing)
         else:
+            existing_configuration = self.parse_session_result_payload(
+                existing.configuration_json
+            )
+            merged_configuration = {
+                **(existing_configuration if isinstance(existing_configuration, dict) else {}),
+                **configuration,
+            }
+            terminal_statuses = {"completed", "failed", "cancelled"}
+            if existing.status in terminal_statuses and status == "running":
+                status = existing.status
+                completed_at = existing.completed_at
+                error = self.parse_session_result_payload(existing.error_json)
             existing.status = status
             existing.target_revision_version_id = target_revision_version_id
-            existing.configuration_json = self.serialize_json_payload(configuration)
+            existing.configuration_json = self.serialize_json_payload(
+                merged_configuration
+            )
             existing.reviewer_note = self.normalize_string(reviewer_note)
             existing.initiated_by = self.normalize_string(initiated_by)
             existing.actor_display_name = self.normalize_string(initiated_by)
@@ -726,6 +740,29 @@ def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
             )
         ).scalar_one_or_none()
         return None if row is None else serialize_revision_run_row(self, row)
+    finally:
+        db_session.close()
+
+###############################################################################
+def get_revision_run_by_job_id(self, job_id: str) -> dict[str, Any] | None:
+    safe_job_id = str(job_id).strip()
+    if not safe_job_id:
+        return None
+    db_session = self.session_factory()
+    try:
+        rows = db_session.execute(
+            select(ClinicalSessionRevisionRun).order_by(
+                ClinicalSessionRevisionRun.started_at.desc(),
+                ClinicalSessionRevisionRun.id.desc(),
+            )
+        ).scalars()
+        for row in rows:
+            configuration = self.parse_session_result_payload(row.configuration_json)
+            if not isinstance(configuration, dict):
+                continue
+            if str(configuration.get("job_id") or "").strip() == safe_job_id:
+                return serialize_revision_run_row(self, row)
+        return None
     finally:
         db_session.close()
 
