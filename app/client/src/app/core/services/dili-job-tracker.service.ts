@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 
 import { REPORT_EXPORT_FILENAME } from '../constants';
-import { JobStatus, JobStatusResponse } from '../models/types';
+import { ClinicalJobResult, JobStatus, JobStatusResponse } from '../models/types';
 import { AppStateService } from '../state/app-state.service';
 import {
   cancelClinicalJob,
@@ -163,7 +163,7 @@ export class DiliJobTrackerService {
       );
       this.applyJobStatus(status);
       if (!isTerminalJobStatus(status.status) && this.stateService.state().diliAgent.jobId === vm.jobId) {
-        this.beginPolling(vm.jobId, intervalMs);
+        this.beginPolling(vm.jobId, intervalMs, true);
       }
     } catch (error) {
       const message = normalizeThrownError(
@@ -192,15 +192,23 @@ export class DiliJobTrackerService {
     }
   }
 
-  private beginPolling(jobId: string, intervalMs: number): void {
+  private beginPolling(jobId: string, intervalMs: number, delayFirstPoll = false): void {
     this.stopPolling();
     this.latestVersion = -1;
     this.lastPollResponseTimestamp = Date.now();
     const pollToken = ++this.pollToken;
+    let shouldDelayFirstPoll = delayFirstPoll;
     void this.jobPolling.run({
       intervalMs,
       isCancelled: () => pollToken !== this.pollToken,
       pollStep: async () => {
+        if (shouldDelayFirstPoll) {
+          shouldDelayFirstPoll = false;
+          await new Promise((resolve) => globalThis.setTimeout(resolve, Math.max(intervalMs, 250)));
+          if (pollToken !== this.pollToken) {
+            return false;
+          }
+        }
         try {
           const status = await fetchClinicalJobStatus(
             jobId,
@@ -250,7 +258,7 @@ export class DiliJobTrackerService {
     }
   }
 
-  private applyJobStatus(status: JobStatusResponse): void {
+  private applyJobStatus(status: JobStatusResponse<ClinicalJobResult>): void {
     const terminalStatus = isTerminalJobStatus(status.status);
     const stage =
       status.result && typeof status.result.progress_stage === 'string'
@@ -260,32 +268,33 @@ export class DiliJobTrackerService {
       status.result && typeof status.result.progress_message === 'string'
         ? status.result.progress_message
         : null;
+    const currentAgentState = this.stateService.state().diliAgent;
+    const resolvedStage = terminalStatus ? status.status : stage ?? currentAgentState.jobStage;
+    const resolvedStageMessage = terminalStatus
+      ? this.resolveTerminalStageMessage(status)
+      : stageMessage ?? currentAgentState.jobStageMessage;
     const resolvedProgress = typeof status.progress === 'number' ? status.progress : 0;
     const now = Date.now();
     const progressSignature = [
       status.status,
       resolvedProgress.toFixed(2),
-      stage ?? '',
-      stageMessage ?? '',
+      resolvedStage ?? '',
+      resolvedStageMessage ?? '',
     ].join('|');
     const lastProgressAtMs =
       this.lastProgressSignature !== progressSignature
         ? now
-        : this.stateService.state().diliAgent.jobLastProgressAtMs;
+        : currentAgentState.jobLastProgressAtMs;
     this.lastProgressSignature = progressSignature;
 
     this.stateService.updateDiliAgent({
       jobProgress: terminalStatus ? 100 : resolvedProgress,
       jobStatus: status.status,
-      jobStage: terminalStatus
-        ? status.status
-        : stage,
-      jobStageMessage: terminalStatus
-        ? this.resolveTerminalStageMessage(status)
-        : stageMessage,
+      jobStage: resolvedStage,
+      jobStageMessage: resolvedStageMessage,
       isStarting: false,
       isRunning: !terminalStatus,
-      jobStartedAtMs: this.stateService.state().diliAgent.jobStartedAtMs ?? now,
+      jobStartedAtMs: currentAgentState.jobStartedAtMs ?? now,
       jobLastProgressAtMs: lastProgressAtMs ?? now,
     });
 
@@ -316,7 +325,7 @@ export class DiliJobTrackerService {
     });
   }
 
-  private resolveTerminalStageMessage(status: JobStatusResponse): string {
+  private resolveTerminalStageMessage(status: JobStatusResponse<ClinicalJobResult>): string {
     if (status.status === 'completed') {
       return 'Clinical analysis completed.';
     }

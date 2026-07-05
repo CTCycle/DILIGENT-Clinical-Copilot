@@ -35,6 +35,7 @@
 :host ::ng-deep .model-config-page {
   gap: 16px;
   color: var(--mc-text);
+  overflow-x: clip;
   max-width: none;
   margin-inline: 0;
   min-height: calc(100vh - var(--app-top-nav-height, 0px));
@@ -434,6 +435,8 @@
 }
 
 .model-config-table-shell {
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   overflow-y: auto;
   height: 430px;
