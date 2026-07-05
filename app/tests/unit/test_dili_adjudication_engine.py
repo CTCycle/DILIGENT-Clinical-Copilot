@@ -20,6 +20,24 @@ def test_r_ratio_boundary_values_follow_livertox_definitions() -> None:
     assert DiliPatternEngine.classify(3.0) == "mixed"
 
 ###############################################################################
+def test_undated_multi_timepoint_labs_use_peak_multiples() -> None:
+    patterns = DiliPatternEngine().assess(
+        PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(marker_name="ALT", value=32, source="laboratory_analysis"),
+                ClinicalLabEntry(marker_name="AST", value=28, source="laboratory_analysis"),
+                ClinicalLabEntry(marker_name="ALP", value=92, source="laboratory_analysis"),
+                ClinicalLabEntry(marker_name="ALT", value=860, source="laboratory_analysis"),
+                ClinicalLabEntry(marker_name="AST", value=610, source="laboratory_analysis"),
+                ClinicalLabEntry(marker_name="ALP", value=210, source="laboratory_analysis"),
+            ]
+        )
+    )
+
+    assert patterns[0].pattern == "hepatocellular"
+    assert patterns[0].r_ratio == 12.285714285714286
+
+###############################################################################
 def test_structured_dossier_preserves_missing_competing_causes() -> None:
     bundle = DiliEvidenceBuilder().build(
         payload=PatientData(

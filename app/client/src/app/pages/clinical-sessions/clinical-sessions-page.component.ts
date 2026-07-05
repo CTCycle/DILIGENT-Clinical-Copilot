@@ -3,14 +3,11 @@ import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, 
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
-  LucideBookOpen,
-  LucideBraces,
   LucideFileText,
   LucideFlaskConical,
   LucideHeartPulse,
   LucideImage,
   LucidePill,
-  LucideSave,
   LucideTrash2,
 } from '@lucide/angular';
 
@@ -33,6 +30,20 @@ import {
 } from '../../core/models/types';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { formatErrorMessage, formatUnknownError } from '../../core/utils';
+import {
+  DEFAULT_CLINICAL_SESSION_METADATA_TEXT,
+  ClinicalSessionMetadataKey,
+  normalizeClinicalSessionMetadata,
+  readMetadataEntries,
+} from './clinical-session-metadata';
+import { ClinicalSessionEditorToolbarComponent } from './components/clinical-session-editor-toolbar.component';
+import {
+  ClinicalSessionDateFilterMode,
+  ClinicalSessionSection,
+  EditorCommandEvent,
+  EditorCommandName,
+  EditorViewMode,
+} from './clinical-sessions.types';
 
 type DetectedDrugEvidence = {
   name: string;
@@ -66,14 +77,12 @@ type DrugEvidenceDraft = DetectedDrugEvidence & {
   imports: [
     CommonModule,
     FormsModule,
-    LucideBookOpen,
-    LucideBraces,
+    ClinicalSessionEditorToolbarComponent,
     LucideFileText,
     LucideFlaskConical,
     LucideHeartPulse,
     LucideImage,
     LucidePill,
-    LucideSave,
     LucideTrash2,
   ],
   templateUrl: './clinical-sessions-page.component.html',
@@ -88,7 +97,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   readonly sessions = signal<InspectionSessionItem[]>([]);
   readonly statusFilter = signal<'all' | InspectionSessionStatus>('all');
-  readonly dateFilterMode = signal<'any' | 'after' | 'before' | 'exact'>('any');
+  readonly dateFilterMode = signal<ClinicalSessionDateFilterMode>('any');
   readonly dateFilter = signal('');
   readonly filteredSessions = computed(() => {
     const status = this.statusFilter();
@@ -116,12 +125,12 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly detailError = signal<string | null>(null);
   readonly query = signal('');
   readonly editorText = signal('');
-  readonly editorViewMode = signal<'source' | 'rendered'>('source');
+  readonly editorViewMode = signal<EditorViewMode>('source');
   readonly editorFontSize = signal(16);
   readonly manualEditReviewerNote = signal('');
   readonly manualEditEditedBy = signal('');
-  readonly metadataText = signal('{\n  "documents": [],\n  "images": []\n}');
-  readonly activeSection = signal<'preview' | 'editor' | 'metadata' | 'revision' | 'timeline'>('preview');
+  readonly metadataText = signal(DEFAULT_CLINICAL_SESSION_METADATA_TEXT);
+  readonly activeSection = signal<ClinicalSessionSection>('preview');
   readonly saveStatus = signal('');
   readonly deletingSessionId = signal<number | null>(null);
   readonly detectedDrugEvidence = signal<DetectedDrugEvidence[]>([]);
@@ -171,7 +180,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.editorViewMode.set('source');
       this.manualEditReviewerNote.set('');
       this.manualEditEditedBy.set(this.defaultReviewerLabel(detail));
-      this.metadataText.set(JSON.stringify(this.normalizeMetadata(detail.metadata || {}), null, 2));
+      this.metadataText.set(JSON.stringify(normalizeClinicalSessionMetadata(detail.metadata || {}), null, 2));
       this.syncTimelineModelSelection(detail);
       this.activeSection.set('preview');
       this.detectedDiseases.set(this.previewDetectedDiseases(detail));
@@ -218,7 +227,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     void this.ensureSelectedSessionVisible();
   }
 
-  updateDateFilterMode(value: 'any' | 'after' | 'before' | 'exact'): void {
+  updateDateFilterMode(value: ClinicalSessionDateFilterMode): void {
     this.dateFilterMode.set(value);
     if (value === 'any') {
       this.dateFilter.set('');
@@ -250,7 +259,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.editorText.set('');
     this.manualEditReviewerNote.set('');
     this.manualEditEditedBy.set('');
-    this.metadataText.set('{\n  "documents": [],\n  "images": []\n}');
+    this.metadataText.set(DEFAULT_CLINICAL_SESSION_METADATA_TEXT);
     this.detectedDrugEvidence.set([]);
     this.detectedDiseases.set([]);
     this.labSummary.set([]);
@@ -264,7 +273,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.editorText.set(value);
   }
 
-  setEditorViewMode(mode: 'source' | 'rendered'): void {
+  setEditorViewMode(mode: EditorViewMode): void {
     if (this.editorViewMode() === mode) return;
     this.editorViewMode.set(mode);
     const detail = this.selected();
@@ -277,7 +286,11 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.editorFontSize.set(next);
   }
 
-  runEditorCommand(command: string, value?: string): void {
+  handleEditorCommand(event: EditorCommandEvent): void {
+    this.runEditorCommand(event.command, event.value);
+  }
+
+  runEditorCommand(command: EditorCommandName, value?: string): void {
     const element = this.sessionTextEditor?.nativeElement;
     if (!element) return;
     element.focus();
@@ -410,7 +423,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.manualEditEditedBy.set(value);
   }
 
-  setSection(section: 'preview' | 'editor' | 'metadata' | 'revision' | 'timeline'): void {
+  setSection(section: ClinicalSessionSection): void {
     this.activeSection.set(section);
   }
 
@@ -1008,31 +1021,11 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     return parsed.toISOString().slice(0, 10);
   }
 
-  metadataEntries(key: 'documents' | 'images'): string[] {
-    try {
-      const parsed = JSON.parse(this.metadataText()) as Record<string, unknown>;
-      const values = parsed[key];
-      if (!Array.isArray(values)) return [];
-      return values
-        .map((item) => {
-          if (typeof item === 'string') return item.trim();
-          if (!item || typeof item !== 'object') return '';
-          const record = item as Record<string, unknown>;
-          const label =
-            record['title'] ||
-            record['file_name'] ||
-            record['name'] ||
-            record['path'] ||
-            record['source'];
-          return typeof label === 'string' ? label.trim() : JSON.stringify(record);
-        })
-        .filter((item) => item.length > 0);
-    } catch {
-      return [];
-    }
+  metadataEntries(key: ClinicalSessionMetadataKey): string[] {
+    return readMetadataEntries(this.metadataText(), key);
   }
 
-  onMetadataFilesSelected(kind: 'documents' | 'images', event: Event): void {
+  onMetadataFilesSelected(kind: ClinicalSessionMetadataKey, event: Event): void {
     const input = event.target as HTMLInputElement | null;
     const files = Array.from(input?.files || []);
     if (!files.length) return;
@@ -1044,31 +1037,19 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       last_modified: new Date(file.lastModified).toISOString(),
     }));
     const metadata = this.readMetadataDraft();
-    const current = Array.isArray(metadata[kind]) ? (metadata[kind] as unknown[]) : [];
+    const current: unknown[] = Array.isArray(metadata[kind]) ? metadata[kind] : [];
     metadata[kind] = [...current, ...additions];
-    this.metadataText.set(JSON.stringify(this.normalizeMetadata(metadata), null, 2));
+    this.metadataText.set(JSON.stringify(normalizeClinicalSessionMetadata(metadata), null, 2));
     if (input) input.value = '';
-  }
-
-  private normalizeMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
-    return {
-      documents: Array.isArray(metadata['documents']) ? metadata['documents'] : [],
-      images: Array.isArray(metadata['images']) ? metadata['images'] : [],
-      manual_metadata:
-        metadata['manual_metadata'] && typeof metadata['manual_metadata'] === 'object'
-          ? metadata['manual_metadata']
-          : {},
-      ...metadata,
-    };
   }
 
   private readMetadataDraft(): Record<string, unknown> {
     try {
-      return this.normalizeMetadata(
+      return normalizeClinicalSessionMetadata(
         JSON.parse(this.metadataText()) as Record<string, unknown>,
       );
     } catch {
-      return this.normalizeMetadata({});
+      return normalizeClinicalSessionMetadata({});
     }
   }
 

@@ -196,6 +196,12 @@ def test_audit_blocks_report_without_claim_references() -> None:
     )
 
     assert audit.blocking_issues
+    assert audit.manual_review_required is True
+    assert any(
+        decision.get("gate") == "manual_review"
+        and decision.get("manual_review_required") is True
+        for decision in audit.gate_decisions
+    )
     assert audit.outcome == "partially_faithful_with_major_issues"
 
 ###############################################################################

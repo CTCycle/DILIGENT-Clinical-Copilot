@@ -16,6 +16,41 @@ class DiliPatternEngine:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def _best_entry(
+        cls,
+        entries: list[ClinicalLabEntry],
+        marker_names: set[str],
+    ) -> ClinicalLabEntry | None:
+        selected: ClinicalLabEntry | None = None
+        selected_multiple: float | None = None
+        for entry in entries:
+            if entry.marker_name.upper() not in marker_names:
+                continue
+            value = cls._value(entry)
+            uln = cls._uln(entry)
+            if value is None or uln is None or uln <= 0:
+                current_multiple = None
+            else:
+                current_multiple = value / uln
+            if selected is None:
+                selected = entry
+                selected_multiple = current_multiple
+                continue
+            if selected_multiple is None and current_multiple is not None:
+                selected = entry
+                selected_multiple = current_multiple
+                continue
+            if (
+                selected_multiple is not None
+                and current_multiple is not None
+                and current_multiple > selected_multiple
+            ):
+                selected = entry
+                selected_multiple = current_multiple
+        return selected
+
+    # -------------------------------------------------------------------------
+    @classmethod
     def _uln(cls, entry: ClinicalLabEntry) -> float | None:
         if entry.upper_limit_normal and entry.upper_limit_normal > 0:
             return float(entry.upper_limit_normal)
@@ -41,12 +76,8 @@ class DiliPatternEngine:
             buckets.setdefault(entry.sample_date or "undated", []).append(entry)
         calculated: list[DiliInjuryPattern] = []
         for sample_date, entries in buckets.items():
-            alt = next(
-                (item for item in entries if item.marker_name.upper() == "ALT"), None
-            )
-            alp = next(
-                (item for item in entries if item.marker_name.upper() == "ALP"), None
-            )
+            alt = self._best_entry(entries, {"ALT"})
+            alp = self._best_entry(entries, {"ALP"})
             if alt is None or alp is None:
                 continue
             alt_value, alp_value = self._value(alt), self._value(alp)
