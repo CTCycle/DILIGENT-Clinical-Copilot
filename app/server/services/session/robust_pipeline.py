@@ -405,6 +405,8 @@ def audit_report(
                 "message": "Timed-drug requirement was not satisfied.",
             }
         )
+    if blocking_issues:
+        manual_review_required = True
     if manual_review_required:
         non_blocking_issues.append(
             {

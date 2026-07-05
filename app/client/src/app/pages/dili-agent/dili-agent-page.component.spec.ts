@@ -29,6 +29,22 @@ describe('DiliAgentPageComponent', () => {
     expect(component.canStartSession()).toBeFalsy();
   });
 
+  it('renders disabled run reason as visible associated feedback', () => {
+    component.stateService.updateDiliAgent({
+      form: { ...component.vm.form, visitDate: '2025-01-01', clinicalInput: 'word '.repeat(59) },
+    });
+
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const runButton = root.querySelector<HTMLButtonElement>('.stitch-dili-actions .btn-primary');
+    const reason = root.querySelector<HTMLElement>('#run-disabled-reason');
+
+    expect(runButton?.disabled).toBe(true);
+    expect(runButton?.getAttribute('aria-describedby')).toBe('run-disabled-reason');
+    expect(reason?.textContent).toContain('Clinical input needs at least 60 words.');
+  });
+
   it('canStartSession true when all preconditions are met', () => {
     component.stateService.updateDiliAgent({
       form: { ...component.vm.form, visitDate: '2025-01-01', clinicalInput: 'word '.repeat(60) },

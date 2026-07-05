@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -144,6 +144,13 @@ export class ModelConfigPageComponent implements OnInit {
   });
   readonly draftConfig = signal<DraftRuntimeConfig>(resolveDraftFromSettings(this.appState.state().diliAgent.settings));
   readonly lastUpdatedAt = signal<string | null>(null);
+
+  @HostListener('document:keydown.escape')
+  closeRagSettingsOnEscape(): void {
+    if (this.ragSettingsModalOpen()) {
+      this.closeRagSettingsPanel();
+    }
+  }
 
   readonly filteredLocalModels = computed(() => {
     const query = this.modelSearchQuery().trim().toLowerCase();
