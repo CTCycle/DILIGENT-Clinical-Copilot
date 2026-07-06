@@ -324,13 +324,9 @@
               <div class="model-config-provider-name">
                 <span class="model-config-provider-mark" [class.is-openai]="provider === 'openai'" [class.is-gemini]="provider === 'gemini'">
                   @if (provider === 'openai') {
-                    <span class="model-config-openai-mark" aria-label="OpenAI logo" role="img">
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                      <span></span>
+                    <span class="model-config-provider-logo-switch" aria-label="OpenAI logo" role="img">
+                      <img class="model-config-provider-logo model-config-provider-logo-light" src="/logos/openai-mark-dark.png" alt="" aria-hidden="true" />
+                      <img class="model-config-provider-logo model-config-provider-logo-dark" src="/logos/openai-mark-light.png" alt="" aria-hidden="true" />
                     </span>
                   } @else {
                     <img src="/logos/google-g.svg" alt="Google logo" />
