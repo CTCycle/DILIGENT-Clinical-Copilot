@@ -59,6 +59,23 @@ def _build_variant_heading_payload() -> dict:
     }
 
 ###############################################################################
+def _mock_ready_preflight(page: Page) -> None:
+    page.route(
+        "**/api/clinical/validate-input",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=(
+                '{"ready":true,"blocking_issues":[],"non_blocking_issues":[],'
+                '"runtime_settings":{},"extraction_quality":{},'
+                '"deterministic_diagnostics":{},'
+                '"rag_readiness":{"requested":false,"available":true,'
+                '"backend":"disabled","model":null,"reason_code":null,"message":null}}'
+            ),
+        ),
+    )
+
+###############################################################################
 def test_dilu_agent_page_loads(page: Page, base_url: str):
     page.goto(base_url)
 
@@ -354,6 +371,7 @@ def test_dili_run_burst_click_submits_single_job(
             return
         route.continue_()
 
+    _mock_ready_preflight(page)
     page.route("**/api/clinical/jobs", count_submissions)
     page.route(
         "**/api/clinical/jobs/burst-test**",
@@ -376,6 +394,7 @@ def test_dili_run_burst_click_submits_single_job(
         }"""
     )
     page.wait_for_timeout(1200)
+    page.unroute("**/api/clinical/validate-input")
     page.unroute("**/api/clinical/jobs/burst-test**")
     page.unroute("**/api/clinical/jobs", count_submissions)
 
@@ -424,6 +443,7 @@ def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
             )
         route.fulfill(status=200, content_type="application/json", body=body)
 
+    _mock_ready_preflight(page)
     page.route("**/api/clinical/jobs", start_navigation_resume_job)
     page.route("**/api/clinical/jobs/nav-resume**", serve_navigation_resume_status)
     try:
@@ -447,6 +467,7 @@ def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
         page.unroute(
             "**/api/clinical/jobs/nav-resume**", serve_navigation_resume_status
         )
+        page.unroute("**/api/clinical/validate-input")
         page.unroute("**/api/clinical/jobs", start_navigation_resume_job)
 
 ###############################################################################
@@ -492,6 +513,7 @@ def test_dili_progress_polling_survives_refresh(page: Page, base_url: str):
             )
         route.fulfill(status=200, content_type="application/json", body=body)
 
+    _mock_ready_preflight(page)
     page.route("**/api/clinical/jobs", start_refresh_resume_job)
     page.route("**/api/clinical/jobs/refresh-resume**", serve_refresh_resume_status)
     try:
@@ -511,6 +533,7 @@ def test_dili_progress_polling_survives_refresh(page: Page, base_url: str):
         page.unroute(
             "**/api/clinical/jobs/refresh-resume**", serve_refresh_resume_status
         )
+        page.unroute("**/api/clinical/validate-input")
         page.unroute("**/api/clinical/jobs", start_refresh_resume_job)
 
 ###############################################################################
@@ -542,6 +565,7 @@ def test_dili_submit_accepts_variant_section_headings(
             return
         route.continue_()
 
+    _mock_ready_preflight(page)
     page.route("**/api/clinical/jobs", submit_variant)
     page.route(
         "**/api/clinical/jobs/variant-headings**",
@@ -557,6 +581,7 @@ def test_dili_submit_accepts_variant_section_headings(
     )
     run_button.click()
     page.wait_for_timeout(1200)
+    page.unroute("**/api/clinical/validate-input")
     page.unroute("**/api/clinical/jobs/variant-headings**")
     page.unroute("**/api/clinical/jobs", submit_variant)
 
@@ -579,6 +604,7 @@ def test_dili_run_conflict_surfaces_clear_error_message(
             body='{"detail":"Another operation is already running."}',
         )
 
+    _mock_ready_preflight(page)
     page.route("**/api/clinical/jobs", mock_conflict)
     try:
         page.goto(base_url)
@@ -591,6 +617,7 @@ def test_dili_run_conflict_surfaces_clear_error_message(
         )
         expect(run_button).to_be_enabled(timeout=10000)
     finally:
+        page.unroute("**/api/clinical/validate-input")
         page.unroute("**/api/clinical/jobs", mock_conflict)
 
 ###############################################################################

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DILIGENT Desktop",
+  "version": "2.3.0",
+  "identifier": "com.diligent.desktop",
+  "build": {
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../client/dist/browser",
+    "devUrl": "about:blank"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DILIGENT Desktop",
+        "url": "about:blank",
+        "width": 1440,
+        "height": 920,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "withGlobalTauri": false
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "runtime/pyproject.toml": "runtime/pyproject.toml",
+      "runtime/app/server": "runtime/app/server",
+      "runtime/app/scripts": "runtime/app/scripts",
+      "runtime/settings": "runtime/settings",
+      "runtime/app/client/dist": "runtime/app/client/dist",
+      "runtime/app/resources/models": "runtime/app/resources/models",
+      "runtime/app/resources/sources": "runtime/app/resources/sources",
+      "runtime/runtimes/uv.lock": "runtime/runtimes/uv.lock",
+      "runtime/runtimes/python": "runtime/runtimes/python",
+      "runtime/runtimes/uv": "runtime/runtimes/uv"
+    }
+  }
+}
+
