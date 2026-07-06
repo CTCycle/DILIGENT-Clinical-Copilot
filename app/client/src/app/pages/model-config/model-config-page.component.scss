@@ -679,8 +679,8 @@
 .model-config-provider-mark {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   color: var(--mc-brand);
 }
 
@@ -688,41 +688,23 @@
   color: #0f172a;
 }
 
-.model-config-openai-mark {
+.model-config-provider-logo-switch {
   position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+}
+
+.model-config-provider-logo {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
   display: block;
-  width: 22px;
-  height: 22px;
 }
 
-.model-config-openai-mark span {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 7px;
-  height: 11px;
-  margin-left: -3.5px;
-  margin-top: -9.5px;
-  border: 2.2px solid currentColor;
-  border-radius: 999px;
-  background: transparent;
-  transform-origin: 50% 8px;
-}
-
-.model-config-openai-mark span:nth-child(1) { transform: rotate(0deg) translateY(-4px); }
-.model-config-openai-mark span:nth-child(2) { transform: rotate(60deg) translateY(-4px); }
-.model-config-openai-mark span:nth-child(3) { transform: rotate(120deg) translateY(-4px); }
-.model-config-openai-mark span:nth-child(4) { transform: rotate(180deg) translateY(-4px); }
-.model-config-openai-mark span:nth-child(5) { transform: rotate(240deg) translateY(-4px); }
-.model-config-openai-mark span:nth-child(6) { transform: rotate(300deg) translateY(-4px); }
-
-.model-config-openai-mark::after {
-  content: "";
-  position: absolute;
-  inset: 7px;
-  border: 1.6px solid currentColor;
-  border-radius: 50%;
-  background: var(--mc-surface);
+.model-config-provider-logo-dark {
+  display: none;
 }
 
 .model-config-provider-mark img {
@@ -839,6 +821,14 @@
 
 :host-context([data-theme="dark"]) .model-config-provider-mark.is-openai {
   color: #eefbf6;
+}
+
+:host-context([data-theme="dark"]) .model-config-provider-logo-light {
+  display: none;
+}
+
+:host-context([data-theme="dark"]) .model-config-provider-logo-dark {
+  display: block;
 }
 
 .model-config-test-btn {
