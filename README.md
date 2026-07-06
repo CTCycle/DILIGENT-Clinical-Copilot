@@ -148,11 +148,11 @@ Equivalent PowerShell runners:
 - `assets/docs/coding/error_handling.md`: backend and frontend error strategy.
 - `assets/docs/ui/components_and_patterns.md`: frontend structure and interface patterns.
 
-## 10. Development Status
+## 9. Development Status
 
-This project is under active development and may contain incomplete features or defects. Tagged releases (currently v2.2.0) are stable for local evaluation.
+This project is under active development and may contain incomplete features or defects. Tagged releases are stable for local evaluation.
 
-## 9. License
+## 10. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.
 
 
