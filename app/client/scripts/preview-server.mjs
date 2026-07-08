@@ -11,9 +11,9 @@ const envPath = path.resolve(rootDir, '../../settings/.env');
 
 const defaults = {
   FASTAPI_HOST: '127.0.0.1',
-  FASTAPI_PORT: '8000',
+  FASTAPI_PORT: '7690',
   UI_HOST: '127.0.0.1',
-  UI_PORT: '7861',
+  UI_PORT: '9847',
 };
 
 function loadEnvFile(filePath) {
@@ -47,10 +47,10 @@ function resolveArg(flag, fallback) {
   return fallback;
 }
 
-const uiHost = resolveArg('--host', env.UI_HOST || defaults.UI_HOST);
-const uiPort = Number.parseInt(resolveArg('--port', env.UI_PORT || defaults.UI_PORT), 10);
-const apiHost = env.FASTAPI_HOST || defaults.FASTAPI_HOST;
-const apiPort = Number.parseInt(env.FASTAPI_PORT || defaults.FASTAPI_PORT, 10);
+const uiHost = resolveArg('--host', process.env.UI_HOST || env.UI_HOST || defaults.UI_HOST);
+const uiPort = Number.parseInt(resolveArg('--port', process.env.UI_PORT || env.UI_PORT || defaults.UI_PORT), 10);
+const apiHost = process.env.FASTAPI_HOST || env.FASTAPI_HOST || defaults.FASTAPI_HOST;
+const apiPort = Number.parseInt(process.env.FASTAPI_PORT || env.FASTAPI_PORT || defaults.FASTAPI_PORT, 10);
 
 if (!existsSync(staticRoot)) {
   throw new Error(`Missing Angular build output: ${staticRoot}`);
