@@ -54,23 +54,38 @@ jobs:
           $env:APP_TEST_FRONTEND_URL = "http://127.0.0.1:9847"
           $env:APP_TEST_BACKEND_URL = "http://127.0.0.1:7690"
           $backend = Start-Process -FilePath "python" -ArgumentList "-m","uvicorn","app:app","--host","127.0.0.1","--port","7690" -WorkingDirectory "app/server" -RedirectStandardOutput "app/server/.ci-modelconfig-backend.out.log" -RedirectStandardError "app/server/.ci-modelconfig-backend.err.log" -WindowStyle Hidden -PassThru
-          $frontend = Start-Process -FilePath "npm.cmd" -ArgumentList "run","start" -WorkingDirectory "app/client" -RedirectStandardOutput "app/client/.ci-modelconfig-frontend.out.log" -RedirectStandardError "app/client/.ci-modelconfig-frontend.err.log" -WindowStyle Hidden -PassThru
           try {
             $deadline = (Get-Date).AddMinutes(3)
-            $ready = $false
+            $backendReady = $false
             while ((Get-Date) -lt $deadline) {
               try {
                 $backendHealth = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7690/api/health" -TimeoutSec 3
-                $frontendHealth = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:9847/" -TimeoutSec 3
-                if ($backendHealth.StatusCode -eq 200 -and $frontendHealth.StatusCode -lt 500) {
-                  $ready = $true
+                $backendConfig = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7690/api/model-config" -TimeoutSec 3
+                if ($backendHealth.StatusCode -eq 200 -and $backendConfig.StatusCode -eq 200) {
+                  $backendReady = $true
                   break
                 }
               } catch {}
               Start-Sleep -Milliseconds 500
             }
-            if (-not $ready) {
-              throw "Backend/frontend readiness check timed out."
+            if (-not $backendReady) {
+              throw "Backend readiness check timed out."
+            }
+
+            $frontend = Start-Process -FilePath "npm.cmd" -ArgumentList "run","preview","--","--host","127.0.0.1","--port","9847","--strictPort" -WorkingDirectory "app/client" -RedirectStandardOutput "app/client/.ci-modelconfig-frontend.out.log" -RedirectStandardError "app/client/.ci-modelconfig-frontend.err.log" -WindowStyle Hidden -PassThru
+            $frontendReady = $false
+            while ((Get-Date) -lt $deadline) {
+              try {
+                $frontendHealth = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:9847/" -TimeoutSec 3
+                if ($frontendHealth.StatusCode -lt 500) {
+                  $frontendReady = $true
+                  break
+                }
+              } catch {}
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $frontendReady) {
+              throw "Frontend readiness check timed out."
             }
 
             python -m pytest app/tests/unit/test_model_config_persistence.py -q --junitxml app/tests/.ci-modelconfig-unit-junit.xml
