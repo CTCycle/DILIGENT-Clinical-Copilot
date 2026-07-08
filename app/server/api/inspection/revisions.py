@@ -5,12 +5,16 @@ from fastapi import APIRouter, Body, HTTPException, status
 from api.inspection.common import InspectionJobEndpointMixin
 from domain.inspection import (
     RevisionArtifactListResponse,
+    RevisionArtifactResponse,
     RevisionClinicalReviewActionListResponse,
+    RevisionClinicalReviewActionResponse,
     RevisionClinicalReviewUpdateRequest,
     RevisionClinicalReviewUpdateResponse,
     RevisionEntityListResponse,
+    RevisionEntityResponse,
     RevisionPipelineRunResponse,
     RevisionPipelineStepListResponse,
+    RevisionPipelineStepResponse,
     SessionRevisionRequest,
 )
 from domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
@@ -21,9 +25,9 @@ from services.inspection.revision_scaffold import (
 )
 from services.inspection.service import DataInspectionService
 
+
 ###############################################################################
 class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -135,9 +139,11 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Revision run not found.",
             )
-        return RevisionPipelineStepListResponse(
-            items=self.service.list_revision_steps(pipeline_run_id)
-        )
+        items = [
+            RevisionPipelineStepResponse(**item)
+            for item in self.service.list_revision_steps(pipeline_run_id)
+        ]
+        return RevisionPipelineStepListResponse(items=items)
 
     # -------------------------------------------------------------------------
     def list_session_revision_artifacts(
@@ -155,7 +161,9 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=str(exc),
             ) from exc
-        return RevisionArtifactListResponse(items=items)
+        return RevisionArtifactListResponse(
+            items=[RevisionArtifactResponse(**item) for item in items]
+        )
 
     # -------------------------------------------------------------------------
     def list_session_revision_entities(
@@ -173,7 +181,9 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=str(exc),
             ) from exc
-        return RevisionEntityListResponse(items=items)
+        return RevisionEntityListResponse(
+            items=[RevisionEntityResponse(**item) for item in items]
+        )
 
     # -------------------------------------------------------------------------
     def list_session_revision_reviews(
@@ -191,7 +201,9 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=str(exc),
             ) from exc
-        return RevisionClinicalReviewActionListResponse(items=items)
+        return RevisionClinicalReviewActionListResponse(
+            items=[RevisionClinicalReviewActionResponse(**item) for item in items]
+        )
 
     # -------------------------------------------------------------------------
     def update_session_revision_clinical_review(
@@ -235,7 +247,7 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
             )
         return RevisionClinicalReviewUpdateResponse(
             version=detail["version"],
-            review_action=action,
+            review_action=RevisionClinicalReviewActionResponse(**action),
         )
 
     # -------------------------------------------------------------------------

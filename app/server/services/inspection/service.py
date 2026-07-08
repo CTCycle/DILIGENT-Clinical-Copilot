@@ -10,7 +10,6 @@ from common.paths import VECTOR_DB_PATH
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.inspection import InspectionJobPhase
-from domain.patient_timeline import PatientTimeline
 from repositories.serialization.data import DataSerializer
 from repositories.serialization.document_serializer import DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
@@ -25,22 +24,8 @@ from services.inspection.normalization import (
 from services.inspection.normalization import (
     normalize_text as normalize_text_value,
 )
-from services.inspection.timeline import (
-    build_fallback_timeline as build_fallback_timeline_value,
-)
+from services.inspection.timeline import InspectionTimelineMixin
 from services.inspection.update_jobs import DataInspectionUpdateJobRunner
-from services.inspection.timeline import (
-    generate_session_timeline as generate_session_timeline_value,
-)
-from services.inspection.timeline import (
-    get_session_timeline as get_session_timeline_value,
-)
-from services.inspection.timeline import (
-    get_session_timeline_by_id as get_session_timeline_by_id_value,
-)
-from services.inspection.timeline import (
-    list_session_timelines as list_session_timelines_value,
-)
 from services.inspection.update_config import InspectionUpdateConfigMixin
 from services.inspection.revision_scaffold import InspectionRevisionScaffoldMixin
 from services.inspection.revision_agent import RevisionAgentRunner
@@ -49,10 +34,12 @@ from services.runtime.jobs import JobManager
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
 
+
 ###############################################################################
 class DataInspectionService(
     InspectionUpdateConfigMixin,
     InspectionRevisionScaffoldMixin,
+    InspectionTimelineMixin,
 ):
     RXNAV_JOB_TYPE = "rxnav_update"
     LIVERTOX_JOB_TYPE = "livertox_update"
@@ -212,46 +199,6 @@ class DataInspectionService(
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
         return self.serializer.delete_session(session_id)
-
-    # -------------------------------------------------------------------------
-    def get_session_timeline(self, session_id: int) -> PatientTimeline | None:
-        return get_session_timeline_value(self, session_id)
-
-    # -------------------------------------------------------------------------
-    def get_session_timeline_by_id(
-        self, session_id: int, timeline_id: int
-    ) -> PatientTimeline | None:
-        return get_session_timeline_by_id_value(self, session_id, timeline_id)
-
-    # -------------------------------------------------------------------------
-    def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
-        return list_session_timelines_value(self, session_id)
-
-    # -------------------------------------------------------------------------
-    def generate_session_timeline(
-        self,
-        session_id: int,
-        *,
-        force_regenerate: bool = False,
-    ) -> PatientTimeline | None:
-        return generate_session_timeline_value(
-            self,
-            session_id,
-            force_regenerate=force_regenerate,
-        )
-
-    # -------------------------------------------------------------------------
-    def build_fallback_timeline(
-        self,
-        *,
-        session_id: int,
-        source: dict[str, Any],
-    ) -> PatientTimeline:
-        return build_fallback_timeline_value(
-            self,
-            session_id=session_id,
-            source=source,
-        )
 
     # -------------------------------------------------------------------------
     def normalize_text(self, value: Any) -> str | None:
