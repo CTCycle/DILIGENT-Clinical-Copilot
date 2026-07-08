@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-07-02
+Last updated: 2026-07-08
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -9,7 +9,7 @@ Last updated: 2026-07-02
 - Service layer: `app/server/services/*`
   - Owns clinical orchestration, model orchestration, inspection workflows, and job control.
   - Inspection update orchestration is implemented in `app/server/services/inspection/update_jobs.py` through `DataInspectionUpdateJobRunner`.
-  - `DataInspectionService` (in `app/server/services/inspection/service.py`) composes behavior from mixins in `update_config.py`, `revision_diff.py`, `revision_decisions.py`, and `revision_runner.py`.
+  - `DataInspectionService` (in `app/server/services/inspection/service.py`) composes behavior from mixins in `update_config.py`, `revision_scaffold.py`, and `timeline.py`.
   - `ClinicalSessionService` (in `app/server/services/session/session_service.py`) composes behavior from mixins in `consultation.py` and `extraction_pipeline.py`.
   - Clinical and revision workflow helper code shared across session paths lives in `app/server/services/session/workflow_shared.py`; revision workflows must not import from first-run workflow modules.
   - Drug resolution lives in `app/server/services/clinical/drug_resolution/` and owns local-first RxNav catalog candidate generation, LiverTox candidate generation, deterministic acceptance policy, and prepared-input serialization.

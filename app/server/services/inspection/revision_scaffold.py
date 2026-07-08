@@ -11,20 +11,32 @@ REVISION_JOB_MISSING_STATUS_MESSAGE = (
     "and retry if needed."
 )
 
+
 ###############################################################################
 class SessionRevisionNotFoundError(ValueError):
     pass
+
 
 ###############################################################################
 class SessionRevisionConflictError(ValueError):
     pass
 
+
 ###############################################################################
 class SessionRevisionValidationError(ValueError):
     pass
 
+
 ###############################################################################
 class InspectionRevisionScaffoldMixin:
+    serializer: Any
+    jobs: Any
+    revision_agent_runner: Any
+    REVISION_JOB_TYPE: str
+    get_session_detail: Any
+    get_session_version_detail: Any
+    get_job_status: Any
+    cancel_job: Any
 
     # -------------------------------------------------------------------------
     @staticmethod

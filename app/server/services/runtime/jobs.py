@@ -13,6 +13,7 @@ from common.utils.error_filters import get_sensitive_error_tokens
 from common.utils.logger import logger
 from services.runtime.state import JobState
 
+
 ###############################################################################
 class JobErrorSanitizer:
     LOCAL_MODEL_MEMORY_MESSAGE = (
@@ -97,9 +98,9 @@ class JobErrorSanitizer:
             return candidate
         return "Operation failed unexpectedly. Please retry."
 
+
 ###############################################################################
 class JobManager:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.jobs: dict[str, JobState] = {}
@@ -315,6 +316,7 @@ class JobManager:
             if param.kind == inspect.Parameter.VAR_KEYWORD:
                 return True
         return any(param.name == "job_id" for param in parameters)
+
 
 ###############################################################################
 @lru_cache(maxsize=1)
