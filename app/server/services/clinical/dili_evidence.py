@@ -351,7 +351,7 @@ class DiliEvidenceBuilder:
             body = fallback_text.strip()
         user_summary = DiliEvidenceBuilder.render_user_summary(bundle)
         if user_summary:
-            return f"{body}\n\n---\n\n{user_summary}".strip()
+            return f"{user_summary}\n\n---\n\n{body}".strip()
         return body
 
     # -------------------------------------------------------------------------

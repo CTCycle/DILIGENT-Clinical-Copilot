@@ -39,6 +39,10 @@ VALUE_UNIT_RE = re.compile(
     r"(?P<value>[-+]?\d+(?:[.,]\d+)?)\s*(?P<unit>u/l|ui/l|µmol/l|umol/l|mg/dl|ml/min(?:/1\.73m2)?)?",
     re.IGNORECASE,
 )
+RELATIVE_TIME_VALUE_PREFIX_RE = re.compile(
+    r"(?:^|[\s.;,:(-])(?:day|week|month|year|giorno|settimana|mese|anno|d)\s*$",
+    re.IGNORECASE,
+)
 SINGLE_VALUE_MARKERS = frozenset({"CR", "EGFR", "INR", "ALB"})
 
 ###############################################################################
@@ -467,6 +471,8 @@ class ClinicalLabExtractor:
                 for limit_start, limit_end in upper_limit_spans
             ):
                 continue
+            if self.value_looks_like_relative_timepoint(segment[:start]):
+                continue
             raw_value = match.group("value")
             parsed = self.parse_numeric(raw_value)
             if parsed is None:
@@ -481,6 +487,11 @@ class ClinicalLabExtractor:
             if marker in SINGLE_VALUE_MARKERS:
                 break
         return values
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def value_looks_like_relative_timepoint(prefix: str) -> bool:
+        return RELATIVE_TIME_VALUE_PREFIX_RE.search(prefix[-32:]) is not None
 
     # -------------------------------------------------------------------------
     def extract_date_from_text(

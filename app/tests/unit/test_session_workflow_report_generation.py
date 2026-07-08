@@ -217,9 +217,10 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
         ),
     )
 
-    assert result["final_report"].startswith(
-        "Relazione narrativa con discussione farmacologica e sintesi finale."
-    )
+    assert result["final_report"].startswith("## DILI adjudication summary")
+    assert "Relazione narrativa con discussione farmacologica e sintesi finale." in result[
+        "final_report"
+    ]
     assert not result["final_report"].startswith("# Structured DILI causality dossier")
     assert "## DILI adjudication summary" in result["final_report"]
     assert result["pipeline_artifacts"]["structured_dili_report"].startswith(

@@ -120,6 +120,32 @@ def test_merges_manual_labs_with_extracted_entries() -> None:
     assert {entry.marker_name for entry in timeline.entries} == {"ALT", "ALP"}
 
 ###############################################################################
+def test_relative_day_labels_are_not_extracted_as_bilirubin_values() -> None:
+    extractor = ClinicalLabExtractor(
+        client=FakeLabClient([LabExtractionPayload(entries=[], onset_context=None)])
+    )
+    payload = PatientData(
+        laboratory_analysis=(
+            "Day 0 before exposure ALT 28 U/L, AST 24 U/L, ALP 92 U/L, "
+            "total bilirubin 0.7 mg/dL. Day 21 ALT 820 U/L, AST 610 U/L, "
+            "ALP 160 U/L, total bilirubin 3.2 mg/dL, INR 1.1. Day 28 ALT "
+            "640 U/L, ALP 145 U/L, bilirubin 2.4 mg/dL after stopping medication."
+        ),
+        drugs="Amoxicillin clavulanate started 21 days before liver enzyme rise.",
+    )
+
+    timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
+
+    observed = [(entry.marker_name, entry.value) for entry in timeline.entries]
+    assert ("TBIL", 21.0) not in observed
+    assert ("TBIL", 28.0) not in observed
+    assert {entry.value for entry in timeline.entries if entry.marker_name == "TBIL"} == {
+        0.7,
+        2.4,
+        3.2,
+    }
+
+###############################################################################
 def test_preserves_relative_timing_without_absolute_dates() -> None:
     extractor = ClinicalLabExtractor(
         client=FakeLabClient(

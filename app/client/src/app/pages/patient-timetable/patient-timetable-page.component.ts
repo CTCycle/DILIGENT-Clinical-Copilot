@@ -4,8 +4,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import {
-  fetchInspectionSessionTimeline,
   fetchInspectionSessionTimelineById,
+  fetchInspectionSessionTimelineList,
   generateInspectionSessionTimeline,
 } from '../../core/services/inspection-api';
 import {
@@ -221,7 +221,7 @@ export class PatientTimetablePageComponent implements OnInit {
     try {
       const payload = timelineId
         ? await fetchInspectionSessionTimelineById(sessionId, timelineId)
-        : await fetchInspectionSessionTimeline(sessionId);
+        : await this.fetchLatestTimeline(sessionId);
       this.timeline.set(payload);
       this.timelineId.set(payload.timeline_id ?? timelineId ?? null);
       this.selectedEventId.set(payload.events[0]?.event_id ?? null);
@@ -304,6 +304,15 @@ export class PatientTimetablePageComponent implements OnInit {
     this.sessionId.set(sessionId);
     this.timelineId.set(timelineId);
     await this.loadTimeline(sessionId, timelineId);
+  }
+
+  private async fetchLatestTimeline(sessionId: number): Promise<InspectionSessionTimeline> {
+    const timelines = await fetchInspectionSessionTimelineList(sessionId);
+    const latest = timelines.items[0];
+    if (!latest?.timeline_id) {
+      throw new Error('Not found');
+    }
+    return fetchInspectionSessionTimelineById(sessionId, latest.timeline_id);
   }
 
   private parseEventDate(value: string | null): Date | null {
