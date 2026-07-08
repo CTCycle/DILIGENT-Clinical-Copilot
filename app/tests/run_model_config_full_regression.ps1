@@ -109,19 +109,21 @@ try {
         -RedirectStandardError $backendErrLog `
         -WindowStyle Hidden
 
-    Write-Host "[INFO] Starting frontend..."
+    Write-Host "[INFO] Waiting for backend health..."
+    Wait-Url -Url "$backendUrl/api/health" -TimeoutSeconds 90
+    Start-Sleep -Milliseconds 750
+    Wait-Url -Url "$backendUrl/api/model-config" -TimeoutSeconds 90
+
+    Write-Host "[INFO] Starting frontend preview..."
     Start-Process -FilePath $npmExe `
-        -ArgumentList "run", "start" `
+        -ArgumentList "run", "preview", "--", "--host", "127.0.0.1", "--port", "9847", "--strictPort" `
         -WorkingDirectory $clientDir `
         -RedirectStandardOutput $frontendOutLog `
         -RedirectStandardError $frontendErrLog `
         -WindowStyle Hidden
 
-    Write-Host "[INFO] Waiting for backend/frontend health..."
-    Wait-Url -Url "$backendUrl/api/health" -TimeoutSeconds 90
+    Write-Host "[INFO] Waiting for frontend health..."
     Wait-Url -Url $frontendUrl -TimeoutSeconds 90
-    Start-Sleep -Milliseconds 750
-    Wait-Url -Url "$backendUrl/api/model-config" -TimeoutSeconds 30
 
     Write-Host "[STEP] Running model-config unit tests..."
     if (Test-PythonModule -PythonPath $backendPython -ModuleName "pytest") {

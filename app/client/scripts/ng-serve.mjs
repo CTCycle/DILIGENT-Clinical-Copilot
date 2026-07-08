@@ -7,9 +7,9 @@ const envPath = path.resolve(projectRoot, '../../settings/.env');
 
 const defaults = {
   FASTAPI_HOST: '127.0.0.1',
-  FASTAPI_PORT: '8000',
+  FASTAPI_PORT: '7690',
   UI_HOST: '127.0.0.1',
-  UI_PORT: '7861',
+  UI_PORT: '9847',
 };
 
 function loadEnvFile(filePath) {
@@ -35,10 +35,10 @@ function loadEnvFile(filePath) {
 }
 
 const env = loadEnvFile(envPath);
-const uiHost = env.UI_HOST || defaults.UI_HOST;
-const uiPort = env.UI_PORT || defaults.UI_PORT;
-const apiHost = env.FASTAPI_HOST || defaults.FASTAPI_HOST;
-const apiPort = env.FASTAPI_PORT || defaults.FASTAPI_PORT;
+const uiHost = process.env.UI_HOST || env.UI_HOST || defaults.UI_HOST;
+const uiPort = process.env.UI_PORT || env.UI_PORT || defaults.UI_PORT;
+const apiHost = process.env.FASTAPI_HOST || env.FASTAPI_HOST || defaults.FASTAPI_HOST;
+const apiPort = process.env.FASTAPI_PORT || env.FASTAPI_PORT || defaults.FASTAPI_PORT;
 
 const proxyConfigPath = path.resolve(projectRoot, 'proxy.conf.json');
 const proxyConfigContent = `${JSON.stringify(
