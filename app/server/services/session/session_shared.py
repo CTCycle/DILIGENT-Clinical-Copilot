@@ -539,18 +539,29 @@ def run_clinical_job(
     section_extraction: ClinicalSectionExtractionResult | None = None,
     normalized_document: NormalizedDocument | None = None,
     report_mode: str = "faithful_only",
+    runtime_snapshot: dict[str, object] | None = None,
+    runtime_snapshot_hash: str | None = None,
 ) -> dict[str, Any]:
-    result = asyncio.run(
-        execute_clinical_job(
-            service=service,
-            payload=payload,
-            patient_image_base64=patient_image_base64,
-            job_id=job_id,
-            section_extraction=section_extraction,
-            normalized_document=normalized_document,
-            report_mode=report_mode,
+    with LLMRuntimeConfig.override_for_run(runtime_snapshot):
+        result = asyncio.run(
+            execute_clinical_job(
+                service=service,
+                payload=payload,
+                patient_image_base64=patient_image_base64,
+                job_id=job_id,
+                section_extraction=section_extraction,
+                normalized_document=normalized_document,
+                report_mode=report_mode,
+            )
         )
-    )
     if not result:
         return {}
+    if runtime_snapshot is not None:
+        result.setdefault("runtime_settings", {}).update(runtime_snapshot)
+        result.setdefault("pipeline_artifacts", {})["runtime_snapshot"] = runtime_snapshot
+        result["pipeline_artifacts"]["runtime_snapshot_hash"] = runtime_snapshot_hash
+        result["runtime_settings"]["runtime_snapshot_hash"] = runtime_snapshot_hash
+        session_id = result.get("session_id")
+        if isinstance(session_id, int):
+            service.serializer.upsert_session_result_payload(session_id, result)
     return result

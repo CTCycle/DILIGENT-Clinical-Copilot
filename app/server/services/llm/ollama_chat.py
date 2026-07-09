@@ -150,6 +150,13 @@ def prepare_generation_parameters(
         think_value = LLMRuntimeConfig.is_ollama_reasoning_enabled()
     else:
         think_value = bool(think)
+    if options_payload is None:
+        options_payload = {}
+    configured_seed = LLMRuntimeConfig.get_ollama_seed()
+    if configured_seed is not None:
+        options_payload.setdefault("seed", configured_seed)
+    if not options_payload:
+        options_payload = None
     return round(temp_value, 2), think_value, options_payload
 
 ###############################################################################

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -23,6 +25,7 @@ from services.llm.provider_factory import (
 
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATE_SHORT_RE = re.compile(r"^\d{4}-\d{2}$")
+DATE_YEAR_RE = re.compile(r"^\d{4}$")
 
 ###############################################################################
 class PatientTimelineExtractor:
@@ -144,8 +147,13 @@ class PatientTimelineExtractor:
     @classmethod
     def event_sort_key(cls, event: PatientTimelineEvent) -> tuple[int, str, int, str]:
         normalized_date = cls.normalize_date_token(event.event_date)
-        if normalized_date and DATE_PREFIX_RE.fullmatch(normalized_date):
-            return (0, normalized_date, event.sort_order, event.title.casefold())
+        if normalized_date:
+            if DATE_PREFIX_RE.fullmatch(normalized_date):
+                return (0, normalized_date, event.sort_order, event.title.casefold())
+            if DATE_SHORT_RE.fullmatch(normalized_date):
+                return (0, f"{normalized_date}-01", event.sort_order, event.title.casefold())
+            if DATE_YEAR_RE.fullmatch(normalized_date):
+                return (0, f"{normalized_date}-01-01", event.sort_order, event.title.casefold())
         relative = (event.relative_time or "").casefold()
         return (1, relative, event.sort_order, event.title.casefold())
 
@@ -202,10 +210,21 @@ class PatientTimelineExtractor:
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for timeline extraction")
 
+        source_payload_json = json.dumps(
+            source_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+            separators=(",", ":"),
+        )
+        source_payload_hash = hashlib.sha256(
+            source_payload_json.encode("utf-8")
+        ).hexdigest()
         user_prompt = (
             "Build a structured clinical timeline from this patient session payload.\n"
             "Focus on therapy start/stop, disease manifestation, lab milestones, and other dated events.\n\n"
-            f"{source_payload}"
+            f"Source payload SHA-256: {source_payload_hash}\n"
+            f"Canonical JSON payload:\n{source_payload_json}"
         )
         parsed: PatientTimelineExtraction | None = None
         for attempt in range(1, self.extraction_retry_attempts + 1):
@@ -241,5 +260,6 @@ class PatientTimelineExtractor:
             session_id=int(session_id),
             generated_at=datetime.now(UTC),
             generation_status="llm_generated",
+            source_payload_hash=source_payload_hash,
             events=normalized_events,
         )

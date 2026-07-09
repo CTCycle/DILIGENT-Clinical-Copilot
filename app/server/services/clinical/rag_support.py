@@ -154,8 +154,12 @@ class RagSupportService:
             return None
         fragments: list[str] = []
         references: list[RagDocumentReference] = []
+        excluded_count = 0
         seen_references: set[tuple[str, int | None, int | None]] = set()
         for index, record in enumerate(results, start=1):
+            if not self.is_context_eligible(record):
+                excluded_count += 1
+                continue
             fragment = self.format_similarity_fragment(index, record)
             if fragment:
                 fragments.append(fragment)
@@ -171,11 +175,41 @@ class RagSupportService:
                 continue
             seen_references.add(dedupe_key)
             references.append(reference)
+        if excluded_count:
+            self.record_low_relevance_issue(excluded_count)
         if not fragments:
             return None
         return RagRetrievalBundle(
             context_text="\n".join(fragments),
             references=tuple(references),
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def is_context_eligible(record: dict[str, Any]) -> bool:
+        """Never inject an explicitly non-relevant reranked chunk into clinical prompts."""
+        text = str(record.get("text") or "").strip()
+        if not text:
+            return False
+        score = record.get("rerank_score")
+        return not isinstance(score, (int, float)) or float(score) > 0.0
+
+    # -------------------------------------------------------------------------
+    def record_low_relevance_issue(self, excluded_count: int) -> None:
+        if not hasattr(self.consultation, "pipeline_issues"):
+            self.consultation.pipeline_issues = []
+        if any(issue.code == "rag_low_relevance_excluded" for issue in self.consultation.pipeline_issues):
+            return
+        self.consultation.pipeline_issues.append(
+            PipelineIssue(
+                severity="warning",
+                code="rag_low_relevance_excluded",
+                message=(
+                    f"Excluded {excluded_count} low-relevance retrieval chunk"
+                    f"{'s' if excluded_count != 1 else ''} from clinical context."
+                ),
+                field="rag",
+            )
         )
 
     # -------------------------------------------------------------------------

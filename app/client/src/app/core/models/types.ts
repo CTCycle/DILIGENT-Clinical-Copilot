@@ -51,7 +51,8 @@ export type ModelConfigStateResponse = {
   text_extraction_model: string | null;
   ollama_temperature: number;
   cloud_temperature: number;
-  ollama_reasoning: boolean;
+    ollama_reasoning: boolean;
+    ollama_seed: number | null;
   rag_settings: RagSettings;
   rag_model: string | null;
   updated_at: string | null;
@@ -65,7 +66,8 @@ export type ModelConfigUpdateRequest = {
   text_extraction_model?: string | null;
   ollama_temperature?: number;
   cloud_temperature?: number;
-  ollama_reasoning?: boolean;
+    ollama_reasoning?: boolean;
+    ollama_seed?: number | null;
   rag_settings?: Partial<RagSettings>;
 };
 

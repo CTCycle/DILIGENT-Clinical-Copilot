@@ -719,6 +719,7 @@ async def process_single_patient_workflow(
             "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
             "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
             "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
+            "ollama_seed": LLMRuntimeConfig.get_ollama_seed(),
             "use_rag": bool(payload.use_rag),
             "resolved_runtime": dict(getattr(service, "resolved_runtime", {})),
             "stage_elapsed_ms": dict(getattr(service, "stage_elapsed_ms", {})),
@@ -909,6 +910,9 @@ def start_clinical_job_workflow(
         raise ServiceValidationError(
             service.serialize_pipeline_issues(exc.issues)
         ) from exc
+    runtime_snapshot, runtime_snapshot_hash = LLMRuntimeConfig.capture_run_snapshot(
+        use_rag=request_payload.use_rag
+    )
     job_id = service.job_manager.start_job(
         job_type=service.JOB_TYPE,
         runner=run_clinical_job,
@@ -920,6 +924,8 @@ def start_clinical_job_workflow(
             "section_extraction": section_extraction,
             "normalized_document": normalized_document,
             "report_mode": request_payload.report_mode,
+            "runtime_snapshot": runtime_snapshot,
+            "runtime_snapshot_hash": runtime_snapshot_hash,
         },
     )
     job_status = service.job_manager.get_job_status(job_id)
