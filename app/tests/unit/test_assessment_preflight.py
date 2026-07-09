@@ -306,7 +306,7 @@ def test_job_start_rechecks_rag_readiness_before_submission(monkeypatch) -> None
             requested=requested,
             available=False,
             backend="ollama",
-            model="nomic-embed-text:latest",
+            model="nomic-embed-text:v1.5",
             reason_code="rag_ollama_unavailable",
             message="Start Ollama and retry.",
         ),

@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-06-21
+Last updated: 2026-07-09
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -45,7 +45,9 @@ Recommended workflow:
 6. Compare exposure dates against lab abnormalities and symptoms.
 7. Use the timeline to refine DILI Agent input if needed.
 
-Timeline generation may show a fallback notice when local model extraction is unavailable. In that case, the timetable is built deterministically from persisted session fields and should be treated as a navigation aid rather than a model-extracted chronology.
+Timeline generation may show a fallback notice when local model extraction is unavailable. In that case, the timetable is built deterministically from persisted session fields with uncertain timing and no invented exact dates. Treat fallback events as navigation aids rather than model-extracted chronology.
+
+For LLM-generated timelines, events without preserved source evidence are not part of the persisted clinical chronology contract. In the UI, missing source evidence should be treated as a warning rather than as clinically grounded support.
 
 ## Inspect Local Data
 Open **Data Inspection** from the sidebar.

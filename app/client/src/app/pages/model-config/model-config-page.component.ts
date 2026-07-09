@@ -76,7 +76,7 @@ const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
   hybrid_vector_weight: 0.7,
   hybrid_text_weight: 0.3,
   embedding_backend: 'ollama',
-  ollama_embedding_model: 'nomic-embed-text:latest',
+  ollama_embedding_model: 'nomic-embed-text:v1.5',
   hf_embedding_model: '',
   cloud_provider: 'openai',
   cloud_embedding_model: 'text-embedding-3-small',

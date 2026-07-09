@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-06-30
+Last updated: 2026-07-09
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -65,6 +65,11 @@ with the unchanged `dili_evidence_bundle` as the authoritative structured audit
 contract. LLM clinical synthesis must remain evidence-bounded and is not allowed
 to introduce unsupported clinical facts.
 
+Blocking faithfulness issues are finalization blockers. The workflow may retain
+generated artifacts for audit, but the persisted session status must not remain
+`successful` when blocking faithfulness issues exist. Such cases require human
+review before clinical reliance.
+
 Longitudinal adjudication is clinically conservative by default: dose changes,
 restart or rechallenge mentions, first symptoms, bilirubin or jaundice timing,
 marker-specific peaks, dechallenge direction, recovery versus persistence, and
@@ -116,6 +121,21 @@ Clinical preflight reports whether the configured RAG embedding backend is ready
 If Ollama is unavailable, the DILI Agent offers three explicit choices: retry after starting Ollama, run the pending assessment once without RAG, or cancel. Running without RAG does not change the saved model configuration. Job submission repeats the readiness check to prevent a stale successful preflight from starting a RAG-enabled job after the dependency becomes unavailable.
 
 If retrieval becomes unavailable after a job starts, the report continues safely without supporting RAG documents and records one aggregated pipeline warning listing the affected drugs.`r`n`r`nWhen RAG is enabled, retrieved text is used only as hidden model context. The final report bibliography lists compact references to retrieved documents by filename and page number only.
+
+Default Ollama embedding configuration must use an immutable model tag rather
+than `:latest`, and vector collection reset is opt-in rather than enabled by
+default.
+
+## Timeline Grounding
+Patient timeline extraction keeps month-only tokens such as `YYYY-MM` as
+month-precision values and does not promote them to exact calendar days.
+
+LLM-generated timeline events require preserved source evidence to remain in the
+normalized event set. Events without source evidence are dropped rather than
+persisted as clinically grounded chronology.
+
+Deterministic fallback timeline events keep `timing_type="uncertain"` and do
+not reuse the patient visit date as an invented exact event date.
 
 ## Failure Modes
 - Missing required sections block structural preprocessing.

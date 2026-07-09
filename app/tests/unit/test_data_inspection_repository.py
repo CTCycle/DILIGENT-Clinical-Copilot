@@ -531,6 +531,55 @@ def test_timeline_generation_marks_fallback_payload() -> None:
     assert len(history) == 1
     assert history[0]["timeline_id"] == generated.timeline_id
     assert history[0]["generation_status"] == "fallback"
+    assert all(event.event_date is None for event in generated.events)
+    assert all(event.extracted_timing_text is None for event in generated.events)
+    assert all(event.timing_type == "uncertain" for event in generated.events)
+
+###############################################################################
+def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> None:
+    serializer, _ = build_serializer()
+    original_runtime_settings = {
+        "use_cloud_services": False,
+        "llm_provider": "openai",
+        "text_extraction_model": "baseline-parser",
+        "clinical_model": "baseline-clinical",
+    }
+    save_session(
+        serializer,
+        patient_name="Stable Runtime Patient",
+        timestamp=datetime(2025, 1, 1, 8, 30),
+        status="successful",
+        report="Stable runtime report",
+        anamnesis="Stable runtime context.",
+        payload={
+            "report": "Stable runtime report",
+            "issues": [],
+            "runtime_settings": original_runtime_settings,
+        },
+    )
+    session_rows, _ = serializer.list_sessions(
+        search="Stable Runtime Patient",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(session_rows[0]["session_id"])
+    service = DataInspectionService(
+        serializer=serializer,
+        timeline_extractor=FakeTimelineExtractor(),
+        jobs=JobManager(),
+    )
+
+    _ = service.generate_session_timeline(session_id, force_regenerate=True)
+
+    source_after = serializer.get_session_timeline_source(session_id)
+    assert source_after is not None
+    assert (
+        source_after["session_result_payload"]["runtime_settings"]
+        == original_runtime_settings
+    )
 
 ###############################################################################
 def test_session_payload_timeline_is_not_read_as_history_record() -> None:

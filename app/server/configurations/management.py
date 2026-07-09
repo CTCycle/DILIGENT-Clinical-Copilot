@@ -418,7 +418,7 @@ def _build_rag_settings(
         hf_embedding_model=coerce_str(data.get("hf_embedding_model"), ""),
         vector_index_metric=coerce_str(data.get("vector_index_metric"), "cosine"),
         vector_index_type=coerce_str(data.get("vector_index_type"), "IVF_FLAT"),
-        reset_vector_collection=coerce_bool(data.get("reset_vector_collection"), True),
+        reset_vector_collection=coerce_bool(data.get("reset_vector_collection"), False),
         cloud_provider=coerce_str(data.get("cloud_provider"), defaults.llm_provider),
         cloud_model=coerce_str(data.get("cloud_model"), defaults.cloud_model),
         cloud_embedding_model=coerce_str(data.get("cloud_embedding_model"), ""),

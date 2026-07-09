@@ -817,7 +817,7 @@ def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
 def serialize_manual_edit_row(self, row: ClinicalSessionManualEdit) -> dict[str, Any]:
     try:
         edited_fields = json.loads(row.edited_fields_json)
-    except TypeError, json.JSONDecodeError:
+    except (TypeError, json.JSONDecodeError):
         edited_fields = []
     metadata = self.parse_session_result_payload(row.metadata_json)
     return {

@@ -120,7 +120,9 @@
             <dt>Rationale</dt>
             <dd>{{ event.confidence_rationale || 'Not reported' }}</dd>
             <dt>Source evidence</dt>
-            <dd class="source-evidence">{{ event.source_evidence || 'Not reported' }}</dd>
+            <dd class="source-evidence" [class.is-warning]="!selectedEventHasSourceEvidence()">
+              {{ event.source_evidence || 'Missing source evidence. Do not treat this event as clinically grounded chronology.' }}
+            </dd>
           </dl>
           @if (event.linked_patient_event_ids.length > 0) {
             <div class="linked-events">

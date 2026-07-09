@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from typing import cast
@@ -558,6 +558,7 @@ async def process_single_patient_workflow(
             if faithfulness_audit.manual_review_required
             else "no",
         }
+    session_status = "successful"
     if faithfulness_audit.blocking_issues:
         issues.extend(
             PipelineIssue(
@@ -569,6 +570,7 @@ async def process_single_patient_workflow(
             )
             for issue in faithfulness_audit.blocking_issues
         )
+        session_status = "failed"
     final_report = DiliEvidenceBuilder.compose_clinical_report(
         clinical_narrative=llm_clinical_summary,
         generated_report=generated_report,
@@ -622,6 +624,10 @@ async def process_single_patient_workflow(
         final_report=final_report,
     )
 
+    manual_review_required = bool(
+        faithfulness_audit.manual_review_required
+        or faithfulness_audit.blocking_issues
+    )
     result_payload = {
         "report": narrative,
         "final_report": final_report,
@@ -721,8 +727,11 @@ async def process_single_patient_workflow(
                 getattr(service, "structured_failure_kind", {})
             ),
         },
-        "manual_review_required": faithfulness_audit.manual_review_required,
+        "manual_review_required": manual_review_required,
         "blocking_issues": faithfulness_audit.blocking_issues,
+        "clinical_validity": (
+            "requires_human_review" if session_status == "failed" else "validated"
+        ),
         "report_comparison": report_comparison_payload,
         "pipeline_artifacts": {
             "normalized_document": normalized_document.model_dump(),
@@ -800,7 +809,7 @@ async def process_single_patient_workflow(
                 "patient_name": payload.name,
                 "patient_visit_date": payload.visit_date,
                 "patient_image_base64": patient_image_base64,
-                "session_timestamp": datetime.now(),
+                "session_timestamp": datetime.now(UTC),
                 "version": session_version,
                 "original_session_id": original_session_id,
                 "metadata": {"use_rag": bool(payload.use_rag)},
@@ -820,7 +829,7 @@ async def process_single_patient_workflow(
                 "detected_drugs": detected_drugs,
                 "matched_drugs": matched_drugs_payload,
                 "issues": serialized_issues,
-                "session_status": "successful",
+                "session_status": session_status,
                 "session_result_payload": result_payload,
             },
         )

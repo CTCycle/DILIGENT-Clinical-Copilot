@@ -193,7 +193,13 @@ export class PatientTimetablePageComponent implements OnInit {
     if (timeline.generation_status === 'fallback') {
       return timeline.generation_note || 'This timetable uses deterministic fallback events because local model extraction was unavailable.';
     }
-    return timeline.generation_note || 'Generated with the configured local timeline extraction model.';
+    const sourceKind = timeline.source_kind === 'cloud' ? 'cloud' : 'local';
+    return timeline.generation_note || `Generated with the configured ${sourceKind} timeline extraction model.`;
+  });
+
+  readonly selectedEventHasSourceEvidence = computed(() => {
+    const event = this.selectedEvent();
+    return Boolean(event?.source_evidence && event.source_evidence.trim().length > 0);
   });
 
   readonly sourceModelLabel = computed(() => {

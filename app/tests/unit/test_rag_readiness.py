@@ -12,7 +12,7 @@ def _settings(**overrides: object) -> SimpleNamespace:
         "use_cloud_embeddings": False,
         "embedding_backend": "ollama",
         "cloud_embedding_model": "",
-        "ollama_embedding_model": "nomic-embed-text:latest",
+        "ollama_embedding_model": "nomic-embed-text:v1.5",
         "ollama_base_url": "http://127.0.0.1:11434",
     }
     values.update(overrides)
@@ -55,7 +55,7 @@ def test_rag_readiness_accepts_available_embedding_model(monkeypatch) -> None:
         readiness.httpx,
         "get",
         lambda *args, **kwargs: _Response(
-            {"models": [{"name": "nomic-embed-text:latest"}]}
+            {"models": [{"name": "nomic-embed-text:v1.5"}]}
         ),
     )
 
@@ -63,7 +63,7 @@ def test_rag_readiness_accepts_available_embedding_model(monkeypatch) -> None:
 
     assert result.available is True
     assert result.backend == "ollama"
-    assert result.model == "nomic-embed-text:latest"
+    assert result.model == "nomic-embed-text:v1.5"
 
 ###############################################################################
 def test_rag_readiness_skips_probe_when_not_requested(monkeypatch) -> None:

@@ -121,7 +121,7 @@ describe('DiliAgentPageComponent', () => {
       requested: true,
       available: false,
       backend: 'ollama',
-      model: 'nomic-embed-text:latest',
+      model: 'nomic-embed-text:v1.5',
       reason_code: 'rag_ollama_unavailable',
       message: 'Start Ollama and retry.',
     });
@@ -130,7 +130,7 @@ describe('DiliAgentPageComponent', () => {
 
     expect(fixture.nativeElement.textContent).toContain('RAG requires Ollama');
     expect(fixture.nativeElement.textContent).toContain('Run without RAG');
-    expect(fixture.nativeElement.textContent).toContain('nomic-embed-text:latest');
+    expect(fixture.nativeElement.textContent).toContain('nomic-embed-text:v1.5');
   });
 
   it('disables RAG only for the pending run', async () => {
