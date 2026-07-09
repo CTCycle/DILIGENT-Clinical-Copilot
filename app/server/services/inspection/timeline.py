@@ -202,30 +202,45 @@ class InspectionTimelineMixin:
             clinical_model = coerce_optional_str(
                 runtime_settings.get("clinical_model")
             ) or coerce_optional_str(source.get("clinical_model"))
-            requested_runtime_settings = {
-                "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
-                "llm_provider": LLMRuntimeConfig.get_llm_provider(),
-                "cloud_model": LLMRuntimeConfig.get_cloud_model(),
-                "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model()
-                or text_extraction_model,
-                "clinical_model": LLMRuntimeConfig.get_clinical_model()
-                or clinical_model,
-                "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
-                "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
-                "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
-            }
+            requested_runtime_settings = dict(runtime_settings)
+            requested_runtime_settings.setdefault(
+                "use_cloud_services", LLMRuntimeConfig.is_cloud_enabled()
+            )
+            requested_runtime_settings.setdefault(
+                "llm_provider", LLMRuntimeConfig.get_llm_provider()
+            )
+            requested_runtime_settings.setdefault("cloud_model", LLMRuntimeConfig.get_cloud_model())
+            requested_runtime_settings.setdefault(
+                "text_extraction_model",
+                LLMRuntimeConfig.get_text_extraction_model() or text_extraction_model,
+            )
+            requested_runtime_settings.setdefault(
+                "clinical_model",
+                LLMRuntimeConfig.get_clinical_model() or clinical_model,
+            )
+            requested_runtime_settings.setdefault(
+                "ollama_temperature", LLMRuntimeConfig.get_ollama_temperature()
+            )
+            requested_runtime_settings.setdefault(
+                "cloud_temperature", LLMRuntimeConfig.get_cloud_temperature()
+            )
+            requested_runtime_settings.setdefault(
+                "ollama_reasoning", LLMRuntimeConfig.is_ollama_reasoning_enabled()
+            )
+            requested_runtime_settings.setdefault("ollama_seed", LLMRuntimeConfig.get_ollama_seed())
 
             try:
-                timeline = asyncio.run(
-                    asyncio.wait_for(
-                        self.timeline_extractor.extract_timeline(
-                            session_id=session_id,
-                            source_payload=source,
-                            runtime_settings=requested_runtime_settings,
-                        ),
-                        timeout=timeline_timeout_s,
+                with LLMRuntimeConfig.override_for_run(requested_runtime_settings):
+                    timeline = asyncio.run(
+                        asyncio.wait_for(
+                            self.timeline_extractor.extract_timeline(
+                                session_id=session_id,
+                                source_payload=source,
+                                runtime_settings=requested_runtime_settings,
+                            ),
+                            timeout=timeline_timeout_s,
+                        )
                     )
-                )
                 timeline = PatientTimeline(
                     **{
                         **timeline.model_dump(),

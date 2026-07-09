@@ -1,5 +1,5 @@
 # Deployment And Packaging
-Last updated: 2026-07-01
+Last updated: 2026-07-09
 
 ## Desktop Packaging
 - Packaging command:
@@ -29,5 +29,7 @@ release\tauri\build_with_tauri.bat
 
 ## Packaging Constraints
 - Desktop packaging is Windows-focused in the current repository.
+- The packaged application is localhost-only. Network deployment, reverse
+  proxies, and unauthenticated multi-user access are unsupported.
 - No supported container deployment path exists.
 - Packaged runtime depends on the bundled frontend dist plus backend resources being present and aligned.

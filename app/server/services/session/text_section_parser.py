@@ -44,7 +44,7 @@ def _section_requires_review(match_strategy: str, confidence_score: float) -> bo
             "content_inference",
             "fallback_assignment",
         }
-        or confidence_score < 0.75
+        or confidence_score < 0.85
     )
 
 ###############################################################################

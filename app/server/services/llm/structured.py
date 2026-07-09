@@ -10,7 +10,8 @@ from pydantic import BaseModel, ValidationError
 T = TypeVar("T", bound=BaseModel)
 
 ###############################################################################
-def extract_first_json_dict(text: str) -> dict[str, Any] | None:
+def extract_first_json_dict_lenient_nonclinical(text: str) -> dict[str, Any] | None:
+    """Legacy recovery helper. Clinical structured-output paths must not use it."""
     decoder = json.JSONDecoder()
     for match in re.finditer(r"\{", text):
         start = match.start()
@@ -23,7 +24,7 @@ def extract_first_json_dict(text: str) -> dict[str, Any] | None:
     return None
 
 ###############################################################################
-def parse_json_dict(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
+def parse_json_dict_lenient_nonclinical(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
     if isinstance(obj_or_text, dict):
         return obj_or_text
     if not isinstance(obj_or_text, str) or not obj_or_text.strip():
@@ -32,7 +33,7 @@ def parse_json_dict(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
         loaded = json.loads(obj_or_text)
         return loaded if isinstance(loaded, dict) else None
     except json.JSONDecodeError:
-        return extract_first_json_dict(obj_or_text)
+        return extract_first_json_dict_lenient_nonclinical(obj_or_text)
 
 ###############################################################################
 class StructuredOutputParser(Generic[T]):

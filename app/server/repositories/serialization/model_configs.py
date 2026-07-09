@@ -23,6 +23,7 @@ class ModelConfigSerializer:
     OLLAMA_TEMPERATURE_KEY = "ollama_temperature"
     CLOUD_TEMPERATURE_KEY = "cloud_temperature"
     OLLAMA_REASONING_KEY = "ollama_reasoning"
+    OLLAMA_SEED_KEY = "ollama_seed"
     RAG_SETTING_PREFIX = "rag."
     RAG_SETTING_KEYS = {
         "chunk_size",
@@ -48,6 +49,7 @@ class ModelConfigSerializer:
     DEFAULT_OLLAMA_TEMPERATURE = 0.7
     DEFAULT_CLOUD_TEMPERATURE = 0.7
     DEFAULT_OLLAMA_REASONING = False
+    DEFAULT_OLLAMA_SEED = 42
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -94,6 +96,7 @@ class ModelConfigSerializer:
         ollama_temperature: float | object = UNSET,
         cloud_temperature: float | object = UNSET,
         ollama_reasoning: bool | object = UNSET,
+        ollama_seed: int | None | object = UNSET,
         rag_settings: dict[str, object] | object = UNSET,
     ) -> ModelConfigSnapshot:
         db_session = self.session_factory()
@@ -161,6 +164,13 @@ class ModelConfigSerializer:
                     db_session=db_session,
                     key=self.OLLAMA_REASONING_KEY,
                     value=self.normalize_bool_text(ollama_reasoning),
+                    updated_at=now,
+                )
+            if ollama_seed is not UNSET:
+                self.upsert_runtime_setting(
+                    db_session=db_session,
+                    key=self.OLLAMA_SEED_KEY,
+                    value="" if ollama_seed is None else str(int(ollama_seed)),
                     updated_at=now,
                 )
             if rag_settings is not UNSET:
@@ -279,6 +289,18 @@ class ModelConfigSerializer:
         return normalized in {"1", "true", "yes", "on"}
 
     # -------------------------------------------------------------------------
+    @classmethod
+    def read_runtime_seed(cls, rows: list[RuntimeSetting]) -> int | None:
+        values = {str(row.setting_key): row.setting_value for row in rows}
+        raw_value = values.get(cls.OLLAMA_SEED_KEY, cls.DEFAULT_OLLAMA_SEED)
+        if raw_value in {None, ""}:
+            return None
+        try:
+            return max(0, int(str(raw_value)))
+        except (TypeError, ValueError):
+            return cls.DEFAULT_OLLAMA_SEED
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def normalize_bool_text(value: object) -> str:
         return "true" if bool(value) else "false"
@@ -345,6 +367,7 @@ class ModelConfigSerializer:
             runtime_rows
         )
         ollama_reasoning = cls.read_runtime_reasoning(runtime_rows)
+        ollama_seed = cls.read_runtime_seed(runtime_rows)
         rag_settings = cls.read_runtime_rag_settings(runtime_rows)
         updated_values = [
             row.updated_at
@@ -374,6 +397,7 @@ class ModelConfigSerializer:
             ollama_temperature=ollama_temperature,
             cloud_temperature=cloud_temperature,
             ollama_reasoning=ollama_reasoning,
+            ollama_seed=ollama_seed,
             rag_settings=rag_settings,
             updated_at=updated_at,
         )

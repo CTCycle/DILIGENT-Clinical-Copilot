@@ -1,5 +1,5 @@
 # Runtime Modes
-Last updated: 2026-06-06
+Last updated: 2026-07-09
 
 ## Supported Modes
 ### Local Development
@@ -31,6 +31,7 @@ Last updated: 2026-06-06
   - resource catalogs and source documents
 
 ## Limitations
+- DILIGENT is designed for single-user localhost development and the packaged`n  desktop runtime. Authenticated network deployment is not supported.
 - No official container workflow.
 - Desktop build is Windows-focused in current release scripts and output layout.
 - Long-running operations rely on backend job polling.

@@ -53,6 +53,7 @@ class ModelConfigSnapshotStore(Protocol):
         ollama_temperature: float | object = ...,
         cloud_temperature: float | object = ...,
         ollama_reasoning: bool | object = ...,
+        ollama_seed: int | None | object = ...,
         rag_settings: dict[str, object] | object = ...,
     ) -> ModelConfigSnapshot: ...
 
@@ -352,6 +353,8 @@ class ModelConfigService:
 
         if "ollama_reasoning" in fields_set and payload.ollama_reasoning is not None:
             updates["ollama_reasoning"] = payload.ollama_reasoning
+        if "ollama_seed" in fields_set:
+            updates["ollama_seed"] = payload.ollama_seed
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -699,6 +702,7 @@ class ModelConfigService:
             ollama_temperature=snapshot.ollama_temperature,
             cloud_temperature=snapshot.cloud_temperature,
             ollama_reasoning=snapshot.ollama_reasoning,
+            ollama_seed=snapshot.ollama_seed,
             rag_settings=rag_settings_payload(build_effective_rag_settings()),
             rag_model=self.resolve_current_rag_model_label(),
             updated_at=snapshot.updated_at,
