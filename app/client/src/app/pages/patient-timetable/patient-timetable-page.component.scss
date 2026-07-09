@@ -444,6 +444,12 @@ button,
   padding: var(--space-sm);
 }
 
+.source-evidence.is-warning {
+  border-color: var(--color-status-error-border);
+  background: var(--color-status-error-bg);
+  color: var(--color-status-error-text);
+}
+
 .linked-events {
   display: flex;
   flex-wrap: wrap;

@@ -309,7 +309,7 @@ class JobManager:
     def runner_accepts_job_id(self, runner: Callable[..., dict[str, Any]]) -> bool:
         try:
             signature = inspect.signature(runner)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return False
         parameters = list(signature.parameters.values())
         for param in parameters:

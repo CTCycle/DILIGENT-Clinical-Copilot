@@ -35,6 +35,7 @@ def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
                         title="ALT peak",
                         event_type="lab",
                         event_date="2025-03-01",
+                        source_evidence="ALT reached 450 U/L on 2025-03-01.",
                         confidence=0.6,
                     ),
                     PatientTimelineEvent(
@@ -42,6 +43,7 @@ def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
                         title="Therapy started",
                         event_type="therapy",
                         event_date="2025-01-10",
+                        source_evidence="Therapy started on 2025-01-10.",
                         confidence=0.8,
                     ),
                     PatientTimelineEvent(
@@ -49,6 +51,7 @@ def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
                         title="ALT peak",
                         event_type="lab",
                         event_date="2025-03-01",
+                        source_evidence="ALT reached 450 U/L on 2025-03-01.",
                         confidence=0.9,
                     ),
                 ]
@@ -71,3 +74,40 @@ def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
     assert result.events[0].sort_order == 0
     assert result.events[1].title == "ALT peak"
     assert result.events[1].confidence == 0.9
+
+###############################################################################
+def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(
+            PatientTimelineExtraction(
+                events=[
+                    PatientTimelineEvent(
+                        event_id="missing-evidence",
+                        title="Therapy started",
+                        event_type="therapy",
+                        event_date="2025-01-10",
+                    ),
+                    PatientTimelineEvent(
+                        event_id="grounded",
+                        title="ALT peak",
+                        event_type="lab",
+                        event_date="2025-03-01",
+                        source_evidence="ALT 450 U/L on 2025-03-01.",
+                    ),
+                ]
+            )
+        )
+    )
+
+    result = asyncio.run(
+        extractor.extract_timeline(
+            session_id=9,
+            source_payload={"laboratory_analysis": "ALT 450 U/L on 2025-03-01."},
+        )
+    )
+
+    assert [event.event_id for event in result.events] == ["grounded"]
+
+###############################################################################
+def test_normalize_date_token_keeps_month_precision_without_promoting_day() -> None:
+    assert PatientTimelineExtractor.normalize_date_token("2025-02") == "2025-02"

@@ -453,7 +453,7 @@ class AnalysisRunner:
         if match_confidence is not None:
             try:
                 match_confidence = float(match_confidence)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 match_confidence = None
         match_reason, match_notes = normalize_match_reason(
             livertox_data.get("match_reason"),

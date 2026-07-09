@@ -13,7 +13,6 @@ from domain.patient_timeline import (
 )
 from services.inspection.normalization import (
     extract_lab_marker,
-    first_iso_date,
     normalize_text,
 )
 from services.inspection.runtime import coerce_optional_str
@@ -74,7 +73,6 @@ class InspectionTimelineMixin:
         source: dict[str, Any],
     ) -> PatientTimeline:
         events: list[PatientTimelineEvent] = []
-        visit_date = first_iso_date(source.get("visit_date"))
 
         drugs_text = normalize_text(source.get("drugs"))
         if drugs_text:
@@ -84,9 +82,9 @@ class InspectionTimelineMixin:
                     title="Therapy context",
                     description=drugs_text[:450],
                     event_type="therapy",
-                    timing_type="relative",
-                    event_date=visit_date,
-                    extracted_timing_text=visit_date,
+                    timing_type="uncertain",
+                    event_date=None,
+                    extracted_timing_text=None,
                     source="fallback_parser",
                     source_evidence=drugs_text[:1000],
                     sort_order=10,
@@ -101,9 +99,9 @@ class InspectionTimelineMixin:
                     title="Clinical symptom context",
                     description=anamnesis_text[:450],
                     event_type="disease",
-                    timing_type="relative",
-                    event_date=visit_date,
-                    extracted_timing_text=visit_date,
+                    timing_type="uncertain",
+                    event_date=None,
+                    extracted_timing_text=None,
                     source="fallback_parser",
                     source_evidence=anamnesis_text[:1000],
                     sort_order=20,
@@ -119,9 +117,9 @@ class InspectionTimelineMixin:
                     title=marker or "Laboratory findings",
                     description=labs_text[:450],
                     event_type="lab",
-                    timing_type="explicit_date" if visit_date else "relative",
-                    event_date=visit_date,
-                    extracted_timing_text=visit_date,
+                    timing_type="uncertain",
+                    event_date=None,
+                    extracted_timing_text=None,
                     source="fallback_parser",
                     source_evidence=labs_text[:1000],
                     sort_order=30,
@@ -269,50 +267,6 @@ class InspectionTimelineMixin:
                         "model_provider": requested_runtime_settings["llm_provider"],
                     }
                 )
-
-            session_payload["runtime_settings"] = {
-                "use_cloud_services": (
-                    requested_runtime_settings["use_cloud_services"]
-                    if requested_runtime_settings["use_cloud_services"] is not None
-                    else LLMRuntimeConfig.is_cloud_enabled()
-                ),
-                "llm_provider": (
-                    requested_runtime_settings["llm_provider"]
-                    if requested_runtime_settings["llm_provider"]
-                    else LLMRuntimeConfig.get_llm_provider()
-                ),
-                "cloud_model": (
-                    requested_runtime_settings["cloud_model"]
-                    if requested_runtime_settings["cloud_model"]
-                    else LLMRuntimeConfig.get_cloud_model()
-                ),
-                "text_extraction_model": (
-                    requested_runtime_settings["text_extraction_model"]
-                    if requested_runtime_settings["text_extraction_model"]
-                    else LLMRuntimeConfig.get_text_extraction_model()
-                ),
-                "clinical_model": (
-                    requested_runtime_settings["clinical_model"]
-                    if requested_runtime_settings["clinical_model"]
-                    else LLMRuntimeConfig.get_clinical_model()
-                ),
-                "ollama_temperature": (
-                    requested_runtime_settings["ollama_temperature"]
-                    if requested_runtime_settings["ollama_temperature"] is not None
-                    else LLMRuntimeConfig.get_ollama_temperature()
-                ),
-                "cloud_temperature": (
-                    requested_runtime_settings["cloud_temperature"]
-                    if requested_runtime_settings["cloud_temperature"] is not None
-                    else LLMRuntimeConfig.get_cloud_temperature()
-                ),
-                "ollama_reasoning": (
-                    requested_runtime_settings["ollama_reasoning"]
-                    if requested_runtime_settings["ollama_reasoning"] is not None
-                    else LLMRuntimeConfig.is_ollama_reasoning_enabled()
-                ),
-            }
-            self.serializer.upsert_session_result_payload(session_id, session_payload)
             persisted = self.serializer.create_session_timeline_record(
                 session_id,
                 timeline.model_dump(mode="json"),

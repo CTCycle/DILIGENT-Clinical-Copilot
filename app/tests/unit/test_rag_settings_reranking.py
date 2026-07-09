@@ -26,7 +26,7 @@ def test_build_rag_settings_reads_retrieval_counts() -> None:
                 "hybrid_vector_weight": 0.7,
                 "hybrid_text_weight": 0.3,
                 "embedding_backend": "ollama",
-                "ollama_embedding_model": "nomic-embed-text:latest",
+                "ollama_embedding_model": "nomic-embed-text:v1.5",
                 "cloud_provider": "openai",
                 "cloud_model": "gpt-4.1-mini",
             }
@@ -43,7 +43,7 @@ def test_build_rag_settings_reads_retrieval_counts() -> None:
     assert settings["hybrid_vector_weight"] == 0.7
     assert settings["hybrid_text_weight"] == 0.3
     assert settings["embedding_backend"] == "ollama"
-    assert settings["ollama_embedding_model"] == "nomic-embed-text:latest"
+    assert settings["ollama_embedding_model"] == "nomic-embed-text:v1.5"
 
 ###############################################################################
 def test_build_rag_settings_enforces_candidate_floor() -> None:
@@ -61,3 +61,4 @@ def test_build_rag_settings_defaults_to_lightweight_reranker_profile() -> None:
     settings = payload["rag"]
 
     assert settings["reranker_model"] == "lightweight-balanced-v1"
+    assert settings["reset_vector_collection"] is False
