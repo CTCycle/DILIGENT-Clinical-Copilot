@@ -34,7 +34,8 @@ class SQLiteRepository:
             future=True,
             expire_on_commit=False,
         )
-        Base.metadata.create_all(self.engine)
+        if db_file_missing:
+            Base.metadata.create_all(self.engine)
         AccessKeyEncryptionMaterialSerializer(
             engine=self.engine,
             session_factory=seed_session_factory,
@@ -46,7 +47,7 @@ class SQLiteRepository:
             )
         else:
             logger.info(
-                "SQLite DB file already existed; ensured additive schema and encryption material at %s",
+                "SQLite DB file already existed; ensured encryption material at %s",
                 str(self.db_path),
             )
         self.session_factory = sessionmaker(bind=self.engine, future=True)

@@ -11,21 +11,17 @@ REVISION_JOB_MISSING_STATUS_MESSAGE = (
     "and retry if needed."
 )
 
-
 ###############################################################################
 class SessionRevisionNotFoundError(ValueError):
     pass
-
 
 ###############################################################################
 class SessionRevisionConflictError(ValueError):
     pass
 
-
 ###############################################################################
 class SessionRevisionValidationError(ValueError):
     pass
-
 
 ###############################################################################
 class InspectionRevisionScaffoldMixin:

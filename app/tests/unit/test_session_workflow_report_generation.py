@@ -264,16 +264,18 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
 
 ###############################################################################
 def test_workflow_restores_rag_bibliography_from_consultation_references() -> None:
+
+    ###############################################################################
     class FakeRagClinicalService(FakeClinicalService):
 
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------------
         def build_rag_query(self, **kwargs: Any) -> dict[str, str]:
             _ = kwargs
             return {
                 "Paracetamolo": "paracetamol hepatocellular DILI LiverTox references"
             }
 
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------------
         async def run_consultation(
             self, **kwargs: Any
         ) -> tuple[SimpleNamespace, str]:

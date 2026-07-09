@@ -17,7 +17,6 @@ from services.inspection.normalization import (
 )
 from services.inspection.runtime import coerce_optional_str
 
-
 ###############################################################################
 class InspectionTimelineMixin:
     serializer: Any

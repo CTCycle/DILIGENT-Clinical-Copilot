@@ -167,7 +167,7 @@ def test_session_report_and_text_use_result_payload_only() -> None:
             "session_timestamp": datetime(2025, 1, 1, 8, 30),
             "anamnesis": "Original anamnesis",
             "drugs": "acetaminophen",
-            "final_report": "Legacy section report",
+            "final_report": "Section report",
             "session_result_payload": {
                 "report": "Payload report",
                 "original_session_text": "Payload session text",
@@ -176,11 +176,11 @@ def test_session_report_and_text_use_result_payload_only() -> None:
     )
     serializer.save_clinical_session(
         {
-            "patient_name": "Legacy Only",
+            "patient_name": "Payload Missing Text",
             "session_timestamp": datetime(2025, 1, 2, 8, 30),
-            "anamnesis": "Legacy anamnesis",
+            "anamnesis": "Section anamnesis",
             "drugs": "ibuprofen",
-            "final_report": "Section-only report",
+            "final_report": "Section report",
             "session_result_payload": {},
         }
     )
@@ -195,7 +195,7 @@ def test_session_report_and_text_use_result_payload_only() -> None:
     )
     items_by_name = {item["patient_name"]: item for item in items}
     assert items_by_name["Payload Only"]["has_report"] is True
-    assert items_by_name["Legacy Only"]["has_report"] is False
+    assert items_by_name["Payload Missing Text"]["has_report"] is False
 
     payload_detail = serializer.get_session_detail(
         int(items_by_name["Payload Only"]["session_id"])
@@ -204,15 +204,13 @@ def test_session_report_and_text_use_result_payload_only() -> None:
     assert payload_detail["report"] == "Payload report"
     assert payload_detail["session_text"] == "Payload session text"
 
-    legacy_detail = serializer.get_session_detail(
-        int(items_by_name["Legacy Only"]["session_id"])
+    missing_text_detail = serializer.get_session_detail(
+        int(items_by_name["Payload Missing Text"]["session_id"])
     )
-    assert legacy_detail is not None
-    assert legacy_detail["report"] is None
-    assert (
-        legacy_detail["session_text"]
-        == "Anamnesis:\nLegacy anamnesis\n\nDrugs:\nibuprofen"
-    )
+    assert missing_text_detail is not None
+    assert missing_text_detail["report"] is None
+    assert missing_text_detail["session_text"] == ""
+    assert missing_text_detail["sections"]["anamnesis"] == "Section anamnesis"
 
 ###############################################################################
 def test_catalog_search_and_drug_delete_cleanup() -> None:
