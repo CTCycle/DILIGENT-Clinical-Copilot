@@ -6,24 +6,21 @@ import time
 from services.runtime.jobs import JobManager
 from services.session.session_service import ClinicalSessionService
 
-
 ###############################################################################
 def accepts_named_job_id(job_id: str) -> dict[str, object]:
     return {"job_id": job_id}
-
 
 ###############################################################################
 def accepts_kwargs(**kwargs: object) -> dict[str, object]:
     return dict(kwargs)
 
-
 ###############################################################################
 def accepts_no_job_id() -> dict[str, object]:
     return {}
 
-
 ###############################################################################
 class _SnapshotCancelManager:
+
     # -------------------------------------------------------------------------
     def get_job_status(self, job_id: str) -> dict[str, object]:
         return {
@@ -42,7 +39,6 @@ class _SnapshotCancelManager:
             "progress": 0.5,
         }
 
-
 ###############################################################################
 def test_clinical_cancel_response_converts_job_snapshot_to_success_bool() -> None:
     service = ClinicalSessionService.__new__(ClinicalSessionService)
@@ -53,26 +49,21 @@ def test_clinical_cancel_response_converts_job_snapshot_to_success_bool() -> Non
     assert response.success is True
     assert response.job_id == "job-123"
 
-
 ###############################################################################
 def test_runner_accepts_named_job_id() -> None:
     assert JobManager().runner_accepts_job_id(accepts_named_job_id)
-
 
 ###############################################################################
 def test_runner_accepts_kwargs() -> None:
     assert JobManager().runner_accepts_job_id(accepts_kwargs)
 
-
 ###############################################################################
 def test_runner_rejects_callable_without_job_id() -> None:
     assert not JobManager().runner_accepts_job_id(accepts_no_job_id)
 
-
 ###############################################################################
 def test_runner_rejects_non_inspectable_callable() -> None:
     assert not JobManager().runner_accepts_job_id(len)
-
 
 ###############################################################################
 def test_running_cancel_transitions_to_cancelled_immediately() -> None:
@@ -100,7 +91,6 @@ def test_running_cancel_transitions_to_cancelled_immediately() -> None:
     assert terminal is not None
     assert terminal["status"] == "cancelled"
 
-
 ###############################################################################
 def test_running_cancel_allows_duplicate_job_submission_immediately() -> None:
     manager = JobManager()
@@ -118,7 +108,6 @@ def test_running_cancel_allows_duplicate_job_submission_immediately() -> None:
     assert manager.is_job_running("runtime_test") is False
     release.set()
 
-
 ###############################################################################
 def test_job_result_merge_is_single_source_of_truth() -> None:
     manager = JobManager()
@@ -134,7 +123,6 @@ def test_job_result_merge_is_single_source_of_truth() -> None:
     release.set()
     assert snapshot is not None
     assert snapshot["result"] == {"a": 1, "b": 2}
-
 
 ###############################################################################
 def test_job_running_checks_can_be_scoped() -> None:
