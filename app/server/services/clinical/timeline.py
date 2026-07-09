@@ -137,7 +137,7 @@ class PatientTimelineExtractor:
         if DATE_PREFIX_RE.fullmatch(candidate):
             return candidate
         if DATE_SHORT_RE.fullmatch(candidate):
-            return f"{candidate}-01"
+            return candidate
         return candidate
 
     # -------------------------------------------------------------------------
@@ -164,6 +164,8 @@ class PatientTimelineExtractor:
     ) -> list[PatientTimelineEvent]:
         deduped: dict[tuple[str, str, str], PatientTimelineEvent] = {}
         for item in events:
+            if not item.source_evidence or not item.source_evidence.strip():
+                continue
             payload = item.model_dump()
             payload["event_date"] = self.normalize_date_token(item.event_date)
             event = PatientTimelineEvent(

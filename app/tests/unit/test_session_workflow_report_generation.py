@@ -16,12 +16,13 @@ from domain.clinical.entities import (
     PatientLabTimeline,
     PatientRucamAssessmentBundle,
 )
+import services.session.session_workflow as session_workflow_module
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.session_shared import build_failed_session_payload
 from services.session.session_workflow import process_single_patient_workflow
-from services.session.workflow_shared import ClinicalPersistenceError
-from services.session.session_service import ClinicalSessionService
 from services.clinical.report_finalizer import ReportFinalizer
+from services.session.session_service import ClinicalSessionService
+from services.session.workflow_shared import ClinicalPersistenceError
 
 ###############################################################################
 class FakePatternAnalyzer:
@@ -412,3 +413,49 @@ def test_runtime_timeout_respects_provider_cap(monkeypatch) -> None:
     )
 
     assert timeout == 30.0
+
+###############################################################################
+def test_workflow_marks_blocking_faithfulness_result_as_failed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = PatientData(
+        name="Mario Rossi",
+        visit_date=date(2025, 5, 20),
+        anamnesis="Paziente con ittero.",
+        drugs="Paracetamolo 1-0-0-0",
+        laboratory_analysis="ALT 100 U/L, ALP 120 U/L.",
+    )
+    service = FakeClinicalService()
+    original_audit_report = session_workflow_module.audit_report
+
+    def blocked_audit_report(*args: Any, **kwargs: Any) -> Any:
+        audit = original_audit_report(*args, **kwargs)
+        audit_payload = audit.model_dump()
+        audit_payload["manual_review_required"] = True
+        audit_payload["blocking_issues"] = [
+            {
+                "code": "faithfulness_gate_blocked",
+                "message": "Source evidence did not support a final claim.",
+            }
+        ]
+        return audit.__class__(**audit_payload)
+
+    monkeypatch.setattr(session_workflow_module, "audit_report", blocked_audit_report)
+
+    result = asyncio.run(
+        process_single_patient_workflow(
+            service,
+            payload,
+            normalized_document=DocumentNormalizer().normalize(
+                "Paziente con ittero.\nParacetamolo 1-0-0-0\nALT 100 U/L, ALP 120 U/L."
+            ),
+            report_mode="faithful_only",
+        ),
+    )
+
+    assert result["clinical_validity"] == "requires_human_review"
+    assert result["manual_review_required"] is True
+    assert any(
+        issue["code"] == "faithfulness_gate_blocked" for issue in result["issues"]
+    )
+    assert service.serializer.saved_payload["session_status"] == "failed"

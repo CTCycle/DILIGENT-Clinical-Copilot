@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-07-02
+Last updated: 2026-07-09
 
 ## Relational Database
 - SQLAlchemy-backed storage
@@ -23,6 +23,7 @@ Last updated: 2026-07-02
 - The current runtime does not execute or read the previous deterministic session revision pipeline.
 - The active revision skeleton creates draft revision version shells, revision run rows, one `revision_agent_issue_scan` step, and a `revision_agent_issue_scan` pipeline artifact. It does not create revised clinical sessions or revised entity rows yet.
 - Patient timeline history is persisted only in clinical_session_timelines; session result payloads are not a timeline read source.
+- Timeline generation metadata stays on persisted timeline records. Generating or regenerating a timeline must not rewrite the original clinical session runtime metadata stored in the assessment payload.
 - Evidence-locked DILI artifacts are persisted inside the database-backed session result payload:
   - 
 ormalized_document
@@ -33,6 +34,7 @@ ormalized_document
   - discrepancy report
   - un_bundle_index
 - Successful clinical workflows require persistence. Serializer failures, missing persisted ids, or failed upserts are treated as service dependency failures rather than silent in-memory success.
+- Sessions with blocking faithfulness issues may persist audit artifacts, but they must not be stored as clinically successful finalizations.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
 
 ## Reference Catalog Persistence
@@ -49,6 +51,7 @@ app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-resee
 ## Vector Persistence
 - LanceDB collection under `app/resources/sources/vectors`
 - RAG retrieval uses vector search, LanceDB full-text search, metadata-aware fusion, and lightweight local heuristic reranking profiles.
+- Default runtime configuration pins the Ollama embedding model to an immutable tag and keeps vector collection reset disabled unless explicitly requested.
 
 ## Filesystem Resources
 - `app/resources/sources`

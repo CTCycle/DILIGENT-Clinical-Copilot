@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-07-01
+Last updated: 2026-07-09
 
 ## Primary Runtime Files
 - Active env file: `settings/.env`
@@ -41,3 +41,7 @@ Last updated: 2026-07-01
 - Cloud-versus-local model usage is runtime-configured through model configuration APIs.
 - Database mode, embedded SQLite versus PostgreSQL, is controlled by `settings/.env`.
 - Catalog seeding is hash-checked and incremental on normal startup.
+
+## RAG Defaults
+- The default Ollama embedding model is pinned in `settings/configurations.json` and should not use a mutable `:latest` tag.
+- `reset_vector_collection` defaults to `false` and should only be enabled for explicit maintenance or rebuild operations.

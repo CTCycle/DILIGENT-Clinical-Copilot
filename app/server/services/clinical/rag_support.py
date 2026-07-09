@@ -221,7 +221,7 @@ class RagSupportService:
             return None
         try:
             parsed = float(match.group(1))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         if parsed <= 0:
             return None
@@ -286,7 +286,7 @@ class RagSupportService:
     def _coerce_page_number(value: Any) -> int | None:
         try:
             parsed = int(str(value).strip())
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         return parsed if parsed >= 1 else None
 
