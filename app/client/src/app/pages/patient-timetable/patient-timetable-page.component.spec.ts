@@ -88,4 +88,16 @@ describe('PatientTimetablePageComponent', () => {
       'Missing source evidence. Do not treat this event as clinically grounded chronology.',
     );
   });
+
+  it('uses explicit partial-date precision without browser partial-date parsing', () => {
+    const resolver = (component as unknown as { resolveEventDate: (value: string | null) => unknown }).resolveEventDate;
+    const label = (component as unknown as { precisionLabel: (value: string | null) => string }).precisionLabel.bind(component);
+
+    expect(resolver.call(component, '2025-02-03')).toEqual({ date: new Date(Date.UTC(2025, 1, 3)), precision: 'day' });
+    expect(resolver.call(component, '2025-02')).toEqual({ date: new Date(Date.UTC(2025, 1, 1)), precision: 'month' });
+    expect(resolver.call(component, '2025')).toEqual({ date: new Date(Date.UTC(2025, 0, 1)), precision: 'year' });
+    expect(resolver.call(component, '2025-99')).toBeNull();
+    expect(resolver.call(component, null)).toBeNull();
+    expect(label('2025-02')).toBe('Month precision');
+  });
 });

@@ -3,6 +3,8 @@ from __future__ import annotations
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from datetime import datetime
+import hashlib
+import json
 from typing import Literal
 
 from common.catalogs.model_choices import get_cloud_model_choices
@@ -117,6 +119,11 @@ class LLMRuntimeConfig:
                 if "ollama_reasoning" in overrides
                 else bool(snapshot.ollama_reasoning)
             ),
+            ollama_seed=(
+                cls._coerce_optional_int(overrides.get("ollama_seed"))
+                if "ollama_seed" in overrides
+                else snapshot.ollama_seed
+            ),
             rag_settings=snapshot.rag_settings,
             updated_at=snapshot.updated_at,
         )
@@ -133,6 +140,16 @@ class LLMRuntimeConfig:
     @staticmethod
     def _coerce_optional_float(value: object) -> float | None:
         if value is None:
+            return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _coerce_optional_int(value: object) -> int | None:
+        if value is None:
+            return None
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError):
             return None
         if isinstance(value, (int, float)):
             return float(value)
@@ -161,7 +178,6 @@ class LLMRuntimeConfig:
         normalized = {
             str(key): value
             for key, value in (overrides or {}).items()
-            if value is not None
         }
         token: Token[dict[str, object] | None] | None = None
         if normalized:
@@ -207,6 +223,37 @@ class LLMRuntimeConfig:
     @classmethod
     def is_ollama_reasoning_enabled(cls) -> bool:
         return bool(cls._load_snapshot().ollama_reasoning)
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def get_ollama_seed(cls) -> int | None:
+        return cls._load_snapshot().ollama_seed
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def capture_run_snapshot(cls, *, use_rag: bool) -> tuple[dict[str, object], str]:
+        """Capture the complete resolved runtime once for a clinical job."""
+        parser_provider, parser_model = cls.resolve_provider_and_model("parser")
+        clinical_provider, clinical_model = cls.resolve_provider_and_model("clinical")
+        snapshot: dict[str, object] = {
+            "use_cloud_services": cls.is_cloud_enabled(),
+            "llm_provider": cls.get_llm_provider(),
+            "cloud_model": cls.get_cloud_model(),
+            "text_extraction_model": cls.get_text_extraction_model(),
+            "clinical_model": cls.get_clinical_model(),
+            "ollama_temperature": cls.get_ollama_temperature(),
+            "cloud_temperature": cls.get_cloud_temperature(),
+            "ollama_reasoning": cls.is_ollama_reasoning_enabled(),
+            "ollama_seed": cls.get_ollama_seed(),
+            "use_rag": bool(use_rag),
+            "rag_settings": cls._load_snapshot().rag_settings or {},
+            "parser_provider": parser_provider,
+            "parser_model": parser_model,
+            "clinical_provider": clinical_provider,
+            "clinical_model_resolved": clinical_model,
+        }
+        canonical = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return snapshot, hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     # -------------------------------------------------------------------------
     @classmethod

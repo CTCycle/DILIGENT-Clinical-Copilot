@@ -19,7 +19,7 @@ from repositories.serialization.access_keys import AccessKeySerializer
 from services.llm.structured import (
     StructuredOutputParser,
     T,
-    parse_json_dict,
+    parse_json_object_strict,
 )
 
 ProviderName = Literal["openai", "gemini"]
@@ -696,4 +696,9 @@ class CloudLLMClient:
     # -------------------------------------------------------------------------
     @staticmethod
     def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
-        return parse_json_dict(obj_or_text)
+        if isinstance(obj_or_text, dict):
+            return obj_or_text
+        try:
+            return parse_json_object_strict(obj_or_text)
+        except ValueError:
+            return None

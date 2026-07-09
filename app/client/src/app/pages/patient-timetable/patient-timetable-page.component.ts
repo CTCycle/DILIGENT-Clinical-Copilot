@@ -32,6 +32,13 @@ type TimelineDateRange = {
   end: Date | null;
 };
 
+type TimelineDatePrecision = 'day' | 'month' | 'year';
+
+type ResolvedTimelineDate = {
+  date: Date;
+  precision: TimelineDatePrecision;
+};
+
 type TimelineScalePoint = {
   label: string;
   shortLabel: string;
@@ -90,7 +97,7 @@ export class PatientTimetablePageComponent implements OnInit {
 
   readonly dateRange = computed<TimelineDateRange>(() => {
     const dates = this.orderedEvents()
-      .map((event) => this.parseEventDate(event.event_date))
+      .map((event) => this.resolveEventDate(event.event_date)?.date ?? null)
       .filter((value): value is Date => value !== null)
       .sort((a, b) => a.getTime() - b.getTime());
     return {
@@ -321,12 +328,35 @@ export class PatientTimetablePageComponent implements OnInit {
     return fetchInspectionSessionTimelineById(sessionId, latest.timeline_id);
   }
 
-  private parseEventDate(value: string | null): Date | null {
+  private resolveEventDate(value: string | null): ResolvedTimelineDate | null {
     if (!value) {
       return null;
     }
-    const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+    const exactMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    const monthMatch = /^(\d{4})-(\d{2})$/.exec(value);
+    const yearMatch = /^(\d{4})$/.exec(value);
+    const match = exactMatch ?? monthMatch ?? yearMatch;
+    if (!match) {
+      return null;
+    }
+    const year = Number(match[1]);
+    const month = exactMatch || monthMatch ? Number(match[2]) : 1;
+    const day = exactMatch ? Number(match[3]) : 1;
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+      Number.isNaN(date.getTime()) ||
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      return null;
+    }
+    return { date, precision: exactMatch ? 'day' : monthMatch ? 'month' : 'year' };
+  }
+
+  precisionLabel(value: string | null): string {
+    const precision = this.resolveEventDate(value)?.precision;
+    return precision ? `${precision[0].toUpperCase()}${precision.slice(1)} precision` : 'Not reported';
   }
 
   private monthLabel(value: Date): string {
@@ -347,7 +377,7 @@ export class PatientTimetablePageComponent implements OnInit {
     total: number,
     range: TimelineDateRange,
   ): number {
-    const eventDate = this.parseEventDate(event.event_date);
+    const eventDate = this.resolveEventDate(event.event_date)?.date ?? null;
     if (eventDate && range.start && range.end) {
       const span = Math.max(1, range.end.getTime() - range.start.getTime());
       const elapsed = eventDate.getTime() - range.start.getTime();

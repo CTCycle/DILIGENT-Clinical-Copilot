@@ -92,6 +92,7 @@ class PatientTimeline(BaseModel):
     source_model: str | None = Field(default=None, max_length=200)
     source_kind: PatientTimelineSourceKind | None = None
     model_provider: str | None = Field(default=None, max_length=40)
+    source_payload_hash: str | None = Field(default=None, min_length=64, max_length=64)
     events: list[PatientTimelineEvent] = Field(default_factory=list)
 
     # -------------------------------------------------------------------------
@@ -119,6 +120,7 @@ class SessionTimelinePreview(BaseModel):
     source_model: str | None = Field(default=None, max_length=200)
     source_kind: PatientTimelineSourceKind | None = None
     model_provider: str | None = Field(default=None, max_length=40)
+    source_payload_hash: str | None = Field(default=None, min_length=64, max_length=64)
     event_count: int = Field(default=0, ge=0)
     start_date: str | None = Field(default=None, max_length=40)
     end_date: str | None = Field(default=None, max_length=40)

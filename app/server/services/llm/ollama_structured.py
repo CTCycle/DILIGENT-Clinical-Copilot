@@ -14,7 +14,7 @@ from services.llm.ollama_runtime import OllamaError
 from services.llm.structured import (
     StructuredOutputParser,
     T,
-    parse_json_dict,
+    parse_json_object_strict,
 )
 
 ###############################################################################
@@ -352,18 +352,10 @@ async def parse_with_repairs(
     raise RuntimeError("No structured output produced by the model")
 
 ###############################################################################
-def extract_first_json_object(text: str) -> str | None:
-    decoder = json.JSONDecoder()
-    for match in re.finditer(r"\{", text):
-        start = match.start()
-        try:
-            parsed, end = decoder.raw_decode(text[start:])
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            return text[start : start + end]
-    return None
-
-###############################################################################
 def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
-    return parse_json_dict(obj_or_text)
+    if isinstance(obj_or_text, dict):
+        return obj_or_text
+    try:
+        return parse_json_object_strict(obj_or_text)
+    except ValueError:
+        return None

@@ -111,6 +111,8 @@
           <dl>
             <dt>Timing</dt>
             <dd>{{ timingLabel(event.timing_type) }}</dd>
+            <dt>Date precision</dt>
+            <dd>{{ precisionLabel(event.event_date) }}</dd>
             <dt>Extracted text</dt>
             <dd>{{ event.extracted_timing_text || event.relative_time || event.event_date || 'Not reported' }}</dd>
             <dt>Source</dt>

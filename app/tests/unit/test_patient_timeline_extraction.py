@@ -17,10 +17,11 @@ class FakeTimelineClient:
     def __init__(self, payload: PatientTimelineExtraction) -> None:
         self.payload = payload
         self.call_count = 0
+        self.last_kwargs: dict[str, Any] = {}
 
     # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientTimelineExtraction:
-        _ = kwargs
+        self.last_kwargs = kwargs
         self.call_count += 1
         return self.payload
 
@@ -111,3 +112,30 @@ def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
 ###############################################################################
 def test_normalize_date_token_keeps_month_precision_without_promoting_day() -> None:
     assert PatientTimelineExtractor.normalize_date_token("2025-02") == "2025-02"
+
+
+def test_timeline_sort_orders_year_month_and_day_without_changing_display_values() -> None:
+    extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
+    events = [
+        PatientTimelineEvent(event_id="relative", title="Later", relative_time="after discharge", source_evidence="Later."),
+        PatientTimelineEvent(event_id="day", title="Day", event_date="2025-02-03", source_evidence="Day."),
+        PatientTimelineEvent(event_id="month", title="Month", event_date="2025-02", source_evidence="Month."),
+        PatientTimelineEvent(event_id="year", title="Year", event_date="2025", source_evidence="Year."),
+    ]
+
+    normalized = extractor.normalize_events(events)
+
+    assert [event.event_id for event in normalized] == ["year", "month", "day", "relative"]
+    assert [event.event_date for event in normalized[:3]] == ["2025", "2025-02", "2025-02-03"]
+
+
+def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
+    client = FakeTimelineClient(PatientTimelineExtraction())
+    extractor = PatientTimelineExtractor(client=client)
+
+    asyncio.run(extractor.extract_timeline(session_id=5, source_payload={"b": 2, "a": "x"}))
+
+    prompt = client.last_kwargs["user_prompt"]
+    assert '{"a":"x","b":2}' in prompt
+    assert "Source payload SHA-256:" in prompt
+    assert "'a':" not in prompt
