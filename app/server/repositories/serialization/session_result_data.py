@@ -273,18 +273,6 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         payload = self.get_session_result_payload(safe_session_id) or {}
         metadata = self.parse_session_result_payload(session_row.metadata_json) or {}
         session_text = self.normalize_string(payload.get("original_session_text")) or ""
-        if not session_text and sections:
-            ordered_sections = [
-                ("anamnesis", "Anamnesis"),
-                ("drugs", "Drugs"),
-                ("laboratory_analysis", "Laboratory Analysis"),
-            ]
-            section_parts = [
-                f"{label}:\n{sections[key]}"
-                for key, label in ordered_sections
-                if sections.get(key)
-            ]
-            session_text = "\n\n".join(section_parts)
         official_report_text = self.normalize_string(payload.get("report"))
         manual_edit_rows = db_session.execute(
             select(ClinicalSessionManualEdit)
