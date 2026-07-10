@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -119,3 +119,6 @@ Last updated: 2026-07-08
 - Runtime and security helpers use canonical service modules; transitional shims are not maintained.
 - Supported external access-key providers are `openai`, `gemini`, and `brave`.
 - Containerized runtime is not implemented in the current repository.
+
+### Agentic revision boundary
+`services/inspection/revision_agent.py` orchestrates a controlled revision loop. Context assembly, prompts, fixed tools, patch validation, and finalization stay in `services/inspection`; the workflow does not import or rerun first-run clinical workflow modules.

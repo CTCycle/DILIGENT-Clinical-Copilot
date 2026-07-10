@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-07-02
+Last updated: 2026-07-10
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
@@ -92,3 +92,6 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 - Revision jobs currently expose the revision-agent skeleton: start, status, persisted run, and persisted step/artifact reads are active for issue identification only. Report rewriting, tool execution, and revised entity persistence are not implemented yet.
 - Research has no active route inventory in the current architecture source and should not be documented as an active API surface until implemented.
 
+
+### Session revision agent
+`POST /api/inspection/sessions/{session_id}/revision/jobs` starts an agentic revision job. Existing status, cancellation, pipeline-run, step, artifact, entity, and clinical-review routes remain stable. The job returns revision/version identifiers and task, tool, QA, and human-review summaries.

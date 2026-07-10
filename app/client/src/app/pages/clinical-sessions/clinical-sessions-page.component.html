@@ -445,14 +445,16 @@
         }
 
         @if (activeSection() === 'revision') {
-          <div class="clinical-session-panel clinical-session-revision-placeholder">
-            <h3>Session revision rewrite pending</h3>
-            <p>
-              The previous LLM-assisted session revision workflow has been removed.
-              This area is intentionally reserved for the replacement implementation.
-            </p>
-          </div>
-        }
+          <div class="clinical-session-panel clinical-session-revision-panel">
+            <h3>Agentic report revision</h3>
+            <p class="clinical-session-panel-note">Creates a new draft version. Human review is required before clinical reliance.</p>
+            <label class="clinical-session-field"><span>Revision instruction</span><textarea [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe the report issue."></textarea></label>
+            <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="startRevision()" [disabled]="revisionRunning()">Start revision</button>@if (revisionRunning()) { <button type="button" class="btn" (click)="cancelRevision()">Cancel</button> }</div>
+            @if (revisionStatus()) { <p class="clinical-session-panel-note">{{ revisionStatus() }}</p> }
+            @if (revisionVersionId() !== null && !revisionRunning()) { <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="recordRevisionReview('approved')">Approve by human</button><button type="button" class="btn" (click)="recordRevisionReview('rejected')">Reject</button></div> }
+            @if (revisionSteps().length) { <h4>Agent trace</h4><ul class="clinical-session-side-list">@for (step of revisionSteps(); track step.step_name) { <li><strong>{{ step.step_name }}</strong><small>{{ step.status }}</small></li> }</ul> }
+            @if (revisionArtifacts().length) { <h4>Draft artifacts</h4><ul class="clinical-session-side-list">@for (artifact of revisionArtifacts(); track artifact.artifact_key) { <li><strong>{{ artifact.artifact_key || 'artifact' }}</strong><small>{{ artifact.status || 'recorded' }}</small></li> }</ul> }
+          </div>        }
 
         @if (activeSection() === 'timeline') {
           <div class="clinical-session-panel clinical-session-timeline-panel">

@@ -11,17 +11,21 @@ REVISION_JOB_MISSING_STATUS_MESSAGE = (
     "and retry if needed."
 )
 
+
 ###############################################################################
 class SessionRevisionNotFoundError(ValueError):
     pass
+
 
 ###############################################################################
 class SessionRevisionConflictError(ValueError):
     pass
 
+
 ###############################################################################
 class SessionRevisionValidationError(ValueError):
     pass
+
 
 ###############################################################################
 class InspectionRevisionScaffoldMixin:
@@ -85,8 +89,8 @@ class InspectionRevisionScaffoldMixin:
         pipeline_run_id = uuid.uuid4().hex
         model_configuration = {
             "pipeline_run_id": pipeline_run_id,
-            "revision_agent": "single_model_issue_scan",
-            "revision_mode": "agent_issue_scan",
+            "revision_agent": "single_model_agentic_revision",
+            "revision_mode": "agentic_revision",
             "root_session_id": root_session_id,
             "source_session_id": int(session_id),
             "source_version_id": int(source_version["version_id"]),
@@ -112,7 +116,7 @@ class InspectionRevisionScaffoldMixin:
             root_session_id=root_session_id,
             source_version_id=int(source_version["version_id"]),
             target_revision_version_id=revision_version_id,
-            revision_mode="agent_issue_scan",
+            revision_mode="agentic_revision",
             revision_kind="llm_assisted_revision",
             configuration=model_configuration,
             reviewer_note=revision_request.revision_instruction,
@@ -123,7 +127,7 @@ class InspectionRevisionScaffoldMixin:
         )
         job_id = self.jobs.start_job(
             job_type=self.REVISION_JOB_TYPE,
-            runner=self.revision_agent_runner.run_issue_scan,
+            runner=self.revision_agent_runner.run_agentic,
             kwargs={
                 "pipeline_run_id": pipeline_run_id,
                 "revision_version_id": revision_version_id,
@@ -141,7 +145,7 @@ class InspectionRevisionScaffoldMixin:
             root_session_id=root_session_id,
             source_version_id=int(source_version["version_id"]),
             target_revision_version_id=revision_version_id,
-            revision_mode="agent_issue_scan",
+            revision_mode="agentic_revision",
             revision_kind="llm_assisted_revision",
             configuration=model_configuration,
             reviewer_note=revision_request.revision_instruction,
