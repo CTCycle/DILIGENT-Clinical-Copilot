@@ -27,6 +27,7 @@ from repositories.serialization.session_revision_data import (
     validate_revision_livertox_decision,
 )
 
+
 ###############################################################################
 def persist_revision_artifacts(
     self,
@@ -258,6 +259,7 @@ def persist_revision_artifacts(
     finally:
         db_session.close()
 
+
 ###############################################################################
 def persist_revision_agent_issue_scan(
     self,
@@ -286,6 +288,7 @@ def persist_revision_agent_issue_scan(
         raise
     finally:
         db_session.close()
+
 
 ###############################################################################
 def persist_revision_entities(
@@ -488,6 +491,7 @@ def persist_revision_entities(
     finally:
         db_session.close()
 
+
 ###############################################################################
 def list_revision_artifacts_for_version(
     self,
@@ -513,6 +517,7 @@ def list_revision_artifacts_for_version(
     finally:
         db_session.close()
 
+
 ###############################################################################
 def list_revision_entities_for_version(
     self,
@@ -536,5 +541,36 @@ def list_revision_entities_for_version(
             )
         ).scalars()
         return [serialize_revision_entity_row(self, row) for row in rows]
+    finally:
+        db_session.close()
+
+
+def persist_revision_artifact(
+    self,
+    *,
+    pipeline_run_id: str,
+    revision_version_id: int,
+    artifact_key: str,
+    payload: dict[str, Any],
+    status: str = "derived",
+) -> list[dict[str, Any]]:
+    db_session = self.session_factory()
+    try:
+        row = _create_revision_artifact_row(
+            self,
+            revision_version_id=int(revision_version_id),
+            pipeline_run_id=str(pipeline_run_id),
+            artifact_kind="pipeline_artifact",
+            artifact_key=artifact_key,
+            status=status,
+            payload=payload,
+        )
+        db_session.add(row)
+        db_session.flush()
+        db_session.commit()
+        return [serialize_revision_artifact_row(self, row)]
+    except Exception:
+        db_session.rollback()
+        raise
     finally:
         db_session.close()

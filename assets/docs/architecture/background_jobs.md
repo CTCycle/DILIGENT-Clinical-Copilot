@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-07-02
+Last updated: 2026-07-10
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -100,3 +100,5 @@ If a runner does not check stop requests, cancellation is delayed.
 - The revision agent does not rewrite the clinical report, rerun DILI adjudication, or execute tools in the current implementation.
 - Tool use is represented only as proposed `tool_intents` in the persisted issue scan until a tool manifest is added.
 
+
+- `session_revision` executes planner, bounded fixed-tool calls, deterministic patching, QA, and draft finalization. The API supports cancellation and revision concurrency remains scoped by root session.

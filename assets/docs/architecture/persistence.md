@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Relational Database
 - SQLAlchemy-backed storage
@@ -25,7 +25,7 @@ Last updated: 2026-07-09
 - Patient timeline history is persisted only in clinical_session_timelines; session result payloads are not a timeline read source.
 - Timeline generation metadata stays on persisted timeline records. Generating or regenerating a timeline must not rewrite the original clinical session runtime metadata stored in the assessment payload.
 - Evidence-locked DILI artifacts are persisted inside the database-backed session result payload:
-  - 
+  -
 ormalized_document
   - xtraction_artifact
   - act_graph
@@ -63,3 +63,6 @@ app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-resee
 - Encrypted provider keys are persisted in database tables.
 - Encryption material is seeded and managed through shared security helpers.
 
+
+## Agentic revision artifacts
+Revision runs persist bounded context, plan, tool trace, draft report, QA, and finalization artifacts. Successful non-dry runs create a new `agentic_revision` session and attach it to the pre-created version shell; QA blockers persist as `qa_failed` drafts for human review.

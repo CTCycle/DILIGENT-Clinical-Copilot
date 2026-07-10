@@ -62,7 +62,7 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
             ) from exc
         return self.build_job_start_response(
             payload=payload,
-            message="Revision agent issue scan started.",
+            message="Revision agent started.",
         )
 
     # -------------------------------------------------------------------------
@@ -126,7 +126,7 @@ class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
             ) from exc
         return self.build_job_start_response(
             payload=payload,
-            message="Revision agent issue scan retry started.",
+            message="Revision agent retry started.",
         )
 
     # -------------------------------------------------------------------------

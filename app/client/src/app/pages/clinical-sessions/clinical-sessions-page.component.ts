@@ -12,21 +12,29 @@ import {
 } from '@lucide/angular';
 
 import {
+  cancelSessionRevisionJob,
   deleteInspectionSession,
   fetchClinicalSessionDetail,
+  fetchRevisionArtifacts,
+  fetchRevisionPipelineSteps,
   fetchInspectionSessionTimelineList,
   fetchInspectionLiverToxCatalog,
   fetchInspectionRxNavCatalog,
   fetchInspectionSessions,
   generateInspectionSessionTimeline,
   manualEditClinicalSessionReport,
+  startSessionRevisionJob,
+  fetchSessionRevisionJobStatus,
   updateClinicalSession,
+  updateRevisionClinicalReview,
 } from '../../core/services/inspection-api';
 import {
   ClinicalSessionDetail,
   InspectionSessionItem,
   InspectionSessionStatus,
   InspectionSessionTimelinePreview,
+  RevisionArtifact,
+  RevisionPipelineStep,
 } from '../../core/models/types';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { formatErrorMessage, formatUnknownError } from '../../core/utils';
@@ -143,6 +151,14 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly timelineListError = signal<string | null>(null);
   readonly timelineModelName = signal('');
   readonly timelineModelSource = signal<'local' | 'cloud'>('local');
+  readonly revisionInstruction = signal('');
+  readonly revisionStatus = signal('');
+  readonly revisionRunning = signal(false);
+  readonly revisionJobId = signal<string | null>(null);
+  readonly revisionVersionId = signal<number | null>(null);
+  readonly revisionSteps = signal<RevisionPipelineStep[]>([]);
+  readonly revisionArtifacts = signal<RevisionArtifact[]>([]);
+  private revisionPollCancelled = false;
 
   ngOnInit(): void {
     void this.loadSessions();
@@ -415,6 +431,70 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.metadataText.set(value);
   }
 
+  updateRevisionInstruction(value: string): void {
+    this.revisionInstruction.set(value);
+  }
+
+  async startRevision(): Promise<void> {
+    const detail = this.selected();
+    if (!detail || this.revisionRunning()) return;
+    this.revisionRunning.set(true);
+    this.revisionStatus.set('Starting revision agent...');
+    this.revisionPollCancelled = false;
+    try {
+      const started = await startSessionRevisionJob(detail.session_id, {
+        revision_instruction: this.revisionInstruction().trim() || null,
+        model_overrides: { cloud_model: 'gpt-4.1-mini', use_cloud_services: true },
+      });
+      this.revisionJobId.set(started.job_id);
+      await this.pollRevision(detail.session_id, started.job_id);
+    } catch (error) {
+      this.revisionStatus.set(formatUnknownError(error, 'Failed to start revision agent.'));
+      this.revisionRunning.set(false);
+    }
+  }
+
+  async cancelRevision(): Promise<void> {
+    const jobId = this.revisionJobId();
+    if (!jobId) return;
+    await cancelSessionRevisionJob(jobId);
+    this.revisionPollCancelled = true;
+    this.revisionRunning.set(false);
+    this.revisionStatus.set('Cancellation requested.');
+  }
+
+  async recordRevisionReview(status: 'approved' | 'rejected'): Promise<void> {
+    const detail = this.selected();
+    const versionId = this.revisionVersionId();
+    if (!detail || versionId === null) return;
+    try {
+      await updateRevisionClinicalReview(detail.session_id, versionId, {
+        clinical_review_status: status,
+        reviewed_by: this.manualEditEditedBy().trim() || null,
+        reviewer_note: this.revisionInstruction().trim() || null,
+      });
+      this.revisionStatus.set(`Draft ${status} by human reviewer.`);
+    } catch (error) {
+      this.revisionStatus.set(formatUnknownError(error, 'Failed to record clinical review.'));
+    }
+  }
+  private async pollRevision(sessionId: number, jobId: string): Promise<void> {
+    while (!this.revisionPollCancelled) {
+      const status = await fetchSessionRevisionJobStatus(jobId);
+      const result = status.result;
+      this.revisionStatus.set(status.status === 'running' ? 'Revision agent is working...' : status.status);
+      if (typeof result?.revision_version_id === 'number') this.revisionVersionId.set(result.revision_version_id);
+      if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
+        this.revisionRunning.set(false);
+        const pipelineRunId = typeof result?.pipeline_run_id === 'string' ? result.pipeline_run_id : null;
+        const versionId = this.revisionVersionId();
+        if (pipelineRunId) this.revisionSteps.set((await fetchRevisionPipelineSteps(pipelineRunId)).items);
+        if (versionId) this.revisionArtifacts.set((await fetchRevisionArtifacts(sessionId, versionId)).items);
+        return;
+      }
+      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 1000));
+    }
+  }
   updateManualEditReviewerNote(value: string): void {
     this.manualEditReviewerNote.set(value);
   }

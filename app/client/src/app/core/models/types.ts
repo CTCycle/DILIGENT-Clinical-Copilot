@@ -488,3 +488,55 @@ export type InspectionRagVectorStoreSummary = {
 
 
 
+
+export type SessionRevisionRequest = {
+  selected_text?: string | null;
+  revision_instruction?: string | null;
+  model_overrides?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  max_tasks?: number;
+  max_tool_iterations?: number;
+  allowed_tools?: string[] | null;
+  revision_goal?: "full_report_revision" | "selected_text_revision" | "metadata_review";
+  dry_run?: boolean;
+};
+
+export type RevisionJobResult = Record<string, unknown> & {
+  pipeline_run_id?: string;
+  revision_version_id?: number;
+  revised_session_id?: number | null;
+  revision_status?: string;
+  task_count?: number;
+  tool_call_count?: number;
+  blocking_issue_count?: number;
+  manual_review_required?: boolean;
+};
+
+export type RevisionJobStatusResponse = JobStatusResponse<RevisionJobResult>;
+
+export type RevisionPipelineStep = {
+  step_name: string;
+  step_index: number;
+  step_count: number;
+  status: string;
+  output_summary?: Record<string, unknown> | null;
+  output_payload?: Record<string, unknown> | null;
+  error?: Record<string, unknown> | null;
+};
+
+export type RevisionPipelineStepListResponse = { items: RevisionPipelineStep[] };
+
+export type RevisionArtifact = {
+  artifact_key: string | null;
+  status: string | null;
+  payload: Record<string, unknown> | null;
+};
+
+export type RevisionArtifactListResponse = { items: RevisionArtifact[] };
+
+export type RevisionClinicalReviewUpdateRequest = {
+  clinical_review_status: "approved" | "rejected";
+  reviewer_note?: string | null;
+  reviewed_by?: string | null;
+  metadata?: Record<string, unknown>;
+};

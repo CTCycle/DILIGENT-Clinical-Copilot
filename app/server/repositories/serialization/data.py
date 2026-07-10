@@ -28,9 +28,9 @@ from repositories.serialization import (
     session_revision_steps,
 )
 
+
 ###############################################################################
 class DataSerializer:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -816,3 +816,12 @@ class DataSerializer:
     # -------------------------------------------------------------------------
     def first_alias_model_term_type(self, aliases: list[DrugAlias]) -> str | None:
         return evidence_aliases.first_alias_model_term_type(self, aliases)
+
+    def persist_revision_artifact(self, **kwargs: Any) -> list[dict[str, Any]]:
+        return session_revision_artifacts.persist_revision_artifact(self, **kwargs)
+
+    def finalize_revision_version(self, **kwargs: Any) -> dict[str, Any] | None:
+        return session_revision_data.finalize_revision_version(self, **kwargs)
+
+    def persist_revision_entities(self, **kwargs: Any) -> list[dict[str, Any]]:
+        return session_revision_artifacts.persist_revision_entities(self, **kwargs)
