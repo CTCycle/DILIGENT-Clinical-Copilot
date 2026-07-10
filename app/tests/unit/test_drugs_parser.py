@@ -4,7 +4,8 @@ import asyncio
 from typing import Any
 
 from domain.clinical import DrugEntry, PatientDrugs
-from services.clinical.parser import DrugsParser, LocalDrugEntryDraft, LocalPatientDrugs
+from domain.clinical.extractor_contracts import LocalDrugEntryDraft, LocalPatientDrugs
+from services.clinical.parser import DrugsParser
 
 ###############################################################################
 class RecordingCorpusStructuredClient:

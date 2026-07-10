@@ -9,6 +9,9 @@ DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (
 ![DILIGENT flow schema](assets/figures/diligent-flow.png)
 _Conceptual flow from case intake through guided DILI analysis, session recording, and review._
 
+![DILIGENT Clinical Copilot overview](assets/figures/clinical-copilot-overview.png)
+_DILIGENT Clinical Copilot overview._
+
 ## 2. Quick Start
 
 ### 2.1 Windows (Recommended)

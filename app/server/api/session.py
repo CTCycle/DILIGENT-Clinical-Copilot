@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, HTTPException, Response, status
+from fastapi import APIRouter, Body, Response, status
 
 from domain.clinical.entities import (
     ClinicalSectionTemplateResponse,
@@ -16,7 +16,7 @@ from domain.jobs import (
 from services.clinical.template import get_clinical_section_template
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
-from services.session.validation import validate_clinical_session_request
+from api.session_validation import validate_clinical_session_request
 from services.session.session_service import ClinicalSessionService
 
 router = APIRouter(tags=["session"])
@@ -34,12 +34,7 @@ class ClinicalSessionEndpoint:
         self,
         request_payload: ClinicalSessionRequest = Body(...),
     ) -> JobStartResponse:
-        errors = validate_clinical_session_request(request_payload)
-        if errors:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=errors,
-            )
+        validate_clinical_session_request(request_payload)
         return self.service.start_clinical_job(request_payload)
 
     # -------------------------------------------------------------------------

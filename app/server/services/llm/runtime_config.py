@@ -141,6 +141,12 @@ class LLMRuntimeConfig:
     def _coerce_optional_float(value: object) -> float | None:
         if value is None:
             return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        try:
+            return float(str(value).strip())
+        except ValueError:
+            return None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -148,14 +154,8 @@ class LLMRuntimeConfig:
         if value is None:
             return None
         try:
-            return max(0, int(value))
+            return max(0, int(str(value).strip()))
         except (TypeError, ValueError):
-            return None
-        if isinstance(value, (int, float)):
-            return float(value)
-        try:
-            return float(str(value).strip())
-        except ValueError:
             return None
 
     # -------------------------------------------------------------------------
