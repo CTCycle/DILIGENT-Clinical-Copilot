@@ -22,6 +22,7 @@ from domain.clinical import (
     PatientLabTimeline,
     RucamComponentAssessment,
 )
+from services.clinical.drug_analysis import DrugAnalysisService
 from services.clinical.analysis_runner import AnalysisRunner
 from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
@@ -130,14 +131,14 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
     consultation.analysis_retry_attempts = 2
 
     result = asyncio.run(
-        consultation.request_drug_analysis(
+        DrugAnalysisService(consultation).request_drug_analysis(
             drug_name="Acetaminophen",
             canonical_name="acetaminophen",
             origins=["therapy"],
             extraction_metadata=[],
             livertox_status="matched",
             excerpt="Acetaminophen can cause dose-related liver injury.",
-            rag_documents=None,
+            rag_context=None,
             clinical_context="No additional context.",
             suspension=DrugSuspensionContext(suspended=False),
             visit_date=date(2025, 4, 14),
@@ -257,7 +258,7 @@ def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> N
     rendered = consultation.render_matched_drug_section(entry)
 
     assert "**RUCAM**: Structured RUCAM score: 6 (probable)." in rendered
-    assert "**Evidence match**: weak_alias_or_class_match" in rendered
+    assert "Local evidence match: weak_alias_or_class_match" in rendered
     assert "Drug match is not a direct canonical match." in rendered
 
 ###############################################################################

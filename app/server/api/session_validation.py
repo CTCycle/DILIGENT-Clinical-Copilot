@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+from fastapi import HTTPException, status
+
 
 from domain.clinical.entities import ClinicalSessionRequest
 
@@ -13,7 +15,7 @@ def count_words(text: str) -> int:
 ###############################################################################
 def validate_clinical_session_request(
     request: ClinicalSessionRequest,
-) -> list[dict[str, str]]:
+) -> None:
     details: list[dict[str, str]] = []
 
     clinical_input = (request.clinical_input or "").strip()
@@ -44,4 +46,8 @@ def validate_clinical_session_request(
             }
         )
 
-    return details
+    if details:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=details,
+        )

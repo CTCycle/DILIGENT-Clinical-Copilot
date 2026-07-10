@@ -167,10 +167,11 @@ class ModelConfigSerializer:
                     updated_at=now,
                 )
             if ollama_seed is not UNSET:
+                normalized_ollama_seed = self.normalize_optional_seed(ollama_seed)
                 self.upsert_runtime_setting(
                     db_session=db_session,
                     key=self.OLLAMA_SEED_KEY,
-                    value="" if ollama_seed is None else str(int(ollama_seed)),
+                    value="" if normalized_ollama_seed is None else str(normalized_ollama_seed),
                     updated_at=now,
                 )
             if rag_settings is not UNSET:
@@ -409,3 +410,13 @@ class ModelConfigSerializer:
             return None
         normalized = str(value).strip()
         return normalized or None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_optional_seed(value: object) -> int | None:
+        if value is None:
+            return None
+        try:
+            return max(0, int(str(value).strip()))
+        except (TypeError, ValueError):
+            return None
