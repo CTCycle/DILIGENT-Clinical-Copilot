@@ -23,3 +23,8 @@ def test_progress_messages_cover_ordered_events() -> None:
     ]
     for event in ordered:
         assert event in CLINICAL_PROGRESS_MESSAGES
+
+    assert "vector retrieval disabled" in CLINICAL_PROGRESS_MESSAGES[
+        "livertox_lookup.no_rag"
+    ]
+    assert "vector evidence" in CLINICAL_PROGRESS_MESSAGES["livertox_lookup.rag"]

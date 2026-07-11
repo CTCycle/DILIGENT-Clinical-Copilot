@@ -12,11 +12,13 @@ from domain.clinical import (
     PatientLabTimeline,
 )
 from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
+from services.clinical.dili_pattern import DiliPatternEngine
 from services.clinical.validation import (
     build_validation_bundle,
     ensure_required_sections,
     ensure_timed_therapy_drug,
 )
+
 
 ###############################################################################
 def test_missing_anamnesis_raises_localized_error() -> None:
@@ -26,6 +28,7 @@ def test_missing_anamnesis_raises_localized_error() -> None:
         ensure_required_sections(payload, bundle=bundle)
     assert any(issue.code == "missing_anamnesis" for issue in exc_info.value.issues)
 
+
 ###############################################################################
 def test_missing_visit_date_raises_localized_error() -> None:
     payload = PatientData(anamnesis="History", drugs="Drug A")
@@ -34,6 +37,7 @@ def test_missing_visit_date_raises_localized_error() -> None:
         ensure_required_sections(payload, bundle=bundle)
     assert any(issue.code == "missing_visit_date" for issue in exc_info.value.issues)
 
+
 ###############################################################################
 def test_missing_timed_drug_raises_error() -> None:
     drugs = PatientDrugs(entries=[DrugEntry(name="Drug A", source="therapy")])
@@ -41,6 +45,7 @@ def test_missing_timed_drug_raises_error() -> None:
     with pytest.raises(ClinicalPipelineValidationError) as exc_info:
         ensure_timed_therapy_drug(drugs, bundle=bundle)
     assert any(issue.code == "missing_timed_drug" for issue in exc_info.value.issues)
+
 
 ###############################################################################
 def test_drug_schedule_counts_as_timing_information() -> None:
@@ -57,6 +62,7 @@ def test_drug_schedule_counts_as_timing_information() -> None:
     bundle = build_validation_bundle("en")
     ensure_timed_therapy_drug(drugs, bundle=bundle)
 
+
 ###############################################################################
 def test_insufficient_pattern_labs_raise_blocker() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
@@ -66,6 +72,7 @@ def test_insufficient_pattern_labs_raise_blocker() -> None:
     assert any(
         issue.code == "missing_hepatotoxicity_inputs" for issue in assessment.issues
     )
+
 
 ###############################################################################
 def test_non_critical_missing_data_does_not_block() -> None:
@@ -110,3 +117,90 @@ def test_non_critical_missing_data_does_not_block() -> None:
         )
     )
     assert assessment.status == "ok"
+
+
+###############################################################################
+def test_case_a_peak_pair_is_the_injury_anchor() -> None:
+    entries: list[ClinicalLabEntry] = []
+    for sample_date, alt, alp in (
+        ("2026-01-04", 22, 82),
+        ("2026-01-28", 800, 160),
+        ("2026-02-04", 420, 145),
+        ("2026-02-18", 95, 118),
+    ):
+        entries.extend(
+            [
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=alt,
+                    upper_limit_normal=40,
+                    sample_date=sample_date,
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALP",
+                    value=alp,
+                    upper_limit_normal=120,
+                    sample_date=sample_date,
+                    source="laboratory_analysis",
+                ),
+            ]
+        )
+
+    assessment = HepatotoxicityPatternAnalyzer().assess_payload(
+        PatientLabTimeline(entries=entries)
+    )
+
+    assert assessment.score.r_score == pytest.approx(15.0)
+    assert assessment.score.classification == "hepatocellular"
+
+    structured_patterns = DiliPatternEngine().assess(
+        PatientLabTimeline(entries=entries)
+    )
+    assert structured_patterns[0].assessment_point == "peak"
+    assert structured_patterns[0].r_ratio == pytest.approx(15.0)
+    assert structured_patterns[0].pattern == "hepatocellular"
+    assert structured_patterns[1].assessment_point == "first_qualifying"
+
+
+###############################################################################
+def test_primary_injury_anchor_uses_marker_multiples_across_varying_ulns() -> None:
+    timeline = PatientLabTimeline(
+        entries=[
+            ClinicalLabEntry(
+                marker_name="ALT",
+                value=180,
+                upper_limit_normal=30,
+                sample_date="2026-04-01",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALP",
+                value=240,
+                upper_limit_normal=120,
+                sample_date="2026-04-01",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALT",
+                value=280,
+                upper_limit_normal=70,
+                sample_date="2026-04-08",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALP",
+                value=120,
+                upper_limit_normal=120,
+                sample_date="2026-04-08",
+                source="laboratory_analysis",
+            ),
+        ]
+    )
+
+    score = HepatotoxicityPatternAnalyzer().assess_payload(timeline).score
+
+    # 180 is numerically lower than 280, but 180/30 is the higher ALT multiple.
+    assert score.alt_multiple == pytest.approx(6.0)
+    assert score.r_score == pytest.approx(3.0)
+    assert score.classification == "mixed"

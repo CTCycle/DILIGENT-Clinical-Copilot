@@ -129,4 +129,8 @@ class DiliPatternEngine:
         first.assessment_point = "first_qualifying"
         peak_payload = peak.model_copy(deep=True)
         peak_payload.assessment_point = "peak"
-        return [first, peak_payload]
+        # Consumers treat the first pattern as the clinical injury phenotype.
+        # Put the peak ALT assessment first so a normal baseline cannot become
+        # the primary DILI classification; retain the chronological first pair
+        # as the secondary audit point.
+        return [peak_payload, first]

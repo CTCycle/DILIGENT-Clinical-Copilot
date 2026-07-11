@@ -227,6 +227,12 @@ class CloudLLMClient:
         if supports_sampling and options and "top_p" in options:
             kwargs["top_p"] = float(options["top_p"])
         if format == "json":
+            json_instruction = "Return the response as one valid JSON object."
+            kwargs["instructions"] = (
+                f"{instructions}\n\n{json_instruction}"
+                if instructions
+                else json_instruction
+            )
             kwargs["text"] = {"format": {"type": "json_object"}}
         response = await self.openai_client.responses.create(**kwargs)
         return self._normalize_content(self._extract_openai_output_text(response))

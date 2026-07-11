@@ -459,6 +459,7 @@ async def process_single_patient_workflow(
         issues=issues,
         progress_callback=progress_callback,
         stop_check=stop_check,
+        use_rag=payload.use_rag,
     )
     match_audit_issues: list[PipelineIssue] = []
     if prepared_inputs is not None and hasattr(service, "build_match_audit_issues"):

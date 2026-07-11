@@ -260,6 +260,8 @@ export class DiliAgentPageComponent implements OnDestroy {
         });
         return;
       }
+      this.ragReadinessDialog.set(null);
+      this.pendingRagPayload = null;
 
       const reviewWarnings = this.collectReviewRequiredWarnings(preflight.non_blocking_issues);
       if (reviewWarnings.length && !this.preflightReviewAcknowledged()) {
