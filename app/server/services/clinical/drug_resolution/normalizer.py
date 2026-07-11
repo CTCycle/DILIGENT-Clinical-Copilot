@@ -24,6 +24,7 @@ _AGE_SEX_PROSE_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 class DrugMentionNormalizer:
     """Normalize extracted drug entries and split regimen components once."""

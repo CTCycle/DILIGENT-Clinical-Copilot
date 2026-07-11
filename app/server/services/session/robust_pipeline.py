@@ -94,6 +94,7 @@ FACT_REPORT_LABELS = {
     },
 }
 
+
 ###############################################################################
 def build_extraction_artifact(
     *,
@@ -186,6 +187,7 @@ def build_extraction_artifact(
         extraction_issues=issues,
     )
 
+
 ###############################################################################
 def build_fact_graph(
     *,
@@ -265,6 +267,7 @@ def build_fact_graph(
         )
     return FactGraph(nodes=nodes)
 
+
 ###############################################################################
 def validate_fact_graph(fact_graph: FactGraph) -> FactGraphValidation:
     hard_issues: list[dict[str, Any]] = []
@@ -287,6 +290,7 @@ def validate_fact_graph(fact_graph: FactGraph) -> FactGraphValidation:
                 }
             )
     return FactGraphValidation(hard_issues=hard_issues, soft_issues=soft_issues)
+
 
 ###############################################################################
 def render_fact_graph_report(
@@ -364,10 +368,12 @@ def render_fact_graph_report(
     )
     return "\n".join(lines).strip(), metadata
 
+
 ###############################################################################
 def _fact_report_labels(report_language: str) -> dict[str, str]:
     language_key = resolve_supported_language_code(report_language)
     return FACT_REPORT_LABELS.get(language_key, FACT_REPORT_LABELS["en"])
+
 
 ###############################################################################
 def audit_report(
@@ -444,6 +450,7 @@ def audit_report(
         discrepancy_report=structured_comparison,
     )
 
+
 ###############################################################################
 def build_run_bundle_index(
     *, run_id: str, session_id: int | None = None
@@ -463,6 +470,7 @@ def build_run_bundle_index(
         },
     )
 
+
 ###############################################################################
 def _extraction_confidence(
     section_extraction: ClinicalSectionExtractionResult | None,
@@ -470,6 +478,7 @@ def _extraction_confidence(
     if section_extraction is None:
         return 0.6
     return max(0.0, min(1.0, float(section_extraction.confidence)))
+
 
 ###############################################################################
 def _section_from_text(
@@ -489,6 +498,7 @@ def _section_from_text(
         missing=not bool(stripped),
         issues=[] if stripped else ["section_missing"],
     )
+
 
 ###############################################################################
 def _find_semantic_section(
@@ -512,6 +522,7 @@ def _find_semantic_section(
         confidence=0.0,
         issues=["section_missing"],
     )
+
 
 ###############################################################################
 def _span_for_text(*, key: str, text: str, source_text: str) -> SourceSpan | None:
@@ -540,6 +551,7 @@ def _span_for_text(*, key: str, text: str, source_text: str) -> SourceSpan | Non
         end_char=max(0, start + len(text)),
         text=text[:5000],
     )
+
 
 ###############################################################################
 def _extract_timed_drugs(payload: PatientData) -> list[TimedDrugMention]:
@@ -582,6 +594,7 @@ def _extract_timed_drugs(payload: PatientData) -> list[TimedDrugMention]:
             )
     return mentions
 
+
 ###############################################################################
 def _guess_drug_name(line: str) -> str | None:
     cleaned = re.sub(r"^[\-*•\d.)\s]+", "", line).strip()
@@ -604,6 +617,7 @@ def _guess_drug_name(line: str) -> str | None:
         return None
     return " ".join(words[:4])
 
+
 ###############################################################################
 def _drug_node(
     entry: DrugEntry,
@@ -620,6 +634,7 @@ def _drug_node(
         origin="source_verbatim",
     )
 
+
 ###############################################################################
 def _section_spans(
     extraction_artifact: ExtractionArtifact,
@@ -630,6 +645,7 @@ def _section_spans(
         return []
     return section.source_spans
 
+
 ###############################################################################
 def _summarize_value(value: dict[str, Any]) -> str:
     for key in ("text", "classification", "outcome", "causality", "drug_name", "name"):
@@ -637,6 +653,7 @@ def _summarize_value(value: dict[str, Any]) -> str:
         if item:
             return str(item)
     return ", ".join(f"{key}: {item}" for key, item in list(value.items())[:3])
+
 
 ###############################################################################
 def _render_discrepancy_report(
@@ -660,6 +677,7 @@ def _render_discrepancy_report(
             for issue in non_blocking_issues
         )
     return "\n".join(lines).strip()
+
 
 ###############################################################################
 def _build_structured_report_comparison(
@@ -735,6 +753,7 @@ def _build_structured_report_comparison(
         "manual_review": "yes" if manual_review_required else "no",
     }
     return json.dumps(payload, ensure_ascii=False)
+
 
 ###############################################################################
 def _is_therapy_contaminated(text: str) -> bool:

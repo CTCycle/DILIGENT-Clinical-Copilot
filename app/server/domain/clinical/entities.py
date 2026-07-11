@@ -21,6 +21,7 @@ Comparator = Literal["<=", "<", ">=", ">"]
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 MAX_LAB_TEXT_LENGTH = 20000
 
+
 ###############################################################################
 class PatientData(BaseModel):
     """
@@ -102,7 +103,7 @@ class PatientData(BaseModel):
             day = int(str(value.get("day", "")).strip())
             month = int(str(value.get("month", "")).strip())
             year = int(str(value.get("year", "")).strip())
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         try:
             return date(year, month, day)
@@ -140,6 +141,7 @@ class PatientData(BaseModel):
     @model_validator(mode="after")
     def require_sections(self) -> "PatientData":
         return self
+
 
 ###############################################################################
 class ClinicalSessionRequest(BaseModel):
@@ -203,10 +205,12 @@ class ClinicalSessionRequest(BaseModel):
                 normalized.append(cleaned)
         return normalized
 
+
 ###############################################################################
 class ClinicalSectionTemplateResponse(BaseModel):
     headings: dict[str, list[str]] = Field(default_factory=dict)
     template: str = Field(..., min_length=1)
+
 
 ###############################################################################
 class ClinicalSectionLineRange(BaseModel):
@@ -220,6 +224,7 @@ class ClinicalSectionLineRange(BaseModel):
             raise ValueError("start_line must be less than or equal to end_line")
         return self
 
+
 ###############################################################################
 class LlmClinicalSectionLineRangeDraft(BaseModel):
     start_line: int = Field(..., ge=1)
@@ -232,6 +237,7 @@ class LlmClinicalSectionLineRangeDraft(BaseModel):
             raise ValueError("start_line must be less than or equal to end_line")
         return self
 
+
 ###############################################################################
 class LlmClinicalSectionExtractionDraft(BaseModel):
     anamnesis: list[LlmClinicalSectionLineRangeDraft] = Field(default_factory=list)
@@ -240,6 +246,7 @@ class LlmClinicalSectionExtractionDraft(BaseModel):
         default_factory=list
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
 
 ###############################################################################
 class ClinicalSectionExtractionResult(BaseModel):
@@ -265,6 +272,7 @@ class ClinicalSectionExtractionResult(BaseModel):
             if value is not None and not value.strip():
                 raise ValueError("section text fields cannot be blank strings")
         return self
+
 
 ###############################################################################
 class DrugEntry(BaseModel):
@@ -359,7 +367,7 @@ class DrugEntry(BaseModel):
                 continue
             try:
                 cleaned.append(float(slot))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
         if not cleaned:
             return []
@@ -367,6 +375,7 @@ class DrugEntry(BaseModel):
             return cleaned[:4]
         cleaned.extend([0.0] * (4 - len(cleaned)))
         return cleaned
+
 
 ###############################################################################
 class PipelineIssue(BaseModel):
@@ -377,9 +386,9 @@ class PipelineIssue(BaseModel):
     line_index: int | None = Field(default=None, ge=0)
     raw_line: str | None = Field(default=None, max_length=5000)
 
+
 ###############################################################################
 class ClinicalPipelineValidationError(Exception):
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -392,11 +401,13 @@ class ClinicalPipelineValidationError(Exception):
         )
         super().__init__(first_line)
 
+
 ###############################################################################
 class PatientDrugs(BaseModel):
     """Container for parsed drug entries."""
 
     entries: list[DrugEntry] = Field(default_factory=list)
+
 
 ###############################################################################
 class DiseaseContextEntry(BaseModel):
@@ -441,9 +452,11 @@ class DiseaseContextEntry(BaseModel):
         stripped = str(value).strip()
         return stripped or None
 
+
 ###############################################################################
 class PatientDiseaseContext(BaseModel):
     entries: list[DiseaseContextEntry] = Field(default_factory=list)
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -452,12 +465,14 @@ class DeterministicDrugExtractionResult:
     unresolved_lines: list[str]
     regimen_lines: list[str]
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class DeterministicDiseaseExtractionResult:
     context: PatientDiseaseContext
     matched_lines: list[str]
     unresolved_lines: list[str]
+
 
 ###############################################################################
 class ClinicalLabEntry(BaseModel):
@@ -492,9 +507,11 @@ class ClinicalLabEntry(BaseModel):
         stripped = str(value).strip()
         return stripped or None
 
+
 ###############################################################################
 class PatientLabTimeline(BaseModel):
     entries: list[ClinicalLabEntry] = Field(default_factory=list)
+
 
 ###############################################################################
 class LiverInjuryOnsetContext(BaseModel):
@@ -515,6 +532,7 @@ class LiverInjuryOnsetContext(BaseModel):
             return None
         stripped = str(value).strip()
         return stripped or None
+
 
 ###############################################################################
 class RucamComponentAssessment(BaseModel):
@@ -541,6 +559,7 @@ class RucamComponentAssessment(BaseModel):
             return None
         stripped = str(value).strip()
         return stripped or None
+
 
 ###############################################################################
 class DrugRucamAssessment(BaseModel):
@@ -600,9 +619,11 @@ class DrugRucamAssessment(BaseModel):
                 cleaned.append(text)
         return cleaned
 
+
 ###############################################################################
 class PatientRucamAssessmentBundle(BaseModel):
     entries: list[DrugRucamAssessment] = Field(default_factory=list)
+
 
 ###############################################################################
 class LiverToxMatchInfo(BaseModel):
@@ -611,6 +632,7 @@ class LiverToxMatchInfo(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0)
     reason: str = Field(..., min_length=1, max_length=50)
     notes: list[str] = Field(default_factory=list)
+
 
 ###############################################################################
 class LiverToxBatchMatchItem(BaseModel):
@@ -630,15 +652,18 @@ class LiverToxBatchMatchItem(BaseModel):
             raise ValueError("drug_name cannot be empty")
         return cleaned
 
+
 ###############################################################################
 class LiverToxBatchMatchSuggestion(BaseModel):
     matches: list[LiverToxBatchMatchItem] = Field(default_factory=list)
+
 
 ###############################################################################
 class LiverToxMatchSuggestion(BaseModel):
     match_name: str | None = Field(default=None, max_length=200)
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     rationale: str | None = Field(default=None, max_length=500)
+
 
 ###############################################################################
 class HepatotoxicityPatternScore(BaseModel):
@@ -664,11 +689,13 @@ class HepatotoxicityPatternScore(BaseModel):
         description="DILI pattern classification derived from the R ratio.",
     )
 
+
 ###############################################################################
 class HepatotoxicityPatternAssessment(BaseModel):
     score: HepatotoxicityPatternScore
     status: Literal["ok", "undetermined_due_to_missing_labs"] = "ok"
     issues: list[PipelineIssue] = Field(default_factory=list)
+
 
 ###############################################################################
 class DrugToxicityFindings(BaseModel):
@@ -690,6 +717,7 @@ class DrugToxicityFindings(BaseModel):
             if key not in unique:
                 unique[key] = normalized
         return list(unique.values())
+
 
 ###############################################################################
 class DrugHepatotoxicityAnalysis(BaseModel):
@@ -717,9 +745,11 @@ class DrugHepatotoxicityAnalysis(BaseModel):
             raise ValueError("Either analysis or error must be provided for each drug.")
         return self
 
+
 ###############################################################################
 class PatientDrugToxicityBundle(BaseModel):
     entries: list[DrugHepatotoxicityAnalysis] = Field(default_factory=list)
+
 
 ###############################################################################
 class DrugSuspensionContext(BaseModel):
@@ -752,6 +782,7 @@ class DrugSuspensionContext(BaseModel):
         description="Human-readable summary of the therapy start timing.",
     )
 
+
 ###############################################################################
 def create_drug_suspension_context() -> DrugSuspensionContext:
     return DrugSuspensionContext(
@@ -766,25 +797,35 @@ def create_drug_suspension_context() -> DrugSuspensionContext:
         start_note=None,
     )
 
+
 ###############################################################################
 class RagDocumentReference(BaseModel):
     file_name: str = Field(..., min_length=1, max_length=500)
     page_start: int | None = Field(default=None, ge=1)
     page_end: int | None = Field(default=None, ge=1)
+    line_start: int | None = Field(default=None, ge=1)
+    line_end: int | None = Field(default=None, ge=1)
     document_title: str | None = Field(default=None, max_length=500)
     section_title: str | None = Field(default=None, max_length=500)
     chunk_id: str | None = Field(default=None, max_length=500)
 
     # -------------------------------------------------------------------------
     @model_validator(mode="after")
-    def normalize_page_range(self) -> "RagDocumentReference":
+    def validate_location_ranges(self) -> "RagDocumentReference":
         if (
             self.page_start is not None
             and self.page_end is not None
             and self.page_end < self.page_start
         ):
-            self.page_end = self.page_start
+            raise ValueError("page_end cannot precede page_start")
+        if (
+            self.line_start is not None
+            and self.line_end is not None
+            and self.line_end < self.line_start
+        ):
+            raise ValueError("line_end cannot precede line_start")
         return self
+
 
 ###############################################################################
 class DrugClinicalAssessment(BaseModel):
@@ -820,6 +861,7 @@ class DrugClinicalAssessment(BaseModel):
             return None
         stripped = str(value).strip()
         return stripped or None
+
 
 ###############################################################################
 class PatientDrugClinicalReport(BaseModel):

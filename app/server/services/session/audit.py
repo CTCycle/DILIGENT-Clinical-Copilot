@@ -5,10 +5,12 @@ from typing import Any
 
 from domain.clinical.entities import PipelineIssue
 
+
 ###############################################################################
 def build_source_hash(text: str) -> str:
     normalized = (text or "").replace("\r\n", "\n").replace("\r", "\n")
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
 
 ###############################################################################
 def validate_span(text: str, start: int, end: int, expected: str) -> bool:
@@ -16,17 +18,21 @@ def validate_span(text: str, start: int, end: int, expected: str) -> bool:
         return False
     return text[start:end] == expected
 
+
 ###############################################################################
 def build_section_audit_record(**kwargs: Any) -> dict[str, Any]:
     return dict(kwargs)
+
 
 ###############################################################################
 def build_extraction_decision_record(**kwargs: Any) -> dict[str, Any]:
     return dict(kwargs)
 
+
 ###############################################################################
 def build_tool_call_record(**kwargs: Any) -> dict[str, Any]:
     return dict(kwargs)
+
 
 ###############################################################################
 def append_pipeline_issue(

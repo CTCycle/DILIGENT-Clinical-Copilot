@@ -26,6 +26,7 @@ from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.report_language import phrase, resolve_report_language
 from services.text.normalization import normalize_drug_query_name
 
+
 ###############################################################################
 def _compile_terms_regex(category: str) -> re.Pattern[str]:
     values = get_reference_catalog_snapshot().values(
@@ -68,9 +69,9 @@ RucamCausalityCategory = Literal[
     "not assessable",
 ]
 
+
 ###############################################################################
 class RucamScoreEstimator:
-
     # -------------------------------------------------------------------------
     def resolve_provided_rucam_score(
         self,

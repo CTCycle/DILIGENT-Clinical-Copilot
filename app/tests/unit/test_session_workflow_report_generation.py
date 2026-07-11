@@ -24,9 +24,9 @@ from services.clinical.report_finalizer import ReportFinalizer
 from services.session.session_service import ClinicalSessionService
 from services.session.workflow_shared import ClinicalPersistenceError
 
+
 ###############################################################################
 class FakePatternAnalyzer:
-
     # -------------------------------------------------------------------------
     def stringify_scores(
         self, pattern_score: HepatotoxicityPatternScore
@@ -37,6 +37,7 @@ class FakePatternAnalyzer:
             else "Not available"
         }
 
+
 ###############################################################################
 class FakeDrugsParser:
     model = "test-parser"
@@ -45,9 +46,9 @@ class FakeDrugsParser:
     def clean_text(self, text: str) -> str:
         return text
 
+
 ###############################################################################
 class FakeSerializer:
-
     # -------------------------------------------------------------------------
     def save_clinical_session(self, payload: dict[str, Any]) -> int | None:
         self.saved_payload = payload
@@ -59,6 +60,7 @@ class FakeSerializer:
     ) -> None:
         self.upserted_session_id = session_id
         self.upserted_payload = payload
+
 
 ###############################################################################
 class FakeClinicalService:
@@ -197,6 +199,7 @@ class FakeClinicalService:
                 serialized.append(dict(issue))
         return serialized
 
+
 ###############################################################################
 def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
     payload = PatientData(
@@ -219,9 +222,10 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
     )
 
     assert result["final_report"].startswith("## DILI adjudication summary")
-    assert "Relazione narrativa con discussione farmacologica e sintesi finale." in result[
-        "final_report"
-    ]
+    assert (
+        "Relazione narrativa con discussione farmacologica e sintesi finale."
+        in result["final_report"]
+    )
     assert not result["final_report"].startswith("# Structured DILI causality dossier")
     assert "## DILI adjudication summary" in result["final_report"]
     assert result["pipeline_artifacts"]["structured_dili_report"].startswith(
@@ -253,7 +257,18 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
         result["extraction_metadata"]["rucam"]["source"]
         == "not_calculated_insufficient_data"
     )
-    assert result["pipeline_artifacts"]["rag_reference_audit"] == {
+    audit = result["pipeline_artifacts"]["rag_reference_audit"]
+    assert {
+        key: audit[key]
+        for key in (
+            "rag_retrieval_enabled",
+            "rag_query_keys",
+            "retrieved_references_by_drug",
+            "retrieved_reference_count",
+            "llm_clinical_summary_has_bibliography",
+            "final_report_has_bibliography",
+        )
+    } == {
         "rag_retrieval_enabled": False,
         "rag_query_keys": [],
         "retrieved_references_by_drug": {},
@@ -262,12 +277,12 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
         "final_report_has_bibliography": False,
     }
 
+
 ###############################################################################
-def test_workflow_restores_rag_bibliography_from_consultation_references() -> None:
+def test_workflow_does_not_recreate_bibliography_outside_report_finalizer() -> None:
 
     ###############################################################################
     class FakeRagClinicalService(FakeClinicalService):
-
         # -------------------------------------------------------------------------
         def build_rag_query(self, **kwargs: Any) -> dict[str, str]:
             _ = kwargs
@@ -276,9 +291,7 @@ def test_workflow_restores_rag_bibliography_from_consultation_references() -> No
             }
 
         # -------------------------------------------------------------------------
-        async def run_consultation(
-            self, **kwargs: Any
-        ) -> tuple[SimpleNamespace, str]:
+        async def run_consultation(self, **kwargs: Any) -> tuple[SimpleNamespace, str]:
             _ = kwargs
             clinical_session = SimpleNamespace(
                 llm_model="gpt-4.1-mini",
@@ -323,27 +336,30 @@ def test_workflow_restores_rag_bibliography_from_consultation_references() -> No
         ),
     )
 
-    assert "## Bibliografia" in result["final_report"]
-    assert "- paracetamol-dili.pdf, pp. 4-5" in result["final_report"]
-    assert "## Bibliografia" in result["llm_clinical_summary"]
+    assert "## Bibliografia" not in result["final_report"]
+    assert "## Bibliografia" not in result["llm_clinical_summary"]
     audit = result["pipeline_artifacts"]["rag_reference_audit"]
     assert audit["rag_retrieval_enabled"] is True
     assert audit["rag_query_keys"] == ["Paracetamolo"]
     assert audit["retrieved_reference_count"] == 1
-    assert audit["llm_clinical_summary_has_bibliography"] is True
-    assert audit["final_report_has_bibliography"] is True
+    assert audit["llm_clinical_summary_has_bibliography"] is False
+    assert audit["final_report_has_bibliography"] is False
+    assert audit["contract_valid"] is False
     assert audit["retrieved_references_by_drug"] == {
         "Paracetamolo": [
             {
                 "file_name": "paracetamol-dili.pdf",
                 "page_start": 4,
                 "page_end": 5,
+                "line_start": None,
+                "line_end": None,
                 "document_title": None,
                 "section_title": None,
                 "chunk_id": None,
             }
         ]
     }
+
 
 ###############################################################################
 def test_workflow_fails_when_persistence_returns_no_session_id() -> None:
@@ -368,6 +384,7 @@ def test_workflow_fails_when_persistence_returns_no_session_id() -> None:
                 report_mode="faithful_only",
             ),
         )
+
 
 ###############################################################################
 def test_failed_session_payload_omits_raw_clinical_text_and_base64_image() -> None:
@@ -401,6 +418,7 @@ def test_failed_session_payload_omits_raw_clinical_text_and_base64_image() -> No
         "laboratory_analysis": len(payload.laboratory_analysis or ""),
     }
 
+
 ###############################################################################
 def test_runtime_timeout_respects_provider_cap(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -415,6 +433,7 @@ def test_runtime_timeout_respects_provider_cap(monkeypatch) -> None:
     )
 
     assert timeout == 30.0
+
 
 ###############################################################################
 def test_workflow_marks_blocking_faithfulness_result_as_failed(

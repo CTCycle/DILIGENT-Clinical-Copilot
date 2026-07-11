@@ -7,13 +7,14 @@ import hashlib
 import json
 from typing import Literal
 
-from common.catalogs.model_choices import get_cloud_model_choices
 from configurations.startup import get_server_settings
 from domain.model_configs import ModelConfigSnapshot
 from domain.settings.configuration import LLMRuntimeDefaults
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
+from services.llm.provider_registry import provider_registry
+
 
 ###############################################################################
 class LLMRuntimeConfig:
@@ -31,19 +32,21 @@ class LLMRuntimeConfig:
     @staticmethod
     def _normalize_provider(value: str | None, fallback: str) -> str:
         normalized = (value or "").strip().lower()
-        return normalized if normalized in get_cloud_model_choices() else fallback
+        try:
+            return provider_registry.get(normalized).provider_id
+        except ValueError:
+            return ""
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _normalize_cloud_model(provider: str, value: str | None, fallback: str) -> str:
-        allowed = get_cloud_model_choices().get(provider, [])
         normalized = (value or "").strip()
-        if normalized and normalized in allowed:
+        if (
+            normalized
+            and provider
+            and provider_registry.is_valid_model(provider, normalized)
+        ):
             return normalized
-        if fallback in allowed:
-            return fallback
-        if allowed:
-            return allowed[0]
         return ""
 
     # -------------------------------------------------------------------------
@@ -155,7 +158,7 @@ class LLMRuntimeConfig:
             return None
         try:
             return max(0, int(str(value).strip()))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------
@@ -175,10 +178,7 @@ class LLMRuntimeConfig:
     @classmethod
     @contextmanager
     def override_for_run(cls, overrides: dict[str, object] | None):
-        normalized = {
-            str(key): value
-            for key, value in (overrides or {}).items()
-        }
+        normalized = {str(key): value for key, value in (overrides or {}).items()}
         token: Token[dict[str, object] | None] | None = None
         if normalized:
             current = cls._runtime_override.get() or {}
@@ -252,7 +252,9 @@ class LLMRuntimeConfig:
             "clinical_provider": clinical_provider,
             "clinical_model_resolved": clinical_model,
         }
-        canonical = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        canonical = json.dumps(
+            snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
         return snapshot, hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     # -------------------------------------------------------------------------
@@ -283,8 +285,5 @@ class LLMRuntimeConfig:
         if snapshot.use_cloud_models:
             provider = (snapshot.cloud_provider or "").strip()
             cloud_model = (snapshot.cloud_model or "").strip()
-            cloud_models = set(get_cloud_model_choices().get(provider, []))
-            if local_model in cloud_models:
-                return provider, local_model
             return provider, cloud_model
         return "ollama", local_model

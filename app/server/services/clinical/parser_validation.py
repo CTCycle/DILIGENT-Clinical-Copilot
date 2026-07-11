@@ -5,6 +5,7 @@ from typing import Any
 
 from services.catalogs.runtime import get_reference_catalog_snapshot
 
+
 ###############################################################################
 @lru_cache(maxsize=1)
 def _get_parser_validation_data() -> dict[str, Any]:
@@ -37,6 +38,7 @@ def _get_parser_validation_data() -> dict[str, Any]:
             snapshot.values("clinical_extraction", "drug_line_prefixes")
         ),
     }
+
 
 ###############################################################################
 def __getattr__(name: str) -> Any:

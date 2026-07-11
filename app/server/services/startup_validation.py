@@ -6,6 +6,7 @@ from domain.settings.configuration import ServerSettings
 from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.llm.model_config import ModelConfigService
 
+
 ###############################################################################
 def run_startup_validations(settings: ServerSettings | None = None) -> None:
     resolved_settings = settings or get_server_settings()

@@ -30,6 +30,8 @@ from repositories.serialization.access_key_encryption import (
 from repositories.serialization.catalogs import (
     ReferenceCatalogSerializer,
 )
+from repositories.serialization.model_configs import ModelConfigSerializer
+
 
 ###############################################################################
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
@@ -43,6 +45,7 @@ def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | i
             connect_args["sslrootcert"] = settings.ssl_ca
     return connect_args
 
+
 ###############################################################################
 def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
     port = settings.port or 5432
@@ -54,6 +57,7 @@ def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
         f"{engine_name}://{safe_username}:{safe_password}"
         f"@{settings.host}:{port}/{safe_database_name}"
     )
+
 
 ###############################################################################
 def clone_settings_with_database(
@@ -76,6 +80,7 @@ def clone_settings_with_database(
         select_page_size=settings.select_page_size,
     )
 
+
 ###############################################################################
 def build_postgres_create_database_sql(
     database_name: str,
@@ -84,6 +89,7 @@ def build_postgres_create_database_sql(
     return sqlalchemy.text(
         f"CREATE DATABASE \"{safe_database_name}\" WITH ENCODING 'UTF8' TEMPLATE template0"
     )
+
 
 ###############################################################################
 def _seed_catalogs(
@@ -131,6 +137,7 @@ def _seed_catalogs(
         entries_written=entries_written,
     )
 
+
 ###############################################################################
 def initialize_sqlite_database(
     settings: DatabaseSettings,
@@ -167,6 +174,7 @@ def initialize_sqlite_database(
         )
         catalog_provider.invalidate()
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
+
 
 ###############################################################################
 def ensure_postgres_database(
@@ -244,6 +252,7 @@ def ensure_postgres_database(
 
     return target_database
 
+
 ###############################################################################
 def run_database_initialization(
     *,
@@ -282,6 +291,7 @@ def run_database_initialization(
     else:
         ensure_postgres_database(settings, **init_kwargs)
 
+
 ###############################################################################
 def initialize_database(
     drop_existing: bool = False,
@@ -294,6 +304,7 @@ def initialize_database(
             seed_catalogs=seed_catalogs,
             force_reseed_catalogs=force_reseed_catalogs,
         )
+        ModelConfigSerializer().migrate_cloud_selection_clean_break()
     except (SQLAlchemyError, ValueError) as exc:
         logger.error("Database initialization failed: %s", exc)
         raise SystemExit(1) from exc

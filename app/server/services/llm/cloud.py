@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import asyncio
 import json
-from typing import Any, Literal
+from typing import Any
 
 import httpx
 from google import genai
@@ -21,20 +21,30 @@ from services.llm.structured import (
     T,
     parse_json_object_strict,
 )
+from domain.llm.providers import CloudProviderId
+from services.llm.provider_registry import provider_registry
+from services.llm.transports.anthropic_messages import AnthropicMessagesTransport
+from services.llm.transports.base import ChatRequest, CloudTransport
+from services.llm.transports.openai_chat import OpenAIChatTransport
+from services.llm.transports.routed_gateway import RoutedGatewayTransport
 
-ProviderName = Literal["openai", "gemini"]
+ProviderName = CloudProviderId
+
 
 ###############################################################################
 class LLMError(RuntimeError):
     pass
 
+
 ###############################################################################
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
 
+
 ###############################################################################
 def short_output_hash(output_text: str) -> str:
     return hashlib.sha256((output_text or "").encode("utf-8")).hexdigest()[:12]
+
 
 ###############################################################################
 class CloudLLMClient:
@@ -64,6 +74,7 @@ class CloudLLMClient:
         self.provider_access_key = provider_access_key
         self.openai_client: AsyncOpenAI | None = None
         self.gemini_client: Any | None = None
+        self.transport: CloudTransport | None = None
 
         if provider == "openai":
             if not provider_access_key:
@@ -93,6 +104,38 @@ class CloudLLMClient:
                 "x-goog-api-key": provider_access_key,
             }
             self.gemini_client = genai.Client(api_key=provider_access_key)
+        elif provider == "deepseek":
+            if not provider_access_key:
+                raise LLMError("No active DeepSeek access key configured")
+            self.base_url = (base_url or "https://api.deepseek.com").rstrip("/")
+            headers = {"Authorization": f"Bearer {provider_access_key}"}
+            self.transport = OpenAIChatTransport(
+                api_key=provider_access_key,
+                base_url=self.base_url,
+                timeout=self.timeout_s,
+            )
+        elif provider == "anthropic":
+            if not provider_access_key:
+                raise LLMError("No active Anthropic access key configured")
+            self.base_url = (base_url or "https://api.anthropic.com").rstrip("/")
+            headers = {"x-api-key": provider_access_key}
+            self.transport = AnthropicMessagesTransport(
+                api_key=provider_access_key,
+                base_url=self.base_url,
+                timeout=self.timeout_s,
+            )
+        elif provider in {"opencode_zen", "opencode_go"}:
+            if not provider_access_key:
+                raise LLMError("No active OpenCode access key configured")
+            definition = provider_registry.get(provider)
+            self.base_url = (base_url or "https://opencode.ai").rstrip("/")
+            headers = {"Authorization": f"Bearer {provider_access_key}"}
+            self.transport = RoutedGatewayTransport(
+                api_key=provider_access_key,
+                base_url=self.base_url,
+                models_path=definition.models_endpoint or "",
+                timeout=self.timeout_s,
+            )
         else:
             raise LLMError(f"Unknown provider: {provider}")
 
@@ -111,14 +154,12 @@ class CloudLLMClient:
 
     # -------------------------------------------------------------------------
     def resolve_provider_access_key(self, provider: ProviderName) -> str | None:
-        if provider not in {"openai", "gemini"}:
-            return None
-
+        credential_scope = provider_registry.get(provider).credential_scope
         access_key_serializer = AccessKeySerializer()
         try:
-            return access_key_serializer.get_active_key_value(provider)
+            return access_key_serializer.get_active_key_value(credential_scope)
         except Exception as exc:  # noqa: BLE001
-            provider_label = "OpenAI" if provider == "openai" else "Gemini"
+            provider_label = provider_registry.get(provider).display_name
             raise LLMError(
                 f"Failed to load active {provider_label} access key"
             ) from exc
@@ -127,6 +168,8 @@ class CloudLLMClient:
     async def close(self) -> None:
         if self.openai_client is not None:
             await self.openai_client.close()
+        if self.transport is not None:
+            await self.transport.close()
         await self.client.aclose()
 
     # -------------------------------------------------------------------------
@@ -139,6 +182,8 @@ class CloudLLMClient:
 
     # -------------------------------------------------------------------------
     async def list_models(self) -> list[str]:
+        if self.transport is not None:
+            return [item.id for item in await self.transport.list_models()]
         if self.provider == "openai":
             try:
                 resp = await self.client.get("/models")
@@ -187,6 +232,16 @@ class CloudLLMClient:
             raise LLMError("Model is required")
 
         try:
+            if self.transport is not None:
+                result = await self.transport.chat(
+                    ChatRequest(
+                        model=resolved_model,
+                        messages=messages,
+                        options=options_payload,
+                        json_mode=format == "json",
+                    )
+                )
+                return self._normalize_content(result.content)
             if self.provider == "openai":
                 return await self._chat_openai(
                     resolved_model=resolved_model,

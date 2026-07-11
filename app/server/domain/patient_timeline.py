@@ -17,6 +17,7 @@ PatientTimelineTimingType = Literal[
     "ordering",
 ]
 
+
 ###############################################################################
 class PatientTimelineEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -81,6 +82,7 @@ class PatientTimelineEvent(BaseModel):
             normalized.append(text[:120])
         return normalized
 
+
 ###############################################################################
 class PatientTimeline(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -104,10 +106,12 @@ class PatientTimeline(BaseModel):
         normalized = " ".join(str(value).split()).strip()
         return normalized or None
 
+
 ###############################################################################
 class PatientTimelineExtraction(BaseModel):
     model_config = ConfigDict(extra="forbid")
     events: list[PatientTimelineEvent] = Field(default_factory=list)
+
 
 ###############################################################################
 class SessionTimelinePreview(BaseModel):
@@ -126,10 +130,12 @@ class SessionTimelinePreview(BaseModel):
     end_date: str | None = Field(default=None, max_length=40)
     title: str | None = Field(default=None, max_length=200)
 
+
 ###############################################################################
 class SessionTimelineListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[SessionTimelinePreview] = Field(default_factory=list)
+
 
 ###############################################################################
 class SessionTimelineRegenerateRequest(BaseModel):

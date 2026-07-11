@@ -6,6 +6,7 @@ from domain.clinical.entities import DrugEntry, PatientDrugs
 from domain.clinical.extras import CandidateSelectionResult
 from services.text.normalization import normalize_drug_query_name
 
+
 ###############################################################################
 def _score_drug(entry: DrugEntry, visit_date: date | None) -> int:
     score = 0
@@ -28,6 +29,7 @@ def _score_drug(entry: DrugEntry, visit_date: date | None) -> int:
         return min(score - 8, -1)
     return score
 
+
 ###############################################################################
 def _parse_therapy_date(value: str | None) -> date | None:
     if not value:
@@ -41,6 +43,7 @@ def _parse_therapy_date(value: str | None) -> date | None:
         except ValueError:
             continue
     return None
+
 
 ###############################################################################
 def select_relevant_candidates(
@@ -91,6 +94,7 @@ def select_relevant_candidates(
         unresolved=unresolved,
         ordered_analysis_drugs=PatientDrugs(entries=selected_entries),
     )
+
 
 ###############################################################################
 def _deduplicate_candidates(

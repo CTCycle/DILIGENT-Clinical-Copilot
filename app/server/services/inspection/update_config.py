@@ -15,6 +15,7 @@ from services.text.vocabulary import (
     upsert_text_normalization_term_payload,
 )
 
+
 ###############################################################################
 class InspectionUpdateConfigMixin:
     RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"
@@ -32,7 +33,7 @@ class InspectionUpdateConfigMixin:
         manifest_path = self.rag_manifest_path()
         try:
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             return {}
         return payload if isinstance(payload, dict) else {}
 
