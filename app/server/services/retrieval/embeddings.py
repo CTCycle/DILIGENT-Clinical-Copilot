@@ -26,15 +26,17 @@ from services.retrieval.settings import build_effective_rag_settings
 ProviderName = Literal["openai", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]
 
+
 ###############################################################################
 class EmbeddingModelMismatchError(RuntimeError):
     pass
 
+
 ###############################################################################
 class Reranker(Protocol):
-
     # -------------------------------------------------------------------------
     def predict(self, pairs: list[tuple[str, str]]) -> list[float]: ...
+
 
 ###############################################################################
 class LocalHeuristicReranker:
@@ -174,6 +176,7 @@ class LocalHeuristicReranker:
             return 0.0
         return matches / len(query_bigrams)
 
+
 ###############################################################################
 def _map_embedding_exception(
     exc: Exception,
@@ -199,9 +202,9 @@ def _map_embedding_exception(
         return OllamaError(f"Failed to request Ollama embeddings: {exc}")
     return LLMError(f"Failed to request cloud embeddings: {exc}")
 
+
 ###############################################################################
 class CloudEmbeddingGenerator:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -276,9 +279,9 @@ class CloudEmbeddingGenerator:
             raise LLMError("Mismatch between cloud embeddings and inputs")
         return normalized
 
+
 ###############################################################################
 class OllamaEmbeddingGenerator:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -335,6 +338,7 @@ class OllamaEmbeddingGenerator:
             raise OllamaError("Mismatch between Ollama embeddings and inputs")
         return normalized
 
+
 ###############################################################################
 def select_embedding_provider(
     *,
@@ -376,9 +380,9 @@ def select_embedding_provider(
 
     raise ValueError(f"Unsupported embedding backend: {backend}")
 
+
 ###############################################################################
 class EmbeddingGenerator:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -461,9 +465,9 @@ class EmbeddingGenerator:
                 asyncio.set_event_loop(previous_loop)
         return loop.run_until_complete(coroutine)
 
+
 ###############################################################################
 class SimilaritySearch:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

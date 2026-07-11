@@ -50,9 +50,9 @@ from services.clinical.hepatox_constants import (  # noqa: E402
     STRUCTURED_DILI_SECTION_LINE_RE,
 )
 
+
 ###############################################################################
 class HepatoxConsultation:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -72,7 +72,7 @@ class HepatoxConsultation:
         self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             chat_signature = None
         self.chat_supports_temperature = (
             chat_signature is not None and "temperature" in chat_signature.parameters

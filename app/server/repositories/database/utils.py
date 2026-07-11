@@ -5,6 +5,7 @@ import re
 SQL_IDENTIFIER_RE = re.compile(r"^[A-Za-z_]\w*$", re.ASCII)
 POSTGRES_DATABASE_NAME_RE = re.compile(r"^\w[\w-]{0,62}$", re.ASCII)
 
+
 ###############################################################################
 def normalize_postgres_engine(engine: str | None) -> str:
     if not engine:
@@ -13,6 +14,7 @@ def normalize_postgres_engine(engine: str | None) -> str:
     if lowered in {"postgres", "postgresql"}:
         return "postgresql+psycopg"
     return engine
+
 
 ###############################################################################
 def validate_sql_identifier(
@@ -26,6 +28,7 @@ def validate_sql_identifier(
     if not SQL_IDENTIFIER_RE.fullmatch(normalized):
         raise ValueError(f"Invalid SQL {label}: {normalized!r}")
     return normalized
+
 
 ###############################################################################
 def validate_postgres_database_name(database_name: str) -> str:

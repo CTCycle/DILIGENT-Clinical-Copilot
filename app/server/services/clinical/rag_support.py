@@ -19,11 +19,13 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RagRetrievalBundle:
     context_text: str | None
     references: tuple[RagDocumentReference, ...]
+
 
 ###############################################################################
 class RagSupportService:
@@ -155,7 +157,9 @@ class RagSupportService:
         fragments: list[str] = []
         references: list[RagDocumentReference] = []
         excluded_count = 0
-        seen_references: set[tuple[str, int | None, int | None]] = set()
+        seen_references: set[
+            tuple[str, int | None, int | None, int | None, int | None]
+        ] = set()
         for index, record in enumerate(results, start=1):
             if not self.is_context_eligible(record):
                 excluded_count += 1
@@ -170,6 +174,8 @@ class RagSupportService:
                 reference.file_name.casefold(),
                 reference.page_start,
                 reference.page_end,
+                reference.line_start,
+                reference.line_end,
             )
             if dedupe_key in seen_references:
                 continue
@@ -198,7 +204,10 @@ class RagSupportService:
     def record_low_relevance_issue(self, excluded_count: int) -> None:
         if not hasattr(self.consultation, "pipeline_issues"):
             self.consultation.pipeline_issues = []
-        if any(issue.code == "rag_low_relevance_excluded" for issue in self.consultation.pipeline_issues):
+        if any(
+            issue.code == "rag_low_relevance_excluded"
+            for issue in self.consultation.pipeline_issues
+        ):
             return
         self.consultation.pipeline_issues.append(
             PipelineIssue(
@@ -255,7 +264,7 @@ class RagSupportService:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -296,6 +305,12 @@ class RagSupportService:
             metadata_dict.get("page_start")
         )
         page_end = RagSupportService._coerce_page_number(metadata_dict.get("page_end"))
+        line_start = RagSupportService._coerce_page_number(
+            record.get("line_start") or metadata_dict.get("line_start")
+        )
+        line_end = RagSupportService._coerce_page_number(
+            record.get("line_end") or metadata_dict.get("line_end")
+        )
         if page_number is not None:
             page_start = page_start or page_number
             page_end = page_end or page_number
@@ -304,6 +319,8 @@ class RagSupportService:
             file_name=file_name,
             page_start=page_start,
             page_end=page_end,
+            line_start=line_start,
+            line_end=line_end,
             document_title=RagSupportService._coerce_optional_text(
                 record.get("document_title") or metadata_dict.get("document_title")
             ),
@@ -320,7 +337,7 @@ class RagSupportService:
     def _coerce_page_number(value: Any) -> int | None:
         try:
             parsed = int(str(value).strip())
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return parsed if parsed >= 1 else None
 

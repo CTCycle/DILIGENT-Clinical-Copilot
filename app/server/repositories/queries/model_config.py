@@ -4,9 +4,9 @@ from sqlalchemy import Select, select
 
 from repositories.schemas.models import ModelSelection, RuntimeSetting
 
+
 ###############################################################################
 class ModelConfigRepositoryQueries:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def select_all() -> Select[tuple[ModelSelection]]:

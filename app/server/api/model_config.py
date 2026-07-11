@@ -7,16 +7,16 @@ from fastapi import APIRouter, Body, Query, status
 from domain.model_configs import (
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
-    OpenAIConnectivityCheckRequest,
-    OpenAIConnectivityCheckResponse,
+    ConnectivityCheckRequest,
+    ConnectivityCheckResponse,
 )
 from services.llm.model_config import ModelConfigService
 
 router = APIRouter(prefix="/model-config", tags=["model-config"])
 
+
 ###############################################################################
 class ModelConfigEndpoint:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -44,13 +44,11 @@ class ModelConfigEndpoint:
         return await self.service.update_state(payload)
 
     # -------------------------------------------------------------------------
-    async def check_openai_connectivity(
+    async def check_connectivity(
         self,
-        payload: OpenAIConnectivityCheckRequest = Body(
-            default_factory=OpenAIConnectivityCheckRequest
-        ),
-    ) -> OpenAIConnectivityCheckResponse:
-        return await self.service.check_openai_connectivity(payload)
+        payload: ConnectivityCheckRequest = Body(...),
+    ) -> ConnectivityCheckResponse:
+        return await self.service.check_connectivity(payload)
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
@@ -69,10 +67,10 @@ class ModelConfigEndpoint:
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
-            "/openai-connectivity-check",
-            self.check_openai_connectivity,
+            "/connectivity-check",
+            self.check_connectivity,
             methods=["POST"],
-            response_model=OpenAIConnectivityCheckResponse,
+            response_model=ConnectivityCheckResponse,
             status_code=status.HTTP_200_OK,
         )
 

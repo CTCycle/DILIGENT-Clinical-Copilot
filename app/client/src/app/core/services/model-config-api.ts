@@ -2,6 +2,8 @@ import { API_BASE_URL } from "../constants";
 import {
   AccessKeyProvider,
   AccessKeyRecord,
+  ConnectivityCheckRequest,
+  ConnectivityCheckResponse,
   JobStartResponse,
   JobStatusResponse,
   ModelConfigStateResponse,
@@ -38,6 +40,16 @@ export async function updateModelConfigState(
     headers: {
       "Content-Type": "application/json",
     },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function checkCloudConnectivity(
+  payload: ConnectivityCheckRequest,
+): Promise<ConnectivityCheckResponse> {
+  return requestJson<ConnectivityCheckResponse>(`${API_BASE_URL}/model-config/connectivity-check`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 }

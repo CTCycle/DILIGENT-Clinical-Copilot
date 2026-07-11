@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from common.catalogs.provider import catalog_provider
 
+
 ###############################################################################
 def get_sensitive_error_tokens() -> tuple[str, ...]:
     snapshot = catalog_provider.get_snapshot()

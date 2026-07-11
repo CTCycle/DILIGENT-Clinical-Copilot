@@ -11,6 +11,7 @@ from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.report_language import phrase, report_heading, rucam_summary_text
 from services.clinical.report_finalizer import ReportFinalizer
 
+
 ###############################################################################
 def test_report_heading_labels_exist_in_selected_language() -> None:
     assert report_heading("report_section_summary", "it")
@@ -19,6 +20,7 @@ def test_report_heading_labels_exist_in_selected_language() -> None:
     assert phrase("case_summary", "en")
     assert phrase("laboratory_history", "en")
     assert phrase("not_calculated_insufficient_data", "en")
+
 
 ###############################################################################
 def test_missing_data_labels_are_stable() -> None:
@@ -31,6 +33,7 @@ def test_missing_data_labels_are_stable() -> None:
         calculation_method="not_calculated",
     )
     assert "RUCAM" in rucam_summary_text(assessment, "en")
+
 
 ###############################################################################
 def test_deterministic_laboratory_section_rendering() -> None:
@@ -51,6 +54,7 @@ def test_deterministic_laboratory_section_rendering() -> None:
     assert "## Laboratory history" in section
     assert "ALT: 210.0 U/L" in section
 
+
 ###############################################################################
 def test_deterministic_bibliography_section_rendering() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
@@ -66,6 +70,7 @@ def test_deterministic_bibliography_section_rendering() -> None:
     )
     assert "## Bibliography" in section
     assert "Amoxicillin" in section
+
 
 ###############################################################################
 def test_rag_bibliography_section_deduplicates_and_merges_ranges() -> None:
@@ -100,8 +105,9 @@ def test_rag_bibliography_section_deduplicates_and_merges_ranges() -> None:
     assert "## Bibliography" in section
     assert "- alpha.pdf, pp. 2-4, 7" in section
 
+
 ###############################################################################
-def test_rag_bibliography_uses_page_not_available_when_missing() -> None:
+def test_rag_bibliography_uses_location_not_available_when_missing() -> None:
     finalizer = ReportFinalizer(object())
     section = finalizer.build_rag_bibliography_section(
         [
@@ -116,7 +122,8 @@ def test_rag_bibliography_uses_page_not_available_when_missing() -> None:
     )
 
     assert section is not None
-    assert "- alpha.pdf, page not available" in section
+    assert "- alpha.pdf, location not available" in section
+
 
 ###############################################################################
 def test_rag_bibliography_omits_raw_retrieved_text() -> None:
@@ -136,6 +143,7 @@ def test_rag_bibliography_omits_raw_retrieved_text() -> None:
     assert section is not None
     assert "Raw retrieved text" not in section
     assert "- alpha.pdf, p. 9" in section
+
 
 ###############################################################################
 def test_rag_bibliography_absent_when_no_references_exist() -> None:

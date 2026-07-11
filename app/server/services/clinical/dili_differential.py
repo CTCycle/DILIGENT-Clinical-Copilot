@@ -82,9 +82,9 @@ UNKNOWN_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 class DiliDifferentialEngine:
-
     # -------------------------------------------------------------------------
     def assess(self, source_text: str) -> DiliDifferentialAssessment:
         lowered = source_text.lower()

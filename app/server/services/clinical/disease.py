@@ -27,6 +27,7 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 class LocalDiseaseContextEntry(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
@@ -34,13 +35,14 @@ class LocalDiseaseContextEntry(BaseModel):
     chronic: bool | None = Field(default=None)
     hepatic_related: bool | None = Field(default=None)
 
+
 ###############################################################################
 class LocalPatientDiseaseContext(BaseModel):
     entries: list[LocalDiseaseContextEntry] = Field(default_factory=list)
 
+
 ###############################################################################
 class DiseaseExtractor:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -281,7 +283,7 @@ class DiseaseExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None

@@ -11,6 +11,7 @@ from services.text.normalization import (
     normalize_drug_query_name,
 )
 
+
 ###############################################################################
 class DrugIdentityResolver:
     """Resolve extracted labels to local, source-backed drug identity candidates."""

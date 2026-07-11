@@ -22,6 +22,7 @@ from domain.clinical.extras import HepatoxPreparedInputs
 from services.retrieval.query import DILIQueryBuilder
 from services.llm.runtime_config import LLMRuntimeConfig
 
+
 ###############################################################################
 class ClinicalSessionExtractionOwner(Protocol):
     drugs_parser: Any
@@ -45,9 +46,9 @@ class ClinicalSessionExtractionOwner(Protocol):
     build_fallback_therapy_drugs: Callable[..., PatientDrugs]
     append_knowledge_base_unavailable_issue: Callable[..., None]
 
+
 ###############################################################################
 class ClinicalSessionExtractionPipelineMixin:
-
     # -------------------------------------------------------------------------
     async def extract_therapy_drugs(
         self: ClinicalSessionExtractionOwner,
@@ -601,11 +602,7 @@ class ClinicalSessionExtractionPipelineMixin:
         stop_check: Callable[[], None] | None,
         use_rag: bool,
     ) -> HepatoxPreparedInputs | None:
-        detail = (
-            "livertox_lookup.rag"
-            if use_rag
-            else "livertox_lookup.no_rag"
-        )
+        detail = "livertox_lookup.rag" if use_rag else "livertox_lookup.no_rag"
         self.emit_progress(
             progress_callback,
             stage="livertox_lookup",
@@ -633,7 +630,9 @@ class ClinicalSessionExtractionPipelineMixin:
                     clinical_context=structured_context,
                     pattern_score=pattern_score,
                     progress_callback=livertox_progress_callback,
-                    identity_resolution_client=getattr(self.drugs_parser, "client", None),
+                    identity_resolution_client=getattr(
+                        self.drugs_parser, "client", None
+                    ),
                     identity_resolution_model=getattr(self.drugs_parser, "model", None),
                     identity_resolution_temperature=float(
                         getattr(self.drugs_parser, "temperature", 0.0)
