@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-07-09
+Last updated: 2026-07-11
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -37,6 +37,12 @@ The structured adjudication layer calculates R ratio at the first qualifying
 paired ALT/ALP date and at the peak ALT date. Boundary values follow LiverTox:
 `R >= 5` is hepatocellular, `R <= 2` is cholestatic, and values between 2 and
 5 are mixed.
+
+The paired sample at the highest ALT/ULN is the primary clinical injury anchor.
+Earlier baseline and later recovery pairs remain available as longitudinal audit
+points but cannot replace the peak injury classification merely because they
+occur first. Candidate selection compares normalized multiples, not raw values,
+so changing laboratory ULNs are handled consistently.
 
 ## Structured DILI Adjudication
 The final report is generated from a persisted `DiliEvidenceBundle` before any
@@ -121,6 +127,11 @@ Clinical preflight reports whether the configured RAG embedding backend is ready
 If Ollama is unavailable, the DILI Agent offers three explicit choices: retry after starting Ollama, run the pending assessment once without RAG, or cancel. Running without RAG does not change the saved model configuration. Job submission repeats the readiness check to prevent a stale successful preflight from starting a RAG-enabled job after the dependency becomes unavailable.
 
 If retrieval becomes unavailable after a job starts, the report continues safely without supporting RAG documents and records one aggregated pipeline warning listing the affected drugs.`r`n`r`nWhen RAG is enabled, retrieved text is used only as hidden model context. The final report bibliography lists compact references to retrieved documents by filename and page number only.
+
+LiverTox input preparation is bounded for cloud and local providers. A timeout
+produces an explicit pipeline warning and safe evidence-free continuation instead
+of leaving the job indefinitely in Step 12. Progress text distinguishes
+LiverTox-only preparation from RAG/vector-enabled retrieval.
 
 Default Ollama embedding configuration must use an immutable model tag rather
 than `:latest`, and vector collection reset is opt-in rather than enabled by

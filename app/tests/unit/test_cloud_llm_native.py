@@ -92,6 +92,41 @@ def test_cloud_llm_native_openai_chat_uses_responses_api_and_normalizes_text(
     assert captured["top_p"] == 0.8
 
 ###############################################################################
+def test_openai_json_mode_includes_json_instruction(monkeypatch) -> None:
+    captured: dict[str, Any] = {}
+
+    class FakeResponses:
+        async def create(self, **kwargs: Any) -> FakeOpenAIResponse:
+            captured.update(kwargs)
+            return FakeOpenAIResponse(output_text='{"value": 7}')
+
+    class FakeAsyncOpenAI:
+        def __init__(self, **kwargs: Any) -> None:
+            _ = kwargs
+            self.responses = FakeResponses()
+
+        async def close(self) -> None:
+            pass
+
+    patch_access_key(monkeypatch)
+    monkeypatch.setattr(cloud_module, "AsyncOpenAI", FakeAsyncOpenAI)
+    client = cloud_module.CloudLLMClient(
+        provider="openai", default_model="gpt-4.1-mini"
+    )
+
+    result = asyncio.run(
+        client.chat(
+            model="gpt-4.1-mini",
+            messages=[{"role": "user", "content": "Return the value."}],
+            format="json",
+        )
+    )
+
+    assert result == {"value": 7}
+    assert "json" in captured["instructions"].casefold()
+    assert captured["text"] == {"format": {"type": "json_object"}}
+
+###############################################################################
 def test_cloud_llm_native_openai_gpt5_chat_omits_sampling_options(monkeypatch) -> None:
     captured: dict[str, Any] = {}
 

@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 from common.utils.logger import logger
+from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
     HepatotoxicityPatternAssessment,
@@ -19,6 +20,7 @@ from domain.clinical.entities import (
 )
 from domain.clinical.extras import HepatoxPreparedInputs
 from services.retrieval.query import DILIQueryBuilder
+from services.llm.runtime_config import LLMRuntimeConfig
 
 ###############################################################################
 class ClinicalSessionExtractionOwner(Protocol):
@@ -597,29 +599,71 @@ class ClinicalSessionExtractionPipelineMixin:
         issues: list[PipelineIssue],
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
+        use_rag: bool,
     ) -> HepatoxPreparedInputs | None:
-        self.emit_progress(progress_callback, stage="livertox_lookup", value=82.0)
-        livertox_progress_callback = self.build_stage_progress_callback(
+        detail = (
+            "livertox_lookup.rag"
+            if use_rag
+            else "livertox_lookup.no_rag"
+        )
+        self.emit_progress(
             progress_callback,
             stage="livertox_lookup",
+            value=82.0,
+            detail=detail,
+        )
+        livertox_progress_callback = self.build_stage_progress_callback(
+            progress_callback,
+            stage=detail,
             start_value=82.0,
             end_value=88.0,
         )
-        prepared_inputs = await self.input_preparator.prepare_inputs(
-            all_detected_drugs,
-            clinical_context=structured_context,
-            pattern_score=pattern_score,
-            progress_callback=livertox_progress_callback,
-            identity_resolution_client=getattr(self.drugs_parser, "client", None),
-            identity_resolution_model=getattr(self.drugs_parser, "model", None),
-            identity_resolution_temperature=float(
-                getattr(self.drugs_parser, "temperature", 0.0)
-            ),
+        runtime = get_server_settings().runtime
+        lookup_timeout_s = min(
+            float(runtime.livertox_llm_timeout),
+            float(runtime.cloud_llm_timeout_cap)
+            if LLMRuntimeConfig.is_cloud_enabled()
+            else float(runtime.local_llm_timeout_cap),
+            120.0,
         )
+        try:
+            prepared_inputs = await asyncio.wait_for(
+                self.input_preparator.prepare_inputs(
+                    all_detected_drugs,
+                    clinical_context=structured_context,
+                    pattern_score=pattern_score,
+                    progress_callback=livertox_progress_callback,
+                    identity_resolution_client=getattr(self.drugs_parser, "client", None),
+                    identity_resolution_model=getattr(self.drugs_parser, "model", None),
+                    identity_resolution_temperature=float(
+                        getattr(self.drugs_parser, "temperature", 0.0)
+                    ),
+                ),
+                timeout=max(float(runtime.minimum_llm_timeout), lookup_timeout_s),
+            )
+        except TimeoutError:
+            logger.warning(
+                "LiverTox input preparation timed out after %.1f seconds; continuing without prepared evidence",
+                lookup_timeout_s,
+            )
+            self.append_warning_issue(
+                issues,
+                code="livertox_lookup_timeout",
+                message=(
+                    "LiverTox evidence preparation timed out; the analysis continued "
+                    "without prepared LiverTox evidence."
+                ),
+            )
+            prepared_inputs = None
         self.run_stop_check(stop_check)
         if prepared_inputs is None and all_detected_drugs.entries:
             self.append_knowledge_base_unavailable_issue(issues)
-        self.emit_progress(progress_callback, stage="livertox_lookup", value=88.0)
+        self.emit_progress(
+            progress_callback,
+            stage="livertox_lookup",
+            value=88.0,
+            detail=detail,
+        )
         return prepared_inputs
 
     # -------------------------------------------------------------------------

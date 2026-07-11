@@ -127,11 +127,20 @@ class HepatotoxicityPatternAnalyzer:
         self, lab_timeline: PatientLabTimeline
     ) -> dict[str, float] | None:
         dated_candidates = self.group_entries_by_date(lab_timeline.entries)
-        for sample_date in sorted(dated_candidates):
-            bucket = dated_candidates[sample_date]
-            pair = self.build_anchor_from_bucket(bucket)
-            if pair is not None:
-                return pair
+        dated_pairs = [
+            pair
+            for sample_date in sorted(dated_candidates)
+            if (pair := self.build_anchor_from_bucket(dated_candidates[sample_date]))
+            is not None
+        ]
+        if dated_pairs:
+            # The clinical injury anchor is the paired ALT/ALP sample at the
+            # peak ALT multiple, not an earlier normal baseline or a later
+            # recovering sample.
+            return max(
+                dated_pairs,
+                key=lambda pair: pair["alt_value"] / pair["alt_uln"],
+            )
         undated = self.build_anchor_from_bucket(lab_timeline.entries)
         return undated
 
