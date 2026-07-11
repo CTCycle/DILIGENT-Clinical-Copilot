@@ -16,9 +16,9 @@ from services.clinical.dili_timeline import DiliTimelineEngine
 LOW_CONFIDENCE_LIVERTOX = {"", "U", "E", "E*", "X", "UNKNOWN"}
 DIRECT_TOXIN_LIVERTOX = {"T", "T*"}
 
+
 ###############################################################################
 class DiliCausalityEngine:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def rucam(

@@ -14,6 +14,7 @@ from configurations.startup import get_server_settings
 from domain.rxnav import RxNormCandidate
 from services.text.vocabulary import get_text_normalization_snapshot
 
+
 ###############################################################################
 async def run_with_semaphore(
     semaphore: asyncio.Semaphore,
@@ -21,6 +22,7 @@ async def run_with_semaphore(
 ):
     async with semaphore:
         return await task_factory()
+
 
 ###############################################################################
 class RxNavClient:

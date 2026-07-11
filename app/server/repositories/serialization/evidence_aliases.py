@@ -15,6 +15,7 @@ from repositories.schemas.models import (
 from repositories.serialization.evidence_data import normalize_drug_name
 from common.utils.text_utils import parse_synonym_list, split_synonym_variants
 
+
 ###############################################################################
 def resolve_drug_id(
     self,
@@ -39,6 +40,7 @@ def resolve_drug_id(
     if alias is None:
         return None
     return int(alias.drug_id)
+
 
 ###############################################################################
 def ensure_drug(
@@ -99,6 +101,7 @@ def ensure_drug(
         candidate.rxnav_last_update = normalized_rxnav_last_update
     return candidate
 
+
 ###############################################################################
 def assign_identifier_if_consistent(
     self,
@@ -117,6 +120,7 @@ def assign_identifier_if_consistent(
         )
     if current_value is None:
         setattr(drug, field_name, incoming_value)
+
 
 ###############################################################################
 def upsert_drug_rxcui(
@@ -143,6 +147,7 @@ def upsert_drug_rxcui(
             f"(rxcui='{normalized_rxcui}', existing_drug_id={int(existing.drug_id)}, incoming_drug_id={drug_id})"
         )
 
+
 ###############################################################################
 def get_drug_by_rxcui(
     self,
@@ -157,6 +162,7 @@ def get_drug_by_rxcui(
         .scalars()
         .first()
     )
+
 
 ###############################################################################
 def get_drug_by_canonical_name_norm(
@@ -174,6 +180,7 @@ def get_drug_by_canonical_name_norm(
         .first()
     )
 
+
 ###############################################################################
 def get_drug_alias_by_norm(
     self,
@@ -188,6 +195,7 @@ def get_drug_alias_by_norm(
         .first()
     )
 
+
 ###############################################################################
 def get_monograph_by_drug_id(
     self,
@@ -200,6 +208,7 @@ def get_monograph_by_drug_id(
         .first()
     )
 
+
 ###############################################################################
 def get_monograph_by_key(
     self,
@@ -211,6 +220,7 @@ def get_monograph_by_key(
         .scalars()
         .first()
     )
+
 
 ###############################################################################
 def upsert_drug_alias(
@@ -256,6 +266,7 @@ def upsert_drug_alias(
     if existing.term_type is None and term_type is not None:
         existing.term_type = term_type
 
+
 ###############################################################################
 def persist_livertox_aliases(
     self, db_session: Session, drug_id: int, row: dict[str, Any]
@@ -288,6 +299,7 @@ def persist_livertox_aliases(
             term_type=None,
         )
 
+
 ###############################################################################
 def extract_text_candidates(self, value: Any) -> list[str]:
     if value is None:
@@ -304,12 +316,14 @@ def extract_text_candidates(self, value: Any) -> list[str]:
     collected.extend(split_synonym_variants(text_value))
     return self.unique_text(collected)
 
+
 ###############################################################################
 def extract_synonym_candidates(self, value: Any) -> list[str]:
     collected: list[str] = []
     for item in parse_synonym_list(value):
         collected.extend(split_synonym_variants(item))
     return self.unique_text(collected)
+
 
 ###############################################################################
 def unique_text(self, values: list[str]) -> list[str]:
@@ -322,6 +336,7 @@ def unique_text(self, values: list[str]) -> list[str]:
         if key not in unique:
             unique[key] = normalized
     return list(unique.values())
+
 
 ###############################################################################
 def build_alias_lookup_by_kind(
@@ -341,6 +356,7 @@ def build_alias_lookup_by_kind(
         values.add(alias)
     return lookup
 
+
 ###############################################################################
 def group_aliases_by_kind(self, aliases: list[DrugAlias]) -> dict[str, set[str]]:
     grouped: dict[str, set[str]] = {}
@@ -351,6 +367,7 @@ def group_aliases_by_kind(self, aliases: list[DrugAlias]) -> dict[str, set[str]]
             continue
         grouped.setdefault(alias_kind.casefold(), set()).add(alias_value)
     return grouped
+
 
 ###############################################################################
 def alias_values_for_kind(self, aliases: pd.DataFrame, alias_kind: str) -> set[str]:
@@ -365,6 +382,7 @@ def alias_values_for_kind(self, aliases: pd.DataFrame, alias_kind: str) -> set[s
         if normalized is not None:
             values.add(normalized)
     return values
+
 
 ###############################################################################
 def alias_model_values_for_kind(
@@ -383,10 +401,12 @@ def alias_model_values_for_kind(
             values.add(normalized)
     return values
 
+
 ###############################################################################
 def first_alias_value(self, aliases: pd.DataFrame, alias_kind: str) -> str | None:
     values = sorted(self.alias_values_for_kind(aliases, alias_kind), key=str.casefold)
     return values[0] if values else None
+
 
 ###############################################################################
 def first_alias_term_type(self, aliases: pd.DataFrame) -> str | None:
@@ -398,6 +418,7 @@ def first_alias_term_type(self, aliases: pd.DataFrame) -> str | None:
             return normalized
     return None
 
+
 ###############################################################################
 def first_alias_model_value(
     self,
@@ -408,6 +429,7 @@ def first_alias_model_value(
         self.alias_model_values_for_kind(aliases, alias_kind), key=str.casefold
     )
     return values[0] if values else None
+
 
 ###############################################################################
 def first_alias_model_term_type(self, aliases: list[DrugAlias]) -> str | None:

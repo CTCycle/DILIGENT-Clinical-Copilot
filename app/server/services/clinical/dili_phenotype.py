@@ -4,9 +4,9 @@ import re
 
 from domain.clinical.dili import DiliInjuryPattern, DiliPhenotypeAssessment
 
+
 ###############################################################################
 class DiliPhenotypeClassifier:
-
     # -------------------------------------------------------------------------
     def assess(
         self, patterns: list[DiliInjuryPattern], source_text: str

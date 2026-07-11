@@ -7,8 +7,10 @@ from configurations.startup import get_server_settings
 from services.llm.cloud import CloudLLMClient, LLMError
 from services.llm.ollama_client import OllamaClient
 
-ProviderName = Literal["openai", "gemini"]
+from services.llm.provider_registry import provider_registry
+
 RuntimePurpose = Literal["clinical", "parser"]
+
 
 ###############################################################################
 def select_llm_provider(
@@ -26,11 +28,14 @@ def select_llm_provider(
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
         )
-    if p in ("openai", "gemini"):
+    try:
+        provider = provider_registry.get(p).provider_id
+    except ValueError:
+        provider = None
+    if provider is not None:
         runtime_timeout = get_server_settings().runtime.default_llm_timeout
-        cloud_provider: ProviderName = "openai" if p == "openai" else "gemini"
         return CloudLLMClient(
-            provider=cloud_provider,
+            provider=provider,
             base_url=kwargs.get("base_url"),
             timeout_s=kwargs.get("timeout_s", runtime_timeout),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
@@ -39,6 +44,7 @@ def select_llm_provider(
             max_retries=kwargs.get("max_retries", 2),
         )
     raise LLMError(f"Unknown or unsupported provider: {provider}")
+
 
 ###############################################################################
 def initialize_llm_client(

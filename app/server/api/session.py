@@ -21,9 +21,9 @@ from services.session.session_service import ClinicalSessionService
 
 router = APIRouter(tags=["session"])
 
+
 ###############################################################################
 class ClinicalSessionEndpoint:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, router: APIRouter, service: ClinicalSessionService) -> None:
         self.router = router

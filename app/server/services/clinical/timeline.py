@@ -27,9 +27,9 @@ DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATE_SHORT_RE = re.compile(r"^\d{4}-\d{2}$")
 DATE_YEAR_RE = re.compile(r"^\d{4}$")
 
+
 ###############################################################################
 class PatientTimelineExtractor:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -151,9 +151,19 @@ class PatientTimelineExtractor:
             if DATE_PREFIX_RE.fullmatch(normalized_date):
                 return (0, normalized_date, event.sort_order, event.title.casefold())
             if DATE_SHORT_RE.fullmatch(normalized_date):
-                return (0, f"{normalized_date}-01", event.sort_order, event.title.casefold())
+                return (
+                    0,
+                    f"{normalized_date}-01",
+                    event.sort_order,
+                    event.title.casefold(),
+                )
             if DATE_YEAR_RE.fullmatch(normalized_date):
-                return (0, f"{normalized_date}-01-01", event.sort_order, event.title.casefold())
+                return (
+                    0,
+                    f"{normalized_date}-01-01",
+                    event.sort_order,
+                    event.title.casefold(),
+                )
         relative = (event.relative_time or "").casefold()
         return (1, relative, event.sort_order, event.title.casefold())
 

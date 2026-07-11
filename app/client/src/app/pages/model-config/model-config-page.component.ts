@@ -8,7 +8,6 @@ import {
 } from '../../components/status-message/status-message.component';
 import { AppStateService } from '../../core/state/app-state.service';
 import { formatUnknownError } from '../../core/utils';
-import { CLOUD_MODEL_CHOICES } from '../../core/constants';
 import {
   buildRuntimeSettingsFromConfig,
   resolveCloudChoices,
@@ -48,13 +47,23 @@ import {
   RagSettingsSectionKey,
 } from './model-config.types';
 
-const DEFAULT_CLOUD_PROVIDERS: readonly CloudProvider[] = ['openai', 'gemini'];
 const MODEL_BATCH_SIZE = 12;
 
 const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
   openai: 'OpenAI',
   gemini: 'Gemini',
+  deepseek: 'DeepSeek',
+  anthropic: 'Anthropic Claude',
+  opencode: 'OpenCode',
   brave: 'Brave',
+};
+const RUNTIME_PROVIDER_LABELS: Record<CloudProvider, string> = {
+  openai: 'OpenAI',
+  gemini: 'Google Gemini',
+  deepseek: 'DeepSeek',
+  anthropic: 'Anthropic Claude',
+  opencode_zen: 'OpenCode Zen',
+  opencode_go: 'OpenCode Go',
 };
 
 const DEFAULT_RAG_SETTINGS_SECTION: RagSettingsSectionKey = 'general';
@@ -87,12 +96,15 @@ const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
 };
 
 function isCloudProvider(provider: string): provider is CloudProvider {
-  return provider === 'openai' || provider === 'gemini';
+  return ['openai', 'gemini', 'deepseek', 'anthropic', 'opencode_zen', 'opencode_go'].includes(provider);
 }
 
 function resolveProviderLabel(provider: string): string {
-  if (provider === 'openai' || provider === 'gemini' || provider === 'brave') {
-    return PROVIDER_LABELS[provider];
+  if (isCloudProvider(provider)) {
+    return RUNTIME_PROVIDER_LABELS[provider];
+  }
+  if (provider in PROVIDER_LABELS) {
+    return PROVIDER_LABELS[provider as AccessKeyProvider];
   }
   return provider;
 }
@@ -121,7 +133,8 @@ export class ModelConfigPageComponent implements OnInit {
   readonly isLoading = signal(true);
   readonly isSaving = signal(false);
   readonly localModels = signal<ModelConfigStateResponse['local_models']>([]);
-  readonly cloudChoices = signal(CLOUD_MODEL_CHOICES);
+  readonly cloudChoices = signal(resolveCloudChoices(undefined));
+  readonly cloudProviders = signal<ModelConfigStateResponse['cloud_providers']>([]);
   readonly modelSearchQuery = signal('');
   readonly visibleModelLimit = signal(MODEL_BATCH_SIZE);
   readonly statusMessage = signal('');
@@ -274,13 +287,11 @@ export class ModelConfigPageComponent implements OnInit {
   });
 
   readonly cloudProviderOptions = computed<CloudProvider[]>(() => {
-    const values = Object.keys(this.cloudChoices());
-    const providers = values.filter(isCloudProvider);
-    if (providers.length) {
-      return providers;
-    }
-    return [...DEFAULT_CLOUD_PROVIDERS];
+    return this.cloudProviders().map((provider) => provider.id);
   });
+  readonly credentialProviderOptions: readonly AccessKeyProvider[] = [
+    'openai', 'gemini', 'deepseek', 'anthropic', 'opencode',
+  ];
 
   readonly missingRequiredModels = computed(() => {
     const draft = this.draftConfig();
@@ -356,6 +367,7 @@ export class ModelConfigPageComponent implements OnInit {
 
   private applyConfigToState(payload: ModelConfigStateResponse, syncDraft: boolean): void {
     this.localModels.set(payload.local_models || []);
+    this.cloudProviders.set(payload.cloud_providers || []);
     this.lastUpdatedAt.set(payload.updated_at);
     this.ragModel.set(payload.rag_model || null);
     const nextRagSettings = this.normalizeRagSettings(payload.rag_settings);
@@ -363,7 +375,9 @@ export class ModelConfigPageComponent implements OnInit {
     if (!this.ragSettingsModalOpen()) {
       this.draftRagSettings.set({ ...nextRagSettings });
     }
-    const choices = resolveCloudChoices(payload.cloud_model_choices);
+    const choices = resolveCloudChoices(Object.fromEntries(
+      (payload.cloud_providers || []).map((provider) => [provider.id, provider.models.map((model) => model.id)]),
+    ));
     this.cloudChoices.set(choices);
 
     const current = this.appState.state().diliAgent.settings;
@@ -578,11 +592,10 @@ export class ModelConfigPageComponent implements OnInit {
 
   handleProviderChange(provider: CloudProvider): void {
     const resolvedProvider = resolveProvider(provider, this.cloudChoices());
-    const cloudModel = resolveCloudModel(resolvedProvider, null, this.cloudChoices());
     this.draftConfig.update((previous) => ({
       ...previous,
       provider: resolvedProvider,
-      cloudModel,
+      cloudModel: null,
     }));
   }
 

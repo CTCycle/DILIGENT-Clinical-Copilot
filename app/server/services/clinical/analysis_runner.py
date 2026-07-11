@@ -24,6 +24,7 @@ CLAIM_EVIDENCE_TRUNCATION_MARKER = " [truncated]"
 MATCH_REASON_MAX_LENGTH = 100
 DrugAssessmentBase: TypeAlias = tuple[DrugClinicalAssessment, str, list[str]]
 
+
 ###############################################################################
 def claim_safe_evidence_quote(value: str | None) -> str | None:
     stripped = str(value).strip() if value is not None else ""
@@ -46,6 +47,7 @@ def claim_safe_evidence_quote(value: str | None) -> str | None:
         truncated = truncated[:boundary].rstrip(" .,;\n")
     return f"{truncated}{marker}"
 
+
 ###############################################################################
 def normalize_match_reason(
     value: Any,
@@ -65,6 +67,7 @@ def normalize_match_reason(
     if len(primary_reason) > MATCH_REASON_MAX_LENGTH:
         primary_reason = primary_reason[:MATCH_REASON_MAX_LENGTH].rstrip()
     return primary_reason or None, normalized_notes
+
 
 ###############################################################################
 class AnalysisRunner:
@@ -453,7 +456,7 @@ class AnalysisRunner:
         if match_confidence is not None:
             try:
                 match_confidence = float(match_confidence)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 match_confidence = None
         match_reason, match_notes = normalize_match_reason(
             livertox_data.get("match_reason"),
@@ -710,6 +713,7 @@ class AnalysisRunner:
         normalized_attempt = max(int(attempt), 1)
         return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
 
+
 ###############################################################################
 def summarize_drug_source_context(entry: DrugEntry) -> str:
     source = (
@@ -722,6 +726,7 @@ def summarize_drug_source_context(entry: DrugEntry) -> str:
     if source == "anamnesis":
         return "Historical anamnesis section entry."
     return "Source section unavailable."
+
 
 ###############################################################################
 def assess_temporal_plausibility(
@@ -736,6 +741,7 @@ def assess_temporal_plausibility(
     if entry.therapy_start_date:
         return "Therapy start is available; temporal assessment is partially supported."
     return "Temporal evidence is limited."
+
 
 ###############################################################################
 def assess_pattern_compatibility(

@@ -12,7 +12,9 @@ def test_openrouter_is_not_supported_provider() -> None:
 
 ###############################################################################
 def test_provider_descriptions_match_supported_providers() -> None:
-    assert set(get_args(ProviderName)) == {"openai", "gemini", "brave"}
+    assert set(get_args(ProviderName)) == {
+        "openai", "gemini", "deepseek", "anthropic", "opencode", "brave"
+    }
 
 ###############################################################################
 def test_access_key_openapi_schema_excludes_openrouter() -> None:

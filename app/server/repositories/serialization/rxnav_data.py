@@ -15,6 +15,7 @@ from common.constants import (
 from common.utils.text_utils import coerce_text, normalize_drug_name
 from configurations.startup import get_server_settings
 
+
 ###############################################################################
 def upsert_drugs_catalog_records(
     self,
@@ -117,11 +118,13 @@ def upsert_drugs_catalog_records(
     finally:
         db_session.close()
 
+
 ###############################################################################
 def resolve_commit_interval(self, override: int | None) -> int:
     if override is not None:
         return max(int(override), 1)
     return max(int(get_server_settings().database.insert_commit_interval), 1)
+
 
 ###############################################################################
 def prepare_rxnav_rows(
@@ -154,6 +157,7 @@ def prepare_rxnav_rows(
     prepared_rows.sort(key=self.rxnav_row_sort_key)
     return prepared_rows
 
+
 ###############################################################################
 def prepare_rxnav_row(self, row: dict[str, Any]) -> dict[str, Any] | None:
     rxcui = self.normalize_string(row.get("rxcui"))
@@ -177,6 +181,7 @@ def prepare_rxnav_row(self, row: dict[str, Any]) -> dict[str, Any] | None:
         "_term_type": self.normalize_string(row.get("term_type")),
     }
 
+
 ###############################################################################
 def rxnav_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
     return (
@@ -187,6 +192,7 @@ def rxnav_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
         self.to_sortable_text(row.get("_standard_name")),
         self.to_sortable_text(row.get("_term_type")),
     )
+
 
 ###############################################################################
 def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
@@ -218,6 +224,7 @@ def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFra
         df.drop_duplicates(subset=["nbk_id", "drug_name"], keep="first"),
     )
     return df.reset_index(drop=True)
+
 
 ###############################################################################
 def is_valid_drug_name(self, value: str) -> bool:

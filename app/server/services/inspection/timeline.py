@@ -17,6 +17,7 @@ from services.inspection.normalization import (
 )
 from services.inspection.runtime import coerce_optional_str
 
+
 ###############################################################################
 class InspectionTimelineMixin:
     serializer: Any
@@ -209,7 +210,9 @@ class InspectionTimelineMixin:
             requested_runtime_settings.setdefault(
                 "llm_provider", LLMRuntimeConfig.get_llm_provider()
             )
-            requested_runtime_settings.setdefault("cloud_model", LLMRuntimeConfig.get_cloud_model())
+            requested_runtime_settings.setdefault(
+                "cloud_model", LLMRuntimeConfig.get_cloud_model()
+            )
             requested_runtime_settings.setdefault(
                 "text_extraction_model",
                 LLMRuntimeConfig.get_text_extraction_model() or text_extraction_model,
@@ -227,7 +230,9 @@ class InspectionTimelineMixin:
             requested_runtime_settings.setdefault(
                 "ollama_reasoning", LLMRuntimeConfig.is_ollama_reasoning_enabled()
             )
-            requested_runtime_settings.setdefault("ollama_seed", LLMRuntimeConfig.get_ollama_seed())
+            requested_runtime_settings.setdefault(
+                "ollama_seed", LLMRuntimeConfig.get_ollama_seed()
+            )
 
             try:
                 with LLMRuntimeConfig.override_for_run(requested_runtime_settings):

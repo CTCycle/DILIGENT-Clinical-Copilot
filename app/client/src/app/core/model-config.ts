@@ -1,4 +1,4 @@
-import { CLOUD_MODEL_CHOICES, DEFAULT_SETTINGS } from "./constants";
+import { DEFAULT_SETTINGS } from "./constants";
 import {
   LocalModelCard,
   CloudProvider,
@@ -10,17 +10,15 @@ export type CloudModelChoices = Record<CloudProvider, string[]>;
 
 type IncomingCloudModelChoices = Partial<Record<CloudProvider, string[]>>;
 
+const CLOUD_PROVIDER_IDS: readonly CloudProvider[] = ["openai", "gemini", "deepseek", "anthropic", "opencode_zen", "opencode_go"];
 function isCloudProvider(provider: string): provider is CloudProvider {
-  return provider === "openai" || provider === "gemini";
+  return CLOUD_PROVIDER_IDS.includes(provider as CloudProvider);
 }
 
 export function resolveCloudChoices(
   cloudChoices: IncomingCloudModelChoices | null | undefined,
 ): CloudModelChoices {
-  return {
-    ...CLOUD_MODEL_CHOICES,
-    ...(cloudChoices || {}),
-  };
+  return Object.fromEntries(CLOUD_PROVIDER_IDS.map((id) => [id, cloudChoices?.[id] || []])) as CloudModelChoices;
 }
 
 export function resolveProvider(
@@ -28,11 +26,8 @@ export function resolveProvider(
   cloudChoices: CloudModelChoices,
 ): CloudProvider {
   const normalized = (provider || "").trim().toLowerCase();
-  if (isCloudProvider(normalized) && cloudChoices[normalized]) {
+  if (isCloudProvider(normalized)) {
     return normalized;
-  }
-  if (cloudChoices.openai) {
-    return "openai";
   }
   return DEFAULT_SETTINGS.provider;
 }
@@ -43,20 +38,17 @@ export function resolveCloudModel(
   cloudChoices: CloudModelChoices,
 ): string | null {
   const options = cloudChoices[provider] || [];
-  if (!options.length) {
-    return null;
-  }
   if (cloudModel && options.includes(cloudModel)) {
     return cloudModel;
   }
-  return options[0];
+  return null;
 }
 
 export function buildRuntimeSettingsFromConfig(
   payload: ModelConfigStateResponse,
   previous: RuntimeSettings,
 ): RuntimeSettings {
-  const cloudChoices = resolveCloudChoices(payload.cloud_model_choices);
+  const cloudChoices = resolveCloudChoices(Object.fromEntries(payload.cloud_providers.map((provider) => [provider.id, provider.models.map((model) => model.id)])));
   const provider = resolveProvider(payload.llm_provider ?? DEFAULT_SETTINGS.provider, cloudChoices);
   const cloudModel = resolveCloudModel(
     provider,

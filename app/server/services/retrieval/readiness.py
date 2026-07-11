@@ -10,6 +10,7 @@ from services.retrieval.settings import build_effective_rag_settings
 OLLAMA_TAGS_PATH = "/api/tags"
 OLLAMA_READINESS_TIMEOUT_SECONDS = 2.5
 
+
 ###############################################################################
 def check_rag_readiness(*, requested: bool) -> RagReadiness:
     settings = build_effective_rag_settings()

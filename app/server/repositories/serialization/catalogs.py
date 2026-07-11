@@ -13,9 +13,9 @@ from domain.catalogs import (
 )
 from repositories.schemas.models import ReferenceCatalogEntry, ReferenceCatalogSeedRun
 
+
 ###############################################################################
 class ReferenceCatalogSerializer:
-
     # -------------------------------------------------------------------------
     def __init__(self, session_factory: sessionmaker) -> None:
         self.session_factory = session_factory

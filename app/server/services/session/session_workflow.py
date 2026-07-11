@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -44,6 +45,8 @@ from services.clinical.pattern_resolution import (
     resolve_hepatic_pattern,
 )
 from services.clinical.report_language import phrase
+from services.clinical.report_finalizer import ReportFinalizer
+from services.llm.provider_registry import provider_registry
 from services.security.access_keys import AccessKeyService
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
 from services.session.document_normalizer import DocumentNormalizer
@@ -69,7 +72,8 @@ from services.session.workflow_shared import (
     resolve_rucam_source as _resolve_rucam_source,
 )
 
-_CLOUD_PROVIDERS = {"openai", "gemini"}
+_CLOUD_PROVIDERS = {item.provider_id for item in provider_registry.all()}
+
 
 ###############################################################################
 def _report_contains_rag_bibliography(
@@ -82,6 +86,7 @@ def _report_contains_rag_bibliography(
         return False
     heading = f"## {phrase('bibliography', report_language)}"
     return heading.casefold() in text.casefold()
+
 
 ###############################################################################
 def _clinical_report_entries_with_rag_references(
@@ -105,6 +110,7 @@ def _clinical_report_entries_with_rag_references(
             entries.append(entry)
     return entries
 
+
 ###############################################################################
 def _build_rag_reference_audit(
     *,
@@ -121,6 +127,38 @@ def _build_rag_reference_audit(
         references_by_drug[entry.drug_name] = [
             reference.model_dump() for reference in entry.rag_references
         ]
+    references = [reference for entry in entries for reference in entry.rag_references]
+    canonical_lines = ReportFinalizer.render_canonical_references(references)
+    report = str(final_report or "")
+    heading_pattern = (
+        r"(?im)^##\s+(?:bibliography|bibliografia|references|sources|works cited)\s*$"
+    )
+    headings = [match.start() for match in re.finditer(heading_pattern, report)]
+    bibliography_start = headings[-1] if headings else -1
+    outside = report[:bibliography_start] if bibliography_start >= 0 else report
+    references_outside = [
+        line for line in canonical_lines if line.removeprefix("- ") in outside
+    ]
+    duplicate_count = len(canonical_lines) - len(set(canonical_lines))
+    raw_retrieved_text_detected = any(
+        excerpt.strip() and excerpt.strip() in report[bibliography_start:]
+        for entry in entries
+        for excerpt in entry.extracted_excerpts
+        if bibliography_start >= 0
+    )
+    bibliography_is_final = bool(headings) and not re.search(
+        r"(?m)^##\s+", report[headings[-1] + 3 :]
+    )
+    contract_valid = not any(
+        (
+            len(headings) > 1,
+            bool(references) and not headings,
+            bool(headings) and not bibliography_is_final,
+            bool(references_outside),
+            duplicate_count > 0,
+            raw_retrieved_text_detected,
+        )
+    )
     return {
         "rag_retrieval_enabled": bool(payload.use_rag),
         "rag_query_keys": sorted((rag_query or {}).keys(), key=str.casefold),
@@ -128,6 +166,13 @@ def _build_rag_reference_audit(
         "retrieved_reference_count": sum(
             len(references) for references in references_by_drug.values()
         ),
+        "canonical_reference_count": len(set(canonical_lines)),
+        "bibliography_heading_count": len(headings),
+        "bibliography_is_final_section": bibliography_is_final,
+        "references_outside_bibliography": references_outside,
+        "duplicate_reference_count": duplicate_count,
+        "raw_retrieved_text_detected": raw_retrieved_text_detected,
+        "contract_valid": contract_valid,
         "llm_clinical_summary_has_bibliography": _report_contains_rag_bibliography(
             llm_clinical_summary,
             report_language=report_language,
@@ -138,34 +183,6 @@ def _build_rag_reference_audit(
         ),
     }
 
-###############################################################################
-def _ensure_rag_bibliography_in_clinical_summary(
-    *,
-    clinical_session: Any,
-    llm_clinical_summary: str | None,
-    report_language: str,
-) -> str | None:
-    if _report_contains_rag_bibliography(
-        llm_clinical_summary,
-        report_language=report_language,
-    ):
-        return llm_clinical_summary
-    entries = _clinical_report_entries_with_rag_references(clinical_session)
-    if not entries:
-        return llm_clinical_summary
-    finalizer = getattr(clinical_session, "report_finalizer", None)
-    if finalizer is None or not hasattr(finalizer, "build_rag_bibliography_section"):
-        return llm_clinical_summary
-    bibliography = finalizer.build_rag_bibliography_section(
-        entries,
-        report_language=report_language,
-    )
-    if not bibliography:
-        return llm_clinical_summary
-    body = str(llm_clinical_summary or "").strip()
-    if not body:
-        return bibliography
-    return f"{body}\n\n{bibliography}"
 
 ###############################################################################
 def _validate_requested_provider_matches_runtime(
@@ -184,6 +201,7 @@ def _validate_requested_provider_matches_runtime(
         raise ServiceValidationError(
             "The active runtime provider must match the requested provider exactly."
         )
+
 
 ###############################################################################
 async def process_single_patient_workflow(
@@ -505,11 +523,6 @@ async def process_single_patient_workflow(
         progress_callback=progress_callback,
         stop_check=stop_check,
     )
-    llm_clinical_summary = _ensure_rag_bibliography_in_clinical_summary(
-        clinical_session=clinical_session,
-        llm_clinical_summary=llm_clinical_summary,
-        report_language=report_language,
-    )
     dili_evidence_bundle = DiliEvidenceBuilder().build(
         payload=payload,
         drugs=analysis_drugs,
@@ -586,6 +599,16 @@ async def process_single_patient_workflow(
         final_report=final_report,
         report_language=report_language,
     )
+    if not rag_reference_audit["contract_valid"]:
+        issues.append(
+            PipelineIssue(
+                severity="error",
+                code="rag_bibliography_contract_failed",
+                message="The verified RAG bibliography contract failed and requires human review.",
+                field="rag",
+            )
+        )
+        session_status = "failed"
 
     patient_label = payload.name or "Unknown patient"
     report_language_key = resolve_supported_language_code(report_language)
@@ -628,6 +651,7 @@ async def process_single_patient_workflow(
     manual_review_required = bool(
         faithfulness_audit.manual_review_required
         or faithfulness_audit.blocking_issues
+        or not rag_reference_audit["contract_valid"]
     )
     result_payload = {
         "report": narrative,
@@ -856,6 +880,7 @@ async def process_single_patient_workflow(
         logger.warning("Clinical assessment persistence returned no session id.")
         raise ClinicalPersistenceError()
     return result_payload
+
 
 ###############################################################################
 def start_clinical_job_workflow(

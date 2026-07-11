@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections import defaultdict
+import re
 from typing import Any
 
 from common.prompts.clinical_assessment import (
@@ -16,6 +16,7 @@ from services.clinical.report_language import (
     report_heading,
 )
 from services.text.vocabulary import get_text_normalization_snapshot
+
 
 ###############################################################################
 class ReportFinalizer:
@@ -50,6 +51,13 @@ class ReportFinalizer:
             for entry in matched_entries
         ]
         matched_sections = [section for section in matched_sections if section]
+        references = [
+            reference for entry in entries for reference in entry.rag_references
+        ]
+        matched_sections = [
+            self.sanitize_generated_text(section, references)
+            for section in matched_sections
+        ]
         unresolved_section = consultation.render_unresolved_mentions_section(
             unresolved_entries,
             report_language=report_language,
@@ -75,6 +83,7 @@ class ReportFinalizer:
                 report_language=report_language,
             )
             if conclusion:
+                conclusion = self.sanitize_generated_text(conclusion, references)
                 heading = report_heading("report_section_summary", report_language)
                 combined_report = f"{combined_report}\n\n## {heading}\n\n{conclusion}"
         bibliography = self.build_rag_bibliography_section(
@@ -244,44 +253,147 @@ class ReportFinalizer:
         *,
         report_language: str,
     ) -> str | None:
-        grouped_pages: dict[str, set[int]] = defaultdict(set)
-        grouped_missing: set[str] = set()
-
-        for entry in entries:
-            for reference in entry.rag_references:
-                file_name = reference.file_name.strip()
-                if not file_name:
-                    continue
-                page_values = self.expand_reference_pages(reference)
-                if page_values:
-                    grouped_pages[file_name].update(page_values)
-                    continue
-                grouped_missing.add(file_name)
-
-        rendered_lines: list[str] = []
-        for file_name in sorted(grouped_pages, key=str.casefold):
-            rendered_lines.append(
-                self.format_bibliography_reference(
-                    file_name=file_name,
-                    pages=sorted(grouped_pages[file_name]),
-                )
-            )
-        missing_only = sorted(
-            (
-                file_name
-                for file_name in grouped_missing
-                if file_name not in grouped_pages
-            ),
-            key=str.casefold,
-        )
-        rendered_lines.extend(
-            f"- {file_name}, page not available" for file_name in missing_only
-        )
+        references = [
+            reference for entry in entries for reference in entry.rag_references
+        ]
+        rendered_lines = self.render_canonical_references(references)
         if not rendered_lines:
             return None
 
         heading = report_heading("bibliography", report_language)
         return "\n".join([f"## {heading}", "", *rendered_lines]).strip()
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def render_canonical_references(
+        cls, references: list[RagDocumentReference]
+    ) -> list[str]:
+        grouped: dict[
+            tuple[str, int | None, int | None], list[tuple[int, int] | None]
+        ] = {}
+        page_only: dict[str, list[tuple[int, int]]] = {}
+        for reference in references:
+            file_name = reference.file_name.strip()
+            if not file_name:
+                continue
+            key = (
+                file_name,
+                reference.page_start,
+                reference.page_end or reference.page_start,
+            )
+            line_range = (
+                (reference.line_start, reference.line_end or reference.line_start)
+                if reference.line_start is not None
+                else None
+            )
+            if line_range is None and reference.page_start is not None:
+                page_only.setdefault(file_name, []).append(
+                    (reference.page_start, reference.page_end or reference.page_start)
+                )
+                continue
+            grouped.setdefault(key, []).append(line_range)
+        lines: list[str] = []
+        for file_name in sorted(page_only, key=str.casefold):
+            ranges = cls.merge_ranges(page_only[file_name])
+            segments = [
+                str(start) if start == end else f"{start}-{end}"
+                for start, end in ranges
+            ]
+            label = "p." if len(segments) == 1 and "-" not in segments[0] else "pp."
+            lines.append(f"- {file_name}, {label} {', '.join(segments)}")
+        for (file_name, page_start, page_end), ranges in sorted(
+            grouped.items(),
+            key=lambda item: (item[0][0].casefold(), item[0][1] or 0, item[0][2] or 0),
+        ):
+            merged = cls.merge_ranges([item for item in ranges if item is not None])
+            if merged:
+                for line_start, line_end in merged:
+                    lines.append(
+                        cls.format_location(
+                            file_name, page_start, page_end, line_start, line_end
+                        )
+                    )
+            else:
+                lines.append(
+                    cls.format_location(file_name, page_start, page_end, None, None)
+                )
+        return list(dict.fromkeys(lines))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def merge_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        merged: list[tuple[int, int]] = []
+        for start, end in sorted(set(ranges)):
+            if merged and start <= merged[-1][1] + 1:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+            else:
+                merged.append((start, end))
+        return merged
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def format_location(
+        file_name: str,
+        page_start: int | None,
+        page_end: int | None,
+        line_start: int | None,
+        line_end: int | None,
+    ) -> str:
+        locations: list[str] = []
+        if page_start is not None:
+            if page_end is not None and page_end != page_start:
+                locations.append(f"pp. {page_start}-{page_end}")
+            else:
+                locations.append(f"p. {page_start}")
+        if line_start is not None:
+            locations.append(
+                f"lines {line_start}-{line_end}"
+                if line_end != line_start
+                else f"line {line_start}"
+            )
+        return f"- {file_name}, {', '.join(locations) if locations else 'location not available'}"
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def sanitize_generated_text(
+        text: str, references: list[RagDocumentReference]
+    ) -> str:
+        forbidden = {
+            "bibliography",
+            "references",
+            "sources",
+            "works cited",
+            "bibliografia",
+            "riferimenti",
+            "fonti",
+            "literaturverzeichnis",
+            "quellen",
+            "bibliographie",
+            "références",
+            "fuentes",
+            "referencias",
+        }
+        kept: list[str] = []
+        dropping = False
+        for line in str(text or "").splitlines():
+            heading = re.match(r"^##\s+(.+?)\s*$", line)
+            if heading:
+                dropping = heading.group(1).strip().casefold() in forbidden
+                if dropping:
+                    continue
+            if dropping:
+                continue
+            candidate = line
+            for reference in references:
+                escaped = re.escape(reference.file_name)
+                candidate = re.sub(
+                    rf"\[?{escaped}\s*,?\s*(?:pp?\.\s*\d+(?:-\d+)?(?:\s*,\s*lines?\s*\d+(?:-\d+)?)?|lines?\s*\d+(?:-\d+)?)\]?",
+                    "",
+                    candidate,
+                    flags=re.IGNORECASE,
+                )
+            kept.append(candidate.rstrip())
+        return "\n".join(kept).strip()
 
     # -------------------------------------------------------------------------
     @staticmethod

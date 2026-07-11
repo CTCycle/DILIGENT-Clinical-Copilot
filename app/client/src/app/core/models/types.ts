@@ -1,4 +1,10 @@
-export type CloudProvider = "openai" | "gemini";
+export type CloudProvider =
+  | "openai"
+  | "gemini"
+  | "deepseek"
+  | "anthropic"
+  | "opencode_zen"
+  | "opencode_go";
 
 export type RuntimeSettings = {
   useCloudServices: boolean;
@@ -43,7 +49,7 @@ export type RagSettings = {
 
 export type ModelConfigStateResponse = {
   local_models: LocalModelCard[];
-  cloud_model_choices: Partial<Record<CloudProvider, string[]>>;
+  cloud_providers: CloudProviderDescriptor[];
   use_cloud_services: boolean;
   llm_provider: string;
   cloud_model: string | null;
@@ -71,7 +77,47 @@ export type ModelConfigUpdateRequest = {
   rag_settings?: Partial<RagSettings>;
 };
 
-export type AccessKeyProvider = "openai" | "gemini" | "brave";
+export type AccessKeyProvider =
+  | "openai"
+  | "gemini"
+  | "deepseek"
+  | "anthropic"
+  | "opencode"
+  | "brave";
+
+export type ProviderCapabilities = {
+  chat: boolean;
+  structured_output: boolean;
+  reasoning: boolean;
+  model_listing: boolean;
+  embeddings: boolean;
+  vision: boolean;
+};
+
+export type CloudModelDescriptor = {
+  id: string;
+  display_name: string;
+  endpoint_family: string | null;
+  capabilities: ProviderCapabilities | null;
+};
+
+export type CloudProviderDescriptor = {
+  id: CloudProvider;
+  display_name: string;
+  credential_scope: AccessKeyProvider;
+  capabilities: ProviderCapabilities;
+  catalog_status: "available" | "cached" | "unavailable" | "authentication_required";
+  models: CloudModelDescriptor[];
+};
+
+export type ConnectivityCheckRequest = { provider: CloudProvider; model: string };
+export type ConnectivityCheckResponse = {
+  provider: CloudProvider;
+  model: string;
+  ok: boolean;
+  response_preview: string | null;
+  error: string | null;
+};
 
 export type AccessKeyRecord = {
   id: number;

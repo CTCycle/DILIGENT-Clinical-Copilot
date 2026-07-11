@@ -22,6 +22,7 @@ from services.clinical.matches_core import (
 )
 from services.text.normalization import normalize_drug_query_name
 
+
 ###############################################################################
 class ClinicalKnowledgePreparation:
     IDENTITY_FALLBACK_SYSTEM_PROMPT = """

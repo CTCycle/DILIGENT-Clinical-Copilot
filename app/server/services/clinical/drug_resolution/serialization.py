@@ -7,6 +7,7 @@ from domain.clinical.drug_resolution import (
     NormalizedDrugMention,
 )
 
+
 ###############################################################################
 def decision_to_payload(
     mention: NormalizedDrugMention,

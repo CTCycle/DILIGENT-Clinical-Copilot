@@ -9,9 +9,9 @@ from domain.keys import (
 from repositories.schemas.models import AccessKey
 from repositories.serialization.access_keys import AccessKeySerializer
 
+
 ###############################################################################
 class AccessKeyService:
-
     # -------------------------------------------------------------------------
     def __init__(self, serializer: AccessKeySerializer | None = None) -> None:
         self.serializer = serializer or AccessKeySerializer()

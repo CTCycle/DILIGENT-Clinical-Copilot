@@ -5,6 +5,9 @@ from datetime import datetime
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
+from domain.llm.providers import CloudProviderDescriptor, CloudProviderId
+
+
 ###############################################################################
 @dataclass(frozen=True)
 class ModelConfigSnapshot:
@@ -20,6 +23,7 @@ class ModelConfigSnapshot:
     rag_settings: dict[str, object] | None = None
     updated_at: datetime | None = None
 
+
 ###############################################################################
 class LocalModelCard(BaseModel):
     name: str
@@ -29,11 +33,12 @@ class LocalModelCard(BaseModel):
     recommended_for_local_extraction: bool = False
     recommended_rank: int | None = None
 
+
 ###############################################################################
 class ModelConfigUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     use_cloud_services: bool | None = None
-    llm_provider: str | None = None
+    llm_provider: CloudProviderId | None = None
     cloud_model: str | None = None
     text_extraction_model: str | None = Field(
         default=None,
@@ -46,12 +51,13 @@ class ModelConfigUpdateRequest(BaseModel):
     ollama_seed: int | None = Field(default=None, ge=0)
     rag_settings: dict[str, object] | None = None
 
+
 ###############################################################################
 class ModelConfigStateResponse(BaseModel):
     local_models: list[LocalModelCard]
-    cloud_model_choices: dict[str, list[str]]
+    cloud_providers: list[CloudProviderDescriptor]
     use_cloud_services: bool
-    llm_provider: str
+    llm_provider: CloudProviderId
     cloud_model: str | None
     text_extraction_model: str | None
     clinical_model: str | None
@@ -63,14 +69,17 @@ class ModelConfigStateResponse(BaseModel):
     rag_model: str | None = None
     updated_at: datetime | None = None
 
-###############################################################################
-class OpenAIConnectivityCheckRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    model: str | None = None
 
 ###############################################################################
-class OpenAIConnectivityCheckResponse(BaseModel):
-    provider: str
+class ConnectivityCheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    provider: CloudProviderId
+    model: str = Field(min_length=1)
+
+
+###############################################################################
+class ConnectivityCheckResponse(BaseModel):
+    provider: CloudProviderId
     model: str
     ok: bool
     response_preview: str | None = None

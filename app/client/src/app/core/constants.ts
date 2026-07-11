@@ -26,27 +26,6 @@ export const CLINICAL_MODEL_CHOICES = [
   "gemma3:27b",
 ];
 
-export const CLOUD_MODEL_CHOICES: Record<CloudProvider, string[]> = {
-  openai: [
-    "gpt-5.4",
-    "gpt-5.4-pro",
-    "gpt-5.4-mini",
-    "gpt-5.4-nano",
-    "gpt-5.2",
-    "gpt-5.2-pro",
-    "gpt-5",
-    "gpt-5-mini",
-    "gpt-5-nano",
-    "gpt-4.1",
-    "gpt-4.1-mini",
-  ],
-  gemini: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
-};
-
-export const CLOUD_PROVIDERS: CloudProvider[] = Object.keys(CLOUD_MODEL_CHOICES).filter(
-  isCloudProvider,
-);
-
 export type LLMRuntimeDefaults = {
   text_extraction_model: string;
   clinical_model: string;
@@ -69,41 +48,10 @@ export const LLM_RUNTIME_DEFAULTS: Readonly<LLMRuntimeDefaults> = {
   ollama_reasoning: false,
 };
 
-function isCloudProvider(provider: string): provider is CloudProvider {
-  return provider === "openai" || provider === "gemini";
-}
-
-function resolveDefaultProvider(provider: string): CloudProvider {
-  const normalized = provider.trim().toLowerCase();
-  if (isCloudProvider(normalized) && CLOUD_MODEL_CHOICES[normalized]) {
-    return normalized;
-  }
-  return "openai";
-}
-
-function resolveDefaultCloudModel(
-  provider: CloudProvider,
-  cloudModel: string,
-): string | null {
-  const models = CLOUD_MODEL_CHOICES[provider] || [];
-  if (!models.length) {
-    return null;
-  }
-  if (cloudModel && models.includes(cloudModel)) {
-    return cloudModel;
-  }
-  return models[0];
-}
-
-const DEFAULT_PROVIDER = resolveDefaultProvider(LLM_RUNTIME_DEFAULTS.llm_provider);
-
 export const DEFAULT_SETTINGS: RuntimeSettings = {
   useCloudServices: LLM_RUNTIME_DEFAULTS.use_cloud_services,
-  provider: DEFAULT_PROVIDER,
-  cloudModel: resolveDefaultCloudModel(
-    DEFAULT_PROVIDER,
-    LLM_RUNTIME_DEFAULTS.cloud_model,
-  ),
+  provider: LLM_RUNTIME_DEFAULTS.llm_provider,
+  cloudModel: null,
   textExtractionModel: LLM_RUNTIME_DEFAULTS.text_extraction_model,
   clinicalModel: LLM_RUNTIME_DEFAULTS.clinical_model,
   temperature: LLM_RUNTIME_DEFAULTS.cloud_temperature,

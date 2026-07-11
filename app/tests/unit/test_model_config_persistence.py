@@ -10,16 +10,16 @@ from common.exceptions import ServiceValidationError
 from domain.model_configs import ModelConfigUpdateRequest
 import services.llm.model_config as model_config_module
 from services.llm.runtime_config import LLMRuntimeConfig
-from domain.model_configs import ModelConfigSnapshot, OpenAIConnectivityCheckRequest
+from domain.model_configs import ConnectivityCheckRequest, ModelConfigSnapshot
 from services.llm.cloud import LLMError
 from services.llm.model_config import ModelConfigService
 from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 
+
 ###############################################################################
 class InMemorySerializer:
-
     # -------------------------------------------------------------------------
     def __init__(self, snapshot: ModelConfigSnapshot) -> None:
         self.snapshot = snapshot
@@ -34,6 +34,7 @@ class InMemorySerializer:
         data.update(updates)
         self.snapshot = ModelConfigSnapshot(**data)
         return self.snapshot
+
 
 ###############################################################################
 def test_model_config_roundtrip_preserves_cloud_selection() -> None:
@@ -66,6 +67,7 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
     assert snapshot.clinical_model == "gpt-oss:20b"
     assert snapshot.text_extraction_model == "qwen3:1.7b"
 
+
 ###############################################################################
 def test_clinical_service_reads_runtime_from_persisted_config() -> None:
     clinical_service = build_clinical_session_service(get_job_manager())
@@ -75,6 +77,7 @@ def test_clinical_service_reads_runtime_from_persisted_config() -> None:
     )
     assert parser_provider
     assert parser_model
+
 
 ###############################################################################
 def test_model_config_service_accepts_cloud_models_for_role_assignments() -> None:
@@ -97,18 +100,19 @@ def test_model_config_service_accepts_cloud_models_for_role_assignments() -> Non
         llm_provider="openai",
         cloud_model="gpt-4.1-mini",
         clinical_model="gpt-4.1-mini",
-        text_extraction_model="gpt-4.1",
+        text_extraction_model="gpt-4.1-mini",
     )
 
     response = asyncio.run(service.update_state(payload))
 
     assert response.clinical_model == "gpt-4.1-mini"
-    assert response.text_extraction_model == "gpt-4.1"
+    assert response.text_extraction_model == "gpt-4.1-mini"
     assert serializer.snapshot.clinical_model == "gpt-4.1-mini"
-    assert serializer.snapshot.text_extraction_model == "gpt-4.1"
+    assert serializer.snapshot.text_extraction_model == "gpt-4.1-mini"
+
 
 ###############################################################################
-def test_model_config_service_normalizes_stale_local_roles_in_cloud_mode() -> None:
+def test_model_config_service_rejects_stale_local_roles_in_cloud_mode() -> None:
     serializer = InMemorySerializer(
         ModelConfigSnapshot(
             clinical_model="gemma4:31b",
@@ -131,12 +135,9 @@ def test_model_config_service_normalizes_stale_local_roles_in_cloud_mode() -> No
         text_extraction_model="qwen3.5:9b",
     )
 
-    response = asyncio.run(service.update_state(payload))
+    with pytest.raises(ServiceValidationError, match="Select a model explicitly"):
+        asyncio.run(service.update_state(payload))
 
-    assert response.clinical_model == "gpt-4.1-mini"
-    assert response.text_extraction_model == "gpt-4.1-mini"
-    assert serializer.snapshot.clinical_model == "gpt-4.1-mini"
-    assert serializer.snapshot.text_extraction_model == "gpt-4.1-mini"
 
 ###############################################################################
 def test_model_config_service_rejects_uninstalled_local_models(monkeypatch) -> None:
@@ -172,6 +173,7 @@ def test_model_config_service_rejects_uninstalled_local_models(monkeypatch) -> N
     with pytest.raises(ServiceValidationError, match="Install local Ollama model"):
         asyncio.run(service.update_state(payload))
 
+
 ###############################################################################
 def test_model_config_service_prioritizes_recommended_installed_local_models(
     monkeypatch,
@@ -205,6 +207,7 @@ def test_model_config_service_prioritizes_recommended_installed_local_models(
     assert response.local_models[0].recommended_for_local_extraction is True
     assert response.local_models[1].name == "qwen3.5:9b"
 
+
 ###############################################################################
 def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) -> None:
     serializer = InMemorySerializer(
@@ -223,7 +226,6 @@ def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) ->
 
     ###############################################################################
     class FailingOllamaClient:
-
         # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
@@ -255,8 +257,9 @@ def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) ->
 
     assert len(warnings) == 2
 
+
 ###############################################################################
-def test_openai_connectivity_check_uses_configured_cloud_model(monkeypatch) -> None:
+def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> None:
     serializer = InMemorySerializer(
         ModelConfigSnapshot(
             clinical_model="gpt-oss:20b",
@@ -273,7 +276,6 @@ def test_openai_connectivity_check_uses_configured_cloud_model(monkeypatch) -> N
 
     ###############################################################################
     class FakeCloudLLMClient:
-
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             calls.append({"init": kwargs})
@@ -294,8 +296,8 @@ def test_openai_connectivity_check_uses_configured_cloud_model(monkeypatch) -> N
     monkeypatch.setattr(model_config_module, "CloudLLMClient", FakeCloudLLMClient)
 
     response = asyncio.run(
-        ModelConfigService(serializer=serializer).check_openai_connectivity(
-            OpenAIConnectivityCheckRequest()
+        ModelConfigService(serializer=serializer).check_connectivity(
+            ConnectivityCheckRequest(provider="openai", model="gpt-4.1-mini")
         )
     )
 
@@ -306,8 +308,9 @@ def test_openai_connectivity_check_uses_configured_cloud_model(monkeypatch) -> N
     assert calls[0]["init"]["provider"] == "openai"
     assert calls[1]["chat"]["model"] == "gpt-4.1-mini"
 
+
 ###############################################################################
-def test_openai_connectivity_check_reports_llm_error(monkeypatch) -> None:
+def test_connectivity_check_reports_llm_error(monkeypatch) -> None:
     serializer = InMemorySerializer(
         ModelConfigSnapshot(
             clinical_model="gpt-oss:20b",
@@ -323,7 +326,6 @@ def test_openai_connectivity_check_reports_llm_error(monkeypatch) -> None:
 
     ###############################################################################
     class FailingCloudLLMClient:
-
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             raise LLMError("No active OpenAI access key configured")
@@ -331,8 +333,8 @@ def test_openai_connectivity_check_reports_llm_error(monkeypatch) -> None:
     monkeypatch.setattr(model_config_module, "CloudLLMClient", FailingCloudLLMClient)
 
     response = asyncio.run(
-        ModelConfigService(serializer=serializer).check_openai_connectivity(
-            OpenAIConnectivityCheckRequest(model="gpt-4.1")
+        ModelConfigService(serializer=serializer).check_connectivity(
+            ConnectivityCheckRequest(provider="openai", model="gpt-4.1")
         )
     )
 

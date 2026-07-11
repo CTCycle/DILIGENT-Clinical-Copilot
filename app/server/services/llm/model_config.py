@@ -4,7 +4,6 @@ from collections.abc import Iterable
 from time import monotonic
 from typing import Any, Protocol, cast
 
-from common.catalogs.model_choices import get_cloud_model_choices
 from common.exceptions import ServiceValidationError
 from common.paths import VECTOR_DB_PATH
 from common.utils.catalog_loader import CatalogLoader
@@ -21,13 +20,15 @@ from domain.model_configs import (
     ModelConfigSnapshot,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
-    OpenAIConnectivityCheckRequest,
-    OpenAIConnectivityCheckResponse,
+    ConnectivityCheckRequest,
+    ConnectivityCheckResponse,
 )
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
 from services.llm.cloud import CloudLLMClient, LLMError
+from services.llm.provider_registry import provider_registry
+from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
 from services.llm.ollama_client import OllamaClient, OllamaError
 from repositories.vectors import LanceVectorDatabase
 from services.retrieval.settings import (
@@ -35,9 +36,9 @@ from services.retrieval.settings import (
     rag_settings_payload,
 )
 
+
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
-
     # -------------------------------------------------------------------------
     def load_snapshot(self) -> ModelConfigSnapshot: ...
 
@@ -57,10 +58,10 @@ class ModelConfigSnapshotStore(Protocol):
         rag_settings: dict[str, object] | object = ...,
     ) -> ModelConfigSnapshot: ...
 
+
 ###############################################################################
 class ModelConfigService:
     _OLLAMA_WARNING_COOLDOWN_SECONDS = 120.0
-    _OPENAI_CONNECTIVITY_FALLBACK_MODEL = "gpt-4.1-mini"
     _FAST_LOCAL_EXTRACTION_MODELS = ("qwen3.5:2b", "qwen3.5:9b")
 
     # -------------------------------------------------------------------------
@@ -94,7 +95,11 @@ class ModelConfigService:
             selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
             include_ollama_availability=should_check_local_availability,
         )
-        return self.build_response(snapshot=snapshot, local_models=local_models)
+        return self.build_response(
+            snapshot=snapshot,
+            local_models=local_models,
+            cloud_providers=await self.discover_provider_descriptors(),
+        )
 
     # -------------------------------------------------------------------------
     async def update_state(
@@ -138,22 +143,20 @@ class ModelConfigService:
             selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
             include_ollama_availability=should_check_local_availability,
         )
-        return self.build_response(snapshot=snapshot, local_models=local_models)
+        return self.build_response(
+            snapshot=snapshot,
+            local_models=local_models,
+            cloud_providers=await self.discover_provider_descriptors(),
+        )
 
     # -------------------------------------------------------------------------
-    async def check_openai_connectivity(
-        self, payload: OpenAIConnectivityCheckRequest
-    ) -> OpenAIConnectivityCheckResponse:
-        snapshot = self.ensure_defaults()
-        requested_model = self.normalize_optional_text(payload.model)
-        model = (
-            requested_model
-            or self.normalize_optional_text(snapshot.cloud_model)
-            or self._OPENAI_CONNECTIVITY_FALLBACK_MODEL
-        )
+    async def check_connectivity(
+        self, payload: ConnectivityCheckRequest
+    ) -> ConnectivityCheckResponse:
+        model = payload.model.strip()
         try:
             async with CloudLLMClient(
-                provider="openai",
+                provider=payload.provider,
                 default_model=model,
                 timeout_s=20.0,
                 max_retries=0,
@@ -167,22 +170,22 @@ class ModelConfigService:
                         },
                         {
                             "role": "user",
-                            "content": "OpenAI connectivity check.",
+                            "content": "Provider connectivity check.",
                         },
                     ],
                     options={"temperature": 0.0},
                 )
         except LLMError as exc:
-            return OpenAIConnectivityCheckResponse(
-                provider="openai",
+            return ConnectivityCheckResponse(
+                provider=payload.provider,
                 model=model,
                 ok=False,
                 error=str(exc),
             )
 
         preview = self._normalize_connectivity_preview(response)
-        return OpenAIConnectivityCheckResponse(
-            provider="openai",
+        return ConnectivityCheckResponse(
+            provider=payload.provider,
             model=model,
             ok=True,
             response_preview=preview,
@@ -464,16 +467,17 @@ class ModelConfigService:
         if model_name is None:
             return None
         if use_cloud_models:
-            cloud_model_names = set(get_cloud_model_choices().get(cloud_provider, []))
+            cloud_model_names = set(provider_registry.get(cloud_provider).models)
             if not cloud_model_names:
+                if active_cloud_model and model_name == active_cloud_model:
+                    return model_name
                 raise ServiceValidationError(
-                    f"No cloud models are available for provider '{cloud_provider}'.",
+                    "Select a model explicitly from the provider catalog."
                 )
             if model_name not in cloud_model_names:
-                fallback = (active_cloud_model or "").strip()
-                if fallback in cloud_model_names:
-                    return fallback
-                return next(iter(sorted(cloud_model_names)))
+                raise ServiceValidationError(
+                    f"Model '{model_name}' is not valid for provider '{cloud_provider}'."
+                )
             return model_name
         if not local_model_names:
             raise ServiceValidationError("No model catalog entries are available.")
@@ -491,30 +495,37 @@ class ModelConfigService:
     @staticmethod
     def resolve_provider(provider: str | None) -> str:
         normalized = (provider or "").strip().lower()
-        if normalized in get_cloud_model_choices():
-            return normalized
-        if LLMRuntimeConfig.get_llm_provider() in get_cloud_model_choices():
-            return LLMRuntimeConfig.get_llm_provider()
-        available = sorted(get_cloud_model_choices().keys())
-        return available[0] if available else "openai"
+        try:
+            return provider_registry.get(normalized).provider_id
+        except ValueError as exc:
+            raise ServiceValidationError(str(exc)) from exc
 
     # -------------------------------------------------------------------------
     @staticmethod
     def resolve_cloud_model(provider: str, model_name: str | None) -> str | None:
-        models = get_cloud_model_choices().get(provider, [])
-        if not models:
-            return None
         normalized = (model_name or "").strip()
-        if normalized and normalized in models:
-            return normalized
-        return models[0]
+        if not normalized:
+            return None
+        if not provider_registry.is_valid_model(provider, normalized):
+            raise ServiceValidationError(
+                f"Model '{normalized}' is not valid for provider '{provider}'."
+            )
+        return normalized
 
     # -------------------------------------------------------------------------
     def ensure_defaults(self) -> ModelConfigSnapshot:
         snapshot = self.serializer.load_snapshot()
         updates: dict[str, Any] = {}
-        runtime_provider = self.resolve_provider(LLMRuntimeConfig.get_llm_provider())
-        snapshot_provider = self.resolve_provider(snapshot.cloud_provider)
+        runtime_candidate = LLMRuntimeConfig.get_llm_provider()
+        try:
+            runtime_provider = self.resolve_provider(runtime_candidate)
+        except ServiceValidationError:
+            runtime_provider = self.resolve_provider(
+                snapshot.cloud_provider or "openai"
+            )
+        snapshot_provider = self.resolve_provider(
+            snapshot.cloud_provider or runtime_provider
+        )
         runtime_cloud_model = self.resolve_cloud_model(
             provider=runtime_provider,
             model_name=LLMRuntimeConfig.get_cloud_model(),
@@ -686,6 +697,7 @@ class ModelConfigService:
         *,
         snapshot: ModelConfigSnapshot,
         local_models: list[LocalModelCard],
+        cloud_providers: list[CloudProviderDescriptor] | None = None,
     ) -> ModelConfigStateResponse:
         provider = self.resolve_provider(snapshot.cloud_provider)
         cloud_model = self.resolve_cloud_model(
@@ -693,7 +705,7 @@ class ModelConfigService:
         )
         return ModelConfigStateResponse(
             local_models=local_models,
-            cloud_model_choices=get_cloud_model_choices(),
+            cloud_providers=cloud_providers or self.build_provider_descriptors(),
             use_cloud_services=bool(snapshot.use_cloud_models),
             llm_provider=provider,
             cloud_model=cloud_model,
@@ -707,6 +719,66 @@ class ModelConfigService:
             rag_model=self.resolve_current_rag_model_label(),
             updated_at=snapshot.updated_at,
         )
+
+    @staticmethod
+    def build_provider_descriptors() -> list[CloudProviderDescriptor]:
+        return [
+            CloudProviderDescriptor(
+                id=item.provider_id,
+                display_name=item.display_name,
+                credential_scope=item.credential_scope,
+                capabilities=item.capabilities,
+                catalog_status="available"
+                if item.models
+                else "authentication_required",
+                models=[
+                    CloudModelDescriptor(id=model, display_name=model)
+                    for model in item.models
+                ],
+            )
+            for item in provider_registry.all()
+        ]
+
+    async def discover_provider_descriptors(self) -> list[CloudProviderDescriptor]:
+        descriptors: list[CloudProviderDescriptor] = []
+        for item in provider_registry.all():
+            if item.models:
+                models = [
+                    CloudModelDescriptor(id=model, display_name=model)
+                    for model in item.models
+                ]
+                status = "available"
+            else:
+                try:
+                    async with CloudLLMClient(
+                        provider=item.provider_id, timeout_s=15.0, max_retries=0
+                    ) as client:
+                        models = [
+                            CloudModelDescriptor(id=model, display_name=model)
+                            for model in await client.list_models()
+                        ]
+                    status = "available"
+                except LLMError as exc:
+                    models = []
+                    status = (
+                        "authentication_required"
+                        if "access key" in str(exc).lower()
+                        else "unavailable"
+                    )
+                except Exception:
+                    models = []
+                    status = "unavailable"
+            descriptors.append(
+                CloudProviderDescriptor(
+                    id=item.provider_id,
+                    display_name=item.display_name,
+                    credential_scope=item.credential_scope,
+                    capabilities=item.capabilities,
+                    catalog_status=status,
+                    models=models,
+                )
+            )
+        return descriptors
 
     # -------------------------------------------------------------------------
     @staticmethod
