@@ -1,8 +1,8 @@
 # User Checklists
-Last updated: 2026-06-03
+Last updated: 2026-07-11
 
 ## Recommended End-to-end Journey
-1. Start DILIGENT with `start_on_windows.bat`.
+1. Start DILIGENT with `start_on_windows.ps1` and choose **Launch application**.
 2. Confirm the UI opens.
 3. Confirm backend health at `/api/health`.
 4. Open **Model Configurations**.

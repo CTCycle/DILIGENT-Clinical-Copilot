@@ -6,28 +6,30 @@ This file captures the repeatable regression slice for model configuration and a
 
 ## Recommended Runner
 
-```powershell
-.\app\tests\run_model_config_regression.ps1
+```cmd
+app\tests\run_tests.bat modelconfig
 ```
 
 This runner performs startup, health checks, focused unit and E2E commands, and cleanup.
 
 ## Full Regression Variant
 
-```powershell
-.\app\tests\run_model_config_full_regression.ps1
+```cmd
+app\tests\run_tests.bat modelconfigfull
 ```
 
 Use this when validating the full `test_app_flow.py` suite plus `test_model_config_api.py`.
 
 ## `run_tests.bat` Shortcuts
 
+Both variants are available through `run_tests.bat`:
+
 ```cmd
 app\tests\run_tests.bat modelconfig
 app\tests\run_tests.bat modelconfigfull
 ```
 
-These shortcuts invoke the PowerShell runners, set `UV_CACHE_DIR` to `%PROJECT_ROOT%\.uv-cache`, and propagate non-zero exit codes on failure.
+These set `DILIGENT_SQLITE_PATH` to a temporary database, override ports 7690/9847, and propagate non-zero exit codes on failure.
 
 ## SQLite Writeability Hardening
 Regression scripts set a per-run temporary database path through:

@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
@@ -9,7 +9,6 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 - `GET /docs`
 - `GET /redoc`
 - `GET /openapi.json`
-- In packaged Tauri mode, `/` and `/{full_path:path}` serve SPA assets.
 
 ## Session And Clinical Routes
 - `GET /api/health`

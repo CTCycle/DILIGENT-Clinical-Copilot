@@ -1,11 +1,11 @@
 # System Overview
-Last updated: 2026-06-18
+Last updated: 2026-07-11
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
 - FastAPI backend in `app/server`
 - Angular standalone frontend in `app/client`
-- Optional Tauri desktop shell in `app/src-tauri`
+- PowerShell launcher and maintenance menu in `start_on_windows.ps1`
 
 Primary flow:
 1. The user submits clinical data in the Angular UI.
@@ -18,11 +18,10 @@ Maintained source-level structure, with build and cache artifacts omitted:
 
 ```text
 .
-|-- start_on_windows.bat
-|-- setup_and_maintenance.bat
+|-- start_on_windows.ps1
 |-- settings/
 |   |-- .env
-|   |-- .env.local.example
+|   |-- .env.example
 |   `-- configurations.json
 |-- app/
 |   |-- resources/
@@ -53,25 +52,20 @@ Maintained source-level structure, with build and cache artifacts omitted:
 |   |   |       |-- core/
 |   |   |       |-- components/
 |   |   |       `-- pages/
-|   |-- src-tauri/
-|   |   |-- tauri.conf.json
-|   |   `-- src/main.rs
 |   `-- tests/
 |       |-- run_tests.bat
 |       |-- conftest.py
 |       |-- unit/
 |       `-- e2e/
-`-- release/
-    `-- tauri/
-        `-- build_with_tauri.bat
+`-- assets/docs/
+    `-- project_index.md
 ```
 
 ## Application Entry Points
 - Backend app: `app/server/app.py`
-  - Builds the FastAPI app through `create_app()`, initializes settings, registers middleware and error handlers, mounts routers under `/api`, serves packaged SPA assets in Tauri mode, and runs startup checks through the FastAPI lifespan path.
+  - Builds the FastAPI app through `create_app()`, initializes settings, registers middleware and error handlers, mounts routers under `/api`, and runs startup checks through the FastAPI lifespan path.
 - Frontend app: `app/client/src/main.ts`
   - Bootstraps Angular `App` with `appConfig`.
 - Frontend routing: `app/client/src/app/app.routes.ts`
   - Current routes: `/`, `/clinical-sessions`, `/data`, `/model-config`, `/sessions/:sessionId/timetable`.
-- Desktop runtime: `app/src-tauri/src/main.rs` plus `tauri.conf.json`.
-- Windows launcher: `start_on_windows.bat`.
+- Windows launcher and maintenance entry point: `start_on_windows.ps1`.

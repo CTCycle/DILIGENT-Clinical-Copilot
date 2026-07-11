@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-07-09
+Last updated: 2026-07-11
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -73,10 +73,10 @@ Do not edit local database files manually while the application is running.
 Some resources or embeddings may require initialization or refresh through:
 
 ```text
-setup_and_maintenance.bat
+start_on_windows.ps1
 ```
 
-Use its menu options for database initialization, dependency maintenance, Python cache cleanup, or embedding updates.
+Use its menu options for database initialization, dependency maintenance, test execution, log cleanup, or cache cleanup.
 
 Expected result:
 - progress is reported
