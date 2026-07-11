@@ -1,5 +1,5 @@
 # Error Handling
-Last updated: 2026-06-03
+Last updated: 2026-07-11
 
 ## Scope
 Apply these rules across backend and frontend code.
@@ -22,6 +22,10 @@ Retries are allowed only for transient failures and must define:
 - max attempts
 - backoff policy
 - hard stop condition
+
+OpenAI JSON mode requests must include an explicit JSON instruction in the
+request messages/instructions. Structured validation remains authoritative;
+invalid fallback output must never silently replace deterministic clinical facts.
 
 ## Timeouts And Cancellation
 - Use explicit timeouts for all I/O and network calls.

@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -87,6 +87,7 @@ If a runner does not check stop requests, cancellation is delayed.
 - These artifacts are persisted through the clinical session result payload rather than loose files.
 - Failed clinical results omit raw anamnesis, drug text, laboratory text, and patient image base64 content. Failure payloads expose generic error text plus `failure_metadata` for diagnostics.
 - DILI sessions perform deterministic section validation before clinical extraction and may parallelize parser-model extraction only when parser batch preflight marks concurrency as safe; otherwise the workflow falls back to sequential execution.
+- DILI LiverTox/evidence preparation has a hard bounded timeout. Timeout records a sanitized warning and continues without prepared evidence; RAG-off progress explicitly states that vector retrieval is disabled.
 
 ## New Job Checklist
 1. Add a runner function returning `dict[str, Any]`.

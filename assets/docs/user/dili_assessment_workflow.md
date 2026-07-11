@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-06-30
+Last updated: 2026-07-11
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -52,6 +52,10 @@ Expected result:
 - the UI shows a generated DILI assessment or a clear error message
 
 Choosing **Run without RAG** affects only the pending assessment. It does not disable the saved RAG configuration for future sessions.
+
+During Step 12, the progress message identifies whether vector retrieval is
+enabled. If evidence preparation exceeds its bounded runtime, the assessment
+continues without that prepared evidence and reports a warning for review.
 
 If the run fails:
 - confirm backend health
