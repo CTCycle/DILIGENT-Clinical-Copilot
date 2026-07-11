@@ -1,5 +1,5 @@
 # User Troubleshooting
-Last updated: 2026-06-03
+Last updated: 2026-07-11
 
 ## Browser Page Does Not Load
 - Check whether the frontend is available at:
@@ -11,7 +11,7 @@ http://127.0.0.1:9847
 - If not, restart with:
 
 ```text
-start_on_windows.bat
+start_on_windows.ps1
 ```
 
 ## Backend Health Check Fails

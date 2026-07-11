@@ -16,8 +16,8 @@ _DILIGENT Clinical Copilot overview._
 
 ### 2.1 Windows (Recommended)
 Run:
-```cmd
-start_on_windows.bat
+```powershell
+.\start_on_windows.ps1
 ```
 
 The launcher prepares local runtimes and dependencies, then starts the backend and frontend on the configured local ports.
@@ -49,19 +49,11 @@ Default local endpoints:
 ## 3. Runtime Profiles
 DILIGENT is configuration-first and uses one active runtime file: `settings/.env`.
 
-The current deployment posture is explicit local single-user operation. Network production deployment without authentication is unsupported; runtime validation rejects non-local deployment modes until access-control work is added.
+The supported runtime profile is explicit local single-user operation. Network production deployment without authentication is unsupported; runtime validation rejects non-local deployment modes until access-control work is added.
 
-Switch to local profile:
-```cmd
-copy /Y settings\.env.local.example settings\.env
-```
+On first launch, `start_on_windows.ps1` creates `settings/.env` from `settings/.env.example` when needed. Edit the active file to change local ports, dependency options, or backend log visibility.
 
-Switch to local Tauri profile:
-```cmd
-copy /Y settings\.env.local.tauri.example settings\.env
-```
-
-See `assets/docs/runtime/modes.md` for full runtime and packaging details.
+See `assets/docs/runtime/modes.md` for full local runtime details.
 
 Clinical job execution is process-local. Persisted clinical sessions remain durable, but in-memory job ids are not durable across backend restarts.
 
@@ -93,33 +85,15 @@ _Runtime source, local model catalog, and active reasoning pipeline settings._
 ![Data inspection](assets/figures/data-inspection.png)
 _Catalog inspection view for curated drug records, update status, and maintenance actions._
 
-## 5. Desktop Packaging (Tauri)
-The desktop shell lives in `app/src-tauri`, while the frontend stays in `app/client`.
-
-Versioned desktop content in `app/src-tauri` is limited to source code, configuration, icons, capabilities, and required build metadata such as `Cargo.toml`, `Cargo.lock`, `build.rs`, and `tauri.conf.json`.
-
-Build Windows desktop artifacts:
-```cmd
-release\tauri\build_with_tauri.bat
-```
-
-Generated outputs:
-- `release/windows/installers`
-- `release/windows/portable`
-
-Generated desktop outputs are not committed to Git. Keep `app/src-tauri/target`, `app/src-tauri/bundle`, `app/src-tauri/gen`, and packaged desktop binaries or archives out of the repository.
-
-Desktop binaries such as `.exe` installers are published as release artifacts, not tracked in the repository. The packaged Windows release currently exports an NSIS `.exe` installer under `release/windows/installers`.
-
-## 6. Setup and Maintenance
+## 5. Setup and Maintenance
 Run:
-```cmd
-setup_and_maintenance.bat
+```powershell
+.\start_on_windows.ps1
 ```
 
-Use this script for offline maintenance operations (for example DB initialization and cleanup tasks).
+Use menu options 2 through 7 for dependency maintenance, database initialization, tests, logs, caches, and uninstall cleanup.
 
-### 6.1 Regression Validation Shortcuts
+### 5.1 Regression Validation Shortcuts
 
 From repository root:
 
@@ -132,31 +106,31 @@ app\tests\run_tests.bat modelconfigfull
 - `modelconfigfull`: model-config unit + full `test_app_flow.py` + `test_model_config_api.py`
   - If `uv --with pytest-playwright` cannot access package indexes on first use, run the PowerShell runner directly after cache warmup.
 
-Equivalent PowerShell runners:
+These are available through `run_tests.bat`:
 
-```powershell
-.\app\tests\run_model_config_regression.ps1
-.\app\tests\run_model_config_full_regression.ps1
+```cmd
+app\tests\run_tests.bat modelconfig
+app\tests\run_tests.bat modelconfigfull
 ```
 
-## 7. Database and Ollama Requirements
+## 6. Database and Ollama Requirements
 - Database schemas are not upgraded in place across this cleanup; recreate the schema (or local SQLite DB file) when upgrading.
 - Runtime startup does not perform SQLite schema salvage/deletion.
 - Ollama must support the chat-capable `/api/chat` API; `/api/generate` fallback behavior has been removed.
 
-## 8. Documentation Map
+## 7. Documentation Map
 - `assets/docs/project_index.md`: entry point for the documentation tree.
 - `assets/docs/architecture/system_overview.md`: repository layout and system boundaries.
 - `assets/docs/architecture/background_jobs.md`: job lifecycle and semantics.
-- `assets/docs/runtime/modes.md`: runtime profiles and packaging.
+- `assets/docs/runtime/modes.md`: supported local runtime profile.
 - `assets/docs/coding/error_handling.md`: backend and frontend error strategy.
 - `assets/docs/ui/components_and_patterns.md`: frontend structure and interface patterns.
 
-## 9. Development Status
+## 8. Development Status
 
 This project is under active development and may contain incomplete features or defects. Tagged releases are stable for local evaluation.
 
-## 10. License
+## 9. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.
 
 

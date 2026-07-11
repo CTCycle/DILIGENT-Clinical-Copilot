@@ -1,9 +1,9 @@
 # Configuration
-Last updated: 2026-07-09
+Last updated: 2026-07-11
 
 ## Primary Runtime Files
 - Active env file: `settings/.env`
-- Env template: `settings/.env.local.example`
+- Env template: `settings/.env.example`
 - Structured operational settings: `settings/configurations.json`
 
 ## Default Local Ports
@@ -17,6 +17,7 @@ Last updated: 2026-07-09
 - `UI_PORT=9847`
 - `VITE_API_BASE_URL=/api`
 - `RELOAD=false`
+- `BACKEND_VISIBLE=false`
 - `OPTIONAL_DEPENDENCIES=true`
 
 ## Operational Settings By Source
@@ -31,11 +32,10 @@ Last updated: 2026-07-09
 - `app/resources/catalogs/*.json`
   - canonical deterministic reference catalogs for text normalization, extraction, matching, DILI behavior, language, and security filters
 
-## Runtime Differences
+## Local Runtime
 - Local runs serve the frontend from a preview or dev process.
-- Packaged Tauri mode serves bundled SPA assets from the backend.
-- Startup validates packaged SPA presence before desktop mode serves assets.
-- Runtime resources are bundled under `runtime/` through `tauri.conf.json`.
+- `BACKEND_VISIBLE=true` opens a dedicated backend terminal; the default keeps it hidden.
+- The frontend preview runs without a visible terminal window.
 
 ## Feature Toggles
 - Cloud-versus-local model usage is runtime-configured through model configuration APIs.

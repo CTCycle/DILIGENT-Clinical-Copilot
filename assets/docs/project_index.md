@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-06-18
+Last updated: 2026-07-11
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -49,13 +49,13 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 
 ### Runtime
 - `runtime/modes.md`
-  - Supported runtime targets and differences between local and packaged execution.
+  - Supported local runtime target and operating boundaries.
 - `runtime/startup.md`
   - Launcher-first startup procedures for local development, Codex sessions, browser-driven UI work, and manual fallback commands only when the launcher path is unsuitable or already diagnosed as failing.
 - `runtime/configuration.md`
   - Environment variables, ports, runtime settings, and catalog inputs.
 - `runtime/deployment.md`
-  - Packaging constraints, release outputs, and dependency notes.
+  - Local deployment constraints and dependency notes.
 - `runtime/troubleshooting.md`
   - Startup failures, port conflicts, backend launch recovery steps, and Angular sandbox-build fallback guidance for `spawn EPERM`.
 - `runtime/qa_regression.md`
@@ -101,4 +101,4 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 ## Environment Rules
 - Windows is the default operating environment for this repository.
 - Support both PowerShell and CMD guidance where commands differ.
-- Keep runtime guidance aligned with `start_on_windows.bat`, `setup_and_maintenance.bat`, `release/tauri/*.bat`, and `app/tests/*.ps1` or `.bat`.
+- Keep runtime guidance aligned with `start_on_windows.ps1` and `app/tests/*.ps1` or `.bat`.
