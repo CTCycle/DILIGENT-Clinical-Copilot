@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('ClinicalSessionsPage revision template', () => {
-  it('renders the current revision placeholder and retained manual edit affordances', () => {
+  it('renders revision controls and the editor toolbar', () => {
     const templatePath = resolve(
       __dirname,
       './clinical-sessions-page.component.html',
@@ -14,11 +14,13 @@ describe('ClinicalSessionsPage revision template', () => {
       'utf-8',
     );
 
-    expect(template).toContain('Session revision rewrite pending');
-    expect(template).toContain('The previous LLM-assisted session revision workflow has been removed.');
-    expect(template).toContain('This area is intentionally reserved for the replacement implementation.');
+    expect(template).toContain('clinical-session-revision-model-panel');
+    expect(template).toContain('Revision model');
+    expect(template).toContain('clinical-session-revision-instruction');
+    expect(template).toContain('setRevisionModelRuntime');
     expect(template).toContain('app-clinical-session-editor-toolbar');
     expect(toolbarTemplate).toContain('Save manual report edit');
+    expect(toolbarTemplate).toContain('role="toolbar"');
     expect(template).toContain('Manual Edit History');
   });
 

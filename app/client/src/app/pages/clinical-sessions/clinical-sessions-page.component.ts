@@ -28,11 +28,14 @@ import {
   updateClinicalSession,
   updateRevisionClinicalReview,
 } from '../../core/services/inspection-api';
+import { fetchModelConfigState } from '../../core/services/model-config-api';
 import {
   ClinicalSessionDetail,
   InspectionSessionItem,
   InspectionSessionStatus,
   InspectionSessionTimelinePreview,
+  CloudProvider,
+  ModelConfigStateResponse,
   RevisionArtifact,
   RevisionPipelineStep,
 } from '../../core/models/types';
@@ -158,10 +161,17 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionVersionId = signal<number | null>(null);
   readonly revisionSteps = signal<RevisionPipelineStep[]>([]);
   readonly revisionArtifacts = signal<RevisionArtifact[]>([]);
+  readonly revisionModelLoading = signal(false);
+  readonly revisionModelError = signal<string | null>(null);
+  readonly revisionModelConfig = signal<ModelConfigStateResponse | null>(null);
+  readonly revisionModelUseCloud = signal(false);
+  readonly revisionModelProvider = signal<CloudProvider>('openai');
+  readonly revisionModelName = signal('');
   private revisionPollCancelled = false;
 
   ngOnInit(): void {
     void this.loadSessions();
+    void this.loadRevisionModelConfig();
   }
 
   ngOnDestroy(): void {
@@ -435,6 +445,73 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.revisionInstruction.set(value);
   }
 
+  async loadRevisionModelConfig(): Promise<void> {
+    this.revisionModelLoading.set(true);
+    this.revisionModelError.set(null);
+    try {
+      const payload = await fetchModelConfigState(true);
+      this.revisionModelConfig.set(payload);
+      this.revisionModelUseCloud.set(payload.use_cloud_services);
+      const configuredProvider = payload.cloud_providers.find((provider) => provider.id === payload.llm_provider)?.id;
+      this.revisionModelProvider.set(configuredProvider || payload.cloud_providers[0]?.id || 'openai');
+      this.revisionModelName.set(this.resolveInitialRevisionModel(payload));
+    } catch (error) {
+      this.revisionModelError.set(formatUnknownError(error, 'Unable to load revision model options.'));
+    } finally {
+      this.revisionModelLoading.set(false);
+    }
+  }
+
+  revisionLocalModels(): ModelConfigStateResponse['local_models'] {
+    return (this.revisionModelConfig()?.local_models || []).filter((model) => model.available_in_ollama);
+  }
+
+  revisionCloudProviders(): ModelConfigStateResponse['cloud_providers'] {
+    return this.revisionModelConfig()?.cloud_providers || [];
+  }
+
+  revisionCloudModels(): ModelConfigStateResponse['cloud_providers'][number]['models'] {
+    return this.revisionCloudProviders().find((provider) => provider.id === this.revisionModelProvider())?.models || [];
+  }
+
+  setRevisionModelRuntime(mode: 'local' | 'cloud'): void {
+    const useCloud = mode === 'cloud';
+    this.revisionModelUseCloud.set(useCloud);
+    const options = useCloud
+      ? this.revisionCloudModels().map((model) => model.id)
+      : this.revisionLocalModels().map((model) => model.name);
+    if (!options.includes(this.revisionModelName())) {
+      this.revisionModelName.set(options[0] || '');
+    }
+  }
+
+  setRevisionModelProvider(value: string): void {
+    const provider = this.revisionCloudProviders().find((candidate) => candidate.id === value);
+    if (!provider) return;
+    this.revisionModelProvider.set(provider.id);
+    const options = provider.models.map((model) => model.id);
+    if (!options.includes(this.revisionModelName())) {
+      this.revisionModelName.set(options[0] || '');
+    }
+  }
+
+  updateRevisionModelName(value: string): void {
+    this.revisionModelName.set(value);
+  }
+
+  private resolveInitialRevisionModel(payload: ModelConfigStateResponse): string {
+    if (payload.use_cloud_services) {
+      const provider = payload.cloud_providers.find((candidate) => candidate.id === payload.llm_provider);
+      return provider?.models.some((model) => model.id === payload.cloud_model)
+        ? payload.cloud_model || ''
+        : provider?.models[0]?.id || '';
+    }
+    const localModels = payload.local_models.filter((model) => model.available_in_ollama);
+    return localModels.some((model) => model.name === payload.clinical_model)
+      ? payload.clinical_model || ''
+      : localModels[0]?.name || payload.clinical_model || '';
+  }
+
   async startRevision(): Promise<void> {
     const detail = this.selected();
     if (!detail || this.revisionRunning()) return;
@@ -444,7 +521,16 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     try {
       const started = await startSessionRevisionJob(detail.session_id, {
         revision_instruction: this.revisionInstruction().trim() || null,
-        model_overrides: { cloud_model: 'gpt-4.1-mini', use_cloud_services: true },
+        model_overrides: this.revisionModelUseCloud()
+          ? {
+              use_cloud_models: true,
+              cloud_provider: this.revisionModelProvider(),
+              cloud_model: this.revisionModelName().trim() || null,
+            }
+          : {
+              use_cloud_models: false,
+              clinical_model: this.revisionModelName().trim() || null,
+            },
       });
       this.revisionJobId.set(started.job_id);
       await this.pollRevision(detail.session_id, started.job_id);
