@@ -448,7 +448,57 @@
           <div class="clinical-session-panel clinical-session-revision-panel">
             <h3>Agentic report revision</h3>
             <p class="clinical-session-panel-note">Creates a new draft version. Human review is required before clinical reliance.</p>
-            <label class="clinical-session-field"><span>Revision instruction</span><textarea [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe the report issue."></textarea></label>
+            <section class="clinical-session-revision-model-panel" aria-label="Revision model selection">
+              <div class="clinical-session-revision-model-header">
+                <div>
+                  <h4>Revision model</h4>
+                  <p>Choose the model for this revision run. This selection does not change global model configuration.</p>
+                </div>
+                <span class="clinical-session-revision-model-badge">{{ revisionModelUseCloud() ? 'Cloud runtime' : 'Local runtime' }}</span>
+              </div>
+              @if (revisionModelLoading()) {
+                <p class="clinical-session-panel-note">Loading model options...</p>
+              } @else {
+                <div class="clinical-session-revision-model-fields">
+                  <label>
+                    <span>Runtime</span>
+                    <select [ngModel]="revisionModelUseCloud() ? 'cloud' : 'local'" (ngModelChange)="setRevisionModelRuntime($event)" [disabled]="revisionRunning()">
+                      <option value="local">Local</option>
+                      <option value="cloud">Cloud</option>
+                    </select>
+                  </label>
+                  @if (revisionModelUseCloud()) {
+                    <label>
+                      <span>Provider</span>
+                      <select [ngModel]="revisionModelProvider()" (ngModelChange)="setRevisionModelProvider($event)" [disabled]="revisionRunning()">
+                        @for (provider of revisionCloudProviders(); track provider.id) {
+                          <option [value]="provider.id">{{ provider.display_name }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label class="clinical-session-revision-model-field-wide">
+                      <span>Model</span>
+                      <select [ngModel]="revisionModelName()" (ngModelChange)="updateRevisionModelName($event)" [disabled]="revisionRunning() || !revisionCloudModels().length">
+                        @for (model of revisionCloudModels(); track model.id) {
+                          <option [value]="model.id">{{ model.display_name || model.id }}</option>
+                        }
+                      </select>
+                    </label>
+                  } @else {
+                    <label class="clinical-session-revision-model-field-wide">
+                      <span>Model</span>
+                      <select [ngModel]="revisionModelName()" (ngModelChange)="updateRevisionModelName($event)" [disabled]="revisionRunning() || !revisionLocalModels().length">
+                        @for (model of revisionLocalModels(); track model.name) {
+                          <option [value]="model.name">{{ model.name }}</option>
+                        }
+                      </select>
+                    </label>
+                  }
+                </div>
+              }
+              @if (revisionModelError()) { <p class="clinical-session-panel-note is-error">{{ revisionModelError() }}</p> }
+            </section>
+            <label class="clinical-session-revision-instruction"><span>Revision instruction</span><textarea [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe the report issue."></textarea></label>
             <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="startRevision()" [disabled]="revisionRunning()">Start revision</button>@if (revisionRunning()) { <button type="button" class="btn" (click)="cancelRevision()">Cancel</button> }</div>
             @if (revisionStatus()) { <p class="clinical-session-panel-note">{{ revisionStatus() }}</p> }
             @if (revisionVersionId() !== null && !revisionRunning()) { <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="recordRevisionReview('approved')">Approve by human</button><button type="button" class="btn" (click)="recordRevisionReview('rejected')">Reject</button></div> }
