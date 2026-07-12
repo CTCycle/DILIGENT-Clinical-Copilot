@@ -292,6 +292,29 @@ function Stop-PortListeners([int]$Port) {
     throw "Port $Port is still occupied after 20 seconds"
 }
 
+function Convert-ToCommandLineArgument([string]$Value) {
+    if ($Value -notmatch '[\s"]') {
+        return $Value
+    }
+    '"{0}"' -f ($Value -replace '"', '\\"')
+}
+
+function Get-BooleanEnvironmentValue {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][bool]$Default
+    )
+
+    $value = [Environment]::GetEnvironmentVariable($Name, 'Process')
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        return $Default
+    }
+    if ($value -notmatch '^(?i:true|false)$') {
+        throw "$Name must be true or false when set"
+    }
+    return $value -ieq 'true'
+}
+
 function Start-Application {
     Import-DotEnv -CreateIfMissing
     Install-ApplicationDependencies
@@ -302,7 +325,7 @@ function Start-Application {
     $uiHost = if ($env:UI_HOST) { $env:UI_HOST } else { '127.0.0.1' }
     $uiPort = if ($env:UI_PORT) { [int]$env:UI_PORT } else { 7861 }
     $reload = $env:RELOAD -eq 'true'
-    $backendVisible = $env:BACKEND_VISIBLE -eq 'true'
+    $backendLogsVisible = Get-BooleanEnvironmentValue -Name 'BACKEND_LOGS_VISIBLE' -Default $true
 
     Stop-PortListeners -Port $fastApiPort
     Stop-PortListeners -Port $uiPort
@@ -319,15 +342,18 @@ function Start-Application {
         $backendArguments += '--reload'
     }
 
+    $backendCommandParts = @($VenvPython) + $backendArguments |
+        ForEach-Object { Convert-ToCommandLineArgument -Value ([string]$_) }
+    $backendCommand = '"{0}"' -f ($backendCommandParts -join ' ')
+
     Write-Step 'Launching backend'
     $backendProcess = $null
-    if ($backendVisible) {
-        $quotedArguments = $backendArguments | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }
-        $backendCommand = '"{0}" {1}' -f $VenvPython, ($quotedArguments -join ' ')
-        Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', "start `"Backend`" cmd /c $backendCommand") -Wait
+    if ($backendLogsVisible) {
+        $backendProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/d', '/k', $backendCommand) `
+            -WorkingDirectory $RepoRoot -WindowStyle Normal -PassThru
     }
     else {
-        $backendProcess = Start-Process -FilePath $VenvPython -ArgumentList $backendArguments `
+        $backendProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/d', '/c', $backendCommand) `
             -WorkingDirectory $RepoRoot -WindowStyle Hidden -PassThru
     }
 
@@ -336,7 +362,7 @@ function Start-Application {
     $healthy = Invoke-HealthCheck -Url $healthUrl -Attempts 60 -DelaySeconds 1
     if (-not $healthy) {
         if ($backendProcess -and -not $backendProcess.HasExited) {
-            Stop-Process -Id $backendProcess.Id -Force
+            & taskkill.exe /PID $backendProcess.Id /T /F | Out-Null
         }
         throw "Backend did not become healthy at $healthUrl"
     }
@@ -344,6 +370,7 @@ function Start-Application {
     $backendPid = @(Get-ListeningProcessIds -Port $fastApiPort | Select-Object -First 1)
     Write-Step 'Launching frontend preview'
     $previewCommand = '"{0}" run preview -- --host "{1}" --port {2} --strictPort' -f $NpmCmd, $uiHost, $uiPort
+    $previewCommand = '"{0}"' -f $previewCommand
     $frontendProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/d', '/c', $previewCommand) `
         -WorkingDirectory $ClientDir -WindowStyle Hidden -PassThru
 
