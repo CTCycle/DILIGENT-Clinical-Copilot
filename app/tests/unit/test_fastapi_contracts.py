@@ -54,3 +54,13 @@ def test_inspection_revision_routes_are_present_in_openapi() -> None:
     assert not missing_paths, "OpenAPI missing inspection paths:\n" + "\n".join(
         missing_paths
     )
+
+
+###############################################################################
+def test_clean_break_routes_are_canonical() -> None:
+    paths = app.openapi()["paths"]
+    assert "/api/model-config/connectivity-check" in paths
+    assert "/api/model-config/openai-connectivity-check" not in paths
+    assert "/api/inspection/sessions/{session_id}/timelines" in paths
+    assert "/api/inspection/sessions/{session_id}/timelines/{timeline_id}" in paths
+    assert "/api/inspection/sessions/{session_id}/timeline" not in paths

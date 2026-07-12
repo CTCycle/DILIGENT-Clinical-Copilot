@@ -25,16 +25,6 @@ class InspectionTimelineEndpoint(InspectionEndpointBase):
         super().__init__(router=router, service=service)
 
     # -------------------------------------------------------------------------
-    def get_session_timeline(self, session_id: int) -> PatientTimeline:
-        timeline = self.service.get_session_timeline(session_id)
-        if timeline is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session timeline not found.",
-            )
-        return timeline
-
-    # -------------------------------------------------------------------------
     def get_session_timeline_by_id(
         self,
         session_id: int,
@@ -124,20 +114,6 @@ class InspectionTimelineEndpoint(InspectionEndpointBase):
             "/sessions/{session_id}/timelines/{timeline_id}",
             self.get_session_timeline_by_id,
             methods=["GET"],
-            response_model=PatientTimeline,
-            status_code=status.HTTP_200_OK,
-        )
-        self.router.add_api_route(
-            "/sessions/{session_id}/timeline",
-            self.get_session_timeline,
-            methods=["GET"],
-            response_model=PatientTimeline,
-            status_code=status.HTTP_200_OK,
-        )
-        self.router.add_api_route(
-            "/sessions/{session_id}/timeline",
-            self.generate_session_timeline,
-            methods=["POST"],
             response_model=PatientTimeline,
             status_code=status.HTTP_200_OK,
         )

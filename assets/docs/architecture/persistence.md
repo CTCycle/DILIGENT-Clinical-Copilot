@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-07-10
+Last updated: 2026-07-12
 
 ## Relational Database
 - SQLAlchemy-backed storage
@@ -62,6 +62,11 @@ app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-resee
 ## Access Key Persistence
 - Encrypted provider keys are persisted in database tables.
 - Encryption material is seeded and managed through shared security helpers.
+
+## Model Configuration Persistence
+- A newly initialized database receives the canonical model defaults from the server settings.
+- Existing provider and model selections are read as stored; unsupported values fail validation and are not translated, invalidated, or replaced by another selection.
+- The database initializer does not run a model-selection migration. Recreate the local database when discarding obsolete selections is intended.
 
 
 ## Agentic revision artifacts

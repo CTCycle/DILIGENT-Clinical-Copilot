@@ -8,7 +8,7 @@ from common.exceptions import ServiceValidationError
 from common.paths import VECTOR_DB_PATH
 from common.utils.catalog_loader import CatalogLoader
 from common.utils.logger import logger
-from services.llm.runtime_config import LLMRuntimeConfig
+from configurations.startup import get_server_settings
 from common.utils.types import (
     coerce_bool,
     coerce_float,
@@ -515,49 +515,66 @@ class ModelConfigService:
     # -------------------------------------------------------------------------
     def ensure_defaults(self) -> ModelConfigSnapshot:
         snapshot = self.serializer.load_snapshot()
-        updates: dict[str, Any] = {}
-        runtime_candidate = LLMRuntimeConfig.get_llm_provider()
-        try:
-            runtime_provider = self.resolve_provider(runtime_candidate)
-        except ServiceValidationError:
-            runtime_provider = self.resolve_provider(
-                snapshot.cloud_provider or "openai"
+        defaults = get_server_settings().llm_defaults
+        is_fresh = snapshot.updated_at is None and all(
+            value is None
+            for value in (
+                snapshot.clinical_model,
+                snapshot.text_extraction_model,
+                snapshot.cloud_provider,
+                snapshot.cloud_model,
             )
-        snapshot_provider = self.resolve_provider(
-            snapshot.cloud_provider or runtime_provider
         )
-        runtime_cloud_model = self.resolve_cloud_model(
-            provider=runtime_provider,
-            model_name=LLMRuntimeConfig.get_cloud_model(),
-        )
+        if is_fresh:
+            return self.serializer.save_snapshot(
+                clinical_model=defaults.clinical_model,
+                text_extraction_model=defaults.text_extraction_model,
+                use_cloud_models=defaults.use_cloud_services,
+                cloud_provider=self.resolve_provider(defaults.llm_provider),
+                cloud_model=self.resolve_cloud_model(
+                    provider=self.resolve_provider(defaults.llm_provider),
+                    model_name=defaults.cloud_model,
+                ),
+                ollama_temperature=defaults.ollama_temperature,
+                cloud_temperature=defaults.cloud_temperature,
+                ollama_reasoning=defaults.ollama_reasoning,
+            )
 
-        if snapshot.clinical_model is None:
-            updates["clinical_model"] = self.normalize_optional_text(
-                LLMRuntimeConfig.get_clinical_model()
-            )
-        if snapshot.text_extraction_model is None:
-            updates["text_extraction_model"] = self.normalize_optional_text(
-                LLMRuntimeConfig.get_text_extraction_model()
-            )
-        if snapshot.cloud_provider is None:
-            updates["cloud_provider"] = runtime_provider
-        if snapshot.cloud_model is None:
-            updates["cloud_model"] = self.resolve_cloud_model(
-                provider=snapshot_provider,
-                model_name=runtime_cloud_model,
-            )
-        if (
-            snapshot.cloud_provider is None
-            and snapshot.cloud_model is None
-            and snapshot.updated_at is None
-        ):
-            updates["use_cloud_models"] = LLMRuntimeConfig.is_cloud_enabled()
-        if snapshot.updated_at is None:
-            updates["ollama_reasoning"] = LLMRuntimeConfig.is_ollama_reasoning_enabled()
-
-        if updates:
-            return self.serializer.save_snapshot(**updates)
+        self.validate_current_snapshot(snapshot)
         return snapshot
+
+    # -------------------------------------------------------------------------
+    def validate_current_snapshot(self, snapshot: ModelConfigSnapshot) -> None:
+        provider = snapshot.cloud_provider
+        if provider is None and snapshot.cloud_model is not None:
+            raise ServiceValidationError(
+                "A cloud model cannot be configured without a cloud provider."
+            )
+        if provider is not None:
+            provider = self.resolve_provider(provider)
+        if snapshot.cloud_model is not None:
+            self.resolve_cloud_model(provider or "", snapshot.cloud_model)
+
+        for role_name, model_name in (
+            ("clinical", snapshot.clinical_model),
+            ("text_extraction", snapshot.text_extraction_model),
+        ):
+            if model_name is None:
+                if not snapshot.use_cloud_models:
+                    raise ServiceValidationError(
+                        f"A model is required for the local '{role_name}' role."
+                    )
+                continue
+            if model_name not in self.local_model_names and not snapshot.use_cloud_models:
+                raise ServiceValidationError(
+                    f"Model '{model_name}' is not supported for role '{role_name}'."
+                )
+
+        if snapshot.use_cloud_models:
+            if provider is None or snapshot.cloud_model is None:
+                raise ServiceValidationError(
+                    "Cloud mode requires both a provider and a model."
+                )
 
     # -------------------------------------------------------------------------
     @staticmethod

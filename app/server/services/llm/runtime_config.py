@@ -8,6 +8,10 @@ import json
 from typing import Literal
 
 from configurations.startup import get_server_settings
+from common.catalogs.model_choices import (
+    get_clinical_model_choices,
+    get_text_extraction_model_choices,
+)
 from domain.model_configs import ModelConfigSnapshot
 from domain.settings.configuration import LLMRuntimeDefaults
 from repositories.serialization.model_configs import (
@@ -34,20 +38,20 @@ class LLMRuntimeConfig:
         normalized = (value or "").strip().lower()
         try:
             return provider_registry.get(normalized).provider_id
-        except ValueError:
-            return ""
+        except ValueError as exc:
+            raise ValueError(f"Unsupported cloud provider: {normalized}") from exc
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _normalize_cloud_model(provider: str, value: str | None, fallback: str) -> str:
         normalized = (value or "").strip()
-        if (
-            normalized
-            and provider
-            and provider_registry.is_valid_model(provider, normalized)
-        ):
-            return normalized
-        return ""
+        if not normalized:
+            raise ValueError("Cloud model is required")
+        if not provider or not provider_registry.is_valid_model(provider, normalized):
+            raise ValueError(
+                f"Model '{normalized}' is not valid for provider '{provider}'"
+            )
+        return normalized
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -72,31 +76,66 @@ class LLMRuntimeConfig:
         defaults = cls._get_defaults()
         snapshot = ModelConfigSerializer().load_snapshot()
         overrides = cls._runtime_override.get() or {}
+        is_fresh = snapshot.updated_at is None and all(
+            value is None
+            for value in (
+                snapshot.clinical_model,
+                snapshot.text_extraction_model,
+                snapshot.cloud_provider,
+                snapshot.cloud_model,
+            )
+        )
+        if is_fresh:
+            base_provider = defaults.llm_provider
+            base_cloud_model = defaults.cloud_model
+            base_clinical_model = defaults.clinical_model
+            base_text_extraction_model = defaults.text_extraction_model
+        else:
+            base_provider = snapshot.cloud_provider
+            base_cloud_model = snapshot.cloud_model
+            base_clinical_model = snapshot.clinical_model
+            base_text_extraction_model = snapshot.text_extraction_model
+            local_choices = set(get_clinical_model_choices()) | set(
+                get_text_extraction_model_choices()
+            )
+            for role_name, model_name in (
+                ("clinical", base_clinical_model),
+                ("text_extraction", base_text_extraction_model),
+            ):
+                if model_name and model_name not in local_choices:
+                    raise ValueError(
+                        f"Model '{model_name}' is not supported for role '{role_name}'"
+                    )
         provider = cls._normalize_provider(
             cls._coerce_optional_text(overrides.get("cloud_provider"))
             if "cloud_provider" in overrides
-            else snapshot.cloud_provider,
+            else base_provider,
             defaults.llm_provider,
         )
-        cloud_model = cls._normalize_cloud_model(
-            provider,
+        requested_cloud_model = (
             cls._coerce_optional_text(overrides.get("cloud_model"))
             if "cloud_model" in overrides
-            else snapshot.cloud_model,
-            defaults.cloud_model,
+            else base_cloud_model
+        )
+        cloud_model = (
+            cls._normalize_cloud_model(provider, requested_cloud_model, defaults.cloud_model)
+            if requested_cloud_model or cls._coerce_bool(
+                overrides.get("use_cloud_models", snapshot.use_cloud_models)
+            )
+            else ""
         )
         return ModelConfigSnapshot(
             clinical_model=cls._normalize_local_model(
                 cls._coerce_optional_text(overrides.get("clinical_model"))
                 if "clinical_model" in overrides
-                else snapshot.clinical_model,
-                defaults.clinical_model,
+                else base_clinical_model,
+                "" if not is_fresh else defaults.clinical_model,
             ),
             text_extraction_model=cls._normalize_local_model(
                 cls._coerce_optional_text(overrides.get("text_extraction_model"))
                 if "text_extraction_model" in overrides
-                else snapshot.text_extraction_model,
-                defaults.text_extraction_model,
+                else base_text_extraction_model,
+                "" if not is_fresh else defaults.text_extraction_model,
             ),
             use_cloud_models=(
                 cls._coerce_bool(overrides.get("use_cloud_models"))
@@ -285,5 +324,14 @@ class LLMRuntimeConfig:
         if snapshot.use_cloud_models:
             provider = (snapshot.cloud_provider or "").strip()
             cloud_model = (snapshot.cloud_model or "").strip()
+            local_choices = set(get_clinical_model_choices()) | set(
+                get_text_extraction_model_choices()
+            )
+            if (
+                local_model
+                and local_model not in local_choices
+                and provider_registry.is_valid_model(provider, local_model)
+            ):
+                return provider, local_model
             return provider, cloud_model
         return "ollama", local_model

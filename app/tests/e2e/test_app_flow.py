@@ -207,10 +207,22 @@ def test_timetable_initial_load_has_no_console_errors_or_failed_requests(
             candidate_id = item.get("session_id") if isinstance(item, dict) else None
             if not isinstance(candidate_id, int) or candidate_id <= 0:
                 continue
-            timeline_response = page.request.get(
-                f"{api_base_url}/api/inspection/sessions/{candidate_id}/timeline"
+            timelines_response = page.request.get(
+                f"{api_base_url}/api/inspection/sessions/{candidate_id}/timelines"
             )
-            if timeline_response.status == 200:
+            if timelines_response.status != 200:
+                continue
+            timelines_payload = timelines_response.json()
+            timeline_items = timelines_payload.get("items", []) if isinstance(timelines_payload, dict) else []
+            latest = timeline_items[0] if isinstance(timeline_items, list) and timeline_items else None
+            timeline_id = latest.get("timeline_id") if isinstance(latest, dict) else None
+            if isinstance(timeline_id, int) and timeline_id > 0:
+                timeline_response = page.request.get(
+                    f"{api_base_url}/api/inspection/sessions/{candidate_id}/timelines/{timeline_id}"
+                )
+            else:
+                timeline_response = None
+            if timeline_response is not None and timeline_response.status == 200:
                 session_id = candidate_id
                 break
     if session_id is None:
