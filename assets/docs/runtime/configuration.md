@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 ## Primary Runtime Files
 - Active env file: `settings/.env`
@@ -17,7 +17,7 @@ Last updated: 2026-07-11
 - `UI_PORT=9847`
 - `VITE_API_BASE_URL=/api`
 - `RELOAD=false`
-- `BACKEND_VISIBLE=false`
+- `BACKEND_LOGS_VISIBLE=true` (defaults to `true` when absent)
 - `OPTIONAL_DEPENDENCIES=true`
 
 ## Operational Settings By Source
@@ -34,7 +34,7 @@ Last updated: 2026-07-11
 
 ## Local Runtime
 - Local runs serve the frontend from a preview or dev process.
-- `BACKEND_VISIBLE=true` opens a dedicated backend terminal; the default keeps it hidden.
+- `BACKEND_LOGS_VISIBLE=true` opens a dedicated backend terminal; `false` keeps it hidden. The launcher defaults to visible logs when the key is absent.
 - The frontend preview runs without a visible terminal window.
 
 ## Feature Toggles
