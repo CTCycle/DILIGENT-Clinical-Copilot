@@ -14,8 +14,6 @@ from repositories.queries.model_config import (
     ModelConfigRepositoryQueries,
 )
 from repositories.schemas.models import ModelSelection, RuntimeSetting
-from services.llm.provider_registry import provider_registry
-from common.utils.logger import logger
 
 ModelRoleType = Literal["clinical", "text_extraction", "cloud"]
 UNSET = object()
@@ -84,51 +82,6 @@ class ModelConfigSerializer:
                 .all()
             )
             return self.build_snapshot_with_runtime(rows, runtime_rows)
-        finally:
-            db_session.close()
-
-    # -------------------------------------------------------------------------
-    def migrate_cloud_selection_clean_break(self) -> int:
-        """Invalidate stale provider/model selections without translating aliases."""
-        db_session = self.session_factory()
-        invalidated = 0
-        try:
-            row = (
-                db_session.execute(ModelConfigRepositoryQueries.select_all())
-                .scalars()
-                .all()
-            )
-            cloud_row = next(
-                (item for item in row if str(item.role_type) == "cloud"), None
-            )
-            if cloud_row is None:
-                return 0
-            provider = str(cloud_row.provider or "").strip().lower()
-            model = str(cloud_row.model_name or "").strip()
-            try:
-                definition = provider_registry.get(provider)
-                valid = bool(model) and (
-                    not definition.models or model in definition.models
-                )
-            except ValueError:
-                valid = False
-            if not valid:
-                invalidated = int(bool(cloud_row.provider)) + int(
-                    bool(cloud_row.model_name)
-                )
-                cloud_row.provider = None
-                cloud_row.model_name = None
-                cloud_row.is_active = False
-                cloud_row.updated_at = datetime.now()
-                db_session.commit()
-            logger.info(
-                "Cloud configuration clean-break migration invalidated %d setting(s)",
-                invalidated,
-            )
-            return invalidated
-        except Exception:
-            db_session.rollback()
-            raise
         finally:
             db_session.close()
 

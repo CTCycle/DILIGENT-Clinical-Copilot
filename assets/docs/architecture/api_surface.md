@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
@@ -29,7 +29,7 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 ## Model Configuration Routes
 - `GET /api/model-config`
 - `PUT /api/model-config`
-- `POST /api/model-config/openai-connectivity-check`
+- `POST /api/model-config/connectivity-check`
 
 ## Access Key Routes
 - `GET /api/access-keys`
@@ -58,8 +58,6 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 - `GET /api/inspection/sessions/{session_id}/timelines`
 - `POST /api/inspection/sessions/{session_id}/timelines`
 - `GET /api/inspection/sessions/{session_id}/timelines/{timeline_id}`
-- `GET /api/inspection/sessions/{session_id}/timeline`
-- `POST /api/inspection/sessions/{session_id}/timeline`
 - `DELETE /api/inspection/sessions/{session_id}`
 - `GET /api/inspection/rxnav`
 - `GET /api/inspection/rxnav/{drug_id}/aliases`

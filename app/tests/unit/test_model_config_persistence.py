@@ -13,6 +13,7 @@ from services.llm.runtime_config import LLMRuntimeConfig
 from domain.model_configs import ConnectivityCheckRequest, ModelConfigSnapshot
 from services.llm.cloud import LLMError
 from services.llm.model_config import ModelConfigService
+from repositories.serialization.model_configs import ModelConfigSerializer
 from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
@@ -35,6 +36,72 @@ class InMemorySerializer:
         self.snapshot = ModelConfigSnapshot(**data)
         return self.snapshot
 
+
+###############################################################################
+def test_model_config_serializer_has_no_clean_break_migration() -> None:
+    assert not hasattr(ModelConfigSerializer, "migrate_cloud_selection_clean_break")
+
+
+###############################################################################
+def test_model_config_service_initializes_fresh_snapshot_from_canonical_defaults() -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model=None,
+            text_extraction_model=None,
+            use_cloud_models=False,
+            cloud_provider=None,
+            cloud_model=None,
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
+            updated_at=None,
+        )
+    )
+    snapshot = ModelConfigService(serializer=serializer).ensure_defaults()
+    assert snapshot.clinical_model
+    assert snapshot.text_extraction_model
+    assert snapshot.cloud_provider
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("cloud_provider", "cloud_model"),
+    [("legacy-openai", "gpt-4.1-mini"), ("deepseek", "legacy-model")],
+)
+def test_model_config_service_rejects_invalid_persisted_cloud_selection(
+    cloud_provider: str, cloud_model: str
+) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="qwen3.5:2b",
+            text_extraction_model="qwen3.5:2b",
+            use_cloud_models=False,
+            cloud_provider=cloud_provider,
+            cloud_model=cloud_model,
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
+            updated_at=datetime.now(),
+        )
+    )
+    with pytest.raises(ServiceValidationError):
+        ModelConfigService(serializer=serializer).ensure_defaults()
+
+
+###############################################################################
+def test_model_config_service_rejects_invalid_persisted_local_model() -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="legacy-local-model",
+            text_extraction_model="qwen3.5:2b",
+            use_cloud_models=False,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
+            updated_at=datetime.now(),
+        )
+    )
+    with pytest.raises(ServiceValidationError):
+        ModelConfigService(serializer=serializer).ensure_defaults()
 
 ###############################################################################
 def test_model_config_roundtrip_preserves_cloud_selection() -> None:

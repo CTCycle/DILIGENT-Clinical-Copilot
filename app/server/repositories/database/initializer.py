@@ -30,7 +30,6 @@ from repositories.serialization.access_key_encryption import (
 from repositories.serialization.catalogs import (
     ReferenceCatalogSerializer,
 )
-from repositories.serialization.model_configs import ModelConfigSerializer
 
 
 ###############################################################################
@@ -304,7 +303,6 @@ def initialize_database(
             seed_catalogs=seed_catalogs,
             force_reseed_catalogs=force_reseed_catalogs,
         )
-        ModelConfigSerializer().migrate_cloud_selection_clean_break()
     except (SQLAlchemyError, ValueError) as exc:
         logger.error("Database initialization failed: %s", exc)
         raise SystemExit(1) from exc

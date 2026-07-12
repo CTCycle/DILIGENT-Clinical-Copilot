@@ -78,16 +78,6 @@ export async function updateClinicalSession(
   );
 }
 
-export async function fetchInspectionSessionTimeline(
-  sessionId: number,
-): Promise<InspectionSessionTimeline> {
-  return requestJson<InspectionSessionTimeline>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timeline`,
-    { method: "GET" },
-    TIMELINE_REQUEST_TIMEOUT_SECONDS,
-  );
-}
-
 export async function fetchInspectionSessionTimelineList(
   sessionId: number,
 ): Promise<InspectionSessionTimelineListResponse> {
