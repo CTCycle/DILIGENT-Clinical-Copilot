@@ -312,8 +312,8 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: var(--space-md);
-  min-height: var(--control-height-sm);
+  gap: var(--space-sm);
+  min-height: calc(var(--control-height-sm) + var(--space-sm));
   margin-bottom: var(--space-md);
   padding: 0 0 var(--space-sm);
   border-bottom: 1px solid var(--color-divider);
@@ -321,6 +321,7 @@
   overflow-x: auto;
   overflow-y: visible;
   scrollbar-width: thin;
+  white-space: nowrap;
 }
 
 .clinical-session-toolbar-group {
@@ -335,7 +336,14 @@
   background: transparent;
 }
 
+.clinical-session-toolbar-group + .clinical-session-toolbar-group {
+  padding-left: var(--space-sm);
+  border-left: 1px solid var(--color-divider);
+}
+
 .clinical-session-toolbar-group-format select {
+  width: 148px;
+  min-width: 148px;
   min-height: var(--control-height-sm);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-sm);
@@ -347,7 +355,7 @@
 }
 
 .clinical-session-toolbar-group-standalone {
-  justify-self: end;
+  margin-left: auto;
 }
 
 .clinical-session-toolbar-group-editing {
@@ -366,8 +374,10 @@
   color: var(--color-text-primary);
   font-size: var(--font-sm);
   font-weight: 700;
+  min-width: 32px;
   padding: 0 var(--space-sm);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .clinical-session-editor-toolbar button:hover:not(:disabled),
@@ -386,6 +396,12 @@
   width: 34px;
   min-width: 34px;
   padding: 4px;
+}
+
+.clinical-session-toolbar-group-editing button {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
 }
 
 .clinical-session-view-mode button.is-active {
@@ -422,7 +438,7 @@
   color: var(--color-text-secondary);
   font-size: var(--font-sm);
   font-weight: 700;
-  min-width: 42px;
+  min-width: 44px;
   text-align: center;
 }
 
@@ -1620,14 +1636,11 @@
   }
 
   .clinical-session-editor-toolbar {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    max-width: 100%;
   }
 
   .clinical-session-toolbar-group-standalone {
     margin-left: 0;
-    justify-self: auto;
   }
 
   .clinical-sessions-layout {
