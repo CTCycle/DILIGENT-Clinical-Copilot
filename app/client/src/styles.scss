@@ -5943,9 +5943,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-preview-a-layout .model-config-cloud-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 150px 140px;
-  gap: 12px;
-  min-height: 64px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  min-height: 76px;
   margin: 0;
   border: 0;
   border-top: 1px solid rgba(155, 196, 183, 0.45);
@@ -5953,6 +5954,42 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: transparent;
   box-shadow: none;
   padding: 10px 0;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-provider-name {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-provider-name > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-provider-name small {
+  max-width: 680px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+  line-height: 1.4;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-provider-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-provider-logo {
+  display: block;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-cloud-row:first-of-type {
@@ -5973,6 +6010,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-provider-mark.is-openai img {
   filter: invert(1) brightness(1.65);
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-provider-mark.is-monochrome img {
+  filter: invert(1) brightness(1.55);
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-table th,
@@ -6190,7 +6231,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-test-btn {
-  width: 140px;
+  width: 152px;
+  justify-self: end;
   padding-right: 10px;
   padding-left: 10px;
   font-size: 11px;
@@ -6372,6 +6414,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .model-config-page .model-config-preview-a-layout .model-config-cloud-row select,
   .model-config-page .model-config-preview-a-layout .model-config-test-btn {
     width: 100%;
+  }
+
+  .model-config-page .model-config-preview-a-layout .model-config-test-btn {
+    justify-self: stretch;
   }
 
   .model-config-page .model-config-preview-a-layout .model-config-table-shell {
