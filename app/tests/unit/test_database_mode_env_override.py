@@ -38,24 +38,14 @@ def test_database_settings_are_loaded_from_json_without_env_overlap(
 ) -> None:
     config_path = tmp_path / "configurations.json"
     _write_config(config_path, _base_payload())
-    monkeypatch.delenv("DATABASE_BACKEND", raising=False)
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.delenv("DATABASE_SQLITE_PATH", raising=False)
-    monkeypatch.delenv("DATABASE_WRITE_BATCH_SIZE", raising=False)
-    monkeypatch.delenv("DATABASE_READ_PAGE_SIZE", raising=False)
-    monkeypatch.setenv("EMBEDDED_DATABASE", "false")
-    monkeypatch.setenv("DATABASE_ENGINE", "postgresql+psycopg")
-    monkeypatch.setenv("DATABASE_HOST", "env-host")
-    monkeypatch.setenv("DATABASE_PORT", "5433")
-    monkeypatch.setenv("DATABASE_NAME", "env_db")
-    monkeypatch.setenv("DATABASE_USERNAME", "env_user")
-    monkeypatch.setenv("DATABASE_PASSWORD", "env_secret")
-    monkeypatch.setenv("DATABASE_SSL", "true")
-    monkeypatch.setenv("DATABASE_SSL_CA", "/env/ca.crt")
+    monkeypatch.setenv("DATABASE_BACKEND", "postgresql")
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql+psycopg://env_user:env_secret@env-host:5433/env_db",
+    )
     monkeypatch.setenv("DATABASE_CONNECT_TIMEOUT", "18")
-    monkeypatch.setenv("DATABASE_INSERT_BATCH_SIZE", "1200")
-    monkeypatch.setenv("DATABASE_INSERT_COMMIT_INTERVAL", "7")
-    monkeypatch.setenv("DATABASE_SELECT_PAGE_SIZE", "2400")
+    monkeypatch.setenv("DATABASE_WRITE_BATCH_SIZE", "1200")
+    monkeypatch.setenv("DATABASE_READ_PAGE_SIZE", "2400")
 
     payload = build_settings_payload_from_json(
         load_configuration_data(config_path),
@@ -64,7 +54,7 @@ def test_database_settings_are_loaded_from_json_without_env_overlap(
 
     assert payload["database"] == {
         "backend": "postgresql",
-        "url": None,
+        "url": "postgresql+psycopg://env_user:env_secret@env-host:5433/env_db",
         "sqlite_path": None,
         "write_batch_size": 1200,
         "read_page_size": 2400,
@@ -75,11 +65,11 @@ def test_database_settings_are_loaded_from_json_without_env_overlap(
         "database_name": "env_db",
         "username": "env_user",
         "password": "env_secret",
-        "ssl": True,
-        "ssl_ca": "/env/ca.crt",
+        "ssl": False,
+        "ssl_ca": None,
         "connect_timeout": 18,
         "insert_batch_size": 1200,
-        "insert_commit_interval": 7,
+        "insert_commit_interval": 5,
         "select_page_size": 2400,
     }
 

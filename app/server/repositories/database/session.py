@@ -15,9 +15,7 @@ from repositories.database.sqlite import SQLiteRepository
 @lru_cache(maxsize=1)
 def get_default_repository():
     settings = get_server_settings().database
-    repository_cls = (
-        SQLiteRepository if settings.embedded_database else PostgresRepository
-    )
+    repository_cls = SQLiteRepository if settings.backend == "sqlite" else PostgresRepository
     return repository_cls(settings)
 
 ###############################################################################

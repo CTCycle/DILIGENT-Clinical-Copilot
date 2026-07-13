@@ -240,7 +240,7 @@ def run_database_initialization(
     use_default_init_kwargs = (
         not drop_existing and seed_catalogs and not force_reseed_catalogs
     )
-    if settings.embedded_database:
+    if settings.backend == "sqlite":
         logger.info("Running SQLite initialization path.")
         if use_default_init_kwargs:
             initialize_sqlite_database(settings)
