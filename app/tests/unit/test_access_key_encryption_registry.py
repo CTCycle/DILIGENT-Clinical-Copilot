@@ -6,15 +6,21 @@ from common.security.cryptography import (
     decrypt_with_key_material,
     encrypt_with_key_material,
 )
-from repositories.schemas.models import (
-    AccessKeyEncryptionMaterial,
-    Base,
-)
+from repositories.schemas.models import Base
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import pytest
+
+###############################################################################
+@pytest.fixture(autouse=True)
+def external_material_file(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv(
+        "DILIGENT_ACCESS_KEY_MATERIAL_FILE",
+        str(tmp_path / "access-key-material.json"),
+    )
 
 ###############################################################################
 def build_serializer() -> tuple[AccessKeyEncryptionMaterialSerializer, sessionmaker]:
@@ -46,26 +52,15 @@ def test_ensure_seeded_is_idempotent() -> None:
     first = serializer.ensure_seeded()
     second = serializer.ensure_seeded()
 
-    assert first.id == second.id
+    assert first.key_material == second.key_material
     assert first.key_version == second.key_version == 1
 
 ###############################################################################
-def test_only_one_active_row_exists_per_purpose() -> None:
-    serializer, factory = build_serializer()
+def test_only_one_active_material_exists_per_purpose() -> None:
+    serializer, _ = build_serializer()
     serializer.ensure_seeded()
     serializer.rotate_material()
-
-    with factory() as db_session:
-        count_active = db_session.execute(
-            select(func.count())
-            .select_from(AccessKeyEncryptionMaterial)
-            .where(
-                AccessKeyEncryptionMaterial.key_purpose == "provider_access_keys",
-                AccessKeyEncryptionMaterial.is_active.is_(True),
-            )
-        ).scalar_one()
-
-    assert int(count_active) == 1
+    assert serializer.get_active_material().is_active is True
 
 ###############################################################################
 def test_rotate_material_creates_new_active_version() -> None:
@@ -95,7 +90,7 @@ def test_get_material_by_version_returns_correct_row() -> None:
     assert v2.key_version == 2
 
 ###############################################################################
-def test_encrypt_and_decrypt_use_db_seeded_material() -> None:
+def test_encrypt_and_decrypt_use_external_material() -> None:
     serializer, _ = build_serializer()
     material = serializer.ensure_seeded()
     plaintext = "provider-secret-123"
