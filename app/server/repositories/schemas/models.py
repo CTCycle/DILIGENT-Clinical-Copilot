@@ -531,69 +531,6 @@ class ClinicalSessionRevisionArtifact(Base):
     )
 
 ###############################################################################
-class ClinicalSessionRevisionEntity(Base):
-    __tablename__ = "clinical_session_revision_entities"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    revision_version_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("clinical_session_versions.id"),
-        nullable=False,
-    )
-    source_version_id: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("clinical_session_versions.id"),
-        nullable=True,
-    )
-    pipeline_run_id: Mapped[str] = mapped_column(String, nullable=False)
-    step_name: Mapped[str] = mapped_column(String, nullable=False)
-    entity_type: Mapped[str] = mapped_column(String, nullable=False)
-    entity_revision_status: Mapped[str] = mapped_column(String, nullable=False)
-    source_section: Mapped[str | None] = mapped_column(String, nullable=True)
-    original_entity_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    original_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    revised_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    normalized_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    requires_human_review: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=False,
-    )
-    human_review_status: Mapped[str | None] = mapped_column(String, nullable=True)
-    payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    schema_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    schema_version: Mapped[str | None] = mapped_column(String, nullable=True)
-    prompt_version: Mapped[str | None] = mapped_column(String, nullable=True)
-    parser_version: Mapped[str | None] = mapped_column(String, nullable=True)
-    model_provider: Mapped[str | None] = mapped_column(String, nullable=True)
-    model_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    input_hash: Mapped[str | None] = mapped_column(String, nullable=True)
-    output_hash: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-        server_default=text("CURRENT_TIMESTAMP"),
-    )
-    superseded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-
-    __table_args__ = (
-        CheckConstraint(
-            "entity_type IN ('drug', 'disease', 'lab_timeline_entry', 'livertox_match', 'dili_assessment')",
-            name="ck_clinical_session_revision_entities_entity_type",
-        ),
-        Index("ix_revision_entities_revision_version_id", "revision_version_id"),
-        Index("ix_revision_entities_source_version_id", "source_version_id"),
-        Index("ix_revision_entities_pipeline_run_id", "pipeline_run_id"),
-        Index("ix_revision_entities_entity_type", "entity_type"),
-        Index("ix_revision_entities_status", "entity_revision_status"),
-        Index("ix_revision_entities_normalized_name", "normalized_name"),
-        Index(
-            "ix_revision_entities_requires_human_review",
-            "requires_human_review",
-        ),
-    )
-
-###############################################################################
 class Drug(Base):
     __tablename__ = "drugs"
 
