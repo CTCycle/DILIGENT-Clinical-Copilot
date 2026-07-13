@@ -26,7 +26,7 @@ def upsert_drugs_catalog_records(
     prepared_rows = self.prepare_rxnav_rows(records)
     if not prepared_rows:
         return
-    effective_commit_interval = self.resolve_commit_interval(commit_interval)
+    effective_batch_size = self.resolve_commit_interval(commit_interval)
     today_marker = date.today().isoformat()
     db_session = self.session_factory()
     try:
@@ -106,7 +106,8 @@ def upsert_drugs_catalog_records(
                         term_type=term_type,
                     )
             pending += 1
-            if pending >= effective_commit_interval:
+            if pending >= effective_batch_size:
+                db_session.flush()
                 db_session.commit()
                 pending = 0
         if pending:
@@ -121,7 +122,7 @@ def upsert_drugs_catalog_records(
 def resolve_commit_interval(self, override: int | None) -> int:
     if override is not None:
         return max(int(override), 1)
-    return max(int(get_server_settings().database.insert_commit_interval), 1)
+    return max(int(get_server_settings().database.insert_batch_size), 1)
 
 ###############################################################################
 def prepare_rxnav_rows(
