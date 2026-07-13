@@ -174,12 +174,14 @@ class AccessKeySerializer:
                 raise ValueError("Access key not found")
             table = self.resolve_table_from_row(target)
 
-            db_session.execute(
-                AccessKeyRepositoryQueries.deactivate_provider_keys(
-                    table, target.provider, now=now
-                )
-            )
-            target.is_active = True
+            provider_rows = db_session.execute(
+                select(table)
+                .where(table.provider == target.provider)
+                .with_for_update()
+            ).scalars().all()
+            for row in provider_rows:
+                row.is_active = int(row.id) == int(target.id)
+                row.updated_at = now
             target.updated_at = now
             db_session.commit()
             db_session.refresh(target)

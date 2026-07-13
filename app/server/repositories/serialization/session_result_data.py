@@ -49,6 +49,7 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
                 session_data.get("session_timestamp")
             ),
             version=self.to_int(session_data.get("version")) or 1,
+            next_version_number=(self.to_int(session_data.get("version")) or 1) + 1,
             original_session_id=self.to_int(session_data.get("original_session_id")),
             hepatic_pattern=self.normalize_string(session_data.get("hepatic_pattern")),
             text_extraction_model=self.normalize_string(

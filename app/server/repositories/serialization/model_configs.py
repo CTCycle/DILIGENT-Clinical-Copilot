@@ -89,8 +89,9 @@ class ModelConfigSerializer:
                         payload.get("text_extraction_model")
                     ),
                     use_cloud_models=bool(payload.get("use_cloud_models", False)),
-                    cloud_provider=self.normalize_optional_text(
-                        payload.get("cloud_provider")
+                    cloud_provider=(
+                        self.normalize_optional_text(payload.get("cloud_provider"))
+                        or "openai"
                     ),
                     cloud_model=self.normalize_optional_text(payload.get("cloud_model")),
                     ollama_temperature=self.normalize_temperature(

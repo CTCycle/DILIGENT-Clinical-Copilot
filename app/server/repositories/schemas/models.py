@@ -72,6 +72,9 @@ class ClinicalSession(Base):
     version: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("1")
     )
+    next_version_number: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("2")
+    )
     original_session_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
