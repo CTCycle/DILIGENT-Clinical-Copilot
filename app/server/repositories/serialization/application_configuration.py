@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from sqlalchemy.engine import Engine
@@ -37,10 +38,11 @@ class ApplicationConfigurationSerializer:
         *,
         schema_version: int = 1,
     ) -> dict[str, Any]:
+        json_safe_payload = json.loads(json.dumps(payload, default=str))
         with unit_of_work(session_factory=self.session_factory) as db_session:
             row = upsert_application_configuration(
                 db_session,
-                payload=payload,
+                payload=json_safe_payload,
                 schema_version=schema_version,
             )
             return dict(row.payload)
