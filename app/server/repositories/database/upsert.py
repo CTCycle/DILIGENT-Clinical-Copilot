@@ -8,6 +8,7 @@ from repositories.schemas.models import (
     ApplicationConfiguration,
     DrugAlias,
     DrugRxnormCode,
+    LiverToxMonograph,
 )
 
 
@@ -136,5 +137,37 @@ def upsert_drug_rxnorm_codes(
     statement = _dialect_insert(db_session, DrugRxnormCode).values(values)
     statement = statement.on_conflict_do_nothing(
         index_elements=[DrugRxnormCode.rxcui]
+    )
+    db_session.execute(statement)
+
+###############################################################################
+def upsert_livertox_monographs(
+    db_session: Session, values: list[dict[str, Any]]
+) -> None:
+    """Atomically replace a batch of LiverTox monograph records by identity."""
+    if not values:
+        return
+    statement = _dialect_insert(db_session, LiverToxMonograph).values(values)
+    statement = statement.on_conflict_do_update(
+        index_elements=[LiverToxMonograph.monograph_key],
+        set_={
+            key: getattr(statement.excluded, key)
+            for key in (
+                "drug_id",
+                "drug_name_norm",
+                "nbk_id",
+                "excerpt",
+                "likelihood_score",
+                "last_update",
+                "reference_count",
+                "year_approved",
+                "agent_classification",
+                "primary_classification",
+                "secondary_classification",
+                "include_in_livertox",
+                "source_url",
+                "source_last_modified",
+            )
+        },
     )
     db_session.execute(statement)

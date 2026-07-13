@@ -16,6 +16,10 @@ from common.constants import (
 )
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
+from repositories.database.upsert import (
+    upsert_drug_aliases,
+    upsert_livertox_monographs,
+)
 from repositories.schemas.models import (
     ClinicalSessionDrug,
     Drug,
@@ -33,43 +37,148 @@ def save_livertox_records(self, records: pd.DataFrame) -> None:
         return
     db_session = self.session_factory()
     try:
-        for row in prepared_rows:
-            drug_name = cast(str, row["_drug_name"])
-            normalized_name = cast(str, row["_canonical_name_norm"])
-            safe_nbk_id = self.normalize_string(row.get("nbk_id"))
-            drug = self.ensure_drug(
-                db_session,
-                canonical_name=drug_name,
-                canonical_name_norm=normalized_name,
-                rxnorm_rxcui=None,
-                livertox_nbk_id=None,
-            )
-            if safe_nbk_id is not None:
-                self.try_assign_livertox_nbk_id(
-                    db_session,
-                    drug=drug,
-                    livertox_nbk_id=safe_nbk_id,
-                )
-            self.upsert_drug_alias(
-                db_session,
-                drug_id=int(drug.id),
-                alias=drug_name,
-                alias_kind="canonical",
-                source="livertox",
-                term_type=None,
-            )
-            self.persist_livertox_aliases(db_session, int(drug.id), row)
-            self.upsert_livertox_monograph(
-                db_session=db_session,
-                drug_id=int(drug.id),
-                row=row,
-            )
+        drug_values = _build_livertox_drug_values(self, prepared_rows)
+        _upsert_livertox_drug_values(db_session, drug_values)
+        db_session.flush()
+        drug_ids = _load_livertox_drug_ids(db_session, drug_values)
+        upsert_drug_aliases(
+            db_session,
+            _build_livertox_alias_values(self, prepared_rows, drug_ids),
+        )
+        upsert_livertox_monographs(
+            db_session,
+            _build_livertox_monograph_values(self, prepared_rows, drug_ids),
+        )
         db_session.commit()
     except Exception:
         db_session.rollback()
         raise
     finally:
         db_session.close()
+
+###############################################################################
+def _build_livertox_drug_values(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    values_by_norm: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        normalized = cast(str, row["_canonical_name_norm"])
+        values_by_norm.setdefault(
+            normalized,
+            {
+                "canonical_name": row["_drug_name"],
+                "canonical_name_norm": normalized,
+                "livertox_nbk_id": self.normalize_string(row.get("nbk_id")),
+            },
+        )
+    return list(values_by_norm.values())
+
+###############################################################################
+def _upsert_livertox_drug_values(db_session, values: list[dict[str, Any]]) -> None:
+    if not values:
+        return
+    dialect = db_session.get_bind().dialect.name
+    if dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert
+    elif dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    else:
+        raise ValueError(f"Unsupported upsert dialect: {dialect}")
+    statement = insert(Drug).values(values)
+    statement = statement.on_conflict_do_update(
+        index_elements=[Drug.canonical_name_norm],
+        set_={
+            "canonical_name": statement.excluded.canonical_name,
+            "livertox_nbk_id": func.coalesce(
+                Drug.livertox_nbk_id, statement.excluded.livertox_nbk_id
+            ),
+        },
+    )
+    db_session.execute(statement)
+
+###############################################################################
+def _load_livertox_drug_ids(
+    db_session, values: list[dict[str, Any]]
+) -> dict[str, int]:
+    names = [value["canonical_name_norm"] for value in values]
+    rows = db_session.execute(
+        select(Drug.canonical_name_norm, Drug.id).where(
+            Drug.canonical_name_norm.in_(names)
+        )
+    ).all()
+    return {str(normalized): int(drug_id) for normalized, drug_id in rows}
+
+###############################################################################
+def _build_livertox_alias_values(
+    self,
+    rows: list[dict[str, Any]],
+    drug_ids: dict[str, int],
+) -> list[dict[str, Any]]:
+    values: dict[tuple[int, str, str, str], dict[str, Any]] = {}
+    for row in rows:
+        drug_id = drug_ids[row["_canonical_name_norm"]]
+        candidates = [
+            (row["_drug_name"], "canonical"),
+            *(
+                (alias, "ingredient")
+                for alias in self.extract_text_candidates(row.get("ingredient"))
+            ),
+            *(
+                (alias, "brand")
+                for alias in self.extract_text_candidates(row.get("brand_name"))
+            ),
+            *(
+                (alias, "synonym")
+                for alias in self.extract_synonym_candidates(row.get("synonyms"))
+            ),
+        ]
+        for alias, alias_kind in candidates:
+            clean_alias = self.normalize_string(alias)
+            if clean_alias is None:
+                continue
+            alias_norm = normalize_drug_name(clean_alias)
+            if not alias_norm:
+                continue
+            key = (drug_id, alias_norm, alias_kind, "livertox")
+            values[key] = {
+                "drug_id": drug_id,
+                "alias": clean_alias,
+                "alias_norm": alias_norm,
+                "alias_kind": alias_kind,
+                "source": "livertox",
+                "term_type": None,
+            }
+    return list(values.values())
+
+###############################################################################
+def _build_livertox_monograph_values(
+    self,
+    rows: list[dict[str, Any]],
+    drug_ids: dict[str, int],
+) -> list[dict[str, Any]]:
+    values: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        monograph_key = self.build_livertox_monograph_key(row)
+        values[monograph_key] = {
+            "drug_id": drug_ids[row["_canonical_name_norm"]],
+            "monograph_key": monograph_key,
+            "drug_name_norm": row["_canonical_name_norm"],
+            "nbk_id": self.normalize_string(row.get("nbk_id")),
+            "excerpt": self.normalize_string(row.get("excerpt")),
+            "likelihood_score": self.normalize_string(row.get("likelihood_score")),
+            "last_update": self.normalize_date(row.get("last_update")),
+            "reference_count": self.to_int(row.get("reference_count")),
+            "year_approved": self.to_int(row.get("year_approved")),
+            "agent_classification": self.normalize_string(row.get("agent_classification")),
+            "primary_classification": self.normalize_string(row.get("primary_classification")),
+            "secondary_classification": self.normalize_string(row.get("secondary_classification")),
+            "include_in_livertox": (
+                None
+                if (flag := self.normalize_flag(row.get("include_in_livertox"))) is None
+                else flag == 1
+            ),
+            "source_url": self.normalize_string(row.get("source_url")),
+            "source_last_modified": self.normalize_string(row.get("source_last_modified")),
+        }
+    return list(values.values())
 
 ###############################################################################
 def prepare_livertox_rows(self, records: pd.DataFrame) -> list[dict[str, Any]]:
