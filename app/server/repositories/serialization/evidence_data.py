@@ -284,7 +284,12 @@ def get_livertox_master_list(self) -> pd.DataFrame:
     )
 
 ###############################################################################
-def get_drugs_catalog(self) -> pd.DataFrame:
+def get_drugs_catalog(
+    self,
+    *,
+    offset: int = 0,
+    limit: int | None = None,
+) -> pd.DataFrame:
     db_session = self.session_factory()
     try:
         drugs = (
@@ -294,7 +299,9 @@ def get_drugs_catalog(self) -> pd.DataFrame:
                     selectinload(Drug.rxnorm_codes),
                     selectinload(Drug.aliases),
                 )
-                .order_by(Drug.id.asc())
+            .order_by(Drug.id.asc())
+            .offset(max(int(offset), 0))
+            .limit(None if limit is None else max(int(limit), 1))
             )
             .scalars()
             .unique()
@@ -352,13 +359,18 @@ def stream_drugs_catalog(self, page_size: int | None = None) -> Iterator[pd.Data
         if page_size is None
         else max(int(page_size), 1)
     )
-    frame = self.get_drugs_catalog()
-    if frame.empty:
-        return
-    for start in range(0, len(frame), chunk_size):
-        chunk = frame.iloc[start : start + chunk_size]
-        if not chunk.empty:
-            yield chunk.reset_index(drop=True)
+    offset = 0
+    while True:
+        frame = self.get_drugs_catalog(offset=offset, limit=chunk_size)
+        if frame.empty:
+            # A page may contain drugs without RxNorm rows; continue until the
+            # database page itself is exhausted rather than ending early.
+            probe = self.get_drugs_catalog(offset=offset, limit=1)
+            if probe.empty:
+                return
+        else:
+            yield frame.reset_index(drop=True)
+        offset += chunk_size
 
 ###############################################################################
 def build_search_pattern(self, search: str | None) -> str | None:
