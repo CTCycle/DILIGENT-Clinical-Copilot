@@ -9,18 +9,17 @@ from repositories.schemas.models import (
     ClinicalSessionVersion,
     Drug,
     DrugIdentifier,
-    Patient,
 )
 
 
+###############################################################################
 def test_session_children_cascade_and_drug_mentions_set_null(
     persistence_session,
 ) -> None:  # type: ignore[no-untyped-def]
-    patient = Patient(name="Contract Patient")
     drug = Drug(canonical_name="Contract Drug", canonical_name_norm="contract drug")
-    persistence_session.add_all([patient, drug])
+    persistence_session.add(drug)
     persistence_session.flush()
-    session = ClinicalSession(patient_id=patient.id, version=1)
+    session = ClinicalSession(patient_name="Contract Patient", version=1)
     persistence_session.add(session)
     persistence_session.flush()
     persistence_session.add_all(

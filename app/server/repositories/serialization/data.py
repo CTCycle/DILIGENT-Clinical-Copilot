@@ -15,7 +15,6 @@ from repositories.schemas.models import (
     Drug,
     DrugAlias,
     LiverToxMonograph,
-    Patient,
 )
 from repositories.serialization import (
     evidence_aliases,
@@ -51,12 +50,6 @@ class DataSerializer:
     # -------------------------------------------------------------------------
     def normalize_session_status(self, value: Any) -> str:
         return session_result_data.normalize_session_status(self, value)
-
-    # -------------------------------------------------------------------------
-    def persist_patient(
-        self, db_session: Session, session_data: dict[str, Any]
-    ) -> Patient:
-        return session_result_data.persist_patient(self, db_session, session_data)
 
     # -------------------------------------------------------------------------
     def decode_patient_image(self, value: Any) -> bytes | None:

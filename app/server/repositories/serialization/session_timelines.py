@@ -10,7 +10,6 @@ from repositories.schemas.models import (
     ClinicalSessionResult,
     ClinicalSessionSection,
     ClinicalSessionTimeline,
-    Patient,
 )
 
 ###############################################################################
@@ -201,13 +200,12 @@ def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
     db_session = self.session_factory()
     try:
         row = db_session.execute(
-            select(ClinicalSession, Patient)
-            .join(Patient, ClinicalSession.patient_id == Patient.id)
+            select(ClinicalSession)
             .where(ClinicalSession.id == safe_session_id)
         ).first()
         if row is None:
             return None
-        session_row, patient_row = row
+        session_row = row[0]
         payload_json = db_session.execute(
             select(ClinicalSessionResult.payload_json).where(
                 ClinicalSessionResult.session_id == safe_session_id
@@ -226,19 +224,19 @@ def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
         }
         return {
             "session_id": safe_session_id,
-            "patient_name": self.normalize_string(patient_row.name),
-            "visit_date": patient_row.visit_date.isoformat()
-            if patient_row.visit_date
+            "patient_name": self.normalize_string(session_row.patient_name),
+            "visit_date": session_row.visit_date.isoformat()
+            if session_row.visit_date
             else None,
             "session_timestamp": (
                 session_row.session_timestamp.isoformat()
                 if session_row.session_timestamp
                 else None
             ),
-            "anamnesis": self.normalize_string(patient_row.anamnesis),
-            "drugs": self.normalize_string(patient_row.drugs),
+            "anamnesis": self.normalize_string(session_row.anamnesis),
+            "drugs": self.normalize_string(session_row.drugs_text),
             "laboratory_analysis": self.normalize_string(
-                patient_row.laboratory_analysis
+                session_row.laboratory_analysis
             ),
             "text_extraction_model": self.normalize_string(
                 session_row.text_extraction_model

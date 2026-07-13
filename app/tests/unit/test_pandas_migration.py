@@ -10,7 +10,6 @@ from repositories.schemas.models import (
     ClinicalSession,
     ClinicalSessionLab,
     ClinicalSessionResult,
-    Patient,
 )
 from repositories.serialization.data import DataSerializer
 from services.clinical.livertox import LiverToxData
@@ -75,16 +74,13 @@ def test_save_clinical_session_preserves_row_append_order() -> None:
             .scalars()
             .all()
         )
-        patients = (
-            db_session.execute(select(Patient).order_by(Patient.id)).scalars().all()
-        )
 
     assert len(rows) == 2
     assert [row.session_timestamp.isoformat() for row in rows] == [
         "2025-01-01T00:00:00",
         "2025-01-02T00:00:00",
     ]
-    assert [row.name for row in patients] == ["existing", "incoming"]
+    assert [row.patient_name for row in rows] == ["existing", "incoming"]
 
 ###############################################################################
 def test_save_clinical_session_persists_raw_result_payload() -> None:
