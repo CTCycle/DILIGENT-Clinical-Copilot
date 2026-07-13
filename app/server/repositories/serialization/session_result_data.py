@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import and_, delete, exists, func, or_, select, update
+from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from common.utils.logger import logger
@@ -22,10 +22,6 @@ from repositories.schemas.models import (
     ClinicalSessionManualEdit,
     ClinicalSessionResult,
     ClinicalSessionTimeline,
-    ClinicalSessionRevisionArtifact,
-    ClinicalSessionRevisionEntity,
-    ClinicalSessionRevisionReview,
-    ClinicalSessionRevisionRun,
     ClinicalSessionSection,
     ClinicalSessionVersion,
     Patient,
@@ -482,108 +478,8 @@ def delete_session(self, session_id: int) -> bool:
         if existing is None:
             return False
         patient_id = int(existing.patient_id)
-
-        # Collect version IDs before deleting, so we can cascade to their children
-        version_ids = [
-            row[0]
-            for row in db_session.execute(
-                select(ClinicalSessionVersion.id).where(
-                    ClinicalSessionVersion.root_session_id == safe_session_id
-                )
-            ).fetchall()
-        ]
-
-        if version_ids:
-            db_session.execute(
-                delete(ClinicalSessionRevisionArtifact).where(
-                    ClinicalSessionRevisionArtifact.revision_version_id.in_(version_ids)
-                )
-            )
-            db_session.execute(
-                delete(ClinicalSessionRevisionEntity).where(
-                    ClinicalSessionRevisionEntity.revision_version_id.in_(version_ids)
-                )
-            )
-            db_session.execute(
-                delete(ClinicalSessionRevisionReview).where(
-                    ClinicalSessionRevisionReview.revision_version_id.in_(version_ids)
-                )
-            )
-            # Nullify self-referential source_version_id before deleting versions
-            db_session.execute(
-                update(ClinicalSessionVersion)
-                .where(ClinicalSessionVersion.id.in_(version_ids))
-                .where(ClinicalSessionVersion.source_version_id.isnot(None))
-                .values(source_version_id=None)
-            )
-
-        # Cascade: revision runs, versions, manual edits
-        db_session.execute(
-            delete(ClinicalSessionRevisionRun).where(
-                ClinicalSessionRevisionRun.session_id == safe_session_id
-            )
-        )
-        db_session.execute(
-            delete(ClinicalSessionRevisionRun).where(
-                ClinicalSessionRevisionRun.root_session_id == safe_session_id
-            )
-        )
-        db_session.execute(
-            delete(ClinicalSessionRevisionReview).where(
-                ClinicalSessionRevisionReview.session_id == safe_session_id
-            )
-        )
-        # Nullify nullable session_id FK before deleting by root_session_id
-        db_session.execute(
-            update(ClinicalSessionVersion)
-            .where(ClinicalSessionVersion.session_id == safe_session_id)
-            .values(session_id=None)
-        )
-        db_session.execute(
-            delete(ClinicalSessionVersion).where(
-                ClinicalSessionVersion.root_session_id == safe_session_id
-            )
-        )
-        db_session.execute(
-            delete(ClinicalSessionManualEdit).where(
-                ClinicalSessionManualEdit.session_id == safe_session_id
-            )
-        )
-        # Nullify self-referential original_session_id on other sessions
-        db_session.execute(
-            update(ClinicalSession)
-            .where(ClinicalSession.original_session_id == safe_session_id)
-            .values(original_session_id=None)
-        )
-
-        db_session.execute(
-            delete(ClinicalSessionResult).where(
-                ClinicalSessionResult.session_id == safe_session_id
-            )
-        )
-        db_session.execute(
-            delete(ClinicalSessionTimeline).where(
-                ClinicalSessionTimeline.session_id == safe_session_id
-            )
-        )
-        db_session.execute(
-            delete(ClinicalSessionSection).where(
-                ClinicalSessionSection.session_id == safe_session_id
-            )
-        )
-        db_session.execute(
-            delete(ClinicalSessionLab).where(
-                ClinicalSessionLab.session_id == safe_session_id
-            )
-        )
-        db_session.execute(
-            delete(ClinicalSessionDrug).where(
-                ClinicalSessionDrug.session_id == safe_session_id
-            )
-        )
-        db_session.execute(
-            delete(ClinicalSession).where(ClinicalSession.id == safe_session_id)
-        )
+        db_session.delete(existing)
+        db_session.flush()
         remaining_patient_sessions = db_session.execute(
             select(func.count())
             .select_from(ClinicalSession)

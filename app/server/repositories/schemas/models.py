@@ -95,28 +95,34 @@ class ClinicalSession(Base):
     sections: Mapped[list["ClinicalSessionSection"]] = relationship(
         "ClinicalSessionSection",
         back_populates="session",
+        passive_deletes=True,
     )
     labs: Mapped[list["ClinicalSessionLab"]] = relationship(
         "ClinicalSessionLab",
         back_populates="session",
+        passive_deletes=True,
     )
     drugs: Mapped[list["ClinicalSessionDrug"]] = relationship(
         "ClinicalSessionDrug",
         back_populates="session",
+        passive_deletes=True,
     )
     result_payload: Mapped["ClinicalSessionResult | None"] = relationship(
         "ClinicalSessionResult",
         back_populates="session",
         uselist=False,
+        passive_deletes=True,
     )
     timelines: Mapped[list["ClinicalSessionTimeline"]] = relationship(
         "ClinicalSessionTimeline",
         back_populates="session",
+        passive_deletes=True,
     )
     manual_edits: Mapped[list["ClinicalSessionManualEdit"]] = relationship(
         "ClinicalSessionManualEdit",
         back_populates="session",
         foreign_keys="ClinicalSessionManualEdit.session_id",
+        passive_deletes=True,
     )
     parent_session: Mapped["ClinicalSession | None"] = relationship(
         "ClinicalSession",
@@ -272,7 +278,7 @@ class ClinicalSessionVersion(Base):
     )
     root_session_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     source_version_id: Mapped[int | None] = mapped_column(
@@ -360,12 +366,12 @@ class ClinicalSessionRevisionRun(Base):
     pipeline_run_id: Mapped[str] = mapped_column(String, nullable=False)
     session_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     root_session_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     source_version_id: Mapped[int] = mapped_column(
@@ -450,7 +456,7 @@ class ClinicalSessionRevisionReview(Base):
     )
     session_id: Mapped[int | None] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="SET NULL"),
         nullable=True,
     )
     clinical_review_status: Mapped[str] = mapped_column(String, nullable=False)
@@ -801,7 +807,7 @@ class ClinicalSessionSection(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     section_kind: Mapped[str] = mapped_column(String, nullable=False)
@@ -828,7 +834,7 @@ class ClinicalSessionLab(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     lab_code: Mapped[str] = mapped_column(String, nullable=False)
@@ -856,7 +862,7 @@ class ClinicalSessionDrug(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     raw_drug_name: Mapped[str] = mapped_column(Text, nullable=False)
