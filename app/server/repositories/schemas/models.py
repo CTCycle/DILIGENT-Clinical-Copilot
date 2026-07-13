@@ -86,12 +86,6 @@ class ClinicalSession(Base):
         back_populates="session",
         passive_deletes=True,
     )
-    manual_edits: Mapped[list["ClinicalSessionManualEdit"]] = relationship(
-        "ClinicalSessionManualEdit",
-        back_populates="session",
-        foreign_keys="ClinicalSessionManualEdit.session_id",
-        passive_deletes=True,
-    )
     parent_session: Mapped["ClinicalSession | None"] = relationship(
         "ClinicalSession",
         remote_side=[id],
@@ -177,61 +171,6 @@ class ClinicalSessionTimeline(Base):
         ),
         Index("ix_clinical_session_timelines_session_id", "session_id"),
         Index("ix_clinical_session_timelines_generated_at", "generated_at"),
-    )
-
-###############################################################################
-class ClinicalSessionManualEdit(Base):
-    __tablename__ = "clinical_session_manual_edits"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
-        nullable=False,
-    )
-    current_version_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("clinical_session_versions.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    edited_by: Mapped[str | None] = mapped_column(String, nullable=True)
-    actor_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    actor_display_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    actor_source: Mapped[str] = mapped_column(String, nullable=False)
-    actor_confidence: Mapped[str] = mapped_column(String, nullable=False)
-    edited_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    previous_text_hash: Mapped[str] = mapped_column(String, nullable=False)
-    new_text_hash: Mapped[str] = mapped_column(String, nullable=False)
-    edited_fields_json: Mapped[str] = mapped_column(Text, nullable=False)
-    reviewer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-        server_default=text("CURRENT_TIMESTAMP"),
-    )
-
-    session: Mapped["ClinicalSession"] = relationship(
-        "ClinicalSession",
-        back_populates="manual_edits",
-        foreign_keys=[session_id],
-    )
-
-    __table_args__ = (
-        CheckConstraint(
-            "actor_source IN ('authenticated_user', 'local_profile', 'manual_entry', 'system', 'unknown')",
-            name="ck_clinical_session_manual_edits_actor_source",
-        ),
-        CheckConstraint(
-            "actor_confidence IN ('verified', 'unverified', 'system')",
-            name="ck_clinical_session_manual_edits_actor_confidence",
-        ),
-        Index("ix_clinical_session_manual_edits_session_id", "session_id"),
-        Index(
-            "ix_clinical_session_manual_edits_current_version_id",
-            "current_version_id",
-        ),
-        Index("ix_clinical_session_manual_edits_edited_at", "edited_at"),
     )
 
 ###############################################################################

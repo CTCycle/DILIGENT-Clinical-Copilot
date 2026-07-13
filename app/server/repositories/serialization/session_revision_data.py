@@ -21,7 +21,6 @@ from repositories.schemas.models import (
     ClinicalSessionRevisionArtifact,
     ClinicalSessionRevisionEntity,
     ClinicalSessionRevisionReview,
-    ClinicalSessionManualEdit,
     ClinicalSessionRevisionRun,
     ClinicalSessionRevisionStep,
     ClinicalSessionResult,
@@ -802,42 +801,42 @@ def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
     db_session = self.session_factory()
     try:
         rows = db_session.execute(
-            select(ClinicalSessionManualEdit)
-            .where(ClinicalSessionManualEdit.session_id == safe_session_id)
+            select(ClinicalSessionVersion)
+            .where(
+                ClinicalSessionVersion.session_id == safe_session_id,
+                ClinicalSessionVersion.revision_kind == "manual_edit",
+            )
             .order_by(
-                ClinicalSessionManualEdit.edited_at.desc(),
-                ClinicalSessionManualEdit.id.desc(),
+                ClinicalSessionVersion.version_number.desc(),
+                ClinicalSessionVersion.id.desc(),
             )
         ).scalars()
-        return [serialize_manual_edit_row(self, row) for row in rows]
+        return [serialize_manual_edit_version(self, row) for row in rows]
     finally:
         db_session.close()
 
 ###############################################################################
-def serialize_manual_edit_row(self, row: ClinicalSessionManualEdit) -> dict[str, Any]:
-    try:
-        edited_fields = json.loads(row.edited_fields_json)
-    except TypeError, json.JSONDecodeError:
-        edited_fields = []
-    metadata = self.parse_session_result_payload(row.metadata_json)
+def serialize_manual_edit_version(
+    self, row: ClinicalSessionVersion
+) -> dict[str, Any]:
+    metadata = self.parse_session_result_payload(row.metadata_json) or {}
+    audit = metadata.get("manual_edit_audit")
+    if not isinstance(audit, dict):
+        audit = {}
     return {
-        "session_id": int(row.session_id),
-        "current_version_id": int(row.current_version_id),
-        "edited_by": self.normalize_string(row.edited_by),
-        "actor_id": self.normalize_string(row.actor_id),
-        "actor_display_name": self.normalize_string(row.actor_display_name),
-        "actor_source": row.actor_source,
-        "actor_confidence": row.actor_confidence,
-        "edited_at": row.edited_at,
-        "previous_text_hash": row.previous_text_hash,
-        "new_text_hash": row.new_text_hash,
-        "edited_fields": (
-            [str(item) for item in edited_fields if isinstance(item, str)]
-            if isinstance(edited_fields, list)
-            else []
-        ),
-        "reviewer_note": self.normalize_string(row.reviewer_note),
-        "metadata": metadata if isinstance(metadata, dict) else {},
+        "session_id": int(row.session_id or row.root_session_id),
+        "current_version_id": int(row.id),
+        "edited_by": self.normalize_string(audit.get("edited_by")),
+        "actor_id": self.normalize_string(audit.get("actor_id")),
+        "actor_display_name": self.normalize_string(audit.get("actor_display_name")),
+        "actor_source": audit.get("actor_source", "unknown"),
+        "actor_confidence": audit.get("actor_confidence", "unverified"),
+        "edited_at": row.completed_at or row.created_at,
+        "previous_text_hash": audit.get("previous_text_hash", ""),
+        "new_text_hash": audit.get("new_text_hash", ""),
+        "edited_fields": audit.get("edited_fields", []),
+        "reviewer_note": self.normalize_string(audit.get("reviewer_note")),
+        "metadata": audit.get("metadata", {}),
     }
 
 ###############################################################################
@@ -913,22 +912,38 @@ def update_current_report_text_with_manual_audit(
             if isinstance(field, str) and field.strip()
         ] or ["report_text"]
 
+        current_version = db_session.get(ClinicalSessionVersion, int(current_version_id))
+        if current_version is None:
+            raise RuntimeError("Current session version disappeared during manual edit")
+        current_version.version_status = "superseded"
+        edit_metadata = {
+            "manual_edit_audit": {
+                "edited_by": normalized_edited_by,
+                "actor_id": None,
+                "actor_display_name": actor_display_name,
+                "actor_source": actor_source,
+                "actor_confidence": actor_confidence,
+                "previous_text_hash": build_text_hash(previous_report),
+                "new_text_hash": build_text_hash(normalized_report),
+                "edited_fields": effective_fields,
+                "reviewer_note": self.normalize_string(reviewer_note),
+                "metadata": normalized_metadata,
+            }
+        }
         db_session.add(
-            ClinicalSessionManualEdit(
+            ClinicalSessionVersion(
                 session_id=safe_session_id,
-                current_version_id=int(current_version_id),
-                edited_by=normalized_edited_by,
-                actor_id=None,
-                actor_display_name=actor_display_name,
-                actor_source=actor_source,
-                actor_confidence=actor_confidence,
-                edited_at=timestamp,
-                previous_text_hash=build_text_hash(previous_report),
-                new_text_hash=build_text_hash(normalized_report),
-                edited_fields_json=self.serialize_json_payload(effective_fields)
-                or "[]",
-                reviewer_note=self.normalize_string(reviewer_note),
-                metadata_json=self.serialize_json_payload(normalized_metadata),
+                root_session_id=int(current_version.root_session_id),
+                source_version_id=int(current_version.id),
+                version_number=int(current_version.version_number) + 1,
+                version_status="current",
+                revision_kind="manual_edit",
+                llm_qa_status="not_run",
+                clinical_review_status="not_reviewed",
+                pipeline_run_id=None,
+                report_text=normalized_report,
+                metadata_json=self.serialize_json_payload(edit_metadata),
+                completed_at=timestamp,
             )
         )
         db_session.commit()

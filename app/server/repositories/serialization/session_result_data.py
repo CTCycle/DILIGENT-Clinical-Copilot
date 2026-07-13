@@ -70,26 +70,27 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         session_id = int(persisted_session.id)
         # Initial intake writes own version 1. Revision sessions are attached
         # to their pre-created version shell during finalization.
-        db_session.add(
-            ClinicalSessionVersion(
-                session_id=session_id,
-                root_session_id=session_id,
-                source_version_id=None,
-                version_number=int(persisted_session.version or 1),
-                version_status="current",
-                revision_kind="original",
-                llm_qa_status="not_run",
-                clinical_review_status="not_reviewed",
-                pipeline_run_id=None,
-                model_configuration_json=self.serialize_json_payload(
-                    {
-                        "text_extraction_model": persisted_session.text_extraction_model,
-                        "clinical_model": persisted_session.clinical_model,
-                    }
-                ),
-                completed_at=persisted_session.session_timestamp,
+        if persisted_session.original_session_id is None:
+            db_session.add(
+                ClinicalSessionVersion(
+                    session_id=session_id,
+                    root_session_id=session_id,
+                    source_version_id=None,
+                    version_number=int(persisted_session.version or 1),
+                    version_status="current",
+                    revision_kind="original",
+                    llm_qa_status="not_run",
+                    clinical_review_status="not_reviewed",
+                    pipeline_run_id=None,
+                    model_configuration_json=self.serialize_json_payload(
+                        {
+                            "text_extraction_model": persisted_session.text_extraction_model,
+                            "clinical_model": persisted_session.clinical_model,
+                        }
+                    ),
+                    completed_at=persisted_session.session_timestamp,
+                )
             )
-        )
         self.persist_session_sections(db_session, session_id, session_data)
         self.persist_session_labs(db_session, session_id, session_data)
         self.persist_session_drugs(db_session, session_id, session_data)
