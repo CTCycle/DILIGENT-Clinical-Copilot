@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Iterator, cast
 
 import pandas as pd
@@ -777,14 +777,14 @@ def resolve_drug_id_from_match_cache(
         return None
     drug = db_session.get(Drug, int(cache.drug_id))
     if drug is None:
-        cache.invalidated_at = datetime.utcnow()
+        cache.invalidated_at = datetime.now(UTC)
         cache.invalidation_reason = "matched_drug_deleted"
         return None
     if (
         cache.rxnorm_rxcui
         and self.get_drug_by_rxcui(db_session, cache.rxnorm_rxcui) is None
     ):
-        cache.invalidated_at = datetime.utcnow()
+        cache.invalidated_at = datetime.now(UTC)
         cache.invalidation_reason = "rxnorm_code_no_longer_resolves"
         return None
     if cache.livertox_monograph_key:
@@ -795,7 +795,7 @@ def resolve_drug_id_from_match_cache(
             )
         )
         if monograph is None:
-            cache.invalidated_at = datetime.utcnow()
+            cache.invalidated_at = datetime.now(UTC)
             cache.invalidation_reason = "livertox_monograph_identity_changed"
             return None
     return int(cache.drug_id)
@@ -845,7 +845,7 @@ def upsert_high_confidence_kb_match_cache(
             KbMatchCache.source == source,
         )
     )
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     deterministic_evidence_version = None
     if rxnorm_rxcui:
         deterministic_evidence_version = f"rxnorm:{rxnorm_rxcui}"
@@ -912,7 +912,7 @@ def load_livertox_match_from_db_cache(
 
         drug = db_session.get(Drug, int(cache.drug_id))
         if drug is None:
-            cache.invalidated_at = datetime.utcnow()
+            cache.invalidated_at = datetime.now(UTC)
             cache.invalidation_reason = "matched_drug_deleted"
             db_session.commit()
             return None
@@ -921,7 +921,7 @@ def load_livertox_match_from_db_cache(
             cache.rxnorm_rxcui
             and self.get_drug_by_rxcui(db_session, cache.rxnorm_rxcui) is None
         ):
-            cache.invalidated_at = datetime.utcnow()
+            cache.invalidated_at = datetime.now(UTC)
             cache.invalidation_reason = "rxnorm_code_no_longer_resolves"
             db_session.commit()
             return None
@@ -932,7 +932,7 @@ def load_livertox_match_from_db_cache(
             )
         )
         if monograph is None:
-            cache.invalidated_at = datetime.utcnow()
+            cache.invalidated_at = datetime.now(UTC)
             cache.invalidation_reason = "livertox_monograph_identity_changed"
             db_session.commit()
             return None
