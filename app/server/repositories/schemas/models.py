@@ -215,7 +215,7 @@ class ClinicalSessionManualEdit(Base):
     )
     current_version_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        ForeignKey("clinical_session_versions.id", ondelete="CASCADE"),
         nullable=False,
     )
     edited_by: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -329,7 +329,11 @@ class ClinicalSessionVersion(Base):
             "clinical_review_status IN ('not_reviewed', 'under_review', 'approved_by_human', 'rejected_by_human')",
             name="ck_clinical_session_versions_clinical_review_status",
         ),
-        UniqueConstraint("session_id", name="uq_clinical_session_versions_session_id"),
+        UniqueConstraint(
+            "session_id",
+            "version_number",
+            name="uq_clinical_session_versions_session_version_number",
+        ),
         UniqueConstraint(
             "root_session_id",
             "version_number",
@@ -494,6 +498,11 @@ class ClinicalSessionRevisionStep(Base):
     __tablename__ = "clinical_session_revision_steps"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    revision_run_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("clinical_session_revision_runs.id", ondelete="CASCADE"),
+        nullable=True,
+    )
     pipeline_run_id: Mapped[str] = mapped_column(String, nullable=False)
     step_name: Mapped[str] = mapped_column(String, nullable=False)
     step_index: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -549,6 +558,11 @@ class ClinicalSessionRevisionArtifact(Base):
     __tablename__ = "clinical_session_revision_artifacts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    revision_run_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("clinical_session_revision_runs.id", ondelete="CASCADE"),
+        nullable=True,
+    )
     revision_version_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("clinical_session_versions.id"),
@@ -556,7 +570,7 @@ class ClinicalSessionRevisionArtifact(Base):
     )
     pipeline_run_id: Mapped[str] = mapped_column(String, nullable=False)
     artifact_kind: Mapped[str] = mapped_column(String, nullable=False)
-    artifact_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    artifact_key: Mapped[str] = mapped_column(String, nullable=False)
     entity_type: Mapped[str | None] = mapped_column(String, nullable=True)
     entity_name: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str | None] = mapped_column(String, nullable=True)

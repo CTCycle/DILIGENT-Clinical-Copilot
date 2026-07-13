@@ -7,6 +7,7 @@ from sqlalchemy import func, select, update
 
 from repositories.schemas.models import (
     ClinicalSessionRevisionReview,
+    ClinicalSessionRevisionRun,
     ClinicalSessionRevisionStep,
     ClinicalSessionVersion,
 )
@@ -134,6 +135,13 @@ def start_revision_step(
     try:
         safe_pipeline_run_id = str(pipeline_run_id)
         safe_step_name = str(step_name)
+        revision_run_id = db_session.execute(
+            select(ClinicalSessionRevisionRun.id).where(
+                ClinicalSessionRevisionRun.pipeline_run_id == safe_pipeline_run_id
+            )
+        ).scalar_one_or_none()
+        if revision_run_id is None:
+            raise ValueError("Revision run must exist before recording a step")
         previous_attempt = db_session.execute(
             select(func.max(ClinicalSessionRevisionStep.attempt_number)).where(
                 ClinicalSessionRevisionStep.pipeline_run_id == safe_pipeline_run_id,
@@ -152,6 +160,7 @@ def start_revision_step(
             .values(superseded_at=now)
         )
         row = ClinicalSessionRevisionStep(
+            revision_run_id=int(revision_run_id),
             pipeline_run_id=safe_pipeline_run_id,
             step_name=safe_step_name,
             step_index=int(step_index),
