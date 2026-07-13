@@ -13,7 +13,7 @@ from domain.clinical.revision import (
     RevisedLabPayload,
     RevisionLiverToxDecision,
 )
-from sqlalchemy import func, select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from repositories.schemas.models import (
@@ -556,18 +556,6 @@ def create_revision_version_shell(
         )
         if source_version is None:
             return None
-        existing_max_version = db_session.execute(
-            select(func.max(ClinicalSessionVersion.version_number)).where(
-                ClinicalSessionVersion.root_session_id == int(root_session_id)
-            )
-        ).scalar_one_or_none()
-        next_version_number = (
-            max(
-                max((int(row.version_number) for row in synced), default=0),
-                existing_max_version or 0,
-            )
-            + 1
-        )
         run_id = pipeline_run_id or uuid.uuid4().hex
         existing = db_session.execute(
             select(ClinicalSessionVersion).where(
@@ -576,6 +564,17 @@ def create_revision_version_shell(
         ).scalar_one_or_none()
         if existing is not None:
             return serialize_version_row(self, existing)
+        counter_result = db_session.execute(
+            update(ClinicalSession)
+            .where(ClinicalSession.id == int(root_session_id))
+            .values(
+                next_version_number=ClinicalSession.next_version_number + 1
+            )
+            .returning(ClinicalSession.next_version_number)
+        ).scalar_one_or_none()
+        if counter_result is None:
+            raise RuntimeError("Session version counter could not be allocated")
+        next_version_number = int(counter_result) - 1
         shell = ClinicalSessionVersion(
             session_id=None,
             root_session_id=int(root_session_id),
