@@ -888,19 +888,6 @@ def start_clinical_job_workflow(
 
     service.apply_persisted_runtime_configuration()
     _validate_requested_provider_matches_runtime(request_payload)
-    service.validate_assessment_prerequisites_without_llm(request_payload)
-    rag_readiness = check_rag_readiness(requested=request_payload.use_rag)
-    if request_payload.use_rag and not rag_readiness.available:
-        raise ServiceValidationError(
-            [
-                {
-                    "severity": "blocking",
-                    "code": rag_readiness.reason_code or "rag_unavailable",
-                    "message": rag_readiness.message or "RAG is unavailable.",
-                    "field": "use_rag",
-                }
-            ]
-        )
     if LLMRuntimeConfig.is_cloud_enabled():
         provider = LLMRuntimeConfig.get_llm_provider().strip().lower()
         if provider not in _CLOUD_PROVIDERS:
@@ -916,6 +903,20 @@ def start_clinical_job_workflow(
             raise ServiceValidationError(
                 f"Configure an active {provider.title()} access key before running cloud analysis."
             )
+
+    service.validate_assessment_prerequisites_without_llm(request_payload)
+    rag_readiness = check_rag_readiness(requested=request_payload.use_rag)
+    if request_payload.use_rag and not rag_readiness.available:
+        raise ServiceValidationError(
+            [
+                {
+                    "severity": "blocking",
+                    "code": rag_readiness.reason_code or "rag_unavailable",
+                    "message": rag_readiness.message or "RAG is unavailable.",
+                    "field": "use_rag",
+                }
+            ]
+        )
 
     try:
         prepared = service.prepare_structured_clinical_input(request_payload)

@@ -41,6 +41,11 @@ def test_prepare_generation_parameters_clamps_temperature_and_strips_options(
         "is_ollama_reasoning_enabled",
         classmethod(lambda cls: False),
     )
+    monkeypatch.setattr(
+        LLMRuntimeConfig,
+        "get_ollama_seed",
+        classmethod(lambda cls: None),
+    )
 
     temperature, think, options = client.prepare_generation_parameters(
         temperature=None,
