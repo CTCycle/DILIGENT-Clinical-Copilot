@@ -141,7 +141,7 @@ def test_rxnav_upsert_persists_curated_aliases_with_separate_provenance() -> Non
     assert all(row.source == "curated" for row in curated)
 
 ###############################################################################
-def test_rxnav_upsert_commits_by_interval() -> None:
+def test_rxnav_upsert_is_atomic_across_the_batch() -> None:
     serializer, engine = build_serializer()
     factory = sessionmaker(bind=engine, future=True)
 
@@ -187,7 +187,7 @@ def test_rxnav_upsert_commits_by_interval() -> None:
     with factory() as db_session:
         drugs = db_session.execute(select(Drug)).scalars().all()
 
-    assert len(drugs) == 3
+    assert len(drugs) == 2
 
 ###############################################################################
 def test_livertox_upsert_idempotent_twice() -> None:

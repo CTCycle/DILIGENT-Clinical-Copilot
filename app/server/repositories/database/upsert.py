@@ -91,6 +91,26 @@ def upsert_drug_alias(
     db_session.execute(statement)
 
 ###############################################################################
+def upsert_drug_aliases(db_session: Session, values: list[dict[str, Any]]) -> None:
+    """Atomically upsert a deduplicated batch of drug aliases."""
+    if not values:
+        return
+    statement = _dialect_insert(db_session, DrugAlias).values(values)
+    statement = statement.on_conflict_do_update(
+        index_elements=[
+            DrugAlias.drug_id,
+            DrugAlias.alias_norm,
+            DrugAlias.alias_kind,
+            DrugAlias.source,
+        ],
+        set_={
+            "alias": statement.excluded.alias,
+            "term_type": statement.excluded.term_type,
+        },
+    )
+    db_session.execute(statement)
+
+###############################################################################
 def upsert_drug_rxnorm_code(
     db_session: Session,
     *,
@@ -101,6 +121,19 @@ def upsert_drug_rxnorm_code(
         drug_id=drug_id,
         rxcui=rxcui,
     )
+    statement = statement.on_conflict_do_nothing(
+        index_elements=[DrugRxnormCode.rxcui]
+    )
+    db_session.execute(statement)
+
+###############################################################################
+def upsert_drug_rxnorm_codes(
+    db_session: Session, values: list[dict[str, Any]]
+) -> None:
+    """Atomically insert a deduplicated batch of RxCUI mappings."""
+    if not values:
+        return
+    statement = _dialect_insert(db_session, DrugRxnormCode).values(values)
     statement = statement.on_conflict_do_nothing(
         index_elements=[DrugRxnormCode.rxcui]
     )
