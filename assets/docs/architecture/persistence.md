@@ -8,18 +8,17 @@ Last updated: 2026-07-13
 - PostgreSQL when external DB mode is configured
 
 ## Persisted Clinical Session Contract
-- `clinical_sessions` is the single source of truth for session records, versioning, revision parentage, and session metadata.
+- `clinical_sessions` is the single source of truth for session records and session metadata; patient identity and intake fields are stored directly on each session.
 - New sessions default to `version=1`.
-- Revised sessions store original_session_id and an incremented ersion.
-- Revision tables store the active revision-agent skeleton and may also contain historical local data:
+- `clinical_session_versions` owns immutable version lineage, root-session relationships, version numbers, and manual edits.
+- Revision tables store the active revision-agent skeleton and canonical artifacts:
   - clinical_session_versions
   - clinical_session_revision_runs
   - clinical_session_revision_steps
   - clinical_session_revision_artifacts
-  - clinical_session_revision_entities
   - clinical_session_revision_reviews
-  - clinical_session_manual_edits
-- Manual edit history remains active through clinical_session_manual_edits.
+- Structured revision entities are stored as `structured_case_entity` rows in `clinical_session_revision_artifacts`.
+- Manual report edits create immutable `clinical_session_versions` rows with `revision_kind=manual_edit`.
 - The current runtime does not execute or read the previous deterministic session revision pipeline.
 - The active revision skeleton creates draft revision version shells, revision run rows, one `revision_agent_issue_scan` step, and a `revision_agent_issue_scan` pipeline artifact. It does not create revised clinical sessions or revised entity rows yet.
 - Patient timeline history is persisted only in clinical_session_timelines; session result payloads are not a timeline read source.
@@ -68,7 +67,7 @@ app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-resee
 
 ## Access Key Persistence
 - Encrypted provider keys are persisted in database tables.
-- Encryption material is seeded and managed through shared security helpers.
+- Versioned Fernet key material is loaded and managed through the protected external `DILIGENT_ACCESS_KEY_MATERIAL_FILE` store.
 - Provider-scoped key retrieval filters by both provider and key id. The persistence constraint covers OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and Brave.
 
 ## Persistence Contract Validation

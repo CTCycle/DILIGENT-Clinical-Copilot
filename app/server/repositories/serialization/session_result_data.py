@@ -50,9 +50,6 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
             session_timestamp=self.parse_datetime(
                 session_data.get("session_timestamp")
             ),
-            version=self.to_int(session_data.get("version")) or 1,
-            next_version_number=(self.to_int(session_data.get("version")) or 1) + 1,
-            original_session_id=self.to_int(session_data.get("original_session_id")),
             hepatic_pattern=self.normalize_string(session_data.get("hepatic_pattern")),
             text_extraction_model=self.normalize_string(
                 session_data.get("text_extraction_model")
@@ -70,13 +67,13 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         session_id = int(persisted_session.id)
         # Initial intake writes own version 1. Revision sessions are attached
         # to their pre-created version shell during finalization.
-        if persisted_session.original_session_id is None:
+        if session_data.get("root_session_id") is None:
             db_session.add(
                 ClinicalSessionVersion(
                     session_id=session_id,
                     root_session_id=session_id,
                     source_version_id=None,
-                    version_number=int(persisted_session.version or 1),
+                    version_number=1,
                     version_status="current",
                     revision_kind="original",
                     llm_qa_status="not_run",
@@ -202,8 +199,14 @@ def list_sessions(
                 ClinicalSessionTimeline.session_id == ClinicalSession.id,
             )
         )
+        version_number = (
+            select(func.max(ClinicalSessionVersion.version_number))
+            .where(ClinicalSessionVersion.session_id == ClinicalSession.id)
+            .scalar_subquery()
+        )
         sessions_stmt = select(
             ClinicalSession,
+            version_number.label("version_number"),
             report_exists.label("has_report"),
             timeline_exists.label("has_timeline"),
         )
@@ -229,8 +232,7 @@ def list_sessions(
                 "session_id": int(session_row.id),
                 "patient_name": self.normalize_string(session_row.patient_name),
                 "session_timestamp": session_row.session_timestamp,
-                "version": int(session_row.version or 1),
-                "original_session_id": self.to_int(session_row.original_session_id),
+                "version": int(version_number or 1),
                 "status": self.normalize_session_status(session_row.session_status),
                 "total_duration": self.to_float(session_row.total_duration),
                 "has_report": bool(has_report),
@@ -241,7 +243,7 @@ def list_sessions(
                     or self.normalize_string(session_row.laboratory_analysis)
                 ),
             }
-            for session_row, has_report, has_timeline in rows
+            for session_row, version_number, has_report, has_timeline in rows
         ]
         return items, total_rows
     finally:
@@ -259,6 +261,11 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         if row is None:
             return None
         session_row = row[0]
+        version_number = db_session.execute(
+            select(func.max(ClinicalSessionVersion.version_number)).where(
+                ClinicalSessionVersion.session_id == safe_session_id
+            )
+        ).scalar_one_or_none()
         section_rows = db_session.execute(
             select(
                 ClinicalSessionSection.section_kind, ClinicalSessionSection.content
@@ -277,8 +284,7 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
             "patient_name": self.normalize_string(session_row.patient_name),
             "visit_date": session_row.visit_date,
             "session_timestamp": session_row.session_timestamp,
-            "version": int(session_row.version or 1),
-            "original_session_id": self.to_int(session_row.original_session_id),
+            "version": int(version_number or 1),
             "status": self.normalize_session_status(session_row.session_status),
             "text_extraction_model": self.normalize_string(
                 session_row.text_extraction_model
@@ -344,16 +350,13 @@ def update_session_text_and_metadata(
         db_session.close()
 
 ###############################################################################
-def get_next_session_version(self, original_session_id: int) -> int:
-    safe_original_id = int(original_session_id)
+def get_next_session_version(self, root_session_id: int) -> int:
+    safe_root_id = int(root_session_id)
     db_session = self.session_factory()
     try:
         max_version = db_session.execute(
-            select(func.max(ClinicalSession.version)).where(
-                or_(
-                    ClinicalSession.id == safe_original_id,
-                    ClinicalSession.original_session_id == safe_original_id,
-                )
+            select(func.max(ClinicalSessionVersion.version_number)).where(
+                ClinicalSessionVersion.root_session_id == safe_root_id
             )
         ).scalar_one_or_none()
         return int(max_version or 1) + 1
