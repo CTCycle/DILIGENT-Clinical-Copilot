@@ -5,6 +5,7 @@ from datetime import date
 from typing import Any, cast
 
 import pandas as pd
+from sqlalchemy import select
 
 from common.constants import (
     DRUG_NAME_ALLOWED_PATTERN,
@@ -14,6 +15,11 @@ from common.constants import (
 )
 from common.utils.text_utils import coerce_text, normalize_drug_name
 from configurations.startup import get_server_settings
+from repositories.database.upsert import (
+    upsert_drug_aliases,
+    upsert_drug_rxnorm_codes,
+)
+from repositories.schemas.models import Drug, DrugRxnormCode
 
 ###############################################################################
 def upsert_drugs_catalog_records(
@@ -26,97 +32,159 @@ def upsert_drugs_catalog_records(
     prepared_rows = self.prepare_rxnav_rows(records)
     if not prepared_rows:
         return
-    effective_batch_size = self.resolve_commit_interval(commit_interval)
     today_marker = date.today().isoformat()
     db_session = self.session_factory()
     try:
-        pending = 0
-        for row in prepared_rows:
-            rxcui = cast(str, row["_rxcui"])
-            raw_name = cast(str | None, row.get("_raw_name"))
-            standard_name = cast(str | None, row.get("_standard_name"))
-            canonical_name = cast(str, row["_canonical_name"])
-            canonical_name_norm = cast(str, row["_canonical_name_norm"])
-            term_type = cast(str | None, row.get("_term_type"))
-            drug = self.ensure_drug(
-                db_session,
-                canonical_name=canonical_name,
-                canonical_name_norm=canonical_name_norm,
-                rxnorm_rxcui=rxcui,
-                livertox_nbk_id=None,
-                rxnav_last_update=today_marker,
-            )
-            drug_id = int(drug.id)
-            self.upsert_drug_alias(
-                db_session,
-                drug_id=drug_id,
-                alias=canonical_name,
-                alias_kind="canonical",
-                source="derived",
-                term_type=term_type,
-            )
-            if raw_name is not None:
-                self.upsert_drug_alias(
-                    db_session,
-                    drug_id=drug_id,
-                    alias=raw_name,
-                    alias_kind="raw_name",
-                    source="rxnorm",
-                    term_type=term_type,
-                )
-            if standard_name is not None:
-                self.upsert_drug_alias(
-                    db_session,
-                    drug_id=drug_id,
-                    alias=standard_name,
-                    alias_kind="standard_name",
-                    source="rxnorm",
-                    term_type=term_type,
-                )
-            for brand in self.extract_text_candidates(row.get("brand_names")):
-                self.upsert_drug_alias(
-                    db_session,
-                    drug_id=drug_id,
-                    alias=brand,
-                    alias_kind="brand",
-                    source="rxnorm",
-                    term_type=term_type,
-                )
-            for synonym in self.extract_synonym_candidates(row.get("synonyms")):
-                self.upsert_drug_alias(
-                    db_session,
-                    drug_id=drug_id,
-                    alias=synonym,
-                    alias_kind="synonym",
-                    source="rxnorm",
-                    term_type=term_type,
-                )
-            if curated_aliases_by_canonical:
-                curated_entries = curated_aliases_by_canonical.get(
-                    canonical_name_norm,
-                    [],
-                )
-                for curated_alias, curated_kind in curated_entries:
-                    self.upsert_drug_alias(
-                        db_session,
-                        drug_id=drug_id,
-                        alias=curated_alias,
-                        alias_kind=curated_kind,
-                        source="curated",
-                        term_type=term_type,
-                    )
-            pending += 1
-            if pending >= effective_batch_size:
-                db_session.flush()
-                db_session.commit()
-                pending = 0
-        if pending:
-            db_session.commit()
+        drug_values = _build_drug_values(prepared_rows, today_marker)
+        _upsert_drug_values(db_session, drug_values)
+        db_session.flush()
+        drug_ids = _load_drug_ids(db_session, drug_values)
+        _validate_rxcui_ownership(db_session, prepared_rows, drug_ids)
+        upsert_drug_rxnorm_codes(
+            db_session,
+            [
+                {
+                    "drug_id": drug_ids[row["_canonical_name_norm"]],
+                    "rxcui": row["_rxcui"],
+                }
+                for row in prepared_rows
+            ],
+        )
+        upsert_drug_aliases(
+            db_session,
+            _build_alias_values(
+                self,
+                prepared_rows,
+                drug_ids,
+                curated_aliases_by_canonical,
+            ),
+        )
+        db_session.commit()
     except Exception:
         db_session.rollback()
         raise
     finally:
         db_session.close()
+
+###############################################################################
+def _build_drug_values(
+    rows: list[dict[str, Any]], rxnav_last_update: str
+) -> list[dict[str, Any]]:
+    values_by_norm: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        normalized = cast(str, row["_canonical_name_norm"])
+        values_by_norm.setdefault(
+            normalized,
+            {
+                "canonical_name": row["_canonical_name"],
+                "canonical_name_norm": normalized,
+                "rxnav_last_update": rxnav_last_update,
+            },
+        )
+    return list(values_by_norm.values())
+
+###############################################################################
+def _upsert_drug_values(db_session, values: list[dict[str, Any]]) -> None:
+    if not values:
+        return
+    dialect = db_session.get_bind().dialect.name
+    if dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert
+    elif dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    else:
+        raise ValueError(f"Unsupported upsert dialect: {dialect}")
+    statement = insert(Drug).values(values)
+    statement = statement.on_conflict_do_update(
+        index_elements=[Drug.canonical_name_norm],
+        set_={
+            "canonical_name": statement.excluded.canonical_name,
+            "rxnav_last_update": statement.excluded.rxnav_last_update,
+        },
+    )
+    db_session.execute(statement)
+
+###############################################################################
+def _load_drug_ids(db_session, values: list[dict[str, Any]]) -> dict[str, int]:
+    names = [value["canonical_name_norm"] for value in values]
+    rows = db_session.execute(
+        select(Drug.canonical_name_norm, Drug.id).where(
+            Drug.canonical_name_norm.in_(names)
+        )
+    ).all()
+    return {str(normalized): int(drug_id) for normalized, drug_id in rows}
+
+###############################################################################
+def _validate_rxcui_ownership(
+    db_session,
+    rows: list[dict[str, Any]],
+    drug_ids: dict[str, int],
+) -> None:
+    rxcuis = list({row["_rxcui"] for row in rows})
+    existing = db_session.execute(
+        select(DrugRxnormCode.rxcui, DrugRxnormCode.drug_id).where(
+            DrugRxnormCode.rxcui.in_(rxcuis)
+        )
+    ).all()
+    existing_by_rxcui = {str(rxcui): int(drug_id) for rxcui, drug_id in existing}
+    for row in rows:
+        current_drug_id = existing_by_rxcui.get(row["_rxcui"])
+        expected_drug_id = drug_ids[row["_canonical_name_norm"]]
+        if current_drug_id is not None and current_drug_id != expected_drug_id:
+            raise RuntimeError(
+                f"Conflicting rxcui mapping for existing drug row "
+                f"(rxcui='{row['_rxcui']}', existing_drug_id={current_drug_id}, "
+                f"incoming_drug_id={expected_drug_id})"
+            )
+
+###############################################################################
+def _build_alias_values(
+    self,
+    rows: list[dict[str, Any]],
+    drug_ids: dict[str, int],
+    curated_aliases_by_canonical: dict[str, list[tuple[str, str]]] | None,
+) -> list[dict[str, Any]]:
+    values: dict[tuple[int, str, str, str], dict[str, Any]] = {}
+    for row in rows:
+        drug_id = drug_ids[row["_canonical_name_norm"]]
+        term_type = cast(str | None, row.get("_term_type"))
+        candidates: list[tuple[Any, str, str]] = [
+            (row["_canonical_name"], "canonical", "derived"),
+            (row.get("_raw_name"), "raw_name", "rxnorm"),
+            (row.get("_standard_name"), "standard_name", "rxnorm"),
+        ]
+        candidates.extend(
+            (brand, "brand", "rxnorm")
+            for brand in self.extract_text_candidates(row.get("brand_names"))
+        )
+        candidates.extend(
+            (synonym, "synonym", "rxnorm")
+            for synonym in self.extract_synonym_candidates(row.get("synonyms"))
+        )
+        if curated_aliases_by_canonical:
+            candidates.extend(
+                (alias, kind, "curated")
+                for alias, kind in curated_aliases_by_canonical.get(
+                    row["_canonical_name_norm"], []
+                )
+            )
+        for alias, alias_kind, source in candidates:
+            clean_alias = self.normalize_string(alias)
+            if clean_alias is None:
+                continue
+            alias_norm = normalize_drug_name(clean_alias)
+            if not alias_norm:
+                continue
+            key = (drug_id, alias_norm, alias_kind, source)
+            values[key] = {
+                "drug_id": drug_id,
+                "alias": clean_alias,
+                "alias_norm": alias_norm,
+                "alias_kind": alias_kind,
+                "source": source,
+                "term_type": term_type,
+            }
+    return list(values.values())
 
 ###############################################################################
 def resolve_commit_interval(self, override: int | None) -> int:
