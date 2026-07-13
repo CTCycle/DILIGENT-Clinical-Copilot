@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 from common.utils.logger import logger
 from common.utils.text_utils import normalize_drug_name
 from repositories.schemas.models import (
+    ClinicalDrugMention,
+    ClinicalLabObservation,
     ClinicalSession,
     ClinicalSessionDrug,
     ClinicalSessionLab,
@@ -771,10 +773,10 @@ def persist_session_labs(
         "INR": "inr",
         "ALB": "albumin",
     }
-    # DB schema enforces one lab row per (session_id, lab_code), so collapse
-    # repeated timeline points of the same marker into a single persisted row.
+    # Preserve every measurement in the canonical observation table. The
+    # legacy summary table remains populated for the current inspection API.
     rows_by_lab_code: dict[str, tuple[str | None, str | None]] = {}
-    for item in timeline_raw:
+    for ordinal, item in enumerate(timeline_raw):
         if not isinstance(item, dict):
             continue
         marker_name = self.normalize_string(item.get("marker_name"))
@@ -791,6 +793,27 @@ def persist_session_labs(
         ) or self.normalize_string(item.get("upper_limit_text"))
         if value_raw is None and upper_limit_raw is None:
             continue
+        numeric_value = self.to_float(value_raw)
+        upper_limit_numeric = self.to_float(upper_limit_raw)
+        db_session.add(
+            ClinicalLabObservation(
+                session_id=session_id,
+                marker_code=lab_code,
+                observation_at=self.parse_datetime(
+                    item.get("observation_at") or item.get("date")
+                ),
+                value_numeric=numeric_value,
+                value_text=value_raw,
+                unit=self.normalize_string(item.get("unit")),
+                upper_limit_numeric=upper_limit_numeric,
+                source_ordinal=ordinal,
+                metadata_json={
+                    key: value
+                    for key, value in item.items()
+                    if key not in {"value", "value_text", "upper_limit_normal", "upper_limit_text"}
+                },
+            )
+        )
         existing_value_raw, existing_upper_limit_raw = rows_by_lab_code.get(
             lab_code, (None, None)
         )
@@ -827,7 +850,7 @@ def persist_session_drugs(
                     records.append({"raw_drug_name": item})
     seen: set[str] = set()
     vocabulary_changed = False
-    for item in records:
+    for mention_ordinal, item in enumerate(records):
         raw_drug_name = self.normalize_string(
             item.get("raw_drug_name") or item.get("name")
         )
@@ -835,7 +858,11 @@ def persist_session_drugs(
             continue
         raw_drug_name_norm = normalize_drug_name(raw_drug_name)
         if not raw_drug_name_norm or raw_drug_name_norm in seen:
-            continue
+            # Repeated mentions are retained in the canonical table even
+            # though the legacy association table remains de-duplicated.
+            duplicate_mention = True
+        else:
+            duplicate_mention = False
         seen.add(raw_drug_name_norm)
         matched_drug_name = self.normalize_string(item.get("matched_drug_name"))
         rxcui = self.normalize_string(item.get("rxcui"))
@@ -853,6 +880,28 @@ def persist_session_drugs(
                 db_session,
                 normalized_drug_key=raw_drug_name_norm,
             )
+        db_session.add(
+            ClinicalDrugMention(
+                session_id=session_id,
+                mention_ordinal=mention_ordinal,
+                raw_name=raw_drug_name,
+                normalized_name=raw_drug_name_norm,
+                drug_id=resolved_drug_id,
+                match_status=(
+                    "ambiguous"
+                    if bool(item.get("ambiguous_match"))
+                    else "matched" if resolved_drug_id is not None else "unresolved"
+                ),
+                confidence=match_confidence,
+                match_reason=match_reason,
+                evidence_json={
+                    "matched_drug_name": matched_drug_name,
+                    "rxcui": rxcui,
+                    "nbk_id": nbk_id,
+                    "duplicate_mention": duplicate_mention,
+                },
+            )
+        )
         promoted_drug_id = resolved_drug_id
         should_promote_observed_alias = (
             promoted_drug_id is not None
@@ -890,17 +939,18 @@ def persist_session_drugs(
             notes_value = json.dumps(notes, ensure_ascii=False)
         else:
             notes_value = self.normalize_string(notes)
-        db_session.add(
-            ClinicalSessionDrug(
-                session_id=session_id,
-                raw_drug_name=raw_drug_name,
-                raw_drug_name_norm=raw_drug_name_norm,
-                drug_id=resolved_drug_id,
-                match_confidence=match_confidence,
-                match_reason=match_reason,
-                match_notes=notes_value,
+        if not duplicate_mention:
+            db_session.add(
+                ClinicalSessionDrug(
+                    session_id=session_id,
+                    raw_drug_name=raw_drug_name,
+                    raw_drug_name_norm=raw_drug_name_norm,
+                    drug_id=resolved_drug_id,
+                    match_confidence=match_confidence,
+                    match_reason=match_reason,
+                    match_notes=notes_value,
+                )
             )
-        )
         self.upsert_high_confidence_kb_match_cache(
             db_session,
             raw_drug_name=raw_drug_name,
