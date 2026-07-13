@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-
 ###############################################################################
 def _bounded(value: Any, limit: int) -> dict[str, Any]:
     text = str(value or "")
@@ -12,7 +11,6 @@ def _bounded(value: Any, limit: int) -> dict[str, Any]:
         "truncated": len(text) > limit,
         "sha256": hashlib.sha256(text.encode()).hexdigest(),
     }
-
 
 ###############################################################################
 def build_revision_context(

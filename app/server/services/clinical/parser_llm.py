@@ -30,7 +30,6 @@ from domain.clinical.extractor_contracts import (
     LocalPatientDrugs,
 )
 
-
 ###############################################################################
 class DrugLlmExtractionMixin(ParserHost):
 

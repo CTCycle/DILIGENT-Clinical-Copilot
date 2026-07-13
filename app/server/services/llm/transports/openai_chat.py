@@ -10,7 +10,6 @@ from services.llm.transports.base import (
     StructuredTransportMixin,
 )
 
-
 ###############################################################################
 class OpenAIChatTransport(StructuredTransportMixin):
 
