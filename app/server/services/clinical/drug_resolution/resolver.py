@@ -21,9 +21,9 @@ from services.clinical.matches_core import LiverToxMatcher
 
 CacheLookupFn = Callable[[str], dict[str, Any] | None]
 
-
 ###############################################################################
 class DrugResolutionService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

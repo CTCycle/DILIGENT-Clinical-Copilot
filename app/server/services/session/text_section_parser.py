@@ -16,7 +16,6 @@ from services.session.clinical_section_parsers import (
 )
 from services.session.audit import build_source_hash
 
-
 ###############################################################################
 class ParsedTextSection(NamedTuple):
     key: str
@@ -33,11 +32,9 @@ class ParsedTextSection(NamedTuple):
     verbatim_coherent: bool = False
     requires_review: bool = False
 
-
 ###############################################################################
 def _line_number_for_offset(text: str, offset: int) -> int:
     return text.count("\n", 0, max(0, offset)) + 1
-
 
 ###############################################################################
 def _section_requires_review(match_strategy: str, confidence_score: float) -> bool:
@@ -50,13 +47,11 @@ def _section_requires_review(match_strategy: str, confidence_score: float) -> bo
         or confidence_score < 0.85
     )
 
-
 ###############################################################################
 class InitialTextSectionParseResult(NamedTuple):
     sections: dict[str, ParsedTextSection]
     missing_required_sections: list[str]
     malformed_sections: list[str]
-
 
 ###############################################################################
 def _aggregate_section_confidence(
@@ -70,7 +65,6 @@ def _aggregate_section_confidence(
     if not confidences:
         return 0.0
     return max(0.0, min(1.0, min(confidences)))
-
 
 ###############################################################################
 def _review_required_sections(
@@ -89,16 +83,13 @@ _CANONICAL_TO_PAYLOAD_KEY: dict[str, ClinicalSectionKey] = {
     "laboratory_history": "laboratory_analysis",
 }
 
-
 ###############################################################################
 def _map_canonical_key(key: str) -> ClinicalSectionKey | None:
     return _CANONICAL_TO_PAYLOAD_KEY.get(key)
 
-
 ###############################################################################
 def _map_missing_keys(keys: list[str]) -> list[str]:
     return [mapped for key in keys if (mapped := _map_canonical_key(key)) is not None]
-
 
 ###############################################################################
 def _map_malformed_issue(issue: str) -> str:
@@ -109,7 +100,6 @@ def _map_malformed_issue(issue: str) -> str:
     if not prefix or not payload_key:
         return issue
     return f"{prefix}:{payload_key}"
-
 
 ###############################################################################
 def parse_initial_text_sections(raw_text: str) -> InitialTextSectionParseResult:
@@ -151,7 +141,6 @@ def parse_initial_text_sections(raw_text: str) -> InitialTextSectionParseResult:
             _map_malformed_issue(issue) for issue in parse_result.malformed_sections
         ],
     )
-
 
 ###############################################################################
 def build_section_extraction_from_initial_text(

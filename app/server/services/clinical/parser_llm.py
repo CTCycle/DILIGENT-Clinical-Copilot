@@ -31,7 +31,10 @@ from domain.clinical.extractor_contracts import (
 )
 
 
+###############################################################################
 class DrugLlmExtractionMixin(ParserHost):
+
+    # -------------------------------------------------------------------------
     def active_provider_name(self) -> str | None:
         provider = self.forced_provider or self.client_provider
         if provider == "injected":

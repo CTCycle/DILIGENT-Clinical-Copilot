@@ -36,9 +36,9 @@ from services.retrieval.settings import (
     rag_settings_payload,
 )
 
-
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
+
     # -------------------------------------------------------------------------
     def load_snapshot(self) -> ModelConfigSnapshot: ...
 
@@ -57,7 +57,6 @@ class ModelConfigSnapshotStore(Protocol):
         ollama_seed: int | None | object = ...,
         rag_settings: dict[str, object] | object = ...,
     ) -> ModelConfigSnapshot: ...
-
 
 ###############################################################################
 class ModelConfigService:
@@ -737,6 +736,7 @@ class ModelConfigService:
             updated_at=snapshot.updated_at,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_provider_descriptors() -> list[CloudProviderDescriptor]:
         return [
@@ -756,6 +756,7 @@ class ModelConfigService:
             for item in provider_registry.all()
         ]
 
+    # -------------------------------------------------------------------------
     async def discover_provider_descriptors(self) -> list[CloudProviderDescriptor]:
         descriptors: list[CloudProviderDescriptor] = []
         for item in provider_registry.all():

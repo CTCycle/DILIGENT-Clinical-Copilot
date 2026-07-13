@@ -4,6 +4,7 @@ import asyncio
 from typing import Any
 
 
+###############################################################################
 class ParserHost:
     client: Any | None
     model: str
@@ -15,5 +16,6 @@ class ParserHost:
     forced_model: str | None
     timeout_s: float
 
+    # -------------------------------------------------------------------------
     def __getattr__(self, name: str) -> Any:
         raise AttributeError(name)

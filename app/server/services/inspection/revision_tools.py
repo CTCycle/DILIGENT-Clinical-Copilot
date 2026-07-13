@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
+###############################################################################
 class RevisionToolRegistry:
     names = frozenset(
         {
@@ -17,6 +18,7 @@ class RevisionToolRegistry:
         }
     )
 
+    # -------------------------------------------------------------------------
     def __init__(
         self, *, serializer: Any, session: dict[str, Any], context: dict[str, Any]
     ) -> None:
@@ -24,11 +26,13 @@ class RevisionToolRegistry:
         self.session = session
         self.context = context
 
+    # -------------------------------------------------------------------------
     def manifest(self, allowed: list[str] | None) -> list[str]:
         return sorted(
             self.names if allowed is None else self.names.intersection(allowed)
         )
 
+    # -------------------------------------------------------------------------
     def execute(
         self, name: str, arguments: dict[str, Any], allowed: list[str] | None
     ) -> dict[str, Any]:
@@ -73,6 +77,7 @@ class RevisionToolRegistry:
             "warning": "RAG retrieval is unavailable to this revision run.",
         }
 
+    # -------------------------------------------------------------------------
     def _payload_path(self, path: str) -> dict[str, Any]:
         if (
             not path
@@ -87,6 +92,7 @@ class RevisionToolRegistry:
             value = value[part]
         return {"found": True, "path": path, "value": value}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _positive_int(value: Any) -> int:
         number = int(value)

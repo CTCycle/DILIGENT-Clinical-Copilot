@@ -10,9 +10,9 @@ SYMPTOM_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 ###############################################################################
 class DiliSeverityGrader:
+
     # -------------------------------------------------------------------------
     def assess(
         self, labs: PatientLabTimeline, source_text: str

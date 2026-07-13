@@ -17,6 +17,8 @@
   background: var(--color-surface-muted);
   color: var(--color-text-primary);
   cursor: pointer;
+  transform: translate(-0.5rem, -0.25rem);
+  width: calc(100% + 0.5rem);
 }
 
 .stitch-dili-rag-toggle input {

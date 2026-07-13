@@ -11,13 +11,6 @@
   margin-bottom: var(--space-lg);
 }
 
-.clinical-sessions-header h1 {
-  margin: 0;
-  font-size: var(--font-2xl);
-  line-height: 1.15;
-  color: var(--color-text-primary);
-}
-
 .clinical-sessions-page .lede {
   margin-top: var(--space-xs);
   max-width: 980px;
@@ -1347,7 +1340,6 @@
 
 :host-context([data-theme="dark"])
   :is(
-    .clinical-sessions-header h1,
     .clinical-session-toolbar h2,
     .clinical-session-preview-card h3,
     .clinical-session-row-main strong

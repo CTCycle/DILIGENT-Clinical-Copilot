@@ -7,7 +7,10 @@ from common.paths import RESOURCES_PATH
 from domain.llm.providers import CloudProviderDefinition, CloudProviderId
 
 
+###############################################################################
 class ProviderRegistry:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self, definitions: tuple[CloudProviderDefinition, ...] | None = None
     ) -> None:
@@ -16,6 +19,7 @@ class ProviderRegistry:
         if len(self._by_id) != len(self._definitions):
             raise ValueError("duplicate cloud provider id")
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _load() -> tuple[CloudProviderDefinition, ...]:
         path = Path(RESOURCES_PATH) / "catalogs" / "cloud_providers.json"
@@ -25,15 +29,18 @@ class ProviderRegistry:
             for item in payload["providers"]
         )
 
+    # -------------------------------------------------------------------------
     def all(self) -> tuple[CloudProviderDefinition, ...]:
         return self._definitions
 
+    # -------------------------------------------------------------------------
     def get(self, provider_id: str) -> CloudProviderDefinition:
         try:
             return self._by_id[provider_id]  # type: ignore[index]
         except KeyError as exc:
             raise ValueError(f"Unsupported cloud provider: {provider_id}") from exc
 
+    # -------------------------------------------------------------------------
     def is_valid_model(self, provider_id: CloudProviderId, model: str) -> bool:
         definition = self.get(provider_id)
         return not definition.models or model in definition.models

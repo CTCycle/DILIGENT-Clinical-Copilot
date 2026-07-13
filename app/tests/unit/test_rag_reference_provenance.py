@@ -7,6 +7,7 @@ from domain.clinical.entities import RagDocumentReference
 from services.clinical.rag_support import RagSupportService
 
 
+###############################################################################
 def test_line_metadata_is_propagated() -> None:
     reference = RagSupportService.build_document_reference(
         {
@@ -24,6 +25,7 @@ def test_line_metadata_is_propagated() -> None:
     )
 
 
+###############################################################################
 @pytest.mark.parametrize(
     "kwargs",
     [

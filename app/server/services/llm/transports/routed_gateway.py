@@ -15,10 +15,12 @@ from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
 
 
+###############################################################################
 class RoutedGatewayTransport(StructuredTransportMixin):
     _cache: dict[str, tuple[datetime, list[CloudModelDescriptor]]] = {}
     _cache_ttl = timedelta(minutes=15)
 
+    # -------------------------------------------------------------------------
     def __init__(
         self, *, api_key: str, base_url: str, models_path: str, timeout: float
     ) -> None:
@@ -29,6 +31,7 @@ class RoutedGatewayTransport(StructuredTransportMixin):
         self._models: dict[str, CloudModelDescriptor] = {}
         self._transports: list[object] = []
 
+    # -------------------------------------------------------------------------
     async def list_models(self) -> list[CloudModelDescriptor]:
         cache_key = f"{self.base_url}{self.models_path}"
         cached = self._cache.get(cache_key)
@@ -62,6 +65,7 @@ class RoutedGatewayTransport(StructuredTransportMixin):
         self._cache[cache_key] = (datetime.now(UTC) + self._cache_ttl, models)
         return models
 
+    # -------------------------------------------------------------------------
     async def chat(self, request: ChatRequest) -> ChatResult:
         if request.model not in self._models:
             await self.list_models()
@@ -97,6 +101,7 @@ class RoutedGatewayTransport(StructuredTransportMixin):
         self._transports.append(transport)
         return await transport.chat(request)
 
+    # -------------------------------------------------------------------------
     async def check_connectivity(self, model: str) -> ConnectivityResult:
         try:
             result = await self.chat(
@@ -109,6 +114,7 @@ class RoutedGatewayTransport(StructuredTransportMixin):
         except Exception as exc:
             return ConnectivityResult(ok=False, error=str(exc))
 
+    # -------------------------------------------------------------------------
     async def close(self) -> None:
         for transport in self._transports:
             await transport.close()

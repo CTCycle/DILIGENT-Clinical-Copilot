@@ -78,6 +78,12 @@
           </div>
         </div>
 
+        @if (runDisabledReason) {
+          <p id="run-disabled-reason" class="stitch-dili-action-hint" aria-live="polite">
+            {{ runDisabledReason }}
+          </p>
+        }
+
         <label class="stitch-dili-rag-toggle" for="rag-enabled">
           <input
             id="rag-enabled"
@@ -103,11 +109,6 @@
           >
             {{ runActionLabel }}
           </button>
-          @if (runDisabledReason) {
-            <p id="run-disabled-reason" class="stitch-dili-action-hint" aria-live="polite">
-              {{ runDisabledReason }}
-            </p>
-          }
           <div class="stitch-dili-clear-container">
             <button class="stitch-dili-clear" type="button" (click)="clearAll()" [disabled]="vm.isRunning">
               Clear all

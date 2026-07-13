@@ -20,6 +20,29 @@
 
 .model-config-reasoning-top-card {
   min-height: 86px;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.model-config-reasoning-top-card .model-config-rag-card-top {
+  min-height: 42px;
+}
+
+.model-config-reasoning-top-card .model-config-section-kicker strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.model-config-reasoning-top-card .model-config-rag-body {
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.model-config-reasoning-top-card .model-config-rag-icon {
+  width: 30px;
+  height: 30px;
 }
 
 .model-config-rag-card input {

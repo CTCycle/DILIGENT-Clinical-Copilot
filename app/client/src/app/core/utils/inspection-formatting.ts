@@ -8,6 +8,7 @@ export type InspectionViewId =
 export type InspectionViewOption = {
   id: InspectionViewId;
   label: string;
+  iconPath: string;
 };
 
 export function inspectionTabId(view: InspectionViewId): string {

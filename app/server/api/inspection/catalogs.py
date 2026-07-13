@@ -21,9 +21,9 @@ from domain.inspection import (
 from domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from services.inspection.service import DataInspectionService
 
-
 ###############################################################################
 class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

@@ -95,16 +95,23 @@ def test_cloud_llm_native_openai_chat_uses_responses_api_and_normalizes_text(
 def test_openai_json_mode_includes_json_instruction(monkeypatch) -> None:
     captured: dict[str, Any] = {}
 
+    ###############################################################################
     class FakeResponses:
+
+        # -------------------------------------------------------------------------
         async def create(self, **kwargs: Any) -> FakeOpenAIResponse:
             captured.update(kwargs)
             return FakeOpenAIResponse(output_text='{"value": 7}')
 
+    ###############################################################################
     class FakeAsyncOpenAI:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             _ = kwargs
             self.responses = FakeResponses()
 
+        # -------------------------------------------------------------------------
         async def close(self) -> None:
             pass
 
