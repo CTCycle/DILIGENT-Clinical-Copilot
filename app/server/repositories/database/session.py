@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from collections.abc import Iterator
 from functools import lru_cache
 
 from sqlalchemy.engine import Engine
@@ -38,3 +40,26 @@ def resolve_session_factory(
         future=True,
         expire_on_commit=expire_on_commit,
     )
+
+
+@contextmanager
+def unit_of_work(
+    *,
+    engine: Engine | None = None,
+    session_factory: sessionmaker | None = None,
+) -> Iterator:
+    """Own one transaction and never commit behind the caller's back."""
+    factory = resolve_session_factory(
+        engine=engine,
+        session_factory=session_factory,
+        expire_on_commit=False,
+    )
+    db_session = factory()
+    try:
+        yield db_session
+        db_session.commit()
+    except Exception:
+        db_session.rollback()
+        raise
+    finally:
+        db_session.close()

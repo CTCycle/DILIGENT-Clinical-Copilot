@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlalchemy
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -9,6 +8,7 @@ from common.paths import DATABASE_FILE_PATH
 from common.utils.logger import logger
 from domain.settings.configuration import DatabaseSettings
 from repositories.schemas.models import Base
+from repositories.database.engine import build_sqlite_engine
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
@@ -22,12 +22,7 @@ class SQLiteRepository:
         self.db_path = DATABASE_FILE_PATH
         db_file_missing = bool(self.db_path and not self.db_path.exists())
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.engine: Engine = sqlalchemy.create_engine(
-            f"sqlite:///{self.db_path}",
-            echo=False,
-            future=True,
-            connect_args={"timeout": 30.0},
-        )
+        self.engine: Engine = build_sqlite_engine(str(self.db_path), timeout=30.0)
         event.listen(self.engine, "connect", self._configure_connection)
         seed_session_factory = sessionmaker(
             bind=self.engine,
