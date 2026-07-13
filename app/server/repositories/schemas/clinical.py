@@ -5,6 +5,8 @@ new repository code should import clinical records from this module.
 """
 
 from repositories.schemas.models import (
+    ClinicalDrugMention,
+    ClinicalLabObservation,
     ClinicalSession,
     ClinicalSessionDrug,
     ClinicalSessionLab,
@@ -22,6 +24,8 @@ from repositories.schemas.models import (
 
 __all__ = [
     "ClinicalSession",
+    "ClinicalDrugMention",
+    "ClinicalLabObservation",
     "ClinicalSessionDrug",
     "ClinicalSessionLab",
     "ClinicalSessionManualEdit",
