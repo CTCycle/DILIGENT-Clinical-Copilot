@@ -12,6 +12,7 @@ from repositories.schemas.models import (
     DrugRxnormCode,
     LiverToxMonograph,
 )
+from repositories.database.upsert import upsert_drug_alias as atomic_upsert_drug_alias
 from repositories.serialization.evidence_data import normalize_drug_name
 from common.utils.text_utils import parse_synonym_list, split_synonym_variants
 
@@ -233,32 +234,15 @@ def upsert_drug_alias(
     alias_norm = normalize_drug_name(clean_alias)
     if not alias_norm:
         return
-    existing = (
-        db_session.execute(
-            DrugRepositoryQueries.alias_for_drug(
-                drug_id=drug_id,
-                alias_norm=alias_norm,
-                alias_kind=alias_kind,
-                source=source,
-            )
-        )
-        .scalars()
-        .first()
+    atomic_upsert_drug_alias(
+        db_session,
+        drug_id=drug_id,
+        alias=clean_alias,
+        alias_norm=alias_norm,
+        alias_kind=alias_kind,
+        source=source,
+        term_type=term_type,
     )
-    if existing is None:
-        db_session.add(
-            DrugAlias(
-                drug_id=drug_id,
-                alias=clean_alias,
-                alias_norm=alias_norm,
-                alias_kind=alias_kind,
-                source=source,
-                term_type=term_type,
-            )
-        )
-        return
-    if existing.term_type is None and term_type is not None:
-        existing.term_type = term_type
 
 ###############################################################################
 def persist_livertox_aliases(
