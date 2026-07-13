@@ -60,6 +60,8 @@ class SQLiteRepository:
         try:
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.execute("PRAGMA busy_timeout=30000")
-            cursor.execute("PRAGMA journal_mode=MEMORY")
+            # WAL keeps readers independent from the single SQLite writer and
+            # remains durable across connections and process restarts.
+            cursor.execute("PRAGMA journal_mode=WAL")
         finally:
             cursor.close()

@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 ## Relational Database
 - SQLAlchemy-backed storage
@@ -34,6 +34,9 @@ ormalized_document
   - discrepancy report
   - un_bundle_index
 - Successful clinical workflows require persistence. Serializer failures, missing persisted ids, or failed upserts are treated as service dependency failures rather than silent in-memory success.
+- SQLite enables foreign keys, a 30-second busy timeout, and WAL journaling for durable cross-connection behavior.
+- SQLAlchemy update timestamps are assigned by an application-level update hook so SQLite and PostgreSQL receive the same `updated_at` behavior; `server_onupdate` is not relied on as a trigger.
+- Version listing and detail reads are side-effect-free. Version synchronization is reserved for explicit write paths.
 - Sessions with blocking faithfulness issues may persist audit artifacts, but they must not be stored as clinically successful finalizations.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
 
@@ -62,6 +65,7 @@ app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-resee
 ## Access Key Persistence
 - Encrypted provider keys are persisted in database tables.
 - Encryption material is seeded and managed through shared security helpers.
+- Provider-scoped key retrieval filters by both provider and key id. The persistence constraint covers OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and Brave.
 
 ## Model Configuration Persistence
 - A newly initialized database receives the canonical model defaults from the server settings.

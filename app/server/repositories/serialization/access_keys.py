@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -13,6 +14,7 @@ from common.security.cryptography import (
 from domain.keys import (
     AccessKeyRecord,
     ProviderName,
+    SUPPORTED_PROVIDERS,
     normalize_access_key,
     normalize_provider_name,
 )
@@ -68,7 +70,12 @@ class AccessKeySerializer:
     ) -> AccessKey | None:
         normalized_provider = self.normalize_provider(provider)
         table = self.resolve_table(normalized_provider)
-        return db_session.get(table, key_id)
+        return db_session.execute(
+            select(table).where(
+                table.id == int(key_id),
+                table.provider == normalized_provider,
+            )
+        ).scalar_one_or_none()
 
     # -------------------------------------------------------------------------
     def _to_record(self, key: AccessKey) -> AccessKeyRecord:
@@ -85,7 +92,7 @@ class AccessKeySerializer:
     # -------------------------------------------------------------------------
     def list_keys(self, provider: str | None = None) -> list[AccessKeyRecord]:
         if provider is None:
-            providers = ("openai", "gemini", "brave")
+            providers = sorted(SUPPORTED_PROVIDERS)
             items: list[AccessKeyRecord] = []
             for provider_name in providers:
                 items.extend(self.list_keys(provider_name))

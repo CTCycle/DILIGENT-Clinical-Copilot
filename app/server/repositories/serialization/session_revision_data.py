@@ -447,8 +447,6 @@ def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
         root_session_id = get_root_session_id_for_session(db_session, safe_session_id)
         if root_session_id is None:
             return []
-        sync_version_records_for_root(self, db_session, root_session_id=root_session_id)
-        db_session.commit()
         rows = list(
             db_session.execute(
                 select(ClinicalSessionVersion)
@@ -480,8 +478,6 @@ def get_session_version_detail(
         root_session_id = get_root_session_id_for_session(db_session, safe_session_id)
         if root_session_id is None:
             return None
-        sync_version_records_for_root(self, db_session, root_session_id=root_session_id)
-        db_session.commit()
         row = db_session.get(ClinicalSessionVersion, safe_version_id)
         if row is None or int(row.root_session_id) != int(root_session_id):
             return None
@@ -520,8 +516,6 @@ def get_version_record_for_session(
         root_session_id = get_root_session_id_for_session(db_session, safe_session_id)
         if root_session_id is None:
             return None
-        sync_version_records_for_root(self, db_session, root_session_id=root_session_id)
-        db_session.commit()
         row = db_session.execute(
             select(ClinicalSessionVersion).where(
                 ClinicalSessionVersion.session_id == safe_session_id

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -23,6 +24,13 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 ###############################################################################
 class Base(DeclarativeBase):
     pass
+
+
+@event.listens_for(Base, "before_update", propagate=True)
+def set_updated_at_before_update(_mapper, _connection, target) -> None:
+    """Keep update timestamps portable across SQLite and PostgreSQL."""
+    if hasattr(target, "updated_at"):
+        target.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
 
 DRUGS_ID_FK = "drugs.id"
@@ -65,7 +73,7 @@ class ClinicalSession(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     patient_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(PATIENTS_ID_FK),
+        ForeignKey(PATIENTS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     session_timestamp: Mapped[datetime | None] = mapped_column(DateTime)
@@ -74,7 +82,7 @@ class ClinicalSession(Base):
     )
     original_session_id: Mapped[int | None] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=True,
     )
     hepatic_pattern: Mapped[str | None] = mapped_column(String)
@@ -134,7 +142,7 @@ class ClinicalSessionResult(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     payload_json: Mapped[str] = mapped_column(Text, nullable=False)
@@ -161,7 +169,7 @@ class ClinicalSessionTimeline(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     generated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -202,12 +210,12 @@ class ClinicalSessionManualEdit(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     current_version_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=False,
     )
     edited_by: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -257,7 +265,7 @@ class ClinicalSessionVersion(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int | None] = mapped_column(
         Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
         nullable=True,
     )
     root_session_id: Mapped[int] = mapped_column(
@@ -1158,7 +1166,7 @@ class AccessKey(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "provider IN ('openai', 'gemini', 'brave')",
+            "provider IN ('openai', 'gemini', 'deepseek', 'anthropic', 'opencode', 'brave')",
             name="ck_access_keys_provider",
         ),
         Index("ix_access_keys_provider", "provider"),
