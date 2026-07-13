@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from common.security.cryptography import (
     decrypt_with_key_material,
     encrypt_with_key_material,
@@ -103,3 +105,18 @@ def test_encrypt_and_decrypt_use_db_seeded_material() -> None:
 
     assert ciphertext != plaintext
     assert restored == plaintext
+
+###############################################################################
+def test_external_material_store_is_versioned_and_roundtrips(monkeypatch, tmp_path: Path) -> None:
+    material_path = tmp_path / "access-key-material.json"
+    monkeypatch.setenv("DILIGENT_ACCESS_KEY_MATERIAL_FILE", str(material_path))
+    serializer, _ = build_serializer()
+
+    first = serializer.ensure_seeded()
+    rotated = serializer.rotate_material()
+
+    assert first.key_version == 1
+    assert rotated.key_version == 2
+    assert serializer.get_active_material().key_version == 2
+    assert serializer.get_material_by_version(1).key_material == first.key_material
+    assert "key_material" in material_path.read_text(encoding="utf-8")

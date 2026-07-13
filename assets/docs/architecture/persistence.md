@@ -40,6 +40,7 @@ ormalized_document
 - Sessions with blocking faithfulness issues may persist audit artifacts, but they must not be stored as clinically successful finalizations.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
 - Canonical repeated observations are stored in `clinical_lab_observations` and ordered drug mentions in `clinical_drug_mentions`; the older summary tables remain only for the current inspection projection during migration.
+- Access-key ciphertext remains in the database, while versioned Fernet key material can be supplied through the external `DILIGENT_ACCESS_KEY_MATERIAL_FILE` store rather than the database registry.
 - Canonical drug identifiers use `drug_identifiers` with unique `(identifier_system, identifier_value)` ownership.
 - `application_configuration` is the fixed-id singleton for validated configuration payloads, and `reference_catalog_manifests` records the currently installed manifest state.
 
