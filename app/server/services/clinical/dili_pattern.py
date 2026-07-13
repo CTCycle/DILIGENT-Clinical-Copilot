@@ -5,7 +5,6 @@ from typing import Literal
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliInjuryPattern
 from domain.clinical.entities import ClinicalLabEntry, PatientLabTimeline
 
-
 ###############################################################################
 class DiliPatternEngine:
     DEFAULT_ULN = {"ALT": 40.0, "ALP": 120.0}

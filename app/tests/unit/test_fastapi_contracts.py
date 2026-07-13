@@ -55,7 +55,6 @@ def test_inspection_revision_routes_are_present_in_openapi() -> None:
         missing_paths
     )
 
-
 ###############################################################################
 def test_clean_break_routes_are_canonical() -> None:
     paths = app.openapi()["paths"]

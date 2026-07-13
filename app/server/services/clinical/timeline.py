@@ -27,9 +27,9 @@ DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATE_SHORT_RE = re.compile(r"^\d{4}-\d{2}$")
 DATE_YEAR_RE = re.compile(r"^\d{4}$")
 
-
 ###############################################################################
 class PatientTimelineExtractor:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

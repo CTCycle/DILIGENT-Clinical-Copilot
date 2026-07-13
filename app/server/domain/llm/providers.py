@@ -20,6 +20,7 @@ TransportStrategy = Literal[
 ]
 
 
+###############################################################################
 class ProviderCapabilities(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     chat: bool
@@ -30,6 +31,7 @@ class ProviderCapabilities(BaseModel):
     vision: bool
 
 
+###############################################################################
 class CloudProviderDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     provider_id: CloudProviderId
@@ -42,6 +44,7 @@ class CloudProviderDefinition(BaseModel):
     capabilities: ProviderCapabilities
     transport_strategy: TransportStrategy
 
+    # -------------------------------------------------------------------------
     @model_validator(mode="after")
     def validate_catalog(self) -> "CloudProviderDefinition":
         if self.discovery_strategy == "static" and not self.models:
@@ -55,6 +58,7 @@ class CloudProviderDefinition(BaseModel):
         return self
 
 
+###############################################################################
 class CloudModelDescriptor(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     id: str
@@ -63,6 +67,7 @@ class CloudModelDescriptor(BaseModel):
     capabilities: ProviderCapabilities | None = None
 
 
+###############################################################################
 class CloudProviderDescriptor(BaseModel):
     id: CloudProviderId
     display_name: str

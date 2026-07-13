@@ -11,12 +11,16 @@ from services.llm.transports.base import (
 )
 
 
+###############################################################################
 class AnthropicMessagesTransport(StructuredTransportMixin):
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
         self.client = AsyncAnthropic(
             api_key=api_key, base_url=base_url, timeout=timeout
         )
 
+    # -------------------------------------------------------------------------
     async def chat(self, request: ChatRequest) -> ChatResult:
         system = "\n\n".join(
             item["content"] for item in request.messages if item.get("role") == "system"
@@ -31,6 +35,7 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
         text = "".join(getattr(block, "text", "") for block in response.content)
         return ChatResult(content=text)
 
+    # -------------------------------------------------------------------------
     async def list_models(self) -> list[CloudModelDescriptor]:
         page = await self.client.models.list()
         return [
@@ -38,6 +43,7 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
             for item in page.data
         ]
 
+    # -------------------------------------------------------------------------
     async def check_connectivity(self, model: str) -> ConnectivityResult:
         try:
             result = await self.chat(
@@ -51,5 +57,6 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
         except Exception as exc:
             return ConnectivityResult(ok=False, error=str(exc))
 
+    # -------------------------------------------------------------------------
     async def close(self) -> None:
         await self.client.close()

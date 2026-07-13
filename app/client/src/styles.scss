@@ -3058,7 +3058,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-layout {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 180px minmax(0, 1fr);
   gap: var(--space-md);
   align-items: stretch;
   min-height: 0;
@@ -3079,7 +3079,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  padding-top: 4px;
+  padding: var(--space-xs) 0 0;
   align-self: start;
 }
 
@@ -3094,22 +3094,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-toolbar-list {
   display: grid;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   align-content: start;
   overflow-y: auto;
 }
 
 .inspection-toolbar-item {
   width: 100%;
-  border: 1px solid rgba(148, 163, 184, 0.42);
-  border-radius: var(--radius-md);
-  background: rgba(248, 250, 252, 0.82);
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: transparent;
   color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  min-height: 42px;
-  padding: 9px 12px;
+  min-height: 38px;
+  padding: 8px 10px;
   font-size: var(--font-sm);
   font-weight: 600;
   text-align: left;
@@ -3118,22 +3119,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .inspection-toolbar-item:hover {
-  border-color: rgba(34, 197, 94, 0.62);
-  background: rgba(220, 252, 231, 0.52);
+  border-left-color: color-mix(in srgb, var(--color-brand) 62%, transparent);
+  background: color-mix(in srgb, var(--color-brand-bg) 60%, transparent);
 }
 
 .inspection-toolbar-item.is-active {
-  border-color: rgba(22, 163, 74, 0.74);
-  background: linear-gradient(130deg, rgba(220, 252, 231, 0.9), rgba(187, 247, 208, 0.84));
-  color: #14532d;
+  border-left-color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand-bg) 78%, transparent);
+  color: var(--color-brand);
   transform: none;
 }
 
 .inspection-nav-icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
-  fill: currentColor;
 }
 
 .inspection-active-view {
@@ -4697,13 +4697,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   margin-bottom: var(--space-lg);
 }
 
-.model-config-header-compact h1 {
-  margin: 0;
-  font-size: var(--font-2xl);
-  line-height: 1.15;
-  color: var(--color-text-primary);
-}
-
 .model-config-header-compact .lede {
   margin: var(--space-sm) 0 0;
   max-width: 720px;
@@ -5577,13 +5570,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-header-compact {
   margin-bottom: 10px;
-}
-
-.model-config-page .model-config-header-compact h1 {
-  margin: 0 0 6px;
-  font-size: 28px;
-  line-height: 1.15;
-  color: #20283a;
 }
 
 .model-config-page .model-config-header-compact .lede {

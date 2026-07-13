@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from domain.clinical.entities import RagDocumentReference
 
 
+###############################################################################
 class LocalDiseaseContextEntry(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     evidence: str | None = Field(default=None, max_length=500)
@@ -14,10 +15,12 @@ class LocalDiseaseContextEntry(BaseModel):
     hepatic_related: bool | None = Field(default=None)
 
 
+###############################################################################
 class LocalPatientDiseaseContext(BaseModel):
     entries: list[LocalDiseaseContextEntry] = Field(default_factory=list)
 
 
+###############################################################################
 class LocalLabEntryDraft(BaseModel):
     marker_name: str = Field(..., min_length=1, max_length=40)
     value_text: str | float | int | None = Field(default=None)
@@ -26,17 +29,20 @@ class LocalLabEntryDraft(BaseModel):
     evidence: str | None = Field(default=None, max_length=500)
 
 
+###############################################################################
 class LocalOnsetContextDraft(BaseModel):
     onset_date: str | None = Field(default=None, max_length=120)
     onset_basis: str | None = Field(default=None, max_length=200)
     evidence: str | None = Field(default=None, max_length=500)
 
 
+###############################################################################
 class LocalLabExtractionPayload(BaseModel):
     entries: list[LocalLabEntryDraft] = Field(default_factory=list)
     onset_context: LocalOnsetContextDraft | None = Field(default=None)
 
 
+###############################################################################
 class LocalDrugEntryDraft(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     dosage: str | None = Field(default=None, max_length=120)
@@ -51,10 +57,12 @@ class LocalDrugEntryDraft(BaseModel):
     current_status: str | None = Field(default=None, max_length=40)
 
 
+###############################################################################
 class LocalPatientDrugs(BaseModel):
     entries: list[LocalDrugEntryDraft] = Field(default_factory=list)
 
 
+###############################################################################
 @dataclass(frozen=True)
 class RagRetrievalBundle:
     context_text: str | None

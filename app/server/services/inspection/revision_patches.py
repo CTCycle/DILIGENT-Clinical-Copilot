@@ -3,6 +3,7 @@ from __future__ import annotations
 from domain.inspection import RevisionReportPatch
 
 
+###############################################################################
 def apply_report_patches(report: str, patches: list[RevisionReportPatch]) -> str:
     ordered = sorted(patches, key=lambda item: item.start, reverse=True)
     previous_start = len(report) + 1
@@ -21,6 +22,7 @@ def apply_report_patches(report: str, patches: list[RevisionReportPatch]) -> str
     return updated
 
 
+###############################################################################
 def validate_draft_report(report: str, patches: list[RevisionReportPatch]) -> str:
     patched = apply_report_patches(report, patches)
     if not patched.strip():

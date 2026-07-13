@@ -1,6 +1,6 @@
 <main class="page-container inspection-page inspection-page-workbench">
   <header class="page-header inspection-page-intro">
-    <p class="lede">Review curated drug knowledge sources, inspect alias and extraction details, update catalog entries directly, and monitor RAG indexing status from a single workspace.</p>
+    <p class="lede">Review curated drug knowledge sources, inspect aliases and extraction details, update catalog entries directly, and monitor RAG indexing status from one workspace designed for transparent clinical evidence maintenance.</p>
   </header>
 
   <section class="inspection-layout">
@@ -20,6 +20,9 @@
             (click)="changeView(view.id)"
             (keydown)="onInspectionTabKeydown($event, view.id)"
           >
+            <svg class="inspection-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path [attr.d]="view.iconPath" />
+            </svg>
             <span>{{ view.label }}</span>
           </button>
         }

@@ -50,9 +50,9 @@ from services.clinical.hepatox_constants import (  # noqa: E402
     STRUCTURED_DILI_SECTION_LINE_RE,
 )
 
-
 ###############################################################################
 class HepatoxConsultation:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

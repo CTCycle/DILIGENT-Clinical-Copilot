@@ -15,10 +15,14 @@ from services.llm.transports.base import (
 )
 
 
+###############################################################################
 class GeminiTransport(StructuredTransportMixin):
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, api_key: str, timeout: float) -> None:
         self.client = genai.Client(api_key=api_key)
 
+    # -------------------------------------------------------------------------
     async def chat(self, request: ChatRequest) -> ChatResult:
         system = "\n\n".join(
             item["content"] for item in request.messages if item.get("role") == "system"
@@ -44,6 +48,7 @@ class GeminiTransport(StructuredTransportMixin):
         )
         return ChatResult(content=str(response.text or ""))
 
+    # -------------------------------------------------------------------------
     async def list_models(self) -> list[CloudModelDescriptor]:
         page = await asyncio.to_thread(lambda: list(self.client.models.list()))
         return [
@@ -55,6 +60,7 @@ class GeminiTransport(StructuredTransportMixin):
             if "generateContent" in (item.supported_actions or [])
         ]
 
+    # -------------------------------------------------------------------------
     async def check_connectivity(self, model: str) -> ConnectivityResult:
         try:
             result = await self.chat(
@@ -67,5 +73,6 @@ class GeminiTransport(StructuredTransportMixin):
         except Exception as exc:
             return ConnectivityResult(ok=False, error=str(exc))
 
+    # -------------------------------------------------------------------------
     async def close(self) -> None:
         self.client.close()

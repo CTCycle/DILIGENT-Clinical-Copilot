@@ -4,6 +4,7 @@ import hashlib
 from typing import Any
 
 
+###############################################################################
 def _bounded(value: Any, limit: int) -> dict[str, Any]:
     text = str(value or "")
     return {
@@ -13,6 +14,7 @@ def _bounded(value: Any, limit: int) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def build_revision_context(
     *,
     session: dict[str, Any],

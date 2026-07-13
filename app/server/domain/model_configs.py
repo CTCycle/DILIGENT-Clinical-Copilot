@@ -7,7 +7,6 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from domain.llm.providers import CloudProviderDescriptor, CloudProviderId
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ModelConfigSnapshot:
@@ -23,7 +22,6 @@ class ModelConfigSnapshot:
     rag_settings: dict[str, object] | None = None
     updated_at: datetime | None = None
 
-
 ###############################################################################
 class LocalModelCard(BaseModel):
     name: str
@@ -32,7 +30,6 @@ class LocalModelCard(BaseModel):
     available_in_ollama: bool
     recommended_for_local_extraction: bool = False
     recommended_rank: int | None = None
-
 
 ###############################################################################
 class ModelConfigUpdateRequest(BaseModel):
@@ -51,7 +48,6 @@ class ModelConfigUpdateRequest(BaseModel):
     ollama_seed: int | None = Field(default=None, ge=0)
     rag_settings: dict[str, object] | None = None
 
-
 ###############################################################################
 class ModelConfigStateResponse(BaseModel):
     local_models: list[LocalModelCard]
@@ -69,13 +65,11 @@ class ModelConfigStateResponse(BaseModel):
     rag_model: str | None = None
     updated_at: datetime | None = None
 
-
 ###############################################################################
 class ConnectivityCheckRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     provider: CloudProviderId
     model: str = Field(min_length=1)
-
 
 ###############################################################################
 class ConnectivityCheckResponse(BaseModel):
