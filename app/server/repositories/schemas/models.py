@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -12,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     LargeBinary,
     String,
     Text,
@@ -1155,6 +1157,7 @@ class AccessKey(Base):
         nullable=False,
         server_default=text("false"),
     )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
@@ -1181,6 +1184,156 @@ class AccessKey(Base):
             sqlite_where=text("is_active = 1"),
             postgresql_where=text("is_active = true"),
         ),
+    )
+
+
+###############################################################################
+class ClinicalLabObservation(Base):
+    __tablename__ = "clinical_lab_observations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    marker_code: Mapped[str] = mapped_column(String, nullable=False)
+    observation_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    value_numeric: Mapped[float | None] = mapped_column(Float, nullable=True)
+    value_text: Mapped[str | None] = mapped_column(String, nullable=True)
+    unit: Mapped[str | None] = mapped_column(String, nullable=True)
+    upper_limit_numeric: Mapped[float | None] = mapped_column(Float, nullable=True)
+    source_ordinal: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_clinical_lab_observations_session_marker",
+            "session_id",
+            "marker_code",
+        ),
+        Index("ix_clinical_lab_observations_observation_at", "observation_at"),
+    )
+
+
+###############################################################################
+class ClinicalDrugMention(Base):
+    __tablename__ = "clinical_drug_mentions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    mention_ordinal: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_name: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String, nullable=False)
+    drug_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey(DRUGS_ID_FK, ondelete="SET NULL"),
+        nullable=True,
+    )
+    match_status: Mapped[str] = mapped_column(String, nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    match_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    evidence_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "mention_ordinal",
+            name="uq_clinical_drug_mentions_session_ordinal",
+        ),
+        Index("ix_clinical_drug_mentions_session_id", "session_id"),
+        Index("ix_clinical_drug_mentions_normalized_name", "normalized_name"),
+    )
+
+
+###############################################################################
+class DrugIdentifier(Base):
+    __tablename__ = "drug_identifiers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    drug_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(DRUGS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    identifier_system: Mapped[str] = mapped_column(String, nullable=False)
+    identifier_value: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "identifier_system",
+            "identifier_value",
+            name="uq_drug_identifiers_system_value",
+        ),
+        Index("ix_drug_identifiers_drug_id", "drug_id"),
+    )
+
+
+###############################################################################
+class ApplicationConfiguration(Base):
+    __tablename__ = "application_configuration"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    schema_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("1")
+    )
+    revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+
+###############################################################################
+class ReferenceCatalogManifest(Base):
+    __tablename__ = "reference_catalog_manifests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    manifest: Mapped[str] = mapped_column(String, nullable=False)
+    installed_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    manifest_hash: Mapped[str] = mapped_column(String, nullable=False)
+    source_path: Mapped[str] = mapped_column(Text, nullable=False)
+    entry_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    installed_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    __table_args__ = (
+        UniqueConstraint("manifest", name="uq_reference_catalog_manifests_manifest"),
+        Index("ix_reference_catalog_manifests_hash", "manifest_hash"),
     )
 
 
