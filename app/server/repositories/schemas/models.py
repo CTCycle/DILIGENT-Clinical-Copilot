@@ -128,6 +128,13 @@ class ClinicalSession(Base):
         Index("ix_clinical_sessions_original_session_id", "original_session_id"),
         Index("ix_clinical_sessions_timestamp", "session_timestamp"),
         Index("ix_clinical_sessions_status", "session_status"),
+        Index(
+            "ix_clinical_sessions_status_timestamp_id",
+            "session_status",
+            "session_timestamp",
+            "id",
+        ),
+        Index("ix_clinical_sessions_timestamp_id", "session_timestamp", "id"),
     )
 
 ###############################################################################
