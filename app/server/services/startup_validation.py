@@ -24,7 +24,7 @@ def run_startup_validations(settings: ServerSettings | None = None) -> None:
     if not (model_snapshot.text_extraction_model or "").strip():
         raise RuntimeError("Text extraction model defaults could not be resolved.")
 
-    if resolved_settings.database.embedded_database:
+    if resolved_settings.database.backend == "sqlite":
         return
 
     if not (resolved_settings.database.engine or "").strip():
