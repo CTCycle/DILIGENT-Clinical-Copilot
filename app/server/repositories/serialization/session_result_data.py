@@ -63,6 +63,29 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         db_session.add(persisted_session)
         db_session.flush()
         session_id = int(persisted_session.id)
+        # Initial intake writes own version 1. Revision sessions are attached
+        # to their pre-created version shell during finalization.
+        if persisted_session.original_session_id is None:
+            db_session.add(
+                ClinicalSessionVersion(
+                    session_id=session_id,
+                    root_session_id=session_id,
+                    source_version_id=None,
+                    version_number=int(persisted_session.version or 1),
+                    version_status="current",
+                    revision_kind="original",
+                    llm_qa_status="not_run",
+                    clinical_review_status="not_reviewed",
+                    pipeline_run_id=None,
+                    model_configuration_json=self.serialize_json_payload(
+                        {
+                            "text_extraction_model": persisted_session.text_extraction_model,
+                            "clinical_model": persisted_session.clinical_model,
+                        }
+                    ),
+                    completed_at=persisted_session.session_timestamp,
+                )
+            )
         self.persist_session_sections(db_session, session_id, session_data)
         self.persist_session_labs(db_session, session_id, session_data)
         self.persist_session_drugs(db_session, session_id, session_data)
@@ -342,7 +365,30 @@ def update_session_text_and_metadata(
         existing = db_session.get(ClinicalSession, safe_session_id)
         if existing is None:
             return None
-        _ = session_text
+        if session_text is not None:
+            result_row = db_session.execute(
+                select(ClinicalSessionResult).where(
+                    ClinicalSessionResult.session_id == safe_session_id
+                )
+            ).scalar_one_or_none()
+            payload = (
+                self.parse_session_result_payload(result_row.payload_json)
+                if result_row is not None
+                else {}
+            ) or {}
+            normalized_text = str(session_text).strip()
+            payload["original_session_text"] = normalized_text
+            if result_row is None:
+                db_session.add(
+                    ClinicalSessionResult(
+                        session_id=safe_session_id,
+                        payload_json=self.serialize_json_payload(payload) or "{}",
+                    )
+                )
+            else:
+                result_row.payload_json = (
+                    self.serialize_json_payload(payload) or "{}"
+                )
         if metadata is not None:
             existing.metadata_json = self.serialize_json_payload(metadata or {})
         db_session.commit()
