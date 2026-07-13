@@ -611,7 +611,6 @@ class ClinicalSessionService(
         normalized_document: Any | None = None,
         report_mode: str = "faithful_only",
         session_version: int = 1,
-        original_session_id: int | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
         stop_check: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
@@ -623,7 +622,6 @@ class ClinicalSessionService(
             normalized_document=normalized_document,
             report_mode=report_mode,
             session_version=session_version,
-            original_session_id=original_session_id,
             progress_callback=progress_callback,
             stop_check=stop_check,
         )

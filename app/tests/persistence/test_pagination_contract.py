@@ -15,8 +15,6 @@ def test_session_pagination_has_stable_timestamp_and_id_order(persistence_sessio
             ClinicalSession(
                 patient_name=f"Page {index}",
                 session_timestamp=timestamp + timedelta(minutes=index),
-                version=1,
-                next_version_number=2,
             )
         )
     persistence_session.commit()

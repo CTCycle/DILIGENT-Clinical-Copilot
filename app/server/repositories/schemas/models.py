@@ -41,17 +41,6 @@ class ClinicalSession(Base):
     laboratory_analysis: Mapped[str | None] = mapped_column(Text)
     patient_image_blob: Mapped[bytes | None] = mapped_column(LargeBinary)
     session_timestamp: Mapped[datetime | None] = mapped_column(DateTime)
-    version: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("1")
-    )
-    next_version_number: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("2")
-    )
-    original_session_id: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
-        nullable=True,
-    )
     hepatic_pattern: Mapped[str | None] = mapped_column(String)
     text_extraction_model: Mapped[str | None] = mapped_column(String)
     clinical_model: Mapped[str | None] = mapped_column(String)
@@ -86,14 +75,9 @@ class ClinicalSession(Base):
         back_populates="session",
         passive_deletes=True,
     )
-    parent_session: Mapped["ClinicalSession | None"] = relationship(
-        "ClinicalSession",
-        remote_side=[id],
-    )
 
     __table_args__ = (
         Index("ix_clinical_sessions_patient_name", "patient_name"),
-        Index("ix_clinical_sessions_original_session_id", "original_session_id"),
         Index("ix_clinical_sessions_timestamp", "session_timestamp"),
         Index("ix_clinical_sessions_status", "session_status"),
         Index(

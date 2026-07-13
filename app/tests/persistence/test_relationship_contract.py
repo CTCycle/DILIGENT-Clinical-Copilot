@@ -19,7 +19,7 @@ def test_session_children_cascade_and_drug_mentions_set_null(
     drug = Drug(canonical_name="Contract Drug", canonical_name_norm="contract drug")
     persistence_session.add(drug)
     persistence_session.flush()
-    session = ClinicalSession(patient_name="Contract Patient", version=1)
+    session = ClinicalSession(patient_name="Contract Patient")
     persistence_session.add(session)
     persistence_session.flush()
     persistence_session.add_all(

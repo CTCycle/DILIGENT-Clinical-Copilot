@@ -438,8 +438,8 @@ class DataSerializer:
         return session_revision_steps.record_revision_review_action(self, **kwargs)
 
     # -------------------------------------------------------------------------
-    def get_next_session_version(self, original_session_id: int) -> int:
-        return session_result_data.get_next_session_version(self, original_session_id)
+    def get_next_session_version(self, root_session_id: int) -> int:
+        return session_result_data.get_next_session_version(self, root_session_id)
 
     # -------------------------------------------------------------------------
     def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
