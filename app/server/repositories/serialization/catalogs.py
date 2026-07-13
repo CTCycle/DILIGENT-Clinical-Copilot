@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from types import MappingProxyType
 
 from sqlalchemy import delete, select
@@ -11,7 +12,11 @@ from domain.catalogs import (
     CatalogManifest,
     normalize_catalog_value,
 )
-from repositories.schemas.models import ReferenceCatalogEntry, ReferenceCatalogSeedRun
+from repositories.schemas.models import (
+    ReferenceCatalogEntry,
+    ReferenceCatalogManifest,
+    ReferenceCatalogSeedRun,
+)
 
 ###############################################################################
 class ReferenceCatalogSerializer:
@@ -74,6 +79,33 @@ class ReferenceCatalogSerializer:
                     )
                 )
                 written += 1
+            installed = (
+                session.execute(
+                    select(ReferenceCatalogManifest).where(
+                        ReferenceCatalogManifest.manifest == manifest.manifest
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            installed_at = datetime.now(UTC).replace(tzinfo=None)
+            if installed is None:
+                session.add(
+                    ReferenceCatalogManifest(
+                        manifest=manifest.manifest,
+                        installed_version=manifest.version,
+                        manifest_hash=manifest_hash,
+                        source_path=source_path,
+                        entry_count=written,
+                        installed_at=installed_at,
+                    )
+                )
+            else:
+                installed.installed_version = manifest.version
+                installed.manifest_hash = manifest_hash
+                installed.source_path = source_path
+                installed.entry_count = written
+                installed.installed_at = installed_at
             session.commit()
             return written
         except Exception:
@@ -87,10 +119,9 @@ class ReferenceCatalogSerializer:
         session = self.session_factory()
         try:
             row = session.execute(
-                select(ReferenceCatalogSeedRun.id).where(
-                    ReferenceCatalogSeedRun.manifest == manifest,
-                    ReferenceCatalogSeedRun.manifest_hash == manifest_hash,
-                    ReferenceCatalogSeedRun.status == "success",
+                select(ReferenceCatalogManifest.id).where(
+                    ReferenceCatalogManifest.manifest == manifest,
+                    ReferenceCatalogManifest.manifest_hash == manifest_hash,
                 )
             ).first()
             return row is not None
