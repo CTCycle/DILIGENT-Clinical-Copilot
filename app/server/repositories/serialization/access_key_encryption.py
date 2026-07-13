@@ -33,6 +33,7 @@ class AccessKeyEncryptionMaterialSerializer:
     database stores only ciphertext and the referenced version number.
     """
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, engine=None, session_factory=None) -> None:
         # Keep the constructor shape used by the repository serializers while
         # making it explicit that database handles are no longer consumed.

@@ -6,7 +6,6 @@ from pathlib import Path
 from common.paths import RESOURCES_PATH
 from domain.llm.providers import CloudProviderDefinition, CloudProviderId
 
-
 ###############################################################################
 class ProviderRegistry:
 

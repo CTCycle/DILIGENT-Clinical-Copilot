@@ -12,6 +12,7 @@ from repositories.schemas.models import (
 )
 
 
+###############################################################################
 def upsert_application_configuration(
     db_session: Session,
     *,

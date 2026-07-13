@@ -10,6 +10,7 @@ from domain.settings.configuration import DatabaseSettings
 from repositories.database.utils import normalize_postgres_engine, validate_postgres_database_name
 
 
+###############################################################################
 def build_sqlite_engine(database_path: str, *, timeout: float = 30.0) -> Engine:
     return sqlalchemy.create_engine(
         f"sqlite:///{database_path}",
@@ -19,6 +20,7 @@ def build_sqlite_engine(database_path: str, *, timeout: float = 30.0) -> Engine:
     )
 
 
+###############################################################################
 def build_postgres_engine(settings: DatabaseSettings) -> Engine:
     if not settings.host or not settings.database_name or not settings.username:
         raise ValueError("PostgreSQL host, database name, and username are required")

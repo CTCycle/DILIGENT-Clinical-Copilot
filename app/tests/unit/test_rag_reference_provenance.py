@@ -6,7 +6,6 @@ from pydantic import ValidationError
 from domain.clinical.entities import RagDocumentReference
 from services.clinical.rag_support import RagSupportService
 
-
 ###############################################################################
 def test_line_metadata_is_propagated() -> None:
     reference = RagSupportService.build_document_reference(
@@ -23,7 +22,6 @@ def test_line_metadata_is_propagated() -> None:
     assert reference == RagDocumentReference(
         file_name="alpha.pdf", page_start=2, page_end=3, line_start=18, line_end=54
     )
-
 
 ###############################################################################
 @pytest.mark.parametrize(

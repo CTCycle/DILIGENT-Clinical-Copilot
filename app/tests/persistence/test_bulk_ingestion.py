@@ -9,6 +9,7 @@ from repositories.schemas.models import Drug, DrugAlias, DrugRxnormCode, LiverTo
 from repositories.serialization.data import DataSerializer
 
 
+###############################################################################
 def test_rxnav_ingestion_uses_set_based_writes(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     statements: Counter[str] = Counter()
     commits = 0
@@ -71,6 +72,7 @@ def test_rxnav_ingestion_uses_set_based_writes(persistence_engine) -> None:  # t
     assert commits == 1
 
 
+###############################################################################
 def test_livertox_ingestion_uses_set_based_writes(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     statements: Counter[str] = Counter()
     commits = 0

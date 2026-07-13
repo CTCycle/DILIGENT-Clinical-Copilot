@@ -40,6 +40,7 @@ def resolve_session_factory(
     )
 
 
+###############################################################################
 @contextmanager
 def unit_of_work(
     *,

@@ -74,6 +74,7 @@ def test_database_settings_are_loaded_from_json_without_env_overlap(
     }
 
 
+###############################################################################
 def test_canonical_sqlite_database_environment_contract(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setenv("DATABASE_BACKEND", "sqlite")
     monkeypatch.setenv("DATABASE_SQLITE_PATH", "C:/data/diligent.db")

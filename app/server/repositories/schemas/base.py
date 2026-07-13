@@ -17,12 +17,14 @@ NAMING_CONVENTION = {
 }
 
 
+###############################################################################
 class UtcDateTime(TypeDecorator[datetime]):
     """Store UTC-normalized datetimes while returning aware Python values."""
 
     impl = DateTime
     cache_ok = True
 
+    # -------------------------------------------------------------------------
     def process_bind_param(
         self, value: datetime | None, _dialect: Any
     ) -> datetime | None:
@@ -32,6 +34,7 @@ class UtcDateTime(TypeDecorator[datetime]):
             return value
         return value.astimezone(UTC).replace(tzinfo=None)
 
+    # -------------------------------------------------------------------------
     def process_result_value(
         self, value: datetime | None, _dialect: Any
     ) -> datetime | None:
@@ -40,10 +43,12 @@ class UtcDateTime(TypeDecorator[datetime]):
         return value.replace(tzinfo=UTC)
 
 
+###############################################################################
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+###############################################################################
 @event.listens_for(Base, "before_update", propagate=True)
 def set_updated_at_before_update(_mapper: Any, _connection: Any, target: Any) -> None:
     """Keep update timestamps portable across SQLite and PostgreSQL."""

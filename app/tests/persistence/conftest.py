@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from repositories.schemas.models import Base
 
 
+###############################################################################
 @pytest.fixture(params=["sqlite", "postgresql"])
 def persistence_engine(request: pytest.FixtureRequest, tmp_path: Path) -> Engine:
     if request.param == "sqlite":
@@ -43,6 +44,7 @@ def persistence_engine(request: pytest.FixtureRequest, tmp_path: Path) -> Engine
         engine.dispose()
 
 
+###############################################################################
 @pytest.fixture
 def persistence_session(persistence_engine: Engine) -> Session:
     factory = sessionmaker(bind=persistence_engine, future=True, expire_on_commit=False)

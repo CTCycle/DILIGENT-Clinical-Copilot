@@ -14,7 +14,6 @@ from services.llm.transports.base import (
     StructuredTransportMixin,
 )
 
-
 ###############################################################################
 class GeminiTransport(StructuredTransportMixin):
 

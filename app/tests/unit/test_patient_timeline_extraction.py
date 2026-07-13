@@ -113,7 +113,6 @@ def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
 def test_normalize_date_token_keeps_month_precision_without_promoting_day() -> None:
     assert PatientTimelineExtractor.normalize_date_token("2025-02") == "2025-02"
 
-
 ###############################################################################
 def test_timeline_sort_orders_year_month_and_day_without_changing_display_values() -> None:
     extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
@@ -128,7 +127,6 @@ def test_timeline_sort_orders_year_month_and_day_without_changing_display_values
 
     assert [event.event_id for event in normalized] == ["year", "month", "day", "relative"]
     assert [event.event_date for event in normalized[:3]] == ["2025", "2025-02", "2025-02-03"]
-
 
 ###############################################################################
 def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
