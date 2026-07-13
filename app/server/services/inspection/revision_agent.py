@@ -101,7 +101,6 @@ def build_revision_agent_user_prompt(
             "visit_date": session.get("visit_date"),
             "session_timestamp": session.get("session_timestamp"),
             "version": session.get("version"),
-            "original_session_id": session.get("original_session_id"),
             "status": session.get("status"),
         },
         "model_context": {
@@ -423,7 +422,7 @@ class RevisionAgentRunner:
                     "version": self.serializer.get_next_session_version(
                         root_session_id
                     ),
-                    "original_session_id": root_session_id,
+                    "root_session_id": root_session_id,
                     "session_kind": "agentic_revision",
                     "session_status": "successful",
                     "anamnesis": (session.get("sections") or {}).get("anamnesis"),

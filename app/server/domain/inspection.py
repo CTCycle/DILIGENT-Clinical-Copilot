@@ -37,7 +37,6 @@ class SessionCatalogItem(BaseModel):
     patient_name: str | None = None
     session_timestamp: datetime | None = None
     version: int = 1
-    original_session_id: int | None = None
     status: SessionStatus
     total_duration: float | None = None
     has_report: bool = False
@@ -60,7 +59,6 @@ class SessionDetailResponse(BaseModel):
     visit_date: DateValue | None = None
     session_timestamp: datetime | None = None
     version: int = 1
-    original_session_id: int | None = None
     status: SessionStatus
     text_extraction_model: str | None = None
     clinical_model: str | None = None
@@ -99,7 +97,6 @@ class SessionRevisionRequest(BaseModel):
         "full_report_revision", "selected_text_revision", "metadata_review"
     ] = "full_report_revision"
     dry_run: bool = False
-
 
 ###############################################################################
 class ManualReportEditRequest(BaseModel):
@@ -743,7 +740,6 @@ class ReferenceCatalogRuntimeObservationUpsertRequest(BaseModel):
     source: str = "runtime"
     is_active: bool = True
 
-
 ###############################################################################
 class RevisionAgentTask(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -753,7 +749,6 @@ class RevisionAgentTask(BaseModel):
     affected_sections: list[str] = Field(default_factory=list)
     required_tools: list[str] = Field(default_factory=list)
     stop_criteria: str
-
 
 ###############################################################################
 class RevisionAgentPlan(BaseModel):
@@ -765,7 +760,6 @@ class RevisionAgentPlan(BaseModel):
         "revised_report"
     )
 
-
 ###############################################################################
 class RevisionAgentToolCall(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -773,7 +767,6 @@ class RevisionAgentToolCall(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
     rationale: str = Field(min_length=1, max_length=1000)
     task_complete: bool = False
-
 
 ###############################################################################
 class RevisionReportPatch(BaseModel):
@@ -783,7 +776,6 @@ class RevisionReportPatch(BaseModel):
     replacement: str = Field(max_length=20000)
     expected_text: str = Field(max_length=20000)
     evidence_references: list[str] = Field(default_factory=list)
-
 
 ###############################################################################
 class RevisionDraftResult(BaseModel):
@@ -796,7 +788,6 @@ class RevisionDraftResult(BaseModel):
     human_review_requirements: list[str] = Field(default_factory=list)
     entity_change_proposals: list[dict[str, Any]] = Field(default_factory=list)
 
-
 ###############################################################################
 class RevisionAgentQaResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -804,7 +795,6 @@ class RevisionAgentQaResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     supported_claim_count: int = Field(default=0, ge=0)
     manual_review_required: bool = True
-
 
 ###############################################################################
 class RevisionAgentFinalResult(BaseModel):

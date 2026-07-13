@@ -13,7 +13,7 @@ from domain.clinical.revision import (
     RevisedLabPayload,
     RevisionLiverToxDecision,
 )
-from sqlalchemy import select, update
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from repositories.schemas.models import (
@@ -59,7 +59,6 @@ def sync_preserved_version_status(
 def derive_revision_kind(session_row: ClinicalSession, root_session_id: int) -> str:
     if (
         int(session_row.id) == int(root_session_id)
-        and int(session_row.version or 1) == 1
     ):
         return "original"
     return "llm_assisted_revision"
@@ -356,10 +355,13 @@ def get_root_session_id_for_session(
     db_session: Session,
     session_id: int,
 ) -> int | None:
-    session_row = db_session.get(ClinicalSession, int(session_id))
-    if session_row is None:
-        return None
-    return int(session_row.original_session_id or session_row.id)
+    version_row = db_session.execute(
+        select(ClinicalSessionVersion.root_session_id)
+        .where(ClinicalSessionVersion.session_id == int(session_id))
+        .order_by(ClinicalSessionVersion.version_number.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    return int(version_row) if version_row is not None else int(session_id)
 
 ###############################################################################
 def ensure_version_record_for_session(
@@ -379,7 +381,7 @@ def ensure_version_record_for_session(
     if existing is not None:
         existing.root_session_id = int(root_session_id)
         existing.source_version_id = source_version_id
-        existing.version_number = int(session_row.version or 1)
+        existing.version_number = 1
         existing.version_status = sync_preserved_version_status(
             existing.version_status,
             is_latest_completed=is_latest_completed,
@@ -401,7 +403,7 @@ def ensure_version_record_for_session(
         session_id=int(session_row.id),
         root_session_id=int(root_session_id),
         source_version_id=source_version_id,
-        version_number=int(session_row.version or 1),
+        version_number=1,
         version_status=default_version_status(is_latest=is_latest_completed),
         revision_kind=derive_revision_kind(session_row, root_session_id),
         llm_qa_status="not_run",
@@ -424,11 +426,8 @@ def sync_version_records_for_root(
     session_rows = list(
         db_session.execute(
             select(ClinicalSession)
-            .where(
-                (ClinicalSession.id == int(root_session_id))
-                | (ClinicalSession.original_session_id == int(root_session_id))
-            )
-            .order_by(ClinicalSession.version.asc(), ClinicalSession.id.asc())
+            .where(ClinicalSession.id == int(root_session_id))
+            .order_by(ClinicalSession.id.asc())
         ).scalars()
     )
     latest_completed_session_id = int(session_rows[-1].id) if session_rows else None
@@ -571,16 +570,11 @@ def create_revision_version_shell(
         if existing is not None:
             return serialize_version_row(self, existing)
         counter_result = db_session.execute(
-            update(ClinicalSession)
-            .where(ClinicalSession.id == int(root_session_id))
-            .values(
-                next_version_number=ClinicalSession.next_version_number + 1
+            select(func.max(ClinicalSessionVersion.version_number)).where(
+                ClinicalSessionVersion.root_session_id == int(root_session_id)
             )
-            .returning(ClinicalSession.next_version_number)
         ).scalar_one_or_none()
-        if counter_result is None:
-            raise RuntimeError("Session version counter could not be allocated")
-        next_version_number = int(counter_result) - 1
+        next_version_number = int(counter_result or 1) + 1
         shell = ClinicalSessionVersion(
             session_id=None,
             root_session_id=int(root_session_id),

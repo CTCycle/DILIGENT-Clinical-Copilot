@@ -208,7 +208,6 @@ async def process_single_patient_workflow(
     normalized_document: NormalizedDocument | None = None,
     report_mode: str = "faithful_only",
     session_version: int = 1,
-    original_session_id: int | None = None,
     progress_callback=None,
     stop_check=None,
 ) -> dict[str, Any]:
@@ -832,7 +831,6 @@ async def process_single_patient_workflow(
                 "patient_image_base64": patient_image_base64,
                 "session_timestamp": datetime.now(UTC),
                 "version": session_version,
-                "original_session_id": original_session_id,
                 "metadata": {"use_rag": bool(payload.use_rag)},
                 "session_kind": "standard_assessment",
                 "hepatic_pattern": pattern_score.classification,
