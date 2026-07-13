@@ -57,6 +57,13 @@ const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
   opencode: 'OpenCode',
   brave: 'Brave',
 };
+const PROVIDER_LOGOS: Partial<Record<AccessKeyProvider, { src: string; alt: string }>> = {
+  openai: { src: '/logos/openai-blossom-light.svg', alt: 'OpenAI logo' },
+  gemini: { src: '/logos/google-g.svg', alt: 'Google logo' },
+  deepseek: { src: '/logos/deepseek.svg', alt: 'DeepSeek logo' },
+  anthropic: { src: '/logos/anthropic.svg', alt: 'Anthropic logo' },
+  opencode: { src: '/logos/opencode.svg', alt: 'OpenCode logo' },
+};
 const RUNTIME_PROVIDER_LABELS: Record<CloudProvider, string> = {
   openai: 'OpenAI',
   gemini: 'Google Gemini',
@@ -726,6 +733,10 @@ export class ModelConfigPageComponent implements OnInit {
 
   getProviderLabel(provider: AccessKeyProvider): string {
     return PROVIDER_LABELS[provider];
+  }
+
+  providerLogo(provider: AccessKeyProvider): { src: string; alt: string } | null {
+    return PROVIDER_LOGOS[provider] || null;
   }
 
   resolveProviderLabel(provider: string): string {
