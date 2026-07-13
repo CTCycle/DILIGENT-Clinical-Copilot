@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 
@@ -61,7 +61,7 @@ def build_failed_session_payload(
         "patient_name": payload.name,
         "patient_visit_date": payload.visit_date,
         "patient_image_base64": None,
-        "session_timestamp": datetime.now(),
+        "session_timestamp": datetime.now(UTC),
         "hepatic_pattern": "indeterminate",
         "anamnesis": None,
         "drugs": None,
