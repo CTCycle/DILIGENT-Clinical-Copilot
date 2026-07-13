@@ -5,6 +5,7 @@ from sqlalchemy import select
 from repositories.schemas.models import ApplicationConfiguration
 
 
+###############################################################################
 def test_configuration_singleton_rolls_back(persistence_session) -> None:  # type: ignore[no-untyped-def]
     persistence_session.add(
         ApplicationConfiguration(payload={"clinical_model": "contract"})
@@ -13,6 +14,7 @@ def test_configuration_singleton_rolls_back(persistence_session) -> None:  # typ
     assert persistence_session.scalar(select(ApplicationConfiguration)) is None
 
 
+###############################################################################
 def test_configuration_singleton_is_unique(persistence_session) -> None:  # type: ignore[no-untyped-def]
     persistence_session.add(
         ApplicationConfiguration(payload={"clinical_model": "contract"})

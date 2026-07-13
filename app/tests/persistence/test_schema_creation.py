@@ -4,6 +4,7 @@ from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 
 
+###############################################################################
 def test_canonical_persistence_tables_exist(persistence_engine: Engine) -> None:
     tables = set(inspect(persistence_engine).get_table_names())
     assert {
@@ -17,6 +18,7 @@ def test_canonical_persistence_tables_exist(persistence_engine: Engine) -> None:
     }.issubset(tables)
 
 
+###############################################################################
 def test_canonical_indexes_are_present(persistence_engine: Engine) -> None:
     indexes = {
         index["name"]

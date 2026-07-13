@@ -11,7 +11,10 @@ from repositories.database.upsert import upsert_application_configuration
 from repositories.schemas.models import ApplicationConfiguration
 
 
+###############################################################################
 class ApplicationConfigurationSerializer:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -25,6 +28,7 @@ class ApplicationConfigurationSerializer:
             expire_on_commit=False,
         )
 
+    # -------------------------------------------------------------------------
     def load(self) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             row = db_session.get(ApplicationConfiguration, 1)
@@ -32,6 +36,7 @@ class ApplicationConfigurationSerializer:
                 return None
             return dict(row.payload)
 
+    # -------------------------------------------------------------------------
     def save(
         self,
         payload: dict[str, Any],

@@ -14,7 +14,6 @@ from services.llm.transports.base import (
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
 
-
 ###############################################################################
 class RoutedGatewayTransport(StructuredTransportMixin):
     _cache: dict[str, tuple[datetime, list[CloudModelDescriptor]]] = {}

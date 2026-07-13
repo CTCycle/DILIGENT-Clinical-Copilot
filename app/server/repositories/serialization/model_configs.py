@@ -26,6 +26,7 @@ class ModelConfigSerializer:
     DEFAULT_OLLAMA_REASONING = False
     DEFAULT_OLLAMA_SEED = 42
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
