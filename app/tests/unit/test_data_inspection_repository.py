@@ -17,7 +17,6 @@ from repositories.schemas.models import (
     DrugRxnormCode,
     KbMatchCache,
     LiverToxMonograph,
-    Patient,
 )
 from repositories.serialization.data import DataSerializer
 from services.inspection import DataInspectionService
@@ -243,11 +242,8 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
                 last_update="2025-01-06",
             )
         )
-        patient = Patient(name="Drug Link")
-        db_session.add(patient)
-        db_session.flush()
         clinical_session = ClinicalSession(
-            patient_id=int(patient.id),
+            patient_name="Drug Link",
             session_timestamp=datetime(2025, 1, 4, 10, 0),
             session_status="successful",
         )

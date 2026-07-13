@@ -4,18 +4,16 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
-from repositories.schemas.models import ClinicalSession, Patient
+from repositories.schemas.models import ClinicalSession
 
 
+###############################################################################
 def test_session_pagination_has_stable_timestamp_and_id_order(persistence_session) -> None:  # type: ignore[no-untyped-def]
     timestamp = datetime(2026, 1, 1, tzinfo=UTC)
-    patients = [Patient(name=f"Page {index}") for index in range(3)]
-    persistence_session.add_all(patients)
-    persistence_session.flush()
-    for index, patient in enumerate(patients):
+    for index in range(3):
         persistence_session.add(
             ClinicalSession(
-                patient_id=patient.id,
+                patient_name=f"Page {index}",
                 session_timestamp=timestamp + timedelta(minutes=index),
                 version=1,
                 next_version_number=2,
