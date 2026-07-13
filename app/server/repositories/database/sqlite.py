@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -19,7 +21,11 @@ class SQLiteRepository:
 
     # -------------------------------------------------------------------------
     def __init__(self, settings: DatabaseSettings) -> None:
-        self.db_path = DATABASE_FILE_PATH
+        self.db_path = (
+            Path(settings.sqlite_path)
+            if settings.sqlite_path
+            else DATABASE_FILE_PATH
+        )
         db_file_missing = bool(self.db_path and not self.db_path.exists())
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.engine: Engine = build_sqlite_engine(str(self.db_path), timeout=30.0)

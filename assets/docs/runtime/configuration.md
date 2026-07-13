@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 ## Primary Runtime Files
 - Active env file: `settings/.env`
@@ -45,3 +45,18 @@ Last updated: 2026-07-12
 ## RAG Defaults
 - The default Ollama embedding model is pinned in `settings/configurations.json` and should not use a mutable `:latest` tag.
 - `reset_vector_collection` defaults to `false` and should only be enabled for explicit maintenance or rebuild operations.
+## Database configuration
+
+Use one canonical database contract:
+
+```text
+DATABASE_BACKEND=sqlite
+DATABASE_URL=
+DATABASE_SQLITE_PATH=
+DATABASE_CONNECT_TIMEOUT=10
+DATABASE_WRITE_BATCH_SIZE=1000
+DATABASE_READ_PAGE_SIZE=1000
+```
+
+Set `DATABASE_BACKEND=postgresql` and provide `DATABASE_URL` for PostgreSQL.
+The old embedded/engine/host/port/password split is no longer documented.
