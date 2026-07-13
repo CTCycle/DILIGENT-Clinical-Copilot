@@ -1,5 +1,5 @@
 """Canonical security schema imports."""
 
-from repositories.schemas.models import AccessKey, AccessKeyEncryptionMaterial
+from repositories.schemas.models import AccessKey
 
-__all__ = ["AccessKey", "AccessKeyEncryptionMaterial"]
+__all__ = ["AccessKey"]

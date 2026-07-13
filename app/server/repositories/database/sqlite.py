@@ -11,9 +11,6 @@ from common.utils.logger import logger
 from domain.settings.configuration import DatabaseSettings
 from repositories.schemas.models import Base
 from repositories.database.engine import build_sqlite_engine
-from repositories.serialization.access_key_encryption import (
-    AccessKeyEncryptionMaterialSerializer,
-)
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
 ###############################################################################
@@ -30,17 +27,8 @@ class SQLiteRepository:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.engine: Engine = build_sqlite_engine(str(self.db_path), timeout=30.0)
         event.listen(self.engine, "connect", self._configure_connection)
-        seed_session_factory = sessionmaker(
-            bind=self.engine,
-            future=True,
-            expire_on_commit=False,
-        )
         if db_file_missing:
             Base.metadata.create_all(self.engine)
-        AccessKeyEncryptionMaterialSerializer(
-            engine=self.engine,
-            session_factory=seed_session_factory,
-        ).ensure_seeded("provider_access_keys")
         if db_file_missing:
             logger.info(
                 "SQLite DB file was missing; created and initialized schema at %s",
@@ -48,7 +36,7 @@ class SQLiteRepository:
             )
         else:
             logger.info(
-                "SQLite DB file already existed; ensured encryption material at %s",
+                "SQLite DB file already existed; ensured schema at %s",
                 str(self.db_path),
             )
         self.session_factory = sessionmaker(bind=self.engine, future=True)

@@ -24,9 +24,6 @@ from repositories.database.utils import (
     validate_postgres_database_name,
 )
 from repositories.schemas.models import Base
-from repositories.serialization.access_key_encryption import (
-    AccessKeyEncryptionMaterialSerializer,
-)
 from repositories.serialization.catalogs import (
     ReferenceCatalogSerializer,
 )
@@ -143,14 +140,6 @@ def initialize_sqlite_database(
     if drop_existing:
         Base.metadata.drop_all(repository.engine)
     Base.metadata.create_all(repository.engine)
-    AccessKeyEncryptionMaterialSerializer(
-        engine=repository.engine,
-        session_factory=sessionmaker(
-            bind=repository.engine,
-            future=True,
-            expire_on_commit=False,
-        ),
-    ).ensure_seeded("provider_access_keys")
     if seed_catalogs:
         session_factory = getattr(
             repository,
@@ -216,15 +205,6 @@ def ensure_postgres_database(
     if drop_existing:
         Base.metadata.drop_all(repository.engine)
     Base.metadata.create_all(repository.engine)
-    material_serializer = AccessKeyEncryptionMaterialSerializer(
-        engine=repository.engine,
-        session_factory=sessionmaker(
-            bind=repository.engine,
-            future=True,
-            expire_on_commit=False,
-        ),
-    )
-    material_serializer.ensure_seeded("provider_access_keys")
     if seed_catalogs:
         session_factory = getattr(repository, "session_factory", None)
         if session_factory is not None:
