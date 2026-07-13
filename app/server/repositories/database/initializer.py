@@ -103,24 +103,11 @@ def _seed_catalogs(
                 manifest_hash=manifest_hash,
                 source_path=str(path),
             )
-            serializer.record_seed_success(
-                manifest=manifest.manifest,
-                version=manifest.version,
-                hash=manifest_hash,
-                source_path=str(path),
-                entry_count=written,
-            )
             if written > 0:
                 manifests_seeded += 1
                 entries_written += written
         except Exception as exc:
-            serializer.record_seed_failure(
-                manifest=manifest.manifest,
-                version=manifest.version,
-                hash=manifest_hash,
-                source_path=str(path),
-                error=str(exc),
-            )
+            _ = exc
             raise
     return CatalogSeedResult(
         manifests_seen=len(paths),
