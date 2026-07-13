@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import and_, delete, exists, func, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from common.utils.logger import logger
@@ -19,12 +19,10 @@ from repositories.schemas.models import (
     ClinicalSession,
     ClinicalSessionDrug,
     ClinicalSessionLab,
-    ClinicalSessionManualEdit,
     ClinicalSessionResult,
     ClinicalSessionTimeline,
     ClinicalSessionSection,
     ClinicalSessionVersion,
-    Patient,
 )
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 from services.text.vocabulary import (
@@ -38,9 +36,17 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         return None
     db_session = self.session_factory()
     try:
-        persisted_patient = self.persist_patient(db_session, session_data)
         persisted_session = ClinicalSession(
-            patient_id=int(persisted_patient.id),
+            patient_name=self.normalize_string(session_data.get("patient_name")),
+            visit_date=self.normalize_date_value(session_data.get("patient_visit_date")),
+            anamnesis=self.normalize_string(session_data.get("anamnesis")),
+            drugs_text=self.normalize_string(session_data.get("drugs")),
+            laboratory_analysis=self.normalize_string(
+                session_data.get("laboratory_analysis")
+            ),
+            patient_image_blob=self.decode_patient_image(
+                session_data.get("patient_image_base64")
+            ),
             session_timestamp=self.parse_datetime(
                 session_data.get("session_timestamp")
             ),
@@ -64,27 +70,26 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         session_id = int(persisted_session.id)
         # Initial intake writes own version 1. Revision sessions are attached
         # to their pre-created version shell during finalization.
-        if persisted_session.original_session_id is None:
-            db_session.add(
-                ClinicalSessionVersion(
-                    session_id=session_id,
-                    root_session_id=session_id,
-                    source_version_id=None,
-                    version_number=int(persisted_session.version or 1),
-                    version_status="current",
-                    revision_kind="original",
-                    llm_qa_status="not_run",
-                    clinical_review_status="not_reviewed",
-                    pipeline_run_id=None,
-                    model_configuration_json=self.serialize_json_payload(
-                        {
-                            "text_extraction_model": persisted_session.text_extraction_model,
-                            "clinical_model": persisted_session.clinical_model,
-                        }
-                    ),
-                    completed_at=persisted_session.session_timestamp,
-                )
+        db_session.add(
+            ClinicalSessionVersion(
+                session_id=session_id,
+                root_session_id=session_id,
+                source_version_id=None,
+                version_number=int(persisted_session.version or 1),
+                version_status="current",
+                revision_kind="original",
+                llm_qa_status="not_run",
+                clinical_review_status="not_reviewed",
+                pipeline_run_id=None,
+                model_configuration_json=self.serialize_json_payload(
+                    {
+                        "text_extraction_model": persisted_session.text_extraction_model,
+                        "clinical_model": persisted_session.clinical_model,
+                    }
+                ),
+                completed_at=persisted_session.session_timestamp,
             )
+        )
         self.persist_session_sections(db_session, session_id, session_data)
         self.persist_session_labs(db_session, session_id, session_data)
         self.persist_session_drugs(db_session, session_id, session_data)
@@ -106,22 +111,6 @@ def normalize_session_status(self, value: Any) -> str:
     if lowered == "failed":
         return "failed"
     return "successful"
-
-###############################################################################
-def persist_patient(self, db_session: Session, session_data: dict[str, Any]) -> Patient:
-    patient = Patient(
-        name=self.normalize_string(session_data.get("patient_name")),
-        visit_date=self.normalize_date_value(session_data.get("patient_visit_date")),
-        anamnesis=self.normalize_string(session_data.get("anamnesis")),
-        drugs=self.normalize_string(session_data.get("drugs")),
-        laboratory_analysis=self.normalize_string(
-            session_data.get("laboratory_analysis")
-        ),
-        image_blob=self.decode_patient_image(session_data.get("patient_image_base64")),
-    )
-    db_session.add(patient)
-    db_session.flush()
-    return patient
 
 ###############################################################################
 def decode_patient_image(self, value: Any) -> bytes | None:
@@ -172,7 +161,7 @@ def list_sessions(
         )
         conditions.append(
             or_(
-                func.lower(func.coalesce(Patient.name, "")).like(
+                func.lower(func.coalesce(ClinicalSession.patient_name, "")).like(
                     search_pattern,
                     escape="\\",
                 ),
@@ -214,17 +203,12 @@ def list_sessions(
         )
         sessions_stmt = select(
             ClinicalSession,
-            Patient,
             report_exists.label("has_report"),
             timeline_exists.label("has_timeline"),
-        ).join(
-            Patient,
-            ClinicalSession.patient_id == Patient.id,
         )
         count_stmt = (
             select(func.count())
             .select_from(ClinicalSession)
-            .join(Patient, ClinicalSession.patient_id == Patient.id)
         )
         if conditions:
             combined = and_(*conditions)
@@ -242,7 +226,7 @@ def list_sessions(
         items = [
             {
                 "session_id": int(session_row.id),
-                "patient_name": self.normalize_string(patient_row.name),
+                "patient_name": self.normalize_string(session_row.patient_name),
                 "session_timestamp": session_row.session_timestamp,
                 "version": int(session_row.version or 1),
                 "original_session_id": self.to_int(session_row.original_session_id),
@@ -251,12 +235,12 @@ def list_sessions(
                 "has_report": bool(has_report),
                 "has_timeline": bool(has_timeline),
                 "can_generate_timeline": bool(
-                    self.normalize_string(patient_row.anamnesis)
-                    or self.normalize_string(patient_row.drugs)
-                    or self.normalize_string(patient_row.laboratory_analysis)
+                    self.normalize_string(session_row.anamnesis)
+                    or self.normalize_string(session_row.drugs_text)
+                    or self.normalize_string(session_row.laboratory_analysis)
                 ),
             }
-            for session_row, patient_row, has_report, has_timeline in rows
+            for session_row, has_report, has_timeline in rows
         ]
         return items, total_rows
     finally:
@@ -268,13 +252,12 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
     db_session = self.session_factory()
     try:
         row = db_session.execute(
-            select(ClinicalSession, Patient)
-            .join(Patient, ClinicalSession.patient_id == Patient.id)
+            select(ClinicalSession)
             .where(ClinicalSession.id == safe_session_id)
         ).first()
         if row is None:
             return None
-        session_row, patient_row = row
+        session_row = row[0]
         section_rows = db_session.execute(
             select(
                 ClinicalSessionSection.section_kind, ClinicalSessionSection.content
@@ -288,40 +271,10 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         metadata = self.parse_session_result_payload(session_row.metadata_json) or {}
         session_text = self.normalize_string(payload.get("original_session_text")) or ""
         official_report_text = self.normalize_string(payload.get("report"))
-        manual_edit_rows = db_session.execute(
-            select(ClinicalSessionManualEdit)
-            .where(ClinicalSessionManualEdit.session_id == safe_session_id)
-            .order_by(
-                ClinicalSessionManualEdit.edited_at.desc(),
-                ClinicalSessionManualEdit.id.desc(),
-            )
-        ).scalars()
-        manual_edit_history = [
-            {
-                "session_id": int(edit.session_id),
-                "current_version_id": int(edit.current_version_id),
-                "edited_by": self.normalize_string(edit.edited_by),
-                "actor_id": self.normalize_string(edit.actor_id),
-                "actor_display_name": self.normalize_string(edit.actor_display_name),
-                "actor_source": edit.actor_source,
-                "actor_confidence": edit.actor_confidence,
-                "edited_at": edit.edited_at,
-                "previous_text_hash": edit.previous_text_hash,
-                "new_text_hash": edit.new_text_hash,
-                "edited_fields": (
-                    json.loads(edit.edited_fields_json)
-                    if self.normalize_string(edit.edited_fields_json) is not None
-                    else []
-                ),
-                "reviewer_note": self.normalize_string(edit.reviewer_note),
-                "metadata": self.parse_session_result_payload(edit.metadata_json) or {},
-            }
-            for edit in manual_edit_rows
-        ]
         return {
             "session_id": safe_session_id,
-            "patient_name": self.normalize_string(patient_row.name),
-            "visit_date": patient_row.visit_date,
+            "patient_name": self.normalize_string(session_row.patient_name),
+            "visit_date": session_row.visit_date,
             "session_timestamp": session_row.session_timestamp,
             "version": int(session_row.version or 1),
             "original_session_id": self.to_int(session_row.original_session_id),
@@ -337,7 +290,6 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
             "result_payload": payload,
             "report": official_report_text,
             "official_report_text": official_report_text,
-            "manual_edit_history": manual_edit_history,
         }
     finally:
         db_session.close()
@@ -477,16 +429,7 @@ def delete_session(self, session_id: int) -> bool:
         existing = db_session.get(ClinicalSession, safe_session_id)
         if existing is None:
             return False
-        patient_id = int(existing.patient_id)
         db_session.delete(existing)
-        db_session.flush()
-        remaining_patient_sessions = db_session.execute(
-            select(func.count())
-            .select_from(ClinicalSession)
-            .where(ClinicalSession.patient_id == patient_id)
-        ).scalar_one()
-        if int(remaining_patient_sessions) == 0:
-            db_session.execute(delete(Patient).where(Patient.id == patient_id))
         db_session.commit()
         return True
     except Exception:

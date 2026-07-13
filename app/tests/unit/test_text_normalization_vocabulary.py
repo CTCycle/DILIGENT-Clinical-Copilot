@@ -5,7 +5,6 @@ from repositories.schemas.models import (
     ClinicalSession,
     Drug,
     DrugAlias,
-    Patient,
     ReferenceCatalogEntry,
 )
 from repositories.serialization.data import DataSerializer
@@ -31,11 +30,10 @@ def test_session_learning_promotes_only_direct_high_confidence_aliases() -> None
             canonical_name_norm="loop diuretics",
             livertox_nbk_id=None,
         )
-        patient = Patient(name="Test", visit_date=None)
-        db_session.add_all([atorvastatin, loop_diuretics, patient])
+        db_session.add_all([atorvastatin, loop_diuretics])
         db_session.flush()
         session = ClinicalSession(
-            patient_id=int(patient.id), session_status="successful"
+            patient_name="Test", session_status="successful"
         )
         db_session.add(session)
         db_session.flush()
