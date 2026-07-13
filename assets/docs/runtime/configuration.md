@@ -60,3 +60,9 @@ DATABASE_READ_PAGE_SIZE=1000
 
 Set `DATABASE_BACKEND=postgresql` and provide `DATABASE_URL` for PostgreSQL.
 The old embedded/engine/host/port/password split is no longer documented.
+
+Provider access-key encryption material is external to the database. Set
+`DILIGENT_ACCESS_KEY_MATERIAL_FILE` to a protected local file (or inject the
+equivalent path through the deployment environment). The file contains
+versioned Fernet material used to decrypt the `access_keys` ciphertext; it must
+not be committed, copied into a database backup, or exposed through logs.
