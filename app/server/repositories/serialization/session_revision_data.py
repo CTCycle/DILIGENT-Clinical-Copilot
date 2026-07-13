@@ -255,7 +255,10 @@ def _create_revision_artifact_row(
         revision_version_id=revision_version_id,
         pipeline_run_id=pipeline_run_id,
         artifact_kind=artifact_kind,
-        artifact_key=self.normalize_string(artifact_key),
+        artifact_key=(
+            self.normalize_string(artifact_key)
+            or f"{artifact_kind}:{pipeline_run_id}"
+        ),
         entity_type=self.normalize_string(entity_type),
         entity_name=self.normalize_string(entity_name),
         status=self.normalize_string(status),
@@ -856,6 +859,14 @@ def update_current_report_text_with_manual_audit(
 
     db_session = self.session_factory()
     try:
+        current_version_id = db_session.execute(
+            select(ClinicalSessionVersion.id)
+            .where(ClinicalSessionVersion.session_id == safe_session_id)
+            .order_by(ClinicalSessionVersion.version_number.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if current_version_id is None:
+            raise RuntimeError("No persisted version exists for manual report edit")
         existing_session = db_session.get(ClinicalSession, safe_session_id)
         if existing_session is None:
             return None
@@ -906,7 +917,7 @@ def update_current_report_text_with_manual_audit(
         db_session.add(
             ClinicalSessionManualEdit(
                 session_id=safe_session_id,
-                current_version_id=safe_session_id,
+                current_version_id=int(current_version_id),
                 edited_by=normalized_edited_by,
                 actor_id=None,
                 actor_display_name=actor_display_name,
