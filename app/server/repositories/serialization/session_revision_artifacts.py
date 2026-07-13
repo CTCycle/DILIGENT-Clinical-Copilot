@@ -7,7 +7,6 @@ from sqlalchemy import select, update
 
 from repositories.schemas.models import (
     ClinicalSessionRevisionArtifact,
-    ClinicalSessionRevisionEntity,
 )
 from repositories.serialization.session_revision_data import (
     REVISION_DRUG_SCHEMA_NAME,
@@ -302,16 +301,18 @@ def persist_revision_entities(
         safe_pipeline_run_id = str(pipeline_run_id)
         now = datetime.now(UTC)
         db_session.execute(
-            update(ClinicalSessionRevisionEntity)
+            update(ClinicalSessionRevisionArtifact)
             .where(
-                ClinicalSessionRevisionEntity.revision_version_id
+                ClinicalSessionRevisionArtifact.revision_version_id
                 == safe_revision_version_id,
-                ClinicalSessionRevisionEntity.superseded_at.is_(None),
+                ClinicalSessionRevisionArtifact.artifact_kind
+                == "structured_case_entity",
+                ClinicalSessionRevisionArtifact.status != "superseded",
             )
-            .values(superseded_at=now)
+            .values(status="superseded", updated_at=now)
         )
 
-        created_rows: list[ClinicalSessionRevisionEntity] = []
+        created_rows: list[ClinicalSessionRevisionArtifact] = []
 
         structured_case = result_payload.get("structured_case")
         if isinstance(structured_case, dict):
@@ -522,23 +523,23 @@ def list_revision_entities_for_version(
     db_session = self.session_factory()
     try:
         rows = db_session.execute(
-            select(ClinicalSessionRevisionEntity)
+            select(ClinicalSessionRevisionArtifact)
             .where(
-                ClinicalSessionRevisionEntity.revision_version_id
+                ClinicalSessionRevisionArtifact.revision_version_id
                 == int(revision_version_id),
-                ClinicalSessionRevisionEntity.superseded_at.is_(None),
+                ClinicalSessionRevisionArtifact.artifact_kind
+                == "structured_case_entity",
+                ClinicalSessionRevisionArtifact.status != "superseded",
             )
             .order_by(
-                ClinicalSessionRevisionEntity.entity_type.asc(),
-                ClinicalSessionRevisionEntity.source_section.asc(),
-                ClinicalSessionRevisionEntity.normalized_name.asc(),
-                ClinicalSessionRevisionEntity.id.asc(),
+                ClinicalSessionRevisionArtifact.entity_type.asc(),
+                ClinicalSessionRevisionArtifact.entity_name.asc(),
+                ClinicalSessionRevisionArtifact.id.asc(),
             )
         ).scalars()
         return [serialize_revision_entity_row(self, row) for row in rows]
     finally:
         db_session.close()
-
 
 ###############################################################################
 def persist_revision_artifact(

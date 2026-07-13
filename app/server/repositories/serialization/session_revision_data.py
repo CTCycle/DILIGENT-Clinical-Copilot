@@ -19,7 +19,6 @@ from sqlalchemy.orm import Session
 from repositories.schemas.models import (
     ClinicalSession,
     ClinicalSessionRevisionArtifact,
-    ClinicalSessionRevisionEntity,
     ClinicalSessionRevisionReview,
     ClinicalSessionRevisionRun,
     ClinicalSessionRevisionStep,
@@ -283,65 +282,73 @@ def _create_revision_entity_row(
     requires_human_review: bool,
     payload: dict[str, Any],
     schema_name: str,
-) -> ClinicalSessionRevisionEntity:
-    return ClinicalSessionRevisionEntity(
+) -> ClinicalSessionRevisionArtifact:
+    entity_metadata = {
+        "source_version_id": source_version_id,
+        "step_name": step_name,
+        "entity_revision_status": entity_revision_status,
+        "source_section": self.normalize_string(source_section),
+        "original_entity_id": self.normalize_string(original_entity_id),
+        "original_name": self.normalize_string(original_name),
+        "revised_name": self.normalize_string(revised_name),
+        "normalized_name": self.normalize_string(normalized_name),
+        "requires_human_review": bool(requires_human_review),
+        "human_review_status": (
+            "required" if requires_human_review else "not_required"
+        ),
+        "schema_name": schema_name,
+        "schema_version": REVISION_ENTITY_SCHEMA_VERSION,
+        "output_hash": build_payload_hash(payload),
+    }
+    artifact_payload = {"entity": entity_metadata, "payload": payload}
+    return _create_revision_artifact_row(
+        self,
         revision_version_id=revision_version_id,
-        source_version_id=source_version_id,
         pipeline_run_id=pipeline_run_id,
-        step_name=step_name,
+        artifact_kind="structured_case_entity",
+        artifact_key=self.normalize_string(original_entity_id)
+        or f"{entity_type}:{normalized_name}",
+        status=entity_revision_status,
+        payload=artifact_payload,
         entity_type=entity_type,
-        entity_revision_status=entity_revision_status,
-        source_section=self.normalize_string(source_section),
-        original_entity_id=self.normalize_string(original_entity_id),
-        original_name=self.normalize_string(original_name),
-        revised_name=self.normalize_string(revised_name),
-        normalized_name=self.normalize_string(normalized_name),
-        requires_human_review=bool(requires_human_review),
-        human_review_status=("required" if requires_human_review else "not_required"),
-        payload_json=self.serialize_json_payload(payload),
-        schema_name=schema_name,
+        entity_name=revised_name,
         schema_version=REVISION_ENTITY_SCHEMA_VERSION,
-        prompt_version=None,
-        parser_version=None,
-        model_provider=None,
-        model_name=None,
-        input_hash=None,
-        output_hash=build_payload_hash(payload),
-        superseded_at=None,
     )
 
 ###############################################################################
 def serialize_revision_entity_row(
     self,
-    row: ClinicalSessionRevisionEntity,
+    row: ClinicalSessionRevisionArtifact,
 ) -> dict[str, Any]:
+    artifact_payload = self.parse_session_result_payload(row.payload_json) or {}
+    entity = artifact_payload.get("entity")
+    payload = artifact_payload.get("payload")
+    entity = entity if isinstance(entity, dict) else {}
     return {
         "revision_version_id": int(row.revision_version_id),
-        "source_version_id": (
-            int(row.source_version_id) if row.source_version_id is not None else None
-        ),
+        "source_version_id": entity.get("source_version_id"),
         "pipeline_run_id": row.pipeline_run_id,
-        "step_name": row.step_name,
+        "step_name": entity.get("step_name"),
         "entity_type": row.entity_type,
-        "entity_revision_status": row.entity_revision_status,
-        "source_section": self.normalize_string(row.source_section),
-        "original_entity_id": self.normalize_string(row.original_entity_id),
-        "original_name": self.normalize_string(row.original_name),
-        "revised_name": self.normalize_string(row.revised_name),
-        "normalized_name": self.normalize_string(row.normalized_name),
-        "requires_human_review": bool(row.requires_human_review),
-        "human_review_status": self.normalize_string(row.human_review_status),
-        "payload": self.parse_session_result_payload(row.payload_json),
-        "schema_name": self.normalize_string(row.schema_name),
-        "schema_version": self.normalize_string(row.schema_version),
-        "prompt_version": self.normalize_string(row.prompt_version),
-        "parser_version": self.normalize_string(row.parser_version),
-        "model_provider": self.normalize_string(row.model_provider),
-        "model_name": self.normalize_string(row.model_name),
-        "input_hash": self.normalize_string(row.input_hash),
-        "output_hash": self.normalize_string(row.output_hash),
+        "entity_revision_status": entity.get("entity_revision_status"),
+        "source_section": entity.get("source_section"),
+        "original_entity_id": entity.get("original_entity_id"),
+        "original_name": entity.get("original_name"),
+        "revised_name": entity.get("revised_name"),
+        "normalized_name": entity.get("normalized_name"),
+        "requires_human_review": bool(entity.get("requires_human_review")),
+        "human_review_status": entity.get("human_review_status"),
+        "payload": payload if isinstance(payload, dict) else {},
+        "schema_name": entity.get("schema_name"),
+        "schema_version": entity.get("schema_version"),
+        "prompt_version": None,
+        "parser_version": None,
+        "model_provider": None,
+        "model_name": None,
+        "input_hash": None,
+        "output_hash": entity.get("output_hash"),
         "created_at": row.created_at,
-        "superseded_at": row.superseded_at,
+        "superseded_at": None,
     }
 
 ###############################################################################
