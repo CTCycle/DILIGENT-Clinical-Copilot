@@ -122,7 +122,8 @@ def upsert_drugs_catalog_records(
 def resolve_commit_interval(self, override: int | None) -> int:
     if override is not None:
         return max(int(override), 1)
-    return max(int(get_server_settings().database.insert_batch_size), 1)
+    database = get_server_settings().database
+    return max(int(getattr(database, "write_batch_size", database.insert_batch_size)), 1)
 
 ###############################################################################
 def prepare_rxnav_rows(
