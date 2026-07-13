@@ -322,13 +322,9 @@
           @for (provider of credentialProviderOptions; track provider) {
             <div class="model-config-cloud-row" [class.is-active]="draftProvider() === provider || (provider === 'opencode' && (draftProvider() === 'opencode_zen' || draftProvider() === 'opencode_go'))">
               <div class="model-config-provider-name">
-                <span class="model-config-provider-mark" [class.is-openai]="provider === 'openai'" [class.is-gemini]="provider === 'gemini'">
-                  @if (provider === 'openai') {
-                    <span class="model-config-provider-logo-switch" aria-label="OpenAI logo" role="img">
-                      <img class="model-config-provider-logo" src="/logos/openai-blossom-light.svg" alt="" aria-hidden="true" />
-                    </span>
-                  } @else if (provider === 'gemini') {
-                    <img src="/logos/google-g.svg" alt="Google logo" />
+                <span class="model-config-provider-mark" [class.is-openai]="provider === 'openai'" [class.is-gemini]="provider === 'gemini'" [class.is-monochrome]="provider === 'openai' || provider === 'anthropic' || provider === 'opencode'">
+                  @if (providerLogo(provider); as logo) {
+                    <img class="model-config-provider-logo" [src]="logo.src" [alt]="logo.alt" />
                   } @else {
                     <span aria-hidden="true">{{ getProviderLabel(provider).slice(0, 1) }}</span>
                   }
