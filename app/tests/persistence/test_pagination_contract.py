@@ -1,0 +1,39 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import select
+
+from repositories.schemas.models import ClinicalSession, Patient
+
+
+def test_session_pagination_has_stable_timestamp_and_id_order(persistence_session) -> None:  # type: ignore[no-untyped-def]
+    timestamp = datetime(2026, 1, 1, tzinfo=UTC)
+    patients = [Patient(name=f"Page {index}") for index in range(3)]
+    persistence_session.add_all(patients)
+    persistence_session.flush()
+    for index, patient in enumerate(patients):
+        persistence_session.add(
+            ClinicalSession(
+                patient_id=patient.id,
+                session_timestamp=timestamp + timedelta(minutes=index),
+                version=1,
+                next_version_number=2,
+            )
+        )
+    persistence_session.commit()
+
+    statement = (
+        select(ClinicalSession.id)
+        .order_by(ClinicalSession.session_timestamp.desc(), ClinicalSession.id.desc())
+        .offset(1)
+        .limit(1)
+    )
+    page = persistence_session.scalars(statement).all()
+    expected = persistence_session.scalar(
+        select(ClinicalSession.id)
+        .order_by(ClinicalSession.session_timestamp.desc(), ClinicalSession.id.desc())
+        .offset(1)
+        .limit(1)
+    )
+    assert page == [expected]
