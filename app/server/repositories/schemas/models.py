@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -16,23 +16,13 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    event,
     text,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from repositories.schemas.base import Base
 
 ###############################################################################
-class Base(DeclarativeBase):
-    pass
-
-
-@event.listens_for(Base, "before_update", propagate=True)
-def set_updated_at_before_update(_mapper, _connection, target) -> None:
-    """Keep update timestamps portable across SQLite and PostgreSQL."""
-    if hasattr(target, "updated_at"):
-        target.updated_at = datetime.now(UTC).replace(tzinfo=None)
-
-
 DRUGS_ID_FK = "drugs.id"
 CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
 PATIENTS_ID_FK = "patients.id"
