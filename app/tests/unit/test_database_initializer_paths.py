@@ -6,6 +6,7 @@ from repositories.database import initializer
 ###############################################################################
 def _sqlite_settings() -> DatabaseSettings:
     return DatabaseSettings(
+        backend="sqlite",
         embedded_database=True,
         engine="postgres",
         host="127.0.0.1",
@@ -24,6 +25,7 @@ def _sqlite_settings() -> DatabaseSettings:
 ###############################################################################
 def _postgres_settings() -> DatabaseSettings:
     return DatabaseSettings(
+        backend="postgresql",
         embedded_database=False,
         engine="postgres",
         host="127.0.0.1",

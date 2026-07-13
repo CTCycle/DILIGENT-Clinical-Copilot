@@ -195,25 +195,9 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
         ollama_port=port,
         database=DatabaseEnvironmentSnapshot(
             backend=coerce_str_or_none(os.getenv("DATABASE_BACKEND")),
-            embedded_database=coerce_str_or_none(os.getenv("EMBEDDED_DATABASE")),
             url=coerce_str_or_none(os.getenv("DATABASE_URL")),
             sqlite_path=coerce_str_or_none(os.getenv("DATABASE_SQLITE_PATH")),
-            engine=coerce_str_or_none(os.getenv("DATABASE_ENGINE")),
-            host=coerce_str_or_none(os.getenv("DATABASE_HOST")),
-            port=coerce_str_or_none(os.getenv("DATABASE_PORT")),
-            database_name=coerce_str_or_none(os.getenv("DATABASE_NAME")),
-            username=coerce_str_or_none(os.getenv("DATABASE_USERNAME")),
-            password=coerce_str_or_none(os.getenv("DATABASE_PASSWORD")),
-            ssl=coerce_str_or_none(os.getenv("DATABASE_SSL")),
-            ssl_ca=coerce_str_or_none(os.getenv("DATABASE_SSL_CA")),
             connect_timeout=coerce_str_or_none(os.getenv("DATABASE_CONNECT_TIMEOUT")),
-            insert_batch_size=coerce_str_or_none(
-                os.getenv("DATABASE_INSERT_BATCH_SIZE")
-            ),
-            insert_commit_interval=coerce_str_or_none(
-                os.getenv("DATABASE_INSERT_COMMIT_INTERVAL")
-            ),
-            select_page_size=coerce_str_or_none(os.getenv("DATABASE_SELECT_PAGE_SIZE")),
             write_batch_size=coerce_str_or_none(
                 os.getenv("DATABASE_WRITE_BATCH_SIZE")
             ),
@@ -285,24 +269,23 @@ def _build_database_settings(
     environment: DatabaseEnvironmentSnapshot,
 ) -> DatabaseSettings:
     url_payload = _parse_database_url(environment.url)
-    backend = (coerce_str_or_none(environment.backend) or "").lower()
-    embedded = (
-        backend == "sqlite"
-        if backend
-        else coerce_bool(environment.embedded_database, True)
-    )
+    backend = (coerce_str_or_none(environment.backend) or "sqlite").lower()
+    if backend not in {"sqlite", "postgresql"}:
+        raise RuntimeError(
+            "DATABASE_BACKEND must be either 'sqlite' or 'postgresql'."
+        )
     write_batch_size = coerce_int(
-        environment.write_batch_size or environment.insert_batch_size,
+        environment.write_batch_size,
         1000,
         minimum=1,
     )
-    commit_interval = coerce_int(environment.insert_commit_interval, 5, minimum=1)
+    commit_interval = 5
     read_page_size = coerce_int(
-        environment.read_page_size or environment.select_page_size,
+        environment.read_page_size,
         1000,
         minimum=100,
     )
-    if embedded:
+    if backend == "sqlite":
         return DatabaseSettings(
             backend="sqlite",
             url=None,
@@ -323,29 +306,17 @@ def _build_database_settings(
             insert_commit_interval=commit_interval,
             select_page_size=read_page_size,
         )
-    engine_value = coerce_str_or_none(environment.engine) or coerce_str_or_none(
-        url_payload.get("engine")
-    )
-    host_value = coerce_str_or_none(environment.host) or coerce_str_or_none(
-        url_payload.get("host")
-    )
+    engine_value = coerce_str_or_none(url_payload.get("engine"))
+    host_value = coerce_str_or_none(url_payload.get("host"))
     port_value = coerce_int(
-        environment.port if environment.port is not None else url_payload.get("port"),
+        url_payload.get("port"),
         5432,
         minimum=1,
         maximum=65535,
     )
-    database_name = coerce_str_or_none(environment.database_name) or coerce_str_or_none(
-        url_payload.get("database_name")
-    )
-    username = coerce_str_or_none(environment.username) or coerce_str_or_none(
-        url_payload.get("username")
-    )
-    password = (
-        coerce_str_or_none(environment.password)
-        if environment.password is not None
-        else coerce_str_or_none(url_payload.get("password"))
-    )
+    database_name = coerce_str_or_none(url_payload.get("database_name"))
+    username = coerce_str_or_none(url_payload.get("username"))
+    password = coerce_str_or_none(url_payload.get("password"))
     return DatabaseSettings(
         backend="postgresql",
         url=environment.url,
@@ -359,8 +330,8 @@ def _build_database_settings(
         database_name=database_name,
         username=username,
         password=password,
-        ssl=coerce_bool(environment.ssl, False),
-        ssl_ca=coerce_str_or_none(environment.ssl_ca),
+        ssl=False,
+        ssl_ca=None,
         connect_timeout=coerce_int(environment.connect_timeout, 10, minimum=1),
         insert_batch_size=write_batch_size,
         insert_commit_interval=commit_interval,
