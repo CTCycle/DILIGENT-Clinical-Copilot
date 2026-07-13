@@ -205,7 +205,23 @@ def list_sessions(
 
     db_session = self.session_factory()
     try:
-        sessions_stmt = select(ClinicalSession, Patient).join(
+        report_exists = exists(
+            select(1).where(
+                ClinicalSessionVersion.session_id == ClinicalSession.id,
+                ClinicalSessionVersion.report_text.isnot(None),
+            )
+        )
+        timeline_exists = exists(
+            select(1).where(
+                ClinicalSessionTimeline.session_id == ClinicalSession.id,
+            )
+        )
+        sessions_stmt = select(
+            ClinicalSession,
+            Patient,
+            report_exists.label("has_report"),
+            timeline_exists.label("has_timeline"),
+        ).join(
             Patient,
             ClinicalSession.patient_id == Patient.id,
         )
@@ -227,30 +243,6 @@ def list_sessions(
             .offset(safe_offset)
             .limit(safe_limit)
         ).all()
-        session_ids = [int(session_row.id) for session_row, _ in rows]
-        report_session_ids: set[int] = set()
-        timeline_session_ids: set[int] = set()
-        if session_ids:
-            persisted_timeline_rows = db_session.execute(
-                select(ClinicalSessionTimeline.session_id).where(
-                    ClinicalSessionTimeline.session_id.in_(session_ids)
-                )
-            ).all()
-            for (timeline_session_id,) in persisted_timeline_rows:
-                timeline_session_ids.add(int(timeline_session_id))
-            result_rows = db_session.execute(
-                select(
-                    ClinicalSessionResult.session_id,
-                    ClinicalSessionResult.payload_json,
-                ).where(ClinicalSessionResult.session_id.in_(session_ids))
-            ).all()
-            for result_session_id, payload_json in result_rows:
-                parsed_payload = self.parse_session_result_payload(payload_json)
-                if not isinstance(parsed_payload, dict):
-                    continue
-                parsed_report = self.normalize_string(parsed_payload.get("report"))
-                if parsed_report is not None:
-                    report_session_ids.add(int(result_session_id))
         items = [
             {
                 "session_id": int(session_row.id),
@@ -260,15 +252,15 @@ def list_sessions(
                 "original_session_id": self.to_int(session_row.original_session_id),
                 "status": self.normalize_session_status(session_row.session_status),
                 "total_duration": self.to_float(session_row.total_duration),
-                "has_report": int(session_row.id) in report_session_ids,
-                "has_timeline": int(session_row.id) in timeline_session_ids,
+                "has_report": bool(has_report),
+                "has_timeline": bool(has_timeline),
                 "can_generate_timeline": bool(
                     self.normalize_string(patient_row.anamnesis)
                     or self.normalize_string(patient_row.drugs)
                     or self.normalize_string(patient_row.laboratory_analysis)
                 ),
             }
-            for session_row, patient_row in rows
+            for session_row, patient_row, has_report, has_timeline in rows
         ]
         return items, total_rows
     finally:
@@ -987,6 +979,24 @@ def persist_session_result_payload(
             payload_json=serialized_payload,
         )
     )
+    current_version = (
+        db_session.execute(
+            select(ClinicalSessionVersion)
+            .where(ClinicalSessionVersion.session_id == int(session_id))
+            .order_by(ClinicalSessionVersion.version_number.desc())
+        )
+        .scalars()
+        .first()
+    )
+    if current_version is not None and isinstance(payload, dict):
+        current_version.report_text = self.normalize_string(payload.get("report"))
+        current_version.hepatic_pattern = self.normalize_string(
+            payload.get("hepatic_pattern")
+        )
+        current_version.total_duration = self.to_float(payload.get("total_duration"))
+        current_version.metadata_json = self.serialize_json_payload(
+            payload.get("metadata")
+        )
 
 ###############################################################################
 def serialize_json_payload(self, payload: Any) -> str | None:

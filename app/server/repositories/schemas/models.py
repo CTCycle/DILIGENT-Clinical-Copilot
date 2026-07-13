@@ -287,6 +287,10 @@ class ClinicalSessionVersion(Base):
     clinical_review_status: Mapped[str] = mapped_column(String, nullable=False)
     pipeline_run_id: Mapped[str | None] = mapped_column(String, nullable=True)
     model_configuration_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    report_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hepatic_pattern: Mapped[str | None] = mapped_column(String, nullable=True)
+    total_duration: Mapped[float | None] = mapped_column(Float, nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
