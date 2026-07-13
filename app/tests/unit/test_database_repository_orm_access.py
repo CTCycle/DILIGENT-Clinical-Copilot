@@ -4,12 +4,13 @@ from pathlib import Path
 
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.sqlite import SQLiteRepository
-from repositories.schemas.models import ModelSelection
+from repositories.schemas.models import ApplicationConfiguration
 from sqlalchemy import select
 
 ###############################################################################
 def _build_settings() -> DatabaseSettings:
     return DatabaseSettings(
+        backend="sqlite",
         embedded_database=True,
         engine=None,
         host=None,
@@ -36,38 +37,27 @@ def test_sqlite_repository_exposes_orm_session_factory(
     repository = SQLiteRepository(_build_settings())
 
     with repository.session_factory() as db_session:
-        db_session.add_all(
-            [
-                ModelSelection(
-                    role_type="clinical",
-                    provider=None,
-                    model_name="llama3.1:8b",
-                    is_active=True,
-                ),
-                ModelSelection(
-                    role_type="text_extraction",
-                    provider=None,
-                    model_name="llama3.1:8b",
-                    is_active=True,
-                ),
-                ModelSelection(
-                    role_type="cloud",
-                    provider="openai",
-                    model_name="gpt-4.1-mini",
-                    is_active=True,
-                ),
-            ]
+        db_session.add(
+            ApplicationConfiguration(
+                payload={
+                    "clinical_model": "llama3.1:8b",
+                    "text_extraction_model": "llama3.1:8b",
+                    "use_cloud_models": True,
+                    "cloud_provider": "openai",
+                    "cloud_model": "gpt-4.1-mini",
+                }
+            )
         )
         db_session.commit()
 
     with repository.session_factory() as db_session:
         loaded = (
             db_session.execute(
-                select(ModelSelection).order_by(ModelSelection.role_type.asc())
+                select(ApplicationConfiguration)
             )
             .scalars()
             .all()
         )
 
-    assert len(loaded) == 3
-    assert [row.role_type for row in loaded] == ["clinical", "cloud", "text_extraction"]
+    assert len(loaded) == 1
+    assert loaded[0].payload["clinical_model"] == "llama3.1:8b"
