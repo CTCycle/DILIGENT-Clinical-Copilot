@@ -38,6 +38,11 @@ def test_database_settings_are_loaded_from_json_without_env_overlap(
 ) -> None:
     config_path = tmp_path / "configurations.json"
     _write_config(config_path, _base_payload())
+    monkeypatch.delenv("DATABASE_BACKEND", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("DATABASE_SQLITE_PATH", raising=False)
+    monkeypatch.delenv("DATABASE_WRITE_BATCH_SIZE", raising=False)
+    monkeypatch.delenv("DATABASE_READ_PAGE_SIZE", raising=False)
     monkeypatch.setenv("EMBEDDED_DATABASE", "false")
     monkeypatch.setenv("DATABASE_ENGINE", "postgresql+psycopg")
     monkeypatch.setenv("DATABASE_HOST", "env-host")

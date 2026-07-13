@@ -76,6 +76,16 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
         "is_cloud_enabled",
         staticmethod(lambda: False),
     )
+    monkeypatch.setattr(
+        endpoint.service,
+        "apply_persisted_runtime_configuration",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        endpoint.service,
+        "validate_assessment_prerequisites_without_llm",
+        lambda _: SimpleNamespace(missing_required_sections=[], malformed_sections=[]),
+    )
 
     monkeypatch.setattr(
         endpoint.service,
@@ -101,7 +111,7 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
                 "Lab analysis: ALT 300 U/L"
             ),
             visit_date=date(2026, 4, 24),
-            selected_model_providers=["openai"],
+            selected_model_providers=[],
         )
     )
 

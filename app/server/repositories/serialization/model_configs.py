@@ -78,7 +78,16 @@ class ModelConfigSerializer:
         db_session = self.session_factory()
         try:
             canonical = db_session.get(ApplicationConfiguration, 1)
-            if canonical is not None:
+            if canonical is not None and all(
+                payload_key in canonical.payload
+                for payload_key in ("clinical_model", "text_extraction_model")
+            ) and (
+                bool(canonical.payload.get("use_cloud_models", False))
+                or all(
+                    self.normalize_optional_text(canonical.payload.get(payload_key))
+                    for payload_key in ("clinical_model", "text_extraction_model")
+                )
+            ):
                 payload = dict(canonical.payload)
                 payload["updated_at"] = canonical.updated_at
                 return ModelConfigSnapshot(
@@ -122,7 +131,8 @@ class ModelConfigSerializer:
                 .all()
             )
             snapshot = self.build_snapshot_with_runtime(rows, runtime_rows)
-            self.application_configuration.save(asdict(snapshot))
+            if rows or runtime_rows:
+                self.application_configuration.save(asdict(snapshot))
             return snapshot
         finally:
             db_session.close()
