@@ -9,6 +9,7 @@ from domain.settings.configuration import DatabaseSettings
 from repositories.database.sqlite import SQLiteRepository
 from repositories.schemas.models import (
     Base,
+    ApplicationConfiguration,
     ReferenceCatalogEntry,
 )
 from sqlalchemy import create_engine, func, inspect, select
@@ -16,6 +17,7 @@ from sqlalchemy import create_engine, func, inspect, select
 ###############################################################################
 def _build_settings() -> DatabaseSettings:
     return DatabaseSettings(
+        backend="sqlite",
         embedded_database=True,
         engine=None,
         host=None,
@@ -54,7 +56,7 @@ def test_sqlite_repository_initializes_schema_when_db_file_missing(
         assert repository.db_path is not None
         assert Path(repository.db_path).exists()
         assert inspector.has_table("access_keys")
-        assert inspector.has_table("model_selections")
+        assert inspector.has_table("application_configuration")
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 
@@ -78,7 +80,7 @@ def test_sqlite_repository_does_not_seed_catalogs_during_construction(
         inspector = inspect(repository.engine)
 
         assert inspector.has_table("access_keys")
-        assert inspector.has_table("model_selections")
+        assert inspector.has_table("application_configuration")
         assert inspector.has_table("reference_catalog_entries")
         with repository.session_factory() as db_session:
             catalog_entries = db_session.execute(
