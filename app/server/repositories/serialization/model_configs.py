@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import datetime
 from typing import Literal
 
@@ -10,6 +11,10 @@ from repositories.database.session import (
     resolve_engine,
     resolve_session_factory,
 )
+from repositories.serialization.application_configuration import (
+    ApplicationConfigurationSerializer,
+)
+from repositories.schemas.models import ApplicationConfiguration
 from repositories.queries.model_config import (
     ModelConfigRepositoryQueries,
 )
@@ -63,11 +68,46 @@ class ModelConfigSerializer:
             engine=self.engine,
             session_factory=session_factory,
         )
+        self.application_configuration = ApplicationConfigurationSerializer(
+            engine=self.engine,
+            session_factory=self.session_factory,
+        )
 
     # -------------------------------------------------------------------------
     def load_snapshot(self) -> ModelConfigSnapshot:
         db_session = self.session_factory()
         try:
+            canonical = db_session.get(ApplicationConfiguration, 1)
+            if canonical is not None:
+                payload = dict(canonical.payload)
+                payload["updated_at"] = canonical.updated_at
+                return ModelConfigSnapshot(
+                    clinical_model=self.normalize_optional_text(
+                        payload.get("clinical_model")
+                    ),
+                    text_extraction_model=self.normalize_optional_text(
+                        payload.get("text_extraction_model")
+                    ),
+                    use_cloud_models=bool(payload.get("use_cloud_models", False)),
+                    cloud_provider=self.normalize_optional_text(
+                        payload.get("cloud_provider")
+                    ),
+                    cloud_model=self.normalize_optional_text(payload.get("cloud_model")),
+                    ollama_temperature=self.normalize_temperature(
+                        payload.get("ollama_temperature", self.DEFAULT_OLLAMA_TEMPERATURE)
+                    ),
+                    cloud_temperature=self.normalize_temperature(
+                        payload.get("cloud_temperature", self.DEFAULT_CLOUD_TEMPERATURE)
+                    ),
+                    ollama_reasoning=bool(payload.get("ollama_reasoning", False)),
+                    ollama_seed=self.normalize_optional_seed(payload.get("ollama_seed")),
+                    rag_settings=(
+                        payload.get("rag_settings")
+                        if isinstance(payload.get("rag_settings"), dict)
+                        else {}
+                    ),
+                    updated_at=canonical.updated_at,
+                )
             rows = (
                 db_session.execute(ModelConfigRepositoryQueries.select_all())
                 .scalars()
@@ -80,7 +120,9 @@ class ModelConfigSerializer:
                 .scalars()
                 .all()
             )
-            return self.build_snapshot_with_runtime(rows, runtime_rows)
+            snapshot = self.build_snapshot_with_runtime(rows, runtime_rows)
+            self.application_configuration.save(asdict(snapshot))
+            return snapshot
         finally:
             db_session.close()
 
@@ -196,9 +238,11 @@ class ModelConfigSerializer:
                 .scalars()
                 .all()
             )
-            return self.build_snapshot_with_runtime(
+            snapshot = self.build_snapshot_with_runtime(
                 refreshed_rows, refreshed_runtime_rows
             )
+            self.application_configuration.save(asdict(snapshot))
+            return snapshot
         except Exception:
             db_session.rollback()
             raise
