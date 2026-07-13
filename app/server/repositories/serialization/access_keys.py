@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.engine import Engine
@@ -162,7 +162,7 @@ class AccessKeySerializer:
         provider: str,
     ) -> AccessKey:
         db_session = self.session_factory()
-        now = datetime.now()
+        now = datetime.now(UTC)
         try:
             normalized_provider = self.normalize_provider(provider)
             target = self.get_key_by_id(
@@ -231,8 +231,8 @@ class AccessKeySerializer:
             if row is None:
                 return None
             if mark_used:
-                row.last_used_at = datetime.now()
-                row.updated_at = datetime.now()
+                row.last_used_at = datetime.now(UTC)
+                row.updated_at = datetime.now(UTC)
                 db_session.commit()
                 db_session.refresh(row)
             return row
