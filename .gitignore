@@ -3,6 +3,7 @@ app/resources/sources/archives/**
 app/resources/sources/documents/**
 app/resources/sources/vectors/**
 app/resources/logs/**
+app/resources/access-key-material.json
 app/client/node_modules/
 app/client/dist/
 app/client/dist-ssr/
