@@ -39,6 +39,9 @@ ormalized_document
 - Version listing and detail reads are side-effect-free. Version synchronization is reserved for explicit write paths.
 - Sessions with blocking faithfulness issues may persist audit artifacts, but they must not be stored as clinically successful finalizations.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
+- Canonical repeated observations are stored in `clinical_lab_observations` and ordered drug mentions in `clinical_drug_mentions`; the older summary tables remain only for the current inspection projection during migration.
+- Canonical drug identifiers use `drug_identifiers` with unique `(identifier_system, identifier_value)` ownership.
+- `application_configuration` is the fixed-id singleton for validated configuration payloads, and `reference_catalog_manifests` records the currently installed manifest state.
 
 ## Reference Catalog Persistence
 - Canonical manifests live in `app/resources/catalogs/*.json`.
@@ -66,6 +69,12 @@ app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-resee
 - Encrypted provider keys are persisted in database tables.
 - Encryption material is seeded and managed through shared security helpers.
 - Provider-scoped key retrieval filters by both provider and key id. The persistence constraint covers OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and Brave.
+
+## Persistence Contract Validation
+
+- `app/tests/persistence` runs against file-backed SQLite on every invocation.
+- When `TEST_DATABASE_URL` is configured, the same parametrized contract runs against PostgreSQL.
+- CI runs both backends in the `persistence-contract` job with a PostgreSQL service container.
 
 ## Model Configuration Persistence
 - A newly initialized database receives the canonical model defaults from the server settings.
