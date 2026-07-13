@@ -717,7 +717,7 @@ class DataSerializer:
         self,
         db_session: Session,
         alias_norm: str | None,
-    ) -> DrugAlias | None:
+    ) -> list[DrugAlias]:
         return evidence_aliases.get_drug_alias_by_norm(self, db_session, alias_norm)
 
     # -------------------------------------------------------------------------

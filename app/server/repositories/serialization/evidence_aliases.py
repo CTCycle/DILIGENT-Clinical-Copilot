@@ -35,10 +35,14 @@ def resolve_drug_id(
     drug = self.get_drug_by_canonical_name_norm(db_session, normalized_name)
     if drug is not None:
         return int(drug.id)
-    alias = self.get_drug_alias_by_norm(db_session, normalized_name)
-    if alias is None:
+    aliases = self.get_drug_alias_by_norm(db_session, normalized_name)
+    if len(aliases) > 1:
+        raise ValueError(
+            f"Drug alias is ambiguous for normalized value '{normalized_name}'"
+        )
+    if not aliases:
         return None
-    return int(alias.drug_id)
+    return int(aliases[0].drug_id)
 
 ###############################################################################
 def ensure_drug(
@@ -179,13 +183,13 @@ def get_drug_alias_by_norm(
     self,
     db_session: Session,
     alias_norm: str | None,
-) -> DrugAlias | None:
+) -> list[DrugAlias]:
     if alias_norm is None:
-        return None
-    return (
+        return []
+    return list(
         db_session.execute(DrugRepositoryQueries.alias_by_norm(alias_norm))
         .scalars()
-        .first()
+        .all()
     )
 
 ###############################################################################
