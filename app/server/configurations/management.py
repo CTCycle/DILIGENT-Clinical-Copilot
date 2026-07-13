@@ -194,8 +194,10 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
         ollama_host=coerce_str_or_none(os.getenv("OLLAMA_HOST")),
         ollama_port=port,
         database=DatabaseEnvironmentSnapshot(
+            backend=coerce_str_or_none(os.getenv("DATABASE_BACKEND")),
             embedded_database=coerce_str_or_none(os.getenv("EMBEDDED_DATABASE")),
             url=coerce_str_or_none(os.getenv("DATABASE_URL")),
+            sqlite_path=coerce_str_or_none(os.getenv("DATABASE_SQLITE_PATH")),
             engine=coerce_str_or_none(os.getenv("DATABASE_ENGINE")),
             host=coerce_str_or_none(os.getenv("DATABASE_HOST")),
             port=coerce_str_or_none(os.getenv("DATABASE_PORT")),
@@ -212,6 +214,10 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
                 os.getenv("DATABASE_INSERT_COMMIT_INTERVAL")
             ),
             select_page_size=coerce_str_or_none(os.getenv("DATABASE_SELECT_PAGE_SIZE")),
+            write_batch_size=coerce_str_or_none(
+                os.getenv("DATABASE_WRITE_BATCH_SIZE")
+            ),
+            read_page_size=coerce_str_or_none(os.getenv("DATABASE_READ_PAGE_SIZE")),
         ),
     )
 
@@ -279,12 +285,30 @@ def _build_database_settings(
     environment: DatabaseEnvironmentSnapshot,
 ) -> DatabaseSettings:
     url_payload = _parse_database_url(environment.url)
-    embedded = coerce_bool(environment.embedded_database, True)
-    insert_batch_size = coerce_int(environment.insert_batch_size, 1000, minimum=1)
+    backend = (coerce_str_or_none(environment.backend) or "").lower()
+    embedded = (
+        backend == "sqlite"
+        if backend
+        else coerce_bool(environment.embedded_database, True)
+    )
+    write_batch_size = coerce_int(
+        environment.write_batch_size or environment.insert_batch_size,
+        1000,
+        minimum=1,
+    )
     commit_interval = coerce_int(environment.insert_commit_interval, 5, minimum=1)
-    select_page_size = coerce_int(environment.select_page_size, 2000, minimum=100)
+    read_page_size = coerce_int(
+        environment.read_page_size or environment.select_page_size,
+        1000,
+        minimum=100,
+    )
     if embedded:
         return DatabaseSettings(
+            backend="sqlite",
+            url=None,
+            sqlite_path=coerce_str_or_none(environment.sqlite_path),
+            write_batch_size=write_batch_size,
+            read_page_size=read_page_size,
             embedded_database=True,
             engine=None,
             host=None,
@@ -295,9 +319,9 @@ def _build_database_settings(
             ssl=False,
             ssl_ca=None,
             connect_timeout=coerce_int(environment.connect_timeout, 10, minimum=1),
-            insert_batch_size=insert_batch_size,
+            insert_batch_size=write_batch_size,
             insert_commit_interval=commit_interval,
-            select_page_size=select_page_size,
+            select_page_size=read_page_size,
         )
     engine_value = coerce_str_or_none(environment.engine) or coerce_str_or_none(
         url_payload.get("engine")
@@ -323,6 +347,11 @@ def _build_database_settings(
         else coerce_str_or_none(url_payload.get("password"))
     )
     return DatabaseSettings(
+        backend="postgresql",
+        url=environment.url,
+        sqlite_path=None,
+        write_batch_size=write_batch_size,
+        read_page_size=read_page_size,
         embedded_database=False,
         engine=(engine_value or "postgres").lower(),
         host=host_value,
@@ -333,9 +362,9 @@ def _build_database_settings(
         ssl=coerce_bool(environment.ssl, False),
         ssl_ca=coerce_str_or_none(environment.ssl_ca),
         connect_timeout=coerce_int(environment.connect_timeout, 10, minimum=1),
-        insert_batch_size=insert_batch_size,
+        insert_batch_size=write_batch_size,
         insert_commit_interval=commit_interval,
-        select_page_size=select_page_size,
+        select_page_size=read_page_size,
     )
 
 ###############################################################################

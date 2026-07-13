@@ -355,7 +355,11 @@ def get_drugs_catalog(
 ###############################################################################
 def stream_drugs_catalog(self, page_size: int | None = None) -> Iterator[pd.DataFrame]:
     chunk_size = (
-        get_server_settings().database.select_page_size
+        getattr(
+            get_server_settings().database,
+            "read_page_size",
+            get_server_settings().database.select_page_size,
+        )
         if page_size is None
         else max(int(page_size), 1)
     )

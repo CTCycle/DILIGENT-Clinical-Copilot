@@ -17,6 +17,11 @@ class JobsSettings(BaseModel):
 ###############################################################################
 class DatabaseSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
+    backend: str = "sqlite"
+    url: str | None = None
+    sqlite_path: str | None = None
+    write_batch_size: int = 1000
+    read_page_size: int = 1000
     embedded_database: bool
     engine: str | None
     host: str | None

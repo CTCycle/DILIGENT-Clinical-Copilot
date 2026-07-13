@@ -58,6 +58,11 @@ def test_database_settings_are_loaded_from_json_without_env_overlap(
     )
 
     assert payload["database"] == {
+        "backend": "postgresql",
+        "url": None,
+        "sqlite_path": None,
+        "write_batch_size": 1200,
+        "read_page_size": 2400,
         "embedded_database": False,
         "engine": "postgresql+psycopg",
         "host": "env-host",
@@ -72,3 +77,20 @@ def test_database_settings_are_loaded_from_json_without_env_overlap(
         "insert_commit_interval": 7,
         "select_page_size": 2400,
     }
+
+
+def test_canonical_sqlite_database_environment_contract(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("DATABASE_BACKEND", "sqlite")
+    monkeypatch.setenv("DATABASE_SQLITE_PATH", "C:/data/diligent.db")
+    monkeypatch.setenv("DATABASE_WRITE_BATCH_SIZE", "250")
+    monkeypatch.setenv("DATABASE_READ_PAGE_SIZE", "500")
+
+    payload = build_settings_payload_from_json(
+        {},
+        environment_snapshot_from_os_env(),
+    )
+
+    assert payload["database"]["backend"] == "sqlite"
+    assert payload["database"]["sqlite_path"] == "C:/data/diligent.db"
+    assert payload["database"]["write_batch_size"] == 250
+    assert payload["database"]["read_page_size"] == 500
