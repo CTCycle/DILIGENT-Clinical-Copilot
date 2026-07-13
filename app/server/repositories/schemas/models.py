@@ -1006,35 +1006,6 @@ class ReferenceCatalogEntry(Base):
     )
 
 ###############################################################################
-class ReferenceCatalogSeedRun(Base):
-    __tablename__ = "reference_catalog_seed_runs"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    manifest: Mapped[str] = mapped_column(String, nullable=False)
-    manifest_version: Mapped[int] = mapped_column(Integer, nullable=False)
-    manifest_hash: Mapped[str] = mapped_column(String, nullable=False)
-    source_path: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(String, nullable=False)
-    seeded_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-        server_default=text("CURRENT_TIMESTAMP"),
-    )
-    entry_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    __table_args__ = (
-        UniqueConstraint(
-            "manifest",
-            "manifest_hash",
-            "status",
-            name="uq_reference_catalog_seed_runs_manifest_hash_status",
-        ),
-        Index("ix_reference_catalog_seed_runs_manifest", "manifest"),
-        Index("ix_reference_catalog_seed_runs_status", "status"),
-    )
-
-###############################################################################
 class AccessKey(Base):
     __tablename__ = "access_keys"
 

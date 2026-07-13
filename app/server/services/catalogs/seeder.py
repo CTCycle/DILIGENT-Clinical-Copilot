@@ -50,20 +50,7 @@ class ReferenceCatalogSeeder:
                 manifest_hash=manifest_hash,
                 source_path=str(path),
             )
-            self.serializer.record_seed_success(
-                manifest=manifest.manifest,
-                version=manifest.version,
-                hash=manifest_hash,
-                source_path=str(path),
-                entry_count=written,
-            )
             return written
         except Exception as exc:
-            self.serializer.record_seed_failure(
-                manifest=manifest.manifest,
-                version=manifest.version,
-                hash=manifest_hash,
-                source_path=str(path),
-                error=str(exc),
-            )
+            _ = exc
             raise

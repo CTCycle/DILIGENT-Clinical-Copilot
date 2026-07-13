@@ -15,7 +15,6 @@ from domain.catalogs import (
 from repositories.schemas.models import (
     ReferenceCatalogEntry,
     ReferenceCatalogManifest,
-    ReferenceCatalogSeedRun,
 )
 
 ###############################################################################
@@ -127,44 +126,6 @@ class ReferenceCatalogSerializer:
             return row is not None
         finally:
             session.close()
-
-    # -------------------------------------------------------------------------
-    def record_seed_success(
-        self,
-        manifest: str,
-        version: int,
-        hash: str,
-        source_path: str,
-        entry_count: int,
-    ) -> None:
-        self._record_seed_run(
-            manifest=manifest,
-            version=version,
-            hash=hash,
-            source_path=source_path,
-            status="success",
-            entry_count=entry_count,
-            error_message=None,
-        )
-
-    # -------------------------------------------------------------------------
-    def record_seed_failure(
-        self,
-        manifest: str,
-        version: int,
-        hash: str,
-        source_path: str,
-        error: str,
-    ) -> None:
-        self._record_seed_run(
-            manifest=manifest,
-            version=version,
-            hash=hash,
-            source_path=source_path,
-            status="failure",
-            entry_count=0,
-            error_message=error,
-        )
 
     # -------------------------------------------------------------------------
     def clear_all_catalog_entries(self) -> None:
@@ -292,55 +253,6 @@ class ReferenceCatalogSerializer:
             row.active = False
             session.commit()
             return True
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
-
-    # -------------------------------------------------------------------------
-    def _record_seed_run(
-        self,
-        *,
-        manifest: str,
-        version: int,
-        hash: str,
-        source_path: str,
-        status: str,
-        entry_count: int,
-        error_message: str | None,
-    ) -> None:
-        session = self.session_factory()
-        try:
-            existing = (
-                session.execute(
-                    select(ReferenceCatalogSeedRun).where(
-                        ReferenceCatalogSeedRun.manifest == manifest,
-                        ReferenceCatalogSeedRun.manifest_hash == hash,
-                        ReferenceCatalogSeedRun.status == status,
-                    )
-                )
-                .scalars()
-                .first()
-            )
-            if existing is None:
-                session.add(
-                    ReferenceCatalogSeedRun(
-                        manifest=manifest,
-                        manifest_version=version,
-                        manifest_hash=hash,
-                        source_path=source_path,
-                        status=status,
-                        entry_count=entry_count,
-                        error_message=error_message,
-                    )
-                )
-            else:
-                existing.manifest_version = version
-                existing.source_path = source_path
-                existing.entry_count = entry_count
-                existing.error_message = error_message
-            session.commit()
         except Exception:
             session.rollback()
             raise

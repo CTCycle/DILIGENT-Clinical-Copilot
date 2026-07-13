@@ -3,13 +3,11 @@
 from repositories.schemas.models import (
     ApplicationConfiguration,
     ReferenceCatalogEntry,
-    ReferenceCatalogSeedRun,
     ReferenceCatalogManifest,
 )
 
 __all__ = [
     "ApplicationConfiguration",
     "ReferenceCatalogEntry",
-    "ReferenceCatalogSeedRun",
     "ReferenceCatalogManifest",
 ]
