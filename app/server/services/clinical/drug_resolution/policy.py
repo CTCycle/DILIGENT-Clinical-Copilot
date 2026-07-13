@@ -10,9 +10,9 @@ from domain.clinical.drug_resolution import (
 )
 from services.catalogs.runtime import get_reference_catalog_snapshot
 
-
 ###############################################################################
 class DrugResolutionPolicy:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.false_positive_tokens = set(

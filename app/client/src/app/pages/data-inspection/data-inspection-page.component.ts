@@ -51,9 +51,21 @@ import {
 } from '../../core/utils/inspection-formatting';
 
 const INSPECTION_VIEWS: InspectionViewOption[] = [
-  { id: 'rxnav', label: 'Drug Catalog' },
-  { id: 'livertox', label: 'LiverTox' },
-  { id: 'rag', label: 'RAG' },
+  {
+    id: 'rxnav',
+    label: 'Drug Catalog',
+    iconPath: 'M7.5 3.75h9a2.25 2.25 0 0 1 2.25 2.25v12a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25V6a2.25 2.25 0 0 1 2.25-2.25Z M9 8.25h6 M9 12h6 M9 15.75h3',
+  },
+  {
+    id: 'livertox',
+    label: 'LiverTox',
+    iconPath: 'M8.25 4.5h7.5 M10.5 4.5v5.25l-3.75 7.5a2.25 2.25 0 0 0 2.01 3.25h6.48a2.25 2.25 0 0 0 2.01-3.25l-3.75-7.5V4.5 M8.5 15h7',
+  },
+  {
+    id: 'rag',
+    label: 'RAG',
+    iconPath: 'M5.25 6.75c0-1.24 2.99-2.25 6.75-2.25s6.75 1.01 6.75 2.25-2.99 2.25-6.75 2.25-6.75-1.01-6.75-2.25Z M5.25 6.75v5.25c0 1.24 2.99 2.25 6.75 2.25s6.75-1.01 6.75-2.25V6.75 M5.25 12v5.25c0 1.24 2.99 2.25 6.75 2.25s6.75-1.01 6.75-2.25V12',
+  },
 ];
 
 const RAG_SUMMARY_FIELDS: ReadonlyArray<{

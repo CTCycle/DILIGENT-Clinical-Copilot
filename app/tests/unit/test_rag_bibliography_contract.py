@@ -4,6 +4,7 @@ from domain.clinical.entities import RagDocumentReference
 from services.clinical.report_finalizer import ReportFinalizer
 
 
+###############################################################################
 def test_page_and_line_locations_render_without_synthetic_pages() -> None:
     lines = ReportFinalizer.render_canonical_references(
         [
@@ -23,6 +24,7 @@ def test_page_and_line_locations_render_without_synthetic_pages() -> None:
     assert "- source.xml, location not available" in lines
 
 
+###############################################################################
 def test_line_ranges_merge_only_when_contiguous_or_overlapping() -> None:
     lines = ReportFinalizer.render_canonical_references(
         [
@@ -34,6 +36,7 @@ def test_line_ranges_merge_only_when_contiguous_or_overlapping() -> None:
     assert lines == ["- notes.txt, lines 10-30", "- notes.txt, lines 40-50"]
 
 
+###############################################################################
 def test_sanitizer_removes_known_sources_and_preserves_clinical_study_mentions() -> (
     None
 ):

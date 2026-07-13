@@ -11,7 +11,10 @@ from services.llm.transports.base import (
 )
 
 
+###############################################################################
 class OpenAIChatTransport(StructuredTransportMixin):
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
         self.client = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),
@@ -23,6 +26,7 @@ class OpenAIChatTransport(StructuredTransportMixin):
             },
         )
 
+    # -------------------------------------------------------------------------
     async def chat(self, request: ChatRequest) -> ChatResult:
         payload = {
             "model": request.model,
@@ -39,6 +43,7 @@ class OpenAIChatTransport(StructuredTransportMixin):
             reasoning_content=str(message.get("reasoning_content") or "") or None,
         )
 
+    # -------------------------------------------------------------------------
     async def list_models(self) -> list[CloudModelDescriptor]:
         response = await self.client.get("models")
         response.raise_for_status()
@@ -49,6 +54,7 @@ class OpenAIChatTransport(StructuredTransportMixin):
             for item in response.json().get("data", [])
         ]
 
+    # -------------------------------------------------------------------------
     async def check_connectivity(self, model: str) -> ConnectivityResult:
         try:
             result = await self.chat(
@@ -61,5 +67,6 @@ class OpenAIChatTransport(StructuredTransportMixin):
         except Exception as exc:
             return ConnectivityResult(ok=False, error=str(exc))
 
+    # -------------------------------------------------------------------------
     async def close(self) -> None:
         await self.client.aclose()

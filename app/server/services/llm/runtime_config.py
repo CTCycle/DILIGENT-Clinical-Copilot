@@ -19,7 +19,6 @@ from repositories.serialization.model_configs import (
 )
 from services.llm.provider_registry import provider_registry
 
-
 ###############################################################################
 class LLMRuntimeConfig:
     _runtime_override: ContextVar[dict[str, object] | None] = ContextVar(

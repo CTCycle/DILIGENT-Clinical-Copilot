@@ -17,7 +17,6 @@ from services.clinical.report_language import (
 )
 from services.text.vocabulary import get_text_normalization_snapshot
 
-
 ###############################################################################
 class ReportFinalizer:
     """Builds the final patient report and conclusion from per-drug assessments."""

@@ -18,9 +18,9 @@ from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 
-
 ###############################################################################
 class InMemorySerializer:
+
     # -------------------------------------------------------------------------
     def __init__(self, snapshot: ModelConfigSnapshot) -> None:
         self.snapshot = snapshot
@@ -36,11 +36,9 @@ class InMemorySerializer:
         self.snapshot = ModelConfigSnapshot(**data)
         return self.snapshot
 
-
 ###############################################################################
 def test_model_config_serializer_has_no_clean_break_migration() -> None:
     assert not hasattr(ModelConfigSerializer, "migrate_cloud_selection_clean_break")
-
 
 ###############################################################################
 def test_model_config_service_initializes_fresh_snapshot_from_canonical_defaults() -> None:
@@ -60,7 +58,6 @@ def test_model_config_service_initializes_fresh_snapshot_from_canonical_defaults
     assert snapshot.clinical_model
     assert snapshot.text_extraction_model
     assert snapshot.cloud_provider
-
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -84,7 +81,6 @@ def test_model_config_service_rejects_invalid_persisted_cloud_selection(
     )
     with pytest.raises(ServiceValidationError):
         ModelConfigService(serializer=serializer).ensure_defaults()
-
 
 ###############################################################################
 def test_model_config_service_rejects_invalid_persisted_local_model() -> None:
@@ -134,7 +130,6 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
     assert snapshot.clinical_model == "gpt-oss:20b"
     assert snapshot.text_extraction_model == "qwen3:1.7b"
 
-
 ###############################################################################
 def test_clinical_service_reads_runtime_from_persisted_config() -> None:
     clinical_service = build_clinical_session_service(get_job_manager())
@@ -144,7 +139,6 @@ def test_clinical_service_reads_runtime_from_persisted_config() -> None:
     )
     assert parser_provider
     assert parser_model
-
 
 ###############################################################################
 def test_model_config_service_accepts_cloud_models_for_role_assignments() -> None:
@@ -177,7 +171,6 @@ def test_model_config_service_accepts_cloud_models_for_role_assignments() -> Non
     assert serializer.snapshot.clinical_model == "gpt-4.1-mini"
     assert serializer.snapshot.text_extraction_model == "gpt-4.1-mini"
 
-
 ###############################################################################
 def test_model_config_service_rejects_stale_local_roles_in_cloud_mode() -> None:
     serializer = InMemorySerializer(
@@ -204,7 +197,6 @@ def test_model_config_service_rejects_stale_local_roles_in_cloud_mode() -> None:
 
     with pytest.raises(ServiceValidationError, match="Select a model explicitly"):
         asyncio.run(service.update_state(payload))
-
 
 ###############################################################################
 def test_model_config_service_rejects_uninstalled_local_models(monkeypatch) -> None:
@@ -240,7 +232,6 @@ def test_model_config_service_rejects_uninstalled_local_models(monkeypatch) -> N
     with pytest.raises(ServiceValidationError, match="Install local Ollama model"):
         asyncio.run(service.update_state(payload))
 
-
 ###############################################################################
 def test_model_config_service_prioritizes_recommended_installed_local_models(
     monkeypatch,
@@ -274,7 +265,6 @@ def test_model_config_service_prioritizes_recommended_installed_local_models(
     assert response.local_models[0].recommended_for_local_extraction is True
     assert response.local_models[1].name == "qwen3.5:9b"
 
-
 ###############################################################################
 def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) -> None:
     serializer = InMemorySerializer(
@@ -293,6 +283,7 @@ def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) ->
 
     ###############################################################################
     class FailingOllamaClient:
+
         # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
@@ -324,7 +315,6 @@ def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) ->
 
     assert len(warnings) == 2
 
-
 ###############################################################################
 def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> None:
     serializer = InMemorySerializer(
@@ -343,6 +333,7 @@ def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> No
 
     ###############################################################################
     class FakeCloudLLMClient:
+
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             calls.append({"init": kwargs})
@@ -375,7 +366,6 @@ def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> No
     assert calls[0]["init"]["provider"] == "openai"
     assert calls[1]["chat"]["model"] == "gpt-4.1-mini"
 
-
 ###############################################################################
 def test_connectivity_check_reports_llm_error(monkeypatch) -> None:
     serializer = InMemorySerializer(
@@ -393,6 +383,7 @@ def test_connectivity_check_reports_llm_error(monkeypatch) -> None:
 
     ###############################################################################
     class FailingCloudLLMClient:
+
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             raise LLMError("No active OpenAI access key configured")

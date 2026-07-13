@@ -45,7 +45,6 @@ RELATIVE_TIME_VALUE_PREFIX_RE = re.compile(
 )
 SINGLE_VALUE_MARKERS = frozenset({"CR", "EGFR", "INR", "ALB"})
 
-
 ###############################################################################
 class LocalLabEntryDraft(BaseModel):
     marker_name: str = Field(..., min_length=1, max_length=40)
@@ -54,19 +53,16 @@ class LocalLabEntryDraft(BaseModel):
     sample_date: str | None = Field(default=None, max_length=120)
     evidence: str | None = Field(default=None, max_length=500)
 
-
 ###############################################################################
 class LocalOnsetContextDraft(BaseModel):
     onset_date: str | None = Field(default=None, max_length=120)
     onset_basis: str | None = Field(default=None, max_length=200)
     evidence: str | None = Field(default=None, max_length=500)
 
-
 ###############################################################################
 class LocalLabExtractionPayload(BaseModel):
     entries: list[LocalLabEntryDraft] = Field(default_factory=list)
     onset_context: LocalOnsetContextDraft | None = Field(default=None)
-
 
 ###############################################################################
 def _load_marker_aliases() -> dict[str, tuple[str, ...]]:
@@ -99,15 +95,14 @@ RUCAM_SCORE_TEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 ###############################################################################
 def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
     normalized = (marker_name or "").strip().casefold()
     return aliases.get(normalized, marker_name)
 
-
 ###############################################################################
 class ClinicalLabExtractor:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

@@ -48,7 +48,6 @@ LOG_CONFIG: dict[str, Any] = {
     },
 }
 
-
 ###############################################################################
 def configure_logging() -> None:
     global _logging_configured

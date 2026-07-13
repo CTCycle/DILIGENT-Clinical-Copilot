@@ -20,7 +20,6 @@ from services.inspection.revision_scaffold import SessionRevisionConflictError
 from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
 
-
 ###############################################################################
 def build_file_serializer(tmp_path: Path) -> DataSerializer:
     engine = create_engine(
@@ -28,7 +27,6 @@ def build_file_serializer(tmp_path: Path) -> DataSerializer:
     )
     Base.metadata.create_all(engine)
     return DataSerializer(engine=engine)
-
 
 ###############################################################################
 def save_revision_source_session(serializer: DataSerializer) -> int:
@@ -53,7 +51,6 @@ def save_revision_source_session(serializer: DataSerializer) -> int:
     )
     assert session_id is not None
     return int(session_id)
-
 
 ###############################################################################
 def fake_issue_scan_call(**kwargs: Any) -> dict[str, Any]:
@@ -100,7 +97,6 @@ def fake_issue_scan_call(**kwargs: Any) -> dict[str, Any]:
         }
     raise AssertionError(f"Unexpected schema: {schema_name}")
 
-
 ###############################################################################
 def test_revision_issue_scan_schema_rejects_unknown_category() -> None:
     with pytest.raises(ValidationError):
@@ -119,7 +115,6 @@ def test_revision_issue_scan_schema_rejects_unknown_category() -> None:
                 ],
             }
         )
-
 
 ###############################################################################
 def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
@@ -145,7 +140,6 @@ def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
     assert "Check hallucinations around dechallenge." in prompt
     assert "may steer focus but is not clinical evidence" in prompt
     assert "No tools are available" in prompt
-
 
 ###############################################################################
 def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> None:
@@ -201,14 +195,13 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
         "revision_agent_qa",
     }
 
-
 ###############################################################################
 class SlowRevisionRunner:
+
     # -------------------------------------------------------------------------
     def run_agentic(self, **_kwargs: Any) -> dict[str, Any]:
         time.sleep(0.4)
         return {}
-
 
 ###############################################################################
 def test_revision_job_rejects_same_root_concurrent_start(tmp_path: Path) -> None:
