@@ -11,7 +11,7 @@ from repositories.database.session import (
     resolve_engine,
     resolve_session_factory,
 )
-from repositories.schemas.models import (
+from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
     LiverToxMonograph,
@@ -42,6 +42,7 @@ class DataSerializer:
             engine=self.engine,
             session_factory=session_factory,
         )
+        self._vocabulary_changed = False
 
     # -------------------------------------------------------------------------
     def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
@@ -553,10 +554,16 @@ class DataSerializer:
     # -------------------------------------------------------------------------
     def persist_session_drugs(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
-    ) -> None:
+    ) -> bool:
         return session_result_data.persist_session_drugs(
             self, db_session, session_id, session_data
         )
+
+    # -------------------------------------------------------------------------
+    def consume_vocabulary_change_signal(self) -> bool:
+        changed = self._vocabulary_changed
+        self._vocabulary_changed = False
+        return changed
 
     # -------------------------------------------------------------------------
     def resolve_drug_id_from_match_cache(

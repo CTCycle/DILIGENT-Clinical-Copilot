@@ -29,6 +29,7 @@ from repositories.serialization.model_configs import (
 from services.llm.cloud import CloudLLMClient, LLMError
 from services.llm.provider_registry import provider_registry
 from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
+from domain.llm.providers import CloudProviderId
 from services.llm.ollama_client import OllamaClient, OllamaError
 from repositories.vectors import LanceVectorDatabase
 from services.retrieval.settings import (
@@ -505,7 +506,7 @@ class ModelConfigService:
         normalized = (model_name or "").strip()
         if not normalized:
             return None
-        if not provider_registry.is_valid_model(provider, normalized):
+        if not provider_registry.is_valid_model(cast(CloudProviderId, provider), normalized):
             raise ServiceValidationError(
                 f"Model '{normalized}' is not valid for provider '{provider}'."
             )
@@ -723,7 +724,7 @@ class ModelConfigService:
             local_models=local_models,
             cloud_providers=cloud_providers or self.build_provider_descriptors(),
             use_cloud_services=bool(snapshot.use_cloud_models),
-            llm_provider=provider,
+            llm_provider=cast(CloudProviderId, provider),
             cloud_model=cloud_model,
             clinical_model=snapshot.clinical_model,
             text_extraction_model=snapshot.text_extraction_model,

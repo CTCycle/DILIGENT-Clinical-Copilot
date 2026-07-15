@@ -3,13 +3,13 @@ from __future__ import annotations
 import asyncio
 
 from domain.clinical.entities import PatientData
-from services.clinical.labs import (
-    ClinicalLabExtractor,
-    LabExtractionPayload,
+from domain.clinical.extras import LabExtractionPayload
+from domain.clinical.extractor_contracts import (
     LocalLabEntryDraft,
     LocalLabExtractionPayload,
     LocalOnsetContextDraft,
 )
+from services.clinical.labs import ClinicalLabExtractor
 
 ###############################################################################
 class _FakeClient:

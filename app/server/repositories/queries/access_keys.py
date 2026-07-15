@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import Select, Update, select, update
 
-from repositories.schemas.models import AccessKey
+from repositories.schemas.security import AccessKey
 
 AccessKeyTable = type[AccessKey]
 

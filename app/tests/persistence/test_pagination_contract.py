@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
-from repositories.schemas.models import ClinicalSession
+from repositories.schemas.clinical import ClinicalSession
 
 
 ###############################################################################

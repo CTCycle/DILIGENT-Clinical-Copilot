@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-import repositories.schemas.models as models
+import repositories.schemas.configuration as configuration
+from repositories.schemas.configuration import ReferenceCatalogEntry, ReferenceCatalogManifest
 from sqlalchemy import UniqueConstraint
 
 ###############################################################################
 def test_reference_catalog_tables_exist_in_schema_models() -> None:
-    assert hasattr(models, "ReferenceCatalogEntry")
-    assert hasattr(models, "ReferenceCatalogManifest")
-    assert models.ReferenceCatalogEntry.__tablename__ == "reference_catalog_entries"
-    assert models.ReferenceCatalogManifest.__tablename__ == "reference_catalog_manifests"
+    assert ReferenceCatalogEntry.__tablename__ == "reference_catalog_entries"
+    assert ReferenceCatalogManifest.__tablename__ == "reference_catalog_manifests"
 
 ###############################################################################
 def test_reference_catalog_entry_unique_constraint_shape() -> None:
     constraints = [
         item
-        for item in models.ReferenceCatalogEntry.__table_args__
+        for item in ReferenceCatalogEntry.__table_args__
         if isinstance(item, UniqueConstraint)
     ]
     assert constraints
@@ -36,7 +35,7 @@ def test_reference_catalog_entry_unique_constraint_shape() -> None:
 def test_reference_catalog_manifest_unique_constraint_shape() -> None:
     constraints = [
         item
-        for item in models.ReferenceCatalogManifest.__table_args__
+        for item in ReferenceCatalogManifest.__table_args__
         if isinstance(item, UniqueConstraint)
     ]
     assert constraints
@@ -49,4 +48,4 @@ def test_reference_catalog_manifest_unique_constraint_shape() -> None:
 
 ###############################################################################
 def test_legacy_text_normalization_model_removed() -> None:
-    assert not hasattr(models, "TextNormalizationTerm")
+    assert not hasattr(configuration, "TextNormalizationTerm")

@@ -5,8 +5,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from domain.clinical import DrugEntry, PatientDrugs
-from repositories.schemas.models import (
-    Base,
+from repositories.schemas.base import Base
+from repositories.schemas.knowledge import (
     Drug,
     DrugRxnormCode,
     KbMatchCache,

@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 ## Relational Database
 - SQLAlchemy-backed storage
@@ -38,7 +38,7 @@ ormalized_document
 - Version listing and detail reads are side-effect-free. Version synchronization is reserved for explicit write paths.
 - Sessions with blocking faithfulness issues may persist audit artifacts, but they must not be stored as clinically successful finalizations.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
-- Canonical repeated observations are stored in `clinical_lab_observations` and ordered drug mentions in `clinical_drug_mentions`; the older summary tables remain only for the current inspection projection during migration.
+- Canonical repeated observations are stored in `clinical_lab_observations` and ordered drug mentions in `clinical_drug_mentions`; these are the only persisted session lab and drug sources.
 - Access-key ciphertext remains in the database, while versioned Fernet key material is stored outside the database in the protected `DILIGENT_ACCESS_KEY_MATERIAL_FILE` store; the ORM has no encryption-material table.
 - Canonical drug identifiers use `drug_identifiers` with unique `(identifier_system, identifier_value)` ownership.
 - `application_configuration` is the fixed-id singleton for validated configuration payloads, and `reference_catalog_manifests` records the currently installed manifest state.
@@ -79,7 +79,7 @@ app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-resee
 ## Model Configuration Persistence
 - A newly initialized database receives the canonical model defaults from the server settings.
 - Existing provider and model selections are read as stored; unsupported values fail validation and are not translated, invalidated, or replaced by another selection.
-- The database initializer does not run a model-selection migration. Recreate the local database when discarding obsolete selections is intended.
+- The database initializer does not transform obsolete model selections. Recreate the local database when replacing local state is intended.
 
 
 ## Agentic revision artifacts

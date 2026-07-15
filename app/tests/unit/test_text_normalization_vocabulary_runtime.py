@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from repositories.schemas.models import Base
+from repositories.schemas.base import Base
 from services.text import vocabulary as vocabulary_module
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.postgresql import insert as postgres_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from repositories.schemas.models import (
-    ApplicationConfiguration,
+from repositories.schemas.configuration import ApplicationConfiguration
+from repositories.schemas.knowledge import (
     DrugAlias,
     DrugRxnormCode,
     LiverToxMonograph,
@@ -20,19 +22,12 @@ def upsert_application_configuration(
     schema_version: int = 1,
 ) -> ApplicationConfiguration:
     """Atomically replace the fixed-id application configuration row."""
-    dialect = db_session.get_bind().dialect.name
     values = {
         "id": 1,
         "schema_version": int(schema_version),
         "payload": payload,
     }
-    if dialect == "sqlite":
-        from sqlalchemy.dialects.sqlite import insert
-    elif dialect == "postgresql":
-        from sqlalchemy.dialects.postgresql import insert
-    else:
-        raise ValueError(f"Unsupported upsert dialect: {dialect}")
-    statement = insert(ApplicationConfiguration).values(**values)
+    statement = dialect_insert(db_session, ApplicationConfiguration).values(**values)
     statement = statement.on_conflict_do_update(
         index_elements=[ApplicationConfiguration.id],
         set_={
@@ -49,15 +44,13 @@ def upsert_application_configuration(
     return row
 
 ###############################################################################
-def _dialect_insert(db_session: Session, model):
+def dialect_insert(db_session: Session, model: Any) -> Any:
     dialect = db_session.get_bind().dialect.name
     if dialect == "sqlite":
-        from sqlalchemy.dialects.sqlite import insert
+        return sqlite_insert(model)
     elif dialect == "postgresql":
-        from sqlalchemy.dialects.postgresql import insert
-    else:
-        raise ValueError(f"Unsupported upsert dialect: {dialect}")
-    return insert(model)
+        return postgres_insert(model)
+    raise ValueError(f"Unsupported upsert dialect: {dialect}")
 
 ###############################################################################
 def upsert_drug_alias(
@@ -70,7 +63,7 @@ def upsert_drug_alias(
     source: str,
     term_type: str | None,
 ) -> None:
-    statement = _dialect_insert(db_session, DrugAlias).values(
+    statement = dialect_insert(db_session, DrugAlias).values(
         drug_id=drug_id,
         alias=alias,
         alias_norm=alias_norm,
@@ -97,7 +90,7 @@ def upsert_drug_aliases(db_session: Session, values: list[dict[str, Any]]) -> No
     """Atomically upsert a deduplicated batch of drug aliases."""
     if not values:
         return
-    statement = _dialect_insert(db_session, DrugAlias).values(values)
+    statement = dialect_insert(db_session, DrugAlias).values(values)
     statement = statement.on_conflict_do_update(
         index_elements=[
             DrugAlias.drug_id,
@@ -119,7 +112,7 @@ def upsert_drug_rxnorm_code(
     drug_id: int,
     rxcui: str,
 ) -> None:
-    statement = _dialect_insert(db_session, DrugRxnormCode).values(
+    statement = dialect_insert(db_session, DrugRxnormCode).values(
         drug_id=drug_id,
         rxcui=rxcui,
     )
@@ -135,7 +128,7 @@ def upsert_drug_rxnorm_codes(
     """Atomically insert a deduplicated batch of RxCUI mappings."""
     if not values:
         return
-    statement = _dialect_insert(db_session, DrugRxnormCode).values(values)
+    statement = dialect_insert(db_session, DrugRxnormCode).values(values)
     statement = statement.on_conflict_do_nothing(
         index_elements=[DrugRxnormCode.rxcui]
     )
@@ -148,7 +141,7 @@ def upsert_livertox_monographs(
     """Atomically replace a batch of LiverTox monograph records by identity."""
     if not values:
         return
-    statement = _dialect_insert(db_session, LiverToxMonograph).values(values)
+    statement = dialect_insert(db_session, LiverToxMonograph).values(values)
     statement = statement.on_conflict_do_update(
         index_elements=[LiverToxMonograph.monograph_key],
         set_={

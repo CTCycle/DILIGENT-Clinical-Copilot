@@ -16,7 +16,7 @@ from domain.clinical.revision import (
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from repositories.schemas.models import (
+from repositories.schemas.clinical import (
     ClinicalSession,
     ClinicalSessionRevisionArtifact,
     ClinicalSessionRevisionReview,

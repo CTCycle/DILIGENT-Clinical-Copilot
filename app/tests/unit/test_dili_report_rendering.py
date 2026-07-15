@@ -34,8 +34,8 @@ def test_missing_data_labels_are_stable() -> None:
 
 ###############################################################################
 def test_deterministic_laboratory_section_rendering() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
-    section = consultation.render_laboratory_section(
+    finalizer = ReportFinalizer(object())
+    section = finalizer.render_laboratory_section(
         PatientLabTimeline(
             entries=[
                 ClinicalLabEntry(
@@ -53,8 +53,8 @@ def test_deterministic_laboratory_section_rendering() -> None:
 
 ###############################################################################
 def test_deterministic_bibliography_section_rendering() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
-    section = consultation.render_bibliography_section(
+    finalizer = ReportFinalizer(object())
+    section = finalizer.render_bibliography_section(
         [
             {
                 "matched_livertox_name": "Amoxicillin",

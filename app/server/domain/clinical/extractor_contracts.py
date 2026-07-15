@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from domain.clinical.entities import RagDocumentReference
+from domain.clinical.entities import PipelineIssue, RagDocumentReference
 
 ###############################################################################
 class LocalDiseaseContextEntry(BaseModel):
@@ -53,6 +54,22 @@ class LocalDrugEntryDraft(BaseModel):
 ###############################################################################
 class LocalPatientDrugs(BaseModel):
     entries: list[LocalDrugEntryDraft] = Field(default_factory=list)
+
+###############################################################################
+class HepaticPatternResolutionInput(BaseModel):
+    explicit_pattern: str | None = None
+    calculated_pattern: str | None = None
+    r_score: float | None = None
+
+###############################################################################
+class HepaticPatternResolutionResult(BaseModel):
+    explicit_value: str | None = None
+    calculated_value: str | None = None
+    final_value: str = "indeterminate"
+    source: Literal["provided", "calculated", "undetermined"] = "undetermined"
+    conflict: bool = False
+    r_score: float | None = None
+    warnings: list[PipelineIssue] = Field(default_factory=list)
 
 ###############################################################################
 @dataclass(frozen=True)

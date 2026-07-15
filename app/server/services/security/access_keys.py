@@ -6,7 +6,7 @@ from domain.keys import (
     ProviderName,
     normalize_provider_name,
 )
-from repositories.schemas.models import AccessKey
+from repositories.schemas.security import AccessKey
 from repositories.serialization.access_keys import AccessKeySerializer
 
 ###############################################################################

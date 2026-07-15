@@ -6,7 +6,7 @@ from common.security.cryptography import (
     decrypt_with_key_material,
     encrypt_with_key_material,
 )
-from repositories.schemas.models import Base
+from repositories.schemas.base import Base
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )

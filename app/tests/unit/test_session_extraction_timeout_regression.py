@@ -5,7 +5,8 @@ from types import SimpleNamespace
 from typing import Any
 
 from domain.clinical import PatientData
-from services.clinical.labs import ClinicalLabExtractor, LabExtractionPayload
+from domain.clinical.extras import LabExtractionPayload
+from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.parser import DrugsParser
 from services.runtime.jobs import JobManager
 from services.session import factory

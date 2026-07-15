@@ -17,17 +17,18 @@ from common.constants import (
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from repositories.database.upsert import (
+    dialect_insert,
     upsert_drug_aliases,
     upsert_livertox_monographs,
 )
-from repositories.schemas.models import (
-    ClinicalSessionDrug,
+from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
     DrugRxnormCode,
     KbMatchCache,
     LiverToxMonograph,
 )
+from repositories.schemas.clinical import ClinicalDrugMention
 from common.utils.text_utils import normalize_drug_name
 
 ###############################################################################
@@ -75,14 +76,7 @@ def _build_livertox_drug_values(self, rows: list[dict[str, Any]]) -> list[dict[s
 def _upsert_livertox_drug_values(db_session, values: list[dict[str, Any]]) -> None:
     if not values:
         return
-    dialect = db_session.get_bind().dialect.name
-    if dialect == "sqlite":
-        from sqlalchemy.dialects.sqlite import insert
-    elif dialect == "postgresql":
-        from sqlalchemy.dialects.postgresql import insert
-    else:
-        raise ValueError(f"Unsupported upsert dialect: {dialect}")
-    statement = insert(Drug).values(values)
+    statement = dialect_insert(db_session, Drug).values(values)
     statement = statement.on_conflict_do_update(
         index_elements=[Drug.canonical_name_norm],
         set_={
@@ -839,8 +833,8 @@ def delete_drug_with_cleanup(self, drug_id: int) -> bool:
         if existing is None:
             return False
         db_session.execute(
-            update(ClinicalSessionDrug)
-            .where(ClinicalSessionDrug.drug_id == safe_drug_id)
+            update(ClinicalDrugMention)
+            .where(ClinicalDrugMention.drug_id == safe_drug_id)
             .values(drug_id=None)
         )
         db_session.execute(delete(DrugAlias).where(DrugAlias.drug_id == safe_drug_id))

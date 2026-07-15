@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime
 import inspect
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from datetime import date
 from typing import Any
 
@@ -18,7 +18,6 @@ from domain.clinical.entities import (
     DrugSuspensionContext,
     PatientDrugClinicalReport,
     PatientDrugs,
-    PatientLabTimeline,
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
@@ -116,26 +115,6 @@ class HepatoxConsultation:
         self.rag_support = RagSupportService(self)
 
     # -------------------------------------------------------------------------
-    def __getattr__(self, name: str) -> Any:
-        if name == "analysis_runner":
-            runner = AnalysisRunner(self)
-            object.__setattr__(self, "analysis_runner", runner)
-            return runner
-        if name == "drug_analysis":
-            service = DrugAnalysisService(self)
-            object.__setattr__(self, "drug_analysis", service)
-            return service
-        if name == "report_finalizer":
-            finalizer = ReportFinalizer(self)
-            object.__setattr__(self, "report_finalizer", finalizer)
-            return finalizer
-        if name == "rag_support":
-            support = RagSupportService(self)
-            object.__setattr__(self, "rag_support", support)
-            return support
-        msg = f"'{type(self).__name__}' object has no attribute '{name}'"
-        raise AttributeError(msg)
-
     # -------------------------------------------------------------------------
     async def run_analysis(
         self,
@@ -671,7 +650,6 @@ class HepatoxConsultation:
             normalized_score = NOT_AVAILABLE_TEXT
         return f"{normalized_name} - LiverTox score {normalized_score}"
 
-    # -------------------------------------------------------------------------
     def format_rucam_prompt_block(self, rucam: DrugRucamAssessment | None) -> str:
         if rucam is None:
             return "Estimated RUCAM not available."
@@ -684,12 +662,10 @@ class HepatoxConsultation:
             f"- Key limitations: {limitations}"
         )
 
-    # -------------------------------------------------------------------------
     @staticmethod
     def is_materially_in_report_language(text: str, report_language: str) -> bool:
         return hepatox_scoring.is_materially_in_report_language(text, report_language)
 
-    # -------------------------------------------------------------------------
     async def repair_language_once(
         self,
         *,
@@ -700,7 +676,6 @@ class HepatoxConsultation:
             source_text=source_text, report_language=report_language
         )
 
-    # -------------------------------------------------------------------------
     async def request_drug_analysis(
         self,
         *,
@@ -738,7 +713,6 @@ class HepatoxConsultation:
             report_language=report_language,
         )
 
-    # -------------------------------------------------------------------------
     async def request_revision_drug_analysis(
         self,
         *,
@@ -776,27 +750,22 @@ class HepatoxConsultation:
             report_language=report_language,
         )
 
-    # -------------------------------------------------------------------------
     @staticmethod
     def escape_braces(value: str) -> str:
         return value.replace("{", "{{").replace("}", "}}")
 
-    # -------------------------------------------------------------------------
     @staticmethod
     def coerce_chat_text(raw_response: Any) -> str:
         return DrugAnalysisService.coerce_chat_text(raw_response)
 
-    # -------------------------------------------------------------------------
     def extract_rate_limit_wait_hint_seconds(self, exc: Exception) -> float | None:
         return self.rag_support.extract_rate_limit_wait_hint_seconds(exc)
 
-    # -------------------------------------------------------------------------
     def retry_backoff_seconds(
         self, attempt: int, *, exc: Exception | None = None
     ) -> float:
         return self.analysis_runner.retry_backoff_seconds(attempt, exc=exc)
 
-    # -------------------------------------------------------------------------
     @staticmethod
     def remove_redundant_report_sentence(text: str) -> str:
         if not text:
@@ -812,41 +781,9 @@ class HepatoxConsultation:
         cleaned = "\n".join(cleaned_lines).strip()
         return re.sub(r"\n{3,}", "\n\n", cleaned)
 
-    # -------------------------------------------------------------------------
-    async def finalize_patient_report(
-        self,
-        entries: list[DrugClinicalAssessment],
-        *,
-        clinical_context: str | None,
-        report_language: str,
-    ) -> str | None:
-        return await self.report_finalizer._build_and_finalize_report(
-            entries,
-            clinical_context=clinical_context,
-            report_language=report_language,
-            generate_conclusion_fn=self.generate_conclusion,
-        )
-
-    # -------------------------------------------------------------------------
-    async def finalize_revision_patient_report(
-        self,
-        entries: list[DrugClinicalAssessment],
-        *,
-        clinical_context: str | None,
-        report_language: str,
-    ) -> str | None:
-        return await self.report_finalizer._build_and_finalize_report(
-            entries,
-            clinical_context=clinical_context,
-            report_language=report_language,
-            generate_conclusion_fn=self.generate_revision_conclusion,
-        )
-
-    # -------------------------------------------------------------------------
     def should_render_as_matched_drug(self, entry: DrugClinicalAssessment) -> bool:
         return self.report_finalizer.should_render_as_matched_drug(entry)
 
-    # -------------------------------------------------------------------------
     def render_matched_drug_section(
         self,
         entry: DrugClinicalAssessment,
@@ -878,10 +815,9 @@ class HepatoxConsultation:
             f"**RUCAM**: {localized_rucam}\n\n"
             f"**{report_label}**\n\n"
             f"{body}\n\n"
-            f"**{bibliography_label}**: {self.bibliography_source_label()}"
+            f"**{bibliography_label}**: {ReportFinalizer.bibliography_source_label()}"
         ).strip()
 
-    # -------------------------------------------------------------------------
     @staticmethod
     def render_clinical_commentary(
         entry: DrugClinicalAssessment,
@@ -945,7 +881,6 @@ class HepatoxConsultation:
             segments
         )
 
-    # -------------------------------------------------------------------------
     def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:
         text = entry.paragraph.strip() if entry.paragraph else ""
         if not text:
@@ -987,7 +922,6 @@ class HepatoxConsultation:
             return ""
         return sanitized
 
-    # -------------------------------------------------------------------------
     def build_fallback_technical_note(
         self,
         entry: DrugClinicalAssessment,
@@ -1007,7 +941,6 @@ class HepatoxConsultation:
             return phrase("livertox_missing", report_language)
         return self.build_error_paragraph(entry, report_language=report_language)
 
-    # -------------------------------------------------------------------------
     def render_unresolved_mentions_section(
         self,
         entries: list[DrugClinicalAssessment],
@@ -1065,7 +998,6 @@ class HepatoxConsultation:
             )
         return "\n".join(lines).strip()
 
-    # -------------------------------------------------------------------------
     def describe_unresolved_entry(
         self,
         entry: DrugClinicalAssessment,
@@ -1093,35 +1025,6 @@ class HepatoxConsultation:
             return phrase("livertox_missing", report_language)
         return phrase("deterministic_section_unavailable", report_language)
 
-    # -------------------------------------------------------------------------
-    async def generate_conclusion(
-        self,
-        *,
-        clinical_context: str,
-        multi_drug_report: str,
-        report_language: str,
-    ) -> str | None:
-        return await self.report_finalizer.generate_conclusion(
-            clinical_context=clinical_context,
-            multi_drug_report=multi_drug_report,
-            report_language=report_language,
-        )
-
-    # -------------------------------------------------------------------------
-    async def generate_revision_conclusion(
-        self,
-        *,
-        clinical_context: str,
-        multi_drug_report: str,
-        report_language: str,
-    ) -> str | None:
-        return await self.report_finalizer.generate_revision_conclusion(
-            clinical_context=clinical_context,
-            multi_drug_report=multi_drug_report,
-            report_language=report_language,
-        )
-
-    # -------------------------------------------------------------------------
     def build_excluded_paragraph(
         self,
         entry: DrugClinicalAssessment,
@@ -1162,7 +1065,6 @@ class HepatoxConsultation:
         )
         return f"{detail} {recommendation}"
 
-    # -------------------------------------------------------------------------
     def build_missing_excerpt_paragraph(
         self,
         entry: DrugClinicalAssessment,
@@ -1171,7 +1073,6 @@ class HepatoxConsultation:
         _ = entry
         return phrase("livertox_missing", report_language)
 
-    # -------------------------------------------------------------------------
     def build_ambiguous_match_paragraph(
         self,
         entry: DrugClinicalAssessment,
@@ -1187,7 +1088,6 @@ class HepatoxConsultation:
         guidance = phrase("manual_curation", report_language)
         return f"{note} {details} {guidance}"
 
-    # -------------------------------------------------------------------------
     def build_error_paragraph(
         self,
         entry: DrugClinicalAssessment,
@@ -1196,71 +1096,3 @@ class HepatoxConsultation:
         _ = entry
         message = phrase("rucam_insufficient_data", report_language)
         return message
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def render_report_heading(title_key: str, language: str) -> str:
-        return f"## {report_heading(title_key, language)}"
-
-    # -------------------------------------------------------------------------
-    def render_drug_assessment_section(
-        self,
-        assessments: Sequence[DrugClinicalAssessment],
-        language: str,
-    ) -> str:
-        lines = [self.render_report_heading("drug_assessments", language), ""]
-        for assessment in assessments:
-            lines.append(
-                self.render_matched_drug_section(
-                    assessment,
-                    report_language=language,
-                )
-            )
-            lines.append("")
-        return "\n".join(lines).strip()
-
-    # -------------------------------------------------------------------------
-    def render_laboratory_section(
-        self,
-        lab_timeline: PatientLabTimeline | None,
-        language: str,
-    ) -> str:
-        lines = [self.render_report_heading("laboratory_history", language), ""]
-        if lab_timeline is None or not lab_timeline.entries:
-            lines.append(phrase("not_available", language))
-            return "\n".join(lines).strip()
-        for entry in lab_timeline.entries:
-            marker = entry.marker_name
-            value = (
-                entry.value if entry.value is not None else (entry.value_text or "?")
-            )
-            unit = entry.unit or ""
-            lines.append(f"- {marker}: {value} {unit}".strip())
-        return "\n".join(lines).strip()
-
-    # -------------------------------------------------------------------------
-    def render_bibliography_section(
-        self,
-        matches: Sequence[dict[str, Any]],
-        language: str,
-    ) -> str:
-        lines = [self.render_report_heading("bibliography", language), ""]
-        if not matches:
-            lines.append(phrase("not_available", language))
-            return "\n".join(lines).strip()
-        for match in matches:
-            name = str(
-                match.get("matched_livertox_name") or match.get("extracted_name") or ""
-            ).strip()
-            strategy = str(match.get("match_strategy") or "unknown").strip()
-            rxnav_validated = bool(match.get("rxnav_validated"))
-            status = "rxnav_validated" if rxnav_validated else "rxnav_unvalidated"
-            if name:
-                lines.append(f"- {name} ({strategy}, {status})")
-        if len(lines) == 2:
-            lines.append(phrase("not_available", language))
-        return "\n".join(lines).strip()
-
-    # -------------------------------------------------------------------------
-    def bibliography_source_label(self) -> str:
-        return ReportFinalizer.bibliography_source_label()

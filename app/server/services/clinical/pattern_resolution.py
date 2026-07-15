@@ -1,28 +1,10 @@
 from __future__ import annotations
 
-from typing import Literal
-
-from pydantic import BaseModel, Field
-
 from domain.clinical.entities import HepatotoxicityPatternScore, PipelineIssue
-
-PatternSource = Literal["provided", "calculated", "undetermined"]
-
-###############################################################################
-class HepaticPatternResolutionInput(BaseModel):
-    explicit_pattern: str | None = None
-    calculated_pattern: str | None = None
-    r_score: float | None = None
-
-###############################################################################
-class HepaticPatternResolutionResult(BaseModel):
-    explicit_value: str | None = None
-    calculated_value: str | None = None
-    final_value: str = "indeterminate"
-    source: PatternSource = "undetermined"
-    conflict: bool = False
-    r_score: float | None = None
-    warnings: list[PipelineIssue] = Field(default_factory=list)
+from domain.clinical.extractor_contracts import (
+    HepaticPatternResolutionInput,
+    HepaticPatternResolutionResult,
+)
 
 ###############################################################################
 def _normalize_pattern(value: str | None) -> str | None:
@@ -53,7 +35,7 @@ def resolve_hepatic_pattern(
         )
     if explicit:
         final_value = explicit
-        source: PatternSource = "provided"
+        source = "provided"
     elif calculated:
         final_value = calculated
         source = "calculated"

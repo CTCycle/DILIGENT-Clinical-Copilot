@@ -8,6 +8,7 @@ from services.llm.cloud import CloudLLMClient, LLMError
 from services.llm.ollama_client import OllamaClient
 
 from services.llm.provider_registry import provider_registry
+from domain.llm.providers import CloudProviderId
 
 RuntimePurpose = Literal["clinical", "parser"]
 
@@ -27,14 +28,15 @@ def select_llm_provider(
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
         )
+    provider_id: CloudProviderId | None
     try:
-        provider = provider_registry.get(p).provider_id
+        provider_id = provider_registry.get(p).provider_id
     except ValueError:
-        provider = None
-    if provider is not None:
+        provider_id = None
+    if provider_id is not None:
         runtime_timeout = get_server_settings().runtime.default_llm_timeout
         return CloudLLMClient(
-            provider=provider,
+            provider=provider_id,
             base_url=kwargs.get("base_url"),
             timeout_s=kwargs.get("timeout_s", runtime_timeout),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
@@ -42,7 +44,7 @@ def select_llm_provider(
             default_model=kwargs.get("default_model"),
             max_retries=kwargs.get("max_retries", 2),
         )
-    raise LLMError(f"Unknown or unsupported provider: {provider}")
+    raise LLMError(f"Unknown or unsupported provider: {p}")
 
 ###############################################################################
 def initialize_llm_client(

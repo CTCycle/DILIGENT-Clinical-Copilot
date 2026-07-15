@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from repositories.schemas.models import (
-    Base,
-    ClinicalSession,
+from repositories.schemas.base import Base
+from repositories.schemas.clinical import ClinicalSession
+from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
-    ReferenceCatalogEntry,
 )
+from repositories.schemas.configuration import ReferenceCatalogEntry
 from repositories.serialization.data import DataSerializer
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker

@@ -12,7 +12,7 @@ from domain.catalogs import (
     CatalogManifest,
     normalize_catalog_value,
 )
-from repositories.schemas.models import (
+from repositories.schemas.configuration import (
     ReferenceCatalogEntry,
     ReferenceCatalogManifest,
 )

@@ -39,8 +39,8 @@ from services.clinical.drug_deduplication import (
     deduplicate_detected_drugs,
 )
 from services.clinical.language import ClinicalLanguageDetector
+from domain.clinical.extractor_contracts import HepaticPatternResolutionInput
 from services.clinical.pattern_resolution import (
-    HepaticPatternResolutionInput,
     copy_pattern_score_with_resolution,
     resolve_hepatic_pattern,
 )
@@ -61,6 +61,7 @@ from services.session.robust_pipeline import (
     validate_fact_graph,
 )
 from services.session.session_shared import NarrativeBuilder, run_clinical_job
+from services.text.vocabulary import invalidate_text_normalization_snapshot
 from services.session.workflow_shared import (
     ClinicalPersistenceError,
     PROGRESS_SEQUENCE as _PROGRESS_SEQUENCE,
@@ -853,6 +854,11 @@ async def process_single_patient_workflow(
             },
         )
         if persisted_session_id is not None:
+            consume_signal = getattr(
+                service.serializer, "consume_vocabulary_change_signal", None
+            )
+            if callable(consume_signal) and consume_signal():
+                invalidate_text_normalization_snapshot()
             result_payload["session_id"] = persisted_session_id
             result_payload["run_bundle_index"] = build_run_bundle_index(
                 run_id=str(persisted_session_id),
