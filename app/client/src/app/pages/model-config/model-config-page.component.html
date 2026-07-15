@@ -429,6 +429,7 @@
     [provider]="openProviderModal() || 'openai'"
     [providerLabel]="resolveProviderLabel(openProviderModal() || 'openai')"
     (closed)="closeKeys()"
+    (keysChanged)="loadModelConfig(false, true)"
   ></app-access-key-modal>
 
   @if (ragSettingsModalOpen()) {
