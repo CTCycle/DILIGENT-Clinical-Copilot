@@ -54,6 +54,7 @@ export class AccessKeyModalComponent implements OnChanges {
   @Input() provider: AccessKeyProvider = 'openai';
   @Input() providerLabel = 'OpenAI';
   @Output() closed = new EventEmitter<void>();
+  @Output() keysChanged = new EventEmitter<void>();
 
   keys: AccessKeyRecord[] = [];
   isLoading = false;
@@ -127,6 +128,7 @@ export class AccessKeyModalComponent implements OnChanges {
       }
       this.newKeyValue = '';
       await this.loadKeys();
+      this.keysChanged.emit();
     } catch (error) {
       this.errorMessage = error instanceof Error ? error.message : 'Unable to add access key.';
     } finally {
@@ -146,6 +148,7 @@ export class AccessKeyModalComponent implements OnChanges {
         last_used_at: item.id === activated.id ? activated.last_used_at : item.last_used_at,
       }));
       this.changeDetectorRef.detectChanges();
+      this.keysChanged.emit();
     } catch (error) {
       this.errorMessage = error instanceof Error ? error.message : 'Unable to activate access key.';
     } finally {
@@ -163,6 +166,7 @@ export class AccessKeyModalComponent implements OnChanges {
       delete next[keyId];
       this.visibleRows = next;
       this.changeDetectorRef.detectChanges();
+      this.keysChanged.emit();
     } catch (error) {
       this.errorMessage = error instanceof Error ? error.message : 'Unable to delete access key.';
     } finally {
