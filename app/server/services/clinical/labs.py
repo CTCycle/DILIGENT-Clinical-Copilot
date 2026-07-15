@@ -7,8 +7,6 @@ from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
-
 from common.prompts.extraction import CLINICAL_LAB_EXTRACTION_PROMPT
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
@@ -20,7 +18,11 @@ from domain.clinical.entities import (
     PatientLabTimeline,
 )
 from domain.clinical.extras import LabExtractionPayload
+from domain.clinical.extractor_contracts import (
+    LocalLabExtractionPayload,
+)
 from services.catalogs.runtime import get_reference_catalog_snapshot
+from services.clinical.lab_normalization import get_marker_aliases
 from services.clinical.extraction_strategy import decide_extraction_strategy
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
@@ -46,46 +48,6 @@ RELATIVE_TIME_VALUE_PREFIX_RE = re.compile(
 SINGLE_VALUE_MARKERS = frozenset({"CR", "EGFR", "INR", "ALB"})
 
 ###############################################################################
-class LocalLabEntryDraft(BaseModel):
-    marker_name: str = Field(..., min_length=1, max_length=40)
-    value_text: str | float | int | None = Field(default=None)
-    unit: str | None = Field(default=None, max_length=50)
-    sample_date: str | None = Field(default=None, max_length=120)
-    evidence: str | None = Field(default=None, max_length=500)
-
-###############################################################################
-class LocalOnsetContextDraft(BaseModel):
-    onset_date: str | None = Field(default=None, max_length=120)
-    onset_basis: str | None = Field(default=None, max_length=200)
-    evidence: str | None = Field(default=None, max_length=500)
-
-###############################################################################
-class LocalLabExtractionPayload(BaseModel):
-    entries: list[LocalLabEntryDraft] = Field(default_factory=list)
-    onset_context: LocalOnsetContextDraft | None = Field(default=None)
-
-###############################################################################
-def _load_marker_aliases() -> dict[str, tuple[str, ...]]:
-    snapshot = get_reference_catalog_snapshot()
-    entries = snapshot.entries("clinical_extraction", "laboratory_markers")
-    by_key: dict[str, list[str]] = {}
-    for entry in entries:
-        by_key.setdefault(entry.key.upper(), []).append(entry.value.casefold())
-    if by_key:
-        return {key: tuple(dict.fromkeys(values)) for key, values in by_key.items()}
-    return {
-        "ALT": ("alt", "alat", "gpt"),
-        "AST": ("ast", "asat", "got"),
-        "ALP": ("alp", "alkp", "alkaline phosphatase"),
-        "TBIL": ("tbil", "total bilirubin", "bilirubin total", "bilirubin"),
-        "DBIL": ("dbil", "direct bilirubin", "bilirubin direct"),
-        "GGT": ("ggt", "gamma gt", "gamma-glutamyl transferase"),
-        "INR": ("inr",),
-        "ALB": ("albumin", "alb"),
-    }
-
-
-MARKER_ALIASES: dict[str, tuple[str, ...]] = _load_marker_aliases()
 HEPATIC_PATTERN_RE = re.compile(
     r"\b(?:hepatic\s+pattern|injury\s+pattern|pattern)\s*[:=]?\s*(hepatocellular|cholestatic|mixed|indeterminate)\b",
     re.IGNORECASE,
@@ -424,7 +386,7 @@ class ClinicalLabExtractor:
         matches: list[tuple[str, str, int]] = []
         occupied: list[range] = []
         alias_items: list[tuple[str, str]] = []
-        for canonical, aliases in MARKER_ALIASES.items():
+        for canonical, aliases in get_marker_aliases().items():
             for alias in aliases:
                 alias_items.append((canonical, alias.casefold()))
         for canonical, alias in sorted(
@@ -525,7 +487,7 @@ class ClinicalLabExtractor:
         text = normalize_lab_marker(
             text, get_text_normalization_snapshot().lab_marker_aliases
         ).lower()
-        for canonical, aliases in MARKER_ALIASES.items():
+        for canonical, aliases in get_marker_aliases().items():
             if text == canonical.lower():
                 return canonical
             for alias in aliases:

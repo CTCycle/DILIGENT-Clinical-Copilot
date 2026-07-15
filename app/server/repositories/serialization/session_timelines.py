@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy import select
 
 from domain.patient_timeline import PatientTimeline, SessionTimelinePreview
-from repositories.schemas.models import (
+from repositories.schemas.clinical import (
     ClinicalSession,
     ClinicalSessionResult,
     ClinicalSessionSection,

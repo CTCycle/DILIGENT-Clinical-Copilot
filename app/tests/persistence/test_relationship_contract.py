@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-from repositories.schemas.models import (
+from repositories.schemas.clinical import (
     ClinicalDrugMention,
     ClinicalLabObservation,
     ClinicalSession,
     ClinicalSessionVersion,
+)
+from repositories.schemas.knowledge import (
     Drug,
     DrugIdentifier,
 )

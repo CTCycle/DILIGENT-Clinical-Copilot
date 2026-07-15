@@ -23,7 +23,7 @@ from repositories.database.utils import (
     normalize_postgres_engine,
     validate_postgres_database_name,
 )
-from repositories.schemas.models import Base
+from repositories.schemas.base import Base
 from repositories.serialization.catalogs import (
     ReferenceCatalogSerializer,
 )

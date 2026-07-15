@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime
-from typing import Literal
+from typing import Literal, cast
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from domain.model_configs import ModelConfigSnapshot
 from repositories.database.session import resolve_engine, resolve_session_factory
-from repositories.schemas.models import ApplicationConfiguration
+from repositories.schemas.configuration import ApplicationConfiguration
 from repositories.serialization.application_configuration import (
     ApplicationConfigurationSerializer,
 )
@@ -143,7 +143,7 @@ class ModelConfigSerializer:
                 payload.get("ollama_seed", cls.DEFAULT_OLLAMA_SEED)
             ),
             rag_settings=(
-                payload.get("rag_settings")
+                cast(dict[str, object], payload["rag_settings"])
                 if isinstance(payload.get("rag_settings"), dict)
                 else {}
             ),
@@ -162,7 +162,7 @@ class ModelConfigSerializer:
     @staticmethod
     def normalize_temperature(value: object) -> float:
         try:
-            return max(0.0, min(2.0, float(value)))
+            return max(0.0, min(2.0, float(str(value))))
         except (TypeError, ValueError):
             return 0.7
 

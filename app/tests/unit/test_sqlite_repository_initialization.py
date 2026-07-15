@@ -7,8 +7,8 @@ from pathlib import Path
 
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.sqlite import SQLiteRepository
-from repositories.schemas.models import (
-    Base,
+from repositories.schemas.base import Base
+from repositories.schemas.configuration import (
     ApplicationConfiguration,
     ReferenceCatalogEntry,
 )
@@ -90,4 +90,3 @@ def test_sqlite_repository_does_not_seed_catalogs_during_construction(
     finally:
         engine.dispose()
         shutil.rmtree(temp_root, ignore_errors=True)
-

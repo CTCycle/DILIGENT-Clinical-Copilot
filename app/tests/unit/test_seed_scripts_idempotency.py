@@ -4,14 +4,14 @@ from typing import Any
 
 import pandas as pd
 import pytest
-from repositories.schemas.models import (
-    Base,
+from repositories.schemas.base import Base
+from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
     DrugRxnormCode,
     LiverToxMonograph,
-    ReferenceCatalogEntry,
 )
+from repositories.schemas.configuration import ReferenceCatalogEntry
 from repositories.serialization.data import DataSerializer
 from services.text.vocabulary import record_text_normalization_observation
 from services.updater import livertox_index

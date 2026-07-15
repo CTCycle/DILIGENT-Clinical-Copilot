@@ -8,6 +8,7 @@ from services.llm.transports.anthropic_messages import AnthropicMessagesTranspor
 from services.llm.transports.base import (
     ChatRequest,
     ChatResult,
+    CloudTransport,
     ConnectivityResult,
     StructuredTransportMixin,
 )
@@ -28,7 +29,7 @@ class RoutedGatewayTransport(StructuredTransportMixin):
         self.models_path = models_path
         self.timeout = timeout
         self._models: dict[str, CloudModelDescriptor] = {}
-        self._transports: list[object] = []
+        self._transports: list[CloudTransport] = []
 
     # -------------------------------------------------------------------------
     async def list_models(self) -> list[CloudModelDescriptor]:

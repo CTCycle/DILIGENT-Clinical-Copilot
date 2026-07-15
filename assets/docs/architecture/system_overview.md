@@ -1,5 +1,5 @@
 # System Overview
-Last updated: 2026-07-11
+Last updated: 2026-07-14
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
@@ -33,6 +33,10 @@ Maintained source-level structure, with build and cache artifacts omitted:
 |   |   |-- configurations/
 |   |   |-- domain/
 |   |   |-- repositories/
+|   |   |   |-- schemas/clinical.py
+|   |   |   |-- schemas/knowledge.py
+|   |   |   |-- schemas/security.py
+|   |   |   `-- schemas/configuration.py
 |   |   |-- services/
 |   |   |-- common/
 |   |   |   |-- catalogs/
@@ -69,3 +73,5 @@ Maintained source-level structure, with build and cache artifacts omitted:
 - Frontend routing: `app/client/src/app/app.routes.ts`
   - Current routes: `/`, `/clinical-sessions`, `/data`, `/model-config`, `/sessions/:sessionId/timetable`.
 - Windows launcher and maintenance entry point: `start_on_windows.ps1`.
+
+Backend ownership is explicit: API endpoints call services, services orchestrate domain contracts, and repositories own persistence. The local database is recreated with `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs` when a clean schema cutover is required.

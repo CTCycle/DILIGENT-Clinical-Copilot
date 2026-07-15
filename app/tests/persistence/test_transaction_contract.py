@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-from repositories.schemas.models import ApplicationConfiguration
+from repositories.schemas.configuration import ApplicationConfiguration
 
 
 ###############################################################################

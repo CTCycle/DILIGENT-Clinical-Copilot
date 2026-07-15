@@ -5,10 +5,10 @@ from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
-from repositories.schemas.models import (
-    Base,
+from repositories.schemas.base import Base
+from repositories.schemas.clinical import (
+    ClinicalLabObservation,
     ClinicalSession,
-    ClinicalSessionLab,
     ClinicalSessionResult,
 )
 from repositories.serialization.data import DataSerializer
@@ -122,7 +122,7 @@ def test_save_clinical_session_persists_raw_result_payload() -> None:
     assert json.loads(result_row.payload_json) == raw_payload
 
 ###############################################################################
-def test_save_clinical_session_deduplicates_labs_per_marker() -> None:
+def test_save_clinical_session_persists_each_lab_observation() -> None:
     serializer, engine = build_serializer()
     serializer.save_clinical_session(
         {
@@ -157,14 +157,14 @@ def test_save_clinical_session_deduplicates_labs_per_marker() -> None:
     with factory() as db_session:
         labs = (
             db_session.execute(
-                select(ClinicalSessionLab).order_by(ClinicalSessionLab.lab_code)
+                select(ClinicalLabObservation).order_by(ClinicalLabObservation.source_ordinal)
             )
             .scalars()
             .all()
         )
 
-    assert len(labs) == 2
-    assert [row.lab_code for row in labs] == ["alt", "ast"]
+    assert len(labs) == 3
+    assert [row.marker_code for row in labs] == ["alt", "alt", "ast"]
 
 ###############################################################################
 def test_livertox_data_keeps_internal_dataframe_copies_isolated() -> None:

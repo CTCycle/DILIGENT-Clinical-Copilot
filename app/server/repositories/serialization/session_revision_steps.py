@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy import func, select, update
 
-from repositories.schemas.models import (
+from repositories.schemas.clinical import (
     ClinicalSessionRevisionReview,
     ClinicalSessionRevisionRun,
     ClinicalSessionRevisionStep,

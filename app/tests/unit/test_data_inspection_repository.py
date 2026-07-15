@@ -8,10 +8,9 @@ from domain.patient_timeline import (
     PatientTimeline,
     PatientTimelineEvent,
 )
-from repositories.schemas.models import (
-    Base,
-    ClinicalSession,
-    ClinicalSessionDrug,
+from repositories.schemas.base import Base
+from repositories.schemas.clinical import ClinicalDrugMention, ClinicalSession
+from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
     DrugRxnormCode,
@@ -250,11 +249,13 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
         db_session.add(clinical_session)
         db_session.flush()
         db_session.add(
-            ClinicalSessionDrug(
+            ClinicalDrugMention(
                 session_id=int(clinical_session.id),
-                raw_drug_name="Acetaminophen",
-                raw_drug_name_norm="acetaminophen",
+                mention_ordinal=0,
+                raw_name="Acetaminophen",
+                normalized_name="acetaminophen",
                 drug_id=int(drug.id),
+                match_status="matched",
             )
         )
         db_session.commit()
@@ -292,9 +293,9 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
         assert db_session.execute(select(DrugRxnormCode)).scalars().all() == []
         assert db_session.execute(select(LiverToxMonograph)).scalars().all() == []
         assert db_session.execute(select(KbMatchCache)).scalars().all() == []
-        session_drugs = db_session.execute(select(ClinicalSessionDrug)).scalars().all()
-        assert len(session_drugs) == 1
-        assert session_drugs[0].drug_id is None
+        mentions = db_session.execute(select(ClinicalDrugMention)).scalars().all()
+        assert len(mentions) == 1
+        assert mentions[0].drug_id is None
 
 ###############################################################################
 def test_update_job_lifecycle_with_cooperative_cancel() -> None:

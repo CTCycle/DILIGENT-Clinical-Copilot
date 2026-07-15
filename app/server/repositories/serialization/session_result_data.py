@@ -13,21 +13,16 @@ from sqlalchemy.orm import Session
 
 from common.utils.logger import logger
 from common.utils.text_utils import normalize_drug_name
-from repositories.schemas.models import (
+from repositories.schemas.clinical import (
     ClinicalDrugMention,
     ClinicalLabObservation,
     ClinicalSession,
-    ClinicalSessionDrug,
-    ClinicalSessionLab,
     ClinicalSessionResult,
     ClinicalSessionTimeline,
     ClinicalSessionSection,
     ClinicalSessionVersion,
 )
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
-from services.text.vocabulary import (
-    invalidate_text_normalization_snapshot,
-)
 
 ###############################################################################
 def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
@@ -90,9 +85,14 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
             )
         self.persist_session_sections(db_session, session_id, session_data)
         self.persist_session_labs(db_session, session_id, session_data)
-        self.persist_session_drugs(db_session, session_id, session_data)
+        vocabulary_changed = self.persist_session_drugs(
+            db_session, session_id, session_data
+        )
         self.persist_session_result_payload(db_session, session_id, session_data)
         db_session.commit()
+        self._vocabulary_changed = bool(
+            getattr(self, "_vocabulary_changed", False) or vocabulary_changed
+        )
         return session_id
     except Exception:
         db_session.rollback()
@@ -609,9 +609,7 @@ def persist_session_labs(
         "INR": "inr",
         "ALB": "albumin",
     }
-    # Preserve every measurement in the canonical observation table. The
-    # legacy summary table remains populated for the current inspection API.
-    rows_by_lab_code: dict[str, tuple[str | None, str | None]] = {}
+    # Preserve every measurement in the canonical observation table.
     for ordinal, item in enumerate(timeline_raw):
         if not isinstance(item, dict):
             continue
@@ -650,26 +648,11 @@ def persist_session_labs(
                 },
             )
         )
-        existing_value_raw, existing_upper_limit_raw = rows_by_lab_code.get(
-            lab_code, (None, None)
-        )
-        merged_value_raw = existing_value_raw or value_raw
-        merged_upper_limit_raw = existing_upper_limit_raw or upper_limit_raw
-        rows_by_lab_code[lab_code] = (merged_value_raw, merged_upper_limit_raw)
-    for lab_code, (value_raw, upper_limit_raw) in rows_by_lab_code.items():
-        db_session.add(
-            ClinicalSessionLab(
-                session_id=session_id,
-                lab_code=lab_code,
-                value_raw=value_raw,
-                upper_limit_raw=upper_limit_raw,
-            )
-        )
 
 ###############################################################################
 def persist_session_drugs(
     self, db_session: Session, session_id: int, session_data: dict[str, Any]
-) -> None:
+) -> bool:
     payload = session_data.get("matched_drugs")
     records: list[dict[str, Any]] = []
     if isinstance(payload, list):
@@ -771,22 +754,6 @@ def persist_session_drugs(
             )
             vocabulary_changed = True
         notes = item.get("match_notes")
-        if isinstance(notes, (list, dict)):
-            notes_value = json.dumps(notes, ensure_ascii=False)
-        else:
-            notes_value = self.normalize_string(notes)
-        if not duplicate_mention:
-            db_session.add(
-                ClinicalSessionDrug(
-                    session_id=session_id,
-                    raw_drug_name=raw_drug_name,
-                    raw_drug_name_norm=raw_drug_name_norm,
-                    drug_id=resolved_drug_id,
-                    match_confidence=match_confidence,
-                    match_reason=match_reason,
-                    match_notes=notes_value,
-                )
-            )
         self.upsert_high_confidence_kb_match_cache(
             db_session,
             raw_drug_name=raw_drug_name,
@@ -805,8 +772,7 @@ def persist_session_drugs(
             },
             ambiguous=bool(item.get("ambiguous_match")),
         )
-    if vocabulary_changed:
-        invalidate_text_normalization_snapshot()
+    return vocabulary_changed
 
 ###############################################################################
 def persist_session_result_payload(

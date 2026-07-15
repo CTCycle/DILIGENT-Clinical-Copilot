@@ -23,7 +23,7 @@ from repositories.database.session import (
     resolve_session_factory,
 )
 from repositories.queries.access_keys import AccessKeyRepositoryQueries
-from repositories.schemas.models import AccessKey
+from repositories.schemas.security import AccessKey
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )

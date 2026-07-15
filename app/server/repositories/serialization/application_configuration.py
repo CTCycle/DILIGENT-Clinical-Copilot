@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 from repositories.database.session import resolve_engine, resolve_session_factory, unit_of_work
 from repositories.database.upsert import upsert_application_configuration
-from repositories.schemas.models import ApplicationConfiguration
+from repositories.schemas.configuration import ApplicationConfiguration
 
 
 ###############################################################################
