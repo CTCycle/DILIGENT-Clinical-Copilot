@@ -26,7 +26,7 @@ class UtcDateTime(TypeDecorator[datetime]):
 
     # -------------------------------------------------------------------------
     def process_bind_param(
-        self, value: datetime | None, _dialect: Any
+        self, value: datetime | None, dialect: Any
     ) -> datetime | None:
         if value is None:
             return None
@@ -36,7 +36,7 @@ class UtcDateTime(TypeDecorator[datetime]):
 
     # -------------------------------------------------------------------------
     def process_result_value(
-        self, value: datetime | None, _dialect: Any
+        self, value: datetime | None, dialect: Any
     ) -> datetime | None:
         if value is None:
             return None

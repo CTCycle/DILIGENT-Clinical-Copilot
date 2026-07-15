@@ -16,10 +16,11 @@ from common.constants import (
 from common.utils.text_utils import coerce_text, normalize_drug_name
 from configurations.startup import get_server_settings
 from repositories.database.upsert import (
+    dialect_insert,
     upsert_drug_aliases,
     upsert_drug_rxnorm_codes,
 )
-from repositories.schemas.models import Drug, DrugRxnormCode
+from repositories.schemas.knowledge import Drug, DrugRxnormCode
 
 ###############################################################################
 def upsert_drugs_catalog_records(
@@ -87,14 +88,7 @@ def _build_drug_values(
 def _upsert_drug_values(db_session, values: list[dict[str, Any]]) -> None:
     if not values:
         return
-    dialect = db_session.get_bind().dialect.name
-    if dialect == "sqlite":
-        from sqlalchemy.dialects.sqlite import insert
-    elif dialect == "postgresql":
-        from sqlalchemy.dialects.postgresql import insert
-    else:
-        raise ValueError(f"Unsupported upsert dialect: {dialect}")
-    statement = insert(Drug).values(values)
+    statement = dialect_insert(db_session, Drug).values(values)
     statement = statement.on_conflict_do_update(
         index_elements=[Drug.canonical_name_norm],
         set_={

@@ -1,37 +1,619 @@
-"""Canonical clinical schema imports.
+from __future__ import annotations
 
-The concrete mappings remain in ``models`` during the clean-break migration;
-new repository code should import clinical records from this module.
-"""
+from datetime import date, datetime
+from typing import Any
 
-from repositories.schemas.models import (
-    ClinicalDrugMention,
-    ClinicalLabObservation,
-    ClinicalSession,
-    ClinicalSessionDrug,
-    ClinicalSessionLab,
-    ClinicalSessionResult,
-    ClinicalSessionRevisionArtifact,
-    ClinicalSessionRevisionReview,
-    ClinicalSessionRevisionRun,
-    ClinicalSessionRevisionStep,
-    ClinicalSessionSection,
-    ClinicalSessionTimeline,
-    ClinicalSessionVersion,
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
 )
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-__all__ = [
-    "ClinicalSession",
-    "ClinicalDrugMention",
-    "ClinicalLabObservation",
-    "ClinicalSessionDrug",
-    "ClinicalSessionLab",
-    "ClinicalSessionResult",
-    "ClinicalSessionRevisionArtifact",
-    "ClinicalSessionRevisionReview",
-    "ClinicalSessionRevisionRun",
-    "ClinicalSessionRevisionStep",
-    "ClinicalSessionSection",
-    "ClinicalSessionTimeline",
-    "ClinicalSessionVersion",
-]
+from repositories.schemas.base import Base
+
+DRUGS_ID_FK = "drugs.id"
+CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
+ACTIVE_SQLITE_WHERE = "is_active = 1"
+ACTIVE_POSTGRESQL_WHERE = "is_active = true"
+
+class ClinicalSession(Base):
+    __tablename__ = "clinical_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    patient_name: Mapped[str | None] = mapped_column(String)
+    visit_date: Mapped[date | None] = mapped_column(Date)
+    anamnesis: Mapped[str | None] = mapped_column(Text)
+    drugs_text: Mapped[str | None] = mapped_column(Text)
+    laboratory_analysis: Mapped[str | None] = mapped_column(Text)
+    patient_image_blob: Mapped[bytes | None] = mapped_column(LargeBinary)
+    session_timestamp: Mapped[datetime | None] = mapped_column(DateTime)
+    hepatic_pattern: Mapped[str | None] = mapped_column(String)
+    text_extraction_model: Mapped[str | None] = mapped_column(String)
+    clinical_model: Mapped[str | None] = mapped_column(String)
+    total_duration: Mapped[float | None] = mapped_column(Float)
+    session_status: Mapped[str | None] = mapped_column(String, nullable=True)
+    session_kind: Mapped[str | None] = mapped_column(String, nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    sections: Mapped[list["ClinicalSessionSection"]] = relationship(
+        "ClinicalSessionSection",
+        back_populates="session",
+        passive_deletes=True,
+    )
+
+    result_payload: Mapped["ClinicalSessionResult | None"] = relationship(
+        "ClinicalSessionResult",
+        back_populates="session",
+        uselist=False,
+        passive_deletes=True,
+    )
+    timelines: Mapped[list["ClinicalSessionTimeline"]] = relationship(
+        "ClinicalSessionTimeline",
+        back_populates="session",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (
+        Index("ix_clinical_sessions_patient_name", "patient_name"),
+        Index("ix_clinical_sessions_timestamp", "session_timestamp"),
+        Index("ix_clinical_sessions_status", "session_status"),
+        Index(
+            "ix_clinical_sessions_status_timestamp_id",
+            "session_status",
+            "session_timestamp",
+            "id",
+        ),
+        Index("ix_clinical_sessions_timestamp_id", "session_timestamp", "id"),
+    )
+
+###############################################################################
+
+class ClinicalSessionResult(Base):
+    __tablename__ = "clinical_session_results"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+
+    session: Mapped["ClinicalSession"] = relationship(
+        "ClinicalSession",
+        back_populates="result_payload",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("session_id", name="uq_clinical_session_results_session_id"),
+        Index("ix_clinical_session_results_session_id", "session_id"),
+    )
+
+###############################################################################
+
+class ClinicalSessionTimeline(Base):
+    __tablename__ = "clinical_session_timelines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    generated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    generation_status: Mapped[str] = mapped_column(String, nullable=False)
+    generation_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_kind: Mapped[str | None] = mapped_column(String, nullable=True)
+    model_provider: Mapped[str | None] = mapped_column(String, nullable=True)
+    timeline_payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+
+    session: Mapped["ClinicalSession"] = relationship(
+        "ClinicalSession",
+        back_populates="timelines",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "generation_status IN ('llm_generated', 'fallback')",
+            name="ck_clinical_session_timelines_generation_status",
+        ),
+        CheckConstraint(
+            "source_kind IS NULL OR source_kind IN ('local', 'cloud')",
+            name="ck_clinical_session_timelines_source_kind",
+        ),
+        Index("ix_clinical_session_timelines_session_id", "session_id"),
+        Index("ix_clinical_session_timelines_generated_at", "generated_at"),
+    )
+
+###############################################################################
+
+class ClinicalSessionVersion(Base):
+    __tablename__ = "clinical_session_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=True,
+    )
+    root_session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_version_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("clinical_session_versions.id"),
+        nullable=True,
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    version_status: Mapped[str] = mapped_column(String, nullable=False)
+    revision_kind: Mapped[str] = mapped_column(String, nullable=False)
+    llm_qa_status: Mapped[str] = mapped_column(String, nullable=False)
+    clinical_review_status: Mapped[str] = mapped_column(String, nullable=False)
+    pipeline_run_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    model_configuration_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    report_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hepatic_pattern: Mapped[str | None] = mapped_column(String, nullable=True)
+    total_duration: Mapped[float | None] = mapped_column(Float, nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    session: Mapped["ClinicalSession | None"] = relationship(
+        "ClinicalSession",
+        foreign_keys=[session_id],
+    )
+    root_session: Mapped["ClinicalSession"] = relationship(
+        "ClinicalSession",
+        foreign_keys=[root_session_id],
+    )
+    source_version: Mapped["ClinicalSessionVersion | None"] = relationship(
+        "ClinicalSessionVersion",
+        remote_side=[id],
+        foreign_keys=[source_version_id],
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "version_status IN ('current', 'superseded', 'draft_revision', 'pending_qa', 'qa_failed', 'requires_human_review', 'llm_qa_passed', 'human_approved', 'human_rejected')",
+            name="ck_clinical_session_versions_version_status",
+        ),
+        CheckConstraint(
+            "revision_kind IN ('original', 'manual_edit', 'llm_assisted_revision')",
+            name="ck_clinical_session_versions_revision_kind",
+        ),
+        CheckConstraint(
+            "llm_qa_status IN ('not_run', 'pending', 'passed', 'passed_with_warnings', 'failed', 'requires_human_review')",
+            name="ck_clinical_session_versions_llm_qa_status",
+        ),
+        CheckConstraint(
+            "clinical_review_status IN ('not_reviewed', 'under_review', 'approved_by_human', 'rejected_by_human')",
+            name="ck_clinical_session_versions_clinical_review_status",
+        ),
+        UniqueConstraint(
+            "session_id",
+            "version_number",
+            name="uq_clinical_session_versions_session_version_number",
+        ),
+        UniqueConstraint(
+            "root_session_id",
+            "version_number",
+            name="uq_clinical_session_versions_root_version_number",
+        ),
+        Index("ix_clinical_session_versions_root_session_id", "root_session_id"),
+        Index("ix_clinical_session_versions_source_version_id", "source_version_id"),
+        Index("ix_clinical_session_versions_session_id", "session_id"),
+        Index("ix_clinical_session_versions_pipeline_run_id", "pipeline_run_id"),
+        Index("ix_clinical_session_versions_status", "version_status"),
+    )
+
+###############################################################################
+
+class ClinicalSessionRevisionRun(Base):
+    __tablename__ = "clinical_session_revision_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pipeline_run_id: Mapped[str] = mapped_column(String, nullable=False)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    root_session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_version_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("clinical_session_versions.id"),
+        nullable=False,
+    )
+    target_revision_version_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("clinical_session_versions.id"),
+        nullable=True,
+    )
+    revision_mode: Mapped[str] = mapped_column(String, nullable=False)
+    revision_kind: Mapped[str] = mapped_column(String, nullable=False)
+    configuration_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    initiated_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    actor_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    actor_display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    actor_source: Mapped[str] = mapped_column(String, nullable=False)
+    actor_confidence: Mapped[str] = mapped_column(String, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    error_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_usage_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cost_estimate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "revision_kind IN ('original', 'manual_edit', 'llm_assisted_revision')",
+            name="ck_clinical_session_revision_runs_revision_kind",
+        ),
+        CheckConstraint(
+            "actor_source IN ('authenticated_user', 'local_profile', 'manual_entry', 'system', 'unknown')",
+            name="ck_clinical_session_revision_runs_actor_source",
+        ),
+        CheckConstraint(
+            "actor_confidence IN ('verified', 'unverified', 'system')",
+            name="ck_clinical_session_revision_runs_actor_confidence",
+        ),
+        UniqueConstraint(
+            "pipeline_run_id",
+            name="uq_clinical_session_revision_runs_pipeline_run_id",
+        ),
+        Index("ix_clinical_session_revision_runs_session_id", "session_id"),
+        Index("ix_clinical_session_revision_runs_root_session_id", "root_session_id"),
+        Index(
+            "ix_clinical_session_revision_runs_source_version_id",
+            "source_version_id",
+        ),
+        Index(
+            "ix_clinical_session_revision_runs_target_revision_version_id",
+            "target_revision_version_id",
+        ),
+        Index("ix_clinical_session_revision_runs_status", "status"),
+        Index("ix_clinical_session_revision_runs_started_at", "started_at"),
+    )
+
+###############################################################################
+
+class ClinicalSessionRevisionReview(Base):
+    __tablename__ = "clinical_session_revision_reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    revision_version_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("clinical_session_versions.id"),
+        nullable=False,
+    )
+    session_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="SET NULL"),
+        nullable=True,
+    )
+    clinical_review_status: Mapped[str] = mapped_column(String, nullable=False)
+    reviewer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    actor_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    actor_display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    actor_source: Mapped[str] = mapped_column(String, nullable=False)
+    actor_confidence: Mapped[str] = mapped_column(String, nullable=False)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "clinical_review_status IN ('under_review', 'approved_by_human', 'rejected_by_human')",
+            name="ck_clinical_session_revision_reviews_clinical_review_status",
+        ),
+        CheckConstraint(
+            "actor_source IN ('authenticated_user', 'local_profile', 'manual_entry', 'system', 'unknown')",
+            name="ck_clinical_session_revision_reviews_actor_source",
+        ),
+        CheckConstraint(
+            "actor_confidence IN ('verified', 'unverified', 'system')",
+            name="ck_clinical_session_revision_reviews_actor_confidence",
+        ),
+        Index(
+            "ix_clinical_session_revision_reviews_revision_version_id",
+            "revision_version_id",
+        ),
+        Index("ix_clinical_session_revision_reviews_session_id", "session_id"),
+        Index("ix_clinical_session_revision_reviews_reviewed_at", "reviewed_at"),
+    )
+
+###############################################################################
+
+class ClinicalSessionRevisionStep(Base):
+    __tablename__ = "clinical_session_revision_steps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    revision_run_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("clinical_session_revision_runs.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    pipeline_run_id: Mapped[str] = mapped_column(String, nullable=False)
+    step_name: Mapped[str] = mapped_column(String, nullable=False)
+    step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    step_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    input_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    output_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    input_summary_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_summary_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    schema_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    schema_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    parser_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    model_provider: Mapped[str | None] = mapped_column(String, nullable=True)
+    model_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    token_usage_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    retry_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    error_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "pipeline_run_id",
+            "step_name",
+            "attempt_number",
+            name="uq_clinical_session_revision_steps_run_step_attempt",
+        ),
+        Index("ix_clinical_session_revision_steps_pipeline_run_id", "pipeline_run_id"),
+        Index("ix_clinical_session_revision_steps_step_name", "step_name"),
+        Index("ix_clinical_session_revision_steps_status", "status"),
+    )
+
+###############################################################################
+
+class ClinicalSessionRevisionArtifact(Base):
+    __tablename__ = "clinical_session_revision_artifacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    revision_run_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("clinical_session_revision_runs.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    revision_version_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("clinical_session_versions.id"),
+        nullable=False,
+    )
+    pipeline_run_id: Mapped[str] = mapped_column(String, nullable=False)
+    artifact_kind: Mapped[str] = mapped_column(String, nullable=False)
+    artifact_key: Mapped[str] = mapped_column(String, nullable=False)
+    entity_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    entity_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str | None] = mapped_column(String, nullable=True)
+    schema_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "artifact_kind IN ('structured_case_entity', 'llm_qa_output', 'report_comparison', 'pipeline_artifact')",
+            name="ck_clinical_session_revision_artifacts_artifact_kind",
+        ),
+        Index(
+            "ix_clinical_session_revision_artifacts_revision_version_id",
+            "revision_version_id",
+        ),
+        Index(
+            "ix_clinical_session_revision_artifacts_pipeline_run_id",
+            "pipeline_run_id",
+        ),
+        Index(
+            "ix_clinical_session_revision_artifacts_artifact_kind",
+            "artifact_kind",
+        ),
+        Index(
+            "ix_clinical_session_revision_artifacts_entity_type",
+            "entity_type",
+        ),
+    )
+
+###############################################################################
+
+class ClinicalSessionSection(Base):
+    __tablename__ = "clinical_session_sections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    section_kind: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+
+    session: Mapped["ClinicalSession"] = relationship(
+        "ClinicalSession",
+        back_populates="sections",
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "section_kind",
+            name="uq_clinical_session_sections_identity",
+        ),
+        Index("ix_clinical_session_sections_session_id", "session_id"),
+    )
+
+###############################################################################
+
+class ClinicalLabObservation(Base):
+    __tablename__ = "clinical_lab_observations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    marker_code: Mapped[str] = mapped_column(String, nullable=False)
+    observation_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    value_numeric: Mapped[float | None] = mapped_column(Float, nullable=True)
+    value_text: Mapped[str | None] = mapped_column(String, nullable=True)
+    unit: Mapped[str | None] = mapped_column(String, nullable=True)
+    upper_limit_numeric: Mapped[float | None] = mapped_column(Float, nullable=True)
+    source_ordinal: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_clinical_lab_observations_session_marker",
+            "session_id",
+            "marker_code",
+        ),
+        Index("ix_clinical_lab_observations_observation_at", "observation_at"),
+    )
+
+###############################################################################
+
+class ClinicalDrugMention(Base):
+    __tablename__ = "clinical_drug_mentions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    mention_ordinal: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_name: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String, nullable=False)
+    drug_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey(DRUGS_ID_FK, ondelete="SET NULL"),
+        nullable=True,
+    )
+    match_status: Mapped[str] = mapped_column(String, nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    match_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    evidence_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "mention_ordinal",
+            name="uq_clinical_drug_mentions_session_ordinal",
+        ),
+        Index("ix_clinical_drug_mentions_session_id", "session_id"),
+        Index("ix_clinical_drug_mentions_normalized_name", "normalized_name"),
+    )

@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from sqlalchemy import create_engine
 
 from domain.inspection import RevisionIssueScanResult, SessionRevisionRequest
-from repositories.schemas.models import Base
+from repositories.schemas.base import Base
 from repositories.serialization.data import DataSerializer
 from services.inspection.revision_agent import (
     RevisionAgentRunner,

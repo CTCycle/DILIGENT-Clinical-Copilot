@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import Select, select
 
-from repositories.schemas.models import (
+from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
     DrugRxnormCode,

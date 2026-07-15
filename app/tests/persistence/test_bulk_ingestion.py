@@ -5,7 +5,7 @@ from collections import Counter
 import pandas as pd
 from sqlalchemy import event, select
 
-from repositories.schemas.models import Drug, DrugAlias, DrugRxnormCode, LiverToxMonograph
+from repositories.schemas.knowledge import Drug, DrugAlias, DrugRxnormCode, LiverToxMonograph
 from repositories.serialization.data import DataSerializer
 
 

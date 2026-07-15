@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -26,10 +26,12 @@ Last updated: 2026-07-10
   - Drug resolution decision schemas live in `app/server/domain/clinical/drug_resolution.py`.
   - Clinical claim envelopes live in `app/server/domain/clinical/claims.py` and are attached to per-drug DILI assessments for source and limitation review.
   - Deterministic DILI adjudication contracts live in `app/server/domain/clinical/dili.py`, including timeline events, Hy's Law state, componentized RUCAM, DILIN-like causality, and acceptance-question evidence payloads.
+  - Extractor and hepatic-pattern request/result contracts live in `app/server/domain/clinical/extractor_contracts.py`.
 - Runtime state: `app/server/services/runtime/state.py`
   - Internal job state only. It is not a public domain contract and must not be imported by endpoints.
 - Repository layer: `app/server/repositories/*`
   - Owns SQL persistence, serialization, and vector store access.
+  - ORM ownership is split across `repositories/schemas/clinical.py`, `knowledge.py`, `security.py`, and `configuration.py`; all mappings register on the shared `Base.metadata`.
   - Access key persistence mapping and active key retrieval stay in `app/server/repositories/serialization/access_keys.py`.
   - Reference catalog persistence and seeding are implemented through `reference_catalog_entries` and `reference_catalog_seed_runs` in `app/server/repositories/serialization/catalogs.py`.
   - Database initialization (`repositories/database/initializer.py`) handles catalog seeding inline using `common/catalogs/manifest_loader.py` rather than the services layer, preserving strict layering during bootstrapping.
@@ -116,7 +118,7 @@ Last updated: 2026-07-10
 - Runtime settings come from `settings/.env` and `settings/configurations.json`.
 - Database connection and database-mode values are sourced from `settings/.env`.
 - Runtime settings are accessed through `get_server_settings()`.
-- Runtime and security helpers use canonical service modules; transitional shims are not maintained.
+- Runtime and security helpers use canonical service modules.
 - Supported external access-key providers are `openai`, `gemini`, and `brave`.
 - Containerized runtime is not implemented in the current repository.
 

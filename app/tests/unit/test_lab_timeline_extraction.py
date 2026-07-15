@@ -8,10 +8,8 @@ from domain.clinical import (
     LiverInjuryOnsetContext,
     PatientData,
 )
-from services.clinical.labs import (
-    ClinicalLabExtractor,
-    LabExtractionPayload,
-)
+from domain.clinical.extras import LabExtractionPayload
+from services.clinical.labs import ClinicalLabExtractor
 
 ###############################################################################
 class FakeLabClient:

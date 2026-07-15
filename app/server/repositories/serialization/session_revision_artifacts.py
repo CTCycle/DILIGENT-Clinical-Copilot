@@ -5,9 +5,7 @@ from typing import Any
 
 from sqlalchemy import select, update
 
-from repositories.schemas.models import (
-    ClinicalSessionRevisionArtifact,
-)
+from repositories.schemas.clinical import ClinicalSessionRevisionArtifact
 from repositories.serialization.session_revision_data import (
     REVISION_DRUG_SCHEMA_NAME,
     REVISION_DISEASE_SCHEMA_NAME,

@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from repositories.schemas.models import (
-    AccessKey,
-    Base,
-)
+from repositories.schemas.security import AccessKey
+from repositories.schemas.base import Base
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )

@@ -6,7 +6,7 @@ import pandas as pd
 from sqlalchemy.orm import Session
 
 from repositories.queries.drugs import DrugRepositoryQueries
-from repositories.schemas.models import (
+from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
     DrugRxnormCode,

@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from repositories.schemas.models import (
-    ApplicationConfiguration,
+from repositories.schemas.configuration import ApplicationConfiguration
+from repositories.schemas.knowledge import (
     Drug,
     DrugIdentifier,
 )

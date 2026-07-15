@@ -11,10 +11,15 @@ from common.prompts.clinical_assessment import (
     LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
 )
 from common.utils.logger import logger
-from domain.clinical.entities import DrugClinicalAssessment, RagDocumentReference
-from services.clinical.report_language import (
-    report_heading,
+from domain.clinical.entities import (
+    DrugClinicalAssessment,
+    PatientLabTimeline,
+    RagDocumentReference,
 )
+from services.clinical.report_language import (
+    phrase,
+)
+from services.clinical.report_language import report_heading
 from services.text.vocabulary import get_text_normalization_snapshot
 
 ###############################################################################
@@ -64,7 +69,7 @@ class ReportFinalizer:
         sections: list[str] = []
         if matched_sections:
             sections.append(
-                consultation.render_drug_assessment_section(
+                self.render_drug_assessment_section(
                     matched_entries,
                     report_language,
                 )
@@ -92,6 +97,52 @@ class ReportFinalizer:
         if bibliography:
             combined_report = f"{combined_report}\n\n{bibliography}"
         return combined_report
+
+    # -------------------------------------------------------------------------
+    def render_drug_assessment_section(
+        self,
+        assessments: list[DrugClinicalAssessment],
+        language: str,
+    ) -> str:
+        lines = [f"## {report_heading('drug_assessments', language)}", ""]
+        for assessment in assessments:
+            lines.extend(
+                [
+                    self.consultation.render_matched_drug_section(
+                        assessment, report_language=language
+                    ),
+                    "",
+                ]
+            )
+        return "\n".join(lines).strip()
+
+    # -------------------------------------------------------------------------
+    def render_laboratory_section(
+        self, lab_timeline: PatientLabTimeline | None, language: str
+    ) -> str:
+        lines = [f"## {report_heading('laboratory_history', language)}", ""]
+        if lab_timeline is None or not lab_timeline.entries:
+            lines.append(phrase("not_available", language))
+            return "\n".join(lines).strip()
+        for entry in lab_timeline.entries:
+            value = entry.value if entry.value is not None else (entry.value_text or "?")
+            lines.append(f"- {entry.marker_name}: {value} {entry.unit or ''}".strip())
+        return "\n".join(lines).strip()
+
+    # -------------------------------------------------------------------------
+    def render_bibliography_section(
+        self, matches: list[dict[str, Any]], language: str
+    ) -> str:
+        lines = [f"## {report_heading('bibliography', language)}", ""]
+        for match in matches:
+            name = str(match.get("matched_livertox_name") or match.get("extracted_name") or "").strip()
+            if name:
+                strategy = str(match.get("match_strategy") or "unknown").strip()
+                status = "rxnav_validated" if match.get("rxnav_validated") else "rxnav_unvalidated"
+                lines.append(f"- {name} ({strategy}, {status})")
+        if len(lines) == 2:
+            lines.append(phrase("not_available", language))
+        return "\n".join(lines).strip()
 
     # -------------------------------------------------------------------------
     async def _run_conclusion(

@@ -26,6 +26,16 @@ from services.clinical.drug_analysis import DrugAnalysisService
 from services.clinical.analysis_runner import AnalysisRunner
 from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
+from services.clinical.report_finalizer import ReportFinalizer
+from services.clinical.rag_support import RagSupportService
+
+###############################################################################
+def build_test_consultation() -> HepatoxConsultation:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation.analysis_runner = AnalysisRunner(consultation)
+    consultation.report_finalizer = ReportFinalizer(consultation)
+    consultation.rag_support = RagSupportService(consultation)
+    return consultation
 
 ###############################################################################
 class FlakyChatClient:
@@ -89,7 +99,7 @@ def test_assess_payload_raises_when_labs_missing_and_not_overridden() -> None:
 
 ###############################################################################
 def test_evaluate_suspension_marks_anamnesis_mentions_as_uncertain_exposure() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
     entry = DrugEntry(
         name="Paracetamol",
         source="anamnesis",
@@ -105,7 +115,7 @@ def test_evaluate_suspension_marks_anamnesis_mentions_as_uncertain_exposure() ->
 
 ###############################################################################
 def test_parse_timeline_date_uses_visit_year_for_partial_dates() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
 
     parsed = consultation.parse_timeline_date("14-04", visit_date=date(2025, 4, 20))
 
@@ -120,7 +130,7 @@ def test_format_visit_date_anchor_handles_missing_and_present_values() -> None:
 
 ###############################################################################
 def test_request_drug_analysis_retries_on_transient_failure() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
     consultation.llm_client = FlakyChatClient(
         fail_count=1,
         response={"content": "Recovered clinical paragraph."},
@@ -226,7 +236,7 @@ def test_legacy_hepatox_timeline_helper_module_is_removed() -> None:
 
 ###############################################################################
 def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
     entry = DrugClinicalAssessment(
         drug_name="Pantozol",
         match_status="matched",
@@ -263,15 +273,15 @@ def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> N
 
 ###############################################################################
 def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
 
     async def fake_generate_conclusion(**kwargs):  # type: ignore[no-untyped-def]
         _ = kwargs
         return "Integrated recommendations."
 
-    consultation.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
+    consultation.report_finalizer.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
     report = asyncio.run(
-        consultation.finalize_patient_report(
+        consultation.report_finalizer.finalize_patient_report(
             [
                 DrugClinicalAssessment(
                     drug_name="Acetaminophen",
@@ -293,15 +303,15 @@ def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
 def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_sections() -> (
     None
 ):
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
 
     async def fake_generate_conclusion(**kwargs):  # type: ignore[no-untyped-def]
         _ = kwargs
         return None
 
-    consultation.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
+    consultation.report_finalizer.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
     report = asyncio.run(
-        consultation.finalize_patient_report(
+        consultation.report_finalizer.finalize_patient_report(
             [
                 DrugClinicalAssessment(
                     drug_name="Pantozol",
@@ -346,15 +356,15 @@ def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_se
 
 ###############################################################################
 def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
 
     async def fake_generate_conclusion(**kwargs):  # type: ignore[no-untyped-def]
         _ = kwargs
         return None
 
-    consultation.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
+    consultation.report_finalizer.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
     report = asyncio.run(
-        consultation.finalize_patient_report(
+        consultation.report_finalizer.finalize_patient_report(
             [
                 DrugClinicalAssessment(
                     drug_name="Valium",
@@ -380,15 +390,15 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
 def test_finalize_patient_report_renders_accepted_resolution_status_as_matched() -> (
     None
 ):
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
 
     async def fake_generate_conclusion(**kwargs):  # type: ignore[no-untyped-def]
         _ = kwargs
         return None
 
-    consultation.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
+    consultation.report_finalizer.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
     report = asyncio.run(
-        consultation.finalize_patient_report(
+        consultation.report_finalizer.finalize_patient_report(
             [
                 DrugClinicalAssessment(
                     drug_name="Abiraterone",
@@ -411,7 +421,7 @@ def test_finalize_patient_report_renders_accepted_resolution_status_as_matched()
 
 ###############################################################################
 def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
     resolved = {
         "piperacillina tazobactam": {
             "normalized_name": "piperacillina tazobactam",
@@ -440,7 +450,7 @@ def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() 
 
 ###############################################################################
 def test_build_drug_assessment_base_attaches_claim_narrative_for_matched_drug() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
     consultation.rag_support = type(
         "FakeRagSupport",
         (),
@@ -486,7 +496,7 @@ def test_build_drug_assessment_base_attaches_claim_narrative_for_matched_drug() 
 
 ###############################################################################
 def test_build_drug_assessment_base_normalizes_oversized_match_reason() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
     consultation.rag_support = type(
         "FakeRagSupport",
         (),
@@ -530,7 +540,7 @@ def test_build_drug_assessment_base_normalizes_oversized_match_reason() -> None:
 
 ###############################################################################
 def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
     section = consultation.render_unresolved_mentions_section(
         [
             DrugClinicalAssessment(
@@ -560,7 +570,7 @@ def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
 
 ###############################################################################
 def test_unresolved_candidate_details_render_names_without_raw_payloads() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
     section = consultation.render_unresolved_mentions_section(
         [
             DrugClinicalAssessment(
@@ -578,7 +588,7 @@ def test_unresolved_candidate_details_render_names_without_raw_payloads() -> Non
 
 ###############################################################################
 def test_sanitize_renderable_body_removes_structured_dili_section() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation = build_test_consultation()
     entry = DrugClinicalAssessment(
         drug_name="Pembrolizumab",
         paragraph=(

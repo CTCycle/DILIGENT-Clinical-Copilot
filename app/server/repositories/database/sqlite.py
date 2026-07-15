@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from common.paths import DATABASE_FILE_PATH
 from common.utils.logger import logger
 from domain.settings.configuration import DatabaseSettings
-from repositories.schemas.models import Base
+from repositories.schemas.base import Base
 from repositories.database.engine import build_sqlite_engine
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 

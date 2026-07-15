@@ -4,7 +4,7 @@ from pathlib import Path
 
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.sqlite import SQLiteRepository
-from repositories.schemas.models import ApplicationConfiguration
+from repositories.schemas.configuration import ApplicationConfiguration
 from sqlalchemy import select
 
 ###############################################################################

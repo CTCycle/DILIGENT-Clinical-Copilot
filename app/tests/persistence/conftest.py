@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from repositories.schemas.models import Base
+from repositories.schemas.base import Base
 
 
 ###############################################################################

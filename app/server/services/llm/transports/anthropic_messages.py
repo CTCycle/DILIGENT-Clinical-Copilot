@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from typing import cast
+
 from anthropic import AsyncAnthropic
+from anthropic.types import MessageParam
 
 from domain.llm.providers import CloudModelDescriptor
 from services.llm.transports.base import (
@@ -24,7 +27,10 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
         system = "\n\n".join(
             item["content"] for item in request.messages if item.get("role") == "system"
         )
-        messages = [item for item in request.messages if item.get("role") != "system"]
+        messages = cast(
+            list[MessageParam],
+            [item for item in request.messages if item.get("role") != "system"],
+        )
         response = await self.client.messages.create(
             model=request.model,
             system=system,

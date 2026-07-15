@@ -1,7 +1,5 @@
-from services.clinical.pattern_resolution import (
-    HepaticPatternResolutionInput,
-    resolve_hepatic_pattern,
-)
+from domain.clinical.extractor_contracts import HepaticPatternResolutionInput
+from services.clinical.pattern_resolution import resolve_hepatic_pattern
 
 ###############################################################################
 def test_explicit_pattern_is_preserved_without_overwriting_calculated_value() -> None:

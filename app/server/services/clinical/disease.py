@@ -6,14 +6,16 @@ import unicodedata
 from collections.abc import Callable
 from typing import Any
 
-from pydantic import BaseModel, Field
-
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     DiseaseContextEntry,
     PatientDiseaseContext,
+)
+from domain.clinical.extractor_contracts import (
+    LocalDiseaseContextEntry,
+    LocalPatientDiseaseContext,
 )
 from common.prompts.extraction import ANAMNESIS_DISEASE_EXTRACTION_PROMPT
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
@@ -26,17 +28,6 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     r"please\s+try\s+again\s+in\s+(\d+(?:\.\d+)?)s",
     re.IGNORECASE,
 )
-
-###############################################################################
-class LocalDiseaseContextEntry(BaseModel):
-    name: str = Field(..., min_length=1, max_length=200)
-    evidence: str | None = Field(default=None, max_length=500)
-    chronic: bool | None = Field(default=None)
-    hepatic_related: bool | None = Field(default=None)
-
-###############################################################################
-class LocalPatientDiseaseContext(BaseModel):
-    entries: list[LocalDiseaseContextEntry] = Field(default_factory=list)
 
 ###############################################################################
 class DiseaseExtractor:

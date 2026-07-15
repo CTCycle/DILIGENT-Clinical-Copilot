@@ -113,9 +113,9 @@ class AccessKeyEncryptionMaterialSerializer:
         purpose_store = payload.get(purpose)
         if isinstance(purpose_store, dict):
             active_version = int(purpose_store.get("active_version", 0))
-            record = self._get_version_record(payload, purpose, active_version)
-            if active_version and record is not None:
-                return self._material(purpose, active_version, record)
+            existing_record = self._get_version_record(payload, purpose, active_version)
+            if active_version and existing_record is not None:
+                return self._material(purpose, active_version, existing_record)
 
         now = datetime.now(UTC).replace(tzinfo=None)
         version = 1

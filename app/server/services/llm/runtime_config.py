@@ -5,7 +5,7 @@ from contextvars import ContextVar, Token
 from datetime import datetime
 import hashlib
 import json
-from typing import Literal
+from typing import Literal, cast
 
 from configurations.startup import get_server_settings
 from common.catalogs.model_choices import (
@@ -13,6 +13,7 @@ from common.catalogs.model_choices import (
     get_text_extraction_model_choices,
 )
 from domain.model_configs import ModelConfigSnapshot
+from domain.llm.providers import CloudProviderId
 from domain.settings.configuration import LLMRuntimeDefaults
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
@@ -33,7 +34,7 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _normalize_provider(value: str | None, fallback: str) -> str:
+    def _normalize_provider(value: str | None, fallback: str) -> CloudProviderId:
         normalized = (value or "").strip().lower()
         try:
             return provider_registry.get(normalized).provider_id
@@ -46,7 +47,7 @@ class LLMRuntimeConfig:
         normalized = (value or "").strip()
         if not normalized:
             raise ValueError("Cloud model is required")
-        if not provider or not provider_registry.is_valid_model(provider, normalized):
+        if not provider or not provider_registry.is_valid_model(cast(CloudProviderId, provider), normalized):
             raise ValueError(
                 f"Model '{normalized}' is not valid for provider '{provider}'"
             )
@@ -329,7 +330,7 @@ class LLMRuntimeConfig:
             if (
                 local_model
                 and local_model not in local_choices
-                and provider_registry.is_valid_model(provider, local_model)
+                and provider_registry.is_valid_model(cast(CloudProviderId, provider), local_model)
             ):
                 return provider, local_model
             return provider, cloud_model
