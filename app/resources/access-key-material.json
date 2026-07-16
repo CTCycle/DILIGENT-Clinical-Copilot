@@ -1,0 +1,13 @@
+{
+  "provider_access_keys": {
+    "active_version": 1,
+    "versions": {
+      "1": {
+        "activated_at": "2026-07-13T21:12:52.519563",
+        "is_active": true,
+        "key_material": "C-wGhHzipVnQZWBB5yNx_EjiqnJZrzP2THJpQZrn7TI=",
+        "seeded_at": "2026-07-13T21:12:52.519563"
+      }
+    }
+  }
+}
