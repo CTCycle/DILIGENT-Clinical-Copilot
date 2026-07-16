@@ -34,7 +34,9 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
 
         previous_keys = set(os.environ.keys())
         if env_path.exists():
-            load_dotenv(dotenv_path=env_path, override=True)
+            # Deployment and CI environment variables must be able to override
+            # machine-local values committed to or supplied by the .env file.
+            load_dotenv(dotenv_path=env_path, override=False)
         else:
             logger.warning(".env file not found at: %s", env_path)
 

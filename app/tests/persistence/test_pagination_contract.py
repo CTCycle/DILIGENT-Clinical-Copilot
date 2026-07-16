@@ -6,7 +6,6 @@ from sqlalchemy import select
 
 from repositories.schemas.clinical import ClinicalSession
 
-
 ###############################################################################
 def test_session_pagination_has_stable_timestamp_and_id_order(persistence_session) -> None:  # type: ignore[no-untyped-def]
     timestamp = datetime(2026, 1, 1, tzinfo=UTC)
