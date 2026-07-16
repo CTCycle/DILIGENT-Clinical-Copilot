@@ -186,7 +186,10 @@ def validate_clinical_input_preflight(
             ClinicalInputPreflightIssue(
                 severity="blocking",
                 code="livertox_catalog_empty",
-                message="LiverTox catalog is empty. Rebuild LiverTox data.",
+                message=(
+                    "LiverTox catalog is empty. Run the LiverTox update job from "
+                    "Data Inspection before clinical analysis."
+                ),
                 field="knowledge_base",
             )
         )
@@ -200,7 +203,10 @@ def validate_clinical_input_preflight(
             ClinicalInputPreflightIssue(
                 severity="blocking",
                 code="rxnav_catalog_empty",
-                message="RxNav catalog is empty. Rebuild RxNav data.",
+                message=(
+                    "RxNav catalog is empty. Run the RxNav update job from Data "
+                    "Inspection before clinical analysis."
+                ),
                 field="knowledge_base",
             )
         )
