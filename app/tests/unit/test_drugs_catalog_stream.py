@@ -4,7 +4,6 @@ import pandas as pd
 
 from repositories.serialization import evidence_data
 
-
 ###############################################################################
 def test_stream_drugs_catalog_uses_paged_repository_function(monkeypatch) -> None:
     serializer = object()

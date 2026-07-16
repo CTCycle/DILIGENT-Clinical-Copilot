@@ -91,11 +91,41 @@ jobs:
         run: |
           $env:APP_TEST_FRONTEND_URL = "http://127.0.0.1:9847"
           $env:APP_TEST_BACKEND_URL = "http://127.0.0.1:7690"
+          $ciRuntimeDir = Join-Path $env:RUNNER_TEMP "diligent-modelconfig"
+          New-Item -ItemType Directory -Path $ciRuntimeDir -Force | Out-Null
+          $env:DATABASE_BACKEND = "sqlite"
+          $env:DATABASE_SQLITE_PATH = Join-Path $ciRuntimeDir "modelconfig.sqlite3"
+          $env:DILIGENT_SQLITE_PATH = $env:DATABASE_SQLITE_PATH
+          $backendOut = "app/server/.ci-modelconfig-backend.out.log"
+          $backendErr = "app/server/.ci-modelconfig-backend.err.log"
+          $frontendOut = "app/client/.ci-modelconfig-frontend.out.log"
+          $frontendErr = "app/client/.ci-modelconfig-frontend.err.log"
+          function Write-ProcessDiagnostics($label, $process, $stdoutPath, $stderrPath) {
+            Write-Output "[$label] process diagnostics"
+            if ($null -eq $process) {
+              Write-Output "Process was not created."
+            } else {
+              $process.Refresh()
+              Write-Output "PID=$($process.Id) HasExited=$($process.HasExited)"
+              if ($process.HasExited) {
+                Write-Output "ExitCode=$($process.ExitCode)"
+              }
+            }
+            foreach ($log in @(@("stdout", $stdoutPath), @("stderr", $stderrPath))) {
+              Write-Output "--- $($label) $($log[0]) ---"
+              if (Test-Path -LiteralPath $log[1]) {
+                Get-Content -LiteralPath $log[1] -Tail 200
+              } else {
+                Write-Output "Log file not created: $($log[1])"
+              }
+            }
+          }
           $backend = Start-Process -FilePath "python" -ArgumentList "-m","uvicorn","app:app","--host","127.0.0.1","--port","7690" -WorkingDirectory "app/server" -RedirectStandardOutput "app/server/.ci-modelconfig-backend.out.log" -RedirectStandardError "app/server/.ci-modelconfig-backend.err.log" -WindowStyle Hidden -PassThru
           try {
-            $deadline = (Get-Date).AddMinutes(3)
             $backendReady = $false
-            while ((Get-Date) -lt $deadline) {
+            $backendDeadline = (Get-Date).AddMinutes(3)
+            $lastBackendError = "No response received."
+            while ((Get-Date) -lt $backendDeadline) {
               try {
                 $backendHealth = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7690/api/health" -TimeoutSec 3
                 $backendConfig = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7690/api/model-config" -TimeoutSec 3
@@ -103,27 +133,43 @@ jobs:
                   $backendReady = $true
                   break
                 }
-              } catch {}
+              } catch {
+                $lastBackendError = $_.Exception.Message
+                $backend.Refresh()
+                if ($backend.HasExited) {
+                  break
+                }
+              }
               Start-Sleep -Milliseconds 500
             }
             if (-not $backendReady) {
-              throw "Backend readiness check timed out."
+              Write-ProcessDiagnostics "backend readiness failure" $backend $backendOut $backendErr
+              throw "Backend readiness check failed before deadline. Last probe error: $lastBackendError"
             }
 
-            $frontend = Start-Process -FilePath "npm.cmd" -ArgumentList "run","preview","--","--host","127.0.0.1","--port","9847","--strictPort" -WorkingDirectory "app/client" -RedirectStandardOutput "app/client/.ci-modelconfig-frontend.out.log" -RedirectStandardError "app/client/.ci-modelconfig-frontend.err.log" -WindowStyle Hidden -PassThru
+            $frontend = Start-Process -FilePath "npm.cmd" -ArgumentList "run","preview","--","--host","127.0.0.1","--port","9847","--strictPort" -WorkingDirectory "app/client" -RedirectStandardOutput $frontendOut -RedirectStandardError $frontendErr -WindowStyle Hidden -PassThru
             $frontendReady = $false
-            while ((Get-Date) -lt $deadline) {
+            $frontendDeadline = (Get-Date).AddMinutes(3)
+            $lastFrontendError = "No response received."
+            while ((Get-Date) -lt $frontendDeadline) {
               try {
                 $frontendHealth = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:9847/" -TimeoutSec 3
                 if ($frontendHealth.StatusCode -lt 500) {
                   $frontendReady = $true
                   break
                 }
-              } catch {}
+              } catch {
+                $lastFrontendError = $_.Exception.Message
+                $frontend.Refresh()
+                if ($frontend.HasExited) {
+                  break
+                }
+              }
               Start-Sleep -Milliseconds 500
             }
             if (-not $frontendReady) {
-              throw "Frontend readiness check timed out."
+              Write-ProcessDiagnostics "frontend readiness failure" $frontend $frontendOut $frontendErr
+              throw "Frontend readiness check failed before deadline. Last probe error: $lastFrontendError"
             }
 
             python -m pytest app/tests/unit/test_model_config_persistence.py -q --junitxml app/tests/.ci-modelconfig-unit-junit.xml
@@ -136,6 +182,10 @@ jobs:
               throw "Model-config e2e slice failed with exit code $LASTEXITCODE."
             }
           } finally {
+            if (-not $backendReady -or -not $frontendReady) {
+              Write-ProcessDiagnostics "regression cleanup" $backend $backendOut $backendErr
+              Write-ProcessDiagnostics "regression cleanup" $frontend $frontendOut $frontendErr
+            }
             foreach ($process in @($backend, $frontend)) {
               if ($null -ne $process -and -not $process.HasExited) {
                 Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue

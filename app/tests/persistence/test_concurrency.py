@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from repositories.serialization.data import DataSerializer
 
 
+###############################################################################
 def test_concurrent_session_writes_remain_isolated(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     def save(index: int) -> int:
         serializer = DataSerializer(engine=persistence_engine)

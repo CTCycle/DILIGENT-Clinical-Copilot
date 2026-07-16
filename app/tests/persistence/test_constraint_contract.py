@@ -9,7 +9,6 @@ from repositories.schemas.knowledge import (
     DrugIdentifier,
 )
 
-
 ###############################################################################
 def test_singleton_and_identifier_constraints_are_enforced(persistence_session) -> None:  # type: ignore[no-untyped-def]
     persistence_session.add(ApplicationConfiguration(payload={"revision": 1}))
