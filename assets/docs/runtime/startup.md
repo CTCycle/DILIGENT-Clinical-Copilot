@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-07-11
+Last updated: 2026-07-16
 
 ## Recommended Local Startup
 On Windows, use:
@@ -12,7 +12,7 @@ The launcher:
 - ensures portable Python, `uv`, and Node runtimes under `runtimes/`
 - runs `uv sync`
 - installs frontend dependencies
-- builds frontend dist
+- builds frontend dist at application startup when `always_rebuild=true`; skips that build when `false`
 - starts the backend with the synchronized virtual-environment Python and `uvicorn`
 - starts the frontend preview server
 - recreates a stale backend virtual environment when the repository has moved
