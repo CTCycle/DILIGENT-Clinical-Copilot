@@ -7,6 +7,7 @@ from pathlib import Path
 SERVER_ROOT = Path(__file__).resolve().parents[2] / "server"
 
 
+###############################################################################
 def python_files(root: Path) -> list[Path]:
     ignored = {"__pycache__", ".venv", "pytest-cache-files"}
     return [
@@ -19,6 +20,7 @@ def python_files(root: Path) -> list[Path]:
     ]
 
 
+###############################################################################
 def test_schema_ownership_and_removed_tables_are_canonical() -> None:
     schema_root = SERVER_ROOT / "repositories" / "schemas"
     assert not (schema_root / "models.py").exists()
@@ -30,6 +32,7 @@ def test_schema_ownership_and_removed_tables_are_canonical() -> None:
     assert "clinical_session_drugs" not in source
 
 
+###############################################################################
 def test_backend_layer_imports_and_file_size_guard() -> None:
     for path in python_files(SERVER_ROOT):
         assert len(path.read_text(encoding="utf-8").splitlines()) <= 1100, path
@@ -45,6 +48,7 @@ def test_backend_layer_imports_and_file_size_guard() -> None:
                 assert not any(name.startswith("services.") for name in names), path
 
 
+###############################################################################
 def test_domain_owns_extractor_and_pattern_contracts() -> None:
     contracts = (SERVER_ROOT / "domain" / "clinical" / "extractor_contracts.py").read_text(
         encoding="utf-8"

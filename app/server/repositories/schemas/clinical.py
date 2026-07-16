@@ -27,6 +27,7 @@ CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
 ACTIVE_SQLITE_WHERE = "is_active = 1"
 ACTIVE_POSTGRESQL_WHERE = "is_active = true"
 
+###############################################################################
 class ClinicalSession(Base):
     __tablename__ = "clinical_sessions"
 
@@ -78,7 +79,6 @@ class ClinicalSession(Base):
     )
 
 ###############################################################################
-
 class ClinicalSessionResult(Base):
     __tablename__ = "clinical_session_results"
 
@@ -106,7 +106,6 @@ class ClinicalSessionResult(Base):
     )
 
 ###############################################################################
-
 class ClinicalSessionTimeline(Base):
     __tablename__ = "clinical_session_timelines"
 
@@ -148,7 +147,6 @@ class ClinicalSessionTimeline(Base):
     )
 
 ###############################################################################
-
 class ClinicalSessionVersion(Base):
     __tablename__ = "clinical_session_versions"
 
@@ -241,7 +239,6 @@ class ClinicalSessionVersion(Base):
     )
 
 ###############################################################################
-
 class ClinicalSessionRevisionRun(Base):
     __tablename__ = "clinical_session_revision_runs"
 
@@ -328,7 +325,6 @@ class ClinicalSessionRevisionRun(Base):
     )
 
 ###############################################################################
-
 class ClinicalSessionRevisionReview(Base):
     __tablename__ = "clinical_session_revision_reviews"
 
@@ -390,7 +386,6 @@ class ClinicalSessionRevisionReview(Base):
     )
 
 ###############################################################################
-
 class ClinicalSessionRevisionStep(Base):
     __tablename__ = "clinical_session_revision_steps"
 
@@ -451,7 +446,6 @@ class ClinicalSessionRevisionStep(Base):
     )
 
 ###############################################################################
-
 class ClinicalSessionRevisionArtifact(Base):
     __tablename__ = "clinical_session_revision_artifacts"
 
@@ -510,7 +504,6 @@ class ClinicalSessionRevisionArtifact(Base):
     )
 
 ###############################################################################
-
 class ClinicalSessionSection(Base):
     __tablename__ = "clinical_session_sections"
 
@@ -538,7 +531,6 @@ class ClinicalSessionSection(Base):
     )
 
 ###############################################################################
-
 class ClinicalLabObservation(Base):
     __tablename__ = "clinical_lab_observations"
 
@@ -576,7 +568,6 @@ class ClinicalLabObservation(Base):
     )
 
 ###############################################################################
-
 class ClinicalDrugMention(Base):
     __tablename__ = "clinical_drug_mentions"
 

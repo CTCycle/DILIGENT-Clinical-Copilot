@@ -10,7 +10,6 @@ from repositories.database.session import resolve_engine, resolve_session_factor
 from repositories.database.upsert import upsert_application_configuration
 from repositories.schemas.configuration import ApplicationConfiguration
 
-
 ###############################################################################
 class ApplicationConfigurationSerializer:
 

@@ -8,7 +8,6 @@ from sqlalchemy import event, select
 from repositories.schemas.knowledge import Drug, DrugAlias, DrugRxnormCode, LiverToxMonograph
 from repositories.serialization.data import DataSerializer
 
-
 ###############################################################################
 def test_rxnav_ingestion_uses_set_based_writes(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     statements: Counter[str] = Counter()
@@ -70,7 +69,6 @@ def test_rxnav_ingestion_uses_set_based_writes(persistence_engine) -> None:  # t
         {"DRUGS": 1, "DRUG_RXNORM_CODES": 1, "DRUG_ALIASES": 1}
     )
     assert commits == 1
-
 
 ###############################################################################
 def test_livertox_ingestion_uses_set_based_writes(persistence_engine) -> None:  # type: ignore[no-untyped-def]

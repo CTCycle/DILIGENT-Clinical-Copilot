@@ -12,7 +12,7 @@ from configurations.startup import (
 )
 
 ###############################################################################
-def test_initialize_environment_loads_dotenv_with_override_precedence(
+def test_initialize_environment_preserves_process_environment_precedence(
     tmp_path, monkeypatch
 ) -> None:
     dotenv_path = tmp_path / ".env"
@@ -27,7 +27,7 @@ def test_initialize_environment_loads_dotenv_with_override_precedence(
 
     assert environment.get_dotenv_injected_keys()
     assert "DILIGENT_TAURI_MODE" in environment.get_dotenv_injected_keys()
-    assert os.environ.get("FASTAPI_HOST") == "0.0.0.0"
+    assert os.environ.get("FASTAPI_HOST") == "127.0.0.1"
 
 ###############################################################################
 def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(

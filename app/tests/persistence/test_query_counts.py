@@ -7,6 +7,7 @@ from sqlalchemy import event
 from repositories.serialization.data import DataSerializer
 
 
+###############################################################################
 def test_session_listing_uses_bounded_query_shape(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     serializer = DataSerializer(engine=persistence_engine)
     for index in range(3):

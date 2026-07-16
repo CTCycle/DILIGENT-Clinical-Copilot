@@ -24,6 +24,7 @@ CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
 ACTIVE_SQLITE_WHERE = "is_active = 1"
 ACTIVE_POSTGRESQL_WHERE = "is_active = true"
 
+###############################################################################
 class Drug(Base):
     __tablename__ = "drugs"
 
@@ -56,7 +57,6 @@ class Drug(Base):
     )
 
 ###############################################################################
-
 class DrugRxnormCode(Base):
     __tablename__ = "drug_rxnorm_codes"
 
@@ -75,7 +75,6 @@ class DrugRxnormCode(Base):
     )
 
 ###############################################################################
-
 class DrugAlias(Base):
     __tablename__ = "drug_aliases"
 
@@ -104,7 +103,6 @@ class DrugAlias(Base):
     )
 
 ###############################################################################
-
 class LiverToxMonograph(Base):
     __tablename__ = "livertox_monographs"
 
@@ -137,7 +135,6 @@ class LiverToxMonograph(Base):
     )
 
 ###############################################################################
-
 class KbMatchCache(Base):
     __tablename__ = "kb_match_cache"
 
@@ -196,7 +193,6 @@ class KbMatchCache(Base):
     )
 
 ###############################################################################
-
 class DrugIdentifier(Base):
     __tablename__ = "drug_identifiers"
 

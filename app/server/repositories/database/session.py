@@ -39,7 +39,6 @@ def resolve_session_factory(
         expire_on_commit=expire_on_commit,
     )
 
-
 ###############################################################################
 @contextmanager
 def unit_of_work(

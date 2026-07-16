@@ -115,7 +115,6 @@ class HepatoxConsultation:
         self.rag_support = RagSupportService(self)
 
     # -------------------------------------------------------------------------
-    # -------------------------------------------------------------------------
     async def run_analysis(
         self,
         *,
@@ -650,6 +649,7 @@ class HepatoxConsultation:
             normalized_score = NOT_AVAILABLE_TEXT
         return f"{normalized_name} - LiverTox score {normalized_score}"
 
+    # -------------------------------------------------------------------------
     def format_rucam_prompt_block(self, rucam: DrugRucamAssessment | None) -> str:
         if rucam is None:
             return "Estimated RUCAM not available."
@@ -662,10 +662,12 @@ class HepatoxConsultation:
             f"- Key limitations: {limitations}"
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def is_materially_in_report_language(text: str, report_language: str) -> bool:
         return hepatox_scoring.is_materially_in_report_language(text, report_language)
 
+    # -------------------------------------------------------------------------
     async def repair_language_once(
         self,
         *,
@@ -676,6 +678,7 @@ class HepatoxConsultation:
             source_text=source_text, report_language=report_language
         )
 
+    # -------------------------------------------------------------------------
     async def request_drug_analysis(
         self,
         *,
@@ -713,6 +716,7 @@ class HepatoxConsultation:
             report_language=report_language,
         )
 
+    # -------------------------------------------------------------------------
     async def request_revision_drug_analysis(
         self,
         *,
@@ -750,22 +754,27 @@ class HepatoxConsultation:
             report_language=report_language,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def escape_braces(value: str) -> str:
         return value.replace("{", "{{").replace("}", "}}")
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def coerce_chat_text(raw_response: Any) -> str:
         return DrugAnalysisService.coerce_chat_text(raw_response)
 
+    # -------------------------------------------------------------------------
     def extract_rate_limit_wait_hint_seconds(self, exc: Exception) -> float | None:
         return self.rag_support.extract_rate_limit_wait_hint_seconds(exc)
 
+    # -------------------------------------------------------------------------
     def retry_backoff_seconds(
         self, attempt: int, *, exc: Exception | None = None
     ) -> float:
         return self.analysis_runner.retry_backoff_seconds(attempt, exc=exc)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def remove_redundant_report_sentence(text: str) -> str:
         if not text:
@@ -781,9 +790,11 @@ class HepatoxConsultation:
         cleaned = "\n".join(cleaned_lines).strip()
         return re.sub(r"\n{3,}", "\n\n", cleaned)
 
+    # -------------------------------------------------------------------------
     def should_render_as_matched_drug(self, entry: DrugClinicalAssessment) -> bool:
         return self.report_finalizer.should_render_as_matched_drug(entry)
 
+    # -------------------------------------------------------------------------
     def render_matched_drug_section(
         self,
         entry: DrugClinicalAssessment,
@@ -818,6 +829,7 @@ class HepatoxConsultation:
             f"**{bibliography_label}**: {ReportFinalizer.bibliography_source_label()}"
         ).strip()
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def render_clinical_commentary(
         entry: DrugClinicalAssessment,
@@ -881,6 +893,7 @@ class HepatoxConsultation:
             segments
         )
 
+    # -------------------------------------------------------------------------
     def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:
         text = entry.paragraph.strip() if entry.paragraph else ""
         if not text:
@@ -922,6 +935,7 @@ class HepatoxConsultation:
             return ""
         return sanitized
 
+    # -------------------------------------------------------------------------
     def build_fallback_technical_note(
         self,
         entry: DrugClinicalAssessment,
@@ -941,6 +955,7 @@ class HepatoxConsultation:
             return phrase("livertox_missing", report_language)
         return self.build_error_paragraph(entry, report_language=report_language)
 
+    # -------------------------------------------------------------------------
     def render_unresolved_mentions_section(
         self,
         entries: list[DrugClinicalAssessment],
@@ -998,6 +1013,7 @@ class HepatoxConsultation:
             )
         return "\n".join(lines).strip()
 
+    # -------------------------------------------------------------------------
     def describe_unresolved_entry(
         self,
         entry: DrugClinicalAssessment,
@@ -1025,6 +1041,7 @@ class HepatoxConsultation:
             return phrase("livertox_missing", report_language)
         return phrase("deterministic_section_unavailable", report_language)
 
+    # -------------------------------------------------------------------------
     def build_excluded_paragraph(
         self,
         entry: DrugClinicalAssessment,
@@ -1065,6 +1082,7 @@ class HepatoxConsultation:
         )
         return f"{detail} {recommendation}"
 
+    # -------------------------------------------------------------------------
     def build_missing_excerpt_paragraph(
         self,
         entry: DrugClinicalAssessment,
@@ -1073,6 +1091,7 @@ class HepatoxConsultation:
         _ = entry
         return phrase("livertox_missing", report_language)
 
+    # -------------------------------------------------------------------------
     def build_ambiguous_match_paragraph(
         self,
         entry: DrugClinicalAssessment,
@@ -1088,6 +1107,7 @@ class HepatoxConsultation:
         guidance = phrase("manual_curation", report_language)
         return f"{note} {details} {guidance}"
 
+    # -------------------------------------------------------------------------
     def build_error_paragraph(
         self,
         entry: DrugClinicalAssessment,

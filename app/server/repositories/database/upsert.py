@@ -13,7 +13,6 @@ from repositories.schemas.knowledge import (
     LiverToxMonograph,
 )
 
-
 ###############################################################################
 def upsert_application_configuration(
     db_session: Session,

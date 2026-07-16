@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from repositories.schemas.base import Base
 
-
 ###############################################################################
 @pytest.fixture(params=["sqlite", "postgresql"])
 def persistence_engine(request: pytest.FixtureRequest, tmp_path: Path) -> Engine:
@@ -42,7 +41,6 @@ def persistence_engine(request: pytest.FixtureRequest, tmp_path: Path) -> Engine
     finally:
         Base.metadata.drop_all(engine)
         engine.dispose()
-
 
 ###############################################################################
 @pytest.fixture
