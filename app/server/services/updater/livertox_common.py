@@ -8,6 +8,8 @@ from typing import Any
 
 import httpx
 
+from common.utils.logger import logger
+
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)
 DEFAULT_HTTP_HEADERS = {
@@ -31,8 +33,15 @@ def load_json(path: str | Path) -> dict[str, Any] | None:
 
 ###############################################################################
 def save_masterlist_metadata(path: str | Path, payload: dict[str, Any]) -> None:
-    with Path(path).open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle)
+    try:
+        with Path(path).open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle)
+    except OSError as exc:
+        logger.warning(
+            "LiverTox source metadata cache was not updated at %s: %s",
+            path,
+            exc,
+        )
 
 ###############################################################################
 def metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:

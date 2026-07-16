@@ -259,8 +259,18 @@ function Install-ApplicationDependencies {
     }
 
     Write-Step 'Installing frontend dependencies'
-    $npmInstall = if (Test-Path -LiteralPath (Join-Path $ClientDir 'package-lock.json')) { 'ci' } else { 'install' }
-    Invoke-Checked -FilePath $NpmCmd -ArgumentList @($npmInstall) -WorkingDirectory $ClientDir
+    $nodeModules = Join-Path $ClientDir 'node_modules'
+    $angularCli = Join-Path $nodeModules '@angular/cli/bin/ng.js'
+    if (Test-Path -LiteralPath $angularCli) {
+        Write-Info 'Reusing existing frontend dependencies'
+    }
+    elseif (Test-Path -LiteralPath (Join-Path $ClientDir 'package-lock.json')) {
+        Write-Info 'Installing frontend dependencies from lockfile without lifecycle scripts'
+        Invoke-Checked -FilePath $NpmCmd -ArgumentList @('ci', '--ignore-scripts', '--no-audit', '--no-fund') -WorkingDirectory $ClientDir
+    }
+    else {
+        Invoke-Checked -FilePath $NpmCmd -ArgumentList @('install', '--ignore-scripts', '--no-audit', '--no-fund') -WorkingDirectory $ClientDir
+    }
 
     Write-Step 'Building frontend'
     Invoke-Checked -FilePath $NpmCmd -ArgumentList @('run', 'build') -WorkingDirectory $ClientDir

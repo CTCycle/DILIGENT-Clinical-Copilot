@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from domain.model_configs import ModelConfigSnapshot
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.model_config import ModelConfigService
+from repositories.serialization.model_configs import ModelConfigSerializer
 
 ###############################################################################
 def test_model_config_service_ensure_defaults_applies_snapshot(monkeypatch) -> None:
@@ -57,3 +59,25 @@ def test_cloud_runtime_preserves_valid_cloud_role_override() -> None:
             "openai",
             "gpt-4.1-mini",
         )
+
+###############################################################################
+def test_cloud_runtime_accepts_persisted_cloud_role_models(monkeypatch) -> None:
+    snapshot = ModelConfigSnapshot(
+        use_cloud_models=True,
+        cloud_provider="openai",
+        cloud_model="gpt-4.1-mini",
+        clinical_model="gpt-4.1-mini",
+        text_extraction_model="gpt-4.1-mini",
+        ollama_temperature=0.0,
+        cloud_temperature=0.0,
+    )
+    monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: snapshot)
+
+    assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
+        "openai",
+        "gpt-4.1-mini",
+    )
+    assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
+        "openai",
+        "gpt-4.1-mini",
+    )

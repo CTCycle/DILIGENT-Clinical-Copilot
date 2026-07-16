@@ -284,6 +284,10 @@ class CloudLLMClient:
                 if instructions
                 else json_instruction
             )
+            kwargs["input"] = [
+                *input_messages,
+                {"role": "user", "content": json_instruction},
+            ]
             kwargs["text"] = {"format": {"type": "json_object"}}
         response = await self.openai_client.responses.create(**kwargs)
         return self._normalize_content(self._extract_openai_output_text(response))
