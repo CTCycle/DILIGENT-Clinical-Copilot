@@ -238,6 +238,8 @@ function Set-LauncherEnvironment {
 }
 
 function Install-ApplicationDependencies {
+    param([bool]$BuildFrontend = $true)
+
     Initialize-PortableRuntimes
     Import-DotEnv
     Set-LauncherEnvironment
@@ -272,9 +274,15 @@ function Install-ApplicationDependencies {
         Invoke-Checked -FilePath $NpmCmd -ArgumentList @('install', '--ignore-scripts', '--no-audit', '--no-fund') -WorkingDirectory $ClientDir
     }
 
-    Write-Step 'Building frontend'
-    Invoke-Checked -FilePath $NpmCmd -ArgumentList @('run', 'build') -WorkingDirectory $ClientDir
-    Write-Ok 'Dependencies and frontend build are ready'
+    if ($BuildFrontend) {
+        Write-Step 'Building frontend'
+        Invoke-Checked -FilePath $NpmCmd -ArgumentList @('run', 'build') -WorkingDirectory $ClientDir
+        Write-Ok 'Dependencies and frontend build are ready'
+    }
+    else {
+        Write-Info 'Skipping frontend build because always_rebuild=false'
+        Write-Ok 'Dependencies are ready'
+    }
 }
 
 function Get-ListeningProcessIds([int]$Port) {
@@ -327,7 +335,8 @@ function Get-BooleanEnvironmentValue {
 
 function Start-Application {
     Import-DotEnv -CreateIfMissing
-    Install-ApplicationDependencies
+    $alwaysRebuild = Get-BooleanEnvironmentValue -Name 'always_rebuild' -Default $true
+    Install-ApplicationDependencies -BuildFrontend $alwaysRebuild
     Set-LauncherEnvironment
 
     $fastApiHost = if ($env:FASTAPI_HOST) { $env:FASTAPI_HOST } else { '127.0.0.1' }
