@@ -468,11 +468,11 @@ def stream_drugs_catalog(self, page_size: int | None = None) -> Iterator[pd.Data
     )
     offset = 0
     while True:
-        frame = self.get_drugs_catalog(offset=offset, limit=chunk_size)
+        frame = get_drugs_catalog(self, offset=offset, limit=chunk_size)
         if frame.empty:
             # A page may contain drugs without RxNorm rows; continue until the
             # database page itself is exhausted rather than ending early.
-            probe = self.get_drugs_catalog(offset=offset, limit=1)
+            probe = get_drugs_catalog(self, offset=offset, limit=1)
             if probe.empty:
                 return
         else:

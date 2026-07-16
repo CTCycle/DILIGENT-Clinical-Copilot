@@ -523,7 +523,7 @@ class RucamComponentAssessment(BaseModel):
     score: int = Field(default=0)
     status: Literal["scored", "not_assessable", "excluded"] = Field(default="scored")
     evidence: str | None = Field(default=None, max_length=1000)
-    evidence_date: str | None = Field(default=None, max_length=40)
+    evidence_date: str | None = Field(default=None, max_length=120)
     rationale: str | None = Field(default=None, max_length=2000)
 
     # -------------------------------------------------------------------------

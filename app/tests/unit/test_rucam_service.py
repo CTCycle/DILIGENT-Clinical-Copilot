@@ -9,6 +9,7 @@ from domain.clinical import (
     PatientDiseaseContext,
     PatientDrugs,
     PatientLabTimeline,
+    RucamComponentAssessment,
 )
 from services.clinical.rucam import RucamScoreEstimator
 
@@ -215,3 +216,15 @@ def test_rechallenge_component_carries_supporting_text_when_present() -> None:
     )
     assert component.status in {"scored", "not_assessable"}
     assert component.evidence
+
+###############################################################################
+def test_rucam_component_accepts_relative_exposure_date_phrase() -> None:
+    evidence_date = "21 days before synthetic laboratory elevation"
+
+    component = RucamComponentAssessment(
+        component_key="time_to_onset",
+        label="Time to onset",
+        evidence_date=evidence_date,
+    )
+
+    assert component.evidence_date == evidence_date

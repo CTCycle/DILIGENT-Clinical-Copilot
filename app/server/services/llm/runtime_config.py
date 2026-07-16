@@ -95,6 +95,9 @@ class LLMRuntimeConfig:
             base_cloud_model = snapshot.cloud_model
             base_clinical_model = snapshot.clinical_model
             base_text_extraction_model = snapshot.text_extraction_model
+            use_cloud_models = cls._coerce_bool(
+                overrides.get("use_cloud_models", snapshot.use_cloud_models)
+            )
             local_choices = set(get_clinical_model_choices()) | set(
                 get_text_extraction_model_choices()
             )
@@ -102,7 +105,7 @@ class LLMRuntimeConfig:
                 ("clinical", base_clinical_model),
                 ("text_extraction", base_text_extraction_model),
             ):
-                if model_name and model_name not in local_choices:
+                if not use_cloud_models and model_name and model_name not in local_choices:
                     raise ValueError(
                         f"Model '{model_name}' is not supported for role '{role_name}'"
                     )
@@ -137,10 +140,8 @@ class LLMRuntimeConfig:
                 else base_text_extraction_model,
                 "" if not is_fresh else defaults.text_extraction_model,
             ),
-            use_cloud_models=(
-                cls._coerce_bool(overrides.get("use_cloud_models"))
-                if "use_cloud_models" in overrides
-                else bool(snapshot.use_cloud_models)
+            use_cloud_models=cls._coerce_bool(
+                overrides.get("use_cloud_models", snapshot.use_cloud_models)
             ),
             cloud_provider=provider,
             cloud_model=cloud_model,

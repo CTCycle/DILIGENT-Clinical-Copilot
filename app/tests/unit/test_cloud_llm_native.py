@@ -131,6 +131,7 @@ def test_openai_json_mode_includes_json_instruction(monkeypatch) -> None:
 
     assert result == {"value": 7}
     assert "json" in captured["instructions"].casefold()
+    assert "json" in captured["input"][-1]["content"].casefold()
     assert captured["text"] == {"format": {"type": "json_object"}}
 
 ###############################################################################

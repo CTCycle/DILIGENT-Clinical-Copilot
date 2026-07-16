@@ -398,14 +398,16 @@ class ClinicalSessionService(
         )
         if not livertox_rows:
             raise ServiceValidationError(
-                "LiverTox catalog is empty. Rebuild LiverTox data before clinical analysis."
+                "LiverTox catalog is empty. Run the LiverTox update job from Data "
+                "Inspection before clinical analysis."
             )
         rxnav_rows, _ = self.serializer.list_rxnav_catalog(
             search=None, offset=0, limit=1
         )
         if not rxnav_rows:
             raise ServiceValidationError(
-                "RxNav catalog is empty. Rebuild RxNav data before clinical analysis."
+                "RxNav catalog is empty. Run the RxNav update job from Data Inspection "
+                "before clinical analysis."
             )
 
         parse_result = parse_initial_text_sections(clinical_input)
