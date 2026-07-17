@@ -43,6 +43,7 @@ as `cached` if a later refresh fails. No catalog cache survives a backend restar
 - `DELETE /api/access-keys/{key_id}`
 
 ## Inspection Routes
+- `GET /api/inspection/jobs`
 - `GET /api/inspection/sessions`
 - `GET /api/inspection/sessions/{session_id}`
 - `GET /api/inspection/sessions/{session_id}/versions`

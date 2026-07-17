@@ -19,6 +19,7 @@ import {
   InspectionSessionTimelineRequest,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobStatusResponse,
+  InspectionUpdateJobListResponse,
   JobCancelResponse,
   JobStartResponse,
   ClinicalSessionDetail,
@@ -35,6 +36,13 @@ import { buildQueryString, requestJson } from "./http-api";
 
 const TIMELINE_REQUEST_TIMEOUT_SECONDS = 360;
 const INSPECTION_JOB_STATUS_TIMEOUT_SECONDS = 20;
+
+export async function fetchInspectionUpdateJobs(): Promise<InspectionUpdateJobListResponse> {
+  return requestJson<InspectionUpdateJobListResponse>(`${API_BASE_URL}/inspection/jobs`, {
+    method: "GET",
+    headers: { "Cache-Control": "no-cache" },
+  });
+}
 
 export async function fetchInspectionSessions(
   query: InspectionSessionQuery,
