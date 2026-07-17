@@ -2,9 +2,7 @@
   min-height: calc(100vh - var(--app-top-nav-height));
   padding-top: var(--space-xl);
   padding-bottom: var(--space-xl);
-  background:
-    radial-gradient(88% 72% at 2% 0%, rgba(80, 181, 143, 0.16), transparent 58%),
-    linear-gradient(150deg, #f7fbf9 0%, #eef6f2 100%);
+  background: var(--app-background);
 }
 
 .clinical-sessions-header {

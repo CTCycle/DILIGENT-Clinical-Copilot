@@ -493,6 +493,43 @@ function Uninstall-Application {
     Write-Ok 'Application runtimes and generated dependencies removed; settings and user data were preserved'
 }
 
+function Write-MenuRule {
+    Write-Host '  +------------------------------------------------------------------+' -ForegroundColor DarkCyan
+}
+
+function Write-MenuOption {
+    param(
+        [Parameter(Mandatory = $true)][string]$Number,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
+
+    $content = '{0}  {1,-31} {2}' -f $Number, $Label, $Description
+    Write-Host ('  |  {0,-62}  |' -f $content) -ForegroundColor Gray
+}
+
+function Show-MainMenu {
+    Write-Host ''
+    Write-MenuRule
+    Write-Host ('  |  {0,-62}  |' -f 'DILIGENT  /  CLINICAL COPILOT') -ForegroundColor Cyan
+    Write-Host ('  |  {0,-62}  |' -f 'Local development and maintenance console') -ForegroundColor DarkGray
+    Write-MenuRule
+    Write-Host ('  |  {0,-62}  |' -f '') -ForegroundColor DarkCyan
+    Write-Host ('  |  {0,-62}  |' -f 'APPLICATION') -ForegroundColor Yellow
+    Write-MenuOption -Number '1.' -Label 'Launch application' -Description 'Start local services'
+    Write-Host ('  |  {0,-62}  |' -f '') -ForegroundColor DarkCyan
+    Write-Host ('  |  {0,-62}  |' -f 'MAINTENANCE') -ForegroundColor Yellow
+    Write-MenuOption -Number '2.' -Label 'Install / update dependencies' -Description 'Sync runtimes + packages'
+    Write-MenuOption -Number '3.' -Label 'Initialize database' -Description 'Prepare local data store'
+    Write-MenuOption -Number '4.' -Label 'Run test suite' -Description 'Execute project checks'
+    Write-MenuOption -Number '5.' -Label 'Remove logs' -Description 'Delete application logs'
+    Write-MenuOption -Number '6.' -Label 'Clear cache' -Description 'Remove temporary caches'
+    Write-MenuOption -Number '7.' -Label 'Uninstall application' -Description 'Remove generated files'
+    Write-Host ('  |  {0,-62}  |' -f '') -ForegroundColor DarkCyan
+    Write-Host ('  |  {0,-62}  |' -f '8.  Exit') -ForegroundColor Gray
+    Write-MenuRule
+}
+
 function Wait-ForMenu {
     Write-Host ''
     Write-Host 'Press any key to return to menu...'
@@ -503,18 +540,7 @@ while ($true) {
     if ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
         Clear-Host
     }
-    Write-Host '========================================='
-    Write-Host '    DILIGENT Clinical Copilot'
-    Write-Host '========================================='
-    Write-Host '1.  Launch application'
-    Write-Host '2.  Install / update dependencies'
-    Write-Host '3.  Initialize database'
-    Write-Host '4.  Run test suite'
-    Write-Host '5.  Remove logs'
-    Write-Host '6.  Clear cache'
-    Write-Host '7.  Uninstall application'
-    Write-Host '8.  Exit'
-    Write-Host '========================================='
+    Show-MainMenu
     $rawSelection = Read-Host 'Select an option (1-8)'
     if ($null -eq $rawSelection) {
         exit 0
