@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 
 from common.utils.logger import logger
-from domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
+from domain.jobs import JobCancelResponse, JobListResponse, JobStartResponse, JobStatusResponse
 from services.inspection.service import DataInspectionService
 
 ###############################################################################
@@ -21,6 +21,23 @@ class InspectionEndpointBase:
 
 ###############################################################################
 class InspectionJobEndpointMixin(InspectionEndpointBase):
+
+    # -------------------------------------------------------------------------
+    def list_update_jobs(self, response: Response) -> JobListResponse:
+        response.headers["Cache-Control"] = "no-store"
+        return JobListResponse(
+            jobs=[JobStatusResponse(**payload) for payload in self.service.list_update_jobs()]
+        )
+
+    # -------------------------------------------------------------------------
+    def add_update_job_discovery_route(self) -> None:
+        self.router.add_api_route(
+            "/jobs",
+            self.list_update_jobs,
+            methods=["GET"],
+            response_model=JobListResponse,
+            status_code=status.HTTP_200_OK,
+        )
 
     # -------------------------------------------------------------------------
     def build_job_start_response(

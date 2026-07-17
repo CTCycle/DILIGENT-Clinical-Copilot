@@ -252,6 +252,10 @@ export type InspectionUpdateJobResult = {
 
 export type InspectionUpdateJobStatusResponse = JobStatusResponse<InspectionUpdateJobResult>;
 
+export type InspectionUpdateJobListResponse = {
+  jobs: InspectionUpdateJobStatusResponse[];
+};
+
 export type JobCancelResponse = {
   job_id: string;
   success: boolean;

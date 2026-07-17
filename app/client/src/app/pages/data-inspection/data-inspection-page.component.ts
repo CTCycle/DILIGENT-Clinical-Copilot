@@ -42,6 +42,7 @@ import {
 import { InspectionDetailResource } from '../../core/state/inspection-detail-resource';
 import { InspectionPagedResource } from '../../core/state/inspection-paged-resource';
 import { InspectionUpdateJobResource, InspectionUpdateTargetActionsMap, isRecord } from '../../core/state/inspection-update-job-resource';
+import { InspectionUpdateJobTrackerService } from '../../core/state/inspection-update-job-tracker.service';
 import {
   InspectionViewId,
   InspectionViewOption,
@@ -113,6 +114,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   @ViewChild('ragFolderInput') private ragFolderInput?: ElementRef<HTMLInputElement>;
 
   private readonly jobPolling = inject(JobPollingService);
+  private readonly inspectionUpdateTracker = inject(InspectionUpdateJobTrackerService);
   readonly inspectionViews = INSPECTION_VIEWS;
   readonly activeView = signal<InspectionViewId>('rxnav');
 
@@ -218,6 +220,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     this.jobPolling,
     this.updateTargetActions,
     () => this.ragSelectedFolderPath(),
+    inject(InspectionUpdateJobTrackerService),
   );
   readonly activeUpdateTarget = this.updateJob.activeTarget;
   readonly updateConfig = this.updateJob.updateConfig;
@@ -261,6 +264,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   private async initializePageData(): Promise<void> {
+    await this.inspectionUpdateTracker.discover();
     await Promise.all([
       this.loadRxNav(),
       this.loadLiverTox(),

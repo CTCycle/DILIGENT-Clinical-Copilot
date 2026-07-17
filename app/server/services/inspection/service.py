@@ -552,6 +552,31 @@ class DataInspectionService(
         return payload
 
     # -------------------------------------------------------------------------
+    def list_update_jobs(self) -> list[dict[str, Any]]:
+        supported_types = {
+            self.RXNAV_JOB_TYPE,
+            self.LIVERTOX_JOB_TYPE,
+            self.RAG_JOB_TYPE,
+        }
+        latest_by_type: dict[str, dict[str, Any]] = {}
+        for payload in self.jobs.list_jobs():
+            job_type = str(payload.get("job_type") or "")
+            if job_type not in supported_types:
+                continue
+            current = latest_by_type.get(job_type)
+            incoming_key = (
+                float(payload.get("created_at") or 0),
+                int(payload.get("version") or 0),
+            )
+            current_key = (
+                float(current.get("created_at") or 0),
+                int(current.get("version") or 0),
+            ) if current else (-1.0, -1)
+            if incoming_key > current_key:
+                latest_by_type[job_type] = payload
+        return list(latest_by_type.values())
+
+    # -------------------------------------------------------------------------
     def cancel_job(self, job_id: str, *, expected_type: str) -> bool:
         payload = self.get_job_status(job_id, expected_type=expected_type)
         if payload is None:
