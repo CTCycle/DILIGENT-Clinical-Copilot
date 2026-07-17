@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-07-11
+Last updated: 2026-07-17
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -42,9 +42,12 @@ Patient has liver issue. Check DILI.
 1. Review the entered information.
 2. Confirm the selected model configuration.
 3. Select the run or submit action.
-4. If RAG uses Ollama embeddings and Ollama is unavailable, choose whether to retry after starting Ollama, run this assessment without RAG, or cancel.
-5. Wait for the progress indicator to finish.
-6. Do not refresh the browser during an active run unless the application is unresponsive.
+4. The application completes all pre-flight checks before starting backend processing or model calls.
+5. If blocking issues are listed, return to the input panel and correct them before retrying.
+6. If only warnings are listed, either return to update the input or explicitly continue with the stated limitations.
+7. If RAG is unavailable, continuing applies a no-RAG fallback only to the pending assessment. The saved RAG preference is unchanged.
+8. Wait for the progress indicator to finish.
+9. Do not refresh the browser during an active run unless the application is unresponsive.
 
 Expected result:
 - the application submits structured clinical input to the backend

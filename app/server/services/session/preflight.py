@@ -5,6 +5,7 @@ from inspect import isawaitable
 from typing import Any, cast
 
 from common.exceptions import ServiceValidationError
+from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
@@ -153,6 +154,16 @@ def validate_clinical_input_preflight(
     runtime_settings = _runtime_settings()
     deterministic_diagnostics: dict[str, Any] = {}
     rag_readiness = check_rag_readiness(requested=request_payload.use_rag)
+    if request_payload.use_rag and not rag_readiness.available:
+        non_blocking.append(
+            ClinicalInputPreflightIssue(
+                severity="non_blocking",
+                code=rag_readiness.reason_code or "rag_unavailable",
+                message=rag_readiness.message
+                or "RAG evidence retrieval is unavailable for this assessment.",
+                field="use_rag",
+            )
+        )
     _validate_ui_metadata(request_payload, blocking)
     _validate_provider_key(blocking)
     _validate_requested_provider(request_payload, blocking, runtime_settings)
@@ -168,6 +179,8 @@ def validate_clinical_input_preflight(
                 field="clinical_input",
             )
         )
+    _validate_knowledge_bases(service, blocking)
+    if not clinical_input:
         return _result(
             blocking,
             non_blocking,
@@ -176,38 +189,16 @@ def validate_clinical_input_preflight(
             deterministic_diagnostics,
             rag_readiness,
         )
-    livertox_rows, _ = service.serializer.list_livertox_catalog(
-        search=None,
-        offset=0,
-        limit=1,
-    )
-    if not livertox_rows:
-        blocking.append(
+    if len(clinical_input.split()) < 60:
+        non_blocking.append(
             ClinicalInputPreflightIssue(
-                severity="blocking",
-                code="livertox_catalog_empty",
+                severity="non_blocking",
+                code="clinical_input_too_short",
                 message=(
-                    "LiverTox catalog is empty. Run the LiverTox update job from "
-                    "Data Inspection before clinical analysis."
+                    "Clinical input contains fewer than 60 words and may not provide "
+                    "enough context for a reliable assessment."
                 ),
-                field="knowledge_base",
-            )
-        )
-    rxnav_rows, _ = service.serializer.list_rxnav_catalog(
-        search=None,
-        offset=0,
-        limit=1,
-    )
-    if not rxnav_rows:
-        blocking.append(
-            ClinicalInputPreflightIssue(
-                severity="blocking",
-                code="rxnav_catalog_empty",
-                message=(
-                    "RxNav catalog is empty. Run the RxNav update job from Data "
-                    "Inspection before clinical analysis."
-                ),
-                field="knowledge_base",
+                field="clinical_input",
             )
         )
     parse_result = parse_initial_text_sections(clinical_input)
@@ -404,11 +395,18 @@ def validate_clinical_input_preflight(
             )
         )
     except Exception as exc:  # noqa: BLE001
+        logger.exception(
+            "Clinical input pre-flight failed: error_type=%s",
+            type(exc).__name__,
+        )
         blocking.append(
             ClinicalInputPreflightIssue(
                 severity="blocking",
                 code="preflight_failed",
-                message=str(exc),
+                message=(
+                    "The application could not complete the safety checks. "
+                    "Review the input and runtime configuration, then retry."
+                ),
             )
         )
     return _result(
@@ -419,6 +417,61 @@ def validate_clinical_input_preflight(
         deterministic_diagnostics,
         rag_readiness,
     )
+
+###############################################################################
+def _validate_knowledge_bases(
+    service: Any,
+    blocking: list[ClinicalInputPreflightIssue],
+) -> None:
+    try:
+        livertox_rows, _ = service.serializer.list_livertox_catalog(
+            search=None,
+            offset=0,
+            limit=1,
+        )
+        rxnav_rows, _ = service.serializer.list_rxnav_catalog(
+            search=None,
+            offset=0,
+            limit=1,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Clinical pre-flight knowledge-base check failed: error_type=%s",
+            type(exc).__name__,
+        )
+        blocking.append(
+            ClinicalInputPreflightIssue(
+                severity="blocking",
+                code="knowledge_base_unavailable",
+                message="The local clinical knowledge base could not be inspected.",
+                field="knowledge_base",
+            )
+        )
+        return
+    if not livertox_rows:
+        blocking.append(
+            ClinicalInputPreflightIssue(
+                severity="blocking",
+                code="livertox_catalog_empty",
+                message=(
+                    "LiverTox catalog is empty. Run the LiverTox update job from "
+                    "Data Inspection before clinical analysis."
+                ),
+                field="knowledge_base",
+            )
+        )
+    if not rxnav_rows:
+        blocking.append(
+            ClinicalInputPreflightIssue(
+                severity="blocking",
+                code="rxnav_catalog_empty",
+                message=(
+                    "RxNav catalog is empty. Run the RxNav update job from Data "
+                    "Inspection before clinical analysis."
+                ),
+                field="knowledge_base",
+            )
+        )
 
 ###############################################################################
 def _validate_ui_metadata(
@@ -504,11 +557,16 @@ def _validate_persistence(
         with service.serializer.session_factory() as db_session:
             db_session.connection()
     except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Clinical pre-flight persistence check failed: error_type=%s",
+            type(exc).__name__,
+        )
         blocking.append(
             ClinicalInputPreflightIssue(
                 severity="blocking",
                 code="persistence_unavailable",
-                message=f"Session persistence is not writable or reachable: {exc}",
+                message="Session storage is not writable or reachable.",
+                field="session_storage",
             )
         )
 
@@ -541,13 +599,185 @@ def _result(
 ) -> ClinicalInputPreflightResult:
     return ClinicalInputPreflightResult(
         ready=not blocking,
-        blocking_issues=blocking,
-        non_blocking_issues=non_blocking,
+        blocking_issues=[_present_preflight_issue(issue) for issue in blocking],
+        non_blocking_issues=[
+            _present_preflight_issue(issue) for issue in non_blocking
+        ],
         runtime_settings=runtime_settings,
         extraction_quality=extraction_quality,
         deterministic_diagnostics=deterministic_diagnostics,
         rag_readiness=rag_readiness,
     )
 
+
+def _present_preflight_issue(
+    issue: ClinicalInputPreflightIssue,
+) -> ClinicalInputPreflightIssue:
+    title, consequence = _ISSUE_PRESENTATIONS.get(
+        issue.code,
+        (
+            "Review required"
+            if issue.severity == "non_blocking"
+            else "Analysis cannot start",
+            (
+                "Continuing may reduce the completeness or reliability of the assessment."
+                if issue.severity == "non_blocking"
+                else "The analysis cannot be started safely until this issue is corrected."
+            ),
+        ),
+    )
+    affected_section = _FIELD_LABELS.get(
+        issue.field or "",
+        (issue.field or "Analysis configuration").replace("_", " ").title(),
+    )
+    return issue.model_copy(
+        update={
+            "title": title,
+            "description": issue.message,
+            "affected_section": affected_section,
+            "consequence": consequence,
+            "continuation_allowed": issue.severity == "non_blocking",
+        }
+    )
+
+
+_FIELD_LABELS = {
+    "anamnesis": "Anamnesis",
+    "clinical_input": "Clinical input",
+    "drugs": "Pharmacological therapy",
+    "knowledge_base": "Clinical knowledge base",
+    "laboratory_analysis": "Laboratory analysis",
+    "selected_model_providers": "Model configuration",
+    "session_storage": "Session storage",
+    "use_rag": "RAG evidence",
+    "visit_date": "Visit date",
+}
+
+_ISSUE_PRESENTATIONS: dict[str, tuple[str, str]] = {
+    "active_provider_key_missing": (
+        "Provider access key missing",
+        "The configured cloud model cannot be contacted without an active access key.",
+    ),
+    "anamnesis_disease_context_sparse": (
+        "Clinical context may be incomplete",
+        "Relevant comorbidities or competing causes may be underrepresented in the assessment.",
+    ),
+    "anamnesis_regimen_lines_need_review": (
+        "Medication history needs review",
+        "Some historical medication details may be omitted or interpreted with uncertainty.",
+    ),
+    "clinical_input_missing": (
+        "Clinical input is empty",
+        "There is no clinical information available to analyse.",
+    ),
+    "clinical_input_too_short": (
+        "Clinical input may be too brief",
+        "The assessment may omit important chronology, competing causes, or clinical context.",
+    ),
+    "livertox_catalog_empty": (
+        "LiverTox data is unavailable",
+        "Drug-specific hepatotoxicity evidence cannot be evaluated.",
+    ),
+    "knowledge_base_unavailable": (
+        "Clinical knowledge base is unavailable",
+        "Medication matching and evidence-backed assessment cannot be completed reliably.",
+    ),
+    "manual_review_required": (
+        "Possible non-clinical content detected",
+        "Administrative or bibliography text may reduce extraction quality.",
+    ),
+    "missing_anamnesis": (
+        "Anamnesis is missing",
+        "The assessment cannot evaluate clinical context or competing causes.",
+    ),
+    "missing_drugs": (
+        "Pharmacological therapy is missing",
+        "There is no medication exposure available for DILI causality assessment.",
+    ),
+    "missing_laboratory_analysis": (
+        "Laboratory analysis is missing",
+        "The liver injury pattern and severity cannot be evaluated.",
+    ),
+    "missing_timed_drug": (
+        "Medication timing is missing",
+        "Latency and exposure chronology cannot be evaluated reliably.",
+    ),
+    "missing_visit_date": (
+        "Visit date is missing",
+        "The workflow cannot anchor the clinical chronology or persist a valid assessment date.",
+    ),
+    "minimum_extraction_quality_not_met": (
+        "Clinical extraction confidence is low",
+        "Important facts may be incomplete or assigned to the wrong section.",
+    ),
+    "persistence_unavailable": (
+        "Session storage is unavailable",
+        "The analysis result cannot be stored reliably.",
+    ),
+    "preflight_failed": (
+        "Safety checks could not finish",
+        "The analysis cannot start because processing readiness is unknown.",
+    ),
+    "preflight_validation_failed": (
+        "Clinical input is invalid",
+        "The backend cannot process the current request safely.",
+    ),
+    "provider_selection_missing": (
+        "No model provider selected",
+        "No configured model is available to perform the analysis.",
+    ),
+    "requested_provider_mismatch": (
+        "Selected provider does not match runtime",
+        "The request would run with a different provider than the one selected in the interface.",
+    ),
+    "rag_embedding_model_missing": (
+        "RAG embedding model is not configured",
+        "The assessment can continue, but indexed evidence will not be retrieved.",
+    ),
+    "rag_ollama_model_unavailable": (
+        "RAG embedding model is unavailable",
+        "The assessment can continue, but indexed evidence will not be retrieved.",
+    ),
+    "rag_ollama_unavailable": (
+        "RAG evidence service is unavailable",
+        "The assessment can continue, but indexed evidence will not be retrieved.",
+    ),
+    "rag_unavailable": (
+        "RAG evidence is unavailable",
+        "The assessment can continue, but indexed evidence will not be retrieved.",
+    ),
+    "required_sections_malformed": (
+        "Required sections are malformed",
+        "The application cannot reliably separate the clinical sections.",
+    ),
+    "required_sections_missing": (
+        "Required clinical sections are missing",
+        "The analysis would lack mandatory clinical, therapy, or laboratory information.",
+    ),
+    "rxnav_catalog_empty": (
+        "RxNav data is unavailable",
+        "Medication normalization and matching cannot be completed reliably.",
+    ),
+    "section_extraction_confidence_needs_review": (
+        "Section extraction needs review",
+        "The analysis can continue, but some information may have been assigned to the wrong section.",
+    ),
+    "section_extraction_confidence_too_low": (
+        "Section extraction is unreliable",
+        "The clinical sections cannot be separated safely enough for analysis.",
+    ),
+    "section_extraction_requires_review": (
+        "Inferred sections need review",
+        "One or more sections were inferred and may not accurately represent the source text.",
+    ),
+    "timed_drug_feasibility_failed": (
+        "Medication chronology is incomplete",
+        "Causality and latency assessment will be less reliable without exposure timing.",
+    ),
+    "visit_date_missing": (
+        "Visit date is missing",
+        "The workflow cannot anchor the clinical chronology or persist a valid assessment date.",
+    ),
+}
 
 _CLOUD_PROVIDERS = {"openai", "gemini"}
