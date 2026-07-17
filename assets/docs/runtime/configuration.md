@@ -17,7 +17,7 @@ Last updated: 2026-07-16
 - `UI_PORT=9847`
 - `VITE_API_BASE_URL=/api`
 - `RELOAD=false`
-- `always_rebuild=true` (rebuilds the frontend at application startup when `true`; skips that build when `false`)
+- `ALWAYS_REBUILD=true` (rebuilds the frontend at application startup when `true`; skips that build when `false`)
 - `BACKEND_LOGS_VISIBLE=true` (defaults to `true` when absent)
 - `OPTIONAL_DEPENDENCIES=true`
 

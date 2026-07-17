@@ -280,7 +280,7 @@ function Install-ApplicationDependencies {
         Write-Ok 'Dependencies and frontend build are ready'
     }
     else {
-        Write-Info 'Skipping frontend build because always_rebuild=false'
+        Write-Info 'Skipping frontend build because ALWAYS_REBUILD=false'
         Write-Ok 'Dependencies are ready'
     }
 }
@@ -335,8 +335,9 @@ function Get-BooleanEnvironmentValue {
 
 function Start-Application {
     Import-DotEnv -CreateIfMissing
-    $alwaysRebuild = Get-BooleanEnvironmentValue -Name 'always_rebuild' -Default $true
+    $alwaysRebuild = Get-BooleanEnvironmentValue -Name 'ALWAYS_REBUILD' -Default $true
     Install-ApplicationDependencies -BuildFrontend $alwaysRebuild
+    Initialize-Database
     Set-LauncherEnvironment
 
     $fastApiHost = if ($env:FASTAPI_HOST) { $env:FASTAPI_HOST } else { '127.0.0.1' }
@@ -420,8 +421,7 @@ function Initialize-Database {
     }
     Invoke-Checked -FilePath $UvExe -WorkingDirectory $RepoRoot -ArgumentList @(
         'run', '--project', 'app/server', '--python', $PythonExe, 'python',
-        'app/scripts/initialize_database.py', '--drop-existing', '--seed-catalogs',
-        '--force-reseed-catalogs'
+        'app/scripts/initialize_database.py', '--seed-catalogs'
     )
     Write-Ok 'Database initialization completed'
 }
