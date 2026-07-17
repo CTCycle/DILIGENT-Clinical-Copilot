@@ -6,9 +6,9 @@ import { ModalShellComponent } from '../../components/modal-shell/modal-shell.co
 import { DEFAULT_FORM_STATE, REPORT_EXPORT_FILENAME } from '../../core/constants';
 import {
   ClinicalInputPreflightIssue,
+  ClinicalInputPreflightResponse,
   ClinicalRequestPayload,
   JobStatus,
-  RagReadiness,
 } from '../../core/models/types';
 import { validateClinicalInput, fetchClinicalSectionTemplate } from '../../core/services/clinical-api';
 import { DiliJobTrackerService } from '../../core/services/dili-job-tracker.service';
@@ -23,10 +23,15 @@ import {
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const STALL_THRESHOLD_MS = 600_000;
-const SECTION_REVIEW_WARNING_CODES = new Set([
-  'section_extraction_confidence_needs_review',
-  'section_extraction_requires_review',
-]);
+const PREFLIGHT_FIELD_TARGETS: Record<string, string> = {
+  anamnesis: 'clinical-input',
+  clinical_input: 'clinical-input',
+  drugs: 'clinical-input',
+  laboratory_analysis: 'clinical-input',
+  selected_model_providers: 'run-analysis-button',
+  use_rag: 'rag-enabled',
+  visit_date: 'visit-date',
+};
 const CLINICAL_INPUT_TEMPLATE_FALLBACK = `Chief concern:
 History of present illness:
 Current medications (dose/start date):
@@ -48,6 +53,7 @@ function isTerminalJobStatus(status: JobStatus | null): boolean {
 })
 export class DiliAgentPageComponent implements OnDestroy {
   @ViewChild('patientImageInput') private patientImageInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('runAnalysisButton') private runAnalysisButton?: ElementRef<HTMLButtonElement>;
 
   readonly stateService = inject(AppStateService);
   private readonly markdownRenderer = inject(MarkdownRendererService);
@@ -55,10 +61,24 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   readonly isCancelling = signal(false);
   readonly isRunActionLocked = signal(false);
-  readonly preflightReviewAcknowledged = signal(false);
-  readonly preflightReviewMessages = signal<string[]>([]);
-  readonly preflightReviewNoticeVisible = computed(() => this.preflightReviewMessages().length > 0);
-  readonly ragReadinessDialog = signal<RagReadiness | null>(null);
+  readonly isPreflightChecking = signal(false);
+  readonly preflightDialog = signal<ClinicalInputPreflightResponse | null>(null);
+  readonly preflightContinuationInFlight = signal(false);
+  readonly preflightIssues = computed<ClinicalInputPreflightIssue[]>(() => {
+    const result = this.preflightDialog();
+    return result
+      ? [...result.blocking_issues, ...result.non_blocking_issues]
+      : [];
+  });
+  readonly preflightHasBlockingIssues = computed(
+    () => Boolean(this.preflightDialog()?.blocking_issues.length),
+  );
+  readonly preflightBlockingCount = computed(
+    () => this.preflightDialog()?.blocking_issues.length ?? 0,
+  );
+  readonly preflightWarningCount = computed(
+    () => this.preflightDialog()?.non_blocking_issues.length ?? 0,
+  );
   readonly todayIso = todayIso;
   readonly finalReportMarkdown = computed(() => this.stateService.state().diliAgent.message || this.reportBody);
   readonly renderedReport = computed(() => this.markdownRenderer.render(this.finalReportMarkdown()));
@@ -67,7 +87,8 @@ export class DiliAgentPageComponent implements OnDestroy {
   private runActionLockTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private runControlDebounceTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private runControlDebounced = false;
-  private pendingRagPayload: ClinicalRequestPayload | null = null;
+  private pendingPreflightPayload: ClinicalRequestPayload | null = null;
+  private preflightAttempt = 0;
 
   constructor() {
     void this.loadClinicalSectionTemplate();
@@ -99,7 +120,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   handleFormChange<K extends keyof typeof this.vm.form>(key: K, value: (typeof this.vm.form)[K]): void {
-    this.clearPreflightReviewState();
+    this.invalidatePreflightState();
     const currentMessage = this.vm.message ?? '';
     const shouldClearStaleOutput =
       !this.vm.isRunning &&
@@ -172,40 +193,60 @@ export class DiliAgentPageComponent implements OnDestroy {
     reader.readAsDataURL(file);
   }
 
-  private clearPreflightReviewState(): void {
-    this.preflightReviewAcknowledged.set(false);
-    this.preflightReviewMessages.set([]);
+  private invalidatePreflightState(): void {
+    this.preflightAttempt += 1;
+    this.isPreflightChecking.set(false);
+    this.preflightDialog.set(null);
+    this.pendingPreflightPayload = null;
+    this.preflightContinuationInFlight.set(false);
   }
 
-  closeRagReadinessDialog(): void {
-    this.ragReadinessDialog.set(null);
-    this.pendingRagPayload = null;
+  returnToInputFromPreflight(): void {
+    const targetId = this.resolveFirstAffectedControlId();
+    this.invalidatePreflightState();
     this.clearRunActionLock();
+    queueMicrotask(() => {
+      const target = targetId
+        ? document.getElementById(targetId)
+        : this.runAnalysisButton?.nativeElement;
+      target?.focus();
+    });
   }
 
-  async retryRagReadiness(): Promise<void> {
-    this.ragReadinessDialog.set(null);
-    this.pendingRagPayload = null;
-    this.clearRunActionLock();
-    await this.executeRunSession();
-  }
-
-  async runWithoutRag(): Promise<void> {
-    const payload = this.pendingRagPayload;
-    this.ragReadinessDialog.set(null);
-    this.pendingRagPayload = null;
-    this.clearRunActionLock();
-    if (!payload) {
+  async continueAfterPreflight(): Promise<void> {
+    if (
+      this.preflightHasBlockingIssues()
+      || this.preflightContinuationInFlight()
+      || !this.pendingPreflightPayload
+    ) {
       return;
     }
-    await this.executeRunSession({ ...payload, use_rag: false });
+    this.preflightContinuationInFlight.set(true);
+    const result = this.preflightDialog();
+    const requiresRagFallback = Boolean(
+      result?.non_blocking_issues.some((issue) => issue.field === 'use_rag'),
+    );
+    const payload = requiresRagFallback
+      ? { ...this.pendingPreflightPayload, use_rag: false }
+      : this.pendingPreflightPayload;
+    this.preflightDialog.set(null);
+    this.pendingPreflightPayload = null;
+    this.clearRunActionLock();
+    try {
+      await this.startValidatedSession(payload);
+    } finally {
+      this.preflightContinuationInFlight.set(false);
+    }
   }
 
-  private collectReviewRequiredWarnings(issues: ClinicalInputPreflightIssue[]): string[] {
-    return issues
-      .filter((issue) => SECTION_REVIEW_WARNING_CODES.has(issue.code))
-      .map((issue) => issue.message.trim())
-      .filter(Boolean);
+  private resolveFirstAffectedControlId(): string | null {
+    for (const issue of this.preflightIssues()) {
+      const target = issue.field ? PREFLIGHT_FIELD_TARGETS[issue.field] : null;
+      if (target) {
+        return target;
+      }
+    }
+    return null;
   }
 
   private clearRunActionLock(): void {
@@ -225,85 +266,81 @@ export class DiliAgentPageComponent implements OnDestroy {
     }, Math.max(500, windowMs));
   }
 
-  private async executeRunSession(payloadOverride?: ClinicalRequestPayload): Promise<void> {
-    if (this.vm.isStarting || this.vm.isRunning || this.isRunActionLocked()) {
+  private async executeRunSession(
+    payloadOverride?: ClinicalRequestPayload,
+  ): Promise<void> {
+    if (
+      this.vm.isStarting
+      || this.vm.isRunning
+      || this.isRunActionLocked()
+      || this.isPreflightChecking()
+    ) {
       return;
     }
 
     this.lockRunAction();
     this.isCancelling.set(false);
+    this.invalidatePreflightState();
+    const payload = payloadOverride ?? buildClinicalPayload(this.vm.form, this.vm.settings);
+    const attempt = ++this.preflightAttempt;
+    this.isPreflightChecking.set(true);
 
     try {
-      const payload = payloadOverride ?? buildClinicalPayload(this.vm.form, this.vm.settings);
       const preflight = await validateClinicalInput(payload);
-      if (!preflight.ready) {
-        this.clearPreflightReviewState();
-        this.diliJobTracker.clearJobState();
-        this.stateService.updateDiliAgent({
-          isStarting: false,
-          isRunning: false,
-          message: `[ERROR] ${preflight.blocking_issues.map((issue) => issue.message).join(' ')}`,
-        });
+      if (attempt !== this.preflightAttempt) {
         return;
       }
-      if (
-        payload.use_rag
-        && preflight.rag_readiness?.requested
-        && !preflight.rag_readiness.available
-      ) {
-        this.pendingRagPayload = payload;
-        this.ragReadinessDialog.set(preflight.rag_readiness);
-        this.stateService.updateDiliAgent({
-          isStarting: false,
-          isRunning: false,
-          message: '',
-        });
+      const issues = [
+        ...preflight.blocking_issues,
+        ...preflight.non_blocking_issues,
+      ];
+      if (issues.length) {
+        this.pendingPreflightPayload = payload;
+        this.preflightDialog.set(preflight);
         return;
       }
-      this.ragReadinessDialog.set(null);
-      this.pendingRagPayload = null;
-
-      const reviewWarnings = this.collectReviewRequiredWarnings(preflight.non_blocking_issues);
-      if (reviewWarnings.length && !this.preflightReviewAcknowledged()) {
-        this.preflightReviewMessages.set(reviewWarnings);
-        this.stateService.updateDiliAgent({
-          isStarting: false,
-          isRunning: false,
-          message: '[WARN] Review section extraction warnings and acknowledge before running.',
-        });
-        return;
-      }
-      if (!reviewWarnings.length) {
-        this.clearPreflightReviewState();
-      }
-
-      const preflightWarningSummary = preflight.non_blocking_issues.length
-        ? `[WARN] ${preflight.non_blocking_issues.map((issue) => issue.message).join(' ')}`
-        : null;
-      await this.diliJobTracker.startSession(payload, preflightWarningSummary);
+      await this.startValidatedSession(payload);
     } catch (error) {
-      this.stateService.updateDiliAgent({
-        message: formatUnknownError(error, 'Unexpected error'),
-        exportUrl: null,
-        jobStage: null,
-        jobStageMessage: null,
-        isStarting: false,
-        isRunning: false,
+      if (attempt !== this.preflightAttempt) {
+        return;
+      }
+      console.error('Clinical pre-flight request failed.', error);
+      const description =
+        'The application could not complete the safety checks. Verify backend connectivity and runtime configuration, then retry.';
+      this.pendingPreflightPayload = null;
+      this.preflightDialog.set({
+        ready: false,
+        blocking_issues: [
+          {
+            severity: 'blocking',
+            code: 'preflight_request_failed',
+            message: description,
+            field: null,
+            title: 'Pre-flight checks are unavailable',
+            description,
+            affected_section: 'Analysis readiness',
+            consequence: 'The analysis cannot start until the safety checks complete successfully.',
+            continuation_allowed: false,
+          },
+        ],
+        non_blocking_issues: [],
+        runtime_settings: {},
+        extraction_quality: {},
+        deterministic_diagnostics: {},
+        rag_readiness: null,
       });
+    } finally {
+      if (attempt === this.preflightAttempt) {
+        this.isPreflightChecking.set(false);
+      }
     }
   }
 
-  async runSession(): Promise<void> {
-    const message = this.validationMessage();
-    if (message) {
-      this.diliJobTracker.clearJobState();
-      this.stateService.updateDiliAgent({
-        isRunning: false,
-        message,
-      });
-      return;
-    }
+  private async startValidatedSession(payload: ClinicalRequestPayload): Promise<void> {
+    await this.diliJobTracker.startSession(payload, null);
+  }
 
+  async runSession(): Promise<void> {
     await this.executeRunSession();
   }
 
@@ -328,16 +365,11 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   clearAll(): void {
-    this.closeRagReadinessDialog();
-    this.clearPreflightReviewState();
+    this.invalidatePreflightState();
     this.diliJobTracker.clearJobState();
     this.stateService.updateDiliAgent({
       form: { ...DEFAULT_FORM_STATE },
     });
-  }
-
-  acknowledgePreflightReview(): void {
-    this.preflightReviewAcknowledged.set(true);
   }
 
   async copyReport(): Promise<void> {
@@ -377,6 +409,9 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (this.preflightDialog()) {
+      return;
+    }
     if (this.vm.isExpanded) {
       this.collapseReport();
     }
@@ -449,10 +484,13 @@ export class DiliAgentPageComponent implements OnDestroy {
     return this.isCancelling()
       || this.vm.isStarting
       || this.isRunActionLocked()
-      || !this.canStartSession();
+      || this.isPreflightChecking();
   }
 
   get runActionLabel(): string {
+    if (this.isPreflightChecking()) {
+      return 'Checking inputs...';
+    }
     if (!this.vm.isRunning) {
       return 'Run DILI analysis';
     }
@@ -463,25 +501,6 @@ export class DiliAgentPageComponent implements OnDestroy {
       return 'Starting...';
     }
     return 'Stop analysis';
-  }
-
-  get runDisabledReason(): string | null {
-    if (this.vm.isRunning || this.vm.isStarting || this.isCancelling()) {
-      return null;
-    }
-    if (!this.vm.form.visitDate.trim()) {
-      return 'Add a visit date to run analysis.';
-    }
-    if (!this.vm.form.clinicalInput.trim()) {
-      return 'Add the clinical input to run analysis.';
-    }
-    if (!this.clinicalInputMeetsMinimumLength()) {
-      return 'Clinical input needs at least 60 words.';
-    }
-    if (!this.hasSelectedModelProvider()) {
-      return 'Select a model provider to run analysis.';
-    }
-    return null;
   }
 
   get reportBody(): string {
@@ -507,44 +526,5 @@ export class DiliAgentPageComponent implements OnDestroy {
     });
   }
 
-  private countClinicalWords(value: string): number {
-    const matches = value.match(/\b[\wÀ-ÖØ-öø-ÿ']+\b/gu);
-    return matches ? matches.length : 0;
-  }
 
-  private selectedModelProviders(): string[] {
-    const provider = this.vm.settings.provider?.trim();
-    return provider ? [provider] : [];
-  }
-
-  private clinicalInputMeetsMinimumLength(): boolean {
-    return this.countClinicalWords(this.vm.form.clinicalInput.trim()) >= 60;
-  }
-
-  private hasSelectedModelProvider(): boolean {
-    return this.selectedModelProviders().length > 0;
-  }
-
-  canStartSession(): boolean {
-    return Boolean(this.vm.form.visitDate.trim())
-      && Boolean(this.vm.form.clinicalInput.trim())
-      && this.clinicalInputMeetsMinimumLength()
-      && this.hasSelectedModelProvider();
-  }
-
-  validationMessage(): string | null {
-    if (!this.vm.form.visitDate.trim()) {
-      return '[ERROR] Provide the visit date.';
-    }
-    if (!this.vm.form.clinicalInput.trim()) {
-      return '[ERROR] Provide the clinical input.';
-    }
-    if (!this.clinicalInputMeetsMinimumLength()) {
-      return '[ERROR] Clinical input must contain at least 60 words.';
-    }
-    if (!this.hasSelectedModelProvider()) {
-      return '[ERROR] Select at least one model provider.';
-    }
-    return null;
-  }
 }

@@ -78,12 +78,6 @@
           </div>
         </div>
 
-        @if (runDisabledReason) {
-          <p id="run-disabled-reason" class="stitch-dili-action-hint" aria-live="polite">
-            {{ runDisabledReason }}
-          </p>
-        }
-
         <label class="stitch-dili-rag-toggle" for="rag-enabled">
           <input
             id="rag-enabled"
@@ -100,11 +94,11 @@
 
         <div class="stitch-dili-actions">
           <button
+            #runAnalysisButton
+            id="run-analysis-button"
             class="btn btn-primary"
             type="button"
             [disabled]="runActionDisabled"
-            [attr.title]="runDisabledReason"
-            [attr.aria-describedby]="runDisabledReason ? 'run-disabled-reason' : null"
             (click)="runOrStop()"
           >
             {{ runActionLabel }}
@@ -115,24 +109,6 @@
             </button>
           </div>
         </div>
-        @if (preflightReviewNoticeVisible()) {
-          <div class="stitch-dili-review-warning" role="alert" aria-live="polite">
-            <p class="stitch-dili-review-warning__title">Review extracted section quality before running.</p>
-            <ul>
-              @for (message of preflightReviewMessages(); track message) {
-                <li>{{ message }}</li>
-              }
-            </ul>
-            <button
-              class="btn btn-secondary"
-              type="button"
-              (click)="acknowledgePreflightReview()"
-              [disabled]="preflightReviewAcknowledged()"
-            >
-              {{ preflightReviewAcknowledged() ? 'Acknowledged' : 'Acknowledge review' }}
-            </button>
-          </div>
-        }
       </section>
 
     </aside>
@@ -172,40 +148,92 @@
 </main>
 
 <app-modal-shell
-  [isOpen]="ragReadinessDialog() !== null"
-  title="RAG requires Ollama"
-  titleId="rag-readiness-title"
-  ariaLabelledBy="rag-readiness-title"
-  ariaDescribedBy="rag-readiness-description"
-  dialogClassName="modal-container rag-readiness-modal"
-  closeLabel="Cancel RAG readiness check"
+  [isOpen]="preflightDialog() !== null"
+  [title]="preflightHasBlockingIssues() ? 'Cannot start analysis' : 'Review before continuing'"
+  titleId="preflight-title"
+  ariaLabelledBy="preflight-title"
+  ariaDescribedBy="preflight-description"
+  dialogClassName="modal-container preflight-modal"
+  closeLabel="Return to clinical input"
   [footer]="true"
-  (close)="closeRagReadinessDialog()"
+  [showCloseButton]="!preflightHasBlockingIssues()"
+  [closeOnEscape]="true"
+  [restoreFocus]="false"
+  (close)="returnToInputFromPreflight()"
 >
-  <section class="rag-readiness-content">
-    <p id="rag-readiness-description">
-      {{ ragReadinessDialog()?.message }}
-    </p>
-    @if (ragReadinessDialog()?.model) {
-      <p class="rag-readiness-model">
-        Required embedding model: <strong>{{ ragReadinessDialog()?.model }}</strong>
+  <section class="preflight-modal-content">
+    <div class="preflight-introduction">
+      <p id="preflight-description">
+        @if (preflightHasBlockingIssues()) {
+          Correct the blocking items below before starting the analysis.
+        } @else {
+          The analysis can continue, but the listed limitations may reduce its completeness or reliability.
+        }
       </p>
-    }
-    <p>
-      Start the Ollama server and retry to use the existing RAG index, or continue
-      this assessment with RAG disabled. The saved RAG preference will not change.
-    </p>
+      <div class="preflight-summary" aria-label="Pre-flight issue summary">
+        @if (preflightBlockingCount()) {
+          <span class="preflight-summary-badge is-blocking">
+            {{ preflightBlockingCount() }} blocking
+          </span>
+        }
+        @if (preflightWarningCount()) {
+          <span class="preflight-summary-badge is-warning">
+            {{ preflightWarningCount() }} warning{{ preflightWarningCount() === 1 ? '' : 's' }}
+          </span>
+        }
+      </div>
+    </div>
+
+    <div class="preflight-issue-list" data-testid="preflight-issue-list" tabindex="0">
+      @for (issue of preflightIssues(); track issue.code + '-' + $index) {
+        <article
+          class="preflight-issue"
+          [class.is-blocking]="issue.severity === 'blocking'"
+          [class.is-warning]="issue.severity === 'non_blocking'"
+        >
+          <div class="preflight-issue-heading">
+            <span class="preflight-severity">
+              {{ issue.severity === 'blocking' ? 'Blocking' : 'Warning' }}
+            </span>
+            <h3>{{ issue.title }}</h3>
+          </div>
+          <dl>
+            <div>
+              <dt>Affected section</dt>
+              <dd>{{ issue.affected_section }}</dd>
+            </div>
+            <div>
+              <dt>What needs attention</dt>
+              <dd>{{ issue.description }}</dd>
+            </div>
+            <div>
+              <dt>Consequence</dt>
+              <dd>{{ issue.consequence }}</dd>
+            </div>
+          </dl>
+        </article>
+      }
+    </div>
   </section>
 
-  <div modal-footer class="rag-readiness-actions">
-    <button class="btn btn-primary" type="button" (click)="retryRagReadiness()">
-      Retry
+  <div modal-footer class="preflight-actions">
+    <button
+      class="btn btn-secondary"
+      type="button"
+      data-modal-initial-focus
+      (click)="returnToInputFromPreflight()"
+    >
+      Return to input
     </button>
-    <button class="btn btn-secondary" type="button" (click)="runWithoutRag()">
-      Run without RAG
-    </button>
-    <button class="btn btn-secondary" type="button" (click)="closeRagReadinessDialog()">
-      Cancel
-    </button>
+    @if (!preflightHasBlockingIssues()) {
+      <button
+        class="btn btn-primary"
+        type="button"
+        [disabled]="preflightContinuationInFlight()"
+        (click)="continueAfterPreflight()"
+      >
+        {{ preflightContinuationInFlight() ? 'Starting...' : 'Continue with limitations' }}
+      </button>
+    }
   </div>
 </app-modal-shell>

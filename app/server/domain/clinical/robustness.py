@@ -175,6 +175,11 @@ class ClinicalInputPreflightIssue(BaseModel):
     code: str
     message: str
     field: str | None = None
+    title: str = ""
+    description: str = ""
+    affected_section: str = ""
+    consequence: str = ""
+    continuation_allowed: bool = False
 
 ###############################################################################
 class RagReadiness(BaseModel):
