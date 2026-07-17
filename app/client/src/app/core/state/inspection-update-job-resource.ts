@@ -1,4 +1,4 @@
-import { signal } from '@angular/core';
+import { effect, signal } from '@angular/core';
 
 import {
   InspectionLiverToxOverrideRequest,
@@ -11,6 +11,7 @@ import {
 } from '../models/types';
 import { resolvePollIntervalMs } from '../services/clinical-api';
 import { JobPollingService } from '../services/job-polling.service';
+import { InspectionUpdateJobTrackerService } from './inspection-update-job-tracker.service';
 
 type InspectionUpdateOverridesByTarget = {
   rxnav: InspectionRxNavOverrideRequest;
@@ -196,13 +197,38 @@ export class InspectionUpdateJobResource {
     private readonly jobPolling: JobPollingService,
     private readonly actions: InspectionUpdateTargetActionsMap,
     private readonly getRagDocumentsPath: () => string = () => '',
-  ) {}
+    private readonly tracker: InspectionUpdateJobTrackerService | null = null,
+  ) {
+    if (this.tracker) {
+      this.tracker.configureRefreshers({
+        rxnav: this.actions.rxnav.refresh,
+        livertox: this.actions.livertox.refresh,
+        rag: this.actions.rag.refresh,
+      });
+      effect(() => {
+        const states = this.tracker!.targetState();
+        for (const target of ['rxnav', 'livertox', 'rag'] as InspectionUpdateTarget[]) {
+          const state = states[target];
+          this.patchTargetState(target, {
+            jobId: state.jobId,
+            running: state.running,
+            progress: state.progress,
+            message: state.message,
+            error: state.error,
+          });
+        }
+      });
+    }
+  }
 
   dispose(): void {
     this.cancelActivePolling();
   }
 
   async open(target: InspectionUpdateTarget): Promise<void> {
+    if (this.tracker) {
+      await this.tracker.discover();
+    }
     this.activeTarget.set(target);
     const state = this.getTargetState(target);
     this.applyStateToSignals(state);
@@ -250,6 +276,17 @@ export class InspectionUpdateJobResource {
       return;
     }
     this.updateError.set(null);
+    if (this.tracker) {
+      try {
+        await this.tracker.start(target, this.buildStartPayload(target) as Record<string, unknown>);
+      } catch (error) {
+        this.patchTargetState(target, {
+          running: false,
+          error: error instanceof Error ? error.message : 'Failed to start update job.',
+        });
+      }
+      return;
+    }
     this.patchTargetState(target, {
       error: null,
       running: true,
@@ -283,6 +320,10 @@ export class InspectionUpdateJobResource {
     const target = this.activeTarget();
     const jobId = this.updateJobId();
     if (!target || !jobId) {
+      return;
+    }
+    if (this.tracker) {
+      await this.tracker.cancel(target);
       return;
     }
     try {
@@ -382,6 +423,9 @@ export class InspectionUpdateJobResource {
   }
 
   private cancelActivePolling(): void {
+    if (this.tracker) {
+      return;
+    }
     this.updatePollToken += 1;
     for (const [target, state] of this.targetStates) {
       if (state.running) {
