@@ -38,9 +38,7 @@
   overflow-x: clip;
   max-width: none;
   margin-inline: 0;
-  background:
-    radial-gradient(72% 58% at 92% 24%, rgba(196, 235, 221, 0.28), rgba(196, 235, 221, 0) 58%),
-    linear-gradient(180deg, #fbfdfc 0%, #f7fbf9 100%);
+  background: var(--app-background);
 }
 
 :host ::ng-deep .model-config-page h1,
