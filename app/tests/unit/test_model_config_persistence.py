@@ -13,6 +13,7 @@ from services.llm.runtime_config import LLMRuntimeConfig
 from domain.model_configs import ConnectivityCheckRequest, ModelConfigSnapshot
 from services.llm.cloud import LLMError
 from services.llm.model_config import ModelConfigService
+from domain.llm.providers import CloudModelDescriptor
 from repositories.serialization.model_configs import ModelConfigSerializer
 from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import get_job_manager
@@ -62,7 +63,7 @@ def test_model_config_service_initializes_fresh_snapshot_from_canonical_defaults
 ###############################################################################
 @pytest.mark.parametrize(
     ("cloud_provider", "cloud_model"),
-    [("legacy-openai", "gpt-4.1-mini"), ("deepseek", "legacy-model")],
+    [("legacy-openai", "gpt-4.1-mini")],
 )
 def test_model_config_service_rejects_invalid_persisted_cloud_selection(
     cloud_provider: str, cloud_model: str
@@ -81,6 +82,26 @@ def test_model_config_service_rejects_invalid_persisted_cloud_selection(
     )
     with pytest.raises(ServiceValidationError):
         ModelConfigService(serializer=serializer).ensure_defaults()
+
+###############################################################################
+def test_model_config_service_allows_persisted_deepseek_model_before_refresh() -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="deepseek-v4-flash",
+            text_extraction_model="deepseek-v4-flash",
+            use_cloud_models=True,
+            cloud_provider="deepseek",
+            cloud_model="deepseek-v4-flash",
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
+            updated_at=datetime.now(),
+        )
+    )
+
+    snapshot = ModelConfigService(serializer=serializer).ensure_defaults()
+
+    assert snapshot.cloud_provider == "deepseek"
+    assert snapshot.cloud_model == "deepseek-v4-flash"
 
 ###############################################################################
 def test_model_config_service_rejects_invalid_persisted_local_model() -> None:
@@ -400,3 +421,44 @@ def test_connectivity_check_reports_llm_error(monkeypatch) -> None:
     assert response.provider == "openai"
     assert response.model == "gpt-4.1"
     assert response.error == "No active OpenAI access key configured"
+
+###############################################################################
+def test_provider_catalog_uses_last_successful_models_when_refresh_fails(monkeypatch) -> None:
+    ModelConfigService._provider_catalog_cache.clear()
+    failures: set[str] = set()
+
+    ###############################################################################
+    class FakeCloudLLMClient:
+
+        # -------------------------------------------------------------------------
+        def __init__(self, *, provider: str, **kwargs: Any) -> None:
+            _ = kwargs
+            self.provider = provider
+            if provider in failures:
+                raise LLMError("Provider request failed")
+
+        # -------------------------------------------------------------------------
+        async def __aenter__(self):
+            return self
+
+        # -------------------------------------------------------------------------
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        # -------------------------------------------------------------------------
+        async def list_model_descriptors(self) -> list[CloudModelDescriptor]:
+            return [CloudModelDescriptor(id=f"{self.provider}-model", display_name="Model")]
+
+    monkeypatch.setattr(model_config_module, "CloudLLMClient", FakeCloudLLMClient)
+    service = ModelConfigService()
+
+    first = asyncio.run(service.discover_provider_descriptors())
+    assert next(item for item in first if item.id == "deepseek").catalog_status == "available"
+
+    failures.add("deepseek")
+    second = asyncio.run(service.discover_provider_descriptors())
+    deepseek = next(item for item in second if item.id == "deepseek")
+    assert deepseek.catalog_status == "cached"
+    assert [item.id for item in deepseek.models] == ["deepseek-model"]
+    assert deepseek.catalog_message == "Showing models from the last successful provider refresh."
+    ModelConfigService._provider_catalog_cache.clear()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import httpx
+import hashlib
 from datetime import UTC, datetime, timedelta
 
 from domain.llm.providers import CloudModelDescriptor
@@ -33,7 +34,8 @@ class RoutedGatewayTransport(StructuredTransportMixin):
 
     # -------------------------------------------------------------------------
     async def list_models(self) -> list[CloudModelDescriptor]:
-        cache_key = f"{self.base_url}{self.models_path}"
+        key_fingerprint = hashlib.sha256(self.api_key.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"{self.base_url}{self.models_path}:{key_fingerprint}"
         cached = self._cache.get(cache_key)
         if cached and cached[0] > datetime.now(UTC):
             self._models = {item.id: item for item in cached[1]}

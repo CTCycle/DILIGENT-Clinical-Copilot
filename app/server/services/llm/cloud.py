@@ -21,7 +21,7 @@ from services.llm.structured import (
     T,
     parse_json_object_strict,
 )
-from domain.llm.providers import CloudProviderId
+from domain.llm.providers import CloudModelDescriptor, CloudProviderId
 from services.llm.provider_registry import provider_registry
 from services.llm.transports.anthropic_messages import AnthropicMessagesTransport
 from services.llm.transports.base import ChatRequest, CloudTransport
@@ -178,8 +178,12 @@ class CloudLLMClient:
 
     # -------------------------------------------------------------------------
     async def list_models(self) -> list[str]:
+        return [item.id for item in await self.list_model_descriptors()]
+
+    # -------------------------------------------------------------------------
+    async def list_model_descriptors(self) -> list[CloudModelDescriptor]:
         if self.transport is not None:
-            return [item.id for item in await self.transport.list_models()]
+            return await self.transport.list_models()
         if self.provider == "openai":
             try:
                 resp = await self.client.get("/models")
@@ -187,8 +191,52 @@ class CloudLLMClient:
                 raise LLMTimeout("Timed out listing OpenAI models") from e
             self.raise_for_status(resp)
             data = resp.json()
-            return [m["id"] for m in data.get("data", []) if "id" in m]
+            return [
+                CloudModelDescriptor(
+                    id=str(item["id"]),
+                    display_name=str(item.get("name") or item["id"]),
+                )
+                for item in data.get("data", [])
+                if isinstance(item, dict) and item.get("id")
+            ]
+        if self.provider == "gemini":
+            return await self._list_gemini_model_descriptors()
         return []
+
+    # -------------------------------------------------------------------------
+    async def _list_gemini_model_descriptors(self) -> list[CloudModelDescriptor]:
+        if self.gemini_client is None:
+            raise LLMError("Gemini client is not configured")
+
+        def list_models() -> list[Any]:
+            return list(self.gemini_client.models.list())
+
+        try:
+            raw_models = await asyncio.to_thread(list_models)
+        except Exception as exc:  # noqa: BLE001
+            raise self._map_provider_exception(exc) from exc
+
+        models: list[CloudModelDescriptor] = []
+        for item in raw_models:
+            name = str(getattr(item, "name", "") or "").strip()
+            model_id = name.removeprefix("models/")
+            actions = getattr(item, "supported_actions", None)
+            if actions is None:
+                actions = getattr(item, "supported_generation_methods", ())
+            normalized_actions = {
+                str(action).replace("_", "").lower() for action in (actions or ())
+            }
+            if not model_id or "generatecontent" not in normalized_actions:
+                continue
+            models.append(
+                CloudModelDescriptor(
+                    id=model_id,
+                    display_name=str(
+                        getattr(item, "display_name", None) or model_id
+                    ),
+                )
+            )
+        return models
 
     # -------------------------------------------------------------------------
     async def check_model_availability(self, name: str) -> None:
