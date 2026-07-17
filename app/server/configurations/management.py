@@ -194,6 +194,7 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
         ollama_host=coerce_str_or_none(os.getenv("OLLAMA_HOST")),
         ollama_port=port,
         database=DatabaseEnvironmentSnapshot(
+            embedded_database=coerce_str_or_none(os.getenv("EMBEDDED_DATABASE")),
             backend=coerce_str_or_none(os.getenv("DATABASE_BACKEND")),
             url=coerce_str_or_none(os.getenv("DATABASE_URL")),
             sqlite_path=coerce_str_or_none(os.getenv("DATABASE_SQLITE_PATH")),
@@ -269,10 +270,14 @@ def _build_database_settings(
     environment: DatabaseEnvironmentSnapshot,
 ) -> DatabaseSettings:
     url_payload = _parse_database_url(environment.url)
-    backend = (coerce_str_or_none(environment.backend) or "sqlite").lower()
+    embedded_value = coerce_str_or_none(environment.embedded_database)
+    if embedded_value is not None:
+        backend = "sqlite" if coerce_bool(embedded_value, True) else "postgresql"
+    else:
+        backend = (coerce_str_or_none(environment.backend) or "sqlite").lower()
     if backend not in {"sqlite", "postgresql"}:
         raise RuntimeError(
-            "DATABASE_BACKEND must be either 'sqlite' or 'postgresql'."
+            "EMBEDDED_DATABASE must be a boolean value."
         )
     write_batch_size = coerce_int(
         environment.write_batch_size,
