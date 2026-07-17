@@ -51,16 +51,32 @@ Last updated: 2026-07-16
 Use one canonical database contract:
 
 ```text
-DATABASE_BACKEND=sqlite
+###############################################################################
+# Database Mode
+###############################################################################
+EMBEDDED_DATABASE=true
+
+###############################################################################
+# External Database Connection
+###############################################################################
 DATABASE_URL=
-DATABASE_SQLITE_PATH=
-DATABASE_CONNECT_TIMEOUT=10
-DATABASE_WRITE_BATCH_SIZE=1000
-DATABASE_READ_PAGE_SIZE=1000
+DATABASE_ENGINE=postgresql+psycopg
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=DILIGENT
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=
+
+###############################################################################
+# External Database Security And Performance
+###############################################################################
+DATABASE_SSL=false
+DATABASE_SSL_CA=
+DATABASE_CONNECT_TIMEOUT=30
+DATABASE_INSERT_BATCH_SIZE=1000
 ```
 
-Set `DATABASE_BACKEND=postgresql` and provide `DATABASE_URL` for PostgreSQL.
-The old embedded/engine/host/port/password split is no longer documented.
+Set `EMBEDDED_DATABASE=true` for SQLite or `false` for PostgreSQL.
 
 Provider access-key encryption material is external to the database. Set
 `DILIGENT_ACCESS_KEY_MATERIAL_FILE` to a protected local file (or inject the

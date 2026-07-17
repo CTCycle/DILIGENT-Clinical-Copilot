@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class DatabaseEnvironmentSnapshot(BaseModel):
     model_config = ConfigDict(frozen=True)
 
+    embedded_database: str | None = None
     backend: str | None = None
     url: str | None = None
     sqlite_path: str | None = None
