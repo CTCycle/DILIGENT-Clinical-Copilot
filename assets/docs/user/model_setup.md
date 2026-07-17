@@ -1,5 +1,5 @@
 # Model Setup
-Last updated: 2026-06-24
+Last updated: 2026-07-17
 
 ## Configure Models
 Open **Model Configurations** from the sidebar.
@@ -14,7 +14,7 @@ This page controls how the application calls a model during analysis. Expect con
 Recommended workflow:
 1. Decide whether the run should use a local or cloud provider.
 2. For local testing, select an Ollama-compatible model if available.
-3. For cloud use, select the intended provider and model.
+3. For cloud use, select the intended provider and assign a catalog model to the clinical and extraction roles.
 4. Save or apply the configuration.
 5. Add and activate an access key if the provider requires one.
 
@@ -22,12 +22,16 @@ Recommended workflow:
 Supported provider key operations currently cover:
 - OpenAI
 - Gemini
+- DeepSeek
+- Anthropic Claude
+- OpenCode (shared by Zen and Go)
 - Brave
 
 Expected behavior:
 - The application stores provider keys through the backend access-key service.
 - The UI should show fingerprints and metadata rather than the full secret after saving.
 - Only one key should be active for a provider at a time.
+- Cloud model catalogs are loaded from each provider's official API after its key is active. If a later refresh fails, the page marks the last successful catalog as cached; after a backend restart, add or reactivate the key to refresh it again.
 
 Recommended workflow:
 1. Open **Model Configurations**.

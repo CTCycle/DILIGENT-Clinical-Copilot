@@ -107,6 +107,8 @@ export type CloudProviderDescriptor = {
   credential_scope: AccessKeyProvider;
   capabilities: ProviderCapabilities;
   catalog_status: "available" | "cached" | "unavailable" | "authentication_required";
+  catalog_updated_at?: string | null;
+  catalog_message?: string | null;
   models: CloudModelDescriptor[];
 };
 

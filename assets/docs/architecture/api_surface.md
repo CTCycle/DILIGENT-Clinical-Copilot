@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-07-12
+Last updated: 2026-07-17
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
@@ -30,6 +30,11 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 - `GET /api/model-config`
 - `PUT /api/model-config`
 - `POST /api/model-config/connectivity-check`
+
+`GET /api/model-config` returns each cloud provider's model catalog together with
+freshness status and a user-safe message. Catalogs are refreshed through the
+provider's official model-list API; a successful in-process result is returned
+as `cached` if a later refresh fails. No catalog cache survives a backend restart.
 
 ## Access Key Routes
 - `GET /api/access-keys`

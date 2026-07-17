@@ -414,3 +414,49 @@ def test_cloud_llm_native_provider_exception_maps_to_existing_error_types(
         assert False, "Expected timeout mapping"
     except cloud_module.LLMTimeout:
         pass
+
+###############################################################################
+def test_gemini_model_discovery_normalizes_ids_and_filters_generation_models(
+    monkeypatch,
+) -> None:
+
+    ###############################################################################
+    class FakeModel:
+
+        # -------------------------------------------------------------------------
+        def __init__(self, name: str, actions: list[str]) -> None:
+            self.name = name
+            self.display_name = name.replace("models/", "").title()
+            self.supported_actions = actions
+
+    ###############################################################################
+    class FakeModels:
+
+        # -------------------------------------------------------------------------
+        def list(self):
+            return [
+                FakeModel("models/gemini-3.5-flash", ["generateContent"]),
+                FakeModel("models/text-embedding-004", ["embedContent"]),
+            ]
+
+    ###############################################################################
+    class FakeGeminiClient:
+
+        # -------------------------------------------------------------------------
+        def __init__(self, **kwargs: Any) -> None:
+            _ = kwargs
+            self.models = FakeModels()
+
+    ###############################################################################
+    class FakeGenAI:
+        Client = FakeGeminiClient
+
+    patch_access_key(monkeypatch, "key-gemini")
+    monkeypatch.setattr(cloud_module, "genai", FakeGenAI)
+    client = cloud_module.CloudLLMClient(provider="gemini")
+
+    models = asyncio.run(client.list_model_descriptors())
+
+    assert [(item.id, item.display_name) for item in models] == [
+        ("gemini-3.5-flash", "Gemini-3.5-Flash"),
+    ]

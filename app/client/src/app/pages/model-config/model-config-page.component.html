@@ -37,7 +37,7 @@
                 <input
                   type="radio"
                   name="runtime-source"
-                  aria-label="Cloud Models (OpenAI / Gemini)"
+                  aria-label="Cloud Models"
                   [checked]="draftConfig().useCloudServices"
                   (change)="handleCloudSwitchChange(true)"
                   [disabled]="isSaving() || isLoading()"
@@ -47,7 +47,7 @@
                 </svg>
                 <span>
                   <strong>Cloud</strong>
-                  <small>OpenAI / Gemini</small>
+                  <small>OpenAI, Gemini, DeepSeek, Claude, or OpenCode</small>
                 </span>
                 <i class="model-config-radio-dot" aria-hidden="true"></i>
               </label>
@@ -119,10 +119,24 @@
                 <path d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" />
               </svg>
             </div>
-            <button class="model-config-tag-select" type="button" [disabled]="draftConfig().useCloudServices">
-              <span>{{ draftConfig().useCloudServices ? resolveProviderLabel(draftProvider()) : 'All Tags' }}</span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-            </button>
+            @if (draftConfig().useCloudServices) {
+              <select
+                class="model-config-tag-select"
+                aria-label="Cloud provider"
+                [ngModel]="draftProvider()"
+                (ngModelChange)="handleProviderChange($event)"
+                [disabled]="isSaving() || isLoading()"
+              >
+                @for (provider of cloudProviderOptions(); track provider) {
+                  <option [value]="provider">{{ resolveProviderLabel(provider) }}</option>
+                }
+              </select>
+            } @else {
+              <button class="model-config-tag-select" type="button" disabled>
+                <span>All Tags</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+            }
           </div>
 
           @if (!draftConfig().useCloudServices) {
@@ -177,7 +191,9 @@
             </button>
           </div>
           } @else {
-          <p class="model-config-cloud-filter-note">Tag filters are available only for local catalog metadata.</p>
+          <p class="model-config-cloud-filter-note" [class.is-warning]="selectedCloudProvider()?.catalog_status !== 'available'">
+            {{ cloudCatalogMessage() || 'Tag filters are available only for local catalog metadata.' }}
+          </p>
           }
 
           <div class="model-config-table-shell" (scroll)="onModelCatalogScroll($event)">
@@ -372,12 +388,6 @@
             <dt>Extraction Model</dt>
             <dd>{{ selectedExtractionModel() }}</dd>
           </div>
-          @if (draftConfig().useCloudServices) {
-            <div>
-              <dt>Cloud Model</dt>
-              <dd>{{ draftCloudModel() || 'Not set' }}</dd>
-            </div>
-          }
           <div>
             <dt>RAG Settings</dt>
             <dd>

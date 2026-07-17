@@ -48,7 +48,7 @@ Thumbs.db
 # Misc
 *.lock
 *.log
-*.db
+*.db*
 *.sqlite*
 *.exe
 *.gz

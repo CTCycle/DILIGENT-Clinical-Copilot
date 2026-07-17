@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -72,4 +73,6 @@ class CloudProviderDescriptor(BaseModel):
     catalog_status: Literal[
         "available", "cached", "unavailable", "authentication_required"
     ]
+    catalog_updated_at: datetime | None = None
+    catalog_message: str | None = None
     models: list[CloudModelDescriptor]
