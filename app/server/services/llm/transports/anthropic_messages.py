@@ -42,11 +42,17 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
 
     # -------------------------------------------------------------------------
     async def list_models(self) -> list[CloudModelDescriptor]:
-        page = await self.client.models.list()
-        return [
-            CloudModelDescriptor(id=item.id, display_name=item.display_name)
-            for item in page.data
-        ]
+        models: list[CloudModelDescriptor] = []
+        after_id: str | None = None
+        while True:
+            page = await self.client.models.list(limit=100, after_id=after_id)
+            models.extend(
+                CloudModelDescriptor(id=item.id, display_name=item.display_name)
+                for item in page.data
+            )
+            if not getattr(page, "has_more", False) or not page.data:
+                return models
+            after_id = page.data[-1].id
 
     # -------------------------------------------------------------------------
     async def check_connectivity(self, model: str) -> ConnectivityResult:

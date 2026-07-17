@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from time import monotonic
 from typing import Any, Protocol, cast
 
@@ -63,6 +64,9 @@ class ModelConfigSnapshotStore(Protocol):
 class ModelConfigService:
     _OLLAMA_WARNING_COOLDOWN_SECONDS = 120.0
     _FAST_LOCAL_EXTRACTION_MODELS = ("qwen3.5:2b", "qwen3.5:9b")
+    _provider_catalog_cache: dict[
+        CloudProviderId, tuple[datetime, list[CloudModelDescriptor]]
+    ] = {}
 
     # -------------------------------------------------------------------------
     def __init__(self, serializer: ModelConfigSnapshotStore | None = None) -> None:
@@ -453,8 +457,9 @@ class ModelConfigService:
         }
 
     # -------------------------------------------------------------------------
-    @staticmethod
+    @classmethod
     def resolve_role_model_selection(
+        cls,
         *,
         role_name: str,
         model_name: str | None,
@@ -467,7 +472,7 @@ class ModelConfigService:
         if model_name is None:
             return None
         if use_cloud_models:
-            cloud_model_names = set(provider_registry.get(cloud_provider).models)
+            cloud_model_names = cls.known_provider_model_names(cloud_provider)
             if not cloud_model_names:
                 if active_cloud_model and model_name == active_cloud_model:
                     return model_name
@@ -501,16 +506,26 @@ class ModelConfigService:
             raise ServiceValidationError(str(exc)) from exc
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def resolve_cloud_model(provider: str, model_name: str | None) -> str | None:
+    @classmethod
+    def resolve_cloud_model(cls, provider: str, model_name: str | None) -> str | None:
         normalized = (model_name or "").strip()
         if not normalized:
             return None
-        if not provider_registry.is_valid_model(cast(CloudProviderId, provider), normalized):
+        known_models = cls.known_provider_model_names(provider)
+        if known_models and normalized not in known_models:
             raise ServiceValidationError(
                 f"Model '{normalized}' is not valid for provider '{provider}'."
             )
         return normalized
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def known_provider_model_names(cls, provider: str) -> set[str]:
+        definition = provider_registry.get(provider)
+        if definition.models:
+            return set(definition.models)
+        cached = cls._provider_catalog_cache.get(definition.provider_id)
+        return {item.id for item in cached[1]} if cached else set()
 
     # -------------------------------------------------------------------------
     def ensure_defaults(self) -> ModelConfigSnapshot:
@@ -761,6 +776,8 @@ class ModelConfigService:
     async def discover_provider_descriptors(self) -> list[CloudProviderDescriptor]:
         descriptors: list[CloudProviderDescriptor] = []
         for item in provider_registry.all():
+            catalog_updated_at: datetime | None = None
+            message: str | None = None
             if item.models:
                 models = [
                     CloudModelDescriptor(id=model, display_name=model)
@@ -772,21 +789,45 @@ class ModelConfigService:
                     async with CloudLLMClient(
                         provider=item.provider_id, timeout_s=15.0, max_retries=0
                     ) as client:
-                        models = [
-                            CloudModelDescriptor(id=model, display_name=model)
-                            for model in await client.list_models()
-                        ]
-                    status = "available"
+                        models = await client.list_model_descriptors()
+                    if models:
+                        catalog_updated_at = datetime.now(UTC)
+                        self._provider_catalog_cache[item.provider_id] = (
+                            catalog_updated_at,
+                            models,
+                        )
+                        status = "available"
+                    else:
+                        status = "unavailable"
+                        message = "This provider returned no models available for clinical text generation."
                 except LLMError as exc:
-                    models = []
-                    status = (
-                        "authentication_required"
-                        if "access key" in str(exc).lower()
-                        else "unavailable"
-                    )
+                    cached = self._provider_catalog_cache.get(item.provider_id)
+                    if cached:
+                        catalog_updated_at, models = cached
+                        status = "cached"
+                        message = "Showing models from the last successful provider refresh."
+                    else:
+                        models = []
+                        status = (
+                            "authentication_required"
+                            if "access key" in str(exc).lower()
+                            else "unavailable"
+                        )
+                        message = (
+                            "Add and activate an access key to load this provider's models."
+                            if status == "authentication_required"
+                            else "The provider catalog could not be refreshed. Try again shortly."
+                        )
                 except Exception:
-                    models = []
-                    status = "unavailable"
+                    cached = self._provider_catalog_cache.get(item.provider_id)
+                    if cached:
+                        catalog_updated_at, models = cached
+                        status = "cached"
+                        message = "Showing models from the last successful provider refresh."
+                    else:
+                        models = []
+                        status = "unavailable"
+                        message = "The provider catalog could not be refreshed. Try again shortly."
             descriptors.append(
                 CloudProviderDescriptor(
                     id=item.provider_id,
@@ -794,6 +835,8 @@ class ModelConfigService:
                     credential_scope=item.credential_scope,
                     capabilities=item.capabilities,
                     catalog_status=status,
+                    catalog_updated_at=catalog_updated_at,
+                    catalog_message=message,
                     models=models,
                 )
             )

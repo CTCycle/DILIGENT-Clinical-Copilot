@@ -226,6 +226,18 @@ export class ModelConfigPageComponent implements OnInit {
 
   readonly activeCloudModels = computed(() => this.cloudChoices()[this.draftProvider()] || []);
 
+  readonly selectedCloudProvider = computed(() =>
+    this.cloudProviders().find((provider) => provider.id === this.draftProvider()) || null,
+  );
+
+  readonly cloudCatalogMessage = computed(() => {
+    const provider = this.selectedCloudProvider();
+    if (!provider) return '';
+    if (provider.catalog_message) return provider.catalog_message;
+    if (provider.catalog_status === 'available') return 'Live provider catalog loaded.';
+    return '';
+  });
+
   readonly runtimeLabel = computed(() =>
     this.draftConfig().useCloudServices
       ? `Cloud (${resolveProviderLabel(this.draftProvider())})`
@@ -603,7 +615,11 @@ export class ModelConfigPageComponent implements OnInit {
       ...previous,
       provider: resolvedProvider,
       cloudModel: null,
+      clinicalModel: '',
+      textExtractionModel: '',
     }));
+    this.modelSearchQuery.set('');
+    this.resetVisibleModelLimit();
   }
 
   handleCloudModelChange(modelName: string): void {

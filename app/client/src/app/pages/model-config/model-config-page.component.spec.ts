@@ -24,6 +24,10 @@ describe('ModelConfigPageComponent', () => {
     component.cloudChoices.set({
       openai: ['gpt-4.1-mini'],
       gemini: ['gemini-2.5-pro'],
+      deepseek: [],
+      anthropic: [],
+      opencode_zen: [],
+      opencode_go: [],
     });
     component.draftConfig.set({
       useCloudServices: false,
@@ -52,5 +56,33 @@ describe('ModelConfigPageComponent', () => {
       'Configuration saved.',
       true,
     );
+  });
+
+  it('switches providers without retaining stale cloud selections or search', () => {
+    component.cloudChoices.set({
+      openai: ['gpt-4.1-mini'],
+      gemini: ['gemini-3.5-flash'],
+      deepseek: ['deepseek-v4-flash'],
+      anthropic: [],
+      opencode_zen: [],
+      opencode_go: [],
+    });
+    component.draftConfig.set({
+      useCloudServices: true,
+      provider: 'openai',
+      cloudModel: 'gpt-4.1-mini',
+      clinicalModel: 'gpt-4.1-mini',
+      textExtractionModel: 'gpt-4.1-mini',
+      temperature: 0.7,
+    });
+    component.setModelSearchQuery('gpt');
+
+    component.handleProviderChange('deepseek');
+
+    expect(component.draftProvider()).toBe('deepseek');
+    expect(component.draftCloudModel()).toBeNull();
+    expect(component.draftConfig().clinicalModel).toBe('');
+    expect(component.draftConfig().textExtractionModel).toBe('');
+    expect(component.modelSearchQuery()).toBe('');
   });
 });
