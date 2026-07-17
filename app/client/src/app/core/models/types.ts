@@ -156,6 +156,11 @@ export type ClinicalInputPreflightIssue = {
   code: string;
   message: string;
   field?: string | null;
+  title: string;
+  description: string;
+  affected_section: string;
+  consequence: string;
+  continuation_allowed: boolean;
 };
 
 export type ClinicalInputPreflightResponse = {

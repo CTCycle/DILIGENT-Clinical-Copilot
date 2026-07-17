@@ -1,5 +1,5 @@
 # Components And Patterns
-Last updated: 2026-06-25
+Last updated: 2026-07-17
 
 ## Page Layout Patterns
 - DILI page uses a responsive grid through `.stitch-dili-grid` and a sticky sidebar on desktop.
@@ -19,7 +19,12 @@ Last updated: 2026-06-25
 ### Modals
 - Use `ModalShellComponent`.
 - Keep close actions consistent.
-- RAG dependency failures use a blocking decision modal with retry, run-without-RAG, and cancel actions. The run-without-RAG action applies only to the pending assessment.
+- DILI pre-flight issues are aggregated in one constrained modal before job submission.
+- Blocking issues allow only a return to the input panel.
+- Non-blocking warnings require an explicit choice between returning to the input panel and continuing with accepted limitations.
+- RAG readiness is represented as a non-blocking pre-flight warning. Continuing disables RAG only for the pending assessment.
+- Modal headers and footers remain visible while only long content regions scroll.
+- Shared modal behavior traps focus, restores focus, blocks background interaction, and supports Escape through the same safe close path.
 
 ### Navigation
 - Sidebar and tab patterns must support keyboard navigation.

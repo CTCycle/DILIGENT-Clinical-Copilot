@@ -32,6 +32,9 @@
   --color-status-error-text: #991b1b;
   --color-status-error-bg: rgba(254, 226, 226, 0.72);
   --color-status-error-border: rgba(248, 113, 113, 0.55);
+  --color-status-warning-text: #8a5a00;
+  --color-status-warning-bg: #fff7df;
+  --color-status-warning-border: #d8a83d;
 
   /* Typography */
   --font-xs: 11px;
@@ -106,6 +109,9 @@
   --color-status-error-text: #fca5a5;
   --color-status-error-bg: rgba(153, 27, 27, 0.28);
   --color-status-error-border: rgba(248, 113, 113, 0.4);
+  --color-status-warning-text: #facc15;
+  --color-status-warning-bg: rgba(133, 77, 14, 0.3);
+  --color-status-warning-border: rgba(250, 204, 21, 0.45);
   --shadow-sm: 0 4px 12px -6px rgba(2, 6, 23, 0.65);
   --shadow-md: 0 12px 30px -16px rgba(2, 6, 23, 0.62);
   --shadow-lg: 0 22px 48px -28px rgba(2, 6, 23, 0.74);
@@ -2250,7 +2256,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   position: fixed;
   inset: 0;
   background: var(--color-overlay);
-  z-index: 50;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2260,6 +2266,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .modal-container {
   background: var(--color-surface);
+  color: inherit;
+  border: 0;
+  padding: 0;
+  margin: auto;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   max-width: 480px;
@@ -2268,6 +2278,38 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: flex;
   flex-direction: column;
   animation: slideUp 0.25s ease;
+}
+
+.modal-container.preflight-modal {
+  width: min(760px, calc(100vw - (2 * var(--space-xl))));
+  max-width: 760px;
+  max-height: min(82vh, 780px);
+  overflow: hidden;
+}
+
+.preflight-modal .modal-body {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 600px) {
+  .modal-overlay {
+    padding: var(--space-md);
+  }
+
+  .modal-container.preflight-modal {
+    width: calc(100vw - (2 * var(--space-md)));
+    max-height: calc(100vh - (2 * var(--space-md)));
+  }
+
+  .preflight-modal .modal-header,
+  .preflight-modal .modal-body,
+  .preflight-modal .modal-footer {
+    padding-left: var(--space-lg);
+    padding-right: var(--space-lg);
+  }
 }
 
 @keyframes slideUp {
