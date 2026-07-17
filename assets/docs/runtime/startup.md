@@ -12,7 +12,7 @@ The launcher:
 - ensures portable Python, `uv`, and Node runtimes under `runtimes/`
 - runs `uv sync`
 - installs frontend dependencies
-- builds frontend dist at application startup when `always_rebuild=true`; skips that build when `false`
+- builds frontend dist at application startup when `ALWAYS_REBUILD=true`; skips that build when `false`
 - starts the backend with the synchronized virtual-environment Python and `uvicorn`
 - starts the frontend preview server
 - recreates a stale backend virtual environment when the repository has moved
