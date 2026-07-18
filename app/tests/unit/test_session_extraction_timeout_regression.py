@@ -5,10 +5,12 @@ from types import SimpleNamespace
 from typing import Any
 
 from domain.clinical import PatientData
+from domain.clinical import DrugEntry, PatientDrugs
 from domain.clinical.extras import LabExtractionPayload
 from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.parser import DrugsParser
 from services.runtime.jobs import JobManager
+from services.session import extraction_pipeline
 from services.session import factory
 from services.session.session_service import ClinicalSessionService
 
@@ -124,3 +126,70 @@ def test_runtime_timeout_resolution_does_not_apply_six_second_parser_cap() -> No
     timeout = ClinicalSessionService._resolve_runtime_timeout(base_timeout_s=120.0)
 
     assert timeout > 6.0
+
+
+def test_livertox_timeout_does_not_claim_knowledge_base_is_unavailable(
+    monkeypatch: Any,
+) -> None:
+    class Owner:
+        drugs_parser = SimpleNamespace(client=None, model=None, temperature=0.0)
+        input_preparator = SimpleNamespace()
+
+        @staticmethod
+        def emit_progress(*args: Any, **kwargs: Any) -> None:
+            _ = args, kwargs
+
+        @staticmethod
+        def build_stage_progress_callback(*args: Any, **kwargs: Any):
+            _ = args, kwargs
+            return lambda _value: None
+
+        @staticmethod
+        def run_stop_check(stop_check: Any) -> None:
+            _ = stop_check
+
+        @staticmethod
+        def append_warning_issue(
+            issues: list[Any], *, code: str, message: str, field: str | None = None
+        ) -> None:
+            issues.append(SimpleNamespace(code=code, message=message, field=field))
+
+        @staticmethod
+        def append_knowledge_base_unavailable_issue(issues: list[Any]) -> None:
+            issues.append(SimpleNamespace(code="knowledge_base_unavailable"))
+
+    async def slow_prepare_inputs(*args: Any, **kwargs: Any) -> None:
+        _ = args, kwargs
+        await asyncio.sleep(0.05)
+
+    Owner.input_preparator.prepare_inputs = slow_prepare_inputs
+    monkeypatch.setattr(
+        extraction_pipeline,
+        "get_server_settings",
+        lambda: SimpleNamespace(
+            runtime=SimpleNamespace(
+                livertox_llm_timeout=0.01,
+                cloud_llm_timeout_cap=0.01,
+                local_llm_timeout_cap=0.01,
+                minimum_llm_timeout=0.01,
+            )
+        ),
+    )
+    owner = Owner()
+    issues: list[Any] = []
+
+    prepared = asyncio.run(
+        extraction_pipeline.ClinicalSessionExtractionPipelineMixin.run_livertox_lookup(
+            owner,
+            all_detected_drugs=PatientDrugs(entries=[DrugEntry(name="Pantozol")]),
+            structured_context="",
+            pattern_score=None,
+            issues=issues,
+            progress_callback=None,
+            stop_check=None,
+            use_rag=False,
+        )
+    )
+
+    assert prepared is None
+    assert [issue.code for issue in issues] == ["livertox_lookup_timeout"]

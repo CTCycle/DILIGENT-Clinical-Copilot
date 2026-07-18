@@ -159,7 +159,6 @@ export class DiliJobTrackerService {
       const status = await fetchClinicalJobStatus(
         vm.jobId,
         `reattach-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        Math.min(30, Math.max(5, Math.ceil((intervalMs / 1000) * 4))),
       );
       this.applyJobStatus(status);
       if (!isTerminalJobStatus(status.status) && this.stateService.state().diliAgent.jobId === vm.jobId) {
@@ -213,7 +212,6 @@ export class DiliJobTrackerService {
           const status = await fetchClinicalJobStatus(
             jobId,
             `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            Math.min(30, Math.max(5, Math.ceil((intervalMs / 1000) * 4))),
           );
           if (pollToken !== this.pollToken) {
             return false;
@@ -388,7 +386,6 @@ export class DiliJobTrackerService {
       const status = await fetchClinicalJobStatus(
         jobId,
         `watchdog-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        Math.min(30, Math.max(5, Math.ceil((pollIntervalMs / 1000) * 4))),
       );
       this.lastPollResponseTimestamp = Date.now();
       this.applyJobStatus(status);

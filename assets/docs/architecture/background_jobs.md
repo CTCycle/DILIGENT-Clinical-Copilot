@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-07-11
+Last updated: 2026-07-19
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -67,9 +67,11 @@ Additional rules:
 
 Frontend polling is implemented through app-lifetime tracker services such as
 `app/client/src/app/core/services/dili-job-tracker.service.ts` and stops on
-terminal states. Active DILI job linkage is persisted in session storage so the
-UI can reattach after route navigation or a same-session page refresh while the
-backend worker is still running.
+terminal states. Active DILI job linkage is persisted in local storage so the
+UI can reattach after route navigation, page refresh, or browser close/reopen
+while the backend worker is still running. Clinical status requests use the
+global one-hour HTTP timeout; the request timeout is independent from the
+worker duration because polling does not execute the clinical job inline.
 
 ## Cancellation Rules
 - Pending jobs can be marked `cancelled` immediately.
@@ -87,7 +89,7 @@ If a runner does not check stop requests, cancellation is delayed.
 - These artifacts are persisted through the clinical session result payload rather than loose files.
 - Failed clinical results omit raw anamnesis, drug text, laboratory text, and patient image base64 content. Failure payloads expose generic error text plus `failure_metadata` for diagnostics.
 - DILI sessions perform deterministic section validation before clinical extraction and may parallelize parser-model extraction only when parser batch preflight marks concurrency as safe; otherwise the workflow falls back to sequential execution.
-- DILI LiverTox/evidence preparation has a hard bounded timeout. Timeout records a sanitized warning and continues without prepared evidence; RAG-off progress explicitly states that vector retrieval is disabled.
+- DILI LiverTox/evidence preparation has a hard bounded timeout. Timeout records a sanitized timeout warning and continues without prepared evidence; it must not be reported as an unavailable or empty knowledge base. RAG-off progress explicitly states that vector retrieval is disabled.
 
 ## New Job Checklist
 1. Add a runner function returning `dict[str, Any]`.

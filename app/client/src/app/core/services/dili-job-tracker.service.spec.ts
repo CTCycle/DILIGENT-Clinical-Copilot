@@ -15,7 +15,7 @@ describe('DiliJobTrackerService', () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:report-url');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
 
@@ -24,7 +24,7 @@ describe('DiliJobTrackerService', () => {
   });
 
   afterEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
   });
 
   it('reattaches an active persisted job on bootstrap and refreshes progress', async () => {
