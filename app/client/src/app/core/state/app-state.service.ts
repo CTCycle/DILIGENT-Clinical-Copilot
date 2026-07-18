@@ -121,12 +121,12 @@ function readOptionalString(value: unknown): string | null {
 }
 
 function readPersistedDiliAgentState(): Partial<DiliAgentState> | null {
-  if (!('sessionStorage' in globalThis)) {
+  if (!('localStorage' in globalThis)) {
     return null;
   }
 
   try {
-    const serializedState = globalThis.sessionStorage.getItem(DILI_AGENT_PERSISTED_STATE_KEY);
+    const serializedState = globalThis.localStorage.getItem(DILI_AGENT_PERSISTED_STATE_KEY);
     if (!serializedState) {
       return null;
     }
@@ -196,7 +196,7 @@ function readPersistedDiliAgentState(): Partial<DiliAgentState> | null {
 }
 
 function writePersistedDiliAgentState(state: DiliAgentState): void {
-  if (!('sessionStorage' in globalThis)) {
+  if (!('localStorage' in globalThis)) {
     return;
   }
 
@@ -218,7 +218,7 @@ function writePersistedDiliAgentState(state: DiliAgentState): void {
   };
 
   try {
-    globalThis.sessionStorage.setItem(
+    globalThis.localStorage.setItem(
       DILI_AGENT_PERSISTED_STATE_KEY,
       JSON.stringify(persistedState),
     );

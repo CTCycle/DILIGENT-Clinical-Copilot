@@ -48,6 +48,7 @@ describe('DiliAgentPageComponent', () => {
   let tracker: DiliJobTrackerService;
 
   beforeEach(async () => {
+    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [DiliAgentPageComponent],
     }).compileComponents();
@@ -190,6 +191,9 @@ describe('DiliAgentPageComponent', () => {
   });
 
   it('continues once and disables RAG only for the accepted pending run', async () => {
+    component.stateService.updateDiliAgent({
+      form: { ...component.vm.form, useRag: true },
+    });
     const payload: ClinicalRequestPayload = {
       name: 'Patient',
       visit_date: { day: 17, month: 7, year: 2026 },
