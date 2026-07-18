@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-07-17
+Last updated: 2026-07-19
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -46,8 +46,12 @@ Patient has liver issue. Check DILI.
 5. If blocking issues are listed, return to the input panel and correct them before retrying.
 6. If only warnings are listed, either return to update the input or explicitly continue with the stated limitations.
 7. If RAG is unavailable, continuing applies a no-RAG fallback only to the pending assessment. The saved RAG preference is unchanged.
-8. Wait for the progress indicator to finish.
-9. Do not refresh the browser during an active run unless the application is unresponsive.
+8. Wait for the progress indicator to finish. DILI runs can take a long time;
+   the browser request timeout is one hour and does not cancel the background
+   job.
+9. You may navigate away, refresh, or close and reopen the browser. The DILI
+   page reattaches to the saved job id and retrieves the latest progress when
+   the backend is still running.
 
 Expected result:
 - the application submits structured clinical input to the backend

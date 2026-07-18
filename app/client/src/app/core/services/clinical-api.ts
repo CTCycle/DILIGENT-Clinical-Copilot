@@ -90,10 +90,6 @@ export function pollClinicalJobStatus(
   onError: (message: string) => void,
 ): { stop: () => void } {
   const safeIntervalMs = Math.max(intervalMs, 250);
-  const requestTimeoutSeconds = Math.min(
-    30,
-    Math.max(5, Math.ceil((safeIntervalMs / 1000) * 4)),
-  );
   const maxConsecutivePollErrors = 30;
   let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
   let stopped = false;
@@ -106,7 +102,6 @@ export function pollClinicalJobStatus(
       const status = await fetchClinicalJobStatus(
         jobId,
         `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        requestTimeoutSeconds,
       );
       if (stopped) return;
       const incomingVersion =

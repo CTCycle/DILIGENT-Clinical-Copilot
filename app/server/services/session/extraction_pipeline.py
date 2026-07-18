@@ -69,6 +69,7 @@ class ClinicalSessionExtractionPipelineMixin:
         timeout_s = self._resolve_runtime_timeout(
             base_timeout_s=float(getattr(self.drugs_parser, "timeout_s", 1.0))
         )
+        lookup_timed_out = False
         try:
             therapy_drugs = await asyncio.wait_for(
                 self.drugs_parser.extract_drugs_from_therapy(
@@ -640,6 +641,7 @@ class ClinicalSessionExtractionPipelineMixin:
                 timeout=max(float(runtime.minimum_llm_timeout), lookup_timeout_s),
             )
         except TimeoutError:
+            lookup_timed_out = True
             logger.warning(
                 "LiverTox input preparation timed out after %.1f seconds; continuing without prepared evidence",
                 lookup_timeout_s,
@@ -654,7 +656,11 @@ class ClinicalSessionExtractionPipelineMixin:
             )
             prepared_inputs = None
         self.run_stop_check(stop_check)
-        if prepared_inputs is None and all_detected_drugs.entries:
+        if (
+            prepared_inputs is None
+            and all_detected_drugs.entries
+            and not lookup_timed_out
+        ):
             self.append_knowledge_base_unavailable_issue(issues)
         self.emit_progress(
             progress_callback,
