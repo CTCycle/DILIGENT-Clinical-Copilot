@@ -19,7 +19,12 @@ def iter_catalog_manifest_paths() -> list[Path]:
         path
         for path in CATALOG_MANIFEST_DIR.glob("*.json")
         if path.name
-        not in {"llm_models.json", "local_models.json", "cloud_providers.json"}
+        not in {
+            "cloud_providers.json",
+            "llm_generation_policies.json",
+            "llm_models.json",
+            "local_models.json",
+        }
     )
 
 ###############################################################################

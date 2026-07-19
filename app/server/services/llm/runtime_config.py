@@ -237,7 +237,6 @@ class LLMRuntimeConfig:
         return bool(cls._load_snapshot().use_cloud_models)
 
     # -------------------------------------------------------------------------
-    @classmethod
     # -------------------------------------------------------------------------
     @classmethod
     def is_ollama_reasoning_enabled(cls) -> bool:

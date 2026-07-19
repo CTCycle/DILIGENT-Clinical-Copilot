@@ -967,6 +967,14 @@
   line-height: 1.45;
 }
 
+.model-config-description-panel .field-help-text {
+  display: block;
+  margin-top: 6px;
+  color: var(--mc-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .model-config-temperature-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 66px;
