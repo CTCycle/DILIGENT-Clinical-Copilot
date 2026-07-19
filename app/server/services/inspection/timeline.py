@@ -221,12 +221,6 @@ class InspectionTimelineMixin:
                 LLMRuntimeConfig.get_clinical_model() or clinical_model,
             )
             requested_runtime_settings.setdefault(
-                "ollama_temperature", LLMRuntimeConfig.get_ollama_temperature()
-            )
-            requested_runtime_settings.setdefault(
-                "cloud_temperature", LLMRuntimeConfig.get_cloud_temperature()
-            )
-            requested_runtime_settings.setdefault(
                 "ollama_reasoning", LLMRuntimeConfig.is_ollama_reasoning_enabled()
             )
             requested_runtime_settings.setdefault(

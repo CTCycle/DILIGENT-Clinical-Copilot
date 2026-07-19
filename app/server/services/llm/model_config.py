@@ -28,6 +28,7 @@ from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
 from services.llm.cloud import CloudLLMClient, LLMError
+from services.llm.generation_policy import GenerationPurpose
 from services.llm.provider_registry import provider_registry
 from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
 from domain.llm.providers import CloudProviderId
@@ -53,8 +54,6 @@ class ModelConfigSnapshotStore(Protocol):
         use_cloud_models: bool | object = ...,
         cloud_provider: str | None | object = ...,
         cloud_model: str | None | object = ...,
-        ollama_temperature: float | object = ...,
-        cloud_temperature: float | object = ...,
         ollama_reasoning: bool | object = ...,
         ollama_seed: int | None | object = ...,
         rag_settings: dict[str, object] | object = ...,
@@ -177,7 +176,7 @@ class ModelConfigService:
                             "content": "Provider connectivity check.",
                         },
                     ],
-                    options={"temperature": 0.0},
+                    purpose=GenerationPurpose.CONNECTIVITY_CHECK,
                 )
         except LLMError as exc:
             return ConnectivityCheckResponse(
@@ -348,15 +347,6 @@ class ModelConfigService:
     ) -> None:
         if "use_cloud_services" in fields_set:
             updates["use_cloud_models"] = bool(payload.use_cloud_services)
-
-        if (
-            "ollama_temperature" in fields_set
-            and payload.ollama_temperature is not None
-        ):
-            updates["ollama_temperature"] = payload.ollama_temperature
-
-        if "cloud_temperature" in fields_set and payload.cloud_temperature is not None:
-            updates["cloud_temperature"] = payload.cloud_temperature
 
         if "ollama_reasoning" in fields_set and payload.ollama_reasoning is not None:
             updates["ollama_reasoning"] = payload.ollama_reasoning
@@ -550,8 +540,6 @@ class ModelConfigService:
                     provider=self.resolve_provider(defaults.llm_provider),
                     model_name=defaults.cloud_model,
                 ),
-                ollama_temperature=defaults.ollama_temperature,
-                cloud_temperature=defaults.cloud_temperature,
                 ollama_reasoning=defaults.ollama_reasoning,
             )
 
@@ -743,8 +731,6 @@ class ModelConfigService:
             cloud_model=cloud_model,
             clinical_model=snapshot.clinical_model,
             text_extraction_model=snapshot.text_extraction_model,
-            ollama_temperature=snapshot.ollama_temperature,
-            cloud_temperature=snapshot.cloud_temperature,
             ollama_reasoning=snapshot.ollama_reasoning,
             ollama_seed=snapshot.ollama_seed,
             rag_settings=rag_settings_payload(build_effective_rag_settings()),

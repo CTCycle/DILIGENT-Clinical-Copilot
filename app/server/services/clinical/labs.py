@@ -10,6 +10,7 @@ from typing import Any, Literal
 from common.prompts.extraction import CLINICAL_LAB_EXTRACTION_PROMPT
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
+from services.llm.generation_policy import GenerationPurpose
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalLabEntry,
@@ -613,7 +614,7 @@ class ClinicalLabExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         if parsed <= 0:
             return None
@@ -799,7 +800,7 @@ class ClinicalLabExtractor:
                         system_prompt=system_prompt,
                         user_prompt=user_prompt,
                         schema=schema,
-                        temperature=self.temperature,
+                        purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
                         use_json_mode=True,
                         max_repair_attempts=1,
                     ),

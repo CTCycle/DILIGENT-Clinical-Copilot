@@ -1,5 +1,7 @@
 # Backend Layers
-Last updated: 2026-07-14
+Last updated: 2026-07-19
+
+Sampling behavior is owned by `services/llm/generation_policy.py`.
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`

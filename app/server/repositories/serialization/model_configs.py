@@ -21,8 +21,7 @@ UNSET = object()
 class ModelConfigSerializer:
     """Persist the validated model configuration as one singleton document."""
 
-    DEFAULT_OLLAMA_TEMPERATURE = 0.7
-    DEFAULT_CLOUD_TEMPERATURE = 0.7
+    MODEL_CONFIG_PAYLOAD_SCHEMA_VERSION = 2
     DEFAULT_OLLAMA_REASONING = False
     DEFAULT_OLLAMA_SEED = 42
 
@@ -61,8 +60,6 @@ class ModelConfigSerializer:
         use_cloud_models: bool | object = UNSET,
         cloud_provider: str | None | object = UNSET,
         cloud_model: str | None | object = UNSET,
-        ollama_temperature: float | object = UNSET,
-        cloud_temperature: float | object = UNSET,
         ollama_reasoning: bool | object = UNSET,
         ollama_seed: int | None | object = UNSET,
         rag_settings: dict[str, object] | object = UNSET,
@@ -75,8 +72,6 @@ class ModelConfigSerializer:
             "use_cloud_models": use_cloud_models,
             "cloud_provider": cloud_provider,
             "cloud_model": cloud_model,
-            "ollama_temperature": ollama_temperature,
-            "cloud_temperature": cloud_temperature,
             "ollama_reasoning": ollama_reasoning,
             "ollama_seed": ollama_seed,
             "rag_settings": rag_settings,
@@ -84,12 +79,8 @@ class ModelConfigSerializer:
         for key, value in updates.items():
             if value is not UNSET:
                 current[key] = value
-        current["ollama_temperature"] = self.normalize_temperature(
-            current.get("ollama_temperature", self.DEFAULT_OLLAMA_TEMPERATURE)
-        )
-        current["cloud_temperature"] = self.normalize_temperature(
-            current.get("cloud_temperature", self.DEFAULT_CLOUD_TEMPERATURE)
-        )
+        current.pop("ollama_temperature", None)
+        current.pop("cloud_temperature", None)
         current["ollama_reasoning"] = bool(current.get("ollama_reasoning", False))
         current["ollama_seed"] = self.normalize_optional_seed(
             current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
@@ -99,7 +90,9 @@ class ModelConfigSerializer:
             if isinstance(current.get("rag_settings"), dict)
             else {}
         )
-        self.application_configuration.save(current, schema_version=1)
+        self.application_configuration.save(
+            current, schema_version=self.MODEL_CONFIG_PAYLOAD_SCHEMA_VERSION
+        )
         return self.load_snapshot()
 
     # -------------------------------------------------------------------------
@@ -111,8 +104,6 @@ class ModelConfigSerializer:
             use_cloud_models=False,
             cloud_provider=None,
             cloud_model=None,
-            ollama_temperature=cls.DEFAULT_OLLAMA_TEMPERATURE,
-            cloud_temperature=cls.DEFAULT_CLOUD_TEMPERATURE,
             ollama_reasoning=cls.DEFAULT_OLLAMA_REASONING,
             ollama_seed=cls.DEFAULT_OLLAMA_SEED,
             rag_settings={},
@@ -132,12 +123,6 @@ class ModelConfigSerializer:
             use_cloud_models=bool(payload.get("use_cloud_models", False)),
             cloud_provider=cls.normalize_optional_text(payload.get("cloud_provider")),
             cloud_model=cls.normalize_optional_text(payload.get("cloud_model")),
-            ollama_temperature=cls.normalize_temperature(
-                payload.get("ollama_temperature", cls.DEFAULT_OLLAMA_TEMPERATURE)
-            ),
-            cloud_temperature=cls.normalize_temperature(
-                payload.get("cloud_temperature", cls.DEFAULT_CLOUD_TEMPERATURE)
-            ),
             ollama_reasoning=bool(payload.get("ollama_reasoning", False)),
             ollama_seed=cls.normalize_optional_seed(
                 payload.get("ollama_seed", cls.DEFAULT_OLLAMA_SEED)
@@ -160,13 +145,6 @@ class ModelConfigSerializer:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def normalize_temperature(value: object) -> float:
-        try:
-            return max(0.0, min(2.0, float(str(value))))
-        except (TypeError, ValueError):
-            return 0.7
-
-    # -------------------------------------------------------------------------
     @staticmethod
     def normalize_optional_seed(value: object) -> int | None:
         if value is None:

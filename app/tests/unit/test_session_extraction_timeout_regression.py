@@ -128,32 +128,40 @@ def test_runtime_timeout_resolution_does_not_apply_six_second_parser_cap() -> No
     assert timeout > 6.0
 
 
+###############################################################################
 def test_livertox_timeout_does_not_claim_knowledge_base_is_unavailable(
     monkeypatch: Any,
 ) -> None:
+
+    ###############################################################################
     class Owner:
         drugs_parser = SimpleNamespace(client=None, model=None, temperature=0.0)
         input_preparator = SimpleNamespace()
 
+        # -------------------------------------------------------------------------
         @staticmethod
         def emit_progress(*args: Any, **kwargs: Any) -> None:
             _ = args, kwargs
 
+        # -------------------------------------------------------------------------
         @staticmethod
         def build_stage_progress_callback(*args: Any, **kwargs: Any):
             _ = args, kwargs
             return lambda _value: None
 
+        # -------------------------------------------------------------------------
         @staticmethod
         def run_stop_check(stop_check: Any) -> None:
             _ = stop_check
 
+        # -------------------------------------------------------------------------
         @staticmethod
         def append_warning_issue(
             issues: list[Any], *, code: str, message: str, field: str | None = None
         ) -> None:
             issues.append(SimpleNamespace(code=code, message=message, field=field))
 
+        # -------------------------------------------------------------------------
         @staticmethod
         def append_knowledge_base_unavailable_issue(issues: list[Any]) -> None:
             issues.append(SimpleNamespace(code="knowledge_base_unavailable"))

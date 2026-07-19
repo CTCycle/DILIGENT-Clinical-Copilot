@@ -9,6 +9,7 @@ import httpx
 
 from configurations.startup import get_server_settings
 from services.llm import ollama_chat, ollama_residency, ollama_structured
+from services.llm.generation_policy import GenerationPurpose
 from services.llm.ollama_runtime import (
     OllamaError,
     OllamaTimeout,
@@ -308,20 +309,15 @@ class OllamaClient:
     def prepare_generation_parameters(
         self,
         *,
+        model: str,
+        purpose: GenerationPurpose,
         temperature: float | None,
         think: bool | None,
         options: dict[str, Any] | None,
-    ) -> tuple[float, bool, dict[str, Any] | None]:
+    ) -> tuple[float | None, bool, dict[str, Any] | None]:
         return ollama_chat.prepare_generation_parameters(
-            self, temperature=temperature, think=think, options=options
+            self, model=model, purpose=purpose, temperature=temperature, think=think, options=options
         )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def resolve_temperature(
-        temperature: float | None, options: dict[str, Any] | None
-    ) -> tuple[float, dict[str, Any] | None]:
-        return ollama_chat.resolve_temperature(temperature, options)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -344,7 +340,7 @@ class OllamaClient:
         messages: list[dict[str, str]],
         stream: bool,
         format: str | None,
-        temperature: float,
+        temperature: float | None,
         think: bool,
         options: dict[str, Any] | None,
         keep_alive: str | None,
@@ -382,11 +378,13 @@ class OllamaClient:
         think: bool | None,
         options: dict[str, Any] | None,
         messages: list[dict[str, str]] | None = None,
-    ) -> tuple[str, float, bool, dict[str, Any] | None]:
+        purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
+    ) -> tuple[str, float | None, bool, dict[str, Any] | None]:
         return await ollama_chat.prepare_common_options(
             self,
             model=model,
             temperature=temperature,
+            purpose=purpose,
             think=think,
             options=options,
             messages=messages,

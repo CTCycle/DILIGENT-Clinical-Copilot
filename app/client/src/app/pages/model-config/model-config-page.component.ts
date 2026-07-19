@@ -148,7 +148,6 @@ export class ModelConfigPageComponent implements OnInit {
   readonly openProviderModal = signal<AccessKeyProvider | null>(null);
   readonly modelPullProgress = signal<Record<string, ModelPullProgressState>>({});
   readonly previewReasoningEnabled = signal(true);
-  readonly previewTemperatureOverride = signal<number | null>(null);
   readonly previewCloudModelOverrides = signal<Partial<Record<CloudProvider, string>>>({});
   readonly ragSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
   readonly draftRagSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
@@ -348,15 +347,12 @@ export class ModelConfigPageComponent implements OnInit {
     const draft = this.draftConfig();
     const savedProvider = resolveProvider(settings.provider, this.cloudChoices());
     const savedCloudModel = resolveCloudModel(savedProvider, settings.cloudModel, this.cloudChoices());
-    const temperatureChanged =
-      this.previewTemperatureOverride() === null && draft.temperature !== settings.temperature;
     const hasPendingChanges =
       draft.useCloudServices !== settings.useCloudServices ||
       this.draftProvider() !== savedProvider ||
       (this.draftCloudModel() || '') !== (savedCloudModel || '') ||
       draft.clinicalModel !== settings.clinicalModel ||
-      draft.textExtractionModel !== settings.textExtractionModel ||
-      temperatureChanged;
+      draft.textExtractionModel !== settings.textExtractionModel;
 
     return (
       this.isLoading() ||
@@ -415,7 +411,6 @@ export class ModelConfigPageComponent implements OnInit {
   private applyPreviewDefaultState(): void {
     const state = this.appState.state().diliAgent;
     this.previewReasoningEnabled.set(state.settings.reasoning);
-    this.previewTemperatureOverride.set(null);
   }
 
   async persistConfigPatch(patch: ModelConfigUpdateRequest, successMessage = '', syncDraft = true): Promise<void> {
@@ -642,21 +637,6 @@ export class ModelConfigPageComponent implements OnInit {
     await this.persistConfigPatch({ ollama_reasoning: enabled }, 'Extra parameters saved.', false);
   }
 
-  setTemperature(value: string): void {
-    this.previewTemperatureOverride.set(null);
-    const parsed = Number.parseFloat(value.replace(',', '.'));
-    if (!Number.isFinite(parsed)) return;
-    const bounded = Math.max(0, Math.min(2, parsed));
-    this.draftConfig.update((previous) => ({
-      ...previous,
-      temperature: bounded,
-    }));
-  }
-
-  formattedTemperature(): string {
-    return (this.previewTemperatureOverride() ?? this.draftConfig().temperature).toFixed(2);
-  }
-
   async handleSaveConfiguration(): Promise<void> {
     const draft = this.draftConfig();
     const missingLocalModels = this.missingRequiredModels();
@@ -671,10 +651,6 @@ export class ModelConfigPageComponent implements OnInit {
       clinical_model: draft.clinicalModel || null,
       text_extraction_model: draft.textExtractionModel || null,
     };
-    if (this.previewTemperatureOverride() === null) {
-      patch.ollama_temperature = draft.temperature;
-      patch.cloud_temperature = draft.temperature;
-    }
     await this.persistConfigPatch(
       patch,
       'Configuration saved.',

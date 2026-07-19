@@ -11,6 +11,7 @@ from common.catalogs.model_choices import get_cloud_model_choices
 from common.prompts.timeline import PATIENT_TIMELINE_EXTRACTION_PROMPT
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
+from services.llm.generation_policy import GenerationPurpose
 from configurations.startup import get_server_settings
 from domain.patient_timeline import (
     PatientTimeline,
@@ -244,7 +245,7 @@ class PatientTimelineExtractor:
                     system_prompt=PATIENT_TIMELINE_EXTRACTION_PROMPT.strip(),
                     user_prompt=user_prompt,
                     schema=PatientTimelineExtraction,
-                    temperature=self.temperature,
+                    purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
                     use_json_mode=True,
                     max_repair_attempts=2,
                 )

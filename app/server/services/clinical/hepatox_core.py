@@ -71,12 +71,9 @@ class HepatoxConsultation:
         self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             chat_signature = None
-        self.chat_supports_temperature = (
-            chat_signature is not None and "temperature" in chat_signature.parameters
-        )
-        self.temperature = LLMRuntimeConfig.get_ollama_temperature()
+        self.chat_supports_temperature = False
         self.similarity_search: SimilaritySearch | None = None
         rag_settings = build_effective_rag_settings()
         self.rag_use_reranking = bool(rag_settings.use_reranking)

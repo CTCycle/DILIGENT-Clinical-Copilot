@@ -4304,18 +4304,6 @@
             ],
             "title": "Clinical Model"
           },
-          "ollama_temperature": {
-            "type": "number",
-            "maximum": 2.0,
-            "minimum": 0.0,
-            "title": "Ollama Temperature"
-          },
-          "cloud_temperature": {
-            "type": "number",
-            "maximum": 2.0,
-            "minimum": 0.0,
-            "title": "Cloud Temperature"
-          },
           "ollama_reasoning": {
             "type": "boolean",
             "title": "Ollama Reasoning"
@@ -4369,8 +4357,6 @@
           "cloud_model",
           "text_extraction_model",
           "clinical_model",
-          "ollama_temperature",
-          "cloud_temperature",
           "ollama_reasoning",
           "ollama_seed",
           "rag_settings"
@@ -4441,32 +4427,6 @@
               }
             ],
             "title": "Clinical Model"
-          },
-          "ollama_temperature": {
-            "anyOf": [
-              {
-                "type": "number",
-                "maximum": 2.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ollama Temperature"
-          },
-          "cloud_temperature": {
-            "anyOf": [
-              {
-                "type": "number",
-                "maximum": 2.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cloud Temperature"
           },
           "ollama_reasoning": {
             "anyOf": [

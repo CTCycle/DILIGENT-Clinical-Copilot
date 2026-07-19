@@ -6,7 +6,6 @@ from pathlib import Path
 
 SERVER_ROOT = Path(__file__).resolve().parents[2] / "server"
 
-
 ###############################################################################
 def python_files(root: Path) -> list[Path]:
     ignored = {"__pycache__", ".venv", "pytest-cache-files"}
@@ -19,7 +18,6 @@ def python_files(root: Path) -> list[Path]:
         )
     ]
 
-
 ###############################################################################
 def test_schema_ownership_and_removed_tables_are_canonical() -> None:
     schema_root = SERVER_ROOT / "repositories" / "schemas"
@@ -30,7 +28,6 @@ def test_schema_ownership_and_removed_tables_are_canonical() -> None:
     assert "ClinicalSessionDrug" not in source
     assert "clinical_session_labs" not in source
     assert "clinical_session_drugs" not in source
-
 
 ###############################################################################
 def test_backend_layer_imports_and_file_size_guard() -> None:
@@ -46,7 +43,6 @@ def test_backend_layer_imports_and_file_size_guard() -> None:
             if isinstance(node, (ast.Import, ast.ImportFrom)):
                 names = [alias.name for alias in node.names]
                 assert not any(name.startswith("services.") for name in names), path
-
 
 ###############################################################################
 def test_domain_owns_extractor_and_pattern_contracts() -> None:

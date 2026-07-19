@@ -12,7 +12,6 @@ export type RuntimeSettings = {
   cloudModel: string | null;
   textExtractionModel: string;
   clinicalModel: string;
-  temperature: number;
   reasoning: boolean;
 };
 
@@ -55,8 +54,6 @@ export type ModelConfigStateResponse = {
   cloud_model: string | null;
   clinical_model: string | null;
   text_extraction_model: string | null;
-  ollama_temperature: number;
-  cloud_temperature: number;
     ollama_reasoning: boolean;
     ollama_seed: number | null;
   rag_settings: RagSettings;
@@ -70,8 +67,6 @@ export type ModelConfigUpdateRequest = {
   cloud_model?: string | null;
   clinical_model?: string | null;
   text_extraction_model?: string | null;
-  ollama_temperature?: number;
-  cloud_temperature?: number;
     ollama_reasoning?: boolean;
     ollama_seed?: number | null;
   rag_settings?: Partial<RagSettings>;

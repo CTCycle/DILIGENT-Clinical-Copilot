@@ -27,6 +27,7 @@ from common.prompts.revision_agent import (
 from services.inspection.revision_tools import RevisionToolRegistry
 from services.llm.provider_factory import select_llm_provider
 from services.llm.runtime_config import LLMRuntimeConfig
+from services.llm.generation_policy import GenerationPurpose
 
 REVISION_AGENT_PROMPT_VERSION = "revision-agent-issue-scan-v1"
 REVISION_AGENT_SCHEMA_NAME = "revision_issue_scan_result"
@@ -45,7 +46,6 @@ StructuredCall = Callable[..., Any]
 class RevisionAgentRuntime:
     provider: str
     model: str
-    temperature: float
 
 ###############################################################################
 def _clip_text(value: Any, limit: int) -> str:
@@ -69,15 +69,9 @@ def resolve_revision_agent_runtime(
     overrides = dict(model_overrides or {})
     with LLMRuntimeConfig.override_for_run(overrides):
         provider, model = LLMRuntimeConfig.resolve_provider_and_model("clinical")
-        temperature = (
-            LLMRuntimeConfig.get_cloud_temperature()
-            if provider in {"openai", "gemini"}
-            else LLMRuntimeConfig.get_ollama_temperature()
-        )
     return RevisionAgentRuntime(
         provider=provider,
         model=model,
-        temperature=float(temperature),
     )
 
 ###############################################################################
@@ -491,7 +485,7 @@ class RevisionAgentRunner:
                     system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
                     user_prompt=user_prompt,
                     schema=schema,
-                    temperature=runtime.temperature,
+                    purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
                 )
             )
         client = select_llm_provider(
@@ -503,7 +497,7 @@ class RevisionAgentRunner:
                 system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
                 schema=schema,
-                temperature=runtime.temperature,
+                purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
                 use_json_mode=True,
                 max_repair_attempts=1,
             )
@@ -522,7 +516,7 @@ class RevisionAgentRunner:
                 system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
                 schema=RevisionIssueScanResult,
-                temperature=runtime.temperature,
+                purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
             )
             if isinstance(value, RevisionIssueScanResult):
                 return value
@@ -538,7 +532,7 @@ class RevisionAgentRunner:
                 system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
                 schema=RevisionIssueScanResult,
-                temperature=runtime.temperature,
+                purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
                 use_json_mode=True,
                 max_repair_attempts=1,
             )
