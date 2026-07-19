@@ -14,6 +14,7 @@ from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, OpenAIError
 from common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
+from services.llm.generation_policy import GenerationPurpose, GenerationPolicy
 from configurations.startup import get_server_settings
 from repositories.serialization.access_keys import AccessKeySerializer
 from services.llm.structured import (
@@ -267,13 +268,22 @@ class CloudLLMClient:
         messages: list[dict[str, str]],
         format: str | None = None,
         options: dict[str, Any] | None = None,
+        purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
     ) -> dict[str, Any] | str:
-        options_payload = dict(options) if options else {}
-        if "temperature" not in options_payload:
-            options_payload["temperature"] = LLMRuntimeConfig.get_cloud_temperature()
         resolved_model = model or self.default_model
         if not resolved_model:
             raise LLMError("Model is required")
+        policy = LLMRuntimeConfig.resolve_generation_policy(
+            purpose=purpose,
+            provider=self.provider,
+            model=resolved_model,
+            reasoning_enabled=False,
+        )
+        options_payload = {
+            key: value for key, value in (options or {}).items() if key != "temperature"
+        }
+        if policy.temperature is not None:
+            options_payload["temperature"] = policy.temperature
 
         try:
             if self.transport is not None:
@@ -504,7 +514,7 @@ class CloudLLMClient:
         model: str,
         system_prompt: str,
         user_prompt: str,
-        temperature: float = 0.0,
+        purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
     ) -> str:
         resolved_model = model or (self.default_model or "")
         raw = await self.chat(
@@ -513,11 +523,7 @@ class CloudLLMClient:
                 {"role": "system", "content": system_prompt.strip()},
                 {"role": "user", "content": user_prompt},
             ],
-            options=(
-                None
-                if self.is_gpt5_family_model(resolved_model)
-                else {"temperature": float(temperature)}
-            ),
+            purpose=purpose,
         )
         return json.dumps(raw) if isinstance(raw, dict) else str(raw)
 
@@ -614,7 +620,7 @@ class CloudLLMClient:
         system_prompt: str,
         user_prompt: str,
         schema: type[T],
-        temperature: float = 0.0,
+        purpose: GenerationPurpose = GenerationPurpose.STRUCTURED_EXTRACTION,
         use_json_mode: bool = True,
         max_repair_attempts: int = 2,
     ) -> T:
@@ -634,7 +640,9 @@ class CloudLLMClient:
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     schema=schema,
-                    temperature=temperature,
+                    policy=LLMRuntimeConfig.resolve_generation_policy(
+                        purpose=purpose, provider=self.provider, model=resolved_model
+                    ),
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning(
@@ -646,11 +654,7 @@ class CloudLLMClient:
             try:
                 raw = await self._chat_gemini(
                     resolved_model=resolved_model,
-                    options=(
-                        None
-                        if self.is_gpt5_family_model(resolved_model)
-                        else {"temperature": temperature}
-                    ),
+                    options=None,
                     messages=[
                         {"role": "system", "content": system_prompt.strip()},
                         {"role": "user", "content": user_prompt},
@@ -667,11 +671,8 @@ class CloudLLMClient:
             model=resolved_model,
             messages=messages,
             format="json" if use_json_mode else None,
-            options=(
-                None
-                if self.is_gpt5_family_model(resolved_model)
-                else {"temperature": temperature}
-            ),
+            options=None,
+            purpose=purpose,
         )
         text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
         return await self.parse_with_repairs(
@@ -692,7 +693,7 @@ class CloudLLMClient:
         system_prompt: str,
         user_prompt: str,
         schema: type[T],
-        temperature: float,
+        policy: GenerationPolicy,
     ) -> T:
         if self.openai_client is None:
             raise LLMError("OpenAI client is not configured")
@@ -702,8 +703,8 @@ class CloudLLMClient:
             "input": [{"role": "user", "content": user_prompt}],
             "text_format": schema,
         }
-        if not self.is_gpt5_family_model(model):
-            kwargs["temperature"] = float(temperature)
+        if policy.temperature is not None:
+            kwargs["temperature"] = policy.temperature
         try:
             response = await self.openai_client.responses.parse(**kwargs)
         except Exception as exc:  # noqa: BLE001
@@ -792,11 +793,7 @@ class CloudLLMClient:
                     model=model,
                     messages=repair_messages,
                     format="json" if use_json_mode else None,
-                    options=(
-                        None
-                        if self.is_gpt5_family_model(model)
-                        else {"temperature": 0.0}
-                    ),
+                    purpose=GenerationPurpose.JSON_REPAIR,
                 )
                 text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
 

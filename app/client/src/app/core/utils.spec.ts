@@ -16,7 +16,6 @@ describe('buildClinicalPayload', () => {
       cloudModel: null,
       textExtractionModel: 'x',
       clinicalModel: 'y',
-      temperature: 0,
       reasoning: false,
     };
 
@@ -38,7 +37,6 @@ describe('buildClinicalPayload', () => {
       cloudModel: null,
       textExtractionModel: 'qwen3.5:9b',
       clinicalModel: 'gpt-oss:20b',
-      temperature: 0,
       reasoning: false,
     };
 

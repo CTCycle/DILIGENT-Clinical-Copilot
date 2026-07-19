@@ -4558,11 +4558,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   box-shadow: inset 0 0 0 1px rgba(72, 95, 88, 0.06);
 }
 
-.model-config-temperature-input {
-  width: 112px;
-  max-width: 100%;
-}
-
 .model-config-caption {
   white-space: nowrap;
   line-height: 1.1;
@@ -5587,12 +5582,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: #b8c9ce;
 }
 
-:root[data-theme="dark"] .model-config-page .model-config-extra-row--side .model-config-temperature-input {
-  background: #14283a;
-  border-color: rgba(128, 158, 174, 0.36);
-  color: #eaf4f5;
-}
-
 :root[data-theme="dark"] .model-config-page .model-config-extra-row--side .model-config-reasoning-field {
   background: #102231;
   border: 1px solid rgba(123, 151, 168, 0.3);
@@ -5763,8 +5752,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   max-width: none;
 }
 
-.model-config-page .model-config-cloud-model-field select,
-.model-config-page .model-config-temperature-input {
+.model-config-page .model-config-cloud-model-field select {
   height: 46px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.86);
@@ -6200,25 +6188,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   grid-template-columns: 28px minmax(0, 1fr);
 }
 
-.model-config-page .model-config-preview-a-layout .model-config-temperature-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 66px;
-  align-items: center;
-  gap: 10px;
-}
-
-.model-config-page .model-config-preview-a-layout .model-config-temperature-row .field-label {
-  margin: 0;
-}
-
-.model-config-page .model-config-preview-a-layout .model-config-temperature-input {
-  width: 66px;
-  justify-self: end;
-  height: 30px;
-  min-height: 30px;
-  text-align: center;
-}
-
 .model-config-page .model-config-preview-a-layout .model-config-description-panel {
   display: block;
   border-top: 1px solid color-mix(in srgb, #9fcbbd 36%, transparent);
@@ -6242,8 +6211,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-preview-a-layout .model-config-search input,
 .model-config-page .model-config-preview-a-layout .model-config-tag-select,
-.model-config-page .model-config-preview-a-layout .model-config-cloud-row select,
-.model-config-page .model-config-preview-a-layout .model-config-temperature-input {
+.model-config-page .model-config-preview-a-layout .model-config-cloud-row select {
   border-color: #bed8cf;
   background: rgba(255, 255, 255, 0.84);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
@@ -6251,8 +6219,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-preview-a-layout .model-config-search input:hover,
 .model-config-page .model-config-preview-a-layout .model-config-tag-select:hover,
-.model-config-page .model-config-preview-a-layout .model-config-cloud-row select:hover,
-.model-config-page .model-config-preview-a-layout .model-config-temperature-input:hover {
+.model-config-page .model-config-preview-a-layout .model-config-cloud-row select:hover {
   border-color: #9fcbbd;
   background: #ffffff;
 }
@@ -6260,7 +6227,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-page .model-config-preview-a-layout .model-config-search input:focus-visible,
 .model-config-page .model-config-preview-a-layout .model-config-tag-select:focus-visible,
 .model-config-page .model-config-preview-a-layout .model-config-cloud-row select:focus-visible,
-.model-config-page .model-config-preview-a-layout .model-config-temperature-input:focus-visible,
 .model-config-page .model-config-preview-a-layout .model-config-filter-pill:focus-visible,
 .model-config-page .model-config-preview-a-layout .model-config-action-btn:focus-visible,
 .model-config-page .model-config-preview-a-layout .model-config-role-action:focus-visible,
@@ -6348,7 +6314,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-cloud-row select,
-:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-temperature-input,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-search input,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-tag-select {
   background: #0b1f1a;
@@ -6501,7 +6466,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout
-  :is(.model-config-search input, .model-config-tag-select, .model-config-cloud-row select, .model-config-temperature-input, .model-config-filter-pill, .model-config-table th) {
+  :is(.model-config-search input, .model-config-tag-select, .model-config-cloud-row select, .model-config-filter-pill, .model-config-table th) {
   background: #0f213f;
   border-color: #35527e;
   color: #dfe9fb;

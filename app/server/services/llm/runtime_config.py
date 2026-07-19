@@ -19,6 +19,11 @@ from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
 from services.llm.provider_registry import provider_registry
+from services.llm.generation_policy import (
+    GenerationPolicy,
+    GenerationPurpose,
+    resolve_generation_policy as resolve_policy,
+)
 
 ###############################################################################
 class LLMRuntimeConfig:
@@ -58,17 +63,6 @@ class LLMRuntimeConfig:
     def _normalize_local_model(value: str | None, fallback: str) -> str:
         normalized = (value or "").strip()
         return normalized or fallback
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _normalize_temperature(value: float | None, fallback: float) -> float:
-        if value is None:
-            return round(max(0.0, min(2.0, fallback)), 2)
-        try:
-            parsed = float(value)
-        except ValueError:
-            parsed = fallback
-        return round(max(0.0, min(2.0, parsed)), 2)
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -145,18 +139,6 @@ class LLMRuntimeConfig:
             ),
             cloud_provider=provider,
             cloud_model=cloud_model,
-            ollama_temperature=cls._normalize_temperature(
-                cls._coerce_optional_float(overrides.get("ollama_temperature"))
-                if "ollama_temperature" in overrides
-                else snapshot.ollama_temperature,
-                defaults.ollama_temperature,
-            ),
-            cloud_temperature=cls._normalize_temperature(
-                cls._coerce_optional_float(overrides.get("cloud_temperature"))
-                if "cloud_temperature" in overrides
-                else snapshot.cloud_temperature,
-                defaults.cloud_temperature,
-            ),
             ollama_reasoning=(
                 cls._coerce_bool(overrides.get("ollama_reasoning"))
                 if "ollama_reasoning" in overrides
@@ -198,7 +180,7 @@ class LLMRuntimeConfig:
             return None
         try:
             return max(0, int(str(value).strip()))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     # -------------------------------------------------------------------------
@@ -256,9 +238,6 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def get_ollama_temperature(cls) -> float:
-        return float(cls._load_snapshot().ollama_temperature)
-
     # -------------------------------------------------------------------------
     @classmethod
     def is_ollama_reasoning_enabled(cls) -> bool:
@@ -275,14 +254,22 @@ class LLMRuntimeConfig:
         """Capture the complete resolved runtime once for a clinical job."""
         parser_provider, parser_model = cls.resolve_provider_and_model("parser")
         clinical_provider, clinical_model = cls.resolve_provider_and_model("clinical")
+        parser_policy = cls.resolve_generation_policy(
+            purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
+            provider=parser_provider,
+            model=parser_model,
+        )
+        clinical_policy = cls.resolve_generation_policy(
+            purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
+            provider=clinical_provider,
+            model=clinical_model,
+        )
         snapshot: dict[str, object] = {
             "use_cloud_services": cls.is_cloud_enabled(),
             "llm_provider": cls.get_llm_provider(),
             "cloud_model": cls.get_cloud_model(),
             "text_extraction_model": cls.get_text_extraction_model(),
             "clinical_model": cls.get_clinical_model(),
-            "ollama_temperature": cls.get_ollama_temperature(),
-            "cloud_temperature": cls.get_cloud_temperature(),
             "ollama_reasoning": cls.is_ollama_reasoning_enabled(),
             "ollama_seed": cls.get_ollama_seed(),
             "use_rag": bool(use_rag),
@@ -291,6 +278,9 @@ class LLMRuntimeConfig:
             "parser_model": parser_model,
             "clinical_provider": clinical_provider,
             "clinical_model_resolved": clinical_model,
+            "sampling_policy_version": parser_policy.policy_version,
+            "parser_sampling_policy": cls._policy_snapshot(parser_policy),
+            "clinical_sampling_policy": cls._policy_snapshot(clinical_policy),
         }
         canonical = json.dumps(
             snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
@@ -298,9 +288,28 @@ class LLMRuntimeConfig:
         return snapshot, hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     # -------------------------------------------------------------------------
-    @classmethod
-    def get_cloud_temperature(cls) -> float:
-        return float(cls._load_snapshot().cloud_temperature)
+    @staticmethod
+    def _policy_snapshot(policy: GenerationPolicy) -> dict[str, object]:
+        return {
+            "policy_id": policy.policy_id,
+            "temperature": policy.temperature if policy.temperature is not None else "provider_default",
+            "match_kind": policy.match_kind.value,
+            "provider": policy.provider,
+            "model": policy.model,
+            "purpose": policy.purpose.value,
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def resolve_generation_policy(
+        *, purpose: GenerationPurpose, provider: str, model: str, reasoning_enabled: bool = False
+    ) -> GenerationPolicy:
+        return resolve_policy(
+            purpose=purpose,
+            provider=provider,
+            model=model,
+            reasoning_enabled=reasoning_enabled,
+        )
 
     # -------------------------------------------------------------------------
     @classmethod

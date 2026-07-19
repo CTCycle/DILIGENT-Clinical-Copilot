@@ -5,6 +5,7 @@ import json
 from playwright.sync_api import Page, Route, expect
 
 
+###############################################################################
 def _fill_valid_fields(page: Page) -> None:
     page.get_by_label("Clinical Input").fill(
         "## Anamnesis\n"
@@ -15,6 +16,7 @@ def _fill_valid_fields(page: Page) -> None:
     page.get_by_label("Visit Date").fill("2026-07-17")
 
 
+###############################################################################
 def _issue(severity: str, code: str, field: str) -> dict:
     return {
         "severity": severity,
@@ -29,6 +31,7 @@ def _issue(severity: str, code: str, field: str) -> dict:
     }
 
 
+###############################################################################
 def _preflight_body(blocking: list[dict], warnings: list[dict]) -> str:
     return json.dumps(
         {
@@ -43,6 +46,7 @@ def _preflight_body(blocking: list[dict], warnings: list[dict]) -> str:
     )
 
 
+###############################################################################
 def test_blocking_preflight_modal_prevents_job_submission(
     page: Page,
     base_url: str,
@@ -84,6 +88,7 @@ def test_blocking_preflight_modal_prevents_job_submission(
         page.unroute("**/api/clinical/jobs", count_jobs)
 
 
+###############################################################################
 def test_warning_acceptance_starts_one_job_and_preserves_form(
     page: Page,
     base_url: str,
@@ -165,6 +170,7 @@ def test_warning_acceptance_starts_one_job_and_preserves_form(
         page.unroute("**/api/clinical/jobs/preflight-warning**")
 
 
+###############################################################################
 def test_long_preflight_list_scrolls_without_hiding_header_or_actions(
     page: Page,
     base_url: str,
@@ -212,6 +218,7 @@ def test_long_preflight_list_scrolls_without_hiding_header_or_actions(
         page.unroute("**/api/clinical/validate-input")
 
 
+###############################################################################
 def test_focus_is_trapped_inside_warning_modal(
     page: Page,
     base_url: str,
@@ -248,6 +255,7 @@ def test_focus_is_trapped_inside_warning_modal(
         page.unroute("**/api/clinical/validate-input")
 
 
+###############################################################################
 def test_escape_closes_modal_and_focuses_first_affected_input(
     page: Page,
     base_url: str,

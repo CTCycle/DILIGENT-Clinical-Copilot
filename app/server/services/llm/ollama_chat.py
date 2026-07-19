@@ -15,6 +15,7 @@ import httpx
 from common.utils.logger import logger
 from common.utils.types import extract_positive_int
 from services.llm.runtime_config import LLMRuntimeConfig
+from services.llm.generation_policy import GenerationPurpose
 from configurations.startup import get_server_settings
 from services.llm.ollama_residency import (
     get_available_memory_bytes,
@@ -140,47 +141,29 @@ async def get_cached_models(self, *, force_refresh: bool = False) -> set[str]:
 def prepare_generation_parameters(
     self,
     *,
+    model: str,
+    purpose: GenerationPurpose,
     temperature: float | None,
     think: bool | None,
     options: dict[str, Any] | None,
-) -> tuple[float, bool, dict[str, Any] | None]:
-    temp_value, options_payload = self.resolve_temperature(temperature, options)
-    temp_value = max(0.0, min(2.0, float(temp_value)))
+) -> tuple[float | None, bool, dict[str, Any] | None]:
     if think is None:
         think_value = LLMRuntimeConfig.is_ollama_reasoning_enabled()
     else:
         think_value = bool(think)
-    if options_payload is None:
-        options_payload = {}
+    options_payload = {key: value for key, value in (options or {}).items() if key != "temperature"}
+    policy = LLMRuntimeConfig.resolve_generation_policy(
+        purpose=purpose,
+        provider="ollama",
+        model=model,
+        reasoning_enabled=think_value,
+    )
     configured_seed = LLMRuntimeConfig.get_ollama_seed()
     if configured_seed is not None:
         options_payload.setdefault("seed", configured_seed)
     if not options_payload:
         options_payload = None
-    return round(temp_value, 2), think_value, options_payload
-
-###############################################################################
-def resolve_temperature(
-    temperature: float | None, options: dict[str, Any] | None
-) -> tuple[float, dict[str, Any] | None]:
-    default_temp = LLMRuntimeConfig.get_ollama_temperature()
-    options_payload = dict(options) if options else None
-    temp_value = default_temp
-    if temperature is not None:
-        try:
-            temp_value = float(temperature)
-        except TypeError, ValueError:
-            temp_value = default_temp
-    if options_payload and "temperature" in options_payload:
-        if temperature is None:
-            try:
-                temp_value = float(options_payload["temperature"])
-            except TypeError, ValueError:
-                temp_value = default_temp
-        options_payload.pop("temperature", None)
-        if not options_payload:
-            options_payload = None
-    return temp_value, options_payload
+    return policy.temperature, think_value, options_payload
 
 ###############################################################################
 def compose_payload(
@@ -206,7 +189,7 @@ def build_chat_payload(
     messages: list[dict[str, str]],
     stream: bool,
     format: str | None,
-    temperature: float,
+    temperature: float | None,
     think: bool,
     options: dict[str, Any] | None,
     keep_alive: str | None,
@@ -215,9 +198,10 @@ def build_chat_payload(
         "model": model,
         "messages": messages,
         "stream": stream,
-        "temperature": temperature,
         "think": think,
     }
+    if temperature is not None:
+        payload["temperature"] = temperature
     return self.compose_payload(
         payload,
         format=format,
@@ -254,10 +238,13 @@ async def prepare_common_options(
     think: bool | None,
     options: dict[str, Any] | None,
     messages: list[dict[str, str]] | None = None,
-) -> tuple[str, float, bool, dict[str, Any] | None]:
+    purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
+) -> tuple[str, float | None, bool, dict[str, Any] | None]:
     resolved_model = self.resolve_model_name(model)
     await self.ensure_model_ready(resolved_model)
     temp_value, think_value, options_payload = self.prepare_generation_parameters(
+        model=resolved_model,
+        purpose=purpose,
         temperature=temperature,
         think=think,
         options=options,
@@ -493,7 +480,7 @@ async def is_server_online(self) -> bool:
     try:
         resp = await self.client.get("/api/tags")
         resp.raise_for_status()
-    except httpx.RequestError, httpx.HTTPStatusError:
+    except (httpx.RequestError, httpx.HTTPStatusError):
         return False
     return True
 
@@ -562,6 +549,7 @@ async def chat(
     messages: list[dict[str, str]],
     format: str | None = None,
     temperature: float | None = None,
+    purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
     think: bool | None = None,
     options: dict[str, Any] | None = None,
     keep_alive: str | None = None,
@@ -578,6 +566,7 @@ async def chat(
     ) = await self.prepare_common_options(
         model=model,
         temperature=temperature,
+        purpose=purpose,
         think=think,
         options=options,
         messages=messages,
@@ -623,6 +612,7 @@ async def chat_stream(
     messages: list[dict[str, str]],
     format: str | None = None,
     temperature: float | None = None,
+    purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
     think: bool | None = None,
     options: dict[str, Any] | None = None,
     keep_alive: str | None = None,
@@ -640,6 +630,7 @@ async def chat_stream(
     ) = await self.prepare_common_options(
         model=model,
         temperature=temperature,
+        purpose=purpose,
         think=think,
         options=options,
         messages=messages,
@@ -829,7 +820,7 @@ async def estimate_max_feasible_context(
     if metadata is None:
         try:
             metadata = await self.show_model(model)
-        except OllamaError, OllamaTimeout:
+        except (OllamaError, OllamaTimeout):
             return None
     if metadata is None:
         metadata = {}

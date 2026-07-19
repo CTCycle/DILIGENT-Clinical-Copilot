@@ -28,7 +28,7 @@ def env_float(name: str, default: float) -> float:
         return default
     try:
         return float(raw)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 ###############################################################################

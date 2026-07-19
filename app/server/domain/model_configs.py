@@ -15,8 +15,6 @@ class ModelConfigSnapshot:
     use_cloud_models: bool
     cloud_provider: str | None
     cloud_model: str | None
-    ollama_temperature: float
-    cloud_temperature: float
     ollama_reasoning: bool = False
     ollama_seed: int | None = 42
     rag_settings: dict[str, object] | None = None
@@ -42,8 +40,6 @@ class ModelConfigUpdateRequest(BaseModel):
         validation_alias=AliasChoices("text_extraction_model", "text_extraction_model"),
     )
     clinical_model: str | None = None
-    ollama_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
-    cloud_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     ollama_reasoning: bool | None = None
     ollama_seed: int | None = Field(default=None, ge=0)
     rag_settings: dict[str, object] | None = None
@@ -57,8 +53,6 @@ class ModelConfigStateResponse(BaseModel):
     cloud_model: str | None
     text_extraction_model: str | None
     clinical_model: str | None
-    ollama_temperature: float = Field(ge=0.0, le=2.0)
-    cloud_temperature: float = Field(ge=0.0, le=2.0)
     ollama_reasoning: bool
     ollama_seed: int | None
     rag_settings: dict[str, object]

@@ -401,20 +401,10 @@
           </div>
         </dl>
 
-        <section class="model-config-parameters" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
-          <h3>Parameters</h3>
-          <div class="field model-config-temperature-row">
-            <label class="field-label" for="global-temperature-input">Temperature</label>
-            <input
-              id="global-temperature-input"
-              type="text"
-              inputmode="decimal"
-              [ngModel]="formattedTemperature()"
-              (ngModelChange)="setTemperature($event)"
-              [disabled]="isSaving() || isLoading()"
-              class="model-config-temperature-input"
-            />
-          </div>
+        <section class="model-config-description-panel">
+          <h3>Generation behavior</h3>
+          <p>Automatically optimized for clinical reliability</p>
+          <span class="field-help-text">Sampling settings are selected automatically according to the provider, model family and operation being performed.</span>
         </section>
 
         <section class="model-config-description-panel">

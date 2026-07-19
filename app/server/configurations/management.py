@@ -224,8 +224,6 @@ def _default_llm_runtime_defaults(
         llm_provider=provider_default,
         cloud_model=cloud_default,
         use_cloud_services=False,
-        ollama_temperature=0.7,
-        cloud_temperature=0.7,
         ollama_reasoning=False,
         ollama_host_default=resolve_ollama_base_url(
             ollama_url=environment.ollama_url,

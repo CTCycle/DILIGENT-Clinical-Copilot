@@ -16,7 +16,7 @@ describe('ModelConfigPageComponent', () => {
     component = fixture.componentInstance;
   });
 
-  it('builds a cloud save patch with role assignments after runtime toggle and temperature update', async () => {
+  it('builds a cloud save patch with role assignments after runtime toggle', async () => {
     const persistSpy = vi
       .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<void> }, 'persistConfigPatch')
       .mockResolvedValue();
@@ -35,11 +35,9 @@ describe('ModelConfigPageComponent', () => {
       cloudModel: 'gpt-4.1-mini',
       clinicalModel: 'gpt-oss:20b',
       textExtractionModel: 'qwen3:14b',
-      temperature: 0.7,
     });
 
     component.handleCloudSwitchChange(true);
-    component.setTemperature('0.64');
 
     await component.handleSaveConfiguration();
 
@@ -50,8 +48,6 @@ describe('ModelConfigPageComponent', () => {
         cloud_model: 'gpt-4.1-mini',
         clinical_model: 'gpt-oss:20b',
         text_extraction_model: 'qwen3:14b',
-        ollama_temperature: 0.64,
-        cloud_temperature: 0.64,
       },
       'Configuration saved.',
       true,
@@ -73,7 +69,6 @@ describe('ModelConfigPageComponent', () => {
       cloudModel: 'gpt-4.1-mini',
       clinicalModel: 'gpt-4.1-mini',
       textExtractionModel: 'gpt-4.1-mini',
-      temperature: 0.7,
     });
     component.setModelSearchQuery('gpt');
 

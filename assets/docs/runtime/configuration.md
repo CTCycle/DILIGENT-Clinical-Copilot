@@ -1,5 +1,8 @@
 # Configuration
-Last updated: 2026-07-16
+Last updated: 2026-07-19
+
+Temperature is not a deployment or operator setting; it is resolved by the
+source-controlled automatic generation policy immediately before each LLM call.
 
 ## Primary Runtime Files
 - Active env file: `settings/.env`

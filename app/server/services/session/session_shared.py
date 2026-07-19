@@ -49,8 +49,6 @@ def build_failed_session_payload(
         "cloud_model": LLMRuntimeConfig.get_cloud_model(),
         "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
         "clinical_model": LLMRuntimeConfig.get_clinical_model(),
-        "ollama_temperature": (LLMRuntimeConfig.get_ollama_temperature()),
-        "cloud_temperature": (LLMRuntimeConfig.get_cloud_temperature()),
         "ollama_reasoning": bool(LLMRuntimeConfig.is_ollama_reasoning_enabled()),
         "resolved_runtime": {},
         "stage_elapsed_ms": {},

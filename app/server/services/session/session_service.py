@@ -241,7 +241,7 @@ class ClinicalSessionService(
             LLMRuntimeConfig.resolve_provider_and_model("clinical")
         )
         logger.info(
-            "Resolved LLM runtime from persisted model config: cloud=%s provider=%s cloud_model=%s text_extraction_provider=%s text_extraction_model=%s clinical_provider=%s clinical_model=%s ollama_temperature=%.2f cloud_temperature=%.2f reasoning=%s",
+            "Resolved LLM runtime from persisted model config: cloud=%s provider=%s cloud_model=%s text_extraction_provider=%s text_extraction_model=%s clinical_provider=%s clinical_model=%s reasoning=%s",
             LLMRuntimeConfig.is_cloud_enabled(),
             LLMRuntimeConfig.get_llm_provider(),
             LLMRuntimeConfig.get_cloud_model(),
@@ -249,8 +249,6 @@ class ClinicalSessionService(
             parser_model,
             clinical_provider,
             clinical_model_resolved,
-            LLMRuntimeConfig.get_ollama_temperature(),
-            LLMRuntimeConfig.get_cloud_temperature(),
             LLMRuntimeConfig.is_ollama_reasoning_enabled(),
         )
 
