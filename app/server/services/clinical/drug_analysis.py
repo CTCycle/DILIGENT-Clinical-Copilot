@@ -13,6 +13,7 @@ from common.prompts.clinical_assessment import (
 )
 from common.utils.logger import logger
 from domain.clinical.entities import DrugRucamAssessment, DrugSuspensionContext
+from services.llm.generation_policy import GenerationPurpose
 
 ###############################################################################
 class DrugAnalysisService:
@@ -99,11 +100,8 @@ class DrugAnalysisService:
         chat_kwargs: dict[str, Any] = {
             "model": consultation.llm_model,
             "messages": messages,
+            "purpose": GenerationPurpose.CLINICAL_SYNTHESIS,
         }
-        if consultation.chat_supports_temperature:
-            chat_kwargs["temperature"] = consultation.temperature
-        else:
-            chat_kwargs["options"] = {"temperature": consultation.temperature}
         raw_response: Any = None
         for attempt in range(1, consultation.analysis_retry_attempts + 1):
             try:

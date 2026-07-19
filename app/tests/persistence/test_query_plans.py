@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-
 ###############################################################################
 def test_session_timestamp_index_is_used_by_listing_plan(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     with persistence_engine.connect() as connection:

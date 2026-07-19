@@ -54,6 +54,8 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
   - Launcher-first startup procedures for local development, Codex sessions, browser-driven UI work, and manual fallback commands only when the launcher path is unsuitable or already diagnosed as failing.
 - `runtime/configuration.md`
   - Environment variables, ports, runtime settings, and catalog inputs.
+- `runtime/generation_policy.md`
+  - Immutable provider/model/task sampling policy and run provenance.
 - `runtime/deployment.md`
   - Local deployment constraints and dependency notes.
 - `runtime/troubleshooting.md`

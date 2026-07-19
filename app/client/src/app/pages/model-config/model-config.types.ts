@@ -10,7 +10,6 @@ export type DraftRuntimeConfig = {
   cloudModel: string | null;
   clinicalModel: string;
   textExtractionModel: string;
-  temperature: number;
 };
 
 export type DraftRagSettings = RagSettings;

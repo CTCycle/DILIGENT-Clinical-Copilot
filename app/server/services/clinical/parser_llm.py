@@ -7,6 +7,7 @@ from typing import Any, Literal, cast
 
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
+from services.llm.generation_policy import GenerationPurpose
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     DrugEntry,
@@ -475,7 +476,7 @@ class DrugLlmExtractionMixin(ParserHost):
                     system_prompt=prompt,
                     user_prompt=user_prompt,
                     schema=schema_model,
-                    temperature=self.temperature,
+                    purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
                     use_json_mode=True,
                     max_repair_attempts=1,
                 ),

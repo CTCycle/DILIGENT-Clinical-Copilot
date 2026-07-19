@@ -118,8 +118,6 @@ class LLMRuntimeDefaults(BaseModel):
     llm_provider: str
     cloud_model: str
     use_cloud_services: bool
-    ollama_temperature: float
-    cloud_temperature: float
     ollama_reasoning: bool
     ollama_host_default: str
 

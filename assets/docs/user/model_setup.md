@@ -1,5 +1,8 @@
 # Model Setup
-Last updated: 2026-07-17
+Last updated: 2026-07-19
+
+Sampling settings are selected automatically according to the provider, model
+family, and operation. They are not user-configurable.
 
 ## Configure Models
 Open **Model Configurations** from the sidebar.

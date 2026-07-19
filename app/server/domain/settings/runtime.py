@@ -10,7 +10,5 @@ class LLMRuntimeState(BaseModel):
     llm_provider: str = ""
     cloud_model: str = ""
     use_cloud_services: bool = False
-    ollama_temperature: float = 0.0
-    cloud_temperature: float = 0.0
     ollama_reasoning: bool = False
     revision: int = 0

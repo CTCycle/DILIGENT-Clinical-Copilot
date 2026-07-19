@@ -13,6 +13,7 @@ from services.retrieval.embeddings import (
     SimilaritySearch,
 )
 from services.text.normalization import normalize_drug_query_name
+from services.llm.generation_policy import GenerationPurpose
 
 RATE_LIMIT_WAIT_HINT_RE = re.compile(
     r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
@@ -245,11 +246,8 @@ class RagSupportService:
                 {"role": "system", "content": repair_system},
                 {"role": "user", "content": repair_user},
             ],
+            "purpose": GenerationPurpose.JSON_REPAIR,
         }
-        if consultation.chat_supports_temperature:
-            chat_kwargs["temperature"] = 0.0
-        else:
-            chat_kwargs["options"] = {"temperature": 0.0}
         repaired = await consultation.llm_client.chat(**chat_kwargs)
         return consultation.drug_analysis.coerce_chat_text(repaired).strip()
 
@@ -262,7 +260,7 @@ class RagSupportService:
             return None
         try:
             parsed = float(match.group(1))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         if parsed <= 0:
             return None
@@ -335,7 +333,7 @@ class RagSupportService:
     def _coerce_page_number(value: Any) -> int | None:
         try:
             parsed = int(str(value).strip())
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         return parsed if parsed >= 1 else None
 

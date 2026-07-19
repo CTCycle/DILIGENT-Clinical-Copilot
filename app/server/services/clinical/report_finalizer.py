@@ -16,6 +16,7 @@ from domain.clinical.entities import (
     PatientLabTimeline,
     RagDocumentReference,
 )
+from services.llm.generation_policy import GenerationPurpose
 from services.clinical.report_language import (
     phrase,
 )
@@ -173,11 +174,8 @@ class ReportFinalizer:
         chat_kwargs: dict[str, Any] = {
             "model": consultation.llm_model,
             "messages": messages,
+            "purpose": GenerationPurpose.CLINICAL_SYNTHESIS,
         }
-        if consultation.chat_supports_temperature:
-            chat_kwargs["temperature"] = consultation.temperature
-        else:
-            chat_kwargs["options"] = {"temperature": consultation.temperature}
         raw_response: Any = None
         for attempt in range(1, consultation.analysis_retry_attempts + 1):
             try:

@@ -17,6 +17,7 @@ from domain.clinical.extras import HepatoxPreparedInputs
 from repositories.serialization.data import DataSerializer
 from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.drug_resolution import DrugResolutionService
+from services.llm.generation_policy import GenerationPurpose
 from services.clinical.matches_core import (
     LiverToxMatcher,
 )
@@ -120,7 +121,7 @@ RxNav and LiverTox evidence before accepting it.
                     system_prompt=self.IDENTITY_FALLBACK_SYSTEM_PROMPT,
                     user_prompt=user_prompt,
                     schema=DrugIdentityProposalBatch,
-                    temperature=float(temperature),
+                    purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
                     use_json_mode=True,
                     max_repair_attempts=1,
                 ),

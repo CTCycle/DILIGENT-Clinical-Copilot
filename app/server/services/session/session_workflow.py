@@ -736,8 +736,6 @@ async def process_single_patient_workflow(
             "cloud_model": LLMRuntimeConfig.get_cloud_model(),
             "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
             "clinical_model": LLMRuntimeConfig.get_clinical_model(),
-            "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
-            "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
             "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
             "ollama_seed": LLMRuntimeConfig.get_ollama_seed(),
             "use_rag": bool(payload.use_rag),

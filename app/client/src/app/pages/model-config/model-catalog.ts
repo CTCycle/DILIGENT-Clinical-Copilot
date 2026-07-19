@@ -71,7 +71,6 @@ export function resolveDraftFromSettings(runtimeSettings: RuntimeSettings): Draf
     cloudModel,
     clinicalModel: runtimeSettings.clinicalModel || '',
     textExtractionModel: runtimeSettings.textExtractionModel || '',
-    temperature: runtimeSettings.temperature,
   };
 }
 
