@@ -160,6 +160,7 @@
   [closeOnEscape]="true"
   [restoreFocus]="false"
   (close)="returnToInputFromPreflight()"
+  (closed)="focusPreflightTarget()"
 >
   <section class="preflight-modal-content">
     <div class="preflight-introduction">
