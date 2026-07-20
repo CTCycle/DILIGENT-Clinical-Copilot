@@ -58,12 +58,12 @@
         min="0"
         max="3"
         step="1"
-        [value]="reasoningLevel"
+        [ngModel]="reasoningLevel"
         [disabled]="disabled"
         [attr.aria-label]="ariaLabel"
         [attr.aria-valuetext]="reasoningLevelLabel"
         [style.--reasoning-progress]="(reasoningLevel / 3 * 100) + '%'"
-        (input)="handleReasoningLevelInput($event)"
+        (ngModelChange)="handleReasoningLevelInputValue($event)"
       />
       <span class="model-config-reasoning-level-labels" aria-hidden="true">
         <span>Off</span>

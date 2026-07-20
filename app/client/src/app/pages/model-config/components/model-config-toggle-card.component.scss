@@ -26,6 +26,7 @@
 
 .model-config-reasoning-top-card .model-config-rag-card-top {
   min-height: 42px;
+  align-items: start;
 }
 
 .model-config-reasoning-top-card .model-config-section-kicker strong {
@@ -47,30 +48,31 @@
 
 .model-config-reasoning-level {
   display: grid;
-  gap: 4px;
+  gap: 8px;
   margin-top: auto;
+  margin-bottom: 4px;
   padding-top: var(--space-xs);
 }
 
 .model-config-reasoning-slider {
   position: static;
   inset: auto;
-  width: calc(100% - 16px);
-  height: 6px;
-  min-height: 6px;
-  margin: 0 8px;
+  width: calc(100% - 12px);
+  height: 4px;
+  min-height: 4px;
+  margin: 0 6px;
   opacity: 1;
   accent-color: var(--mc-brand);
   cursor: pointer;
 }
 
 .model-config-rag-card .model-config-reasoning-slider {
-  position: static;
+  position: relative;
   inset: auto;
-  width: calc(100% - 16px);
-  height: 6px;
-  min-height: 6px;
-  margin: 0 8px;
+  width: calc(100% - 12px);
+  height: 4px;
+  min-height: 4px;
+  margin: 0 6px;
   opacity: 1;
   appearance: none;
   border: 1px solid color-mix(in srgb, var(--mc-border-strong) 70%, transparent);
@@ -83,23 +85,25 @@
     var(--mc-border) 100%
   );
   accent-color: var(--mc-brand);
+  z-index: 2;
+  pointer-events: auto;
   transition: background 120ms ease;
 }
 
 .model-config-rag-card .model-config-reasoning-slider::-webkit-slider-thumb {
-  width: 18px;
-  height: 18px;
+  width: 12px;
+  height: 12px;
   appearance: none;
-  border: 2px solid var(--mc-brand-2);
+  border: 1px solid var(--mc-brand-2);
   border-radius: 50%;
   background: var(--mc-brand);
   box-shadow: 0 1px 4px rgba(12, 45, 36, 0.24);
 }
 
 .model-config-rag-card .model-config-reasoning-slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--mc-brand-2);
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--mc-brand-2);
   border-radius: 50%;
   background: var(--mc-brand);
   box-shadow: 0 1px 4px rgba(12, 45, 36, 0.24);
@@ -113,7 +117,7 @@
   display: flex;
   justify-content: space-between;
   gap: var(--space-xs);
-  padding: 0 8px;
+  padding: 0 6px;
   color: var(--mc-faint);
   font-size: 10px;
   line-height: 1.2;
@@ -247,8 +251,7 @@
 }
 
 :host-context([data-theme="dark"]) .model-config-rag-card {
-  background:
-    linear-gradient(180deg, rgba(16, 29, 54, 0.98), rgba(11, 23, 43, 0.98));
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
   border-color: #2a3f63;
 }
 
