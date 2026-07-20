@@ -76,13 +76,6 @@
                           [iconPath]="'M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z'"
                           (activated)="removeRxNavDrug(row.drug_id)"
                         />
-                        <app-inspection-action-icon-button
-                          [buttonClass]="'inspection-icon-button'"
-                          [ariaLabel]="'Modify RxNav entry for ' + row.drug_name"
-                          [title]="'Modify RxNav entry for ' + row.drug_name"
-                          [iconPath]="'m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z'"
-                          (activated)="openRxNavEdit(row)"
-                        />
                       </td>
                     </tr>
                   }
@@ -143,12 +136,6 @@
                           [title]="'Delete ' + row.drug_name"
                           [iconPath]="'M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z'"
                           (activated)="removeLiverToxDrug(row.drug_id)"
-                        />
-                        <app-inspection-action-icon-button
-                          [ariaLabel]="'Modify LiverTox entry (not implemented)'"
-                          [title]="'Modify LiverTox entry (not implemented)'"
-                          [iconPath]="'m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z'"
-                          [disabled]="true"
                         />
                       </td>
                     </tr>
