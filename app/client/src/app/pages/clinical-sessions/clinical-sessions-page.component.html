@@ -404,6 +404,14 @@
               [ngModel]="metadataText()"
               (ngModelChange)="updateMetadataText($event)"
             ></textarea>
+            @if (metadataSaveStatus()) {
+              <p
+                class="clinical-session-metadata-status"
+                [class.is-error]="metadataSaveStatus().startsWith('[ERROR]') || metadataSaveStatus().startsWith('Failed')"
+                role="status"
+                aria-live="polite"
+              >{{ metadataSaveStatus() }}</p>
+            }
           </div>
         }
 
