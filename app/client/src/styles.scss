@@ -324,9 +324,10 @@ app-root {
 }
 
 .stitch-dili-input-unified {
-  height: min(72vh, 760px) !important;
-  min-height: 280px !important;
-  max-height: min(72vh, 760px) !important;
+  --clinical-input-default-height: min(72vh, 760px);
+  height: var(--clinical-input-default-height);
+  min-height: 280px;
+  max-height: calc(var(--clinical-input-default-height) * 2);
   resize: vertical;
   transition: height 0.08s ease-out;
 }
@@ -2106,6 +2107,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .tab-item {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
@@ -2124,8 +2126,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .tab-item:hover {
-  background: transparent;
+  background: transparent !important;
   color: var(--color-text-primary);
+}
+
+.tab-item::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-brand) 60%, transparent);
+  content: '';
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+
+.tab-item:hover::after {
+  transform: scaleX(0.7);
 }
 
 .tab-item.active {
@@ -3416,7 +3435,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .inspection-table th {
   position: sticky;
   top: 0;
-  background: rgba(237, 244, 234, 0.98);
+  background: color-mix(in srgb, var(--color-brand) 14%, var(--color-surface));
+  border-bottom-color: color-mix(in srgb, var(--color-brand) 34%, var(--color-divider));
   z-index: 1;
   font-size: var(--font-xs);
   text-transform: uppercase;
@@ -3434,7 +3454,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-actions-cell {
   white-space: nowrap;
-  width: 124px;
+  width: 84px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -3479,6 +3499,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-icon-button.is-danger {
   color: #b91c1c;
+}
+
+:root[data-theme='dark'] .inspection-icon-button {
+  background: color-mix(in srgb, var(--color-surface) 88%, white);
+  border-color: color-mix(in srgb, var(--color-border) 70%, white);
+}
+
+:root[data-theme='dark'] .inspection-icon-button.is-primary {
+  color: #60a5fa;
+}
+
+:root[data-theme='dark'] .inspection-icon-button.is-danger {
+  color: #f87171;
 }
 
 .inspection-icon-button:disabled {
@@ -3997,11 +4030,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   height: 18px;
   color: var(--color-brand);
   flex: 0 0 auto;
-}
-
-.stitch-dili-card textarea,
-.stitch-dili-workbench textarea {
-  max-height: 416px;
 }
 
 .stitch-dili-inline-fields {
@@ -5151,6 +5179,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 :root[data-theme="dark"] .page-container.stitch-dili-page {
   background: #071923;
+}
+
+.stitch-dili-workbench textarea.stitch-dili-input-unified {
+  height: var(--clinical-input-default-height);
+  min-height: 280px;
+  max-height: calc(var(--clinical-input-default-height) * 2);
+  resize: vertical;
 }
 
 :root[data-theme="dark"] .stitch-dili-main.stitch-dili-workbench {

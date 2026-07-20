@@ -457,7 +457,7 @@
   height: 430px;
   max-height: 430px;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
   border: 1px solid color-mix(in srgb, var(--mc-border) 72%, transparent);
   border-radius: 7px;
 }
