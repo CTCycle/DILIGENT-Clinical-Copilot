@@ -36,6 +36,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 package-lock.json
+!app/client/package-lock.json
 yarn.lock
 .angular/cache/**
 
