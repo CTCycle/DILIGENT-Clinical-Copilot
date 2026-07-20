@@ -365,8 +365,9 @@
               </div>
             </div>
             <p class="clinical-session-panel-note">Add custom metadata in JSON format. Use `documents`, `images`, and `manual_metadata` for attached evidence.</p>
-            <details class="clinical-session-json-template">
-              <summary>JSON template</summary>
+            <div class="clinical-session-json-template-shell">
+              <details class="clinical-session-json-template">
+                <summary>JSON template</summary>
               <pre>&#123;
   "documents": [],
   "images": [],
@@ -377,30 +378,43 @@
     "notes": ""
   &#125;
 &#125;</pre>
-            </details>
+              </details>
+              <button
+                type="button"
+                class="clinical-session-json-save"
+                aria-label="Save metadata"
+                title="Save metadata"
+                (click)="saveMetadata()"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 4.5h11.5L19 7v12.5H5z" />
+                  <path d="M8 4.5v5h8v-5M8 19.5v-5h8v5" />
+                </svg>
+              </button>
+            </div>
             <textarea
               class="clinical-session-json"
               aria-label="Session metadata JSON"
               [ngModel]="metadataText()"
               (ngModelChange)="updateMetadataText($event)"
             ></textarea>
-            <div class="clinical-session-metadata-editor-footer">
-              <button type="button" class="btn btn-primary clinical-session-json-save" (click)="saveMetadata()">Save metadata</button>
-            </div>
           </div>
         }
 
         @if (activeSection() === 'revision') {
           <div class="clinical-session-panel clinical-session-revision-panel">
-            <h3>Agentic report revision</h3>
-            <p class="clinical-session-panel-note">Creates a new draft version. Human review is required before clinical reliance.</p>
+            <div class="clinical-session-revision-header">
+              <div>
+                <p class="clinical-session-panel-note">Create a new draft with a selected revision model. Human review is required before clinical reliance.</p>
+              </div>
+            </div>
+            <label class="clinical-session-revision-instruction"><span>Revision instruction</span><textarea [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe the report issue."></textarea></label>
             <section class="clinical-session-revision-model-panel" aria-label="Revision model selection">
               <div class="clinical-session-revision-model-header">
                 <div>
                   <h4>Revision model</h4>
                   <p>Choose the model for this revision run. This selection does not change global model configuration.</p>
                 </div>
-                <span class="clinical-session-revision-model-badge">{{ revisionModelUseCloud() ? 'Cloud runtime' : 'Local runtime' }}</span>
               </div>
               @if (revisionModelLoading()) {
                 <p class="clinical-session-panel-note">Loading model options...</p>
@@ -440,12 +454,14 @@
                       </select>
                     </label>
                   }
+                  <div class="clinical-session-actions clinical-session-revision-model-actions">
+                    <button type="button" class="btn btn-primary" (click)="startRevision()" [disabled]="revisionRunning()">Start revision</button>
+                    @if (revisionRunning()) { <button type="button" class="btn" (click)="cancelRevision()">Cancel</button> }
+                  </div>
                 </div>
               }
               @if (revisionModelError()) { <p class="clinical-session-panel-note is-error">{{ revisionModelError() }}</p> }
             </section>
-            <label class="clinical-session-revision-instruction"><span>Revision instruction</span><textarea [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe the report issue."></textarea></label>
-            <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="startRevision()" [disabled]="revisionRunning()">Start revision</button>@if (revisionRunning()) { <button type="button" class="btn" (click)="cancelRevision()">Cancel</button> }</div>
             @if (revisionStatus()) { <p class="clinical-session-panel-note">{{ revisionStatus() }}</p> }
             @if (revisionVersionId() !== null && !revisionRunning()) { <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="recordRevisionReview('approved')">Approve by human</button><button type="button" class="btn" (click)="recordRevisionReview('rejected')">Reject</button></div> }
             @if (revisionSteps().length) { <h4>Agent trace</h4><ul class="clinical-session-side-list">@for (step of revisionSteps(); track step.step_name) { <li><strong>{{ step.step_name }}</strong><small>{{ step.status }}</small></li> }</ul> }
@@ -461,11 +477,12 @@
                   <strong>Timeline Model</strong>
                   <span>{{ timelineModelSource() === 'cloud' ? 'Cloud runtime' : 'Local runtime' }}</span>
                 </div>
-                <button class="clinical-session-timeline-model-card is-selected" type="button">
+                <div class="clinical-session-timeline-model-card is-selected">
                   <span class="clinical-session-timeline-model-card-kicker">Selectable model</span>
-                  <strong>Timeline extraction model</strong>
-                  <small>{{ timelineModelName() || selected()?.text_extraction_model || 'Configured at runtime' }}</small>
-                </button>
+                  <select class="clinical-session-timeline-model-select" aria-label="Timeline extraction model" [ngModel]="timelineModelName() || selected()?.text_extraction_model || ''" (ngModelChange)="timelineModelName.set($event)">
+                    <option [value]="timelineModelName() || selected()?.text_extraction_model || ''">{{ timelineModelName() || selected()?.text_extraction_model || 'Configured at runtime' }}</option>
+                  </select>
+                </div>
                 <button class="btn btn-secondary clinical-session-timeline-action" type="button" (click)="createTimeline()">Generate Timeline</button>
               </section>
 

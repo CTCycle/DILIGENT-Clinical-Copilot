@@ -30,12 +30,12 @@ export class ModelConfigToggleCardComponent {
     return ['Off', 'Low', 'Medium', 'High'][this.reasoningLevel] || 'Off';
   }
 
-  handleReasoningLevelInput(event: Event): void {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement)) {
+  handleReasoningLevelInputValue(value: number | string): void {
+    const normalizedValue = Number(value);
+    if (!Number.isFinite(normalizedValue)) {
       return;
     }
-    this.reasoningLevelChange.emit(Number(target.value));
+    this.reasoningLevelChange.emit(normalizedValue);
   }
 
   handleSettingsClick(event: Event): void {

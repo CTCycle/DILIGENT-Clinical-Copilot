@@ -55,7 +55,8 @@
 }
 
 .model-config-header-compact .lede {
-  max-width: 920px;
+  width: 100%;
+  max-width: none;
   margin-top: 0;
   color: var(--mc-muted);
   font-size: 14px;
@@ -102,6 +103,8 @@
 }
 
 .model-config-runtime-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
   padding: 10px 12px;
   min-height: 158px;
 }
@@ -112,7 +115,7 @@
   gap: 12px;
   min-width: 0;
   min-height: 128px;
-  padding: 14px;
+  padding: 10px 14px 14px;
   border: 1px solid var(--mc-border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--mc-surface) 94%, transparent);
@@ -121,17 +124,17 @@
 
 .model-config-rag-settings-card-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
-  min-height: 42px;
+  min-height: 28px;
 }
 
 .model-config-rag-settings-card-body {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
   gap: 10px;
-    align-items: center;
+  align-items: start;
   color: var(--mc-muted);
   font-size: 12px;
   line-height: 1.35;
@@ -165,10 +168,10 @@
 }
 
 .model-config-rag-settings-card > .model-config-rag-settings-btn {
-  width: 116px;
-  min-width: 116px;
-  min-height: 30px;
-  height: 30px;
+  width: 150px;
+  min-width: 150px;
+  min-height: 28px;
+  height: 28px;
   margin-inline: auto;
   padding: 0 var(--space-md);
   font-size: var(--font-sm);
@@ -218,13 +221,16 @@
   color: var(--mc-muted);
   font-size: 10px;
   font-style: normal;
+  line-height: 1;
+  text-align: center;
 }
 
 .model-config-runtime-options {
   display: grid;
   grid-template-columns: 1fr;
   gap: 9px;
-  margin-top: 8px;
+  align-self: end;
+  margin-top: 14px;
 }
 
 .model-config-runtime-option {
@@ -338,7 +344,7 @@
 
 .model-config-toolbar {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) 160px;
+  grid-template-columns: minmax(0, 1fr) 160px 38px;
   gap: 14px;
   margin-bottom: 12px;
 }
@@ -377,6 +383,46 @@
   stroke: var(--mc-muted);
   stroke-width: 2;
   stroke-linecap: round;
+}
+
+.model-config-catalog-refresh {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+  border: 1px solid #bed8cf;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--mc-muted);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.model-config-catalog-refresh:hover:not(:disabled) {
+  border-color: var(--mc-brand-2);
+  background: #ffffff;
+  color: var(--mc-brand);
+}
+
+.model-config-catalog-refresh:focus-visible {
+  outline: 2px solid var(--mc-brand-2);
+  outline-offset: 2px;
+}
+
+.model-config-catalog-refresh:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.model-config-catalog-refresh svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .model-config-tag-select {
@@ -731,6 +777,7 @@
 
 .model-config-provider-mark.is-openai .model-config-provider-logo {
   filter: none;
+  object-fit: contain;
 }
 
 .model-config-provider-name strong,
@@ -752,19 +799,23 @@
 :host-context([data-theme="dark"]) .model-config-catalog-panel,
 :host-context([data-theme="dark"]) .model-config-cloud-options,
 :host-context([data-theme="dark"]) .model-config-summary-panel {
-  background:
-    linear-gradient(180deg, rgba(16, 29, 54, 0.98), rgba(11, 23, 43, 0.98));
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
   border-color: #2a3f63;
 }
 
+:host-context([data-theme="dark"]) .model-config-rag-settings-card {
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  border-color: #2b456f;
+}
+
 :host-context([data-theme="dark"]) .model-config-runtime-option {
-  background: #12233f !important;
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent) !important;
   border-color: #3f587e !important;
   box-shadow: none !important;
 }
 
 :host-context([data-theme="dark"]) .model-config-runtime-option.is-active {
-  background: #163154 !important;
+  background: rgba(21, 128, 61, 0.32) !important;
   border-color: #59d7c0 !important;
   box-shadow: inset 0 0 0 1px rgba(89, 215, 192, 0.24) !important;
 }
@@ -786,7 +837,7 @@
 :host-context([data-theme="dark"]) .model-config-tag-select,
 :host-context([data-theme="dark"]) .model-config-cloud-row select,
 :host-context([data-theme="dark"]) .model-config-temperature-input {
-  background: #0f1f39;
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
   border-color: #3a547a;
   color: #e2e8f0;
 }
@@ -799,7 +850,7 @@
 
 :host-context([data-theme="dark"]) .model-config-action-btn,
 :host-context([data-theme="dark"]) ::ng-deep .model-config-role-action {
-  background: #132846;
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
   border-color: #3f6ea5;
   color: #77d8f2;
 }
@@ -838,12 +889,18 @@
   color: #c8f7e4;
 }
 
+:host-context([data-theme="dark"]) .model-config-catalog-refresh {
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  border-color: #35527e;
+  color: #dfe9fb;
+}
+
 :host-context([data-theme="dark"]) .model-config-provider-mark.is-openai {
   color: #eefbf6;
 }
 
 :host-context([data-theme="dark"]) .model-config-provider-mark.is-openai .model-config-provider-logo {
-  filter: invert(1) brightness(1.8);
+  filter: brightness(0) invert(1);
 }
 
 :host-context([data-theme="dark"]) .model-config-provider-logo-light {
@@ -935,9 +992,7 @@
 }
 
 :host-context([data-theme="dark"]) ::ng-deep .model-config-page {
-  background:
-    radial-gradient(72% 58% at 92% 24%, rgba(69, 106, 164, 0.2), rgba(69, 106, 164, 0) 58%),
-    linear-gradient(180deg, #061427 0%, #0a1c34 100%);
+  background: transparent;
 }
 
 .model-config-summary-list dd:has(.model-config-summary-icon) {
