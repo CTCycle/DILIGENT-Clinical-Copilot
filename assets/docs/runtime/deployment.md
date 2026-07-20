@@ -4,6 +4,7 @@ Last updated: 2026-07-11
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
 - On Windows, `start_on_windows.ps1` prepares portable runtimes, dependencies, and the frontend build before launching the local services.
+- The frontend runtime baseline is Node.js 22.13.0 or newer within the Node.js 22 line; this is required by the locked `jsdom` version.
 - Manual macOS and Linux startup requires compatible Python, Node.js, and npm installations.
 
 ## Dependency Locks
