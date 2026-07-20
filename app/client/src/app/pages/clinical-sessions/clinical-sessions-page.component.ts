@@ -143,6 +143,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly manualEditReviewerNote = signal('');
   readonly manualEditEditedBy = signal('');
   readonly metadataText = signal(DEFAULT_CLINICAL_SESSION_METADATA_TEXT);
+  readonly metadataSaveStatus = signal('');
   readonly activeSection = signal<ClinicalSessionSection>('preview');
   readonly saveStatus = signal('');
   readonly deletingSessionId = signal<number | null>(null);
@@ -571,16 +572,16 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     try {
       metadata = JSON.parse(this.metadataText()) as Record<string, unknown>;
     } catch {
-      this.saveStatus.set('[ERROR] Metadata must be valid JSON.');
+      this.metadataSaveStatus.set('[ERROR] Metadata must be valid JSON.');
       return;
     }
-    this.saveStatus.set('Saving metadata...');
+    this.metadataSaveStatus.set('Saving metadata...');
     try {
       const updated = await updateClinicalSession(detail.session_id, { metadata });
       this.selected.set(updated);
-      this.saveStatus.set('Metadata saved.');
+      this.metadataSaveStatus.set('Metadata saved.');
     } catch (error) {
-      this.saveStatus.set(formatUnknownError(error, 'Failed to save metadata.'));
+      this.metadataSaveStatus.set(formatUnknownError(error, 'Failed to save metadata.'));
     }
   }
 

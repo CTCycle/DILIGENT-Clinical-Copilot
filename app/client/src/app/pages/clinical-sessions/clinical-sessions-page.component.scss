@@ -1351,6 +1351,17 @@
   stroke-width: 1.8;
 }
 
+.clinical-session-metadata-status {
+  margin: var(--space-sm) 0 0;
+  color: var(--color-brand);
+  font-size: var(--font-sm);
+  font-weight: 700;
+}
+
+.clinical-session-metadata-status.is-error {
+  color: #991b1b;
+}
+
 .clinical-session-revision-header {
   display: grid;
   grid-template-columns: minmax(0, 4fr) minmax(140px, 1fr);

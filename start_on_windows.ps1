@@ -182,18 +182,26 @@ function Initialize-PortableRuntimes {
     if ($nodeNeedsInstall) {
         $nodeZipName = "node-v$NodeVersion-win-x64.zip"
         $nodeUrl = "https://nodejs.org/dist/v$NodeVersion/$nodeZipName"
+        $nodeStageDir = Join-Path $RuntimesDir "nodejs-staging-$PID"
         Write-Info "Downloading $nodeUrl"
-        Invoke-DownloadAndExtract `
-            -Uri $nodeUrl `
-            -ArchivePath (Join-Path $NodeDir $nodeZipName) `
-            -DestinationPath $NodeDir
+        try {
+            Invoke-DownloadAndExtract `
+                -Uri $nodeUrl `
+                -ArchivePath (Join-Path $RuntimesDir $nodeZipName) `
+                -DestinationPath $nodeStageDir
 
-        $expandedNodeDir = Join-Path $NodeDir "node-v$NodeVersion-win-x64"
-        if (Test-Path -LiteralPath (Join-Path $expandedNodeDir 'node.exe')) {
-            Get-ChildItem -LiteralPath $expandedNodeDir -Force | ForEach-Object {
-                Move-Item -LiteralPath $_.FullName -Destination $NodeDir -Force
+            $expandedNodeDir = Join-Path $nodeStageDir "node-v$NodeVersion-win-x64"
+            if (-not (Test-Path -LiteralPath (Join-Path $expandedNodeDir 'node.exe'))) {
+                throw "Downloaded Node.js archive did not contain the expected runtime"
             }
-            Remove-Item -LiteralPath $expandedNodeDir -Recurse -Force
+
+            Remove-Item -LiteralPath $NodeDir -Recurse -Force
+            Move-Item -LiteralPath $expandedNodeDir -Destination $NodeDir
+        }
+        finally {
+            if (Test-Path -LiteralPath $nodeStageDir) {
+                Remove-Item -LiteralPath $nodeStageDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
         }
     }
 
