@@ -1,15 +1,8 @@
-<label
+<section
   class="model-config-rag-card"
   [class.model-config-reasoning-top-card]="reasoningLayout"
   [class.is-active]="checked"
 >
-  <input
-    type="checkbox"
-    [attr.aria-label]="ariaLabel"
-    [ngModel]="checked"
-    (ngModelChange)="checkedChange.emit($event)"
-    [disabled]="disabled"
-  />
   <span class="model-config-rag-card-top">
     <span class="model-config-section-kicker">
       <strong>{{ title }}</strong>
@@ -36,8 +29,12 @@
         </svg>
       </button>
     }
-    <span class="model-config-rag-state">{{ checked ? 'On' : 'Off' }}</span>
-    <span class="model-config-toggle" aria-hidden="true"><i></i></span>
+    @if (reasoningLayout) {
+      <span class="model-config-rag-state">{{ reasoningLevelLabel }}</span>
+    } @else {
+      <span class="model-config-rag-state">{{ checked ? 'On' : 'Off' }}</span>
+      <span class="model-config-toggle" aria-hidden="true"><i></i></span>
+    }
   </span>
   <span class="model-config-rag-body">
     <svg class="model-config-rag-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -53,4 +50,27 @@
     </svg>
     <span>{{ description }}</span>
   </span>
-</label>
+  @if (reasoningLayout) {
+    <div class="model-config-reasoning-level">
+      <input
+        class="model-config-reasoning-slider"
+        type="range"
+        min="0"
+        max="3"
+        step="1"
+        [value]="reasoningLevel"
+        [disabled]="disabled"
+        [attr.aria-label]="ariaLabel"
+        [attr.aria-valuetext]="reasoningLevelLabel"
+        [style.--reasoning-progress]="(reasoningLevel / 3 * 100) + '%'"
+        (input)="handleReasoningLevelInput($event)"
+      />
+      <span class="model-config-reasoning-level-labels" aria-hidden="true">
+        <span>Off</span>
+        <span>Low</span>
+        <span>Medium</span>
+        <span>High</span>
+      </span>
+    </div>
+  }
+</section>

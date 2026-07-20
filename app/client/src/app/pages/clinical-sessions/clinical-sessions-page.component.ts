@@ -836,6 +836,13 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       row.temporalReference = this.drugTemporalReference(row.name, detail);
     }
 
+    for (const row of rows.values()) {
+      if (!row.liverTox && this.hasLiverToxReportEvidence(detail, row.name)) {
+        row.liverTox = true;
+        row.bibliographyLabel = this.resolveDrugBibliographyLabel(row);
+      }
+    }
+
     return [...rows.values()];
   }
 
@@ -918,7 +925,22 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (this.stringValue(record['nbk_id'])) return true;
     const status = this.stringValue(record['match_status'])?.toLowerCase();
     if (status === 'matched_with_excerpt' || status === 'matched_no_excerpt' || status === 'matched') return true;
-    return record['missing_livertox'] === false;
+    if (record['missing_livertox'] === false) return true;
+    const candidates = this.arrayValue(record['livertox_candidates']);
+    return candidates.some((candidate) => {
+      const item = this.recordValue(candidate);
+      return item?.['has_excerpt'] === true;
+    });
+  }
+
+  private hasLiverToxReportEvidence(detail: ClinicalSessionDetail, drugName: string): boolean {
+    const report = typeof detail.sections?.['final_report'] === 'string'
+      ? detail.sections['final_report']
+      : '';
+    const normalizedReport = report.toLowerCase();
+    const reportIndex = normalizedReport.indexOf(drugName.trim().toLowerCase());
+    if (reportIndex < 0) return false;
+    return /livertox/.test(normalizedReport.slice(reportIndex, reportIndex + 2400));
   }
 
   private hasRxNavEvidence(record: Record<string, unknown>): boolean {
