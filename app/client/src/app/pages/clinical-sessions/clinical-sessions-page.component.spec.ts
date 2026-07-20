@@ -21,7 +21,8 @@ describe('ClinicalSessionsPage revision template', () => {
     expect(template).toContain('app-clinical-session-editor-toolbar');
     expect(toolbarTemplate).toContain('Save manual report edit');
     expect(toolbarTemplate).toContain('role="toolbar"');
-    expect(template).toContain('Manual Edit History');
+    expect(template).not.toContain('Reviewer name');
+    expect(template).not.toContain('Manual Edit History');
   });
 
   it('labels frontend-derived clinical evidence as fallback', () => {

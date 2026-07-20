@@ -1,0 +1,97 @@
+:host { display: block; }
+
+.clinical-session-editor-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  align-content: center;
+  gap: var(--space-sm);
+  min-height: var(--control-height-md);
+  height: var(--control-height-md);
+  margin-bottom: var(--space-md);
+  padding: 0 0 var(--space-sm);
+  border-bottom: 1px solid var(--color-divider);
+  background: transparent;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+.clinical-session-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--space-xs);
+  min-width: max-content;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.clinical-session-toolbar-group + .clinical-session-toolbar-group {
+  padding-left: var(--space-sm);
+  border-left: 1px solid var(--color-divider);
+}
+
+.clinical-session-toolbar-group-format select {
+  width: 148px;
+  min-width: 148px;
+  min-height: var(--control-height-sm);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-sm);
+  font-weight: 700;
+  padding: var(--space-xs) var(--space-md);
+}
+
+.clinical-session-toolbar-group-standalone { margin-left: auto; }
+.clinical-session-toolbar-group-editing { height: var(--control-height-sm); overflow: visible; }
+
+.clinical-session-editor-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  min-height: var(--control-height-sm);
+  padding: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-sm);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.clinical-session-editor-toolbar button:hover:not(:disabled),
+.clinical-session-toolbar-group-format select:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-brand) 38%, var(--color-border-subtle));
+  background: var(--color-brand-bg);
+}
+
+.clinical-session-editor-toolbar button > svg { display: block; flex: 0 0 auto; width: 15px; height: 15px; }
+.clinical-session-editor-toolbar .clinical-session-icon-toggle { width: 34px; min-width: 34px; padding: 4px; }
+.clinical-session-view-mode button.is-active { border-color: var(--color-brand); background: var(--color-brand-bg); color: var(--color-brand); }
+.clinical-session-editor-toolbar .btn { min-height: var(--control-height-sm); padding: var(--space-xs) var(--space-md); }
+.clinical-session-editor-toolbar .clinical-session-save-icon-button { width: var(--control-height-sm); min-width: var(--control-height-sm); padding: 4px; }
+.clinical-session-editor-toolbar button:disabled { opacity: 0.5; cursor: not-allowed; }
+.clinical-session-editor-toolbar button:focus-visible,
+.clinical-session-editor-toolbar select:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+.clinical-session-editor-font-size { min-width: 44px; color: var(--color-text-secondary); font-size: var(--font-sm); font-weight: 700; text-align: center; }
+
+@media (max-width: 920px) {
+  .clinical-session-editor-toolbar { max-width: 100%; }
+  .clinical-session-toolbar-group-standalone { margin-left: 0; }
+}
+
+:host-context([data-theme="dark"]) .clinical-session-editor-toolbar { background: transparent; border-color: rgba(128, 158, 174, 0.28); }
+:host-context([data-theme="dark"]) .clinical-session-editor-toolbar button,
+:host-context([data-theme="dark"]) .clinical-session-toolbar-group-format select { background: #0f1f2d; border-color: rgba(123, 151, 168, 0.34); color: #e7f0f2; }
+:host-context([data-theme="dark"]) .clinical-session-toolbar-group { background: transparent; border-color: transparent; }
+:host-context([data-theme="dark"]) .clinical-session-view-mode button.is-active { background: rgba(26, 103, 78, 0.74); border-color: rgba(83, 220, 170, 0.66); color: #f3faf9; }

@@ -59,26 +59,6 @@
               <span class="model-config-section-kicker">
                 <strong>RAG settings</strong>
               </span>
-              <button
-                class="model-config-rag-settings-btn"
-                type="button"
-                aria-label="Open RAG settings"
-                title="RAG settings"
-                (click)="openRagSettingsPanel()"
-                [disabled]="isSaving() || isLoading()"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M4 6h10" />
-                  <path d="M18 6h2" />
-                  <path d="M10 12h10" />
-                  <path d="M4 12h2" />
-                  <path d="M4 18h14" />
-                  <path d="M22 18h-2" />
-                  <circle cx="16" cy="6" r="2" />
-                  <circle cx="8" cy="12" r="2" />
-                  <circle cx="18" cy="18" r="2" />
-                </svg>
-              </button>
             </span>
             <span class="model-config-rag-settings-card-body">
               <svg class="model-config-rag-settings-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -88,6 +68,16 @@
               </svg>
               <span>Configure retrieval, reranking, embeddings, chunking, and vector update parameters.</span>
             </span>
+            <button
+              class="model-config-rag-settings-btn"
+              type="button"
+              aria-label="Configure RAG settings"
+              title="Configure RAG settings"
+              (click)="openRagSettingsPanel()"
+              [disabled]="isSaving() || isLoading()"
+            >
+              Configure
+            </button>
           </section>
 
           <app-model-config-toggle-card
@@ -96,9 +86,10 @@
             ariaLabel="Enable SDL/Reasoning"
             icon="reasoning"
             [checked]="reasoningEnabled()"
+            [reasoningLevel]="reasoningLevel()"
             [disabled]="isSaving() || isLoading()"
             [reasoningLayout]="true"
-            (checkedChange)="handleReasoningChange($event)"
+            (reasoningLevelChange)="handleReasoningLevelChange($event)"
           ></app-model-config-toggle-card>
         </section>
 

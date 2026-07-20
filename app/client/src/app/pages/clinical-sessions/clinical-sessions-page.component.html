@@ -302,59 +302,6 @@
             (input)="onEditorInput($event)"
             (keydown)="onEditorKeydown($event)"
           ></div>
-          <div class="clinical-session-manual-edit-panel">
-            <div class="clinical-session-manual-edit-fields">
-              <label>
-                <span>Reviewer name</span>
-                <input
-                  type="text"
-                  [ngModel]="manualEditEditedBy()"
-                  (ngModelChange)="updateManualEditEditedBy($event)"
-                  aria-label="Reviewer name"
-                />
-              </label>
-              <label>
-                <span>Reviewer note</span>
-                <textarea
-                  class="clinical-session-manual-edit-note"
-                  [ngModel]="manualEditReviewerNote()"
-                  (ngModelChange)="updateManualEditReviewerNote($event)"
-                  aria-label="Reviewer note"
-                  placeholder="Summarize why this manual report correction was made."
-                ></textarea>
-              </label>
-            </div>
-            <section class="clinical-session-manual-edit-history" aria-label="Manual edit history">
-              <div class="clinical-session-manual-edit-history-header">
-                <strong>Manual Edit History</strong>
-                <span>Audited in-place report changes for the current official version</span>
-              </div>
-              @if (detail.manual_edit_history.length) {
-                <div class="clinical-session-manual-edit-list">
-                  @for (edit of detail.manual_edit_history; track edit.edited_at + edit.new_text_hash) {
-                    <article class="clinical-session-manual-edit-item">
-                      <div class="clinical-session-manual-edit-item-header">
-                        <strong>{{ edit.actor_display_name || edit.edited_by || 'Unknown reviewer' }}</strong>
-                        <span>{{ edit.edited_at | date:'medium' }}</span>
-                      </div>
-                      <p>
-                        Fields: {{ edit.edited_fields.join(', ') || 'report_text' }} ·
-                        Source: {{ edit.actor_source }} ·
-                        Confidence: {{ edit.actor_confidence }}
-                      </p>
-                      <p>Previous hash: <code>{{ edit.previous_text_hash }}</code></p>
-                      <p>New hash: <code>{{ edit.new_text_hash }}</code></p>
-                      @if (edit.reviewer_note) {
-                        <p>Note: {{ edit.reviewer_note }}</p>
-                      }
-                    </article>
-                  }
-                </div>
-              } @else {
-                <p class="clinical-session-panel-note">No manual report edits have been saved for this version.</p>
-              }
-            </section>
-          </div>
         }
 
         @if (activeSection() === 'metadata') {

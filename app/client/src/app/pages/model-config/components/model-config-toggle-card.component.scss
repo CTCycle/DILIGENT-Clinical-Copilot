@@ -19,7 +19,7 @@
 }
 
 .model-config-reasoning-top-card {
-  min-height: 86px;
+  min-height: 158px;
   justify-content: flex-start;
   gap: 8px;
 }
@@ -45,6 +45,81 @@
   height: 30px;
 }
 
+.model-config-reasoning-level {
+  display: grid;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: var(--space-xs);
+}
+
+.model-config-reasoning-slider {
+  position: static;
+  inset: auto;
+  width: calc(100% - 16px);
+  height: 6px;
+  min-height: 6px;
+  margin: 0 8px;
+  opacity: 1;
+  accent-color: var(--mc-brand);
+  cursor: pointer;
+}
+
+.model-config-rag-card .model-config-reasoning-slider {
+  position: static;
+  inset: auto;
+  width: calc(100% - 16px);
+  height: 6px;
+  min-height: 6px;
+  margin: 0 8px;
+  opacity: 1;
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--mc-border-strong) 70%, transparent);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--mc-brand) 0%,
+    var(--mc-brand) var(--reasoning-progress, 0%),
+    var(--mc-border) var(--reasoning-progress, 0%),
+    var(--mc-border) 100%
+  );
+  accent-color: var(--mc-brand);
+  transition: background 120ms ease;
+}
+
+.model-config-rag-card .model-config-reasoning-slider::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  appearance: none;
+  border: 2px solid var(--mc-brand-2);
+  border-radius: 50%;
+  background: var(--mc-brand);
+  box-shadow: 0 1px 4px rgba(12, 45, 36, 0.24);
+}
+
+.model-config-rag-card .model-config-reasoning-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--mc-brand-2);
+  border-radius: 50%;
+  background: var(--mc-brand);
+  box-shadow: 0 1px 4px rgba(12, 45, 36, 0.24);
+}
+
+.model-config-reasoning-slider:disabled {
+  cursor: not-allowed;
+}
+
+.model-config-reasoning-level-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  padding: 0 8px;
+  color: var(--mc-faint);
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+}
+
 .model-config-rag-card input {
   position: absolute;
   inset: 0;
@@ -63,6 +138,12 @@
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 6px;
+}
+
+.model-config-rag-settings-card-top {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
 }
 
 .model-config-section-kicker {

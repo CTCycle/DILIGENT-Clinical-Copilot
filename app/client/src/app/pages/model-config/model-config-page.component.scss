@@ -81,7 +81,7 @@
 
 .model-config-control-rail {
   display: grid;
-  grid-template-columns: minmax(0, 2.35fr) repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.32fr) repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: stretch;
 }
@@ -103,10 +103,12 @@
 
 .model-config-runtime-card {
   padding: 10px 12px;
+  min-height: 158px;
 }
 
 .model-config-rag-settings-card {
   display: grid;
+  grid-template-rows: auto 1fr auto;
   gap: 12px;
   min-width: 0;
   min-height: 128px;
@@ -122,16 +124,17 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  min-height: 42px;
 }
 
 .model-config-rag-settings-card-body {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
   gap: 10px;
-  align-items: center;
+    align-items: center;
   color: var(--mc-muted);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .model-config-rag-settings-icon,
@@ -159,6 +162,17 @@
   background: var(--mc-surface-soft);
   color: var(--mc-text);
   cursor: pointer;
+}
+
+.model-config-rag-settings-card > .model-config-rag-settings-btn {
+  width: 116px;
+  min-width: 116px;
+  min-height: 30px;
+  height: 30px;
+  margin-inline: auto;
+  padding: 0 var(--space-md);
+  font-size: var(--font-sm);
+  font-weight: 750;
 }
 
 .model-config-rag-settings-btn svg {
@@ -208,7 +222,7 @@
 
 .model-config-runtime-options {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 9px;
   margin-top: 8px;
 }
@@ -715,6 +729,10 @@
   display: block;
 }
 
+.model-config-provider-mark.is-openai .model-config-provider-logo {
+  filter: none;
+}
+
 .model-config-provider-name strong,
 .model-config-provider-name small {
   display: block;
@@ -822,6 +840,10 @@
 
 :host-context([data-theme="dark"]) .model-config-provider-mark.is-openai {
   color: #eefbf6;
+}
+
+:host-context([data-theme="dark"]) .model-config-provider-mark.is-openai .model-config-provider-logo {
+  filter: invert(1) brightness(1.8);
 }
 
 :host-context([data-theme="dark"]) .model-config-provider-logo-light {

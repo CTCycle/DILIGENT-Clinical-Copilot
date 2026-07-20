@@ -58,7 +58,7 @@ const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
   brave: 'Brave',
 };
 const PROVIDER_LOGOS: Partial<Record<AccessKeyProvider, { src: string; alt: string }>> = {
-  openai: { src: '/logos/openai-blossom-light.svg', alt: 'OpenAI logo' },
+  openai: { src: '/logos/openai.svg', alt: 'OpenAI logo' },
   gemini: { src: '/logos/google-g.svg', alt: 'Google logo' },
   deepseek: { src: '/logos/deepseek.svg', alt: 'DeepSeek logo' },
   anthropic: { src: '/logos/anthropic.svg', alt: 'Anthropic logo' },
@@ -147,7 +147,7 @@ export class ModelConfigPageComponent implements OnInit {
   readonly statusMessage = signal('');
   readonly openProviderModal = signal<AccessKeyProvider | null>(null);
   readonly modelPullProgress = signal<Record<string, ModelPullProgressState>>({});
-  readonly previewReasoningEnabled = signal(true);
+  readonly previewReasoningLevel = signal(2);
   readonly previewCloudModelOverrides = signal<Partial<Record<CloudProvider, string>>>({});
   readonly ragSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
   readonly draftRagSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
@@ -163,6 +163,7 @@ export class ModelConfigPageComponent implements OnInit {
   });
   readonly draftConfig = signal<DraftRuntimeConfig>(resolveDraftFromSettings(this.appState.state().diliAgent.settings));
   readonly lastUpdatedAt = signal<string | null>(null);
+  private reasoningSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   @HostListener('document:keydown.escape')
   closeRagSettingsOnEscape(): void {
@@ -234,7 +235,10 @@ export class ModelConfigPageComponent implements OnInit {
     if (!provider) return '';
     if (provider.catalog_message) return provider.catalog_message;
     if (provider.catalog_status === 'available') return 'Live provider catalog loaded.';
-    return '';
+    if (provider.catalog_status === 'unavailable') {
+      return 'Provider catalog is temporarily unavailable; the configured model remains available.';
+    }
+    return 'No provider models were reported.';
   });
 
   readonly runtimeLabel = computed(() =>
@@ -245,7 +249,8 @@ export class ModelConfigPageComponent implements OnInit {
 
   readonly statusTone = computed(() => resolveStatusTone(this.statusMessage()));
 
-  readonly reasoningEnabled = computed(() => this.previewReasoningEnabled());
+  readonly reasoningLevel = computed(() => this.previewReasoningLevel());
+  readonly reasoningEnabled = computed(() => this.reasoningLevel() > 0);
   readonly currentRagModelLabel = computed(() => {
     if (this.isLoading() && !this.ragModel()) {
       return 'Loading RAG model...';
@@ -293,6 +298,13 @@ export class ModelConfigPageComponent implements OnInit {
       return 'Loading model details...';
     }
     const draft = this.draftConfig();
+    if (draft.useCloudServices) {
+      const providerLabel = resolveProviderLabel(this.draftProvider());
+      const modelName = this.draftCloudModel() || draft.cloudModel;
+      return modelName
+        ? `Cloud model selected: ${modelName} (${providerLabel}). Provider-supplied model details are not available.`
+        : `No cloud model is selected for ${providerLabel}.`;
+    }
     const selectedNames = [draft.clinicalModel, draft.textExtractionModel].filter((name) => !!name);
     const modelMap = new Map(this.localModels().map((model) => [model.name, model.description || '']));
     for (const modelName of selectedNames) {
@@ -410,7 +422,7 @@ export class ModelConfigPageComponent implements OnInit {
 
   private applyPreviewDefaultState(): void {
     const state = this.appState.state().diliAgent;
-    this.previewReasoningEnabled.set(state.settings.reasoning);
+    this.previewReasoningLevel.set(state.settings.reasoning ? 2 : 0);
   }
 
   async persistConfigPatch(patch: ModelConfigUpdateRequest, successMessage = '', syncDraft = true): Promise<void> {
@@ -625,8 +637,10 @@ export class ModelConfigPageComponent implements OnInit {
     this.draftConfig.update((previous) => ({ ...previous, cloudModel: modelName || null }));
   }
 
-  async handleReasoningChange(enabled: boolean): Promise<void> {
-    this.previewReasoningEnabled.set(enabled);
+  handleReasoningLevelChange(level: number): void {
+    const normalizedLevel = Math.max(0, Math.min(3, Math.round(level)));
+    const enabled = normalizedLevel > 0;
+    this.previewReasoningLevel.set(normalizedLevel);
     const currentSettings = this.appState.state().diliAgent.settings;
     this.appState.updateDiliAgent({
       settings: {
@@ -634,7 +648,13 @@ export class ModelConfigPageComponent implements OnInit {
         reasoning: enabled,
       },
     });
-    await this.persistConfigPatch({ ollama_reasoning: enabled }, 'Extra parameters saved.', false);
+    if (this.reasoningSaveTimer) {
+      clearTimeout(this.reasoningSaveTimer);
+    }
+    this.reasoningSaveTimer = setTimeout(() => {
+      void this.persistConfigPatch({ ollama_reasoning: enabled }, 'Extra parameters saved.', false);
+      this.reasoningSaveTimer = null;
+    }, 250);
   }
 
   async handleSaveConfiguration(): Promise<void> {
