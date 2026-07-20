@@ -20,7 +20,7 @@ $script:UvCacheDir = Join-Path $RuntimesDir '.uv-cache'
 $script:EnvFile = Join-Path $RepoRoot 'settings/.env'
 $script:EnvExample = Join-Path $RepoRoot 'settings/.env.example'
 $script:PythonVersion = '3.14.2'
-$script:NodeVersion = '22.12.0'
+$script:NodeVersion = '22.13.0'
 
 function Write-Step([string]$Message) {
     Write-Host "[STEP] $Message" -ForegroundColor Cyan
@@ -170,7 +170,16 @@ function Initialize-PortableRuntimes {
     }
     Write-Ok (& $UvExe --version)
 
-    if (-not (Test-Path -LiteralPath $NodeExe)) {
+    $nodeNeedsInstall = -not (Test-Path -LiteralPath $NodeExe)
+    if (-not $nodeNeedsInstall) {
+        $installedNodeVersion = (& $NodeExe --version).Trim()
+        $nodeNeedsInstall = $installedNodeVersion -ne "v$NodeVersion"
+        if ($nodeNeedsInstall) {
+            Write-Info "Replacing unsupported portable Node.js $installedNodeVersion with v$NodeVersion"
+        }
+    }
+
+    if ($nodeNeedsInstall) {
         $nodeZipName = "node-v$NodeVersion-win-x64.zip"
         $nodeUrl = "https://nodejs.org/dist/v$NodeVersion/$nodeZipName"
         Write-Info "Downloading $nodeUrl"
