@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-07-11
+Last updated: 2026-07-20
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -16,6 +16,7 @@ Recommended workflow:
 2. Locate the target session by identifier, date, or metadata.
 3. Select the session.
 4. Use **Text Editor** for direct in-place manual report edits.
+   The Source view preserves Markdown, whitespace, blank lines, and unsaved drafts while Rendered shows a read-only preview of that same draft. Save persists the source text directly.
 5. Use **LLM Revision** to create a new draft revision version when a model-assisted rewrite is needed.
 6. Use **Official Version History** to inspect version lineage separately from **Manual Edit History**.
 7. Use **Version Comparison** to compare the selected official version against its source or another persisted official version using backend-computed entity and report diffs.
