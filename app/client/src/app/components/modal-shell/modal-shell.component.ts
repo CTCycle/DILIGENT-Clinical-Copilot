@@ -53,6 +53,7 @@ export class ModalShellComponent implements AfterViewInit, OnChanges, OnDestroy 
   @Input() restoreFocus = true;
 
   @Output() close = new EventEmitter<void>();
+  @Output() closed = new EventEmitter<void>();
 
   private previousActiveElement: HTMLElement | null = null;
   private previousBodyOverflow = '';
@@ -155,6 +156,7 @@ export class ModalShellComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (this.restoreFocus && focusTarget?.isConnected) {
       queueMicrotask(() => focusTarget.focus());
     }
+    this.closed.emit();
   }
 
   private trapFocus(event: KeyboardEvent): void {

@@ -68,8 +68,6 @@ def test_cloud_runtime_accepts_persisted_cloud_role_models(monkeypatch) -> None:
         cloud_model="gpt-4.1-mini",
         clinical_model="gpt-4.1-mini",
         text_extraction_model="gpt-4.1-mini",
-        ollama_temperature=0.0,
-        cloud_temperature=0.0,
     )
     monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: snapshot)
 

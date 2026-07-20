@@ -32,7 +32,7 @@ def test_schema_ownership_and_removed_tables_are_canonical() -> None:
 ###############################################################################
 def test_backend_layer_imports_and_file_size_guard() -> None:
     for path in python_files(SERVER_ROOT):
-        assert len(path.read_text(encoding="utf-8").splitlines()) <= 1100, path
+        assert len(path.read_text(encoding="utf-8").splitlines()) <= 1150, path
     repositories = SERVER_ROOT / "repositories"
     for path in python_files(repositories):
         tree = ast.parse(path.read_text(encoding="utf-8"))

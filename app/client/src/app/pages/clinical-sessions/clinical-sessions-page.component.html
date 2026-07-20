@@ -488,16 +488,23 @@
             <div class="clinical-session-timeline-workspace">
               <section class="clinical-session-timeline-models" aria-label="Timeline model selection">
                 <div class="clinical-session-timeline-models-header">
-                  <strong>Timeline Model</strong>
+                  <div>
+                    <h4>Timeline model</h4>
+                    <p>Choose the model for this timeline run.</p>
+                  </div>
                   <span>{{ timelineModelSource() === 'cloud' ? 'Cloud runtime' : 'Local runtime' }}</span>
                 </div>
-                <div class="clinical-session-timeline-model-card is-selected">
-                  <span class="clinical-session-timeline-model-card-kicker">Selectable model</span>
-                  <select class="clinical-session-timeline-model-select" aria-label="Timeline extraction model" [ngModel]="timelineModelName() || selected()?.text_extraction_model || ''" (ngModelChange)="timelineModelName.set($event)">
-                    <option [value]="timelineModelName() || selected()?.text_extraction_model || ''">{{ timelineModelName() || selected()?.text_extraction_model || 'Configured at runtime' }}</option>
-                  </select>
+                <div class="clinical-session-timeline-model-fields">
+                  <label>
+                    <span>Model</span>
+                    <select class="clinical-session-timeline-model-select" aria-label="Timeline extraction model" [ngModel]="timelineModelName() || selected()?.text_extraction_model || ''" (ngModelChange)="timelineModelName.set($event)">
+                      <option [value]="timelineModelName() || selected()?.text_extraction_model || ''">{{ timelineModelName() || selected()?.text_extraction_model || 'Configured at runtime' }}</option>
+                    </select>
+                  </label>
+                  <div class="clinical-session-timeline-model-actions">
+                    <button class="btn btn-secondary clinical-session-timeline-action" type="button" (click)="createTimeline()">Generate Timeline</button>
+                  </div>
                 </div>
-                <button class="btn btn-secondary clinical-session-timeline-action" type="button" (click)="createTimeline()">Generate Timeline</button>
               </section>
 
               <section class="clinical-session-timeline-history" aria-label="Generated timelines">

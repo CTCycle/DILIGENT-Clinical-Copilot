@@ -7,6 +7,10 @@ from configurations.management import (
     environment_snapshot_from_os_env,
     load_configuration_data,
 )
+from domain.settings.environment import (
+    DatabaseEnvironmentSnapshot,
+    EnvironmentSnapshot,
+)
 
 ###############################################################################
 def _write_config(path, payload) -> None:
@@ -33,23 +37,27 @@ def _base_payload() -> dict:
     }
 
 ###############################################################################
-def test_database_settings_are_loaded_from_json_without_env_overlap(
-    tmp_path, monkeypatch
+def test_database_settings_ignore_json_values_and_use_environment_snapshot(
+    tmp_path,
 ) -> None:
     config_path = tmp_path / "configurations.json"
     _write_config(config_path, _base_payload())
-    monkeypatch.setenv("DATABASE_BACKEND", "postgresql")
-    monkeypatch.setenv(
-        "DATABASE_URL",
-        "postgresql+psycopg://env_user:env_secret@env-host:5433/env_db",
+    environment = EnvironmentSnapshot(
+        ollama_url=None,
+        ollama_host=None,
+        ollama_port=None,
+        database=DatabaseEnvironmentSnapshot(
+            backend="postgresql",
+            url="postgresql+psycopg://env_user:env_secret@env-host:5433/env_db",
+            connect_timeout="18",
+            write_batch_size="1200",
+            read_page_size="2400",
+        ),
     )
-    monkeypatch.setenv("DATABASE_CONNECT_TIMEOUT", "18")
-    monkeypatch.setenv("DATABASE_WRITE_BATCH_SIZE", "1200")
-    monkeypatch.setenv("DATABASE_READ_PAGE_SIZE", "2400")
 
     payload = build_settings_payload_from_json(
         load_configuration_data(config_path),
-        environment_snapshot_from_os_env(),
+        environment,
     )
 
     assert payload["database"] == {
