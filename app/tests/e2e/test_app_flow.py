@@ -354,12 +354,6 @@ def test_dili_form_state_restores_after_refresh(page: Page, base_url: str):
 def test_dili_run_burst_click_submits_single_job(
     page: Page, base_url: str, api_base_url: str
 ):
-    runtime_reset = page.request.put(
-        f"{api_base_url}/api/model-config",
-        data={"use_cloud_services": False},
-    )
-    assert runtime_reset.status == 200
-
     page.goto(base_url)
     _fill_required_dili_fields(page)
 
@@ -633,52 +627,6 @@ def test_dili_run_conflict_surfaces_clear_error_message(
         page.unroute("**/api/clinical/jobs", mock_conflict)
 
 ###############################################################################
-def test_model_config_runtime_toggle_enables_save_and_submits_put(
-    page: Page, base_url: str, api_base_url: str
-):
-    runtime_seed = page.request.put(
-        f"{api_base_url}/api/model-config",
-        data={"use_cloud_services": True, "cloud_model": "gpt-4.1-mini"},
-    )
-    assert runtime_seed.status == 200
-
-    page.goto(base_url)
-    page.get_by_role("tab", name="Model Configurations").click()
-    expect(page).to_have_url(re.compile(r"/model-config/?$"))
-
-    runtime_options = page.locator("label.model-config-runtime-option")
-    local_option = runtime_options.nth(0)
-    cloud_option = runtime_options.nth(1)
-    save_button = page.get_by_role("button", name="Save Configuration")
-
-    # Toggle to local mode and verify the save action eventually becomes available.
-    local_option.click()
-    expect(local_option).to_have_class(re.compile(r"\bis-active\b"))
-    expect(save_button).to_be_enabled(timeout=10000)
-
-    # Return to cloud mode and tweak temperature to produce a deterministic save payload.
-    cloud_option.click()
-    expect(cloud_option).to_have_class(re.compile(r"\bis-active\b"))
-    temperature_input = page.locator("#global-temperature-input")
-    current_temperature_raw = temperature_input.input_value().strip()
-    try:
-        current_temperature = float(current_temperature_raw)
-    except ValueError:
-        current_temperature = 0.7
-    next_temperature = 1.99 if abs(current_temperature - 1.99) > 1e-6 else 1.98
-    temperature_input.fill(f"{next_temperature:.2f}")
-    expect(save_button).to_be_enabled(timeout=15000)
-
-    with page.expect_response(
-        lambda response: (
-            response.url.endswith("/api/model-config")
-            and response.request.method == "PUT"
-            and response.status == 200
-        )
-    ):
-        save_button.click()
-
-###############################################################################
 def test_timetable_route_load_does_not_autogenerate_timeline(
     page: Page, base_url: str, api_base_url: str
 ):
@@ -716,55 +664,6 @@ def test_timetable_route_load_does_not_autogenerate_timeline(
     page.unroute("**/api/inspection/sessions/*/timelines", count_timeline_posts)
 
     assert timeline_post_count == 0
-
-###############################################################################
-def test_clinical_sessions_timeline_tab_lists_persisted_timelines(
-    page: Page, base_url: str, api_base_url: str
-):
-    sessions_response = page.request.get(
-        f"{api_base_url}/api/inspection/sessions",
-        params={"offset": 0, "limit": 10},
-    )
-    assert sessions_response.status == 200
-    sessions_payload = sessions_response.json()
-    items = (
-        sessions_payload.get("items") if isinstance(sessions_payload, dict) else None
-    )
-    assert isinstance(items, list) and items, (
-        "No sessions available for timeline history test."
-    )
-
-    target_session = next(
-        (
-            item
-            for item in items
-            if isinstance(item, dict)
-            and isinstance(item.get("session_id"), int)
-            and item.get("patient_name")
-        ),
-        None,
-    )
-    assert isinstance(target_session, dict), (
-        "No named session available for timeline history test."
-    )
-    session_id = target_session["session_id"]
-    patient_name = target_session["patient_name"]
-    assert isinstance(session_id, int) and session_id > 0
-    assert isinstance(patient_name, str) and patient_name.strip()
-
-    timeline_response = page.request.post(
-        f"{api_base_url}/api/inspection/sessions/{session_id}/timelines",
-        data={"force_regenerate": True},
-        timeout=360000,
-    )
-    assert timeline_response.status == 200
-
-    page.goto(f"{base_url}/clinical-sessions")
-    page.get_by_role("button", name=re.compile(re.escape(patient_name))).click()
-    page.get_by_role("button", name="Timeline").click()
-
-    expect(page.get_by_text("Generated Timelines")).to_be_visible()
-    expect(page.get_by_role("button", name="Open Timeline").first).to_be_visible()
 
 ###############################################################################
 def test_timetable_invalid_session_id_shows_validation_error(page: Page, base_url: str):

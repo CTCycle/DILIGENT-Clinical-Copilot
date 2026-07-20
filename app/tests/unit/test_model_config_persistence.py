@@ -50,8 +50,6 @@ def test_model_config_service_initializes_fresh_snapshot_from_canonical_defaults
             use_cloud_models=False,
             cloud_provider=None,
             cloud_model=None,
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=None,
         )
     )
@@ -75,8 +73,6 @@ def test_model_config_service_rejects_invalid_persisted_cloud_selection(
             use_cloud_models=False,
             cloud_provider=cloud_provider,
             cloud_model=cloud_model,
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )
@@ -92,8 +88,6 @@ def test_model_config_service_allows_persisted_deepseek_model_before_refresh() -
             use_cloud_models=True,
             cloud_provider="deepseek",
             cloud_model="deepseek-v4-flash",
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )
@@ -104,6 +98,38 @@ def test_model_config_service_allows_persisted_deepseek_model_before_refresh() -
     assert snapshot.cloud_model == "deepseek-v4-flash"
 
 ###############################################################################
+def test_model_config_service_rejects_switching_cloud_model_roles_to_local_mode(
+    monkeypatch,
+) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="deepseek-v4-flash",
+            text_extraction_model="deepseek-v4-flash",
+            use_cloud_models=True,
+            cloud_provider="deepseek",
+            cloud_model="deepseek-v4-flash",
+            ollama_reasoning=True,
+            ollama_seed=42,
+            updated_at=datetime.now(),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+
+    async def fake_list_available_ollama_models() -> set[str]:
+        return {"qwen3.5:2b"}
+
+    monkeypatch.setattr(
+        service,
+        "list_available_ollama_models",
+        fake_list_available_ollama_models,
+    )
+
+    with pytest.raises(ServiceValidationError, match="not supported for role 'clinical'"):
+        asyncio.run(service.update_state(ModelConfigUpdateRequest(use_cloud_services=False)))
+
+    assert serializer.snapshot.use_cloud_models is True
+
+###############################################################################
 def test_model_config_service_rejects_invalid_persisted_local_model() -> None:
     serializer = InMemorySerializer(
         ModelConfigSnapshot(
@@ -112,8 +138,6 @@ def test_model_config_service_rejects_invalid_persisted_local_model() -> None:
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )
@@ -129,8 +153,6 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )
@@ -170,8 +192,6 @@ def test_model_config_service_accepts_cloud_models_for_role_assignments() -> Non
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )
@@ -201,8 +221,6 @@ def test_model_config_service_rejects_stale_local_roles_in_cloud_mode() -> None:
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )
@@ -228,8 +246,6 @@ def test_model_config_service_rejects_uninstalled_local_models(monkeypatch) -> N
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )
@@ -264,8 +280,6 @@ def test_model_config_service_prioritizes_recommended_installed_local_models(
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )
@@ -295,8 +309,6 @@ def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) ->
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )
@@ -345,8 +357,6 @@ def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> No
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )
@@ -396,8 +406,6 @@ def test_connectivity_check_reports_llm_error(monkeypatch) -> None:
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model=None,
-            ollama_temperature=0.7,
-            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import replace
 from datetime import UTC, datetime
 from time import monotonic
 from typing import Any, Protocol, cast
@@ -136,6 +137,7 @@ class ModelConfigService:
         )
 
         if updates:
+            self.validate_current_snapshot(replace(snapshot, **updates))
             snapshot = self.serializer.save_snapshot(**updates)
 
         should_check_local_availability = (

@@ -88,6 +88,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   private runControlDebounceTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private runControlDebounced = false;
   private pendingPreflightPayload: ClinicalRequestPayload | null = null;
+  private pendingPreflightFocusTargetId: string | null = null;
   private preflightAttempt = 0;
 
   constructor() {
@@ -202,15 +203,18 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   returnToInputFromPreflight(): void {
-    const targetId = this.resolveFirstAffectedControlId();
+    this.pendingPreflightFocusTargetId = this.resolveFirstAffectedControlId();
     this.invalidatePreflightState();
     this.clearRunActionLock();
-    queueMicrotask(() => {
-      const target = targetId
-        ? document.getElementById(targetId)
-        : this.runAnalysisButton?.nativeElement;
-      target?.focus();
-    });
+  }
+
+  focusPreflightTarget(): void {
+    const targetId = this.pendingPreflightFocusTargetId;
+    this.pendingPreflightFocusTargetId = null;
+    const target = targetId
+      ? document.getElementById(targetId)
+      : this.runAnalysisButton?.nativeElement;
+    target?.focus();
   }
 
   async continueAfterPreflight(): Promise<void> {
