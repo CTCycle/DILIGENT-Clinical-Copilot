@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
@@ -48,6 +48,7 @@ import {
   readMetadataEntries,
 } from './clinical-session-metadata';
 import { ClinicalSessionEditorToolbarComponent } from './components/clinical-session-editor-toolbar.component';
+import { applyMarkdownCommand } from './markdown-editor';
 import {
   ClinicalSessionDateFilterMode,
   ClinicalSessionSection,
@@ -100,8 +101,6 @@ type DrugEvidenceDraft = DetectedDrugEvidence & {
   styleUrl: './clinical-sessions-page.component.scss',
 })
 export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
-  @ViewChild('sessionTextEditor') private sessionTextEditor?: ElementRef<HTMLDivElement>;
-
   private readonly router = inject(Router);
   private readonly markdownRenderer = inject(MarkdownRendererService);
   private pollCancelled = false;
@@ -138,6 +137,9 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly editorText = signal('');
   readonly editorViewMode = signal<EditorViewMode>('source');
   readonly editorFontSize = signal(16);
+  readonly renderedEditorHtml = computed(() => this.markdownRenderer.render(this.editorText()).html);
+  private editorUndoStack: string[] = [];
+  private editorRedoStack: string[] = [];
   readonly manualEditReviewerNote = signal('');
   readonly manualEditEditedBy = signal('');
   readonly metadataText = signal(DEFAULT_CLINICAL_SESSION_METADATA_TEXT);
@@ -202,7 +204,9 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     try {
       const detail = await fetchClinicalSessionDetail(sessionId);
       this.selected.set(detail);
-      this.editorText.set(this.toEditorHtml(this.previewOfficialReport(detail)));
+      this.editorText.set(this.previewOfficialReport(detail));
+      this.editorUndoStack = [];
+      this.editorRedoStack = [];
       this.editorViewMode.set('source');
       this.manualEditReviewerNote.set('');
       this.manualEditEditedBy.set(this.defaultReviewerLabel(detail));
@@ -296,15 +300,15 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   updateEditorText(value: string): void {
+    if (value === this.editorText()) return;
+    this.editorUndoStack.push(this.editorText());
+    this.editorRedoStack = [];
     this.editorText.set(value);
   }
 
   setEditorViewMode(mode: EditorViewMode): void {
     if (this.editorViewMode() === mode) return;
     this.editorViewMode.set(mode);
-    const detail = this.selected();
-    const sourceText = detail ? this.previewOfficialReport(detail) : this.editorText();
-    this.editorText.set(mode === 'rendered' ? this.markdownRenderer.render(sourceText).html : this.toEditorHtml(sourceText));
   }
 
   setEditorFontSize(delta: number): void {
@@ -317,17 +321,39 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   runEditorCommand(command: EditorCommandName, value?: string): void {
-    const element = this.sessionTextEditor?.nativeElement;
+    if (command === 'undo') {
+      const previous = this.editorUndoStack.pop();
+      if (previous !== undefined) {
+        this.editorRedoStack.push(this.editorText());
+        this.editorText.set(previous);
+      }
+      return;
+    }
+    if (command === 'redo') {
+      const next = this.editorRedoStack.pop();
+      if (next !== undefined) {
+        this.editorUndoStack.push(this.editorText());
+        this.editorText.set(next);
+      }
+      return;
+    }
+    const element = document.querySelector<HTMLTextAreaElement>('.clinical-session-editor-source');
     if (!element) return;
-    element.focus();
-    document.execCommand(command, false, value);
-    this.editorText.set(element.innerHTML);
+    const edit = applyMarkdownCommand(this.editorText(), element.selectionStart, element.selectionEnd, command, value);
+    if (edit.text === this.editorText()) return;
+    this.editorUndoStack.push(this.editorText());
+    this.editorRedoStack = [];
+    this.editorText.set(edit.text);
+    requestAnimationFrame(() => {
+      element.focus();
+      element.setSelectionRange(edit.selectionStart, edit.selectionEnd);
+    });
   }
 
   onEditorInput(event: Event): void {
-    const target = event.target as HTMLDivElement | null;
+    const target = event.target as HTMLTextAreaElement | null;
     if (!target) return;
-    this.editorText.set(target.innerHTML);
+    this.updateEditorText(target.value);
   }
 
   onEditorKeydown(event: KeyboardEvent): void {
@@ -351,83 +377,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     const url = globalThis.prompt('Enter URL');
     if (!url) return;
     this.runEditorCommand('createLink', url);
-  }
-
-  removeSelection(): void {
-    const element = this.sessionTextEditor?.nativeElement;
-    if (!element) return;
-    element.focus();
-    document.execCommand('delete');
-    this.editorText.set(element.innerHTML);
-  }
-
-  clearFormatting(): void {
-    this.runEditorCommand('removeFormat');
-    this.runEditorCommand('unlink');
-  }
-
-  private toEditorHtml(text: string): string {
-    const escaped = text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-    return escaped.replace(/\r?\n/g, '<br>');
-  }
-
-  private editorValueToPersistedText(): string {
-    const element = this.sessionTextEditor?.nativeElement;
-    if (!element) return this.editorText().trim();
-    return this.editorHtmlToCanonicalText(element.innerHTML);
-  }
-
-  private editorHtmlToCanonicalText(html: string): string {
-    const parsed = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
-    const container = parsed.body.firstElementChild;
-    if (!container) return '';
-    const chunks: string[] = [];
-
-    const appendText = (value: string): void => {
-      const normalized = value.replace(/\s+/g, ' ').trim();
-      if (!normalized) return;
-      const previous = chunks[chunks.length - 1] || '';
-      if (previous && !previous.endsWith('\n') && !previous.endsWith(' ')) {
-        chunks.push(' ');
-      }
-      chunks.push(normalized);
-    };
-
-    const walk = (node: Node, listDepth = 0): void => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        appendText(node.textContent || '');
-        return;
-      }
-      if (!(node instanceof HTMLElement)) return;
-      const tag = node.tagName.toLowerCase();
-      if (tag === 'br') {
-        chunks.push('\n');
-        return;
-      }
-      if (tag === 'li') {
-        chunks.push(`${chunks.length ? '\n' : ''}${'  '.repeat(listDepth)}- `);
-      } else if (['p', 'div', 'section', 'article', 'blockquote', 'pre'].includes(tag)) {
-        if (chunks.length && !chunks[chunks.length - 1].endsWith('\n')) chunks.push('\n');
-      } else if (/^h[1-6]$/.test(tag)) {
-        if (chunks.length && !chunks[chunks.length - 1].endsWith('\n')) chunks.push('\n');
-        chunks.push(`${'#'.repeat(Number(tag[1]))} `);
-      }
-      const nextDepth = tag === 'ul' || tag === 'ol' ? listDepth + 1 : listDepth;
-      for (const child of Array.from(node.childNodes)) {
-        walk(child, nextDepth);
-      }
-      if (['p', 'div', 'section', 'article', 'blockquote', 'pre', 'li'].includes(tag)) {
-        if (!chunks[chunks.length - 1]?.endsWith('\n')) chunks.push('\n');
-      }
-    };
-
-    for (const child of Array.from(container.childNodes)) {
-      walk(child);
-    }
-    return chunks.join('').replace(/\n{3,}/g, '\n\n').trim();
   }
 
   private defaultReviewerLabel(detail: ClinicalSessionDetail): string {
@@ -597,7 +546,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     const detail = this.selected();
     if (!detail) return;
     this.saveStatus.set('Saving manual report edit...');
-    const persistedEditorValue = this.editorValueToPersistedText();
+    const persistedEditorValue = this.editorText();
     try {
       const response = await manualEditClinicalSessionReport(detail.session_id, {
         report_text: persistedEditorValue,

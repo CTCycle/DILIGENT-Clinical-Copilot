@@ -1,23 +1,16 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import {
-  LucideAlignCenter,
-  LucideAlignLeft,
-  LucideAlignRight,
   LucideBold,
   LucideBraces,
-  LucideHighlighter,
   LucideItalic,
   LucideLink,
   LucideList,
   LucideListOrdered,
   LucideBookOpen,
   LucideRedo2,
-  LucideRemoveFormatting,
   LucideSave,
   LucideStrikethrough,
-  LucideUnderline,
   LucideUndo2,
-  LucideX,
 } from '@lucide/angular';
 
 import { EditorCommandEvent, EditorViewMode } from '../clinical-sessions.types';
@@ -27,24 +20,17 @@ import { EditorCommandEvent, EditorViewMode } from '../clinical-sessions.types';
   standalone: true,
   styleUrl: './clinical-session-editor-toolbar.component.scss',
   imports: [
-    LucideAlignCenter,
-    LucideAlignLeft,
-    LucideAlignRight,
     LucideBold,
     LucideBraces,
-    LucideHighlighter,
     LucideItalic,
     LucideLink,
     LucideList,
     LucideListOrdered,
     LucideBookOpen,
     LucideRedo2,
-    LucideRemoveFormatting,
     LucideSave,
     LucideStrikethrough,
-    LucideUnderline,
     LucideUndo2,
-    LucideX,
   ],
   template: `
     <div class="clinical-session-editor-toolbar" role="toolbar" aria-label="Text editor toolbar">
@@ -91,19 +77,12 @@ import { EditorCommandEvent, EditorViewMode } from '../clinical-sessions.types';
         <button type="button" (click)="emitCommand('redo')" aria-label="Redo" title="Redo"><svg lucideRedo2 size="15"></svg></button>
         <button type="button" (click)="emitCommand('bold')" aria-label="Bold" title="Bold"><svg lucideBold size="15"></svg></button>
         <button type="button" (click)="emitCommand('italic')" aria-label="Italic" title="Italic"><svg lucideItalic size="15"></svg></button>
-        <button type="button" (click)="emitCommand('underline')" aria-label="Underline" title="Underline"><svg lucideUnderline size="15"></svg></button>
         <button type="button" (click)="emitCommand('strikeThrough')" aria-label="Strike" title="Strike"><svg lucideStrikethrough size="15"></svg></button>
-        <button type="button" (click)="emitCommand('hiliteColor', '#fff59d')" aria-label="Highlight" title="Highlight"><svg lucideHighlighter size="15"></svg></button>
         <button type="button" (click)="emitCommand('insertUnorderedList')" aria-label="Bullet list" title="Bullet list"><svg lucideList size="15"></svg></button>
         <button type="button" (click)="emitCommand('insertOrderedList')" aria-label="Number list" title="Number list"><svg lucideListOrdered size="15"></svg></button>
-        <button type="button" (click)="emitCommand('justifyLeft')" aria-label="Align left" title="Align left"><svg lucideAlignLeft size="15"></svg></button>
-        <button type="button" (click)="emitCommand('justifyCenter')" aria-label="Align center" title="Align center"><svg lucideAlignCenter size="15"></svg></button>
-        <button type="button" (click)="emitCommand('justifyRight')" aria-label="Align right" title="Align right"><svg lucideAlignRight size="15"></svg></button>
       </div>
       <div class="clinical-session-toolbar-group clinical-session-toolbar-group-standalone">
         <button type="button" (click)="insertLink.emit()" aria-label="Insert link" title="Insert link"><svg lucideLink size="15"></svg></button>
-        <button type="button" (click)="clearFormatting.emit()" aria-label="Clear formatting" title="Clear formatting"><svg lucideRemoveFormatting size="15"></svg></button>
-        <button type="button" (click)="removeSelection.emit()" aria-label="Remove selected text" title="Remove selected text"><svg lucideX size="15"></svg></button>
         <button
           type="button"
           class="btn btn-primary clinical-session-save-icon-button"
@@ -125,8 +104,6 @@ export class ClinicalSessionEditorToolbarComponent {
   @Output() fontSizeDelta = new EventEmitter<number>();
   @Output() editorCommand = new EventEmitter<EditorCommandEvent>();
   @Output() insertLink = new EventEmitter<void>();
-  @Output() clearFormatting = new EventEmitter<void>();
-  @Output() removeSelection = new EventEmitter<void>();
   @Output() save = new EventEmitter<void>();
 
   emitCommand(command: EditorCommandEvent['command'], value?: string): void {

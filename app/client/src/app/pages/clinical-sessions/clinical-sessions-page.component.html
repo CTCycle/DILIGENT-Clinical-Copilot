@@ -284,24 +284,30 @@
             [viewMode]="editorViewMode()"
             [fontSize]="editorFontSize()"
             (viewModeChange)="setEditorViewMode($event)"
-            (fontSizeDelta)="setEditorFontSize($event)"
-            (editorCommand)="handleEditorCommand($event)"
-            (insertLink)="insertLink()"
-            (clearFormatting)="clearFormatting()"
-            (removeSelection)="removeSelection()"
-            (save)="saveManualReportEdit()"
-          ></app-clinical-session-editor-toolbar>
-          <div
-            #sessionTextEditor
-            class="clinical-session-editor clinical-session-editor-surface"
+             (fontSizeDelta)="setEditorFontSize($event)"
+             (editorCommand)="handleEditorCommand($event)"
+             (insertLink)="insertLink()"
+             (save)="saveManualReportEdit()"
+           ></app-clinical-session-editor-toolbar>
+          @if (editorViewMode() === 'source') {
+            <textarea
+            class="clinical-session-editor clinical-session-editor-source"
             aria-label="Session text editor"
-            contenteditable="true"
             spellcheck="true"
             [style.font-size.px]="editorFontSize()"
-            [innerHTML]="editorText()"
+            [ngModel]="editorText()"
+            (ngModelChange)="updateEditorText($event)"
             (input)="onEditorInput($event)"
             (keydown)="onEditorKeydown($event)"
-          ></div>
+            ></textarea>
+          } @else {
+            <div
+              class="clinical-session-editor clinical-session-editor-rendered clinical-session-editor-surface"
+              aria-label="Rendered session text preview"
+              [style.font-size.px]="editorFontSize()"
+              [innerHTML]="renderedEditorHtml()"
+            ></div>
+          }
         }
 
         @if (activeSection() === 'metadata') {

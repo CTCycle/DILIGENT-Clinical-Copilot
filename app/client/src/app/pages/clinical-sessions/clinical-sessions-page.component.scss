@@ -147,6 +147,13 @@
   overflow: hidden;
 }
 
+.clinical-session-workspace {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-lg);
+}
+
 .clinical-session-preview,
 .clinical-session-panel {
   flex: 1 1 auto;
@@ -249,7 +256,8 @@
   flex-direction: column;
   min-height: 0;
   padding: var(--space-lg);
-  overflow: visible;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .clinical-session-toolbar {
@@ -889,7 +897,7 @@
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   overflow: auto;
   white-space: pre;
-  resize: none;
+  resize: vertical;
   padding-bottom: 56px;
 }
 
@@ -897,8 +905,8 @@
   display: grid;
   gap: var(--space-lg);
   min-height: 0;
-  max-height: 100%;
-  overflow: hidden;
+  max-height: none;
+  overflow: visible;
   padding-right: 4px;
 }
 
@@ -951,6 +959,21 @@
   display: grid;
   grid-template-columns: minmax(150px, 0.55fr) minmax(180px, 0.8fr) minmax(260px, 1.65fr) auto;
   gap: var(--space-md);
+}
+
+.clinical-session-editor-source {
+  min-height: 520px;
+  height: min(70vh, 860px);
+  max-height: none;
+  resize: vertical;
+  white-space: pre-wrap;
+  overflow: auto;
+}
+
+.clinical-session-editor-rendered {
+  min-height: 520px;
+  height: auto;
+  overflow: visible;
 }
 
 .clinical-session-revision-model-actions {

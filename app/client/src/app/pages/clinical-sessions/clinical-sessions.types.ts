@@ -8,17 +8,10 @@ export type EditorCommandName =
   | 'redo'
   | 'bold'
   | 'italic'
-  | 'underline'
   | 'strikeThrough'
-  | 'hiliteColor'
   | 'insertUnorderedList'
   | 'insertOrderedList'
-  | 'justifyLeft'
-  | 'justifyCenter'
-  | 'justifyRight'
-  | 'createLink'
-  | 'removeFormat'
-  | 'unlink';
+  | 'createLink';
 
 export type EditorCommandEvent = {
   command: EditorCommandName;
