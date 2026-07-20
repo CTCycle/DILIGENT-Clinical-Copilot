@@ -81,6 +81,7 @@ class ModelConfigService:
         self.local_model_names = {name for name, _, _ in self.local_model_catalog}
         self._last_ollama_warning_message: str | None = None
         self._last_ollama_warning_at = 0.0
+        self._last_provider_descriptors: list[CloudProviderDescriptor] | None = None
 
     # -------------------------------------------------------------------------
     async def get_state(
@@ -146,10 +147,16 @@ class ModelConfigService:
             selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
             include_ollama_availability=should_check_local_availability,
         )
+        provider_descriptors = (
+            self._last_provider_descriptors
+            if fields_set <= {"ollama_reasoning", "ollama_seed"}
+            and self._last_provider_descriptors is not None
+            else await self.discover_provider_descriptors()
+        )
         return self.build_response(
             snapshot=snapshot,
             local_models=local_models,
-            cloud_providers=await self.discover_provider_descriptors(),
+            cloud_providers=provider_descriptors,
         )
 
     # -------------------------------------------------------------------------
@@ -826,6 +833,7 @@ class ModelConfigService:
                     models=models,
                 )
             )
+        self._last_provider_descriptors = descriptors
         return descriptors
 
     # -------------------------------------------------------------------------

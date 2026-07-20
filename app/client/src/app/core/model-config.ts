@@ -38,7 +38,7 @@ export function resolveCloudModel(
   cloudChoices: CloudModelChoices,
 ): string | null {
   const options = cloudChoices[provider] || [];
-  if (cloudModel && options.includes(cloudModel)) {
+  if (cloudModel && (!options.length || options.includes(cloudModel))) {
     return cloudModel;
   }
   return null;
