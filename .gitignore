@@ -10,7 +10,6 @@ app/client/logs/
 runtimes/**
 assets/QA/**
 .playwright-mcp/
-settings\.env
 
 # Python
 *.py[cod]
@@ -48,6 +47,7 @@ yarn.lock
 Thumbs.db
 
 # Misc
+*.env
 *.lock
 *.log
 *.db*
