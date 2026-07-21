@@ -38,6 +38,12 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 freshness status and a user-safe message. Catalogs are refreshed through the
 provider's official model-list API; a successful in-process result is returned
 as `cached` if a later refresh fails. No catalog cache survives a backend restart.
+If a persisted model is no longer present in its provider's refreshed catalog,
+the GET response still returns that saved selection together with the current
+catalog so clients can present a valid replacement. Catalog membership remains
+strictly validated when a new provider or model selection is saved. Responses
+are non-cacheable so model selectors and their Retry actions always observe the
+latest saved configuration and provider-catalog state.
 
 ## Access Key Routes
 - `GET /api/access-keys`

@@ -10,6 +10,7 @@ from playwright.sync_api import APIRequestContext
 def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext):
     response = api_context.get("/api/model-config")
     assert response.status == 200
+    assert "no-store" in response.headers["cache-control"]
 
     payload = response.json()
     assert "use_cloud_services" in payload

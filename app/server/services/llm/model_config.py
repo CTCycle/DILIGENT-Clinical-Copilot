@@ -545,10 +545,7 @@ class ModelConfigService:
                 text_extraction_model=defaults.text_extraction_model,
                 use_cloud_models=defaults.use_cloud_services,
                 cloud_provider=self.resolve_provider(defaults.llm_provider),
-                cloud_model=self.resolve_cloud_model(
-                    provider=self.resolve_provider(defaults.llm_provider),
-                    model_name=defaults.cloud_model,
-                ),
+                cloud_model=self.normalize_optional_text(defaults.cloud_model),
                 ollama_reasoning=defaults.ollama_reasoning,
             )
 
@@ -558,14 +555,13 @@ class ModelConfigService:
     # -------------------------------------------------------------------------
     def validate_current_snapshot(self, snapshot: ModelConfigSnapshot) -> None:
         provider = snapshot.cloud_provider
-        if provider is None and snapshot.cloud_model is not None:
+        cloud_model = self.normalize_optional_text(snapshot.cloud_model)
+        if provider is None and cloud_model is not None:
             raise ServiceValidationError(
                 "A cloud model cannot be configured without a cloud provider."
             )
         if provider is not None:
             provider = self.resolve_provider(provider)
-        if snapshot.cloud_model is not None:
-            self.resolve_cloud_model(provider or "", snapshot.cloud_model)
 
         for role_name, model_name in (
             ("clinical", snapshot.clinical_model),
@@ -583,7 +579,7 @@ class ModelConfigService:
                 )
 
         if snapshot.use_cloud_models:
-            if provider is None or snapshot.cloud_model is None:
+            if provider is None or cloud_model is None:
                 raise ServiceValidationError(
                     "Cloud mode requires both a provider and a model."
                 )
@@ -729,9 +725,7 @@ class ModelConfigService:
         cloud_providers: list[CloudProviderDescriptor] | None = None,
     ) -> ModelConfigStateResponse:
         provider = self.resolve_provider(snapshot.cloud_provider)
-        cloud_model = self.resolve_cloud_model(
-            provider=provider, model_name=snapshot.cloud_model
-        )
+        cloud_model = self.normalize_optional_text(snapshot.cloud_model)
         return ModelConfigStateResponse(
             local_models=local_models,
             cloud_providers=cloud_providers or self.build_provider_descriptors(),

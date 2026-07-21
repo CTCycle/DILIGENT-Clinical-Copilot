@@ -29,6 +29,11 @@ export async function fetchModelConfigState(
       : "";
   return requestJson<ModelConfigStateResponse>(`${API_BASE_URL}/model-config${queryString}`, {
     method: "GET",
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache, no-store, max-age=0",
+      Pragma: "no-cache",
+    },
   });
 }
 
