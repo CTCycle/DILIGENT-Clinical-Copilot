@@ -30,6 +30,26 @@ def test_initialize_environment_preserves_process_environment_precedence(
     assert os.environ.get("FASTAPI_HOST") == "127.0.0.1"
 
 ###############################################################################
+def test_initialize_environment_creates_env_from_example_when_missing(
+    tmp_path, monkeypatch
+) -> None:
+    dotenv_path = tmp_path / ".env"
+    example_path = tmp_path / ".env.example"
+    example_path.write_text(
+        "DILIGENT_TAURI_MODE=true\nFASTAPI_HOST=127.0.0.1\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(paths, "ENV_FILE_PATH", dotenv_path)
+    monkeypatch.setattr(paths, "ENV_EXAMPLE_PATH", example_path)
+    environment.reset_environment_bootstrap_for_tests()
+
+    initialize_environment()
+
+    assert dotenv_path.read_text(encoding="utf-8") == example_path.read_text(
+        encoding="utf-8"
+    )
+    assert os.environ.get("DILIGENT_TAURI_MODE") == "true"
+
+###############################################################################
 def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(
     monkeypatch, tmp_path
 ) -> None:

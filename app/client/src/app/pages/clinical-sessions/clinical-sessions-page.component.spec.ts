@@ -53,4 +53,20 @@ describe('ClinicalSessionsPage revision template', () => {
     expect(template).not.toContain('timelineProviderLabel(timelinePendingDeletion()!)');
     expect(template).not.toContain('timelineModelLabel(timelinePendingDeletion()!)');
   });
+
+  it('keeps timeline selectors visible while model options load and uses compact history rows', () => {
+    const template = readFileSync(
+      resolve(
+        __dirname,
+        './components/clinical-session-timeline-workspace.component.html',
+      ),
+      'utf-8',
+    );
+
+    expect(template).toContain('class="timeline-model-fields"');
+    expect(template).toContain('modelConfigLoading() || generationRunning()');
+    expect(template).toContain('class="timeline-row"');
+    expect(template).toContain('class="timeline-row-meta"');
+    expect(template).not.toContain('class="timeline-gallery">@for');
+  });
 });

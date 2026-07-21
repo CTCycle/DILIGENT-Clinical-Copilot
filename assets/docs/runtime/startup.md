@@ -9,6 +9,7 @@ On Windows, use:
 ```
 
 The launcher:
+- creates `settings/.env` from `settings/.env.example` on first application start when the local environment file is missing
 - ensures portable Python, `uv`, and Node runtimes under `runtimes/`
 - runs `uv sync`
 - installs frontend dependencies
