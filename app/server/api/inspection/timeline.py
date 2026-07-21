@@ -10,6 +10,7 @@ from domain.patient_timeline import (
     SessionTimelinePreview,
     SessionTimelineRegenerateRequest,
 )
+from domain.inspection import DeleteEntityResponse
 from services.inspection.service import DataInspectionService
 
 ###############################################################################
@@ -58,6 +59,7 @@ class InspectionTimelineEndpoint(InspectionEndpointBase):
             timeline = self.service.generate_session_timeline(
                 session_id,
                 force_regenerate=force_regenerate,
+                model_overrides=request.model_overrides,
             )
         except RuntimeError as exc:
             detail_message = str(exc)
@@ -95,6 +97,12 @@ class InspectionTimelineEndpoint(InspectionEndpointBase):
         return timeline
 
     # -------------------------------------------------------------------------
+    def delete_session_timeline(self, session_id: int, timeline_id: int) -> DeleteEntityResponse:
+        if not self.service.delete_session_timeline(session_id, timeline_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session timeline not found.")
+        return DeleteEntityResponse(deleted=True)
+
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "/sessions/{session_id}/timelines",
@@ -115,5 +123,12 @@ class InspectionTimelineEndpoint(InspectionEndpointBase):
             self.get_session_timeline_by_id,
             methods=["GET"],
             response_model=PatientTimeline,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/timelines/{timeline_id}",
+            self.delete_session_timeline,
+            methods=["DELETE"],
+            response_model=DeleteEntityResponse,
             status_code=status.HTTP_200_OK,
         )

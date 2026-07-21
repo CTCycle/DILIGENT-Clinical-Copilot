@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-07-20
+Last updated: 2026-07-21
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -45,6 +45,19 @@ Recommended workflow:
 5. Review timeline entries in chronological order.
 6. Compare exposure dates against lab abnormalities and symptoms.
 7. Use the timeline to refine DILI Agent input if needed.
+
+In the **Timeline** tab, choose a Local or Cloud runtime for each generation run.
+Cloud runs also select a provider and model; these choices do not change global model
+configuration. Saved cards record the run's provider, model, date range, event count,
+and evidence-quality warnings. Use **Open** to reopen a specific saved timeline,
+**Use settings** to copy its available settings into the form, or **Delete** to remove
+only that saved timeline after confirmation.
+
+The timetable separates Clinical events, Medication exposure, Laboratory findings,
+and Uncertain or unanchored events. Use its evidence filter, lane controls, density,
+fit-range, and previous/next navigation to review the chronology. A **Fallback
+chronology** or **Missing source evidence** label is a warning, not clinical
+confirmation.
 
 Timeline generation may show a fallback notice when local model extraction is unavailable. In that case, the timetable is built deterministically from persisted session fields with uncertain timing and no invented exact dates. Treat fallback events as navigation aids rather than model-extracted chronology.
 

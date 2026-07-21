@@ -7,7 +7,10 @@ from typing import Any
 from domain.patient_timeline import (
     PatientTimelineEvent,
     PatientTimelineExtraction,
+    SessionTimelineModelOverrides,
 )
+from repositories.serialization.session_timelines import _build_timeline_preview_payload
+from domain.patient_timeline import PatientTimeline
 from services.clinical.timeline import PatientTimelineExtractor
 
 ###############################################################################
@@ -139,3 +142,39 @@ def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
     assert '{"a":"x","b":2}' in prompt
     assert "Source payload SHA-256:" in prompt
     assert "'a':" not in prompt
+
+
+def test_timeline_model_override_validation_requires_an_unambiguous_runtime_model() -> None:
+    assert SessionTimelineModelOverrides(
+        use_cloud_services=False, text_extraction_model="qwen3:8b"
+    ).text_extraction_model == "qwen3:8b"
+    assert SessionTimelineModelOverrides(
+        use_cloud_services=True, llm_provider="openai", cloud_model="gpt-4.1-mini"
+    ).cloud_model == "gpt-4.1-mini"
+
+    import pytest
+
+    with pytest.raises(ValueError):
+        SessionTimelineModelOverrides(use_cloud_services=False)
+    with pytest.raises(ValueError):
+        SessionTimelineModelOverrides(use_cloud_services=True, llm_provider="openai")
+
+
+def test_timeline_preview_includes_evidence_and_timing_quality_counts() -> None:
+    preview = _build_timeline_preview_payload(
+        PatientTimeline(
+            timeline_id=3,
+            session_id=2,
+            generated_at=datetime.now(UTC),
+            events=[
+                    PatientTimelineEvent(event_id="a", title="A", timing_type="explicit_date", event_date="2025-01", source_evidence="source"),
+                PatientTimelineEvent(event_id="b", title="B", timing_type="uncertain"),
+                PatientTimelineEvent(event_id="c", title="C", timing_type="ordering"),
+            ],
+        )
+    )
+
+    assert preview["source_evidence_event_count"] == 1
+    assert preview["missing_evidence_event_count"] == 2
+    assert preview["uncertain_event_count"] == 2
+    assert preview["undated_event_count"] == 2

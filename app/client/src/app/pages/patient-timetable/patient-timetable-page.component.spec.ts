@@ -100,4 +100,19 @@ describe('PatientTimetablePageComponent', () => {
     expect(resolver.call(component, null)).toBeNull();
     expect(label('2025-02')).toBe('Month precision');
   });
+
+  it('filters evidence, keeps uncertain events exclusive, and supports lane collapse', () => {
+    component.timeline.set({
+      timeline_id: 9, session_id: 12, generated_at: '2026-07-09T08:00:00Z', events: [
+        { event_id: 'therapy', title: 'Therapy', description: null, event_type: 'therapy', timing_type: 'explicit_date', event_date: '2025-01-01', relative_time: null, extracted_timing_text: null, source_evidence: 'source', linked_patient_event_ids: [], source: null, confidence: null, confidence_rationale: null, sort_order: 0 },
+        { event_id: 'uncertain', title: 'Uncertain', description: null, event_type: 'therapy', timing_type: 'uncertain', event_date: null, relative_time: null, extracted_timing_text: null, source_evidence: null, linked_patient_event_ids: [], source: null, confidence: null, confidence_rationale: null, sort_order: 1 },
+      ],
+    });
+
+    expect(component.lanes().find((lane) => lane.id === 'uncertainty')?.items.map((item) => item.event.event_id)).toEqual(['uncertain']);
+    component.setEvidenceFilter('with_evidence');
+    expect(component.filteredEvents().map((event) => event.event_id)).toEqual(['therapy']);
+    component.toggleLaneCollapsed('therapy');
+    expect(component.lanes().find((lane) => lane.id === 'therapy')?.collapsed).toBe(true);
+  });
 });

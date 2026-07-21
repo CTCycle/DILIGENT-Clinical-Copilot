@@ -18,9 +18,12 @@
 
     <section class="timetable-toolbar" aria-label="Timetable controls">
       <span class="toolbar-group">Range <strong>{{ rangeLabel() }}</strong></span>
-      <span class="toolbar-group">Events <strong>{{ orderedEvents().length }}</strong></span>
-      <span class="toolbar-group">Display <strong>All event types</strong></span>
-      <span class="toolbar-group">Group by <strong>None</strong></span>
+      <span class="toolbar-group">Events <strong>{{ filteredEvents().length }}</strong></span>
+      <label class="toolbar-group">Evidence <select [value]="evidenceFilter()" (change)="setEvidenceFilter($any($event.target).value)"><option value="all">All events</option><option value="with_evidence">Has source evidence</option><option value="missing_evidence">Missing source evidence</option></select></label>
+      <label class="toolbar-group"><input type="checkbox" [checked]="showUncertainEvents()" (change)="toggleUncertainEvents()"> Show uncertain</label>
+      <label class="toolbar-group"><input type="checkbox" [checked]="hideEmptyLanes()" (change)="toggleHideEmptyLanes()"> Hide empty lanes</label>
+      <label class="toolbar-group">Density <select [value]="density()" (change)="setDensity($any($event.target).value)"><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select></label>
+      <button type="button" class="btn-secondary" (click)="fitRange()">Fit range</button><button type="button" class="btn-secondary" (click)="selectPreviousEvent()" [disabled]="!hasPreviousEvent()">Previous event</button><button type="button" class="btn-secondary" (click)="selectNextEvent()" [disabled]="!hasNextEvent()">Next event</button>
       <span class="toolbar-group">Source <strong>{{ generationStatusLabel() }}</strong></span>
       <span class="toolbar-group">Model <strong>{{ sourceModelLabel() }}</strong></span>
       <span class="toolbar-group">Generated <strong>{{ timeline()?.generated_at | date: 'mediumDate' }}</strong></span>
@@ -38,7 +41,7 @@
 
     <section class="timetable-content">
       <div class="timeline-area">
-        <div class="timeline-card">
+        <div class="timeline-card" [class.is-compact]="density() === 'compact'">
           <div class="timeline-card-header">
             <div>
               <span class="timeline-card-kicker">Timeline overview</span>
@@ -59,13 +62,14 @@
           </div>
 
           <div class="lane-grid">
-            @for (lane of lanes(); track lane.id) {
-              <section class="lane-row" [class.is-empty]="lane.items.length === 0" [style.--lane-levels]="lane.levelCount">
+            @for (lane of visibleLaneRows(); track lane.id) {
+              <section class="lane-row" [class.is-empty]="lane.items.length === 0" [class.is-collapsed]="lane.collapsed" [style.--lane-levels]="lane.levelCount">
                 <div class="lane-label">
                   <strong>{{ lane.label }}</strong>
                   <span>{{ lane.items.length }} events</span>
+                  <button type="button" class="btn-secondary" [attr.aria-expanded]="!lane.collapsed" (click)="toggleLaneCollapsed(lane.id)">{{ lane.collapsed ? 'Expand' : 'Collapse' }}</button>
                 </div>
-                <div class="lane-track">
+                @if (!lane.collapsed) { <div class="lane-track">
                   <div class="lane-track-line"></div>
                   @if (lane.items.length > 0) {
                     @for (item of lane.items; track item.event.event_id) {
@@ -74,12 +78,15 @@
                         class="timeline-node"
                         [attr.aria-pressed]="selectedEventId() === item.event.event_id"
                         [class.is-selected]="selectedEventId() === item.event.event_id"
+                        [class.is-linked]="isLinkedToSelectedEvent(item.event)"
+                        [class.is-missing-evidence]="!item.event.source_evidence"
                         [class.is-align-start]="item.align === 'start'"
                         [class.is-align-center]="item.align === 'center'"
                         [class.is-align-end]="item.align === 'end'"
                         [style.left.%]="item.positionPercent"
                         [style.--stack-level]="item.stackLevel"
                         [style.--event-color]="item.color"
+                        [attr.aria-label]="item.event.title + ', ' + timingLabel(item.event.timing_type)"
                         (click)="selectEvent(item.event)"
                       >
                         <span class="timeline-node-dot"></span>
@@ -94,7 +101,7 @@
                   } @else {
                     <p class="lane-empty-note">No events in this lane.</p>
                   }
-                </div>
+                </div> }
               </section>
             }
           </div>

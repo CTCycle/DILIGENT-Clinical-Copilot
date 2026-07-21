@@ -482,76 +482,8 @@
             @if (revisionArtifacts().length) { <h4>Draft artifacts</h4><ul class="clinical-session-side-list">@for (artifact of revisionArtifacts(); track artifact.artifact_key) { <li><strong>{{ artifact.artifact_key || 'artifact' }}</strong><small>{{ artifact.status || 'recorded' }}</small></li> }</ul> }
           </div>        }
 
-        @if (activeSection() === 'timeline') {
-          <div class="clinical-session-panel clinical-session-timeline-panel">
-            <p class="clinical-session-panel-note">Generate and revisit persisted patient timelines from the current session state without losing earlier runs.</p>
-            <div class="clinical-session-timeline-workspace">
-              <section class="clinical-session-timeline-models" aria-label="Timeline model selection">
-                <div class="clinical-session-timeline-models-header">
-                  <div>
-                    <h4>Timeline model</h4>
-                    <p>Choose the model for this timeline run.</p>
-                  </div>
-                  <span>{{ timelineModelSource() === 'cloud' ? 'Cloud runtime' : 'Local runtime' }}</span>
-                </div>
-                <div class="clinical-session-timeline-model-fields">
-                  <label>
-                    <span>Model</span>
-                    <select class="clinical-session-timeline-model-select" aria-label="Timeline extraction model" [ngModel]="timelineModelName() || selected()?.text_extraction_model || ''" (ngModelChange)="timelineModelName.set($event)">
-                      <option [value]="timelineModelName() || selected()?.text_extraction_model || ''">{{ timelineModelName() || selected()?.text_extraction_model || 'Configured at runtime' }}</option>
-                    </select>
-                  </label>
-                  <div class="clinical-session-timeline-model-actions">
-                    <button class="btn btn-secondary clinical-session-timeline-action" type="button" (click)="createTimeline()">Generate Timeline</button>
-                  </div>
-                </div>
-              </section>
-
-              <section class="clinical-session-timeline-history" aria-label="Generated timelines">
-                <div class="clinical-session-timeline-history-header">
-                  <div>
-                    <strong>Generated Timelines</strong>
-                    <span>Each run remains available for later review.</span>
-                  </div>
-                </div>
-
-                @if (timelineListLoading()) {
-                  <p class="clinical-session-panel-note">Loading timeline history...</p>
-                } @else if (timelineListError()) {
-                  <p class="clinical-sessions-status is-error">{{ timelineListError() }}</p>
-                } @else if (timelinePreviews().length) {
-                  <div class="clinical-session-timeline-history-list">
-                    @for (preview of timelinePreviews(); track preview.timeline_id ?? preview.generated_at) {
-                      <article class="clinical-session-timeline-history-card">
-                        <div class="clinical-session-version-card-header">
-                          <strong>{{ preview.title || 'Clinical timeline' }}</strong>
-                          <span class="clinical-session-state-badge" [class.is-neutral]="preview.generation_status !== 'fallback'" [class.is-warn]="preview.generation_status === 'fallback'">
-                            {{ timelinePreviewStatusLabel(preview) }}
-                          </span>
-                        </div>
-                        <p>{{ timelinePreviewRangeLabel(preview) }} · {{ preview.event_count }} events</p>
-                        <dl class="clinical-session-timeline-history-meta">
-                          <div>
-                            <dt>Generated</dt>
-                            <dd>{{ preview.generated_at | date: 'medium' }}</dd>
-                          </div>
-                          <div>
-                            <dt>Model</dt>
-                            <dd>{{ timelinePreviewSourceLabel(preview) }}</dd>
-                          </div>
-                        </dl>
-                        <div class="clinical-session-timeline-history-actions">
-                          <button class="btn btn-secondary" type="button" (click)="openTimelineView(preview)">Open Timeline</button>
-                        </div>
-                      </article>
-                    }
-                  </div>
-                } @else {
-                  <p class="clinical-session-panel-note">No persisted timelines yet. Generate the first timeline to start a revisitable history.</p>
-                }
-              </section>
-            </div>
-          </div>
+        @if (activeSection() === 'timeline' && selected(); as detail) {
+          <app-clinical-session-timeline-workspace [session]="detail"></app-clinical-session-timeline-workspace>
         }
 
         @if (saveStatus()) {

@@ -28,6 +28,9 @@ def _build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
     dated_events = [event.event_date for event in payload.events if event.event_date]
     sorted_dates = sorted(dated_events)
     title = payload.events[0].title if payload.events else None
+    source_evidence_event_count = sum(
+        1 for event in payload.events if event.source_evidence and event.source_evidence.strip()
+    )
     return SessionTimelinePreview(
         timeline_id=payload.timeline_id,
         session_id=payload.session_id,
@@ -41,6 +44,12 @@ def _build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
         start_date=sorted_dates[0] if sorted_dates else None,
         end_date=sorted_dates[-1] if sorted_dates else None,
         title=title,
+        source_evidence_event_count=source_evidence_event_count,
+        missing_evidence_event_count=len(payload.events) - source_evidence_event_count,
+        uncertain_event_count=sum(
+            1 for event in payload.events if event.timing_type in {"uncertain", "ordering"}
+        ),
+        undated_event_count=sum(1 for event in payload.events if not event.event_date),
     ).model_dump(mode="json")
 
 ###############################################################################
@@ -188,6 +197,31 @@ def create_session_timeline_record(
                 "session_id": safe_session_id,
             }
         ).model_dump(mode="json")
+    except Exception:
+        db_session.rollback()
+        raise
+    finally:
+        db_session.close()
+
+###############################################################################
+def delete_session_timeline_record(
+    self,
+    session_id: int,
+    timeline_id: int,
+) -> bool:
+    db_session = self.session_factory()
+    try:
+        row = db_session.execute(
+            select(ClinicalSessionTimeline).where(
+                ClinicalSessionTimeline.session_id == int(session_id),
+                ClinicalSessionTimeline.id == int(timeline_id),
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return False
+        db_session.delete(row)
+        db_session.commit()
+        return True
     except Exception:
         db_session.rollback()
         raise

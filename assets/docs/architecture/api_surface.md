@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-07-19
+Last updated: 2026-07-21
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature.
@@ -67,6 +67,7 @@ as `cached` if a later refresh fails. No catalog cache survives a backend restar
 - `GET /api/inspection/sessions/{session_id}/timelines`
 - `POST /api/inspection/sessions/{session_id}/timelines`
 - `GET /api/inspection/sessions/{session_id}/timelines/{timeline_id}`
+- `DELETE /api/inspection/sessions/{session_id}/timelines/{timeline_id}`
 - `DELETE /api/inspection/sessions/{session_id}`
 - `GET /api/inspection/rxnav`
 - `GET /api/inspection/rxnav/{drug_id}/aliases`
@@ -94,6 +95,13 @@ as `cached` if a later refresh fails. No catalog cache survives a backend restar
 - `DELETE /api/inspection/rag/jobs/{job_id}`
 
 ## Notes
+- `POST /api/inspection/sessions/{session_id}/timelines` accepts optional run-scoped
+  `model_overrides`. Local runs require `text_extraction_model`; cloud runs require
+  `llm_provider` and `cloud_model`. These settings are applied only for that run and
+  do not change persisted session settings or global model configuration. Timeline
+  previews include source-evidence, missing-evidence, uncertain, and undated counts.
+- Timeline deletion is scoped by both session and timeline identifiers and returns 404
+  when that exact persisted timeline does not exist.
 - Clinical and inspection workflows rely on job polling for long-running work.
 - Revision jobs currently expose the revision-agent skeleton: start, status, persisted run, and persisted step/artifact reads are active for issue identification only. Report rewriting, tool execution, and revised entity persistence are not implemented yet.
 - Research has no active route inventory in the current architecture source and should not be documented as an active API surface until implemented.

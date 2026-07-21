@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet('Launch', 'Install', 'InitializeDatabase', 'Test', 'Uninstall')]
+    [string]$Action
+)
 
 $ErrorActionPreference = 'Stop'
 $script:RepoRoot = $PSScriptRoot
@@ -551,6 +554,17 @@ function Wait-ForMenu {
     Write-Host ''
     Write-Host 'Press any key to return to menu...'
     [Console]::ReadKey($true) | Out-Null
+}
+
+if ($Action) {
+    switch ($Action) {
+        'Launch' { Start-Application }
+        'Install' { Install-OrUpdateApplication }
+        'InitializeDatabase' { Initialize-Database }
+        'Test' { Invoke-TestSuite }
+        'Uninstall' { Uninstall-Application }
+    }
+    exit 0
 }
 
 while ($true) {

@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 import {
   LucideFileText,
   LucideFlaskConical,
@@ -17,11 +16,9 @@ import {
   fetchClinicalSessionDetail,
   fetchRevisionArtifacts,
   fetchRevisionPipelineSteps,
-  fetchInspectionSessionTimelineList,
   fetchInspectionLiverToxCatalog,
   fetchInspectionRxNavCatalog,
   fetchInspectionSessions,
-  generateInspectionSessionTimeline,
   manualEditClinicalSessionReport,
   startSessionRevisionJob,
   fetchSessionRevisionJobStatus,
@@ -33,7 +30,6 @@ import {
   ClinicalSessionDetail,
   InspectionSessionItem,
   InspectionSessionStatus,
-  InspectionSessionTimelinePreview,
   CloudProvider,
   ModelConfigStateResponse,
   RevisionArtifact,
@@ -48,6 +44,7 @@ import {
   readMetadataEntries,
 } from './clinical-session-metadata';
 import { ClinicalSessionEditorToolbarComponent } from './components/clinical-session-editor-toolbar.component';
+import { ClinicalSessionTimelineWorkspaceComponent } from './components/clinical-session-timeline-workspace.component';
 import { applyMarkdownCommand } from './markdown-editor';
 import {
   ClinicalSessionDateFilterMode,
@@ -90,6 +87,7 @@ type DrugEvidenceDraft = DetectedDrugEvidence & {
     CommonModule,
     FormsModule,
     ClinicalSessionEditorToolbarComponent,
+    ClinicalSessionTimelineWorkspaceComponent,
     LucideFileText,
     LucideFlaskConical,
     LucideHeartPulse,
@@ -101,7 +99,6 @@ type DrugEvidenceDraft = DetectedDrugEvidence & {
   styleUrl: './clinical-sessions-page.component.scss',
 })
 export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
-  private readonly router = inject(Router);
   private readonly markdownRenderer = inject(MarkdownRendererService);
   private pollCancelled = false;
 
@@ -152,11 +149,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly labSummary = signal<Array<{ label: string; value: string }>>([]);
   readonly labTimeline = signal<LabTimelineRow[]>([]);
   readonly hepatotoxicityPattern = signal<string>('N/A');
-  readonly timelinePreviews = signal<InspectionSessionTimelinePreview[]>([]);
-  readonly timelineListLoading = signal(false);
-  readonly timelineListError = signal<string | null>(null);
-  readonly timelineModelName = signal('');
-  readonly timelineModelSource = signal<'local' | 'cloud'>('local');
   readonly revisionInstruction = signal('');
   readonly revisionStatus = signal('');
   readonly revisionRunning = signal(false);
@@ -212,15 +204,12 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.manualEditReviewerNote.set('');
       this.manualEditEditedBy.set(this.defaultReviewerLabel(detail));
       this.metadataText.set(JSON.stringify(normalizeClinicalSessionMetadata(detail.metadata || {}), null, 2));
-      this.syncTimelineModelSelection(detail);
       this.activeSection.set('preview');
       this.detectedDiseases.set(this.previewDetectedDiseases(detail));
       this.labSummary.set(this.previewLaboratorySummary(detail));
       this.labTimeline.set(this.previewLabTimeline(detail));
       this.hepatotoxicityPattern.set(this.previewHepatotoxicityPattern(detail));
-      this.resetTimelineHistoryState();
       void this.loadDetectedDrugEvidence(detail);
-      void this.loadTimelineHistory(detail.session_id);
     } catch (error) {
       this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
     } finally {
@@ -296,7 +285,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.labSummary.set([]);
     this.labTimeline.set([]);
     this.hepatotoxicityPattern.set('N/A');
-    this.resetTimelineHistoryState();
     this.detailError.set(null);
   }
 
@@ -583,78 +571,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     } catch (error) {
       this.metadataSaveStatus.set(formatUnknownError(error, 'Failed to save metadata.'));
     }
-  }
-
-  private resetTimelineHistoryState(): void {
-    this.timelinePreviews.set([]);
-    this.timelineListLoading.set(false);
-    this.timelineListError.set(null);
-  }
-
-  private async loadTimelineHistory(sessionId: number): Promise<void> {
-    this.timelineListLoading.set(true);
-    this.timelineListError.set(null);
-    try {
-      const payload = await fetchInspectionSessionTimelineList(sessionId);
-      if (this.selected()?.session_id !== sessionId) return;
-      this.timelinePreviews.set(payload.items || []);
-    } catch (error) {
-      if (this.selected()?.session_id === sessionId) {
-        this.timelinePreviews.set([]);
-        this.timelineListError.set(
-          formatUnknownError(error, 'Failed to load timeline history.'),
-        );
-      }
-    } finally {
-      if (this.selected()?.session_id === sessionId) {
-        this.timelineListLoading.set(false);
-      }
-    }
-  }
-
-  async createTimeline(): Promise<void> {
-    const detail = this.selected();
-    if (!detail) return;
-    this.saveStatus.set('Creating timeline...');
-    try {
-      await generateInspectionSessionTimeline(detail.session_id, { force_regenerate: true });
-      await this.loadTimelineHistory(detail.session_id);
-      this.saveStatus.set('Timeline generated.');
-    } catch (error) {
-      this.saveStatus.set(formatUnknownError(error, 'Failed to create timeline.'));
-    }
-  }
-
-  async openTimelineView(preview: InspectionSessionTimelinePreview): Promise<void> {
-    if (preview.timeline_id) {
-      await this.router.navigate(['/sessions', preview.session_id, 'timetable', preview.timeline_id]);
-      return;
-    }
-    await this.router.navigate(['/sessions', preview.session_id, 'timetable']);
-  }
-
-  timelinePreviewRangeLabel(preview: InspectionSessionTimelinePreview): string {
-    if (preview.start_date && preview.end_date) {
-      const start = this.formatTimelinePreviewDate(preview.start_date);
-      const end = this.formatTimelinePreviewDate(preview.end_date);
-      return start === end ? start : `${start} - ${end}`;
-    }
-    if (preview.start_date) {
-      return this.formatTimelinePreviewDate(preview.start_date);
-    }
-    return 'Undated chronology';
-  }
-
-  timelinePreviewSourceLabel(preview: InspectionSessionTimelinePreview): string {
-    const model = preview.source_model?.trim();
-    if (model) {
-      return model;
-    }
-    return preview.generation_status === 'fallback' ? 'Fallback chronology' : 'Timeline extraction model';
-  }
-
-  timelinePreviewStatusLabel(preview: InspectionSessionTimelinePreview): string {
-    return preview.generation_status === 'fallback' ? 'Fallback' : 'LLM generated';
   }
 
   statusLabel(value: InspectionSessionStatus): string {
@@ -1189,27 +1105,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     } catch {
       return normalizeClinicalSessionMetadata({});
     }
-  }
-
-  private syncTimelineModelSelection(detail: ClinicalSessionDetail | null): void {
-    const configuredModel = this.timelineModelName().trim();
-    const detailModel = detail?.text_extraction_model?.trim() || '';
-    this.timelineModelName.set(configuredModel || detailModel);
-    if (!configuredModel && detailModel) {
-      this.timelineModelSource.set('local');
-    }
-  }
-
-  private formatTimelinePreviewDate(value: string): string {
-    const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`);
-    if (Number.isNaN(parsed.getTime())) {
-      return value;
-    }
-    return new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'UTC',
-    }).format(parsed);
   }
 
   private stopPoller(): void {

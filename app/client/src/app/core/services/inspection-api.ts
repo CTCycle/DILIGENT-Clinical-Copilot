@@ -368,6 +368,16 @@ export async function startSessionRevisionJob(sessionId: number, payload: Sessio
   });
 }
 
+export async function deleteInspectionSessionTimeline(
+  sessionId: number,
+  timelineId: number,
+): Promise<InspectionDeleteResponse> {
+  return requestJson<InspectionDeleteResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timelines/${encodeURIComponent(String(timelineId))}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function fetchSessionRevisionJobStatus(jobId: string): Promise<RevisionJobStatusResponse> {
   return requestJson<RevisionJobStatusResponse>(`${API_BASE_URL}/inspection/sessions/revision/jobs/${encodeURIComponent(jobId)}`, { method: "GET" });
 }

@@ -1,0 +1,121 @@
+import { CommonModule } from '@angular/common';
+import { Component, Input, OnChanges, OnInit, SimpleChanges, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+
+import { ModalShellComponent } from '../../../components/modal-shell/modal-shell.component';
+import { ClinicalSessionDetail, CloudProvider, InspectionSessionTimelinePreview, ModelConfigStateResponse } from '../../../core/models/types';
+import { deleteInspectionSessionTimeline, fetchInspectionSessionTimelineList, generateInspectionSessionTimeline } from '../../../core/services/inspection-api';
+import { fetchModelConfigState } from '../../../core/services/model-config-api';
+import { formatUnknownError } from '../../../core/utils';
+
+@Component({
+  selector: 'app-clinical-session-timeline-workspace',
+  standalone: true,
+  imports: [CommonModule, FormsModule, ModalShellComponent],
+  templateUrl: './clinical-session-timeline-workspace.component.html',
+  styleUrl: './clinical-session-timeline-workspace.component.scss',
+})
+export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChanges {
+  private readonly router = inject(Router);
+  @Input({ required: true }) session!: ClinicalSessionDetail;
+
+  readonly timelinePreviews = signal<InspectionSessionTimelinePreview[]>([]);
+  readonly timelineListLoading = signal(false);
+  readonly timelineListError = signal<string | null>(null);
+  readonly modelConfig = signal<ModelConfigStateResponse | null>(null);
+  readonly modelConfigLoading = signal(false);
+  readonly modelConfigError = signal<string | null>(null);
+  readonly runtime = signal<'local' | 'cloud'>('local');
+  readonly provider = signal<CloudProvider | string>('openai');
+  readonly modelName = signal('');
+  readonly generationRunning = signal(false);
+  readonly generationStatus = signal<string | null>(null);
+  readonly generationError = signal<string | null>(null);
+  readonly timelinePendingDeletion = signal<InspectionSessionTimelinePreview | null>(null);
+  readonly deletingTimelineId = signal<number | null>(null);
+  readonly deleteError = signal<string | null>(null);
+  readonly settingsRestoreNotice = signal<string | null>(null);
+
+  readonly availableLocalModels = computed(() => (this.modelConfig()?.local_models ?? []).filter((model) => model.available_in_ollama));
+  readonly availableCloudProviders = computed(() => this.modelConfig()?.cloud_providers ?? []);
+  readonly availableCloudModels = computed(() => this.availableCloudProviders().find((candidate) => candidate.id === this.provider())?.models ?? []);
+  readonly selectedConfigurationLabel = computed(() => {
+    const runtime = this.runtime() === 'cloud' ? 'Cloud' : 'Local';
+    const provider = this.runtime() === 'cloud' ? this.availableCloudProviders().find((item) => item.id === this.provider())?.display_name || this.provider() : null;
+    return [runtime, provider, this.modelName()].filter(Boolean).join(' · ');
+  });
+  readonly canGenerate = computed(() => Boolean(this.modelName()) && !this.generationRunning() && !this.modelConfigLoading() && !this.modelConfigError());
+  readonly sortedTimelinePreviews = computed(() => [...this.timelinePreviews()].sort((a, b) => Date.parse(b.generated_at) - Date.parse(a.generated_at)));
+
+  ngOnInit(): void { this.resetAndLoad(); }
+  ngOnChanges(changes: SimpleChanges): void { if (changes['session'] && !changes['session'].firstChange) this.resetAndLoad(); }
+
+  private resetAndLoad(): void {
+    this.timelinePreviews.set([]); this.timelineListError.set(null); this.generationError.set(null); this.generationStatus.set(null); this.settingsRestoreNotice.set(null);
+    void this.loadModelConfiguration(); void this.loadTimelineHistory();
+  }
+
+  async loadModelConfiguration(): Promise<void> {
+    this.modelConfigLoading.set(true); this.modelConfigError.set(null);
+    try {
+      const config = await fetchModelConfigState(true);
+      this.modelConfig.set(config);
+      this.runtime.set(config.use_cloud_services ? 'cloud' : 'local');
+      this.provider.set(config.cloud_providers.find((item) => item.id === config.llm_provider)?.id || config.cloud_providers[0]?.id || 'openai');
+      this.correctModelSelection(config.use_cloud_services ? (config.cloud_model || '') : (config.text_extraction_model || ''));
+    } catch (error) { this.modelConfigError.set(formatUnknownError(error, 'Unable to load timeline model options.')); }
+    finally { this.modelConfigLoading.set(false); }
+  }
+
+  async loadTimelineHistory(): Promise<void> {
+    if (!this.session?.session_id) return;
+    this.timelineListLoading.set(true); this.timelineListError.set(null);
+    try { this.timelinePreviews.set((await fetchInspectionSessionTimelineList(this.session.session_id)).items); }
+    catch (error) { this.timelineListError.set(formatUnknownError(error, 'Unable to load timeline history.')); }
+    finally { this.timelineListLoading.set(false); }
+  }
+
+  setRuntime(value: 'local' | 'cloud'): void { this.runtime.set(value); this.correctModelSelection(); }
+  setProvider(value: string): void { if (this.availableCloudProviders().some((item) => item.id === value)) { this.provider.set(value); this.correctModelSelection(); } }
+  setModelName(value: string): void { this.modelName.set(value); }
+
+  async generateTimeline(): Promise<void> {
+    if (!this.canGenerate()) return;
+    this.generationRunning.set(true); this.generationError.set(null); this.generationStatus.set('Generating timeline…');
+    const cloud = this.runtime() === 'cloud';
+    try {
+      await generateInspectionSessionTimeline(this.session.session_id, { force_regenerate: true, model_overrides: cloud ? { use_cloud_services: true, llm_provider: String(this.provider()), cloud_model: this.modelName() } : { use_cloud_services: false, text_extraction_model: this.modelName() } });
+      this.generationStatus.set('Timeline generated and saved.'); await this.loadTimelineHistory();
+    } catch (error) { this.generationStatus.set(null); this.generationError.set(formatUnknownError(error, 'Unable to generate timeline.')); }
+    finally { this.generationRunning.set(false); }
+  }
+
+  openTimeline(preview: InspectionSessionTimelinePreview): void { if (preview.timeline_id) void this.router.navigate(['/sessions', this.session.session_id, 'timetable', preview.timeline_id]); }
+  useTimelineSettings(preview: InspectionSessionTimelinePreview): void {
+    this.settingsRestoreNotice.set(null); const isCloud = preview.source_kind === 'cloud'; this.runtime.set(isCloud ? 'cloud' : 'local');
+    if (isCloud && preview.model_provider && this.availableCloudProviders().some((item) => item.id === preview.model_provider)) this.provider.set(preview.model_provider);
+    const choices = isCloud ? this.availableCloudModels().map((item) => item.id) : this.availableLocalModels().map((item) => item.name);
+    if (preview.source_model && choices.includes(preview.source_model)) this.modelName.set(preview.source_model);
+    else { this.modelName.set(choices[0] || ''); this.settingsRestoreNotice.set('The original model is unavailable; a compatible currently available model was selected.'); }
+  }
+  requestTimelineDeletion(preview: InspectionSessionTimelinePreview): void { this.timelinePendingDeletion.set(preview); this.deleteError.set(null); }
+  cancelTimelineDeletion(): void { if (this.deletingTimelineId() === null) { this.timelinePendingDeletion.set(null); this.deleteError.set(null); } }
+  async confirmTimelineDeletion(): Promise<void> {
+    const preview = this.timelinePendingDeletion(); if (!preview?.timeline_id) return;
+    this.deletingTimelineId.set(preview.timeline_id); this.deleteError.set(null);
+    try { await deleteInspectionSessionTimeline(this.session.session_id, preview.timeline_id); this.timelinePreviews.update((items) => items.filter((item) => item.timeline_id !== preview.timeline_id)); this.timelinePendingDeletion.set(null); }
+    catch (error) { this.deleteError.set(formatUnknownError(error, 'Unable to delete timeline.')); }
+    finally { this.deletingTimelineId.set(null); }
+  }
+
+  timelineRangeLabel(preview: InspectionSessionTimelinePreview): string { return preview.start_date && preview.end_date ? `${preview.start_date} – ${preview.end_date}` : preview.start_date || preview.end_date || 'No dated events'; }
+  timelineProviderLabel(preview: InspectionSessionTimelinePreview): string { return preview.source_kind === 'cloud' ? preview.model_provider || 'Cloud provider not recorded' : 'Local'; }
+  timelineModelLabel(preview: InspectionSessionTimelinePreview): string { return preview.source_model || 'Model not recorded'; }
+  timelineQualityLabel(preview: InspectionSessionTimelinePreview): string { return preview.generation_status === 'fallback' ? 'Fallback chronology' : 'LLM generated'; }
+
+  private correctModelSelection(preferred = this.modelName()): void {
+    const values = this.runtime() === 'cloud' ? this.availableCloudModels().map((item) => item.id) : this.availableLocalModels().map((item) => item.name);
+    this.modelName.set(values.includes(preferred) ? preferred : values[0] || '');
+  }
+}
