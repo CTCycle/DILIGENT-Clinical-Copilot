@@ -66,7 +66,7 @@ describe('ClinicalSessionsPage revision template', () => {
     expect(template).toContain('class="timeline-model-fields"');
     expect(template).toContain('modelConfigLoading() || generationRunning()');
     expect(template).toContain('class="timeline-row"');
-    expect(template).toContain('class="timeline-row-meta"');
+    expect(template).toContain('class="timeline-row-summary"');
     expect(template).not.toContain('class="timeline-gallery">@for');
   });
 });
