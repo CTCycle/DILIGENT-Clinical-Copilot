@@ -10,6 +10,7 @@ from services.llm.runtime_config import LLMRuntimeConfig
 from domain.patient_timeline import (
     PatientTimeline,
     PatientTimelineEvent,
+    SessionTimelineModelOverrides,
 )
 from services.inspection.normalization import (
     extract_lab_marker,
@@ -63,6 +64,40 @@ class InspectionTimelineMixin:
     # -------------------------------------------------------------------------
     def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
         return self.serializer.list_session_timelines(session_id)
+
+    # -------------------------------------------------------------------------
+    def delete_session_timeline(self, session_id: int, timeline_id: int) -> bool:
+        return self.serializer.delete_session_timeline_record(session_id, timeline_id)
+
+    # -------------------------------------------------------------------------
+    def _build_timeline_runtime_settings(
+        self,
+        *,
+        source: dict[str, Any],
+        model_overrides: SessionTimelineModelOverrides | None,
+    ) -> dict[str, Any]:
+        session_payload = source.get("session_result_payload")
+        persisted = session_payload.get("runtime_settings") if isinstance(session_payload, dict) else None
+        settings = dict(persisted) if isinstance(persisted, dict) else {}
+        settings.setdefault("use_cloud_services", LLMRuntimeConfig.is_cloud_enabled())
+        settings.setdefault("llm_provider", LLMRuntimeConfig.get_llm_provider())
+        settings.setdefault("cloud_model", LLMRuntimeConfig.get_cloud_model())
+        settings.setdefault(
+            "text_extraction_model",
+            LLMRuntimeConfig.get_text_extraction_model() or coerce_optional_str(source.get("text_extraction_model")),
+        )
+        settings.setdefault(
+            "clinical_model",
+            LLMRuntimeConfig.get_clinical_model() or coerce_optional_str(source.get("clinical_model")),
+        )
+        settings.setdefault("ollama_reasoning", LLMRuntimeConfig.is_ollama_reasoning_enabled())
+        settings.setdefault("ollama_seed", LLMRuntimeConfig.get_ollama_seed())
+        if model_overrides is not None:
+            settings["use_cloud_services"] = model_overrides.use_cloud_services
+            settings["llm_provider"] = model_overrides.llm_provider
+            settings["cloud_model"] = model_overrides.cloud_model
+            settings["text_extraction_model"] = model_overrides.text_extraction_model
+        return settings
 
     # -------------------------------------------------------------------------
     def build_fallback_timeline(
@@ -156,6 +191,7 @@ class InspectionTimelineMixin:
         session_id: int,
         *,
         force_regenerate: bool = False,
+        model_overrides: SessionTimelineModelOverrides | None = None,
     ) -> PatientTimeline | None:
         safe_session_id = int(session_id)
         now = time.monotonic()
@@ -182,13 +218,6 @@ class InspectionTimelineMixin:
             source = self.serializer.get_session_timeline_source(session_id)
             if source is None:
                 return None
-            session_payload = source.get("session_result_payload")
-            if not isinstance(session_payload, dict):
-                session_payload = {}
-            runtime_settings = session_payload.get("runtime_settings")
-            if not isinstance(runtime_settings, dict):
-                runtime_settings = {}
-
             timeline_timeout_s = max(
                 20.0,
                 min(
@@ -196,35 +225,13 @@ class InspectionTimelineMixin:
                     float(getattr(self.timeline_extractor, "timeout_s", 90.0)) + 20.0,
                 ),
             )
-            text_extraction_model = coerce_optional_str(
-                runtime_settings.get("text_extraction_model")
-            ) or coerce_optional_str(source.get("text_extraction_model"))
-            clinical_model = coerce_optional_str(
-                runtime_settings.get("clinical_model")
-            ) or coerce_optional_str(source.get("clinical_model"))
-            requested_runtime_settings = dict(runtime_settings)
-            requested_runtime_settings.setdefault(
-                "use_cloud_services", LLMRuntimeConfig.is_cloud_enabled()
+            requested_runtime_settings = self._build_timeline_runtime_settings(
+                source=source, model_overrides=model_overrides
             )
-            requested_runtime_settings.setdefault(
-                "llm_provider", LLMRuntimeConfig.get_llm_provider()
-            )
-            requested_runtime_settings.setdefault(
-                "cloud_model", LLMRuntimeConfig.get_cloud_model()
-            )
-            requested_runtime_settings.setdefault(
-                "text_extraction_model",
-                LLMRuntimeConfig.get_text_extraction_model() or text_extraction_model,
-            )
-            requested_runtime_settings.setdefault(
-                "clinical_model",
-                LLMRuntimeConfig.get_clinical_model() or clinical_model,
-            )
-            requested_runtime_settings.setdefault(
-                "ollama_reasoning", LLMRuntimeConfig.is_ollama_reasoning_enabled()
-            )
-            requested_runtime_settings.setdefault(
-                "ollama_seed", LLMRuntimeConfig.get_ollama_seed()
+            source_model = (
+                requested_runtime_settings["cloud_model"]
+                if requested_runtime_settings["use_cloud_services"]
+                else requested_runtime_settings["text_extraction_model"]
             )
 
             try:
@@ -244,9 +251,7 @@ class InspectionTimelineMixin:
                         **timeline.model_dump(),
                         "generation_status": "llm_generated",
                         "generation_note": None,
-                        "source_model": requested_runtime_settings[
-                            "text_extraction_model"
-                        ],
+                        "source_model": source_model,
                         "source_kind": (
                             "cloud"
                             if requested_runtime_settings["use_cloud_services"]
@@ -268,9 +273,7 @@ class InspectionTimelineMixin:
                 timeline = PatientTimeline(
                     **{
                         **timeline.model_dump(),
-                        "source_model": requested_runtime_settings[
-                            "text_extraction_model"
-                        ],
+                        "source_model": source_model,
                         "source_kind": (
                             "cloud"
                             if requested_runtime_settings["use_cloud_services"]

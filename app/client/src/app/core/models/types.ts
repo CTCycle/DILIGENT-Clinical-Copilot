@@ -378,6 +378,14 @@ export type InspectionSessionTimeline = {
 
 export type InspectionSessionTimelineRequest = {
   force_regenerate?: boolean;
+  model_overrides?: InspectionSessionTimelineModelOverrides | null;
+};
+
+export type InspectionSessionTimelineModelOverrides = {
+  use_cloud_services: boolean;
+  llm_provider?: string | null;
+  cloud_model?: string | null;
+  text_extraction_model?: string | null;
 };
 
 export type InspectionSessionTimelinePreview = {
@@ -393,6 +401,10 @@ export type InspectionSessionTimelinePreview = {
   start_date: string | null;
   end_date: string | null;
   title?: string | null;
+  source_evidence_event_count: number;
+  missing_evidence_event_count: number;
+  uncertain_event_count: number;
+  undated_event_count: number;
 };
 
 export type InspectionSessionTimelineListResponse = {
