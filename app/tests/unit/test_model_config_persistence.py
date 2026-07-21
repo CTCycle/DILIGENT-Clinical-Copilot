@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -13,7 +13,7 @@ from services.llm.runtime_config import LLMRuntimeConfig
 from domain.model_configs import ConnectivityCheckRequest, ModelConfigSnapshot
 from services.llm.cloud import LLMError
 from services.llm.model_config import ModelConfigService
-from domain.llm.providers import CloudModelDescriptor
+from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
 from repositories.serialization.model_configs import ModelConfigSerializer
 from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import get_job_manager
@@ -96,6 +96,44 @@ def test_model_config_service_allows_persisted_deepseek_model_before_refresh() -
 
     assert snapshot.cloud_provider == "deepseek"
     assert snapshot.cloud_model == "deepseek-v4-flash"
+
+###############################################################################
+def test_model_config_state_survives_provider_catalog_drift(monkeypatch) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="gpt-4.1-mini",
+            text_extraction_model="gpt-4.1-mini",
+            use_cloud_models=True,
+            cloud_provider="deepseek",
+            cloud_model="gpt-4.1-mini",
+            updated_at=datetime.now(UTC),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+    monkeypatch.setitem(
+        ModelConfigService._provider_catalog_cache,
+        "deepseek",
+        (
+            datetime.now(UTC),
+            [CloudModelDescriptor(id="deepseek-chat", display_name="DeepSeek Chat")],
+        ),
+    )
+
+    async def fake_discover_provider_descriptors() -> list[CloudProviderDescriptor]:
+        return ModelConfigService.build_provider_descriptors()
+
+    monkeypatch.setattr(
+        service,
+        "discover_provider_descriptors",
+        fake_discover_provider_descriptors,
+    )
+
+    response = asyncio.run(
+        service.get_state(include_local_availability=False)
+    )
+
+    assert response.llm_provider == "deepseek"
+    assert response.cloud_model == "gpt-4.1-mini"
 
 ###############################################################################
 def test_model_config_service_rejects_switching_cloud_model_roles_to_local_mode(

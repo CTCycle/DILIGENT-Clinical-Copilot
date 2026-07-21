@@ -39,4 +39,18 @@ describe('ClinicalSessionsPage revision template', () => {
     expect(template).toContain('drug.bibliographyLabel');
     expect(template).toContain('drug.bibliographyFallback');
   });
+
+  it('guards closed timeline deletion modal content', () => {
+    const template = readFileSync(
+      resolve(
+        __dirname,
+        './components/clinical-session-timeline-workspace.component.html',
+      ),
+      'utf-8',
+    );
+
+    expect(template).toContain('@if (timelinePendingDeletion(); as preview)');
+    expect(template).not.toContain('timelineProviderLabel(timelinePendingDeletion()!)');
+    expect(template).not.toContain('timelineModelLabel(timelinePendingDeletion()!)');
+  });
 });
