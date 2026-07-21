@@ -9,6 +9,7 @@ from typing import Any
 from common.catalogs.model_choices import get_clinical_model_choices, get_text_extraction_model_choices
 
 
+###############################################################################
 class GenerationPurpose(StrEnum):
     STRUCTURED_EXTRACTION = "structured_extraction"
     CLINICAL_SYNTHESIS = "clinical_synthesis"
@@ -16,6 +17,7 @@ class GenerationPurpose(StrEnum):
     CONNECTIVITY_CHECK = "connectivity_check"
 
 
+###############################################################################
 class PolicyMatchKind(StrEnum):
     EXACT_MODEL = "exact_model"
     MODEL_FAMILY = "model_family"
@@ -23,6 +25,7 @@ class PolicyMatchKind(StrEnum):
     FALLBACK = "fallback"
 
 
+###############################################################################
 @dataclass(frozen=True)
 class GenerationPolicy:
     policy_id: str
@@ -40,6 +43,7 @@ _CATALOG_PATH = Path(__file__).resolve().parents[3] / "resources" / "catalogs" /
 _LOCAL_CATALOG_PATH = Path(__file__).resolve().parents[3] / "resources" / "catalogs" / "local_models.json"
 
 
+###############################################################################
 def _load_catalog() -> dict[str, Any]:
     with _CATALOG_PATH.open(encoding="utf-8") as handle:
         catalog = json.load(handle)
@@ -51,6 +55,7 @@ def _load_catalog() -> dict[str, Any]:
 _CATALOG = _load_catalog()
 
 
+###############################################################################
 def _values(rule: dict[str, Any], purpose: GenerationPurpose, reasoning_enabled: bool) -> float | None:
     if "profile" in rule:
         profile = _CATALOG["profiles"][rule["profile"]]
@@ -68,6 +73,7 @@ def _values(rule: dict[str, Any], purpose: GenerationPurpose, reasoning_enabled:
     return selected.get(purpose.value)
 
 
+###############################################################################
 def _policy(
     *, provider: str, model: str, purpose: GenerationPurpose, temperature: float | None,
     match_kind: PolicyMatchKind, rationale: str,
@@ -85,6 +91,7 @@ def _policy(
     )
 
 
+###############################################################################
 def resolve_generation_policy(
     *, purpose: GenerationPurpose, provider: str, model: str, reasoning_enabled: bool = False,
 ) -> GenerationPolicy:
@@ -125,6 +132,7 @@ def resolve_generation_policy(
                    rationale="Unknown model uses the provider/model default")
 
 
+###############################################################################
 def validate_catalog() -> None:
     required = {purpose.value for purpose in GenerationPurpose}
     for name, profile in _CATALOG["profiles"].items():

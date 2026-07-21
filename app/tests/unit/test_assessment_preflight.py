@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 
@@ -241,6 +242,89 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     assert result.deterministic_diagnostics["anamnesis"]["drug_count"] >= 3
     assert result.deterministic_diagnostics["diseases"]["disease_count"] >= 2
     assert result.extraction_quality["timed_drug_count"] >= 1
+
+###############################################################################
+def test_preflight_does_not_warn_when_deterministic_disease_matching_is_empty(
+    monkeypatch,
+) -> None:
+    service = _build_service()
+    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
+    monkeypatch.setattr(
+        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+    )
+    monkeypatch.setattr(
+        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+    )
+    monkeypatch.setattr(
+        "services.session.preflight._validate_provider_key", lambda blocking: None
+    )
+    monkeypatch.setattr(
+        "services.session.preflight.extract_deterministic_diseases",
+        lambda text: type(
+            "DiseaseResult",
+            (),
+            {
+                "context": type("Context", (), {"entries": []})(),
+                "matched_lines": [],
+                "unresolved_lines": [text],
+            },
+        )(),
+    )
+
+    result = validate_clinical_input_preflight(
+        service,
+        ClinicalSessionRequest(
+            visit_date=date(2025, 3, 20),
+            selected_model_providers=["ollama"],
+            clinical_input=_valid_input(),
+        ),
+    )
+
+    assert "anamnesis_disease_context_sparse" not in {
+        issue.code for issue in result.non_blocking_issues
+    }
+
+###############################################################################
+def test_job_start_uses_opencode_credential_scope_for_opencode_go(
+    monkeypatch,
+) -> None:
+    service = _build_service()
+    requested_scopes: list[str] = []
+    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
+    monkeypatch.setattr(
+        "services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.LLMRuntimeConfig.get_llm_provider",
+        lambda: "opencode_go",
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.LLMRuntimeConfig.resolve_provider_and_model",
+        lambda role: ("opencode_go", "minimax-m2.5-free"),
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.AccessKeyService.list_access_keys",
+        lambda _self, provider: requested_scopes.append(provider)
+        or [SimpleNamespace(is_active=True)],
+    )
+    monkeypatch.setattr(
+        service,
+        "validate_assessment_prerequisites_without_llm",
+        lambda request: (_ for _ in ()).throw(AssertionError("validation reached")),
+    )
+
+    with pytest.raises(AssertionError, match="validation reached"):
+        start_clinical_job_workflow(
+            service,
+            ClinicalSessionRequest(
+                clinical_input=_valid_input(),
+                visit_date=date(2025, 3, 20),
+                selected_model_providers=["opencode_go"],
+            ),
+        )
+
+    assert requested_scopes == ["opencode"]
 
 ###############################################################################
 def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
