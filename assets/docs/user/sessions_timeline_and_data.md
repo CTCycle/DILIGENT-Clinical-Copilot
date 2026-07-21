@@ -48,8 +48,8 @@ Recommended workflow:
 
 In the **Timeline** tab, choose a Local or Cloud runtime for each generation run.
 Cloud runs also select a provider and model; these choices do not change global model
-configuration. Saved cards record the run's provider, model, date range, event count,
-and evidence-quality warnings. Use **Open** to reopen a specific saved timeline,
+configuration. Saved timelines appear as compact rows that record the run's provider,
+model, date range, event count, and evidence-quality warnings. Use **Open** to reopen a specific saved timeline,
 **Use settings** to copy its available settings into the form, or **Delete** to remove
 only that saved timeline after confirmation.
 

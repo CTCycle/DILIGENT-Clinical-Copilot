@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from functools import lru_cache
 from pathlib import Path
 
@@ -33,13 +34,18 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
             return env_path if env_path.exists() else None
 
         previous_keys = set(os.environ.keys())
+        if not env_path.exists():
+            example_path = paths.ENV_EXAMPLE_PATH
+            if not example_path.exists():
+                raise FileNotFoundError(
+                    f"Environment template not found at: {example_path}"
+                )
+            shutil.copyfile(example_path, env_path)
+            logger.info("Created %s from %s", env_path, example_path)
         if env_path.exists():
             # Deployment and CI environment variables must be able to override
             # machine-local values committed to or supplied by the .env file.
             load_dotenv(dotenv_path=env_path, override=False)
-        else:
-            logger.warning(".env file not found at: %s", env_path)
-
         state.dotenv_injected_keys.clear()
         state.dotenv_injected_keys.update(set(os.environ.keys()) - previous_keys)
         state.bootstrap.bootstrapped = True
