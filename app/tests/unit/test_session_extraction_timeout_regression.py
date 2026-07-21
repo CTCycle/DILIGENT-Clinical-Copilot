@@ -127,7 +127,6 @@ def test_runtime_timeout_resolution_does_not_apply_six_second_parser_cap() -> No
 
     assert timeout > 6.0
 
-
 ###############################################################################
 def test_livertox_timeout_does_not_claim_knowledge_base_is_unavailable(
     monkeypatch: Any,

@@ -17,6 +17,7 @@ from domain.clinical.robustness import (
 )
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.llm.provider_factory import select_llm_provider
+from services.llm.provider_registry import provider_registry
 from services.retrieval.readiness import check_rag_readiness
 from services.security.access_keys import AccessKeyService
 from services.session.robust_pipeline import build_extraction_artifact
@@ -333,15 +334,6 @@ def validate_clinical_input_preflight(
                     field="anamnesis",
                 )
             )
-        if not disease_context.context.entries:
-            non_blocking.append(
-                ClinicalInputPreflightIssue(
-                    severity="non_blocking",
-                    code="anamnesis_disease_context_sparse",
-                    message="No deterministic disease/context entries were detected from anamnesis.",
-                    field="anamnesis",
-                )
-            )
         if extraction_artifact.confidence < 0.55:
             non_blocking.append(
                 ClinicalInputPreflightIssue(
@@ -493,11 +485,13 @@ def _validate_provider_key(blocking: list[ClinicalInputPreflightIssue]) -> None:
     if not LLMRuntimeConfig.is_cloud_enabled():
         return
     provider = LLMRuntimeConfig.get_llm_provider().strip().lower()
-    if provider not in _CLOUD_PROVIDERS:
+    try:
+        credential_provider = provider_registry.get(provider).credential_scope
+    except ValueError:
         return
     active_keys = [
         item
-        for item in AccessKeyService().list_access_keys(cast(Any, provider))
+        for item in AccessKeyService().list_access_keys(cast(Any, credential_provider))
         if item.is_active
     ]
     if not active_keys:
@@ -609,7 +603,6 @@ def _result(
         rag_readiness=rag_readiness,
     )
 
-
 ###############################################################################
 def _present_preflight_issue(
     issue: ClinicalInputPreflightIssue,
@@ -658,10 +651,6 @@ _ISSUE_PRESENTATIONS: dict[str, tuple[str, str]] = {
     "active_provider_key_missing": (
         "Provider access key missing",
         "The configured cloud model cannot be contacted without an active access key.",
-    ),
-    "anamnesis_disease_context_sparse": (
-        "Clinical context may be incomplete",
-        "Relevant comorbidities or competing causes may be underrepresented in the assessment.",
     ),
     "anamnesis_regimen_lines_need_review": (
         "Medication history needs review",
@@ -780,5 +769,3 @@ _ISSUE_PRESENTATIONS: dict[str, tuple[str, str]] = {
         "The workflow cannot anchor the clinical chronology or persist a valid assessment date.",
     ),
 }
-
-_CLOUD_PROVIDERS = {"openai", "gemini"}

@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-07-11
+Last updated: 2026-07-21
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -12,6 +12,8 @@ Aggregate section confidence is the minimum confidence across required extracted
 Drug, disease, and laboratory extraction use provider-agnostic structured LLM calls for both cloud and local providers. The active runtime provider and model are resolved from persisted model configuration.
 
 Structured LLM output is validated against Pydantic schemas and semantic guardrails. Invalid or contaminated output is retried with the rejected output and validation feedback. If bounded LLM attempts fail, the pipeline falls back to direct rule-based parsers and records fallback warnings.
+
+Pre-flight preserves deterministic extraction counts as diagnostics, but it never asserts that anamnesis is disease-free solely because deterministic matching found no entries. Disease absence is a clinical conclusion, not a parser-gateway condition.
 
 Therapy extraction is always full-section and context-aware when a structured model is available. The complete normalized therapy corpus is submitted in one structured request so medication names, schedules, and continuation lines remain associated across line breaks. Deterministic extraction is retained as a grounding reference and failure fallback, not as a reason to skip corpus-level extraction.
 

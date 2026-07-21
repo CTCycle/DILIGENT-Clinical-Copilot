@@ -144,6 +144,7 @@ def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
     assert "'a':" not in prompt
 
 
+###############################################################################
 def test_timeline_model_override_validation_requires_an_unambiguous_runtime_model() -> None:
     assert SessionTimelineModelOverrides(
         use_cloud_services=False, text_extraction_model="qwen3:8b"
@@ -160,6 +161,7 @@ def test_timeline_model_override_validation_requires_an_unambiguous_runtime_mode
         SessionTimelineModelOverrides(use_cloud_services=True, llm_provider="openai")
 
 
+###############################################################################
 def test_timeline_preview_includes_evidence_and_timing_quality_counts() -> None:
     preview = _build_timeline_preview_payload(
         PatientTimeline(

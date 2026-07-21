@@ -37,6 +37,8 @@ def cancel_active_job(api_context: APIRequestContext) -> None:
         status = payload.get("status")
         if job_id and status in {"pending", "running"}:
             api_context.delete(f"/api/clinical/jobs/{job_id}")
+
+###############################################################################
 def test_clinical_requires_sections(api_context: APIRequestContext):
     response = api_context.post("/api/clinical/jobs", data={"name": "Test"})
     assert response.status == 422
