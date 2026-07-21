@@ -435,39 +435,21 @@
               } @else {
                 <div class="clinical-session-revision-model-fields">
                   <label>
-                    <span>Runtime</span>
-                    <select [ngModel]="revisionModelUseCloud() ? 'cloud' : 'local'" (ngModelChange)="setRevisionModelRuntime($event)" [disabled]="revisionRunning()">
-                      <option value="local">Local</option>
-                      <option value="cloud">Cloud</option>
+                    <span>Provider</span>
+                    <select [ngModel]="revisionModelProvider()" (ngModelChange)="setRevisionModelProvider($event)" [disabled]="revisionRunning()">
+                      @for (provider of revisionProviderOptions(); track provider.id) {
+                        <option [value]="provider.id">{{ provider.display_name }}</option>
+                      }
                     </select>
                   </label>
-                  @if (revisionModelUseCloud()) {
-                    <label>
-                      <span>Provider</span>
-                      <select [ngModel]="revisionModelProvider()" (ngModelChange)="setRevisionModelProvider($event)" [disabled]="revisionRunning()">
-                        @for (provider of revisionCloudProviders(); track provider.id) {
-                          <option [value]="provider.id">{{ provider.display_name }}</option>
-                        }
-                      </select>
-                    </label>
-                    <label class="clinical-session-revision-model-field-wide">
-                      <span>Model</span>
-                      <select [ngModel]="revisionModelName()" (ngModelChange)="updateRevisionModelName($event)" [disabled]="revisionRunning() || !revisionCloudModels().length">
-                        @for (model of revisionCloudModels(); track model.id) {
-                          <option [value]="model.id">{{ model.display_name || model.id }}</option>
-                        }
-                      </select>
-                    </label>
-                  } @else {
-                    <label class="clinical-session-revision-model-field-wide">
-                      <span>Model</span>
-                      <select [ngModel]="revisionModelName()" (ngModelChange)="updateRevisionModelName($event)" [disabled]="revisionRunning() || !revisionLocalModels().length">
-                        @for (model of revisionLocalModels(); track model.name) {
-                          <option [value]="model.name">{{ model.name }}</option>
-                        }
-                      </select>
-                    </label>
-                  }
+                  <label class="clinical-session-revision-model-field-wide">
+                    <span>Model</span>
+                    <select [ngModel]="revisionModelName()" (ngModelChange)="updateRevisionModelName($event)" [disabled]="revisionRunning() || !revisionModels().length">
+                      @for (model of revisionModels(); track model.id) {
+                        <option [value]="model.id">{{ model.display_name || model.id }}</option>
+                      }
+                    </select>
+                  </label>
                   <div class="clinical-session-actions clinical-session-revision-model-actions">
                     <button type="button" class="btn btn-primary" (click)="startRevision()" [disabled]="revisionRunning()">Start revision</button>
                     @if (revisionRunning()) { <button type="button" class="btn" (click)="cancelRevision()">Cancel</button> }

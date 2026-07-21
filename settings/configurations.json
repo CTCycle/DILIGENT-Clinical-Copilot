@@ -4,26 +4,10 @@
   },
   "rag": {
     "vector_collection_name": "documents",
-    "chunk_size": 1024,
-    "chunk_overlap": 128,
-    "embedding_batch_size": 64,
-    "use_hybrid_search": true,
-    "use_reranking": true,
-    "retrieval_candidate_count": 40,
-    "retrieval_selected_count": 6,
-    "reranker_model": "lightweight-balanced-v1",
     "hybrid_vector_weight": 0.65,
     "hybrid_text_weight": 0.35,
-    "embedding_backend": "ollama",
-    "ollama_embedding_model": "nomic-embed-text:v1.5",
-    "hf_embedding_model": "",
     "vector_index_metric": "cosine",
-    "vector_index_type": "IVF_FLAT",
-    "reset_vector_collection": false,
-    "cloud_embedding_model": "",
-    "use_cloud_embeddings": false,
-    "vector_stream_batch_size": 1024,
-    "embedding_max_workers": 4
+    "vector_index_type": "IVF_FLAT"
   },
   "runtime": {
     "default_llm_timeout": 3600.0,

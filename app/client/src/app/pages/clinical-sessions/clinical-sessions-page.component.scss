@@ -149,8 +149,7 @@
 
 .clinical-session-workspace {
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   padding: var(--space-lg);
 }
 
@@ -256,8 +255,7 @@
   flex-direction: column;
   min-height: 0;
   padding: var(--space-lg);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 .clinical-session-toolbar {
@@ -957,7 +955,7 @@
 
 .clinical-session-revision-model-fields {
   display: grid;
-  grid-template-columns: minmax(150px, 0.55fr) minmax(180px, 0.8fr) minmax(260px, 1.65fr) auto;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.65fr) auto;
   gap: var(--space-md);
 }
 
@@ -1800,6 +1798,7 @@
   .clinical-session-workspace {
     min-height: auto;
     height: auto;
+    overflow: visible;
   }
 
   .clinical-sessions-list {

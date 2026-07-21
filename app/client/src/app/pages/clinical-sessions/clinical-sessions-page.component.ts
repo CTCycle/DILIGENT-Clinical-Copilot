@@ -159,8 +159,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionModelLoading = signal(false);
   readonly revisionModelError = signal<string | null>(null);
   readonly revisionModelConfig = signal<ModelConfigStateResponse | null>(null);
-  readonly revisionModelUseCloud = signal(false);
-  readonly revisionModelProvider = signal<CloudProvider>('openai');
+  readonly revisionModelProvider = signal<'ollama' | CloudProvider>('ollama');
   readonly revisionModelName = signal('');
   private revisionPollCancelled = false;
 
@@ -389,9 +388,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     try {
       const payload = await fetchModelConfigState(true);
       this.revisionModelConfig.set(payload);
-      this.revisionModelUseCloud.set(payload.use_cloud_services);
       const configuredProvider = payload.cloud_providers.find((provider) => provider.id === payload.llm_provider)?.id;
-      this.revisionModelProvider.set(configuredProvider || payload.cloud_providers[0]?.id || 'openai');
+      this.revisionModelProvider.set(payload.use_cloud_services ? configuredProvider || payload.cloud_providers[0]?.id || 'ollama' : 'ollama');
       this.revisionModelName.set(this.resolveInitialRevisionModel(payload));
     } catch (error) {
       this.revisionModelError.set(formatUnknownError(error, 'Unable to load revision model options.'));
@@ -408,26 +406,24 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     return this.revisionModelConfig()?.cloud_providers || [];
   }
 
+  revisionProviderOptions(): Array<{ id: 'ollama' | CloudProvider; display_name: string }> {
+    return [{ id: 'ollama', display_name: 'Ollama' }, ...this.revisionCloudProviders()];
+  }
+
   revisionCloudModels(): ModelConfigStateResponse['cloud_providers'][number]['models'] {
     return this.revisionCloudProviders().find((provider) => provider.id === this.revisionModelProvider())?.models || [];
   }
 
-  setRevisionModelRuntime(mode: 'local' | 'cloud'): void {
-    const useCloud = mode === 'cloud';
-    this.revisionModelUseCloud.set(useCloud);
-    const options = useCloud
-      ? this.revisionCloudModels().map((model) => model.id)
-      : this.revisionLocalModels().map((model) => model.name);
-    if (!options.includes(this.revisionModelName())) {
-      this.revisionModelName.set(options[0] || '');
-    }
+  revisionModels(): Array<{ id: string; display_name?: string }> {
+    return this.revisionModelProvider() === 'ollama'
+      ? this.revisionLocalModels().map((model) => ({ id: model.name, display_name: model.name }))
+      : this.revisionCloudModels();
   }
 
   setRevisionModelProvider(value: string): void {
-    const provider = this.revisionCloudProviders().find((candidate) => candidate.id === value);
-    if (!provider) return;
-    this.revisionModelProvider.set(provider.id);
-    const options = provider.models.map((model) => model.id);
+    if (value !== 'ollama' && !this.revisionCloudProviders().some((candidate) => candidate.id === value)) return;
+    this.revisionModelProvider.set(value as 'ollama' | CloudProvider);
+    const options = this.revisionModels().map((model) => model.id);
     if (!options.includes(this.revisionModelName())) {
       this.revisionModelName.set(options[0] || '');
     }
@@ -459,7 +455,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     try {
       const started = await startSessionRevisionJob(detail.session_id, {
         revision_instruction: this.revisionInstruction().trim() || null,
-        model_overrides: this.revisionModelUseCloud()
+        model_overrides: this.revisionModelProvider() !== 'ollama'
           ? {
               use_cloud_models: true,
               cloud_provider: this.revisionModelProvider(),
