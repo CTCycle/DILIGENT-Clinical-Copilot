@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Query, status
+from fastapi import APIRouter, Body, Query, Response, status
 
 from domain.model_configs import (
     ModelConfigStateResponse,
@@ -30,8 +30,14 @@ class ModelConfigEndpoint:
     # -------------------------------------------------------------------------
     async def get_state(
         self,
+        response: Response,
         include_local_availability: Annotated[bool | None, Query()] = None,
     ) -> ModelConfigStateResponse:
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, max-age=0, must-revalidate"
+        )
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
         return await self.service.get_state(
             include_local_availability=include_local_availability,
         )
