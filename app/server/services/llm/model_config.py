@@ -764,6 +764,7 @@ class ModelConfigService:
     # -------------------------------------------------------------------------
     async def discover_provider_descriptors(self) -> list[CloudProviderDescriptor]:
         descriptors: list[CloudProviderDescriptor] = []
+        snapshot = self.ensure_defaults()
         for item in provider_registry.all():
             catalog_updated_at: datetime | None = None
             message: str | None = None
@@ -796,7 +797,9 @@ class ModelConfigService:
                         status = "cached"
                         message = "Showing models from the last successful provider refresh."
                     else:
-                        models = []
+                        models = self._configured_provider_models(
+                            snapshot, item.provider_id
+                        )
                         status = (
                             "authentication_required"
                             if "access key" in str(exc).lower()
@@ -805,7 +808,7 @@ class ModelConfigService:
                         message = (
                             "Add and activate an access key to load this provider's models."
                             if status == "authentication_required"
-                            else "The provider catalog could not be refreshed. Try again shortly."
+                            else self._configured_catalog_message(models)
                         )
                 except Exception:
                     cached = self._provider_catalog_cache.get(item.provider_id)
@@ -814,9 +817,11 @@ class ModelConfigService:
                         status = "cached"
                         message = "Showing models from the last successful provider refresh."
                     else:
-                        models = []
+                        models = self._configured_provider_models(
+                            snapshot, item.provider_id
+                        )
                         status = "unavailable"
-                        message = "The provider catalog could not be refreshed. Try again shortly."
+                        message = self._configured_catalog_message(models)
             descriptors.append(
                 CloudProviderDescriptor(
                     id=item.provider_id,
@@ -831,6 +836,32 @@ class ModelConfigService:
             )
         self._last_provider_descriptors = descriptors
         return descriptors
+
+    @staticmethod
+    def _configured_provider_models(
+        snapshot: ModelConfigSnapshot, provider_id: CloudProviderId
+    ) -> list[CloudModelDescriptor]:
+        if not snapshot.use_cloud_models or snapshot.cloud_provider != provider_id:
+            return []
+        model_names = {
+            model.strip()
+            for model in (
+                snapshot.cloud_model,
+                snapshot.clinical_model,
+                snapshot.text_extraction_model,
+            )
+            if isinstance(model, str) and model.strip()
+        }
+        return [
+            CloudModelDescriptor(id=model, display_name=model)
+            for model in sorted(model_names, key=str.casefold)
+        ]
+
+    @staticmethod
+    def _configured_catalog_message(models: list[CloudModelDescriptor]) -> str:
+        if models:
+            return "Provider catalog unavailable; showing the configured model."
+        return "The provider catalog could not be refreshed. Try again shortly."
 
     # -------------------------------------------------------------------------
     @staticmethod

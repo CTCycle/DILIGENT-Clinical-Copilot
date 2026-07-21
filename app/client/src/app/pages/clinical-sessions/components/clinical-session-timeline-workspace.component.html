@@ -15,43 +15,27 @@
 
     <div class="timeline-model-fields">
       <label>
-        <span>Runtime</span>
-        <select [ngModel]="runtime()" (ngModelChange)="setRuntime($event)" [disabled]="modelConfigLoading() || generationRunning()">
-          <option value="local">Local</option>
-          <option value="cloud">Cloud</option>
+        <span>Provider</span>
+        <select [ngModel]="provider()" (ngModelChange)="setProvider($event)" [disabled]="modelConfigLoading() || generationRunning() || !providerOptions().length">
+          @for (item of providerOptions(); track item.id) { <option [value]="item.id">{{ item.display_name }}</option> }
         </select>
       </label>
-
-      @if (runtime() === 'cloud') {
-        <label>
-          <span>Provider</span>
-          <select [ngModel]="provider()" (ngModelChange)="setProvider($event)" [disabled]="modelConfigLoading() || generationRunning() || !availableCloudProviders().length">
-            @for (item of availableCloudProviders(); track item.id) { <option [value]="item.id">{{ item.display_name }}</option> }
-          </select>
-        </label>
-        <label>
-          <span>Model</span>
-          <select [ngModel]="modelName()" (ngModelChange)="setModelName($event)" [disabled]="modelConfigLoading() || generationRunning() || !availableCloudModels().length">
-            <option value="">Select a model</option>
-            @for (item of availableCloudModels(); track item.id) { <option [value]="item.id">{{ item.display_name || item.id }}</option> }
-          </select>
-        </label>
-      } @else {
-        <label>
-          <span>Model</span>
-          <select [ngModel]="modelName()" (ngModelChange)="setModelName($event)" [disabled]="modelConfigLoading() || generationRunning() || !availableLocalModels().length">
-            <option value="">Select a model</option>
-            @for (item of availableLocalModels(); track item.name) { <option [value]="item.name">{{ item.name }}</option> }
-          </select>
-        </label>
-      }
+      <label>
+        <span>Model</span>
+        <select [ngModel]="modelName()" (ngModelChange)="setModelName($event)" [disabled]="modelConfigLoading() || generationRunning() || !availableModels().length">
+          <option value="">Select a model</option>
+          @for (item of availableModels(); track item.id) { <option [value]="item.id">{{ item.display_name || item.id }}</option> }
+        </select>
+      </label>
     </div>
 
     <p class="timeline-summary">{{ selectedConfigurationLabel() || 'No valid model selected' }}</p>
-    <button type="button" class="btn btn-primary" (click)="generateTimeline()" [disabled]="!canGenerate()">{{ generationRunning() ? 'Generating timeline…' : 'Generate Timeline' }}</button>
-    @if (generationStatus()) { <p aria-live="polite">{{ generationStatus() }}</p> }
-    @if (generationError()) { <p class="is-error" role="alert">{{ generationError() }}</p> }
-    @if (settingsRestoreNotice()) { <p aria-live="polite">{{ settingsRestoreNotice() }}</p> }
+    <div class="timeline-model-actions">
+      <button type="button" class="btn btn-primary" (click)="generateTimeline()" [disabled]="!canGenerate()">{{ generationRunning() ? 'Generating timeline…' : 'Generate Timeline' }}</button>
+      @if (generationStatus()) { <p aria-live="polite">{{ generationStatus() }}</p> }
+      @if (generationError()) { <p class="is-error" role="alert">{{ generationError() }}</p> }
+      @if (settingsRestoreNotice()) { <p aria-live="polite">{{ settingsRestoreNotice() }}</p> }
+    </div>
   </section>
 
   <section class="timeline-history" aria-label="Generated timelines">
@@ -65,21 +49,22 @@
       <div class="timeline-gallery">
         @for (preview of sortedTimelinePreviews(); track preview.timeline_id ?? preview.generated_at) {
           <article class="timeline-row">
-            <div class="timeline-row-heading">
-              <strong>Timeline #{{ preview.timeline_id }}</strong>
-              <span>{{ timelineQualityLabel(preview) }}</span>
-            </div>
-            <p class="timeline-row-title">{{ preview.title || 'No event title available' }}</p>
-            <div class="timeline-row-meta">
-              <span><small>Generated</small>{{ preview.generated_at | date:'medium' }}</span>
-              <span><small>Range</small>{{ timelineRangeLabel(preview) }}</span>
-              <span><small>Source</small>{{ preview.source_kind === 'cloud' ? 'Cloud' : 'Local' }} · {{ timelineProviderLabel(preview) }} · {{ timelineModelLabel(preview) }}</span>
-              <span><small>Quality</small>{{ preview.event_count }} events · {{ preview.source_evidence_event_count }} with evidence · {{ preview.missing_evidence_event_count }} missing · {{ preview.uncertain_event_count + preview.undated_event_count }} uncertain or undated</span>
+            <div class="timeline-row-content">
+              <div class="timeline-row-heading">
+                <strong>Timeline #{{ preview.timeline_id }}</strong>
+                <span>{{ timelineQualityLabel(preview) }}</span>
+              </div>
+              <p class="timeline-row-title">{{ preview.title || 'No event title available' }}</p>
+              <div class="timeline-row-summary">
+                <span>{{ preview.generated_at | date:'mediumDate' }}</span>
+                <span>{{ preview.source_kind === 'cloud' ? 'Cloud' : 'Local' }} · {{ timelineProviderLabel(preview) }} · {{ timelineModelLabel(preview) }}</span>
+                <span>{{ preview.event_count }} events · {{ preview.source_evidence_event_count }} with evidence</span>
+              </div>
             </div>
             <div class="timeline-actions">
-              <button class="btn btn-secondary" type="button" (click)="openTimeline(preview)">Open</button>
-              <button class="btn btn-secondary" type="button" (click)="useTimelineSettings(preview)">Use settings</button>
-              <button class="btn btn-danger" type="button" (click)="requestTimelineDeletion(preview)">Delete</button>
+              <button class="btn btn-secondary timeline-action-icon" type="button" (click)="openTimeline(preview)" aria-label="Open timeline" title="Open timeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg></button>
+              <button class="btn btn-secondary timeline-action-icon" type="button" (click)="useTimelineSettings(preview)" aria-label="Use timeline settings" title="Use timeline settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg></button>
+              <button class="btn btn-danger timeline-action-icon" type="button" (click)="requestTimelineDeletion(preview)" aria-label="Delete timeline" title="Delete timeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg></button>
             </div>
           </article>
         }

@@ -136,6 +136,46 @@ def test_model_config_state_survives_provider_catalog_drift(monkeypatch) -> None
     assert response.cloud_model == "gpt-4.1-mini"
 
 ###############################################################################
+def test_model_config_catalog_keeps_configured_model_when_refresh_fails(
+    monkeypatch,
+) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="gpt-4.1-mini",
+            text_extraction_model="gpt-4.1-mini",
+            use_cloud_models=True,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            updated_at=datetime.now(UTC),
+        )
+    )
+
+    class FailingCloudClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> "FailingCloudClient":
+            return self
+
+        async def __aexit__(self, *_: Any) -> None:
+            return None
+
+        async def list_model_descriptors(self) -> list[CloudModelDescriptor]:
+            raise LLMError("provider catalog unavailable")
+
+    monkeypatch.setattr(model_config_module, "CloudLLMClient", FailingCloudClient)
+    descriptors = asyncio.run(
+        ModelConfigService(serializer=serializer).discover_provider_descriptors()
+    )
+    openai = next(item for item in descriptors if item.id == "openai")
+
+    assert openai.catalog_status == "unavailable"
+    assert [model.id for model in openai.models] == ["gpt-4.1-mini"]
+    assert openai.catalog_message == (
+        "Provider catalog unavailable; showing the configured model."
+    )
+
+###############################################################################
 def test_model_config_service_rejects_switching_cloud_model_roles_to_local_mode(
     monkeypatch,
 ) -> None:

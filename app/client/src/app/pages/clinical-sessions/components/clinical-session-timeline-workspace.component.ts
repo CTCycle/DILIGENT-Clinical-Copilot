@@ -26,8 +26,7 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
   readonly modelConfig = signal<ModelConfigStateResponse | null>(null);
   readonly modelConfigLoading = signal(false);
   readonly modelConfigError = signal<string | null>(null);
-  readonly runtime = signal<'local' | 'cloud'>('local');
-  readonly provider = signal<CloudProvider | string>('openai');
+  readonly provider = signal<'ollama' | CloudProvider>('ollama');
   readonly modelName = signal('');
   readonly generationRunning = signal(false);
   readonly generationStatus = signal<string | null>(null);
@@ -39,11 +38,13 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
 
   readonly availableLocalModels = computed(() => (this.modelConfig()?.local_models ?? []).filter((model) => model.available_in_ollama));
   readonly availableCloudProviders = computed(() => this.modelConfig()?.cloud_providers ?? []);
-  readonly availableCloudModels = computed(() => this.availableCloudProviders().find((candidate) => candidate.id === this.provider())?.models ?? []);
+  readonly providerOptions = computed(() => [{ id: 'ollama', display_name: 'Ollama' }, ...this.availableCloudProviders()]);
+  readonly availableModels = computed(() => this.provider() === 'ollama'
+    ? this.availableLocalModels().map((model) => ({ id: model.name, display_name: model.name }))
+    : this.availableCloudProviders().find((candidate) => candidate.id === this.provider())?.models ?? []);
   readonly selectedConfigurationLabel = computed(() => {
-    const runtime = this.runtime() === 'cloud' ? 'Cloud' : 'Local';
-    const provider = this.runtime() === 'cloud' ? this.availableCloudProviders().find((item) => item.id === this.provider())?.display_name || this.provider() : null;
-    return [runtime, provider, this.modelName()].filter(Boolean).join(' · ');
+    const provider = this.provider() === 'ollama' ? 'Ollama' : this.availableCloudProviders().find((item) => item.id === this.provider())?.display_name || this.provider();
+    return [provider, this.modelName()].filter(Boolean).join(' · ');
   });
   readonly canGenerate = computed(() => Boolean(this.modelName()) && !this.generationRunning() && !this.modelConfigLoading() && !this.modelConfigError());
   readonly sortedTimelinePreviews = computed(() => [...this.timelinePreviews()].sort((a, b) => Date.parse(b.generated_at) - Date.parse(a.generated_at)));
@@ -61,8 +62,9 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
     try {
       const config = await fetchModelConfigState(true);
       this.modelConfig.set(config);
-      this.runtime.set(config.use_cloud_services ? 'cloud' : 'local');
-      this.provider.set(config.cloud_providers.find((item) => item.id === config.llm_provider)?.id || config.cloud_providers[0]?.id || 'openai');
+      this.provider.set(config.use_cloud_services
+        ? config.cloud_providers.find((item) => item.id === config.llm_provider)?.id || config.cloud_providers[0]?.id || 'ollama'
+        : 'ollama');
       this.correctModelSelection(config.use_cloud_services ? (config.cloud_model || '') : (config.text_extraction_model || ''));
     } catch (error) { this.modelConfigError.set(formatUnknownError(error, 'Unable to load timeline model options.')); }
     finally { this.modelConfigLoading.set(false); }
@@ -76,14 +78,17 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
     finally { this.timelineListLoading.set(false); }
   }
 
-  setRuntime(value: 'local' | 'cloud'): void { this.runtime.set(value); this.correctModelSelection(); }
-  setProvider(value: string): void { if (this.availableCloudProviders().some((item) => item.id === value)) { this.provider.set(value); this.correctModelSelection(); } }
+  setProvider(value: string): void {
+    if (value === 'ollama' || this.availableCloudProviders().some((item) => item.id === value)) {
+      this.provider.set(value as 'ollama' | CloudProvider); this.correctModelSelection();
+    }
+  }
   setModelName(value: string): void { this.modelName.set(value); }
 
   async generateTimeline(): Promise<void> {
     if (!this.canGenerate()) return;
     this.generationRunning.set(true); this.generationError.set(null); this.generationStatus.set('Generating timeline…');
-    const cloud = this.runtime() === 'cloud';
+    const cloud = this.provider() !== 'ollama';
     try {
       await generateInspectionSessionTimeline(this.session.session_id, { force_regenerate: true, model_overrides: cloud ? { use_cloud_services: true, llm_provider: String(this.provider()), cloud_model: this.modelName() } : { use_cloud_services: false, text_extraction_model: this.modelName() } });
       this.generationStatus.set('Timeline generated and saved.'); await this.loadTimelineHistory();
@@ -93,9 +98,12 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
 
   openTimeline(preview: InspectionSessionTimelinePreview): void { if (preview.timeline_id) void this.router.navigate(['/sessions', this.session.session_id, 'timetable', preview.timeline_id]); }
   useTimelineSettings(preview: InspectionSessionTimelinePreview): void {
-    this.settingsRestoreNotice.set(null); const isCloud = preview.source_kind === 'cloud'; this.runtime.set(isCloud ? 'cloud' : 'local');
-    if (isCloud && preview.model_provider && this.availableCloudProviders().some((item) => item.id === preview.model_provider)) this.provider.set(preview.model_provider);
-    const choices = isCloud ? this.availableCloudModels().map((item) => item.id) : this.availableLocalModels().map((item) => item.name);
+    this.settingsRestoreNotice.set(null); const isCloud = preview.source_kind === 'cloud';
+    const cloudProvider = isCloud && preview.model_provider && this.availableCloudProviders().some((item) => item.id === preview.model_provider)
+      ? preview.model_provider as CloudProvider
+      : 'ollama';
+    this.provider.set(cloudProvider);
+    const choices = this.availableModels().map((item) => item.id);
     if (preview.source_model && choices.includes(preview.source_model)) this.modelName.set(preview.source_model);
     else { this.modelName.set(choices[0] || ''); this.settingsRestoreNotice.set('The original model is unavailable; a compatible currently available model was selected.'); }
   }
@@ -115,7 +123,7 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
   timelineQualityLabel(preview: InspectionSessionTimelinePreview): string { return preview.generation_status === 'fallback' ? 'Fallback chronology' : 'LLM generated'; }
 
   private correctModelSelection(preferred = this.modelName()): void {
-    const values = this.runtime() === 'cloud' ? this.availableCloudModels().map((item) => item.id) : this.availableLocalModels().map((item) => item.name);
+    const values = this.availableModels().map((item) => item.id);
     this.modelName.set(values.includes(preferred) ? preferred : values[0] || '');
   }
 }
