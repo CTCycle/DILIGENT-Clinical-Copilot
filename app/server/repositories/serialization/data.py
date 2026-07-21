@@ -226,6 +226,12 @@ class DataSerializer:
         )
 
     # -------------------------------------------------------------------------
+    def delete_session_timeline_record(self, session_id: int, timeline_id: int) -> bool:
+        return session_timelines.delete_session_timeline_record(
+            self, session_id, timeline_id
+        )
+
+    # -------------------------------------------------------------------------
     def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         return session_result_data.get_session_detail(self, session_id)
 

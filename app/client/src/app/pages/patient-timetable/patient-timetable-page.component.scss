@@ -444,6 +444,15 @@ button,
   padding: var(--space-sm);
 }
 
+/* Timeline-specific density and evidence states retain the application theme. */
+.timeline-card { --timeline-min-width: 1260px; background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.timeline-card.is-compact { --timeline-min-width: 980px; }
+.timeline-card-header, .lane-row { min-width: var(--timeline-min-width); }
+.lane-label { position: sticky; left: 0; z-index: 3; background: var(--color-surface-alt); border-color: var(--color-border-subtle); }
+.lane-row.is-collapsed { min-height: auto; }
+.timeline-node.is-linked .timeline-node-card { outline: 2px dashed var(--color-brand); outline-offset: 2px; }
+.timeline-node.is-missing-evidence .timeline-node-card { border-color: var(--color-warning); }
+
 .source-evidence.is-warning {
   border-color: var(--color-status-error-border);
   background: var(--color-status-error-bg);

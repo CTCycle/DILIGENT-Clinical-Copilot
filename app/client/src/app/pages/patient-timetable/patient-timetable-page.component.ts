@@ -17,6 +17,8 @@ import {
 
 type TimetableLane = 'clinical' | 'therapy' | 'labs' | 'uncertainty';
 type TimelineCardAlign = 'start' | 'center' | 'end';
+type TimelineEvidenceFilter = 'all' | 'with_evidence' | 'missing_evidence';
+type TimelineDensity = 'compact' | 'comfortable';
 
 type RenderedTimelineEvent = {
   event: InspectionTimelineEvent;
@@ -90,6 +92,12 @@ export class PatientTimetablePageComponent implements OnInit {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly selectedEventId = signal<string | null>(null);
+  readonly visibleLanes = signal<Record<TimetableLane, boolean>>({ clinical: true, therapy: true, labs: true, uncertainty: true });
+  readonly collapsedLanes = signal<Record<TimetableLane, boolean>>({ clinical: false, therapy: false, labs: false, uncertainty: false });
+  readonly evidenceFilter = signal<TimelineEvidenceFilter>('all');
+  readonly showUncertainEvents = signal(true);
+  readonly hideEmptyLanes = signal(false);
+  readonly density = signal<TimelineDensity>('comfortable');
 
   readonly orderedEvents = computed(() =>
     [...(this.timeline()?.events ?? [])].sort((a, b) => a.sort_order - b.sort_order),
@@ -107,7 +115,7 @@ export class PatientTimetablePageComponent implements OnInit {
   });
 
   readonly renderedEvents = computed<RenderedTimelineEvent[]>(() => {
-    const events = this.orderedEvents();
+    const events = this.filteredEvents();
     const range = this.dateRange();
     const items = events.map((event, index) => {
       const positionPercent = this.resolveEventPosition(event, index, events.length, range);
@@ -132,6 +140,8 @@ export class PatientTimetablePageComponent implements OnInit {
         label: TIMETABLE_LANE_LABELS[lane],
         items,
         levelCount,
+        collapsed: this.collapsedLanes()[lane],
+        visible: this.visibleLanes()[lane],
       };
     }),
   );
@@ -203,6 +213,17 @@ export class PatientTimetablePageComponent implements OnInit {
     const sourceKind = timeline.source_kind === 'cloud' ? 'cloud' : 'local';
     return timeline.generation_note || `Generated with the configured ${sourceKind} timeline extraction model.`;
   });
+  readonly visibleLaneRows = computed(() => this.lanes().filter((lane) => lane.visible && (!this.hideEmptyLanes() || lane.items.length > 0)));
+  readonly selectedEventIndex = computed(() => this.filteredEvents().findIndex((event) => event.event_id === this.selectedEventId()));
+  readonly hasPreviousEvent = computed(() => this.selectedEventIndex() > 0);
+  readonly hasNextEvent = computed(() => this.selectedEventIndex() >= 0 && this.selectedEventIndex() < this.filteredEvents().length - 1);
+  readonly linkedSelectedEventIds = computed(() => new Set(this.selectedEvent()?.linked_patient_event_ids ?? []));
+
+  readonly filteredEvents = computed(() => this.orderedEvents().filter((event) => {
+    if (!this.showUncertainEvents() && (event.timing_type === 'uncertain' || event.timing_type === 'ordering' || !this.resolveEventDate(event.event_date))) return false;
+    const hasEvidence = Boolean(event.source_evidence?.trim());
+    return this.evidenceFilter() === 'all' || (this.evidenceFilter() === 'with_evidence' ? hasEvidence : !hasEvidence);
+  }));
 
   readonly selectedEventHasSourceEvidence = computed(() => {
     const event = this.selectedEvent();
@@ -279,6 +300,17 @@ export class PatientTimetablePageComponent implements OnInit {
   selectEvent(event: InspectionTimelineEvent): void {
     this.selectedEventId.set(event.event_id);
   }
+
+  toggleLaneVisibility(lane: TimetableLane): void { this.visibleLanes.update((value) => ({ ...value, [lane]: !value[lane] })); }
+  toggleLaneCollapsed(lane: TimetableLane): void { this.collapsedLanes.update((value) => ({ ...value, [lane]: !value[lane] })); }
+  setEvidenceFilter(value: TimelineEvidenceFilter): void { this.evidenceFilter.set(value); }
+  toggleUncertainEvents(): void { this.showUncertainEvents.update((value) => !value); }
+  toggleHideEmptyLanes(): void { this.hideEmptyLanes.update((value) => !value); }
+  setDensity(value: TimelineDensity): void { this.density.set(value); }
+  selectPreviousEvent(): void { const event = this.filteredEvents()[this.selectedEventIndex() - 1]; if (event) this.selectEvent(event); }
+  selectNextEvent(): void { const event = this.filteredEvents()[this.selectedEventIndex() + 1]; if (event) this.selectEvent(event); }
+  fitRange(): void { document.querySelector<HTMLElement>('.timeline-area')?.scrollTo({ left: 0, behavior: 'smooth' }); }
+  isLinkedToSelectedEvent(event: InspectionTimelineEvent): boolean { return this.linkedSelectedEventIds().has(event.event_id); }
 
   timingLabel(value: InspectionTimelineTimingType): string {
     return TIMING_LABELS[value] ?? value;
