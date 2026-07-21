@@ -118,15 +118,16 @@ class ModelConfigService:
             if "use_cloud_services" in fields_set
             else bool(snapshot.use_cloud_models)
         )
-        should_refresh_local_availability = (
-            not target_use_cloud_models
-            or local_roles_updated
-            or ("use_cloud_services" in fields_set and not target_use_cloud_models)
+        should_refresh_local_availability = not target_use_cloud_models
+        requires_local_model_availability = not target_use_cloud_models
+        available_local_model_names = (
+            await self.list_available_ollama_models()
+            if requires_local_model_availability
+            else set()
         )
-        available_local_model_names = await self.list_available_ollama_models()
         local_model_names = await self._build_local_model_names(
             snapshot=snapshot,
-            refresh_from_ollama=local_roles_updated,
+            refresh_from_ollama=not target_use_cloud_models and local_roles_updated,
         )
         updates = self._build_updates(
             payload=payload,
@@ -141,9 +142,7 @@ class ModelConfigService:
             snapshot = self.serializer.save_snapshot(**updates)
 
         should_check_local_availability = (
-            (not snapshot.use_cloud_models)
-            or local_roles_updated
-            or should_refresh_local_availability
+            not snapshot.use_cloud_models or should_refresh_local_availability
         )
         local_models = await self.list_local_model_cards(
             selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
@@ -151,9 +150,7 @@ class ModelConfigService:
         )
         provider_descriptors = (
             self._last_provider_descriptors
-            if fields_set <= {"ollama_reasoning", "ollama_seed"}
-            and self._last_provider_descriptors is not None
-            else await self.discover_provider_descriptors()
+            or self._build_save_provider_descriptors(snapshot)
         )
         return self.build_response(
             snapshot=snapshot,
@@ -837,6 +834,7 @@ class ModelConfigService:
         self._last_provider_descriptors = descriptors
         return descriptors
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _configured_provider_models(
         snapshot: ModelConfigSnapshot, provider_id: CloudProviderId
@@ -857,6 +855,36 @@ class ModelConfigService:
             for model in sorted(model_names, key=str.casefold)
         ]
 
+    # -------------------------------------------------------------------------
+    def _build_save_provider_descriptors(
+        self, snapshot: ModelConfigSnapshot
+    ) -> list[CloudProviderDescriptor]:
+        descriptors = self.build_provider_descriptors()
+        provider = self.resolve_provider(snapshot.cloud_provider)
+        configured_models = self._configured_provider_models(
+            snapshot, cast(CloudProviderId, provider)
+        )
+        if not configured_models:
+            return descriptors
+
+        for index, descriptor in enumerate(descriptors):
+            if descriptor.id != provider:
+                continue
+            models = {model.id: model for model in descriptor.models}
+            models.update({model.id: model for model in configured_models})
+            descriptors[index] = descriptor.model_copy(
+                update={
+                    "catalog_status": "unavailable",
+                    "catalog_message": (
+                        "Provider catalog refresh is deferred; showing the configured model."
+                    ),
+                    "models": sorted(models.values(), key=lambda model: model.id.casefold()),
+                }
+            )
+            break
+        return descriptors
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _configured_catalog_message(models: list[CloudModelDescriptor]) -> str:
         if models:

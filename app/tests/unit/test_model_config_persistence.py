@@ -150,16 +150,22 @@ def test_model_config_catalog_keeps_configured_model_when_refresh_fails(
         )
     )
 
+    ###############################################################################
     class FailingCloudClient:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **_: Any) -> None:
             pass
 
+        # -------------------------------------------------------------------------
         async def __aenter__(self) -> "FailingCloudClient":
             return self
 
+        # -------------------------------------------------------------------------
         async def __aexit__(self, *_: Any) -> None:
             return None
 
+        # -------------------------------------------------------------------------
         async def list_model_descriptors(self) -> list[CloudModelDescriptor]:
             raise LLMError("provider catalog unavailable")
 
@@ -289,6 +295,44 @@ def test_model_config_service_accepts_cloud_models_for_role_assignments() -> Non
     assert response.text_extraction_model == "gpt-4.1-mini"
     assert serializer.snapshot.clinical_model == "gpt-4.1-mini"
     assert serializer.snapshot.text_extraction_model == "gpt-4.1-mini"
+
+###############################################################################
+def test_model_config_cloud_save_does_not_refresh_remote_catalogs_or_ollama(
+    monkeypatch,
+) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="gpt-4.1-mini",
+            text_extraction_model="gpt-4.1-mini",
+            use_cloud_models=True,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            updated_at=datetime.now(),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+
+    async def unexpected_remote_call() -> object:
+        raise AssertionError("saving must not refresh remote availability")
+
+    monkeypatch.setattr(service, "list_available_ollama_models", unexpected_remote_call)
+    monkeypatch.setattr(service, "discover_provider_descriptors", unexpected_remote_call)
+
+    response = asyncio.run(
+        service.update_state(
+            ModelConfigUpdateRequest(
+                use_cloud_services=True,
+                llm_provider="openai",
+                cloud_model="gpt-4.1-mini",
+                clinical_model="gpt-4.1-mini",
+                text_extraction_model="gpt-4.1-mini",
+            )
+        )
+    )
+
+    assert response.llm_provider == "openai"
+    openai = next(provider for provider in response.cloud_providers if provider.id == "openai")
+    assert [model.id for model in openai.models] == ["gpt-4.1-mini"]
 
 ###############################################################################
 def test_model_config_service_rejects_stale_local_roles_in_cloud_mode() -> None:

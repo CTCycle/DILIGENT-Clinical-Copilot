@@ -143,6 +143,7 @@ class SessionTimelineModelOverrides(BaseModel):
     cloud_model: str | None = None
     text_extraction_model: str | None = None
 
+    # -------------------------------------------------------------------------
     @field_validator("llm_provider", "cloud_model", "text_extraction_model", mode="before")
     @classmethod
     def normalize_optional_text(cls, value: str | None) -> str | None:
@@ -151,6 +152,7 @@ class SessionTimelineModelOverrides(BaseModel):
         normalized = " ".join(str(value).split()).strip()
         return normalized or None
 
+    # -------------------------------------------------------------------------
     @model_validator(mode="after")
     def validate_runtime_selection(self) -> "SessionTimelineModelOverrides":
         if self.use_cloud_services:
@@ -165,7 +167,6 @@ class SessionTimelineModelOverrides(BaseModel):
         elif self.llm_provider or self.cloud_model:
             raise ValueError("Local timeline generation cannot include cloud model settings.")
         return self
-
 
 ###############################################################################
 class SessionTimelineRegenerateRequest(BaseModel):

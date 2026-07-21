@@ -73,8 +73,6 @@ from services.session.workflow_shared import (
     resolve_rucam_source as _resolve_rucam_source,
 )
 
-_CLOUD_PROVIDERS = {item.provider_id for item in provider_registry.all()}
-
 ###############################################################################
 def _report_contains_rag_bibliography(
     report_text: str | None,
@@ -892,13 +890,17 @@ def start_clinical_job_workflow(
     _validate_requested_provider_matches_runtime(request_payload)
     if LLMRuntimeConfig.is_cloud_enabled():
         provider = LLMRuntimeConfig.get_llm_provider().strip().lower()
-        if provider not in _CLOUD_PROVIDERS:
+        try:
+            credential_provider = provider_registry.get(provider).credential_scope
+        except ValueError:
             raise ServiceValidationError(
                 f"Unsupported cloud provider '{provider}' for access-key validation."
             )
         active_keys = [
             item
-            for item in AccessKeyService().list_access_keys(cast(Any, provider))
+            for item in AccessKeyService().list_access_keys(
+                cast(Any, credential_provider)
+            )
             if item.is_active
         ]
         if not active_keys:

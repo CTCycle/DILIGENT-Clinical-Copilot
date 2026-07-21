@@ -13,7 +13,6 @@ from services.session.preflight import (
     validate_clinical_input_preflight,
 )
 
-
 ###############################################################################
 def test_blocking_issue_is_enriched_with_modal_metadata() -> None:
     issue = _present_preflight_issue(
@@ -31,7 +30,6 @@ def test_blocking_issue_is_enriched_with_modal_metadata() -> None:
     assert issue.consequence
     assert issue.continuation_allowed is False
 
-
 ###############################################################################
 def test_unknown_warning_receives_safe_fallback_metadata() -> None:
     issue = _present_preflight_issue(
@@ -46,7 +44,6 @@ def test_unknown_warning_receives_safe_fallback_metadata() -> None:
     assert issue.title == "Review required"
     assert issue.affected_section == "Future Section"
     assert issue.continuation_allowed is True
-
 
 ###############################################################################
 def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
