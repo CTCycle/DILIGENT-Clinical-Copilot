@@ -44,6 +44,7 @@ class DataInspectionService(
     LIVERTOX_JOB_TYPE = "livertox_update"
     RAG_JOB_TYPE = "rag_update"
     REVISION_JOB_TYPE = "session_revision"
+    SESSION_TIMELINE_JOB_TYPE = "session_timeline"
     RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"
     UPDATE_PHASES: dict[UpdateTarget, list[PhaseStep]] = {
         "rxnav": [
@@ -532,6 +533,80 @@ class DataInspectionService(
             raise RuntimeError(f"Failed to initialize {job_type} job")
         status_payload["poll_interval"] = get_server_settings().jobs.polling_interval
         return status_payload
+
+    # -------------------------------------------------------------------------
+    def run_session_timeline_job(
+        self,
+        session_id: int,
+        *,
+        force_regenerate: bool,
+        model_overrides: Any = None,
+        job_id: str,
+    ) -> dict[str, Any]:
+        def report_progress(progress: float, message: str) -> None:
+            self.jobs.update_progress(job_id, progress)
+            self.jobs.update_result(
+                job_id,
+                {"session_id": int(session_id), "progress_message": message},
+            )
+
+        timeline = self.generate_session_timeline(
+            session_id,
+            force_regenerate=force_regenerate,
+            model_overrides=model_overrides,
+            progress_callback=report_progress,
+        )
+        if timeline is None:
+            raise RuntimeError("Session not found.")
+        return {
+            "session_id": int(session_id),
+            "timeline_id": timeline.timeline_id,
+            "progress_message": "Timeline saved.",
+        }
+
+    # -------------------------------------------------------------------------
+    def start_session_timeline_job(
+        self,
+        session_id: int,
+        *,
+        force_regenerate: bool = False,
+        model_overrides: Any = None,
+    ) -> dict[str, Any]:
+        safe_session_id = int(session_id)
+        if self.serializer.get_session_timeline_source(safe_session_id) is None:
+            raise KeyError(safe_session_id)
+        scope_key = f"session_timeline:{safe_session_id}"
+        if self.jobs.is_job_running(self.SESSION_TIMELINE_JOB_TYPE, scope_key=scope_key):
+            raise ValueError("Timeline regeneration is already in progress for this session.")
+        runner = partial(
+            self.run_session_timeline_job,
+            safe_session_id,
+            force_regenerate=force_regenerate,
+            model_overrides=model_overrides,
+        )
+        job_id = self.jobs.start_job(
+            job_type=self.SESSION_TIMELINE_JOB_TYPE,
+            runner=runner,
+            scope_key=scope_key,
+        )
+        payload = self.jobs.get_job_status(job_id)
+        if payload is None:
+            raise RuntimeError("Failed to initialize session timeline job")
+        payload["poll_interval"] = get_server_settings().jobs.polling_interval
+        return payload
+
+    # -------------------------------------------------------------------------
+    def get_session_timeline_job_status(
+        self, session_id: int, job_id: str
+    ) -> dict[str, Any] | None:
+        payload = self.get_job_status(job_id, expected_type=self.SESSION_TIMELINE_JOB_TYPE)
+        if payload is None:
+            return None
+        result = payload.get("result")
+        if isinstance(result, dict) and result.get("session_id") is not None:
+            if int(result["session_id"]) != int(session_id):
+                return None
+        return payload
 
     # -------------------------------------------------------------------------
     def get_job_status(

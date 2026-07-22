@@ -17,6 +17,7 @@ import {
   InspectionSessionTimeline,
   InspectionSessionTimelineListResponse,
   InspectionSessionTimelineRequest,
+  InspectionTimelineJobStatusResponse,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobStatusResponse,
   InspectionUpdateJobListResponse,
@@ -366,6 +367,31 @@ export async function startSessionRevisionJob(sessionId: number, payload: Sessio
   return requestJson<JobStartResponse>(`${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/revision/jobs`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
   });
+}
+
+export async function startInspectionSessionTimelineJob(
+  sessionId: number,
+  payload: InspectionSessionTimelineRequest = {},
+): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timeline-jobs`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function fetchInspectionSessionTimelineJobStatus(
+  sessionId: number,
+  jobId: string,
+): Promise<InspectionTimelineJobStatusResponse> {
+  return requestJson<InspectionTimelineJobStatusResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timeline-jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET", headers: { "Cache-Control": "no-store" } },
+    INSPECTION_JOB_STATUS_TIMEOUT_SECONDS,
+  );
 }
 
 export async function deleteInspectionSessionTimeline(

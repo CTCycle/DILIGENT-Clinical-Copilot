@@ -43,9 +43,20 @@
       <div><h4>Generated timelines</h4><p>Each run remains available for later review.</p></div>
       @if (timelineListLoading() && timelinePreviews().length) { <span aria-live="polite">Refreshing…</span> }
     </header>
-    @if (timelineListLoading() && !timelinePreviews().length) { <p>Loading timeline history…</p> }
+    @if (timelineListLoading() && !timelinePreviews().length && !generationJobId()) { <p>Loading timeline history…</p> }
     @else if (timelineListError()) { <p class="is-error" role="alert">{{ timelineListError() }}</p> }
-    @else if (sortedTimelinePreviews().length) {
+    @else {
+      @if (generationJobId()) {
+        <article class="timeline-row timeline-progress-row" aria-live="polite">
+          <div class="timeline-row-content">
+            <div class="timeline-row-heading"><strong>Timeline being generated</strong><span>{{ generationProgress() | number:'1.0-0' }}%</span></div>
+            <p class="timeline-row-title">{{ generationProgressMessage() || 'Preparing timeline…' }}</p>
+            <progress class="timeline-progress" max="100" [value]="generationProgress()" aria-label="Timeline generation progress"></progress>
+          </div>
+          <div class="timeline-actions"><span class="timeline-progress-status">In progress</span></div>
+        </article>
+      }
+      @if (sortedTimelinePreviews().length) {
       <div class="timeline-gallery">
         @for (preview of sortedTimelinePreviews(); track preview.timeline_id ?? preview.generated_at) {
           <article class="timeline-row">
@@ -69,7 +80,9 @@
           </article>
         }
       </div>
-    } @else { <p>No generated timelines yet.<br>Generate a timeline to create a saved clinical chronology for this session.</p> }
+      }
+      @else if (!generationJobId()) { <p>No generated timelines yet.<br>Generate a timeline to create a saved clinical chronology for this session.</p> }
+    }
   </section>
 </div>
 

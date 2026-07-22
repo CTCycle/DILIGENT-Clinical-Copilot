@@ -190,7 +190,8 @@ export type JobType =
   | "rxnav_update"
   | "livertox_update"
   | "rag_update"
-  | "session_revision";
+  | "session_revision"
+  | "session_timeline";
 
 export type JobStatus =
   | "pending"
@@ -246,6 +247,15 @@ export type InspectionUpdateJobResult = {
 };
 
 export type InspectionUpdateJobStatusResponse = JobStatusResponse<InspectionUpdateJobResult>;
+
+export type InspectionTimelineJobResult = {
+  session_id?: number;
+  timeline_id?: number | null;
+  progress_message?: string;
+  [key: string]: unknown;
+};
+
+export type InspectionTimelineJobStatusResponse = JobStatusResponse<InspectionTimelineJobResult>;
 
 export type InspectionUpdateJobListResponse = {
   jobs: InspectionUpdateJobStatusResponse[];
