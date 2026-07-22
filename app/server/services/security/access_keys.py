@@ -5,6 +5,7 @@ from domain.keys import (
     AccessKeyResponse,
     ProviderName,
     normalize_provider_name,
+    validate_provider_access_key,
 )
 from repositories.schemas.security import AccessKey
 from repositories.serialization.access_keys import AccessKeySerializer
@@ -41,6 +42,7 @@ class AccessKeyService:
     def create_access_key(
         self, provider: ProviderName, access_key: str
     ) -> AccessKeyResponse:
+        validate_provider_access_key(provider, access_key)
         created = self.serializer.create_key(provider, access_key)
         return self.to_response(created)
 

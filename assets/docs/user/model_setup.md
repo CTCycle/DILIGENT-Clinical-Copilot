@@ -1,5 +1,5 @@
 # Model Setup
-Last updated: 2026-07-19
+Last updated: 2026-07-22
 
 Sampling settings are selected automatically according to the provider, model
 family, and operation. They are not user-configurable.
@@ -41,8 +41,8 @@ Recommended workflow:
 2. Choose the provider.
 3. Open the access-key dialog or management control.
 4. Paste the provider key.
-5. Save it.
-6. Activate the key that should be used.
+5. Save it. New keys remain inactive, so a rejected key cannot replace the current active key.
+6. Explicitly activate the key that should be used.
 7. Confirm the active-key indicator is shown.
 
 Do not paste keys into screenshots, chat messages, issue reports, or shared logs.

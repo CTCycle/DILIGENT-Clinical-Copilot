@@ -57,7 +57,7 @@ class AccessKeyEndpoint:
             logger.warning("Access key creation rejected: %s", exc)
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Invalid access key input.",
+                detail=str(exc),
             ) from exc
 
     # -------------------------------------------------------------------------

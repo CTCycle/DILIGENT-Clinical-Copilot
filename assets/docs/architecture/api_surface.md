@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature.
@@ -46,7 +46,7 @@ are non-cacheable so model selectors and their Retry actions always observe the
 latest saved configuration and provider-catalog state.
 
 ## Access Key Routes
-- `GET /api/access-keys`
+- `GET /api/access-keys?provider={openai|gemini|deepseek|anthropic|opencode|brave}`
 - `POST /api/access-keys`
 - `PUT /api/access-keys/{key_id}/activate`
 - `DELETE /api/access-keys/{key_id}`

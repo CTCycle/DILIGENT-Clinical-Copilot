@@ -234,6 +234,66 @@ class SlowRevisionRunner:
         return {}
 
 ###############################################################################
+class FailingRevisionRunner:
+
+    # -------------------------------------------------------------------------
+    def run_agentic(self, **_kwargs: Any) -> dict[str, Any]:
+        raise RuntimeError("Synthetic revision failure")
+
+###############################################################################
+def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    service = DataInspectionService(serializer=serializer, jobs=JobManager())
+    service.revision_agent_runner = FailingRevisionRunner()
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    pipeline_run_id = started["result"]["pipeline_run_id"]
+    for _ in range(20):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] == "failed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision job did not fail")
+
+    run = service.get_revision_run(pipeline_run_id)
+    assert run is not None
+    assert run["status"] == "failed"
+    assert run["error"] == {"message": "Revision processing failed. Retry the revision if needed."}
+
+###############################################################################
+def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    source_version = serializer.get_version_record_for_session(session_id)
+    assert source_version is not None
+    pipeline_run_id = "synthetic-delete-run"
+    shell = serializer.create_revision_version_shell(
+        session_id,
+        reviewer_note="Synthetic cleanup validation.",
+        configuration={},
+        pipeline_run_id=pipeline_run_id,
+    )
+    assert shell is not None
+    serializer.create_or_update_revision_run(
+        pipeline_run_id=pipeline_run_id,
+        session_id=session_id,
+        root_session_id=session_id,
+        source_version_id=int(source_version["version_id"]),
+        target_revision_version_id=int(shell["revision_version_id"]),
+        revision_mode="agentic_revision",
+        revision_kind="llm_assisted_revision",
+        configuration={},
+        reviewer_note="Synthetic cleanup validation.",
+        status="failed",
+    )
+
+    assert serializer.delete_session(session_id) is True
+    assert serializer.get_session_detail(session_id) is None
+    assert serializer.get_revision_run(pipeline_run_id) is None
+
+###############################################################################
 def test_revision_job_rejects_same_root_concurrent_start(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
