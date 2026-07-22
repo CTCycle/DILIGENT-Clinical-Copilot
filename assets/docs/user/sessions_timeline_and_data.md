@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -54,8 +54,11 @@ model, date range, event count, and evidence-quality warnings. Use **Open** to r
 only that saved timeline after confirmation.
 
 The timetable separates Clinical events, Medication exposure, Laboratory findings,
-and Uncertain or unanchored events. Use its evidence filter, lane controls, density,
-fit-range, and previous/next navigation to review the chronology. A **Fallback
+and Uncertain or unanchored events. Positionable uncertain events remain in their clinical lane;
+events without a canonical date appear in Unanchored. Use its evidence filter, lane controls, dense/compact/comfortable
+density, fit/zoom controls, horizontal scrollbar, and previous/next navigation to review the chronology. Close date-proximity
+events are represented by bounded clusters; selecting an event opens the modeless Event inspector on desktop and a bottom-sheet
+inspector on narrow screens. A **Fallback
 chronology** or **Missing source evidence** label is a warning, not clinical
 confirmation.
 

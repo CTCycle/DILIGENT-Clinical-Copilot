@@ -1,9 +1,5 @@
 <main class="timetable-page">
-  <aside class="timetable-rail" aria-label="Navigation">
-    <a class="rail-button" routerLink="/clinical-sessions" title="Back to clinical sessions" aria-label="Back to clinical sessions">‹</a>
-    <span class="rail-button is-active" title="Timetable" aria-label="Current page: timetable">▦</span>
-  </aside>
-
+  <p class="sr-only" aria-live="polite">{{ selectionAnnouncement() }}</p>
   <section class="timetable-shell">
     <header class="timetable-header">
       <div>
@@ -22,7 +18,7 @@
       <label class="toolbar-group">Evidence <select [value]="evidenceFilter()" (change)="setEvidenceFilter($any($event.target).value)"><option value="all">All events</option><option value="with_evidence">Has source evidence</option><option value="missing_evidence">Missing source evidence</option></select></label>
       <label class="toolbar-group"><input type="checkbox" [checked]="showUncertainEvents()" (change)="toggleUncertainEvents()"> Show uncertain</label>
       <label class="toolbar-group"><input type="checkbox" [checked]="hideEmptyLanes()" (change)="toggleHideEmptyLanes()"> Hide empty lanes</label>
-      <label class="toolbar-group">Density <select [value]="density()" (change)="setDensity($any($event.target).value)"><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select></label>
+      <label class="toolbar-group">Density <select [value]="density()" (change)="setDensity($any($event.target).value)"><option value="dense">Dense</option><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select></label>
       <button type="button" class="btn-secondary" (click)="fitRange()">Fit range</button><button type="button" class="btn-secondary" (click)="selectPreviousEvent()" [disabled]="!hasPreviousEvent()">Previous event</button><button type="button" class="btn-secondary" (click)="selectNextEvent()" [disabled]="!hasNextEvent()">Next event</button>
       <span class="toolbar-group">Source <strong>{{ generationStatusLabel() }}</strong></span>
       <span class="toolbar-group">Model <strong>{{ sourceModelLabel() }}</strong></span>
@@ -40,8 +36,8 @@
     }
 
     <section class="timetable-content">
-      <div class="timeline-area">
-        <div class="timeline-card" [class.is-compact]="density() === 'compact'">
+      <div class="timeline-area" #timelineArea (scroll)="setScrollOffset(timelineArea.scrollLeft)">
+        <div class="timeline-card" #timelineCanvas [class.is-compact]="density() === 'compact'" [class.is-dense]="density() === 'dense'">
           <div class="timeline-card-header">
             <div>
               <span class="timeline-card-kicker">Timeline overview</span>
@@ -50,6 +46,14 @@
             <p>Anchored events preserve exact sequence across clinical, therapy, laboratory, and uncertain findings.</p>
           </div>
 
+          <div class="timeline-zoom-controls" aria-label="Timeline zoom controls">
+            <button type="button" class="btn-secondary" (click)="zoomOut()" [disabled]="zoom() <= 0.75">Zoom out</button>
+            <span>{{ (zoom() * 100) | number: '1.0-0' }}%</span>
+            <button type="button" class="btn-secondary" (click)="zoomIn()" [disabled]="zoom() >= 2.5">Zoom in</button>
+            <button type="button" class="btn-secondary" (click)="fitZoom()">Fit</button>
+          </div>
+          <input class="timeline-scrollbar" type="range" min="0" [max]="scrollMax()" [value]="scrollOffset()" aria-label="Timeline horizontal position" (input)="setScrollOffset(+$any($event.target).value)">
+          <div class="timeline-time-canvas" [style.width.%]="100 * zoom()">
           <div class="timeline-axis" aria-label="Timeline range">
             <div class="timeline-axis-line"></div>
             @for (point of scalePoints(); track point.label + '-' + point.positionPercent) {
@@ -66,11 +70,16 @@
               <section class="lane-row" [class.is-empty]="lane.items.length === 0" [class.is-collapsed]="lane.collapsed" [style.--lane-levels]="lane.levelCount">
                 <div class="lane-label">
                   <strong>{{ lane.label }}</strong>
-                  <span>{{ lane.items.length }} events</span>
+                  <span>{{ lane.eventCount }} events</span>
                   <button type="button" class="btn-secondary" [attr.aria-expanded]="!lane.collapsed" (click)="toggleLaneCollapsed(lane.id)">{{ lane.collapsed ? 'Expand' : 'Collapse' }}</button>
                 </div>
                 @if (!lane.collapsed) { <div class="lane-track">
                   <div class="lane-track-line"></div>
+                  @for (cluster of lane.clusters; track cluster.id) {
+                    <button type="button" class="timeline-cluster" [style.left.%]="cluster.positionPercent" [attr.aria-label]="cluster.memberIds.length + ' clustered events'" (click)="selectCluster(cluster)">
+                      <span aria-hidden="true">＋</span>{{ cluster.memberIds.length }} events
+                    </button>
+                  }
                   @if (lane.items.length > 0) {
                     @for (item of lane.items; track item.event.event_id) {
                       <button
@@ -80,14 +89,20 @@
                         [class.is-selected]="selectedEventId() === item.event.event_id"
                         [class.is-linked]="isLinkedToSelectedEvent(item.event)"
                         [class.is-missing-evidence]="!item.event.source_evidence"
+                        [class.is-unanchored]="item.positionPercent === null"
                         [class.is-align-start]="item.align === 'start'"
                         [class.is-align-center]="item.align === 'center'"
                         [class.is-align-end]="item.align === 'end'"
-                        [style.left.%]="item.positionPercent"
+                        [style.left.%]="item.positionPercent ?? undefined"
                         [style.--stack-level]="item.stackLevel"
                         [style.--event-color]="item.color"
+                        [style.--range-start]="item.rangeStartPercent !== null ? item.rangeStartPercent + '%' : null"
+                        [style.--range-width]="item.rangeStartPercent !== null && item.rangeEndPercent !== null ? (item.rangeEndPercent - item.rangeStartPercent) + '%' : null"
+                        [attr.data-event-id]="item.event.event_id"
+                        [attr.tabindex]="selectedEventId() === item.event.event_id ? 0 : -1"
                         [attr.aria-label]="item.event.title + ', ' + timingLabel(item.event.timing_type)"
                         (click)="selectEvent(item.event)"
+                        (keydown)="handleEventKeydown($event, item.event)"
                       >
                         <span class="timeline-node-dot"></span>
                         <span class="timeline-node-stem"></span>
@@ -95,6 +110,9 @@
                           <span class="timeline-node-type">{{ timingLabel(item.event.timing_type) }}</span>
                           <strong>{{ item.event.title }}</strong>
                           <small>{{ eventTimingText(item.event) }}</small>
+                          @if (item.event.date_certainty === 'uncertain' || item.event.timing_type === 'uncertain' || item.event.timing_type === 'ordering') {
+                            <small class="timeline-node-uncertainty">Uncertain timing</small>
+                          }
                         </span>
                       </button>
                     }
@@ -105,12 +123,24 @@
               </section>
             }
           </div>
+          </div>
         </div>
       </div>
 
-      <aside class="evidence-panel">
-        <h2>Evidence</h2>
+      <aside class="evidence-panel" [class.is-open]="selectedEvent()" [attr.role]="isNarrowScreen() ? 'dialog' : 'complementary'" [attr.aria-modal]="isNarrowScreen() ? 'true' : null" aria-label="Event inspector" aria-live="polite">
+        <div class="evidence-panel-header">
+          <h2>Event inspector</h2>
+          <button type="button" class="icon-button" aria-label="Close event inspector" (click)="closeInspector()">×</button>
+        </div>
         @if (selectedEvent(); as event) {
+          @if (selectedCluster(); as cluster) {
+            <section class="cluster-member-list" aria-label="Cluster members">
+              <h3>{{ cluster.memberIds.length }} events at this position</h3>
+              @for (member of clusterMembers(); track member.event_id) {
+                <button type="button" class="cluster-member-button" [class.is-current]="member.event_id === event.event_id" (click)="selectEvent(member)">{{ member.title }}</button>
+              }
+            </section>
+          }
           <section>
             <h3>{{ event.title }}</h3>
             <p>{{ event.description || 'No description supplied.' }}</p>
@@ -119,7 +149,9 @@
             <dt>Timing</dt>
             <dd>{{ timingLabel(event.timing_type) }}</dd>
             <dt>Date precision</dt>
-            <dd>{{ precisionLabel(event.event_date) }}</dd>
+            <dd>{{ precisionLabel(event.event_date) }}{{ event.date_certainty && event.date_certainty !== 'uncertain' ? ' · ' + event.date_certainty : '' }}</dd>
+            <dt>Normalized date</dt>
+            <dd>{{ event.event_date || 'Unanchored' }}{{ event.event_date_end ? ' – ' + event.event_date_end : '' }}</dd>
             <dt>Extracted text</dt>
             <dd>{{ event.extracted_timing_text || event.relative_time || event.event_date || 'Not reported' }}</dd>
             <dt>Source</dt>
@@ -128,6 +160,10 @@
             <dd>{{ confidenceLabel(event.confidence) }}</dd>
             <dt>Rationale</dt>
             <dd>{{ event.confidence_rationale || 'Not reported' }}</dd>
+            @if (event.uncertainty_reason) {
+              <dt>Uncertainty</dt>
+              <dd>{{ event.uncertainty_reason }}</dd>
+            }
             <dt>Source evidence</dt>
             <dd class="source-evidence" [class.is-warning]="!selectedEventHasSourceEvidence()">
               {{ event.source_evidence || 'Missing source evidence. Do not treat this event as clinically grounded chronology.' }}
