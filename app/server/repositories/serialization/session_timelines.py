@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import select
 
 from domain.patient_timeline import PatientTimeline, SessionTimelinePreview
+from domain.timeline_dates import timeline_date_sort_key
 from repositories.schemas.clinical import (
     ClinicalSession,
     ClinicalSessionResult,
@@ -26,7 +27,7 @@ def _validate_timeline_payload(
 ###############################################################################
 def _build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
     dated_events = [event.event_date for event in payload.events if event.event_date]
-    sorted_dates = sorted(dated_events)
+    sorted_dates = sorted(dated_events, key=timeline_date_sort_key)
     title = payload.events[0].title if payload.events else None
     source_evidence_event_count = sum(
         1 for event in payload.events if event.source_evidence and event.source_evidence.strip()

@@ -16,6 +16,8 @@ PatientTimelineTimingType = Literal[
     "uncertain",
     "ordering",
 ]
+PatientTimelineDatePrecision = Literal["day", "month", "year"]
+PatientTimelineDateCertainty = Literal["explicit", "inferred", "uncertain"]
 
 ###############################################################################
 class PatientTimelineEvent(BaseModel):
@@ -26,6 +28,10 @@ class PatientTimelineEvent(BaseModel):
     event_type: PatientTimelineEventType = "other"
     timing_type: PatientTimelineTimingType = "uncertain"
     event_date: str | None = Field(default=None, max_length=40)
+    event_date_end: str | None = Field(default=None, max_length=40)
+    date_precision: PatientTimelineDatePrecision | None = None
+    date_certainty: PatientTimelineDateCertainty = "uncertain"
+    uncertainty_reason: str | None = Field(default=None, max_length=500)
     relative_time: str | None = Field(default=None, max_length=80)
     extracted_timing_text: str | None = Field(default=None, max_length=240)
     source_evidence: str | None = Field(default=None, max_length=1200)
@@ -40,6 +46,7 @@ class PatientTimelineEvent(BaseModel):
         "event_id",
         "title",
         "event_date",
+        "event_date_end",
         "relative_time",
         "extracted_timing_text",
         "source",
@@ -54,7 +61,7 @@ class PatientTimelineEvent(BaseModel):
 
     # -------------------------------------------------------------------------
     @field_validator(
-        "description", "source_evidence", "confidence_rationale", mode="before"
+        "description", "source_evidence", "confidence_rationale", "uncertainty_reason", mode="before"
     )
     @classmethod
     def normalize_description(cls, value: str | None) -> str | None:

@@ -356,6 +356,8 @@ export type InspectionTimelineTimingType =
   | "recurring"
   | "uncertain"
   | "ordering";
+export type InspectionTimelineDatePrecision = "day" | "month" | "year";
+export type InspectionTimelineDateCertainty = "explicit" | "inferred" | "uncertain";
 
 export type InspectionTimelineEvent = {
   event_id: string;
@@ -364,6 +366,10 @@ export type InspectionTimelineEvent = {
   event_type: InspectionTimelineEventType;
   timing_type: InspectionTimelineTimingType;
   event_date: string | null;
+  event_date_end?: string | null;
+  date_precision?: InspectionTimelineDatePrecision | null;
+  date_certainty?: InspectionTimelineDateCertainty;
+  uncertainty_reason?: string | null;
   relative_time: string | null;
   extracted_timing_text: string | null;
   source_evidence: string | null;

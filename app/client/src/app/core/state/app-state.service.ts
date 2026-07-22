@@ -28,7 +28,7 @@ export function normalizePathname(pathname: string): string {
 
 export function resolvePageIdFromPath(pathname: string): PageId {
   const normalized = normalizePathname(pathname);
-  if (normalized === PAGE_PATHS['clinical-sessions']) return 'clinical-sessions';
+  if (normalized === PAGE_PATHS['clinical-sessions'] || normalized.startsWith('/sessions/')) return 'clinical-sessions';
   if (normalized === PAGE_PATHS['data-inspection']) return 'data-inspection';
   if (normalized === PAGE_PATHS['model-config']) return 'model-config';
   return DEFAULT_PAGE;

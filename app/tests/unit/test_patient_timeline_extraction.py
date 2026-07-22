@@ -11,6 +11,7 @@ from domain.patient_timeline import (
 )
 from repositories.serialization.session_timelines import _build_timeline_preview_payload
 from domain.patient_timeline import PatientTimeline
+from domain.timeline_dates import normalize_timeline_interval
 from services.clinical.timeline import PatientTimelineExtractor
 
 ###############################################################################
@@ -145,6 +146,44 @@ def test_timeline_uses_the_single_explicit_date_in_source_evidence() -> None:
     normalized = extractor.normalize_events([event])
 
     assert normalized[0].event_date == "2026-07-21"
+
+
+###############################################################################
+def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens() -> None:
+    extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
+    events = [
+        PatientTimelineEvent(
+            event_id="range",
+            title="Admission",
+            event_date="2025-01",
+            event_date_end="2025-02",
+            date_precision="month",
+            date_certainty="explicit",
+            source_evidence="Admission during the documented interval.",
+        ),
+        PatientTimelineEvent(
+            event_id="invalid",
+            title="Unsupported date",
+            event_date="05.01.2025",
+            source_evidence="Timing was recorded in a localized format.",
+        ),
+    ]
+
+    normalized = extractor.normalize_events(events)
+
+    assert normalized[0].event_date == "2025-01"
+    assert normalized[0].event_date_end == "2025-02"
+    assert normalized[0].date_precision == "month"
+    assert normalized[1].event_date is None
+
+
+###############################################################################
+def test_timeline_date_interval_validates_calendar_days_and_reversed_ranges() -> None:
+    assert normalize_timeline_interval("2024-02-29") is not None
+    assert normalize_timeline_interval("2025-02-29") is None
+    reversed_range = normalize_timeline_interval("2025-03", "2025-02")
+    assert reversed_range is not None
+    assert reversed_range.end_value is None
 
 ###############################################################################
 def test_timeline_prompt_uses_canonical_json_and_hash() -> None:

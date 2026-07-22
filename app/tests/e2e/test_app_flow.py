@@ -2,6 +2,7 @@
 E2E tests for UI navigation and key UI workflows.
 """
 
+import json
 import re
 
 import pytest
@@ -267,7 +268,7 @@ def test_keyboard_navigation_reaches_primary_tabs(page: Page, base_url: str):
             "DILI Agent",
             "Clinical Sessions",
             "Data Inspection",
-            "Model Configurations",
+            "Configurations",
         ):
             return
     raise AssertionError(
@@ -317,12 +318,12 @@ def test_keyboard_tab_traversal_reaches_home_form_controls(page: Page, base_url:
 def test_model_config_navigation(page: Page, base_url: str):
     page.goto(base_url)
 
-    model_button = page.get_by_role("tab", name="Model Configurations")
+    model_button = page.get_by_role("tab", name="Configurations")
     expect(model_button).to_be_visible()
     model_button.click()
 
     expect(page).to_have_url(re.compile(r"/model-config/?$"))
-    expect(page.get_by_role("heading", name="Model Configurations")).to_be_visible()
+    expect(page.get_by_role("heading", name="Runtime Source")).to_be_visible()
 
 ###############################################################################
 def test_data_inspection_navigation(page: Page, base_url: str):
@@ -457,7 +458,7 @@ def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
         expect(page.locator(".spinner-label")).to_contain_text(
             "Extracting therapy and medication data"
         )
-        page.get_by_role("tab", name="Model Configurations").click()
+        page.get_by_role("tab", name="Configurations").click()
         expect(page).to_have_url(re.compile(r"/model-config/?$"))
         page.wait_for_timeout(900)
         page.get_by_role("tab", name="DILI Agent").click()
@@ -670,6 +671,136 @@ def test_timetable_invalid_session_id_shows_validation_error(page: Page, base_ur
     page.goto(f"{base_url}/sessions/0/timetable")
     expect(page.locator(".error-note")).to_contain_text("Invalid session id.")
 
+
+###############################################################################
+def test_timetable_deterministic_chronology_inspector_and_cluster_layout(
+    page: Page, base_url: str
+):
+    timeline = {
+        "timeline_id": 91,
+        "session_id": 42,
+        "generated_at": "2026-07-22T08:00:00Z",
+        "generation_status": "llm_generated",
+        "source_model": "test-model",
+        "source_kind": "local",
+        "model_provider": "ollama",
+        "events": [
+            {
+                "event_id": "december",
+                "title": "December baseline",
+                "description": "Baseline",
+                "event_type": "disease",
+                "timing_type": "explicit_date",
+                "event_date": "2024-12-01",
+                "event_date_end": None,
+                "date_precision": "day",
+                "date_certainty": "explicit",
+                "uncertainty_reason": None,
+                "relative_time": None,
+                "extracted_timing_text": "December 1",
+                "source_evidence": "Baseline on 2024-12-01.",
+                "linked_patient_event_ids": [],
+                "source": "fixture",
+                "confidence": 0.9,
+                "confidence_rationale": "Explicit",
+                "sort_order": 0,
+            },
+            *[
+                {
+                    "event_id": f"therapy-{index}",
+                    "title": f"Therapy {index}",
+                    "description": "Therapy",
+                    "event_type": "therapy",
+                    "timing_type": "explicit_date",
+                    "event_date": "2025-01-05",
+                    "event_date_end": None,
+                    "date_precision": "day",
+                    "date_certainty": "explicit",
+                    "uncertainty_reason": None,
+                    "relative_time": None,
+                    "extracted_timing_text": "January 5",
+                    "source_evidence": "Therapy on 2025-01-05.",
+                    "linked_patient_event_ids": [],
+                    "source": "fixture",
+                    "confidence": 0.9,
+                    "confidence_rationale": "Explicit",
+                    "sort_order": index,
+                }
+                for index in range(1, 5)
+            ],
+            {
+                "event_id": "february",
+                "title": "February endpoint",
+                "description": "Endpoint",
+                "event_type": "lab",
+                "timing_type": "explicit_date",
+                "event_date": "2025-02-01",
+                "event_date_end": None,
+                "date_precision": "day",
+                "date_certainty": "explicit",
+                "uncertainty_reason": None,
+                "relative_time": None,
+                "extracted_timing_text": "February 1",
+                "source_evidence": "Endpoint on 2025-02-01.",
+                "linked_patient_event_ids": [],
+                "source": "fixture",
+                "confidence": 0.9,
+                "confidence_rationale": "Explicit",
+                "sort_order": 5,
+            },
+        ],
+    }
+    preview = {
+        "timeline_id": 91,
+        "session_id": 42,
+        "generated_at": timeline["generated_at"],
+        "generation_status": "llm_generated",
+        "source_model": "test-model",
+        "source_kind": "local",
+        "model_provider": "ollama",
+        "event_count": 6,
+        "start_date": "2024-12-01",
+        "end_date": "2025-02-01",
+        "source_evidence_event_count": 6,
+        "missing_evidence_event_count": 0,
+        "uncertain_event_count": 0,
+        "undated_event_count": 0,
+    }
+
+    page.route(
+        "**/api/inspection/sessions/42/timelines",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body='{"items":[' + json.dumps(preview) + ']}'
+        ),
+    )
+    page.route(
+        "**/api/inspection/sessions/42/timelines/91",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body=json.dumps(timeline)
+        ),
+    )
+
+    page.goto(f"{base_url}/sessions/42/timetable")
+    expect(page.get_by_role("heading", name="Patient Timetable")).to_be_visible()
+    expect(page.locator(".timetable-rail")).to_have_count(0)
+    expect(page.get_by_text("Unanchored")).to_be_visible()
+    axis = page.locator(".timeline-axis")
+    expect(axis).to_be_visible()
+    expect(page.locator(".timeline-axis-tick")).to_have_count(3)
+    expect(axis).to_contain_text("2025")
+    expect(page.get_by_role("button", name="4 clustered events")).to_be_visible()
+
+    cluster_button = page.get_by_role("button", name="4 clustered events")
+    cluster_button.click()
+    inspector = page.get_by_role("complementary", name="Event inspector")
+    expect(inspector).to_be_visible()
+    expect(inspector).to_contain_text("2025-01-05")
+    expect(inspector).to_contain_text("4 events at this position")
+    page.get_by_role("button", name="Therapy 1").click()
+    expect(inspector).to_contain_text("Therapy 1")
+    page.keyboard.press("Escape")
+    expect(inspector).to_be_hidden()
+
 ###############################################################################
 def test_home_form_state_persists_across_back_forward_navigation(
     page: Page, base_url: str
@@ -681,7 +812,7 @@ def test_home_form_state_persists_across_back_forward_navigation(
         "Navigation persistence verification input."
     )
 
-    page.get_by_role("tab", name="Model Configurations").click()
+    page.get_by_role("tab", name="Configurations").click()
     expect(page).to_have_url(re.compile(r"/model-config/?$"))
 
     page.go_back()

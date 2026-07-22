@@ -4,6 +4,7 @@ import { of } from 'rxjs';
 
 import { InspectionSessionTimeline } from '../../core/models/types';
 import { PatientTimetablePageComponent } from './patient-timetable-page.component';
+import { createTimelineScale, normalizeTimelineDate } from './timeline-date';
 
 describe('PatientTimetablePageComponent', () => {
   let fixture: ComponentFixture<PatientTimetablePageComponent>;
@@ -109,10 +110,22 @@ describe('PatientTimetablePageComponent', () => {
       ],
     });
 
-    expect(component.lanes().find((lane) => lane.id === 'uncertainty')?.items.map((item) => item.event.event_id)).toEqual(['uncertain']);
+    expect(component.lanes().find((lane) => lane.id === 'unanchored')?.items.map((item) => item.event.event_id)).toEqual(['uncertain']);
     component.setEvidenceFilter('with_evidence');
     expect(component.filteredEvents().map((event) => event.event_id)).toEqual(['therapy']);
     component.toggleLaneCollapsed('therapy');
     expect(component.lanes().find((lane) => lane.id === 'therapy')?.collapsed).toBe(true);
+  });
+
+  it('keeps January 5 on the same UTC scale as the month boundaries', () => {
+    const start = normalizeTimelineDate('2024-12-01');
+    const event = normalizeTimelineDate('2025-01-05');
+    const end = normalizeTimelineDate('2025-02-01');
+
+    expect(start && event && end).toBeTruthy();
+    const scale = createTimelineScale(start!.startDay, end!.endDay);
+    expect(scale.toPercent(event!.startDay)).toBeCloseTo(56.4516, 3);
+    expect(scale.toPercent(normalizeTimelineDate('2025-01-01')!.startDay)).toBeLessThan(scale.toPercent(event!.startDay));
+    expect(scale.toPercent(normalizeTimelineDate('2025-02-01')!.startDay)).toBeGreaterThan(scale.toPercent(event!.startDay));
   });
 });
