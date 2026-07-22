@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-07-19
+Last updated: 2026-07-22
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled automatic generation policy immediately before each LLM call.
@@ -35,6 +35,14 @@ source-controlled automatic generation policy immediately before each LLM call.
   - excludes all database mode and connection settings
 - `app/resources/catalogs/*.json`
   - canonical deterministic reference catalogs for text normalization, extraction, matching, DILI behavior, language, and security filters
+
+## LLM Time Budgets
+
+`settings/configurations.json` sets the clinical cloud-model ceiling through
+`runtime.cloud_llm_timeout_cap`. It is `1800` seconds (30 minutes) so a
+full clinical synthesis is not prematurely replaced with a fallback report.
+This limit does not make an unreachable provider available: connectivity,
+authentication, and provider-side errors still fail promptly.
 
 ## Local Runtime
 - Local runs serve the frontend from a preview or dev process.
