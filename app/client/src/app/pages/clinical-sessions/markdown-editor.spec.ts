@@ -8,6 +8,12 @@ describe('clinical session Markdown editor', () => {
     expect(result.text).toBe('before  **text**  after');
   });
 
+  it('inserts a wrapped placeholder when formatting at the caret', () => {
+    expect(applyMarkdownCommand('before ', 7, 7, 'bold').text).toBe('before **text**');
+    expect(applyMarkdownCommand('before ', 7, 7, 'italic').text).toBe('before *text*');
+    expect(applyMarkdownCommand('before ', 7, 7, 'strikeThrough').text).toBe('before ~~text~~');
+  });
+
   it('keeps blank lines when formatting a block', () => {
     const result = applyMarkdownCommand('one\n\ntwo', 0, 7, 'formatBlock', 'blockquote');
     expect(result.text).toBe('> one\n> \n> two');

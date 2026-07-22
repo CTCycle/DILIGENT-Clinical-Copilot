@@ -344,9 +344,15 @@ class RevisionAgentRunner:
                     )
                     if decision.task_complete:
                         break
-                    observation = registry.execute(
-                        decision.tool_name, decision.arguments, request.allowed_tools
-                    )
+                    try:
+                        observation = registry.execute(
+                            decision.tool_name, decision.arguments, request.allowed_tools
+                        )
+                    except ValueError as exc:
+                        observation = {
+                            "error": str(exc),
+                            "invalid_tool_input": True,
+                        }
                     task_observations.append(
                         {"tool": decision.tool_name, "observation": observation}
                     )

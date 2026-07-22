@@ -169,6 +169,12 @@
               (updateClick)="openUpdateModal('rag')"
             >
               <div inspectionToolbarBeforeActions class="inspection-rag-path-editor">
+                <span
+                  class="inspection-rag-selected-path"
+                  [title]="displayedRagFolderPath"
+                  [attr.aria-label]="'Selected RAG folder: ' + displayedRagFolderPath"
+                  aria-live="polite"
+                >{{ displayedRagFolderPath }}</span>
                 <button
                   class="btn btn-secondary inspection-mini-btn inspection-rag-picker-btn"
                   type="button"

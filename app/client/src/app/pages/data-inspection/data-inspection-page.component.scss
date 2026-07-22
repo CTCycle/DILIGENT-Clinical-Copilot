@@ -2,7 +2,19 @@
 .inspection-rag-path-editor {
   display: flex;
   align-items: center;
+  gap: var(--space-sm);
   width: auto;
+}
+
+.inspection-rag-selected-path {
+  display: block;
+  max-width: min(24rem, 34vw);
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .inspection-rag-picker-btn {
@@ -76,6 +88,10 @@
 @media (max-width: 900px) {
   .inspection-rag-path-editor {
     width: auto;
+  }
+
+  .inspection-rag-selected-path {
+    max-width: 11rem;
   }
 
   .inspection-rag-summary-row {

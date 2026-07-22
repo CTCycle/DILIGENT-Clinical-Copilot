@@ -148,6 +148,24 @@ def test_timeline_uses_the_single_explicit_date_in_source_evidence() -> None:
     assert normalized[0].event_date == "2026-07-21"
 
 
+def test_timeline_preserves_precise_model_date_when_evidence_only_matches_year() -> None:
+    extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
+    event = PatientTimelineEvent(
+        event_id="natural-date",
+        title="Symptoms began",
+        event_type="disease",
+        timing_type="explicit_date",
+        event_date="2026-07-18",
+        date_precision="day",
+        source_evidence="Symptoms began 18 July 2026.",
+    )
+
+    normalized = extractor.normalize_events([event])
+
+    assert normalized[0].event_date == "2026-07-18"
+    assert normalized[0].date_precision == "day"
+
+
 ###############################################################################
 def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens() -> None:
     extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
