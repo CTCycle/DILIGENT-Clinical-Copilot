@@ -196,6 +196,53 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
     }
 
 
+def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    tool_decisions = 0
+
+    def structured_call(**kwargs: Any) -> dict[str, Any]:
+        nonlocal tool_decisions
+        if kwargs["schema"].__name__ != "RevisionAgentToolCall":
+            return fake_issue_scan_call(**kwargs)
+        tool_decisions += 1
+        if tool_decisions == 1:
+            return {
+                "tool_name": "get_livertox_excerpt",
+                "arguments": {},
+                "rationale": "Inspect the suspected drug evidence.",
+                "task_complete": False,
+            }
+        return {
+            "tool_name": "read_session_context",
+            "arguments": {},
+            "rationale": "Continue after correcting invalid tool input.",
+            "task_complete": True,
+        }
+
+    service = DataInspectionService(serializer=serializer, jobs=JobManager())
+    service.revision_agent_runner = RevisionAgentRunner(
+        serializer=serializer,
+        structured_call=structured_call,
+    )
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    for _ in range(50):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision job did not recover from invalid tool input")
+
+    steps = service.list_revision_steps(started["result"]["pipeline_run_id"])
+    observation = steps[0]["output_payload"]["observations"][0]["observation"]
+    assert observation == {
+        "error": "Tool ids must be positive integers.",
+        "invalid_tool_input": True,
+    }
+
+
 def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)

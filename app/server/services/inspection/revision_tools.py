@@ -94,7 +94,10 @@ class RevisionToolRegistry:
     # -------------------------------------------------------------------------
     @staticmethod
     def _positive_int(value: Any) -> int:
-        number = int(value)
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            raise ValueError("Tool ids must be positive integers.") from None
         if number < 1:
             raise ValueError("Tool ids must be positive.")
         return number

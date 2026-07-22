@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+from sqlalchemy import create_engine, text
 
 from common.exceptions import ServiceValidationError
 from domain.model_configs import ModelConfigUpdateRequest
@@ -15,6 +16,7 @@ from services.llm.cloud import LLMError
 from services.llm.model_config import ModelConfigService
 from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
 from repositories.serialization.model_configs import ModelConfigSerializer
+from repositories.schemas.base import Base
 from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
@@ -40,6 +42,25 @@ class InMemorySerializer:
 ###############################################################################
 def test_model_config_serializer_has_no_clean_break_migration() -> None:
     assert not hasattr(ModelConfigSerializer, "migrate_cloud_selection_clean_break")
+
+
+def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
+    engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'model-config.db'}")
+    Base.metadata.create_all(engine)
+    serializer = ModelConfigSerializer(engine=engine)
+    serializer.save_snapshot(clinical_model="qwen3.5:2b")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE application_configuration "
+                "SET updated_at = '2000-01-01 00:00:00' WHERE id = 1"
+            )
+        )
+
+    snapshot = serializer.save_snapshot(text_extraction_model="qwen3.5:2b")
+
+    assert snapshot.updated_at is not None
+    assert snapshot.updated_at.year > 2000
 
 ###############################################################################
 def test_model_config_service_initializes_fresh_snapshot_from_canonical_defaults() -> None:

@@ -21,6 +21,8 @@ describe('ClinicalSessionsPage revision template', () => {
     expect(template).toContain('app-clinical-session-editor-toolbar');
     expect(template).toContain('clinical-session-metadata-status');
     expect(template).toContain('metadataSaveStatus()');
+    expect(template).toContain('linkDialogOpen()');
+    expect(template).toContain('aria-label="Link URL"');
     expect(toolbarTemplate).toContain('Save manual report edit');
     expect(toolbarTemplate).toContain('role="toolbar"');
     expect(template).not.toContain('Reviewer name');

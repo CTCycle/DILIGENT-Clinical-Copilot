@@ -478,6 +478,31 @@
   </div>
 </main>
 
+<app-modal-shell
+  [isOpen]="linkDialogOpen()"
+  title="Insert link"
+  subtitle="Add the destination for the selected text."
+  dialogClassName="modal-container clinical-session-link-dialog"
+  closeLabel="Close link dialog"
+  (close)="closeLinkDialog()"
+>
+  <label class="clinical-session-link-field">
+    <span>URL</span>
+    <input
+      type="url"
+      [ngModel]="linkUrl()"
+      (ngModelChange)="updateLinkUrl($event)"
+      (keydown.enter)="confirmLink()"
+      placeholder="https://example.com"
+      aria-label="Link URL"
+    />
+  </label>
+  <div class="clinical-session-actions clinical-session-link-actions">
+    <button type="button" class="btn" (click)="closeLinkDialog()">Cancel</button>
+    <button type="button" class="btn btn-primary" (click)="confirmLink()" [disabled]="!linkUrl().trim()">Insert link</button>
+  </div>
+</app-modal-shell>
+
 
 
 
