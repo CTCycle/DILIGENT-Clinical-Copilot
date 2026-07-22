@@ -20,6 +20,16 @@ from services.llm.transports.openai_responses import OpenAIResponsesTransport
 class RoutedGatewayTransport(StructuredTransportMixin):
     _cache: dict[str, tuple[datetime, list[CloudModelDescriptor]]] = {}
     _cache_ttl = timedelta(minutes=15)
+    _opencode_go_anthropic_models = frozenset(
+        {
+            "minimax-m3",
+            "minimax-m2.7",
+            "minimax-m2.5",
+            "qwen3.7-max",
+            "qwen3.7-plus",
+            "qwen3.6-plus",
+        }
+    )
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -72,11 +82,15 @@ class RoutedGatewayTransport(StructuredTransportMixin):
         if request.model not in self._models:
             await self.list_models()
         descriptor = self._models.get(request.model)
-        if descriptor is None or not descriptor.endpoint_family:
+        if descriptor is None:
+            raise ValueError(
+                "Provider model metadata does not include the requested model"
+            )
+        endpoint = self._resolve_transport_endpoint(descriptor)
+        if not endpoint:
             raise ValueError(
                 "Provider model metadata does not declare a transport endpoint"
             )
-        endpoint = descriptor.endpoint_family.lower()
         route_prefix = self.models_path.removesuffix("/models")
         transport_base_url = f"{self.base_url}{route_prefix}"
         if endpoint.startswith("http"):
@@ -102,6 +116,16 @@ class RoutedGatewayTransport(StructuredTransportMixin):
             )
         self._transports.append(transport)
         return await transport.chat(request)
+
+    # -------------------------------------------------------------------------
+    def _resolve_transport_endpoint(self, descriptor: CloudModelDescriptor) -> str:
+        if descriptor.endpoint_family:
+            return descriptor.endpoint_family.lower()
+        if self.models_path != "/zen/go/v1/models":
+            return ""
+        if descriptor.id in self._opencode_go_anthropic_models:
+            return "messages"
+        return "chat/completions"
 
     # -------------------------------------------------------------------------
     async def check_connectivity(self, model: str) -> ConnectivityResult:

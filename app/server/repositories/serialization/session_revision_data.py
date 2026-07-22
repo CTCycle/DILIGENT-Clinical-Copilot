@@ -375,7 +375,8 @@ def ensure_version_record_for_session(
 ) -> ClinicalSessionVersion:
     existing = db_session.execute(
         select(ClinicalSessionVersion).where(
-            ClinicalSessionVersion.session_id == int(session_row.id)
+            ClinicalSessionVersion.session_id == int(session_row.id),
+            ClinicalSessionVersion.version_number == 1,
         )
     ).scalar_one_or_none()
     if existing is not None:
@@ -527,7 +528,10 @@ def get_version_record_for_session(
         row = db_session.execute(
             select(ClinicalSessionVersion).where(
                 ClinicalSessionVersion.session_id == safe_session_id
-            )
+            ).order_by(
+                ClinicalSessionVersion.version_number.desc(),
+                ClinicalSessionVersion.id.desc(),
+            ).limit(1)
         ).scalar_one_or_none()
         return None if row is None else serialize_version_row(self, row)
     except Exception:

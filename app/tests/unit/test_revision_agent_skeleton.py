@@ -195,6 +195,36 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
         "revision_agent_qa",
     }
 
+
+def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+
+    serializer.update_current_report_text_with_manual_audit(
+        session_id,
+        report_text="Manually corrected DILI report.",
+        edited_fields=["report_text"],
+        reviewer_note="Corrected wording.",
+        edited_by="Unit test",
+        metadata={},
+    )
+
+    version = serializer.get_version_record_for_session(session_id)
+
+    assert version is not None
+    assert version["version_number"] == 2
+    assert version["revision_kind"] == "manual_edit"
+
+    service = DataInspectionService(serializer=serializer, jobs=JobManager())
+    service.revision_agent_runner = RevisionAgentRunner(
+        serializer=serializer,
+        structured_call=fake_issue_scan_call,
+    )
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+
+    assert started["job_type"] == service.REVISION_JOB_TYPE
+
 ###############################################################################
 class SlowRevisionRunner:
 
