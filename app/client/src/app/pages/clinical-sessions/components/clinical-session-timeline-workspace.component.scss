@@ -23,6 +23,9 @@ select:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-r
 .timeline-model-actions p { margin: 0; text-align: center; }
 .timeline-gallery { display: grid; }
 .timeline-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-lg); padding: var(--space-sm) 0; border-top: 1px solid var(--color-border); }
+.timeline-progress-row { border-color: var(--color-brand); background: var(--color-brand-bg); }
+.timeline-progress { display: block; width: 100%; height: var(--control-height-sm); accent-color: var(--color-brand); }
+.timeline-progress-status { color: var(--color-brand); font-size: var(--font-xs); font-weight: 700; white-space: nowrap; }
 .timeline-row:first-child { border-top: 0; padding-top: 0; }
 .timeline-row-heading { align-items: center; color: var(--color-text-primary); }
 .timeline-row-heading span { color: var(--color-text-secondary); font-size: .85rem; }
