@@ -429,6 +429,22 @@ def test_runtime_timeout_respects_provider_cap(monkeypatch) -> None:
     assert timeout == 30.0
 
 ###############################################################################
+def test_runtime_timeout_allows_thirty_minute_cloud_clinical_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: True,
+    )
+
+    timeout = ClinicalSessionService._resolve_runtime_timeout(
+        base_timeout_s=3600.0,
+        cloud_cap_s=1800.0,
+    )
+
+    assert timeout == 1800.0
+
+###############################################################################
 def test_workflow_marks_blocking_faithfulness_result_as_failed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
