@@ -11,5 +11,7 @@ describe('DataInspectionPage template', () => {
     const template = readFileSync(templatePath, 'utf-8');
     expect(template).toContain('Vector model');
     expect(template).toContain("row.vector_model || 'Not vectorized'");
+    expect(template).toContain('Selected RAG folder:');
+    expect(template).toContain('{{ displayedRagFolderPath }}');
   });
 });

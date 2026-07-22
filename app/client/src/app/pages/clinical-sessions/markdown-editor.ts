@@ -11,8 +11,9 @@ export function applyMarkdownCommand(source: string, selectionStart: number, sel
   if (command === 'formatBlock') return formatBlock(source, start, end, value || 'p');
   if (command === 'bold' || command === 'italic' || command === 'strikeThrough') {
     const marker = command === 'bold' ? '**' : command === 'italic' ? '*' : '~~';
-    const inner = selected.startsWith(marker) && selected.endsWith(marker) ? selected.slice(marker.length, -marker.length) : selected || 'text';
-    const replacement = inner === selected ? `${marker}${inner}${marker}` : inner;
+    const isWrapped = selected.startsWith(marker) && selected.endsWith(marker);
+    const inner = isWrapped ? selected.slice(marker.length, -marker.length) : selected || 'text';
+    const replacement = isWrapped ? inner : `${marker}${inner}${marker}`;
     return replaceSelection(source, start, end, replacement, replacement.length);
   }
   if (command === 'insertUnorderedList' || command === 'insertOrderedList') return prefixLines(source, start, end, command === 'insertOrderedList' ? '1. ' : '- ');

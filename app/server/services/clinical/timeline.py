@@ -172,7 +172,18 @@ class PatientTimelineExtractor:
             # observation while retaining ambiguous multi-date evidence unchanged.
             normalized_model_date = self.normalize_date_token(item.event_date)
             normalized_model_end = self.normalize_date_token(item.event_date_end)
-            payload["event_date"] = evidence_dates[0] if len(evidence_dates) == 1 else normalized_model_date
+            evidence_date = evidence_dates[0] if len(evidence_dates) == 1 else None
+            if (
+                evidence_date
+                and normalized_model_date
+                and normalized_model_date.startswith(evidence_date)
+                and len(normalized_model_date) > len(evidence_date)
+            ):
+                # A year token embedded in natural-language evidence is not more
+                # authoritative than a model date that preserves the same year at
+                # day or month precision.
+                evidence_date = normalized_model_date
+            payload["event_date"] = evidence_date or normalized_model_date
             payload["event_date_end"] = normalized_model_end
             interval = normalize_timeline_interval(payload["event_date"], normalized_model_end)
             if interval is not None:

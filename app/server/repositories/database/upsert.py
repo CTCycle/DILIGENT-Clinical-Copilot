@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -33,6 +34,7 @@ def upsert_application_configuration(
             "schema_version": statement.excluded.schema_version,
             "payload": statement.excluded.payload,
             "revision": ApplicationConfiguration.revision + 1,
+            "updated_at": func.now(),
         },
     )
     db_session.execute(statement)

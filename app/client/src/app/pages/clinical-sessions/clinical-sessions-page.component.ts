@@ -10,6 +10,8 @@ import {
   LucideTrash2,
 } from '@lucide/angular';
 
+import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
+
 import {
   cancelSessionRevisionJob,
   deleteInspectionSession,
@@ -86,6 +88,7 @@ type DrugEvidenceDraft = DetectedDrugEvidence & {
   imports: [
     CommonModule,
     FormsModule,
+    ModalShellComponent,
     ClinicalSessionEditorToolbarComponent,
     ClinicalSessionTimelineWorkspaceComponent,
     LucideFileText,
@@ -134,6 +137,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly editorText = signal('');
   readonly editorViewMode = signal<EditorViewMode>('source');
   readonly editorFontSize = signal(16);
+  readonly linkDialogOpen = signal(false);
+  readonly linkUrl = signal('');
   readonly renderedEditorHtml = computed(() => this.markdownRenderer.render(this.editorText()).html);
   private editorUndoStack: string[] = [];
   private editorRedoStack: string[] = [];
@@ -362,9 +367,24 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   insertLink(): void {
-    const url = globalThis.prompt('Enter URL');
+    this.linkUrl.set('https://');
+    this.linkDialogOpen.set(true);
+  }
+
+  updateLinkUrl(value: string): void {
+    this.linkUrl.set(value);
+  }
+
+  closeLinkDialog(): void {
+    this.linkDialogOpen.set(false);
+    this.linkUrl.set('');
+  }
+
+  confirmLink(): void {
+    const url = this.linkUrl().trim();
     if (!url) return;
     this.runEditorCommand('createLink', url);
+    this.closeLinkDialog();
   }
 
   private defaultReviewerLabel(detail: ClinicalSessionDetail): string {
