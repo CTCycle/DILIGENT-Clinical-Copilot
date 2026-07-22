@@ -17,7 +17,7 @@ describe('ClinicalSessionsPage revision template', () => {
     expect(template).toContain('clinical-session-revision-model-panel');
     expect(template).toContain('Revision model');
     expect(template).toContain('clinical-session-revision-instruction');
-    expect(template).toContain('setRevisionModelRuntime');
+    expect(template).toContain('setRevisionModelProvider');
     expect(template).toContain('app-clinical-session-editor-toolbar');
     expect(template).toContain('clinical-session-metadata-status');
     expect(template).toContain('metadataSaveStatus()');

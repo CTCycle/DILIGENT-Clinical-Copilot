@@ -122,10 +122,7 @@ export class AccessKeyModalComponent implements OnChanges {
     this.isSaving = true;
     this.errorMessage = '';
     try {
-      const created = await createAccessKey(this.provider, candidate);
-      if (!created.is_active) {
-        await activateAccessKey(created.id, this.provider);
-      }
+      await createAccessKey(this.provider, candidate);
       this.newKeyValue = '';
       await this.loadKeys();
       this.keysChanged.emit();

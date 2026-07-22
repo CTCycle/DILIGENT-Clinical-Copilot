@@ -708,7 +708,7 @@ def create_or_update_revision_run(
                 **configuration,
             }
             terminal_statuses = {"completed", "failed", "cancelled"}
-            if existing.status in terminal_statuses and status == "running":
+            if existing.status in terminal_statuses and status != existing.status:
                 status = existing.status
                 completed_at = existing.completed_at
                 error = self.parse_session_result_payload(existing.error_json)
@@ -1012,6 +1012,36 @@ def fail_revision_run(
                     version_row.version_status = "qa_failed"
                     version_row.llm_qa_status = "failed"
                     version_row.clinical_review_status = "not_reviewed"
+                    version_row.completed_at = datetime.now(UTC)
+        db_session.commit()
+    except Exception:
+        db_session.rollback()
+        raise
+    finally:
+        db_session.close()
+
+###############################################################################
+def cancel_revision_run(self, *, pipeline_run_id: str) -> None:
+    db_session = self.session_factory()
+    try:
+        existing = db_session.execute(
+            select(ClinicalSessionRevisionRun).where(
+                ClinicalSessionRevisionRun.pipeline_run_id == str(pipeline_run_id)
+            )
+        ).scalar_one_or_none()
+        if existing is not None and existing.status not in {"completed", "failed"}:
+            existing.status = "cancelled"
+            existing.completed_at = datetime.now(UTC)
+            existing.error_json = self.serialize_json_payload(
+                {"message": "Revision was cancelled."}
+            )
+            if existing.target_revision_version_id is not None:
+                version_row = db_session.get(
+                    ClinicalSessionVersion, int(existing.target_revision_version_id)
+                )
+                if version_row is not None and version_row.session_id is None:
+                    version_row.version_status = "qa_failed"
+                    version_row.llm_qa_status = "failed"
                     version_row.completed_at = datetime.now(UTC)
         db_session.commit()
     except Exception:
