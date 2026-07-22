@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { AfterViewInit, Component, DestroyRef, ElementRef, HostListener, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -14,17 +14,27 @@ import {
   InspectionTimelineEventType,
   InspectionTimelineTimingType,
 } from '../../core/models/types';
+import {
+  createTimelineScale,
+  dayToUtcDate,
+  normalizeTimelineDate,
+  NormalizedTimelineDate,
+  TimelineDatePrecision,
+} from './timeline-date';
+import { packTimelineItems, TimelineCluster } from './timeline-layout';
 
-type TimetableLane = 'clinical' | 'therapy' | 'labs' | 'uncertainty';
+type TimetableLane = 'clinical' | 'therapy' | 'labs' | 'uncertainty' | 'unanchored';
 type TimelineCardAlign = 'start' | 'center' | 'end';
 type TimelineEvidenceFilter = 'all' | 'with_evidence' | 'missing_evidence';
-type TimelineDensity = 'compact' | 'comfortable';
+type TimelineDensity = 'compact' | 'comfortable' | 'dense';
 
 type RenderedTimelineEvent = {
   event: InspectionTimelineEvent;
   lane: TimetableLane;
   color: string;
-  positionPercent: number;
+  positionPercent: number | null;
+  rangeStartPercent: number | null;
+  rangeEndPercent: number | null;
   align: TimelineCardAlign;
   stackLevel: number;
 };
@@ -33,8 +43,6 @@ type TimelineDateRange = {
   start: Date | null;
   end: Date | null;
 };
-
-type TimelineDatePrecision = 'day' | 'month' | 'year';
 
 type ResolvedTimelineDate = {
   date: Date;
@@ -69,10 +77,12 @@ const TIMETABLE_LANE_LABELS: Record<TimetableLane, string> = {
   therapy: 'Medications',
   labs: 'Labs',
   uncertainty: 'Uncertain',
+  unanchored: 'Unanchored',
 };
 
-const TIMETABLE_LANES: TimetableLane[] = ['clinical', 'therapy', 'labs', 'uncertainty'];
-const CARD_COLLISION_GAP_PERCENT = 20;
+const TIMETABLE_LANES: TimetableLane[] = ['clinical', 'therapy', 'labs', 'uncertainty', 'unanchored'];
+const TIMELINE_MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+const TIMELINE_MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' });
 
 @Component({
   selector: 'app-patient-timetable-page',
@@ -81,7 +91,7 @@ const CARD_COLLISION_GAP_PERCENT = 20;
   templateUrl: './patient-timetable-page.component.html',
   styleUrl: './patient-timetable-page.component.scss',
 })
-export class PatientTimetablePageComponent implements OnInit {
+export class PatientTimetablePageComponent implements OnInit, AfterViewInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -92,38 +102,61 @@ export class PatientTimetablePageComponent implements OnInit {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly selectedEventId = signal<string | null>(null);
-  readonly visibleLanes = signal<Record<TimetableLane, boolean>>({ clinical: true, therapy: true, labs: true, uncertainty: true });
-  readonly collapsedLanes = signal<Record<TimetableLane, boolean>>({ clinical: false, therapy: false, labs: false, uncertainty: false });
+  readonly selectedCluster = signal<TimelineCluster | null>(null);
+  readonly visibleLanes = signal<Record<TimetableLane, boolean>>({ clinical: true, therapy: true, labs: true, uncertainty: true, unanchored: true });
+  readonly collapsedLanes = signal<Record<TimetableLane, boolean>>({ clinical: false, therapy: false, labs: false, uncertainty: false, unanchored: false });
   readonly evidenceFilter = signal<TimelineEvidenceFilter>('all');
   readonly showUncertainEvents = signal(true);
   readonly hideEmptyLanes = signal(false);
   readonly density = signal<TimelineDensity>('comfortable');
+  readonly zoom = signal(1);
+  readonly canvasWidth = signal(1200);
+  readonly scrollOffset = signal(0);
+  readonly scrollMax = signal(0);
+  readonly selectionAnnouncement = signal('');
+  readonly isNarrowScreen = signal(globalThis.matchMedia?.('(max-width: 640px)').matches ?? false);
+  private lastFocusedElement: HTMLElement | null = null;
+  @ViewChild('timelineArea') private timelineArea?: ElementRef<HTMLElement>;
+  @ViewChild('timelineCanvas') private timelineCanvas?: ElementRef<HTMLElement>;
 
-  readonly orderedEvents = computed(() =>
-    [...(this.timeline()?.events ?? [])].sort((a, b) => a.sort_order - b.sort_order),
-  );
+  readonly orderedEvents = computed(() => [...(this.timeline()?.events ?? [])].sort((a, b) => {
+    const left = normalizeTimelineDate(a.event_date);
+    const right = normalizeTimelineDate(b.event_date);
+    if (left && right) return left.startDay - right.startDay || left.endDay - right.endDay || a.sort_order - b.sort_order || a.event_id.localeCompare(b.event_id);
+    if (left) return -1;
+    if (right) return 1;
+    return a.sort_order - b.sort_order || a.event_id.localeCompare(b.event_id);
+  }));
 
   readonly dateRange = computed<TimelineDateRange>(() => {
-    const dates = this.orderedEvents()
-      .map((event) => this.resolveEventDate(event.event_date)?.date ?? null)
-      .filter((value): value is Date => value !== null)
-      .sort((a, b) => a.getTime() - b.getTime());
+    const dates = this.orderedEvents().map((event) => this.resolveNormalizedRange(event)).filter((value): value is NormalizedTimelineDate => value !== null);
     return {
-      start: dates[0] ?? null,
-      end: dates[dates.length - 1] ?? null,
+      start: dates.length ? dayToUtcDate(Math.min(...dates.map((date) => date.startDay))) : null,
+      end: dates.length ? dayToUtcDate(Math.max(...dates.map((date) => date.endDay))) : null,
     };
+  });
+
+  readonly timelineScale = computed(() => {
+    const range = this.dateRange();
+    return range.start && range.end
+      ? createTimelineScale(Math.floor(range.start.getTime() / 86_400_000), Math.floor(range.end.getTime() / 86_400_000))
+      : null;
   });
 
   readonly renderedEvents = computed<RenderedTimelineEvent[]>(() => {
     const events = this.filteredEvents();
     const range = this.dateRange();
-    const items = events.map((event, index) => {
-      const positionPercent = this.resolveEventPosition(event, index, events.length, range);
+    const items = events.map((event) => {
+      const positionPercent = this.resolveEventPosition(event, range);
+      const normalized = this.resolveNormalizedRange(event);
+      const scale = this.timelineScale();
       return {
         event,
         lane: this.resolveLane(event),
         color: EVENT_COLORS[event.event_type] ?? EVENT_COLORS.other,
         positionPercent,
+        rangeStartPercent: normalized && scale ? scale.toPercent(normalized.startDay) : null,
+        rangeEndPercent: normalized && scale ? scale.toPercent(normalized.endDay) : null,
         align: this.resolveEventAlign(positionPercent),
         stackLevel: 0,
       };
@@ -131,17 +164,36 @@ export class PatientTimetablePageComponent implements OnInit {
     return this.assignStackLevels(items);
   });
 
+  readonly laneClusters = computed<Record<TimetableLane, TimelineCluster[]>>(() => {
+    const result = {} as Record<TimetableLane, TimelineCluster[]>;
+    for (const lane of TIMETABLE_LANES) {
+      const items = this.renderedEvents().filter((item) => item.lane === lane && item.positionPercent !== null);
+      result[lane] = packTimelineItems(items.map((item) => ({
+        id: item.event.event_id,
+        positionPercent: item.positionPercent ?? 0,
+        width: this.density() === 'dense' ? 104 : this.density() === 'compact' ? 132 : 176,
+        sortOrder: item.event.sort_order,
+      })), 1200).clusters;
+    }
+    return result;
+  });
+
+  readonly clusteredEventIds = computed(() => new Set(Object.values(this.laneClusters()).flatMap((clusters) => clusters.flatMap((cluster) => cluster.memberIds))));
+
   readonly lanes = computed(() =>
     TIMETABLE_LANES.map((lane) => {
-      const items = this.renderedEvents().filter((item) => item.lane === lane);
+      const items = this.renderedEvents().filter((item) => item.lane === lane && !this.clusteredEventIds().has(item.event.event_id));
+      const eventCount = this.renderedEvents().filter((item) => item.lane === lane).length;
       const levelCount = Math.max(1, ...items.map((item) => item.stackLevel + 1));
       return {
         id: lane,
         label: TIMETABLE_LANE_LABELS[lane],
         items,
+        eventCount,
         levelCount,
         collapsed: this.collapsedLanes()[lane],
         visible: this.visibleLanes()[lane],
+        clusters: this.laneClusters()[lane],
       };
     }),
   );
@@ -171,6 +223,11 @@ export class PatientTimetablePageComponent implements OnInit {
         { label: 'End', shortLabel: 'End', positionPercent: 100, isYearBoundary: false },
       ];
     }
+    const scale = this.timelineScale();
+    if (!scale) return [
+      { label: 'Start', shortLabel: 'Start', positionPercent: 0, isYearBoundary: false },
+      { label: 'End', shortLabel: 'End', positionPercent: 100, isYearBoundary: false },
+    ];
     const start = new Date(Date.UTC(range.start.getUTCFullYear(), range.start.getUTCMonth(), 1));
     const end = new Date(Date.UTC(range.end.getUTCFullYear(), range.end.getUTCMonth(), 1));
     const points: TimelineScalePoint[] = [];
@@ -181,8 +238,8 @@ export class PatientTimetablePageComponent implements OnInit {
       const label = this.monthLabel(cursor);
       points.push({
         label,
-        shortLabel: new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: 'UTC' }).format(cursor),
-        positionPercent: totalMonths <= 1 ? 0 : (offset / totalMonths) * 100,
+        shortLabel: TIMELINE_MONTH_LABEL_FORMATTER.format(cursor),
+        positionPercent: scale.toPercent(Math.floor(cursor.getTime() / 86_400_000)),
         isYearBoundary: cursor.getUTCMonth() === 0 || offset === 0,
       });
       cursor.setUTCMonth(cursor.getUTCMonth() + 1);
@@ -249,6 +306,18 @@ export class PatientTimetablePageComponent implements OnInit {
       });
   }
 
+  ngAfterViewInit(): void {
+    const canvas = this.timelineCanvas?.nativeElement;
+    const area = this.timelineArea?.nativeElement;
+    if (!canvas || !area || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      this.canvasWidth.set(Math.max(720, Math.round(area.clientWidth)));
+      this.scrollMax.set(Math.max(0, area.scrollWidth - area.clientWidth));
+    });
+    observer.observe(area);
+    this.destroyRef.onDestroy(() => observer.disconnect());
+  }
+
   async loadTimeline(sessionId: number, timelineId: number | null): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
@@ -258,7 +327,8 @@ export class PatientTimetablePageComponent implements OnInit {
         : await this.fetchLatestTimeline(sessionId);
       this.timeline.set(payload);
       this.timelineId.set(payload.timeline_id ?? timelineId ?? null);
-      this.selectedEventId.set(payload.events[0]?.event_id ?? null);
+      this.selectedEventId.set(null);
+      this.selectedCluster.set(null);
     } catch (error) {
       this.timeline.set(null);
       if (this.isNotFoundError(error)) {
@@ -286,7 +356,8 @@ export class PatientTimetablePageComponent implements OnInit {
       const payload = await generateInspectionSessionTimeline(id, { force_regenerate: true });
       this.timeline.set(payload);
       this.timelineId.set(payload.timeline_id ?? null);
-      this.selectedEventId.set(payload.events[0]?.event_id ?? null);
+      this.selectedEventId.set(null);
+      this.selectedCluster.set(null);
       if (payload.timeline_id) {
         await this.router.navigate(['/sessions', id, 'timetable', payload.timeline_id], { replaceUrl: true });
       }
@@ -298,7 +369,25 @@ export class PatientTimetablePageComponent implements OnInit {
   }
 
   selectEvent(event: InspectionTimelineEvent): void {
+    const active = document.activeElement;
+    this.lastFocusedElement = active instanceof HTMLElement ? active : null;
+    const lane = this.resolveLane(event);
+    if (this.collapsedLanes()[lane]) this.toggleLaneCollapsed(lane);
+    this.selectedCluster.set(null);
     this.selectedEventId.set(event.event_id);
+    this.selectionAnnouncement.set(`Selected ${event.title}.`);
+    queueMicrotask(() => document.querySelector<HTMLElement>(`[data-event-id="${CSS.escape(event.event_id)}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
+  }
+
+  closeInspector(): void {
+    this.selectedEventId.set(null);
+    this.selectedCluster.set(null);
+    queueMicrotask(() => this.lastFocusedElement?.focus());
+  }
+
+  @HostListener('document:keydown.escape')
+  handleEscape(): void {
+    if (this.selectedEventId()) this.closeInspector();
   }
 
   toggleLaneVisibility(lane: TimetableLane): void { this.visibleLanes.update((value) => ({ ...value, [lane]: !value[lane] })); }
@@ -307,10 +396,35 @@ export class PatientTimetablePageComponent implements OnInit {
   toggleUncertainEvents(): void { this.showUncertainEvents.update((value) => !value); }
   toggleHideEmptyLanes(): void { this.hideEmptyLanes.update((value) => !value); }
   setDensity(value: TimelineDensity): void { this.density.set(value); }
+  setZoom(value: number): void { this.zoom.set(Math.min(2.5, Math.max(0.75, value))); queueMicrotask(() => this.updateScrollMetrics()); }
+  zoomIn(): void { this.setZoom(this.zoom() + 0.25); }
+  zoomOut(): void { this.setZoom(this.zoom() - 0.25); }
+  fitZoom(): void { this.setZoom(1); this.fitRange(); }
+  setScrollOffset(value: number): void {
+    const next = Math.min(this.scrollMax(), Math.max(0, value));
+    this.scrollOffset.set(next);
+    this.timelineArea?.nativeElement.scrollTo({ left: next, behavior: 'auto' });
+  }
+  handleEventKeydown(event: KeyboardEvent, item: InspectionTimelineEvent): void {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.selectEvent(item); return; }
+    if (event.key === 'ArrowLeft') { event.preventDefault(); this.selectPreviousEvent(); }
+    if (event.key === 'ArrowRight') { event.preventDefault(); this.selectNextEvent(); }
+  }
   selectPreviousEvent(): void { const event = this.filteredEvents()[this.selectedEventIndex() - 1]; if (event) this.selectEvent(event); }
   selectNextEvent(): void { const event = this.filteredEvents()[this.selectedEventIndex() + 1]; if (event) this.selectEvent(event); }
-  fitRange(): void { document.querySelector<HTMLElement>('.timeline-area')?.scrollTo({ left: 0, behavior: 'smooth' }); }
+  fitRange(): void { this.setScrollOffset(0); }
   isLinkedToSelectedEvent(event: InspectionTimelineEvent): boolean { return this.linkedSelectedEventIds().has(event.event_id); }
+  selectCluster(cluster: TimelineCluster): void {
+    this.selectedCluster.set(cluster);
+    const event = this.orderedEvents().find((item) => item.event_id === cluster.memberIds[0]);
+    if (event) this.selectEvent(event);
+    this.selectedCluster.set(cluster);
+  }
+
+  clusterMembers(): InspectionTimelineEvent[] {
+    const ids = new Set(this.selectedCluster()?.memberIds ?? []);
+    return this.orderedEvents().filter((event) => ids.has(event.event_id));
+  }
 
   timingLabel(value: InspectionTimelineTimingType): string {
     return TIMING_LABELS[value] ?? value;
@@ -361,29 +475,16 @@ export class PatientTimetablePageComponent implements OnInit {
   }
 
   private resolveEventDate(value: string | null): ResolvedTimelineDate | null {
-    if (!value) {
-      return null;
-    }
-    const exactMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    const monthMatch = /^(\d{4})-(\d{2})$/.exec(value);
-    const yearMatch = /^(\d{4})$/.exec(value);
-    const match = exactMatch ?? monthMatch ?? yearMatch;
-    if (!match) {
-      return null;
-    }
-    const year = Number(match[1]);
-    const month = exactMatch || monthMatch ? Number(match[2]) : 1;
-    const day = exactMatch ? Number(match[3]) : 1;
-    const date = new Date(Date.UTC(year, month - 1, day));
-    if (
-      Number.isNaN(date.getTime()) ||
-      date.getUTCFullYear() !== year ||
-      date.getUTCMonth() !== month - 1 ||
-      date.getUTCDate() !== day
-    ) {
-      return null;
-    }
-    return { date, precision: exactMatch ? 'day' : monthMatch ? 'month' : 'year' };
+    const normalized = normalizeTimelineDate(value);
+    return normalized ? { date: dayToUtcDate(normalized.startDay), precision: normalized.precision } : null;
+  }
+
+  private resolveNormalizedRange(event: InspectionTimelineEvent): NormalizedTimelineDate | null {
+    const start = normalizeTimelineDate(event.event_date);
+    if (!start) return null;
+    const explicitEnd = normalizeTimelineDate(event.event_date_end ?? null);
+    if (!explicitEnd || explicitEnd.startDay < start.startDay) return start;
+    return { ...start, endDay: explicitEnd.endDay };
   }
 
   precisionLabel(value: string | null): string {
@@ -392,11 +493,7 @@ export class PatientTimetablePageComponent implements OnInit {
   }
 
   private monthLabel(value: Date): string {
-    return new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'UTC',
-    }).format(value);
+    return TIMELINE_MONTH_FORMATTER.format(value);
   }
 
   private monthsBetweenCount(start: Date, end: Date): number {
@@ -405,23 +502,16 @@ export class PatientTimetablePageComponent implements OnInit {
 
   private resolveEventPosition(
     event: InspectionTimelineEvent,
-    index: number,
-    total: number,
     range: TimelineDateRange,
-  ): number {
-    const eventDate = this.resolveEventDate(event.event_date)?.date ?? null;
-    if (eventDate && range.start && range.end) {
-      const span = Math.max(1, range.end.getTime() - range.start.getTime());
-      const elapsed = eventDate.getTime() - range.start.getTime();
-      return Math.min(100, Math.max(0, (elapsed / span) * 100));
-    }
-    if (total <= 1) {
-      return 50;
-    }
-    return (index / (total - 1)) * 100;
+  ): number | null {
+    const normalized = this.resolveNormalizedRange(event);
+    const scale = this.timelineScale();
+    if (!normalized || !scale || !range.start || !range.end) return null;
+    return scale.toPercent((normalized.startDay + normalized.endDay) / 2);
   }
 
-  private resolveEventAlign(positionPercent: number): TimelineCardAlign {
+  private resolveEventAlign(positionPercent: number | null): TimelineCardAlign {
+    if (positionPercent === null) return 'start';
     if (positionPercent <= 12) {
       return 'start';
     }
@@ -434,25 +524,23 @@ export class PatientTimetablePageComponent implements OnInit {
   private assignStackLevels(items: RenderedTimelineEvent[]): RenderedTimelineEvent[] {
     const nextItems = items.map((item) => ({ ...item }));
     for (const lane of TIMETABLE_LANES) {
-      const laneItems = nextItems
-        .filter((item) => item.lane === lane)
-        .sort((a, b) => a.positionPercent - b.positionPercent || a.event.sort_order - b.event.sort_order);
-      const latestPositionByLevel: number[] = [];
-      for (const item of laneItems) {
-        let level = latestPositionByLevel.findIndex(
-          (latestPosition) => item.positionPercent - latestPosition >= CARD_COLLISION_GAP_PERCENT,
-        );
-        if (level === -1) {
-          level = latestPositionByLevel.length;
-        }
-        item.stackLevel = level;
-        latestPositionByLevel[level] = item.positionPercent;
+      const laneItems = nextItems.filter((item) => item.lane === lane && item.positionPercent !== null);
+      const layout = packTimelineItems(laneItems.map((item) => ({
+        id: item.event.event_id,
+        positionPercent: item.positionPercent ?? 0,
+        width: this.density() === 'dense' ? 104 : this.density() === 'compact' ? 132 : 176,
+        sortOrder: item.event.sort_order,
+      })), 1200);
+      for (const placement of layout.placements) {
+        const item = laneItems.find((candidate) => candidate.event.event_id === placement.id);
+        if (item) item.stackLevel = placement.row;
       }
     }
     return nextItems;
   }
 
   private resolveLane(event: InspectionTimelineEvent): TimetableLane {
+    if (!normalizeTimelineDate(event.event_date)) return 'unanchored';
     if (event.timing_type === 'uncertain' || event.timing_type === 'ordering') {
       return 'uncertainty';
     }
@@ -463,6 +551,13 @@ export class PatientTimetablePageComponent implements OnInit {
       return 'labs';
     }
     return 'clinical';
+  }
+
+  private updateScrollMetrics(): void {
+    const area = this.timelineArea?.nativeElement;
+    if (!area) return;
+    this.scrollMax.set(Math.max(0, area.scrollWidth - area.clientWidth));
+    this.scrollOffset.set(Math.min(this.scrollOffset(), this.scrollMax()));
   }
 
   private isNotFoundError(error: unknown): boolean {
