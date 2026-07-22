@@ -12,6 +12,9 @@ SUPPORTED_PROVIDERS: frozenset[ProviderName] = frozenset(
 )
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 MIN_ACCESS_KEY_LENGTH = 16
+PLACEHOLDER_ACCESS_KEY_RE = re.compile(
+    r"(?:fake|test|example|placeholder|dummy|invalid)", re.IGNORECASE
+)
 
 ###############################################################################
 def normalize_provider_name(provider: str) -> ProviderName:
@@ -29,6 +32,25 @@ def normalize_access_key(value: str | None) -> str:
         raise ValueError("access_key must not be empty")
     if len(normalized) < MIN_ACCESS_KEY_LENGTH:
         raise ValueError("access_key is too short")
+    if any(character.isspace() for character in normalized):
+        raise ValueError("access_key must not contain whitespace")
+    return normalized
+
+###############################################################################
+def validate_provider_access_key(provider: ProviderName, value: str | None) -> str:
+    """Reject obvious placeholders without retaining or logging the secret."""
+    normalized = normalize_access_key(value)
+    if PLACEHOLDER_ACCESS_KEY_RE.search(normalized):
+        raise ValueError(f"Invalid {provider.title()} access key format.")
+    prefix_by_provider = {
+        "openai": ("sk-",),
+        "gemini": ("AIza",),
+        "deepseek": ("sk-",),
+        "anthropic": ("sk-ant-",),
+    }
+    accepted_prefixes = prefix_by_provider.get(provider)
+    if accepted_prefixes and not normalized.startswith(accepted_prefixes):
+        raise ValueError(f"Invalid {provider.title()} access key format.")
     return normalized
 
 ###############################################################################

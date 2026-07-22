@@ -105,6 +105,7 @@ class InspectionTimelineMixin:
         *,
         session_id: int,
         source: dict[str, Any],
+        generation_note: str | None = None,
     ) -> PatientTimeline:
         events: list[PatientTimelineEvent] = []
 
@@ -178,10 +179,8 @@ class InspectionTimelineMixin:
             session_id=session_id,
             generated_at=datetime.now(UTC),
             generation_status="fallback",
-            generation_note=(
-                "Local model timeline extraction was unavailable; deterministic "
-                "fallback events were built from persisted session fields."
-            ),
+            generation_note=generation_note
+            or "Timeline extraction was unavailable; deterministic fallback events were built from persisted session fields.",
             events=events,
         )
 
@@ -269,6 +268,12 @@ class InspectionTimelineMixin:
                 timeline = self.build_fallback_timeline(
                     session_id=safe_session_id,
                     source=source,
+                    generation_note=(
+                        f"Cloud timeline extraction using {requested_runtime_settings['llm_provider']} "
+                        f"/{source_model} was unavailable; deterministic fallback events were built from persisted session fields."
+                        if requested_runtime_settings["use_cloud_services"]
+                        else "Local timeline extraction was unavailable; deterministic fallback events were built from persisted session fields."
+                    ),
                 )
                 timeline = PatientTimeline(
                     **{

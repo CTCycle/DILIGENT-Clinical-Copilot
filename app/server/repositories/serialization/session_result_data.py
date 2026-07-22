@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import and_, exists, func, or_, select
+from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from common.utils.logger import logger
@@ -20,6 +20,10 @@ from repositories.schemas.clinical import (
     ClinicalSessionResult,
     ClinicalSessionTimeline,
     ClinicalSessionSection,
+    ClinicalSessionRevisionArtifact,
+    ClinicalSessionRevisionReview,
+    ClinicalSessionRevisionRun,
+    ClinicalSessionRevisionStep,
     ClinicalSessionVersion,
 )
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
@@ -433,6 +437,65 @@ def delete_session(self, session_id: int) -> bool:
         existing = db_session.get(ClinicalSession, safe_session_id)
         if existing is None:
             return False
+        root_session_id = db_session.execute(
+            select(ClinicalSessionVersion.root_session_id)
+            .where(ClinicalSessionVersion.session_id == safe_session_id)
+            .order_by(ClinicalSessionVersion.version_number.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        is_root_session = int(root_session_id or safe_session_id) == safe_session_id
+        version_scope = (
+            ClinicalSessionVersion.root_session_id == safe_session_id
+            if is_root_session
+            else ClinicalSessionVersion.session_id == safe_session_id
+        )
+        version_ids = list(
+            db_session.execute(
+                select(ClinicalSessionVersion.id).where(version_scope)
+            ).scalars()
+        )
+        run_ids = list(
+            db_session.execute(
+                select(ClinicalSessionRevisionRun.id).where(
+                    ClinicalSessionRevisionRun.root_session_id == safe_session_id
+                    if is_root_session
+                    else ClinicalSessionRevisionRun.session_id == safe_session_id
+                )
+            ).scalars()
+        )
+        if version_ids:
+            db_session.execute(
+                delete(ClinicalSessionRevisionReview).where(
+                    ClinicalSessionRevisionReview.revision_version_id.in_(version_ids)
+                )
+            )
+            db_session.execute(
+                delete(ClinicalSessionRevisionArtifact).where(
+                    ClinicalSessionRevisionArtifact.revision_version_id.in_(version_ids)
+                )
+            )
+        if run_ids:
+            db_session.execute(
+                delete(ClinicalSessionRevisionStep).where(
+                    ClinicalSessionRevisionStep.revision_run_id.in_(run_ids)
+                )
+            )
+            db_session.execute(
+                delete(ClinicalSessionRevisionArtifact).where(
+                    ClinicalSessionRevisionArtifact.revision_run_id.in_(run_ids)
+                )
+            )
+        db_session.execute(
+            delete(ClinicalSessionRevisionRun).where(
+                ClinicalSessionRevisionRun.root_session_id == safe_session_id
+                if is_root_session
+                else ClinicalSessionRevisionRun.session_id == safe_session_id
+            )
+        )
+        if version_ids:
+            db_session.execute(
+                delete(ClinicalSessionVersion).where(version_scope)
+            )
         db_session.delete(existing)
         db_session.commit()
         return True

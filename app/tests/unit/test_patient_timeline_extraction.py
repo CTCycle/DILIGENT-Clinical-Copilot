@@ -132,6 +132,21 @@ def test_timeline_sort_orders_year_month_and_day_without_changing_display_values
     assert [event.event_date for event in normalized[:3]] == ["2025", "2025-02", "2025-02-03"]
 
 ###############################################################################
+def test_timeline_uses_the_single_explicit_date_in_source_evidence() -> None:
+    extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
+    event = PatientTimelineEvent(
+        event_id="alt",
+        title="ALT 300 U/L",
+        event_type="lab",
+        event_date="2026-07-15",
+        source_evidence="2026-07-21 ALT 300 U/L.",
+    )
+
+    normalized = extractor.normalize_events([event])
+
+    assert normalized[0].event_date == "2026-07-21"
+
+###############################################################################
 def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
     client = FakeTimelineClient(PatientTimelineExtraction())
     extractor = PatientTimelineExtractor(client=client)

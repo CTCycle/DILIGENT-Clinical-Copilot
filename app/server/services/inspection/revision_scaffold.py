@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 from domain.inspection import SessionRevisionRequest
@@ -33,6 +32,22 @@ class InspectionRevisionScaffoldMixin:
     get_session_version_detail: Any
     get_job_status: Any
     cancel_job: Any
+
+    # -------------------------------------------------------------------------
+    def _run_revision_agent(self, **kwargs: Any) -> dict[str, Any]:
+        pipeline_run_id = str(kwargs["pipeline_run_id"])
+        job_id = str(kwargs["job_id"])
+        try:
+            result = self.revision_agent_runner.run_agentic(**kwargs)
+        except Exception:
+            self.serializer.fail_revision_run(
+                pipeline_run_id=pipeline_run_id,
+                error={"message": "Revision processing failed. Retry the revision if needed."},
+            )
+            raise
+        if self.jobs.should_stop(job_id):
+            self.serializer.cancel_revision_run(pipeline_run_id=pipeline_run_id)
+        return result
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -123,7 +138,7 @@ class InspectionRevisionScaffoldMixin:
         )
         job_id = self.jobs.start_job(
             job_type=self.REVISION_JOB_TYPE,
-            runner=self.revision_agent_runner.run_agentic,
+            runner=self._run_revision_agent,
             kwargs={
                 "pipeline_run_id": pipeline_run_id,
                 "revision_version_id": revision_version_id,
@@ -185,6 +200,10 @@ class InspectionRevisionScaffoldMixin:
         run = self.serializer.get_revision_run_by_job_id(job_id)
         if run is None:
             return None
+        self.serializer.fail_revision_run(
+            pipeline_run_id=str(run["pipeline_run_id"]),
+            error={"message": REVISION_JOB_MISSING_STATUS_MESSAGE},
+        )
         return {
             "job_id": job_id,
             "job_type": self.REVISION_JOB_TYPE,
@@ -209,19 +228,7 @@ class InspectionRevisionScaffoldMixin:
         run = self.serializer.get_revision_run_by_job_id(job_id)
         if run is not None:
             configuration = run.get("configuration")
-            self.serializer.create_or_update_revision_run(
-                pipeline_run_id=run["pipeline_run_id"],
-                session_id=int(run["session_id"]),
-                root_session_id=int(run["root_session_id"]),
-                source_version_id=int(run["source_version_id"]),
-                target_revision_version_id=run.get("target_revision_version_id"),
-                revision_mode=str(run["revision_mode"]),
-                revision_kind=str(run["revision_kind"]),
-                configuration=configuration if isinstance(configuration, dict) else {},
-                reviewer_note=run.get("reviewer_note"),
-                status="cancelled",
-                completed_at=datetime.now(UTC),
-            )
+            self.serializer.cancel_revision_run(pipeline_run_id=run["pipeline_run_id"])
         return True
 
     # -------------------------------------------------------------------------

@@ -103,3 +103,25 @@ def test_rejects_too_short_access_key() -> None:
         pass
     else:
         raise AssertionError("Expected short access key to be rejected")
+
+###############################################################################
+def test_rejects_placeholder_key_without_displacing_active_key() -> None:
+    serializer, factory = build_serializer()
+    active = serializer.create_key("openai", "sk-live-valid-secret-value")
+    serializer.activate_key(active.id, provider="openai")
+
+    from services.security.access_keys import AccessKeyService
+
+    service = AccessKeyService(serializer=serializer)
+    try:
+        service.create_access_key("openai", "sk-fake-temporary-placeholder-key")
+    except ValueError as exc:
+        assert "Openai" in str(exc)
+    else:
+        raise AssertionError("Expected placeholder key to be rejected")
+
+    with factory() as db_session:
+        rows = db_session.execute(
+            select(AccessKey).where(AccessKey.provider == "openai")
+        ).scalars().all()
+    assert [row.id for row in rows if row.is_active] == [active.id]

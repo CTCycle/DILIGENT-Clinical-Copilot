@@ -27,6 +27,7 @@ from services.llm.provider_factory import (
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATE_SHORT_RE = re.compile(r"^\d{4}-\d{2}$")
 DATE_YEAR_RE = re.compile(r"^\d{4}$")
+ISO_DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 
 ###############################################################################
 class PatientTimelineExtractor:
@@ -186,7 +187,17 @@ class PatientTimelineExtractor:
             if not item.source_evidence or not item.source_evidence.strip():
                 continue
             payload = item.model_dump()
-            payload["event_date"] = self.normalize_date_token(item.event_date)
+            evidence_dates = list(
+                dict.fromkeys(ISO_DATE_RE.findall(item.source_evidence or ""))
+            )
+            # An explicit source span is authoritative for a single dated event.
+            # This prevents a model from carrying a nearby lab date onto a different
+            # observation while retaining ambiguous multi-date evidence unchanged.
+            payload["event_date"] = (
+                evidence_dates[0]
+                if len(evidence_dates) == 1
+                else self.normalize_date_token(item.event_date)
+            )
             event = PatientTimelineEvent(
                 **payload,
             )
