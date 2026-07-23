@@ -9,7 +9,6 @@ from services.rag.vector_serializer import VectorSerializer
 from services.runtime.jobs import JobManager
 from repositories.serialization.data import DataSerializer
 
-
 ###############################################################################
 def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
 
@@ -61,7 +60,6 @@ def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
         time.sleep(0.01)
 
     assert "Embedded and persisted batch 2/4" in observed_messages
-
 
 ###############################################################################
 def test_batch_progress_scales_through_embedding_window() -> None:

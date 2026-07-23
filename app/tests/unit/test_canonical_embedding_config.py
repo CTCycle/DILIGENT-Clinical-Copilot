@@ -9,6 +9,7 @@ from common.embedding.config import (
 )
 
 
+###############################################################################
 def test_canonical_config_is_the_granite_contract() -> None:
     config = CANONICAL_EMBEDDING_CONFIG
 
@@ -25,11 +26,13 @@ def test_canonical_config_is_the_granite_contract() -> None:
     assert config.trust_remote_code is False
 
 
+###############################################################################
 def test_fingerprint_is_deterministic() -> None:
     assert canonical_embedding_fingerprint() == CANONICAL_EMBEDDING_CONFIG.fingerprint
     assert canonical_embedding_fingerprint() == canonical_embedding_fingerprint()
 
 
+###############################################################################
 def test_fingerprint_changes_for_every_semantic_field() -> None:
     config = CANONICAL_EMBEDDING_CONFIG
     fields = (
@@ -66,6 +69,7 @@ def test_fingerprint_changes_for_every_semantic_field() -> None:
         assert replace(config, **{field: changed}).fingerprint != config.fingerprint
 
 
+###############################################################################
 def test_config_is_frozen() -> None:
     config = CanonicalEmbeddingConfig(**CANONICAL_EMBEDDING_CONFIG.to_canonical_dict())
 

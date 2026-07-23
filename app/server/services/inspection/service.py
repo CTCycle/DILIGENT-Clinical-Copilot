@@ -550,6 +550,20 @@ class DataInspectionService(
         return status_payload
 
     # -------------------------------------------------------------------------
+    def _report_timeline_progress(
+        self,
+        job_id: str,
+        session_id: int,
+        progress: float,
+        message: str,
+    ) -> None:
+        self.jobs.update_progress(job_id, progress)
+        self.jobs.update_result(
+            job_id,
+            {"session_id": int(session_id), "progress_message": message},
+        )
+
+    # -------------------------------------------------------------------------
     def run_session_timeline_job(
         self,
         session_id: int,
@@ -558,18 +572,13 @@ class DataInspectionService(
         model_overrides: Any = None,
         job_id: str,
     ) -> dict[str, Any]:
-        def report_progress(progress: float, message: str) -> None:
-            self.jobs.update_progress(job_id, progress)
-            self.jobs.update_result(
-                job_id,
-                {"session_id": int(session_id), "progress_message": message},
-            )
-
         timeline = self.generate_session_timeline(
             session_id,
             force_regenerate=force_regenerate,
             model_overrides=model_overrides,
-            progress_callback=report_progress,
+            progress_callback=lambda p, m: self._report_timeline_progress(
+                job_id, session_id, p, m
+            ),
         )
         if timeline is None:
             raise RuntimeError("Session not found.")

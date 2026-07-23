@@ -7,6 +7,7 @@ from common.embedding.manifest import (
 )
 
 
+###############################################################################
 def test_manifest_contains_strict_canonical_metadata() -> None:
     manifest = build_embedding_index_manifest(
         generation_id="generation-1",
@@ -25,6 +26,7 @@ def test_manifest_contains_strict_canonical_metadata() -> None:
     assert manifest["embedding_fingerprint"] != CANONICAL_EMBEDDING_CONFIG.fingerprint
 
 
+###############################################################################
 def test_mismatched_manifest_is_rejected() -> None:
     manifest = build_embedding_index_manifest(
         generation_id="generation-1",

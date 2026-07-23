@@ -20,7 +20,6 @@ from repositories.serialization.application_configuration import (
 ModelRoleType = Literal["clinical", "text_extraction", "cloud"]
 UNSET = object()
 
-
 ###############################################################################
 class ModelConfigSerializer:
     """Persist the validated model configuration as one singleton document."""
@@ -178,11 +177,13 @@ class ModelConfigSerializer:
         normalized = str(value).strip()
         return normalized or None
 
+    # -------------------------------------------------------------------------
     @classmethod
     def migrate_rag_settings(cls, value: object) -> dict[str, object]:
         source = value if isinstance(value, dict) else {}
         return {key: source[key] for key in cls.RAG_OPERATIONAL_FIELDS if key in source}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def mark_index_reindex_required() -> None:
         manifest_path = VECTOR_DB_PATH / "rag_index_manifest.json"

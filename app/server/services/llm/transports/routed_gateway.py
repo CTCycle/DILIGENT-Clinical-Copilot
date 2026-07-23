@@ -5,14 +5,9 @@ import hashlib
 from datetime import UTC, datetime, timedelta
 
 from domain.llm.providers import CloudModelDescriptor
+from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
 from services.llm.transports.anthropic_messages import AnthropicMessagesTransport
-from services.llm.transports.base import (
-    ChatRequest,
-    ChatResult,
-    CloudTransport,
-    ConnectivityResult,
-    StructuredTransportMixin,
-)
+from services.llm.transports.base import CloudTransport, StructuredTransportMixin
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
 

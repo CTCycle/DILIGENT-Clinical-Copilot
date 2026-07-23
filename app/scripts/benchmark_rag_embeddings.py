@@ -23,6 +23,7 @@ from services.retrieval.embedding_runtime import (  # noqa: E402
 )  # noqa: E402
 
 
+###############################################################################
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", type=Path, required=True)
@@ -114,6 +115,7 @@ def main() -> int:
     )
 
 
+###############################################################################
 def _version(package: str) -> str:
     try:
         return importlib.metadata.version(package)
