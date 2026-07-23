@@ -35,7 +35,6 @@ from common.paths import (
 from configurations.startup import (
     get_server_settings,
     initialize_settings,
-    tauri_mode_enabled,
 )
 from repositories.database.initializer import initialize_database
 from services.startup_validation import run_startup_validations
@@ -44,7 +43,7 @@ from services.retrieval.embedding_runtime import close_embedding_runtime
 
 ###############################################################################
 def _client_build_available() -> bool:
-    return tauri_mode_enabled() and CLIENT_INDEX_FILE_PATH.is_file()
+    return CLIENT_INDEX_FILE_PATH.is_file()
 
 
 ###############################################################################

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 from pathlib import Path
 from threading import RLock
 from typing import Any
 
 from common import paths
-from common.constants import TRUTHY_ENV_VALUES
 from common.utils.logger import configure_logging
 from configurations.environment import (
     ensure_environment_loaded,
@@ -76,11 +74,6 @@ def reset_app_settings_cache() -> None:
         state.manager = None
 
 ###############################################################################
-def tauri_mode_enabled() -> bool:
-    value = (os.getenv("DILIGENT_TAURI_MODE") or "").strip().lower()
-    return value in TRUTHY_ENV_VALUES
-
-###############################################################################
 def initialize_settings() -> None:
     configure_logging()
     get_server_settings()
@@ -98,5 +91,4 @@ __all__ = [
     "reload_settings_for_tests",
     "reset_app_settings_cache",
     "reset_environment_bootstrap_for_tests",
-    "tauri_mode_enabled",
 ]
