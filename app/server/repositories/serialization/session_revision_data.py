@@ -920,6 +920,13 @@ def update_current_report_text_with_manual_audit(
         current_version = db_session.get(ClinicalSessionVersion, int(current_version_id))
         if current_version is None:
             raise RuntimeError("Current session version disappeared during manual edit")
+        root_version_count = db_session.execute(
+            select(func.max(ClinicalSessionVersion.version_number)).where(
+                ClinicalSessionVersion.root_session_id
+                == int(current_version.root_session_id)
+            )
+        ).scalar_one_or_none()
+        next_version_number = int(root_version_count or current_version.version_number) + 1
         current_version.version_status = "superseded"
         edit_metadata = {
             "manual_edit_audit": {
@@ -940,7 +947,7 @@ def update_current_report_text_with_manual_audit(
                 session_id=safe_session_id,
                 root_session_id=int(current_version.root_session_id),
                 source_version_id=int(current_version.id),
-                version_number=int(current_version.version_number) + 1,
+                version_number=next_version_number,
                 version_status="current",
                 revision_kind="manual_edit",
                 llm_qa_status="not_run",
