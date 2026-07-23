@@ -614,3 +614,66 @@ def test_provider_catalog_uses_last_successful_models_when_refresh_fails(monkeyp
     assert [item.id for item in deepseek.models] == ["deepseek-model"]
     assert deepseek.catalog_message == "Showing models from the last successful provider refresh."
     ModelConfigService._provider_catalog_cache.clear()
+
+
+###############################################################################
+def test_cloud_runtime_uses_cloud_model_when_role_models_are_local() -> None:
+    with LLMRuntimeConfig.override_for_run(
+        {
+            "use_cloud_models": True,
+            "cloud_provider": "openai",
+            "cloud_model": "gpt-4.1-mini",
+            "clinical_model": "gpt-oss:20b",
+            "text_extraction_model": "qwen3:8b",
+        }
+    ):
+        assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
+            "openai",
+            "gpt-4.1-mini",
+        )
+        assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
+            "openai",
+            "gpt-4.1-mini",
+        )
+
+
+###############################################################################
+def test_cloud_runtime_preserves_valid_cloud_role_override() -> None:
+    with LLMRuntimeConfig.override_for_run(
+        {
+            "use_cloud_models": True,
+            "cloud_provider": "openai",
+            "cloud_model": "gpt-4.1-mini",
+            "clinical_model": "gpt-4.1",
+            "text_extraction_model": "gpt-4.1-mini",
+        }
+    ):
+        assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
+            "openai",
+            "gpt-4.1",
+        )
+        assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
+            "openai",
+            "gpt-4.1-mini",
+        )
+
+
+###############################################################################
+def test_cloud_runtime_accepts_persisted_cloud_role_models(monkeypatch) -> None:
+    snapshot = ModelConfigSnapshot(
+        use_cloud_models=True,
+        cloud_provider="openai",
+        cloud_model="gpt-4.1-mini",
+        clinical_model="gpt-4.1-mini",
+        text_extraction_model="gpt-4.1-mini",
+    )
+    monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: snapshot)
+
+    assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
+        "openai",
+        "gpt-4.1-mini",
+    )
+    assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
+        "openai",
+        "gpt-4.1-mini",
+    )

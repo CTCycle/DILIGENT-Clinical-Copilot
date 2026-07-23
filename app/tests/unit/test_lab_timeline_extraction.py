@@ -8,8 +8,11 @@ from domain.clinical import (
     LiverInjuryOnsetContext,
     PatientData,
 )
+from domain.clinical.extractor_contracts import HepaticPatternResolutionInput
 from domain.clinical.extras import LabExtractionPayload
 from services.clinical.labs import ClinicalLabExtractor
+from services.clinical.extraction_strategy import decide_extraction_strategy
+from services.clinical.pattern_resolution import resolve_hepatic_pattern
 
 ###############################################################################
 class FakeLabClient:
@@ -304,3 +307,60 @@ def test_case_style_lab_lines_extract_multiple_grounded_values() -> None:
         174.0,
         432.0,
     }
+
+###############################################################################
+def test_strategy_selects_deterministic_hybrid_and_llm() -> None:
+    deterministic = decide_extraction_strategy(
+        section="therapy",
+        meaningful_line_count=3,
+        parsed_line_count=3,
+        unresolved_line_count=0,
+        evidence_span_count=3,
+    )
+    hybrid = decide_extraction_strategy(
+        section="therapy",
+        meaningful_line_count=4,
+        parsed_line_count=2,
+        unresolved_line_count=2,
+        evidence_span_count=2,
+    )
+    llm = decide_extraction_strategy(
+        section="laboratory_history",
+        meaningful_line_count=4,
+        parsed_line_count=0,
+        unresolved_line_count=4,
+        evidence_span_count=0,
+    )
+
+    assert deterministic.strategy == "deterministic"
+    assert hybrid.strategy == "hybrid"
+    assert llm.strategy == "llm"
+    assert deterministic.reasons
+
+###############################################################################
+def test_explicit_pattern_is_preserved_without_overwriting_calculated_value() -> None:
+    result = resolve_hepatic_pattern(
+        HepaticPatternResolutionInput(
+            explicit_pattern="mixed",
+            calculated_pattern="hepatocellular",
+            r_score=6.2,
+        )
+    )
+
+    assert result.final_value == "mixed"
+    assert result.calculated_value == "hepatocellular"
+    assert result.source == "provided"
+    assert result.conflict is True
+    assert result.warnings[0].code == "hepatic_pattern_source_calculation_conflict"
+
+###############################################################################
+def test_calculated_and_indeterminate_pattern_resolution() -> None:
+    calculated = resolve_hepatic_pattern(
+        HepaticPatternResolutionInput(calculated_pattern="cholestatic")
+    )
+    missing = resolve_hepatic_pattern(HepaticPatternResolutionInput())
+
+    assert calculated.final_value == "cholestatic"
+    assert calculated.source == "calculated"
+    assert missing.final_value == "indeterminate"
+    assert missing.source == "undetermined"
