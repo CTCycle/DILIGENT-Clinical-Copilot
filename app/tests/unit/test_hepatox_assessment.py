@@ -23,7 +23,12 @@ from domain.clinical import (
     RucamComponentAssessment,
 )
 from services.clinical.drug_analysis import DrugAnalysisService
-from services.clinical.analysis_runner import AnalysisRunner
+from services.clinical.analysis_runner import (
+    AnalysisRunner,
+    assess_pattern_compatibility,
+    assess_temporal_plausibility,
+    summarize_drug_source_context,
+)
 from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
 from services.clinical.report_finalizer import ReportFinalizer
@@ -617,3 +622,112 @@ def test_remove_redundant_report_sentence_truncates_structured_dili_section() ->
     cleaned = HepatoxConsultation.remove_redundant_report_sentence(raw)
 
     assert cleaned == "Clinical narrative before appendix."
+
+###############################################################################
+def test_source_text_evidence_produces_high_confidence_claim() -> None:
+    narrative = AnalysisRunner.build_clinical_narrative(
+        drug_name="Amoxicillin",
+        excerpts=["Patient started amoxicillin before ALT increase."],
+        rucam=None,
+        missing_livertox=False,
+        evidence_warnings=[],
+    )
+
+    assert narrative.claims[0].source == "source_text"
+    assert (
+        narrative.claims[0].evidence_quote
+        == "Patient started amoxicillin before ALT increase."
+    )
+    assert narrative.claims[0].confidence == "high"
+    assert narrative.claims[0].requires_review is False
+
+###############################################################################
+def test_long_source_text_evidence_is_truncated_for_claim_quote() -> None:
+    long_excerpt = "OVERVIEW " + ("Abiraterone liver injury evidence. " * 80)
+
+    narrative = AnalysisRunner.build_clinical_narrative(
+        drug_name="Abiraterone",
+        excerpts=[long_excerpt],
+        rucam=None,
+        missing_livertox=False,
+        evidence_warnings=[],
+    )
+
+    evidence_quote = narrative.claims[0].evidence_quote
+    assert evidence_quote is not None
+    assert len(evidence_quote) <= 1000
+    assert evidence_quote.endswith("[truncated]")
+    assert long_excerpt.startswith(evidence_quote.removesuffix(" [truncated]"))
+
+###############################################################################
+def test_blank_source_text_evidence_falls_back_to_review_claim() -> None:
+    narrative = AnalysisRunner.build_clinical_narrative(
+        drug_name="Abiraterone",
+        excerpts=["   \n\t  "],
+        rucam=None,
+        missing_livertox=False,
+        evidence_warnings=[],
+    )
+
+    assert narrative.claims[0].source == "unknown"
+    assert narrative.claims[0].evidence_quote is None
+    assert narrative.claims[0].confidence == "low"
+    assert narrative.claims[0].requires_review is True
+
+###############################################################################
+def test_missing_evidence_claim_requires_review_and_renders_warning() -> None:
+    narrative = AnalysisRunner.build_clinical_narrative(
+        drug_name="Unknown Herb",
+        excerpts=[],
+        rucam=DrugRucamAssessment(
+            drug_name="Unknown Herb",
+            total_score=None,
+            causality_category="not assessable",
+            confidence="low",
+            calculation_method="structured_rucam",
+            limitations=["insufficient follow-up labs"],
+            data_sufficient=False,
+        ),
+        missing_livertox=True,
+        evidence_warnings=["missing_livertox_match"],
+    )
+    entry = DrugClinicalAssessment(
+        drug_name="Unknown Herb",
+        match_status="missing_match",
+        evidence_quality="weak",
+        claims=narrative.claims,
+        narrative=narrative,
+    )
+
+    assert narrative.claims[0].source == "unknown"
+    assert narrative.claims[0].confidence == "low"
+    assert narrative.claims[0].requires_review is True
+    assert all(claim.confidence != "high" for claim in narrative.claims)
+    rendered = HepatoxConsultation.render_clinical_commentary(entry)
+    assert "Clinical commentary" in rendered
+    assert "Clinical review is required" in rendered
+    assert "insufficient follow-up labs" in rendered
+
+###############################################################################
+def test_summarize_drug_source_context_uses_entry_source() -> None:
+    therapy = DrugEntry(name="Drug A", source="therapy")
+    anamnesis = DrugEntry(name="Drug B", source="anamnesis")
+    assert "therapy" in summarize_drug_source_context(therapy).lower()
+    assert "anamnesis" in summarize_drug_source_context(anamnesis).lower()
+
+###############################################################################
+def test_temporal_plausibility_reflects_available_timing_fields() -> None:
+    rich = DrugEntry(
+        name="Drug A",
+        therapy_start_date="2026-01-01",
+        suspension_status=True,
+    )
+    poor = DrugEntry(name="Drug B")
+    assert "sequence" in assess_temporal_plausibility(rich, None).lower()
+    assert "limited" in assess_temporal_plausibility(poor, None).lower()
+
+###############################################################################
+def test_pattern_compatibility_handles_missing_excerpt() -> None:
+    entry = DrugEntry(name="Drug A")
+    message = assess_pattern_compatibility(entry, "mixed", None)
+    assert "unavailable" in message.lower()

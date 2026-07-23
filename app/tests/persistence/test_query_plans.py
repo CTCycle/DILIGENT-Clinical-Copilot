@@ -14,7 +14,9 @@ def test_session_timestamp_index_is_used_by_listing_plan(persistence_engine) -> 
                 )
             ).fetchall()
             rendered = " ".join(str(row) for row in plan).upper()
-            assert "INDEX" in rendered or "SCAN" in rendered
+            assert "USING" in rendered and "INDEX" in rendered, (
+                f"Expected index scan but plan is:\n{rendered}"
+            )
         else:
             plan = connection.execute(
                 text(
@@ -22,4 +24,7 @@ def test_session_timestamp_index_is_used_by_listing_plan(persistence_engine) -> 
                     "ORDER BY session_timestamp DESC, id DESC"
                 )
             ).fetchall()
-            assert plan
+            rendered = " ".join(str(row) for row in plan).upper()
+            assert "INDEX SCAN" in rendered or "INDEX ONLY SCAN" in rendered or "INDEX" in rendered, (
+                f"Expected index usage but plan is:\n{rendered}"
+            )

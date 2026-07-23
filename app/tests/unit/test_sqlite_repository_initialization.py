@@ -90,3 +90,40 @@ def test_sqlite_repository_does_not_seed_catalogs_during_construction(
     finally:
         engine.dispose()
         shutil.rmtree(temp_root, ignore_errors=True)
+
+
+###############################################################################
+def test_sqlite_repository_exposes_orm_session_factory(
+    monkeypatch, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(
+        "repositories.database.sqlite.DATABASE_FILE_PATH",
+        tmp_path / "orm_reads.db",
+    )
+    repository = SQLiteRepository(_build_settings())
+
+    with repository.session_factory() as db_session:
+        db_session.add(
+            ApplicationConfiguration(
+                payload={
+                    "clinical_model": "llama3.1:8b",
+                    "text_extraction_model": "llama3.1:8b",
+                    "use_cloud_models": True,
+                    "cloud_provider": "openai",
+                    "cloud_model": "gpt-4.1-mini",
+                }
+            )
+        )
+        db_session.commit()
+
+    with repository.session_factory() as db_session:
+        loaded = (
+            db_session.execute(
+                select(ApplicationConfiguration)
+            )
+            .scalars()
+            .all()
+        )
+
+    assert len(loaded) == 1
+    assert loaded[0].payload["clinical_model"] == "llama3.1:8b"

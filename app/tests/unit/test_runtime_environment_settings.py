@@ -64,14 +64,3 @@ def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(
 
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     reset_app_settings_cache()
-
-###############################################################################
-def test_ui_owned_json_keys_are_ignored(monkeypatch, tmp_path) -> None:
-    config_path = tmp_path / "configurations.json"
-    config_path.write_text(
-        json.dumps({"llm_defaults": {"cloud_model": "gpt-5-mini"}}),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(paths, "CONFIGURATIONS_FILE", config_path)
-
-    reset_app_settings_cache()
