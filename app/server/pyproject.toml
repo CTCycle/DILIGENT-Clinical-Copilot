@@ -25,9 +25,9 @@ dependencies = [
     "anthropic==0.84.0",
     "google-genai==1.53.0",
     "lancedb==0.30.2",
-    "sentence-transformers==5.6.0",
-    "torch==2.13.0",
-    "safetensors>=0.5.3",
+    "numpy==2.5.1",
+    "onnxruntime==1.27.0",
+    "tokenizers==0.23.1",
     "huggingface-hub>=0.36.0",
     "openpyxl==3.1.5",    
 ]

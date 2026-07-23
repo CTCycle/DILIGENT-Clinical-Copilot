@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled automatic generation policy immediately before each LLM call.
@@ -55,7 +55,7 @@ authentication, and provider-side errors still fail promptly.
 - Catalog seeding is hash-checked and incremental on normal startup.
 
 ## RAG Defaults
-- The default Ollama embedding model is pinned in `settings/configurations.json` and should not use a mutable `:latest` tag.
+- RAG uses `ibm-granite/granite-embedding-97m-multilingual-r2` at the pinned revision and AVX2 quantized ONNX artifact declared in `app/server/common/embedding/config.py`.
 - `reset_vector_collection` defaults to `false` and should only be enabled for explicit maintenance or rebuild operations.
 ## Database configuration
 
@@ -96,4 +96,4 @@ versioned Fernet material used to decrypt the `access_keys` ciphertext; it must
 not be committed, copied into a database backup, or exposed through logs.
 ## RAG embedding runtime
 
-RAG uses ibm-granite/granite-embedding-small-english-r2 at the pinned revision declared in app/server/common/embedding/config.py. The model is downloaded lazily into app/resources/models/embeddings, loaded once per process, and is independent of the configured generation provider. A complete local snapshot is required for offline use; changing the model contract requires a controlled index rebuild.
+The multilingual Granite ONNX snapshot is downloaded lazily into `app/resources/models/embeddings/<revision>/` and loaded once per process with `onnxruntime` and `CPUExecutionProvider`. There is no backend or artifact fallback, and no PyTorch requirement. Offline mode requires a complete verified snapshot; changing the model contract requires a full vector-store rebuild. Readiness is available only after the pinned artifact digest validates.

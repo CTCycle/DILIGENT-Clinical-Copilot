@@ -71,7 +71,6 @@ class RagSettings(BaseModel):
     vector_index_metric: str
     vector_index_type: str
     vector_stream_batch_size: int
-    embedding_device: str
     embedding_offline_mode: bool
 
 ###############################################################################

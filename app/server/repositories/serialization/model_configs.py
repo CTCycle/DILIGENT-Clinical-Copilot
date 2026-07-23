@@ -20,6 +20,7 @@ from repositories.serialization.application_configuration import (
 ModelRoleType = Literal["clinical", "text_extraction", "cloud"]
 UNSET = object()
 
+
 ###############################################################################
 class ModelConfigSerializer:
     """Persist the validated model configuration as one singleton document."""
@@ -50,7 +51,6 @@ class ModelConfigSerializer:
             "hybrid_vector_weight",
             "hybrid_text_weight",
             "vector_stream_batch_size",
-            "embedding_device",
             "embedding_offline_mode",
         }
     )
@@ -128,9 +128,7 @@ class ModelConfigSerializer:
         current["ollama_seed"] = self.normalize_optional_seed(
             current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
         )
-        current["rag_settings"] = (
-            self.migrate_rag_settings(current.get("rag_settings"))
-        )
+        current["rag_settings"] = self.migrate_rag_settings(current.get("rag_settings"))
         self.application_configuration.save(
             current, schema_version=self.MODEL_CONFIG_PAYLOAD_SCHEMA_VERSION
         )
@@ -183,11 +181,7 @@ class ModelConfigSerializer:
     @classmethod
     def migrate_rag_settings(cls, value: object) -> dict[str, object]:
         source = value if isinstance(value, dict) else {}
-        return {
-            key: source[key]
-            for key in cls.RAG_OPERATIONAL_FIELDS
-            if key in source
-        }
+        return {key: source[key] for key in cls.RAG_OPERATIONAL_FIELDS if key in source}
 
     @staticmethod
     def mark_index_reindex_required() -> None:
@@ -202,7 +196,7 @@ class ModelConfigSerializer:
                     json.dumps(payload, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             logger.warning("Unable to mark the existing RAG manifest for reindexing")
 
     # -------------------------------------------------------------------------
@@ -213,5 +207,5 @@ class ModelConfigSerializer:
             return None
         try:
             return max(0, int(str(value).strip()))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None

@@ -12,6 +12,7 @@ from configurations.startup import get_server_settings
 from domain.settings.configuration import RagSettings
 from repositories.serialization.model_configs import ModelConfigSerializer
 
+
 ###############################################################################
 def _runtime_rag_settings() -> dict[str, object]:
     try:
@@ -19,6 +20,7 @@ def _runtime_rag_settings() -> dict[str, object]:
     except Exception:
         return {}
     return dict(snapshot.rag_settings or {})
+
 
 ###############################################################################
 def build_effective_rag_settings(
@@ -67,14 +69,12 @@ def build_effective_rag_settings(
             "vector_stream_batch_size": coerce_positive_int(
                 data.get("vector_stream_batch_size"), base.vector_stream_batch_size
             ),
-            "embedding_device": coerce_str(
-                data.get("embedding_device"), base.embedding_device
-            ),
             "embedding_offline_mode": coerce_bool(
                 data.get("embedding_offline_mode"), base.embedding_offline_mode
             ),
         }
     )
+
 
 ###############################################################################
 def rag_settings_payload(settings: RagSettings | None = None) -> dict[str, Any]:
@@ -91,6 +91,5 @@ def rag_settings_payload(settings: RagSettings | None = None) -> dict[str, Any]:
         "hybrid_vector_weight": resolved.hybrid_vector_weight,
         "hybrid_text_weight": resolved.hybrid_text_weight,
         "vector_stream_batch_size": resolved.vector_stream_batch_size,
-        "embedding_device": resolved.embedding_device,
         "embedding_offline_mode": resolved.embedding_offline_mode,
     }

@@ -19,7 +19,7 @@ def test_rag_readiness_reports_missing_local_cache(monkeypatch) -> None:
 
     assert result.available is False
     assert result.reason_code == "rag_embedding_cache_missing"
-    assert result.backend == "sentence-transformers"
+    assert result.backend == "onnxruntime"
 
 
 def test_rag_readiness_accepts_complete_local_cache(monkeypatch) -> None:
@@ -34,7 +34,7 @@ def test_rag_readiness_accepts_complete_local_cache(monkeypatch) -> None:
     result = readiness.check_rag_readiness(requested=True)
 
     assert result.available is True
-    assert result.backend == "sentence-transformers"
+    assert result.backend == "onnxruntime"
     assert result.model == CANONICAL_EMBEDDING_CONFIG.model_id
 
 

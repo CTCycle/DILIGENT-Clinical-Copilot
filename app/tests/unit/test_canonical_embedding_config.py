@@ -12,8 +12,13 @@ from common.embedding.config import (
 def test_canonical_config_is_the_granite_contract() -> None:
     config = CANONICAL_EMBEDDING_CONFIG
 
-    assert config.model_id == "ibm-granite/granite-embedding-small-english-r2"
-    assert config.revision == "2ab6fa8ea2d674564defd37171ae19079b864b33"
+    assert config.model_id == "ibm-granite/granite-embedding-97m-multilingual-r2"
+    assert config.revision == "c61e626a6255c490879d0af885078b61929d51f6"
+    assert config.runtime_backend == "onnxruntime"
+    assert config.artifact_path == "onnx/model_quint8_avx2.onnx"
+    assert config.quantization == "uint8-avx2"
+    assert config.execution_provider == "CPUExecutionProvider"
+    assert config.maximum_model_tokens == 32768
     assert config.dimension == 384
     assert config.pooling == "cls"
     assert config.normalize is True
@@ -31,6 +36,11 @@ def test_fingerprint_changes_for_every_semantic_field() -> None:
         "schema_version",
         "model_id",
         "revision",
+        "runtime_backend",
+        "artifact_path",
+        "artifact_sha256",
+        "quantization",
+        "execution_provider",
         "dimension",
         "pooling",
         "normalize",
