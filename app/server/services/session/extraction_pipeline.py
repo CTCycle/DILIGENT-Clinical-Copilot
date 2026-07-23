@@ -621,7 +621,6 @@ class ClinicalSessionExtractionPipelineMixin:
             float(runtime.cloud_llm_timeout_cap)
             if LLMRuntimeConfig.is_cloud_enabled()
             else float(runtime.local_llm_timeout_cap),
-            120.0,
         )
         try:
             prepared_inputs = await asyncio.wait_for(
