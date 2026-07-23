@@ -172,7 +172,7 @@ def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
         response = client.post(
             "/api/access-keys",
-            json={"provider": "openai", "access_key": "sk-test-value-secret"},
+            json={"provider": "openai", "access_key": "sk-live-value-secret"},
         )
 
     assert response.status_code == 503

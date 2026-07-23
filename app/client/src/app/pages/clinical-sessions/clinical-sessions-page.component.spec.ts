@@ -13,6 +13,10 @@ describe('ClinicalSessionsPage revision template', () => {
       resolve(__dirname, './components/clinical-session-editor-toolbar.component.ts'),
       'utf-8',
     );
+    const componentSource = readFileSync(
+      resolve(__dirname, './clinical-sessions-page.component.ts'),
+      'utf-8',
+    );
 
     expect(template).toContain('clinical-session-revision-model-panel');
     expect(template).toContain('Revision model');
@@ -23,6 +27,8 @@ describe('ClinicalSessionsPage revision template', () => {
     expect(template).toContain('metadataSaveStatus()');
     expect(template).toContain('linkDialogOpen()');
     expect(template).toContain('aria-label="Link URL"');
+    expect(template).toContain('revisionReviewAvailable()');
+    expect(componentSource).toContain("clinical_review_status: status === 'approved' ? 'approved_by_human' : 'rejected_by_human'");
     expect(toolbarTemplate).toContain('Save manual report edit');
     expect(toolbarTemplate).toContain('role="toolbar"');
     expect(template).not.toContain('Reviewer name');

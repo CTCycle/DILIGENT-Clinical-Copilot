@@ -615,7 +615,7 @@ export type RevisionArtifact = {
 export type RevisionArtifactListResponse = { items: RevisionArtifact[] };
 
 export type RevisionClinicalReviewUpdateRequest = {
-  clinical_review_status: "approved" | "rejected";
+  clinical_review_status: "under_review" | "approved_by_human" | "rejected_by_human";
   reviewer_note?: string | null;
   reviewed_by?: string | null;
   metadata?: Record<string, unknown>;
