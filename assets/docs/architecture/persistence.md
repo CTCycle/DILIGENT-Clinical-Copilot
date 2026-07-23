@@ -57,7 +57,7 @@ app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-resee
 ## Vector Persistence
 - LanceDB collection under `app/resources/sources/vectors`
 - RAG retrieval uses vector search, LanceDB full-text search, metadata-aware fusion, and lightweight local heuristic reranking profiles.
-- Default runtime configuration pins the Ollama embedding model to an immutable tag and keeps vector collection reset disabled unless explicitly requested.
+- RAG uses the immutable Granite embedding contract in common/embedding/config.py. Index generations carry a versioned manifest and exact embedding fingerprint; legacy or mismatched collections are not queryable.
 
 ## Filesystem Resources
 - `app/resources/sources`

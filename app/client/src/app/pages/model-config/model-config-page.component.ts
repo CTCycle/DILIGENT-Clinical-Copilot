@@ -91,15 +91,9 @@ const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
   reranker_model: 'lightweight-balanced-v1',
   hybrid_vector_weight: 0.7,
   hybrid_text_weight: 0.3,
-  embedding_backend: 'ollama',
-  ollama_embedding_model: 'nomic-embed-text:v1.5',
-  hf_embedding_model: '',
-  cloud_provider: 'openai',
-  cloud_embedding_model: 'text-embedding-3-small',
-  use_cloud_embeddings: false,
-  reset_vector_collection: false,
   vector_stream_batch_size: 250,
-  embedding_max_workers: 4,
+  embedding_device: 'auto',
+  embedding_offline_mode: false,
 };
 
 function isCloudProvider(provider: string): provider is CloudProvider {
@@ -153,7 +147,8 @@ export class ModelConfigPageComponent implements OnInit {
   readonly draftRagSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
   readonly ragSettingsModalOpen = signal(false);
   readonly activeRagSettingsSection = signal<RagSettingsSectionKey>(DEFAULT_RAG_SETTINGS_SECTION);
-  readonly ragModel = signal<string | null>(null);
+  readonly embeddingRuntime = signal<ModelConfigStateResponse['embedding_runtime'] | null>(null);
+  readonly embeddingIndex = signal<ModelConfigStateResponse['embedding_index'] | null>(null);
   readonly activeFilters = signal<Record<ModelFilterKey, boolean>>({
     installed: false,
     missing: false,
@@ -251,12 +246,7 @@ export class ModelConfigPageComponent implements OnInit {
 
   readonly reasoningLevel = computed(() => this.previewReasoningLevel());
   readonly reasoningEnabled = computed(() => this.reasoningLevel() > 0);
-  readonly currentRagModelLabel = computed(() => {
-    if (this.isLoading() && !this.ragModel()) {
-      return 'Loading RAG model...';
-    }
-    return this.ragModel() || 'Not vectorized';
-  });
+  readonly currentRagModelLabel = computed(() => this.embeddingRuntime()?.model_display_name || 'Granite Embedding Small English R2');
   readonly ragSettingsValidationMessage = computed(() => {
     const draft = this.draftRagSettings();
     if (draft.retrieval_candidate_count < 1) {
@@ -396,7 +386,8 @@ export class ModelConfigPageComponent implements OnInit {
     this.localModels.set(payload.local_models || []);
     this.cloudProviders.set(payload.cloud_providers || []);
     this.lastUpdatedAt.set(payload.updated_at);
-    this.ragModel.set(payload.rag_model || null);
+    this.embeddingRuntime.set(payload.embedding_runtime);
+    this.embeddingIndex.set(payload.embedding_index);
     const nextRagSettings = this.normalizeRagSettings(payload.rag_settings);
     this.ragSettings.set(nextRagSettings);
     if (!this.ragSettingsModalOpen()) {
@@ -463,10 +454,6 @@ export class ModelConfigPageComponent implements OnInit {
       vector_stream_batch_size: this.coercePositiveInteger(
         settings?.vector_stream_batch_size,
         DEFAULT_RAG_SETTINGS.vector_stream_batch_size,
-      ),
-      embedding_max_workers: this.coercePositiveInteger(
-        settings?.embedding_max_workers,
-        DEFAULT_RAG_SETTINGS.embedding_max_workers,
       ),
     };
   }
@@ -564,7 +551,6 @@ export class ModelConfigPageComponent implements OnInit {
       | 'retrieval_candidate_count'
       | 'retrieval_selected_count'
       | 'vector_stream_batch_size'
-      | 'embedding_max_workers'
     >,
     value: string,
   ): void {
@@ -579,11 +565,7 @@ export class ModelConfigPageComponent implements OnInit {
     key: keyof Pick<
       DraftRagSettings,
       | 'reranker_model'
-      | 'embedding_backend'
-      | 'ollama_embedding_model'
-      | 'hf_embedding_model'
-      | 'cloud_provider'
-      | 'cloud_embedding_model'
+      | 'embedding_device'
     >,
     value: string,
   ): void {
@@ -596,7 +578,7 @@ export class ModelConfigPageComponent implements OnInit {
   setDraftRagBoolean(
     key: keyof Pick<
       DraftRagSettings,
-      'use_hybrid_search' | 'use_reranking' | 'use_cloud_embeddings' | 'reset_vector_collection'
+      'use_hybrid_search' | 'use_reranking' | 'embedding_offline_mode'
     >,
     value: boolean,
   ): void {

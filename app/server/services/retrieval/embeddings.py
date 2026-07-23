@@ -10,6 +10,8 @@ from typing import Any, Literal, Protocol, cast
 import httpx
 
 from common.catalogs.model_choices import get_cloud_model_choices
+from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
+from common.embedding.manifest import read_active_collection_name
 from common.paths import VECTOR_DB_PATH
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
@@ -22,6 +24,7 @@ from common.utils.embedding_model import (
     build_embedding_model_signature,
 )
 from services.retrieval.settings import build_effective_rag_settings
+from services.retrieval.embedding_runtime import get_embedding_runtime
 
 ProviderName = Literal["openai", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]
@@ -461,6 +464,28 @@ class EmbeddingGenerator:
                 asyncio.set_event_loop(previous_loop)
         return loop.run_until_complete(coroutine)
 
+
+class CanonicalEmbeddingGenerator:
+    """Synchronous adapter over the shared local embedding runtime."""
+
+    def __init__(self) -> None:
+        self.runtime = get_embedding_runtime()
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        return self.runtime.embed_documents(texts)
+
+    def embed_queries(self, texts: list[str]) -> list[list[float]]:
+        return self.runtime.embed_queries(texts)
+
+    def resolve_active_embedding_model_spec(self) -> EmbeddingModelSpec:
+        return EmbeddingModelSpec(
+            provider="sentence-transformers",
+            model_name=CANONICAL_EMBEDDING_CONFIG.model_id,
+            dimension=CANONICAL_EMBEDDING_CONFIG.dimension,
+            mode="canonical",
+            signature=CANONICAL_EMBEDDING_CONFIG.fingerprint,
+        )
+
 ###############################################################################
 class SimilaritySearch:
 
@@ -482,21 +507,17 @@ class SimilaritySearch:
             1,
         )
         self.reranker: Reranker | None = None
+        active_collection_name = read_active_collection_name(
+            str(rag_settings.vector_collection_name)
+        )
         self.vector_database = vector_database or LanceVectorDatabase(
             database_path=str(VECTOR_DB_PATH),
-            collection_name=rag_settings.vector_collection_name,
+            collection_name=active_collection_name,
             metric=rag_settings.vector_index_metric,
             index_type=rag_settings.vector_index_type,
             stream_batch_size=rag_settings.vector_stream_batch_size,
         )
-        self.embedding_generator = embedding_generator or EmbeddingGenerator(
-            backend=rag_settings.embedding_backend,
-            ollama_base_url=rag_settings.ollama_base_url,
-            ollama_model=rag_settings.ollama_embedding_model,
-            use_cloud_embeddings=rag_settings.use_cloud_embeddings,
-            cloud_provider=rag_settings.cloud_provider,
-            cloud_embedding_model=rag_settings.cloud_embedding_model,
-        )
+        self.embedding_generator = embedding_generator or CanonicalEmbeddingGenerator()
         try:
             self.vector_database.initialize()
         except Exception as exc:  # noqa: BLE001
@@ -512,12 +533,25 @@ class SimilaritySearch:
         limit = self.default_top_k if top_k is None else max(int(top_k), 1)
         model_spec = self.embedding_generator.resolve_active_embedding_model_spec()
         try:
-            self.vector_database.assert_query_model_matches_index(model_spec.signature)
+            strict_match = getattr(
+                self.vector_database,
+                "assert_embedding_fingerprint_matches",
+                None,
+            )
+            if strict_match is not None:
+                strict_match(model_spec.signature)
+            else:
+                self.vector_database.assert_query_model_matches_index(model_spec.signature)
         except Exception as exc:  # noqa: BLE001
             raise EmbeddingModelMismatchError(
                 "Active embedding model does not match indexed vectors. Rebuild the RAG vector store."
             ) from exc
-        embeddings = self.embedding_generator.embed_texts([normalized])
+        embed_queries = getattr(
+            self.embedding_generator,
+            "embed_queries",
+            self.embedding_generator.embed_texts,
+        )
+        embeddings = embed_queries([normalized])
         if not embeddings:
             return []
         try:

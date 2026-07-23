@@ -2885,6 +2885,27 @@
         }
       }
     },
+    "/api/model-config/embedding-status": {
+      "get": {
+        "tags": [
+          "model-config"
+        ],
+        "summary": "Get Embedding Status",
+        "operationId": "get_embedding_status_api_model_config_embedding_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/model-config/connectivity-check": {
       "post": {
         "tags": [
@@ -3814,6 +3835,102 @@
         ],
         "title": "DrugAliasesResponse"
       },
+      "EmbeddingIndexStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fingerprint"
+          },
+          "document_count": {
+            "type": "integer",
+            "title": "Document Count",
+            "default": 0
+          },
+          "chunk_count": {
+            "type": "integer",
+            "title": "Chunk Count",
+            "default": 0
+          },
+          "built_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Built At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "EmbeddingIndexStatus"
+      },
+      "EmbeddingRuntimeStatus": {
+        "properties": {
+          "model_display_name": {
+            "type": "string",
+            "title": "Model Display Name"
+          },
+          "model_revision": {
+            "type": "string",
+            "title": "Model Revision"
+          },
+          "device": {
+            "type": "string",
+            "title": "Device"
+          },
+          "cache_status": {
+            "type": "string",
+            "title": "Cache Status"
+          },
+          "loaded": {
+            "type": "boolean",
+            "title": "Loaded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_display_name",
+          "model_revision",
+          "device",
+          "cache_status",
+          "loaded"
+        ],
+        "title": "EmbeddingRuntimeStatus"
+      },
+      "EmbeddingStatusResponse": {
+        "properties": {
+          "embedding_runtime": {
+            "$ref": "#/components/schemas/EmbeddingRuntimeStatus"
+          },
+          "embedding_index": {
+            "$ref": "#/components/schemas/EmbeddingIndexStatus"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "embedding_runtime",
+          "embedding_index"
+        ],
+        "title": "EmbeddingStatusResponse"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4195,6 +4312,43 @@
               }
             ],
             "title": "Configured Index Type"
+          },
+          "embedding_model": {
+            "type": "string",
+            "title": "Embedding Model",
+            "default": "ibm-granite/granite-embedding-small-english-r2"
+          },
+          "embedding_revision": {
+            "type": "string",
+            "title": "Embedding Revision",
+            "default": ""
+          },
+          "index_status": {
+            "type": "string",
+            "title": "Index Status",
+            "default": "reindex_required"
+          },
+          "embedding_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Fingerprint"
+          },
+          "built_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Built At"
           }
         },
         "additionalProperties": false,
@@ -4617,16 +4771,11 @@
             "type": "object",
             "title": "Rag Settings"
           },
-          "rag_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rag Model"
+          "embedding_runtime": {
+            "$ref": "#/components/schemas/EmbeddingRuntimeStatus"
+          },
+          "embedding_index": {
+            "$ref": "#/components/schemas/EmbeddingIndexStatus"
           },
           "updated_at": {
             "anyOf": [
@@ -4652,7 +4801,9 @@
           "clinical_model",
           "ollama_reasoning",
           "ollama_seed",
-          "rag_settings"
+          "rag_settings",
+          "embedding_runtime",
+          "embedding_index"
         ],
         "title": "ModelConfigStateResponse"
       },

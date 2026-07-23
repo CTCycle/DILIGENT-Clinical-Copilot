@@ -35,15 +35,9 @@ export type RagSettings = {
   reranker_model: string;
   hybrid_vector_weight: number;
   hybrid_text_weight: number;
-  embedding_backend: string;
-  ollama_embedding_model: string;
-  hf_embedding_model: string;
-  cloud_provider: string;
-  cloud_embedding_model: string;
-  use_cloud_embeddings: boolean;
-  reset_vector_collection: boolean;
   vector_stream_batch_size: number;
-  embedding_max_workers: number;
+  embedding_device: string;
+  embedding_offline_mode: boolean;
 };
 
 export type ModelConfigStateResponse = {
@@ -57,8 +51,30 @@ export type ModelConfigStateResponse = {
     ollama_reasoning: boolean;
     ollama_seed: number | null;
   rag_settings: RagSettings;
-  rag_model: string | null;
+  embedding_runtime: EmbeddingRuntimeStatus;
+  embedding_index: EmbeddingIndexStatus;
   updated_at: string | null;
+};
+
+export type EmbeddingRuntimeStatus = {
+  model_display_name: string;
+  model_revision: string;
+  device: string;
+  cache_status: string;
+  loaded: boolean;
+};
+
+export type EmbeddingIndexStatus = {
+  status: string;
+  fingerprint: string | null;
+  document_count: number;
+  chunk_count: number;
+  built_at: string | null;
+};
+
+export type EmbeddingStatusResponse = {
+  embedding_runtime: EmbeddingRuntimeStatus;
+  embedding_index: EmbeddingIndexStatus;
 };
 
 export type ModelConfigUpdateRequest = {
@@ -522,14 +538,8 @@ export type InspectionRagVectorizationSummary = {
   chunk_overlap: number;
   embedding_batch_size: number;
   vector_stream_batch_size: number;
-  embedding_max_workers: number;
-  embedding_backend: string;
-  ollama_embedding_model: string;
-  hf_embedding_model: string;
-  cloud_provider: CloudProvider;
-  cloud_embedding_model: string;
-  use_cloud_embeddings: boolean;
-  reset_vector_collection: boolean;
+  embedding_device: string;
+  embedding_offline_mode: boolean;
 };
 
 export type InspectionRagUpdateRequest = {
@@ -564,6 +574,11 @@ export type InspectionRagVectorStoreSummary = {
   index_ready: boolean;
   configured_metric: string | null;
   configured_index_type: string | null;
+  embedding_model: string;
+  embedding_revision: string;
+  index_status: string;
+  embedding_fingerprint: string | null;
+  built_at: string | null;
 };
 
 

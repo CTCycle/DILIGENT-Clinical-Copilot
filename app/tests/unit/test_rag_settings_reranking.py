@@ -25,10 +25,8 @@ def test_build_rag_settings_reads_retrieval_counts() -> None:
                 "reranker_model": "cross-encoder/test-model",
                 "hybrid_vector_weight": 0.7,
                 "hybrid_text_weight": 0.3,
-                "embedding_backend": "ollama",
-                "ollama_embedding_model": "nomic-embed-text:v1.5",
-                "cloud_provider": "openai",
-                "cloud_model": "gpt-4.1-mini",
+                "embedding_device": "cpu",
+                "embedding_offline_mode": True,
             }
         },
         _env(),
@@ -42,8 +40,9 @@ def test_build_rag_settings_reads_retrieval_counts() -> None:
     assert settings["reranker_model"] == "cross-encoder/test-model"
     assert settings["hybrid_vector_weight"] == 0.7
     assert settings["hybrid_text_weight"] == 0.3
-    assert settings["embedding_backend"] == "ollama"
-    assert settings["ollama_embedding_model"] == "nomic-embed-text:v1.5"
+    assert settings["embedding_device"] == "cpu"
+    assert settings["embedding_offline_mode"] is True
+    assert "embedding_backend" not in settings
 
 ###############################################################################
 def test_build_rag_settings_enforces_candidate_floor() -> None:
@@ -61,4 +60,8 @@ def test_build_rag_settings_defaults_to_lightweight_reranker_profile() -> None:
     settings = payload["rag"]
 
     assert settings["reranker_model"] == "lightweight-balanced-v1"
-    assert settings["reset_vector_collection"] is False
+    assert settings["chunk_size"] == 512
+    assert settings["chunk_overlap"] == 64
+    assert settings["embedding_device"] == "auto"
+    assert settings["embedding_offline_mode"] is False
+    assert "reset_vector_collection" not in settings
