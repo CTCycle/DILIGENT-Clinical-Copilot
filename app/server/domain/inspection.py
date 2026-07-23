@@ -713,6 +713,11 @@ class LanceVectorStoreSummaryResponse(BaseModel):
     index_ready: bool
     configured_metric: str | None = None
     configured_index_type: str | None = None
+    embedding_model: str = "ibm-granite/granite-embedding-small-english-r2"
+    embedding_revision: str = ""
+    index_status: str = "reindex_required"
+    embedding_fingerprint: str | None = None
+    built_at: str | None = None
 
 ###############################################################################
 class RagUpdateJobSummary(BaseModel):

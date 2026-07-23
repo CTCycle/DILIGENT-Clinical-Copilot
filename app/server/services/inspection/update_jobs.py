@@ -167,29 +167,11 @@ class DataInspectionUpdateJobRunner:
         self.report_phase_by_target(job_id, "rag", 4, "RAG update started")
         updater = RagEmbeddingUpdater(
             documents_path=_override_str(override_values, "documents_path"),
-            use_cloud_embeddings=_override_bool(
-                override_values, "use_cloud_embeddings"
-            ),
-            cloud_provider=_override_str(override_values, "cloud_provider"),
-            cloud_embedding_model=_override_str(
-                override_values, "cloud_embedding_model"
-            ),
             chunk_size=_override_int(override_values, "chunk_size"),
             chunk_overlap=_override_int(override_values, "chunk_overlap"),
             embedding_batch_size=_override_int(override_values, "embedding_batch_size"),
             vector_stream_batch_size=_override_int(
                 override_values, "vector_stream_batch_size"
-            ),
-            embedding_max_workers=_override_int(
-                override_values, "embedding_max_workers"
-            ),
-            embedding_backend=_override_str(override_values, "embedding_backend"),
-            ollama_embedding_model=_override_str(
-                override_values, "ollama_embedding_model"
-            ),
-            hf_embedding_model=_override_str(override_values, "hf_embedding_model"),
-            reset_vector_collection=_override_bool(
-                override_values, "reset_vector_collection"
             ),
             progress_callback=progress_callback,
         )
@@ -223,7 +205,7 @@ class DataInspectionUpdateJobRunner:
         )
         self.report_phase_by_target(job_id, "rag", 96, "Finalizing update")
         self.report_phase_by_target(job_id, "rag", 100, "Completed")
-        backend = "cloud" if bool(updater.use_cloud_embeddings) else "local"
+        backend = "sentence-transformers"
         model_spec = getattr(getattr(updater, "serializer", None), "model_spec", None)
         vector_model = None
         if model_spec is not None:

@@ -77,14 +77,8 @@ const RAG_SUMMARY_FIELDS: ReadonlyArray<{
   { key: 'chunk_overlap', label: 'Chunk overlap' },
   { key: 'embedding_batch_size', label: 'Embedding batch size' },
   { key: 'vector_stream_batch_size', label: 'Vector stream batch size' },
-  { key: 'embedding_max_workers', label: 'Embedding max workers' },
-  { key: 'embedding_backend', label: 'Embedding backend' },
-  { key: 'ollama_embedding_model', label: 'Ollama embedding model' },
-  { key: 'hf_embedding_model', label: 'Hugging Face embedding model' },
-  { key: 'cloud_provider', label: 'Cloud provider' },
-  { key: 'cloud_embedding_model', label: 'Cloud embedding model' },
-  { key: 'use_cloud_embeddings', label: 'Use cloud embeddings' },
-  { key: 'reset_vector_collection', label: 'Reset vector collection' },
+  { key: 'embedding_device', label: 'Embedding device' },
+  { key: 'embedding_offline_mode', label: 'Offline mode' },
 ];
 
 function normalizeFolderSeparators(value: string): string {

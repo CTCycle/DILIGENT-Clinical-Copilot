@@ -68,19 +68,11 @@ class RagSettings(BaseModel):
     reranker_model: str
     hybrid_vector_weight: float
     hybrid_text_weight: float
-    embedding_backend: str
-    ollama_base_url: str
-    ollama_embedding_model: str
-    hf_embedding_model: str
     vector_index_metric: str
     vector_index_type: str
-    reset_vector_collection: bool
-    cloud_provider: str
-    cloud_model: str
-    cloud_embedding_model: str
-    use_cloud_embeddings: bool
     vector_stream_batch_size: int
-    embedding_max_workers: int
+    embedding_device: str
+    embedding_offline_mode: bool
 
 ###############################################################################
 class RuntimeSettings(BaseModel):

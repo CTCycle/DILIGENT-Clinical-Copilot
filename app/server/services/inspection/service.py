@@ -7,6 +7,8 @@ from typing import Any, Literal
 
 from common.constants import DOCUMENT_SUPPORTED_EXTENSIONS
 from common.paths import VECTOR_DB_PATH
+from common.embedding.manifest import read_active_collection_name
+from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.inspection import InspectionJobPhase
@@ -357,7 +359,9 @@ class DataInspectionService(
     def get_rag_vector_store_summary(self) -> dict[str, Any]:
         documents_path = self.get_effective_rag_documents_path()
         rag_settings = build_effective_rag_settings()
-        collection_name = str(rag_settings.vector_collection_name)
+        collection_name = read_active_collection_name(
+            str(rag_settings.vector_collection_name)
+        )
         vector_db = LanceVectorDatabase(
             database_path=str(VECTOR_DB_PATH),
             collection_name=collection_name,
@@ -390,6 +394,15 @@ class DataInspectionService(
             "index_ready": bool(vector_db.index_ready) if exists else False,
             "configured_metric": rag_settings.vector_index_metric,
             "configured_index_type": rag_settings.vector_index_type,
+            "embedding_model": CANONICAL_EMBEDDING_CONFIG.model_id,
+            "embedding_revision": CANONICAL_EMBEDDING_CONFIG.revision,
+            "index_status": str(
+                self.read_rag_manifest().get("status") or "reindex_required"
+            ),
+            "embedding_fingerprint": self.read_rag_manifest().get(
+                "embedding_fingerprint"
+            ),
+            "built_at": self.read_rag_manifest().get("built_at"),
         }
 
     # -------------------------------------------------------------------------

@@ -36,6 +36,8 @@ def test_write_rag_manifest_persists_latest_successful_source(
     service.write_rag_manifest(
         documents_path=r"C:\external\rag",
         summary={
+            "generation_id": "generation-1",
+            "collection_name": "documents__build_generation-1",
             "documents": 99,
             "chunks": 3477,
             "supported_files": 99,
@@ -44,6 +46,8 @@ def test_write_rag_manifest_persists_latest_successful_source(
     )
 
     payload = service.read_rag_manifest()
-    assert payload["documents_path"] == r"C:\external\rag"
-    assert payload["documents"] == 99
-    assert payload["chunks"] == 3477
+    assert payload["generation_id"] == "generation-1"
+    assert payload["collection_name"] == "documents__build_generation-1"
+    assert payload["source"]["documents_path"] == r"C:\external\rag"
+    assert payload["source"]["document_count"] == 99
+    assert payload["source"]["chunk_count"] == 3477

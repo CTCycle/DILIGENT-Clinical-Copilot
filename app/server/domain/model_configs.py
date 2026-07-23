@@ -45,6 +45,22 @@ class ModelConfigUpdateRequest(BaseModel):
     rag_settings: dict[str, object] | None = None
 
 ###############################################################################
+class EmbeddingRuntimeStatus(BaseModel):
+    model_display_name: str
+    model_revision: str
+    device: str
+    cache_status: str
+    loaded: bool
+
+###############################################################################
+class EmbeddingIndexStatus(BaseModel):
+    status: str
+    fingerprint: str | None = None
+    document_count: int = 0
+    chunk_count: int = 0
+    built_at: datetime | None = None
+
+###############################################################################
 class ModelConfigStateResponse(BaseModel):
     local_models: list[LocalModelCard]
     cloud_providers: list[CloudProviderDescriptor]
@@ -56,8 +72,16 @@ class ModelConfigStateResponse(BaseModel):
     ollama_reasoning: bool
     ollama_seed: int | None
     rag_settings: dict[str, object]
-    rag_model: str | None = None
+    embedding_runtime: EmbeddingRuntimeStatus
+    embedding_index: EmbeddingIndexStatus
     updated_at: datetime | None = None
+
+###############################################################################
+class EmbeddingStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    embedding_runtime: EmbeddingRuntimeStatus
+    embedding_index: EmbeddingIndexStatus
 
 ###############################################################################
 class ConnectivityCheckRequest(BaseModel):
