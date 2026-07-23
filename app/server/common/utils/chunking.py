@@ -281,9 +281,11 @@ class SmartDocumentChunker:
         return slug[:48] or "section"
 
 
+###############################################################################
 class TokenWindowDocumentChunker:
     """Chunk documents by the canonical model tokenizer, not characters."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -297,6 +299,7 @@ class TokenWindowDocumentChunker:
         self.overlap_tokens = max(min(overlap_tokens, self.target_tokens - 1), 0)
         self.seed_catalog = seed_catalog
 
+    # -------------------------------------------------------------------------
     def chunk_document(
         self,
         text: str,

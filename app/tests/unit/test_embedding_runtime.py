@@ -17,15 +17,22 @@ from services.retrieval.embedding_runtime import (
 )
 
 
+###############################################################################
 class FakeTokenizer:
+
+    # -------------------------------------------------------------------------
     def encode(self, text: str, *, add_special_tokens: bool = True):
         return SimpleNamespace(ids=[len(text) + 1, 2, 3])
 
+    # -------------------------------------------------------------------------
     def decode(self, ids, *, skip_special_tokens: bool = True) -> str:
         return "decoded " + " ".join(map(str, ids))
 
 
+###############################################################################
 class FakeSession:
+
+    # -------------------------------------------------------------------------
     def __init__(self, output=None, *, token_type_ids: bool = False):
         self.output = (
             output
@@ -43,21 +50,26 @@ class FakeSession:
         self._outputs = [SimpleNamespace(name="last_hidden_state")]
         self.calls = []
 
+    # -------------------------------------------------------------------------
     def get_inputs(self):
         return self._inputs
 
+    # -------------------------------------------------------------------------
     def get_outputs(self):
         return self._outputs
 
+    # -------------------------------------------------------------------------
     def get_providers(self):
         return ["CPUExecutionProvider"]
 
+    # -------------------------------------------------------------------------
     def run(self, names, inputs):
         self.calls.append(inputs)
         batch = inputs["input_ids"].shape[0]
         return [np.tile(self.output, (batch, 1, 1))]
 
 
+###############################################################################
 def _runtime(tmp_path: Path, *, session=None, batch_size=2, config=None):
     config = config or CANONICAL_EMBEDDING_CONFIG
     snapshot = tmp_path / config.revision
@@ -80,6 +92,7 @@ def _runtime(tmp_path: Path, *, session=None, batch_size=2, config=None):
     ), session
 
 
+###############################################################################
 def test_runtime_is_lazy_reuses_session_and_exposes_chunking_adapter(
     tmp_path: Path,
 ) -> None:
@@ -97,12 +110,14 @@ def test_runtime_is_lazy_reuses_session_and_exposes_chunking_adapter(
     assert len(session.calls) == 2
 
 
+###############################################################################
 def test_offline_runtime_rejects_incomplete_cache(tmp_path: Path) -> None:
     runtime = EmbeddingRuntime(cache_directory=tmp_path, offline_mode=True)
     with pytest.raises(EmbeddingRuntimeUnavailable, match="incomplete"):
         runtime.embed_documents(["document"])
 
 
+###############################################################################
 def test_runtime_rejects_corrupted_artifact(tmp_path: Path) -> None:
     runtime, _ = _runtime(tmp_path)
     artifact = (
@@ -115,6 +130,7 @@ def test_runtime_rejects_corrupted_artifact(tmp_path: Path) -> None:
         runtime.embed_documents(["document"])
 
 
+###############################################################################
 def test_runtime_rejects_wrong_dimension(tmp_path: Path) -> None:
     output = np.zeros((1, 3, 12), dtype=np.float32)
     runtime, _ = _runtime(tmp_path, session=FakeSession(output))
@@ -122,6 +138,7 @@ def test_runtime_rejects_wrong_dimension(tmp_path: Path) -> None:
         runtime.embed_documents(["document"])
 
 
+###############################################################################
 def test_runtime_close_releases_session_and_can_be_recreated(tmp_path: Path) -> None:
     runtime, _ = _runtime(tmp_path)
     runtime.embed_queries(["query"])

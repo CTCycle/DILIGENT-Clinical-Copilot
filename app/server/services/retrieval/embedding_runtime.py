@@ -24,14 +24,17 @@ REQUIRED_SNAPSHOT_FILES = frozenset(
 )
 
 
+###############################################################################
 class EmbeddingRuntimeError(RuntimeError):
     """Base error for unavailable or invalid embedding runtime state."""
 
 
+###############################################################################
 class EmbeddingRuntimeUnavailable(EmbeddingRuntimeError):
     """Raised when dependencies, the snapshot, or the ONNX contract is invalid."""
 
 
+###############################################################################
 class EmbeddingVectorValidationError(EmbeddingRuntimeError):
     """Raised when inference violates the canonical vector contract."""
 
@@ -41,22 +44,30 @@ SessionFactory = Callable[..., Any]
 TokenizerFactory = Callable[..., Any]
 
 
+###############################################################################
 class _ChunkingTokenizer:
+
+    # -------------------------------------------------------------------------
     def __init__(self, tokenizer: Any) -> None:
         self._tokenizer = tokenizer
 
+    # -------------------------------------------------------------------------
     def encode(self, text: str, add_special_tokens: bool = False) -> list[int]:
         encoded = self._tokenizer.encode(text, add_special_tokens=add_special_tokens)
         ids = getattr(encoded, "ids", encoded)
         return [int(value) for value in ids]
 
+    # -------------------------------------------------------------------------
     def decode(self, ids: Sequence[int], skip_special_tokens: bool = True) -> str:
         return str(
             self._tokenizer.decode(list(ids), skip_special_tokens=skip_special_tokens)
         )
 
 
+###############################################################################
 class EmbeddingRuntime:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -82,10 +93,12 @@ class EmbeddingRuntime:
         self._lock = threading.RLock()
         self._closed = False
 
+    # -------------------------------------------------------------------------
     @property
     def loaded(self) -> bool:
         return self._session is not None
 
+    # -------------------------------------------------------------------------
     def status(self) -> dict[str, object]:
         snapshot = self._cached_snapshot_path()
         dependency_missing = (
@@ -114,22 +127,26 @@ class EmbeddingRuntime:
             "loaded": self.loaded,
         }
 
+    # -------------------------------------------------------------------------
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         return self._encode(
             texts, self.config.document_prefix, self.config.maximum_model_tokens
         )
 
+    # -------------------------------------------------------------------------
     def embed_queries(self, texts: Sequence[str]) -> list[list[float]]:
         return self._encode(
             texts, self.config.query_prefix, self.config.maximum_query_tokens
         )
 
+    # -------------------------------------------------------------------------
     def get_tokenizer(self) -> Any:
         with self._lock:
             self._ensure_loaded()
             assert self._chunking_tokenizer is not None
             return self._chunking_tokenizer
 
+    # -------------------------------------------------------------------------
     def close(self) -> None:
         with self._lock:
             self._closed = True
@@ -137,6 +154,7 @@ class EmbeddingRuntime:
             self._inference_tokenizer = None
             self._chunking_tokenizer = None
 
+    # -------------------------------------------------------------------------
     def _encode(
         self, texts: Sequence[str], prefix: str, limit: int
     ) -> list[list[float]]:
@@ -193,6 +211,7 @@ class EmbeddingRuntime:
                 all_vectors.extend(self._validate_vectors(vectors.tolist(), len(batch)))
             return all_vectors
 
+    # -------------------------------------------------------------------------
     def _ensure_loaded(self) -> tuple[Any, Any]:
         if self._session is not None and self._inference_tokenizer is not None:
             return self._session, self._inference_tokenizer
@@ -218,6 +237,7 @@ class EmbeddingRuntime:
         self._session = session
         return session, tokenizer
 
+    # -------------------------------------------------------------------------
     def _resolve_snapshot(self) -> Path:
         cached = self._cached_snapshot_path()
         if self._has_required_files(cached):
@@ -248,15 +268,18 @@ class EmbeddingRuntime:
             )
         return cached
 
+    # -------------------------------------------------------------------------
     def _cached_snapshot_path(self) -> Path:
         return self.cache_directory / self.config.revision
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _has_required_files(snapshot: Path) -> bool:
         return snapshot.is_dir() and all(
             (snapshot / item).is_file() for item in REQUIRED_SNAPSHOT_FILES
         )
 
+    # -------------------------------------------------------------------------
     def _verify_artifact(self, artifact: Path) -> None:
         stat = artifact.stat()
         marker = (str(artifact), stat.st_size, stat.st_mtime_ns)
@@ -272,6 +295,7 @@ class EmbeddingRuntime:
             )
         self._verified_artifact = marker
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _select_hidden(session: Any, outputs: Sequence[Any], numpy: Any) -> Any:
         metadata = list(session.get_outputs())
@@ -289,6 +313,7 @@ class EmbeddingRuntime:
             )
         return candidates[0]
 
+    # -------------------------------------------------------------------------
     def _validate_session(self, session: Any) -> None:
         providers = (
             list(session.get_providers()) if hasattr(session, "get_providers") else []
@@ -301,6 +326,7 @@ class EmbeddingRuntime:
                 "ONNX model must declare input_ids and attention_mask"
             )
 
+    # -------------------------------------------------------------------------
     def _validate_vectors(self, rows: Any, expected: int) -> list[list[float]]:
         if not isinstance(rows, list) or len(rows) != expected:
             raise EmbeddingVectorValidationError(
@@ -327,6 +353,7 @@ class EmbeddingRuntime:
             result.append(vector)
         return result
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _optional_module(name: str) -> Any | None:
         try:
@@ -334,6 +361,7 @@ class EmbeddingRuntime:
         except ImportError:
             return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _required_module(name: str) -> Any:
         module = EmbeddingRuntime._optional_module(name)
@@ -343,6 +371,7 @@ class EmbeddingRuntime:
             )
         return module
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _default_snapshot_downloader(**kwargs: object) -> str:
         return str(
@@ -351,12 +380,14 @@ class EmbeddingRuntime:
             )
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _default_tokenizer_factory(path: str) -> Any:
         return getattr(importlib.import_module("tokenizers"), "Tokenizer").from_file(
             path
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _default_session_factory(path: str, **kwargs: object) -> Any:
         return getattr(importlib.import_module("onnxruntime"), "InferenceSession")(
@@ -368,6 +399,7 @@ _EMBEDDING_RUNTIME: EmbeddingRuntime | None = None
 _EMBEDDING_RUNTIME_LOCK = threading.Lock()
 
 
+###############################################################################
 def get_embedding_runtime() -> EmbeddingRuntime:
     global _EMBEDDING_RUNTIME
     with _EMBEDDING_RUNTIME_LOCK:
@@ -382,6 +414,7 @@ def get_embedding_runtime() -> EmbeddingRuntime:
         return _EMBEDDING_RUNTIME
 
 
+###############################################################################
 def close_embedding_runtime() -> None:
     global _EMBEDDING_RUNTIME
     with _EMBEDDING_RUNTIME_LOCK:

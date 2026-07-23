@@ -195,7 +195,6 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
         "revision_agent_qa",
     }
 
-
 ###############################################################################
 def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -243,7 +242,6 @@ def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> 
         "invalid_tool_input": True,
     }
 
-
 ###############################################################################
 def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -273,7 +271,6 @@ def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
     started = service.start_revision_job(session_id, SessionRevisionRequest())
 
     assert started["job_type"] == service.REVISION_JOB_TYPE
-
 
 ###############################################################################
 def test_manual_edit_skips_orphaned_revision_version_numbers(tmp_path: Path) -> None:

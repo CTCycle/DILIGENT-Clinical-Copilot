@@ -43,7 +43,6 @@ class InMemorySerializer:
 def test_model_config_serializer_has_no_clean_break_migration() -> None:
     assert not hasattr(ModelConfigSerializer, "migrate_cloud_selection_clean_break")
 
-
 ###############################################################################
 def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
     engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'model-config.db'}")
@@ -615,7 +614,6 @@ def test_provider_catalog_uses_last_successful_models_when_refresh_fails(monkeyp
     assert deepseek.catalog_message == "Showing models from the last successful provider refresh."
     ModelConfigService._provider_catalog_cache.clear()
 
-
 ###############################################################################
 def test_cloud_runtime_uses_cloud_model_when_role_models_are_local() -> None:
     with LLMRuntimeConfig.override_for_run(
@@ -636,7 +634,6 @@ def test_cloud_runtime_uses_cloud_model_when_role_models_are_local() -> None:
             "gpt-4.1-mini",
         )
 
-
 ###############################################################################
 def test_cloud_runtime_preserves_valid_cloud_role_override() -> None:
     with LLMRuntimeConfig.override_for_run(
@@ -656,7 +653,6 @@ def test_cloud_runtime_preserves_valid_cloud_role_override() -> None:
             "openai",
             "gpt-4.1-mini",
         )
-
 
 ###############################################################################
 def test_cloud_runtime_accepts_persisted_cloud_role_models(monkeypatch) -> None:

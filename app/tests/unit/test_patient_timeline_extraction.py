@@ -147,7 +147,6 @@ def test_timeline_uses_the_single_explicit_date_in_source_evidence() -> None:
 
     assert normalized[0].event_date == "2026-07-21"
 
-
 ###############################################################################
 def test_timeline_preserves_precise_model_date_when_evidence_only_matches_year() -> None:
     extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
