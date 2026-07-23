@@ -55,7 +55,6 @@ only-include = [
 
 [tool.ruff]
 exclude = [
-    "app/src-tauri/target",
     "**/__pycache__",
 ]
 
