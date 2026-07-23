@@ -94,3 +94,6 @@ Provider access-key encryption material is external to the database. Set
 equivalent path through the deployment environment). The file contains
 versioned Fernet material used to decrypt the `access_keys` ciphertext; it must
 not be committed, copied into a database backup, or exposed through logs.
+## RAG embedding runtime
+
+RAG uses ibm-granite/granite-embedding-small-english-r2 at the pinned revision declared in app/server/common/embedding/config.py. The model is downloaded lazily into app/resources/models/embeddings, loaded once per process, and is independent of the configured generation provider. A complete local snapshot is required for offline use; changing the model contract requires a controlled index rebuild.

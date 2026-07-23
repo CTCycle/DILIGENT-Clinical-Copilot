@@ -9,6 +9,7 @@ from domain.model_configs import (
     ModelConfigUpdateRequest,
     ConnectivityCheckRequest,
     ConnectivityCheckResponse,
+    EmbeddingStatusResponse,
 )
 from services.llm.model_config import ModelConfigService
 
@@ -56,6 +57,9 @@ class ModelConfigEndpoint:
     ) -> ConnectivityCheckResponse:
         return await self.service.check_connectivity(payload)
 
+    async def get_embedding_status(self) -> EmbeddingStatusResponse:
+        return await self.service.get_embedding_status()
+
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
@@ -70,6 +74,13 @@ class ModelConfigEndpoint:
             self.update_state,
             methods=["PUT"],
             response_model=ModelConfigStateResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/embedding-status",
+            self.get_embedding_status,
+            methods=["GET"],
+            response_model=EmbeddingStatusResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

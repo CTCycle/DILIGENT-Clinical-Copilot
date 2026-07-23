@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from common.paths import DOCS_PATH, VECTOR_DB_PATH
+from common.paths import (
+    DOCS_PATH,
+    RAG_ACTIVE_GENERATION_POINTER_PATH,
+    VECTOR_DB_PATH,
+)
+from common.embedding.manifest import build_embedding_index_manifest
 from configurations.startup import get_server_settings
 from services.retrieval.settings import build_effective_rag_settings
 from services.text.vocabulary import (
@@ -45,16 +50,35 @@ class InspectionUpdateConfigMixin:
     ) -> None:
         manifest_path = self.rag_manifest_path()
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "documents_path": documents_path,
-            "documents": int(summary.get("documents", 0) or 0),
-            "chunks": int(summary.get("chunks", 0) or 0),
-            "supported_files": int(summary.get("supported_files", 0) or 0),
-            "loaded_documents": int(summary.get("loaded_documents", 0) or 0),
-            "built_at": datetime.now(UTC).isoformat(),
-        }
+        libraries: dict[str, str] = {}
+        for package in ("sentence-transformers", "transformers", "tokenizers", "torch", "lancedb"):
+            try:
+                libraries[package.replace("-", "_")] = version(package)
+            except PackageNotFoundError:
+                libraries[package.replace("-", "_")] = "unavailable"
+        manifest = build_embedding_index_manifest(
+            generation_id=str(summary.get("generation_id") or ""),
+            collection_name=str(summary.get("collection_name") or "documents"),
+            documents_path=documents_path,
+            document_count=int(summary.get("documents", 0) or 0),
+            chunk_count=int(summary.get("chunks", 0) or 0),
+            source_manifest_hash=str(summary.get("source_manifest_hash") or ""),
+            libraries=libraries,
+        )
+        payload = manifest.to_dict()
         manifest_path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        RAG_ACTIVE_GENERATION_POINTER_PATH.write_text(
+            json.dumps(
+                {
+                    "generation_id": manifest.generation_id,
+                    "collection_name": manifest.collection_name,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
             encoding="utf-8",
         )
 
@@ -154,14 +178,8 @@ class InspectionUpdateConfigMixin:
                 "chunk_overlap": int(rag_settings.chunk_overlap),
                 "embedding_batch_size": int(rag_settings.embedding_batch_size),
                 "vector_stream_batch_size": int(rag_settings.vector_stream_batch_size),
-                "embedding_max_workers": int(rag_settings.embedding_max_workers),
-                "embedding_backend": rag_settings.embedding_backend,
-                "ollama_embedding_model": rag_settings.ollama_embedding_model,
-                "hf_embedding_model": rag_settings.hf_embedding_model,
-                "cloud_provider": rag_settings.cloud_provider,
-                "cloud_embedding_model": rag_settings.cloud_embedding_model,
-                "use_cloud_embeddings": bool(rag_settings.use_cloud_embeddings),
-                "reset_vector_collection": bool(rag_settings.reset_vector_collection),
+                "embedding_device": rag_settings.embedding_device,
+                "embedding_offline_mode": bool(rag_settings.embedding_offline_mode),
             }
             return {
                 "target": target,

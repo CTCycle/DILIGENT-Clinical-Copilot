@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -7,6 +8,7 @@ from time import monotonic
 from typing import Any, Protocol, cast
 
 from common.exceptions import ServiceValidationError
+from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 from common.paths import VECTOR_DB_PATH
 from common.utils.catalog_loader import CatalogLoader
 from common.utils.logger import logger
@@ -18,6 +20,9 @@ from common.utils.types import (
     coerce_str,
 )
 from domain.model_configs import (
+    EmbeddingIndexStatus,
+    EmbeddingRuntimeStatus,
+    EmbeddingStatusResponse,
     LocalModelCard,
     ModelConfigSnapshot,
     ModelConfigStateResponse,
@@ -34,11 +39,11 @@ from services.llm.provider_registry import provider_registry
 from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
 from domain.llm.providers import CloudProviderId
 from services.llm.ollama_client import OllamaClient, OllamaError
-from repositories.vectors import LanceVectorDatabase
 from services.retrieval.settings import (
     build_effective_rag_settings,
     rag_settings_payload,
 )
+from services.retrieval.embedding_runtime import get_embedding_runtime
 
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
@@ -156,6 +161,13 @@ class ModelConfigService:
             snapshot=snapshot,
             local_models=local_models,
             cloud_providers=provider_descriptors,
+        )
+
+    # -------------------------------------------------------------------------
+    async def get_embedding_status(self) -> EmbeddingStatusResponse:
+        return EmbeddingStatusResponse(
+            embedding_runtime=self.build_embedding_runtime_status(),
+            embedding_index=self.build_embedding_index_status(),
         )
 
     # -------------------------------------------------------------------------
@@ -422,33 +434,15 @@ class ModelConfigService:
                 ),
                 0.0,
             ),
-            "embedding_backend": coerce_str(
-                payload.get("embedding_backend"), current.embedding_backend
-            ),
-            "ollama_embedding_model": coerce_str(
-                payload.get("ollama_embedding_model"), current.ollama_embedding_model
-            ),
-            "hf_embedding_model": coerce_str(
-                payload.get("hf_embedding_model"), current.hf_embedding_model
-            ),
-            "cloud_provider": coerce_str(
-                payload.get("cloud_provider"), current.cloud_provider
-            ),
-            "cloud_embedding_model": coerce_str(
-                payload.get("cloud_embedding_model"), current.cloud_embedding_model
-            ),
-            "use_cloud_embeddings": coerce_bool(
-                payload.get("use_cloud_embeddings"), current.use_cloud_embeddings
-            ),
-            "reset_vector_collection": coerce_bool(
-                payload.get("reset_vector_collection"), current.reset_vector_collection
-            ),
             "vector_stream_batch_size": coerce_positive_int(
                 payload.get("vector_stream_batch_size"),
                 current.vector_stream_batch_size,
             ),
-            "embedding_max_workers": coerce_positive_int(
-                payload.get("embedding_max_workers"), current.embedding_max_workers
+            "embedding_device": coerce_str(
+                payload.get("embedding_device"), current.embedding_device
+            ),
+            "embedding_offline_mode": coerce_bool(
+                payload.get("embedding_offline_mode"), current.embedding_offline_mode
             ),
         }
 
@@ -536,6 +530,7 @@ class ModelConfigService:
                 snapshot.cloud_model,
             )
         )
+
         if is_fresh:
             return self.serializer.save_snapshot(
                 clinical_model=defaults.clinical_model,
@@ -734,8 +729,59 @@ class ModelConfigService:
             ollama_reasoning=snapshot.ollama_reasoning,
             ollama_seed=snapshot.ollama_seed,
             rag_settings=rag_settings_payload(build_effective_rag_settings()),
-            rag_model=self.resolve_current_rag_model_label(),
+            embedding_runtime=self.build_embedding_runtime_status(),
+            embedding_index=self.build_embedding_index_status(),
             updated_at=snapshot.updated_at,
+        )
+
+    @staticmethod
+    def build_embedding_runtime_status() -> EmbeddingRuntimeStatus:
+        status = get_embedding_runtime().status()
+        return EmbeddingRuntimeStatus(
+            model_display_name="Granite Embedding Small English R2",
+            model_revision=CANONICAL_EMBEDDING_CONFIG.revision,
+            device=str(status["device"]),
+            cache_status=str(status["cache_status"]),
+            loaded=bool(status["loaded"]),
+        )
+
+    @staticmethod
+    def build_embedding_index_status() -> EmbeddingIndexStatus:
+        manifest_path = VECTOR_DB_PATH / "rag_index_manifest.json"
+        if not manifest_path.is_file():
+            return EmbeddingIndexStatus(status="reindex_required")
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return EmbeddingIndexStatus(status="corrupt")
+        if not isinstance(payload, dict):
+            return EmbeddingIndexStatus(status="corrupt")
+        source = payload.get("source")
+        source_data = source if isinstance(source, dict) else {}
+        is_ready = (
+            payload.get("manifest_version") == 2
+            and payload.get("status") == "ready"
+            and bool(payload.get("embedding_fingerprint"))
+        )
+        built_at_value = payload.get("built_at")
+        built_at = None
+        if isinstance(built_at_value, datetime):
+            built_at = built_at_value
+        elif isinstance(built_at_value, str):
+            try:
+                built_at = datetime.fromisoformat(built_at_value)
+            except ValueError:
+                built_at = None
+        return EmbeddingIndexStatus(
+            status="ready" if is_ready else "reindex_required",
+            fingerprint=(
+                str(payload["embedding_fingerprint"])
+                if payload.get("embedding_fingerprint")
+                else None
+            ),
+            document_count=int(source_data.get("document_count", 0) or 0),
+            chunk_count=int(source_data.get("chunk_count", 0) or 0),
+            built_at=built_at,
         )
 
     # -------------------------------------------------------------------------
@@ -892,27 +938,3 @@ class ModelConfigService:
         return "The provider catalog could not be refreshed. Try again shortly."
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def resolve_current_rag_model_label() -> str | None:
-        settings = build_effective_rag_settings()
-        vector_db = LanceVectorDatabase(
-            database_path=str(VECTOR_DB_PATH),
-            collection_name=settings.vector_collection_name,
-            metric=settings.vector_index_metric,
-            index_type=settings.vector_index_type,
-            stream_batch_size=settings.vector_stream_batch_size,
-        )
-        try:
-            if not vector_db.has_collection():
-                return None
-            for batch in vector_db.iter_embeddings(batch_size=1, limit=1):
-                for row in batch:
-                    provider = str(row.get("vector_model_provider") or "").strip()
-                    model_name = str(row.get("vector_model_name") or "").strip()
-                    if provider and model_name:
-                        return f"{provider}:{model_name}"
-                    if model_name:
-                        return model_name
-        except Exception:
-            return None
-        return None

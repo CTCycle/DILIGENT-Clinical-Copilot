@@ -395,8 +395,8 @@ def _build_rag_settings(
         vector_collection_name=coerce_str(
             data.get("vector_collection_name"), "documents"
         ),
-        chunk_size=coerce_positive_int(data.get("chunk_size"), 1024),
-        chunk_overlap=coerce_positive_int(data.get("chunk_overlap"), 128),
+        chunk_size=coerce_positive_int(data.get("chunk_size"), 512),
+        chunk_overlap=coerce_positive_int(data.get("chunk_overlap"), 64),
         embedding_batch_size=coerce_positive_int(
             data.get("embedding_batch_size"),
             DEFAULT_EMBEDDING_BATCH_SIZE,
@@ -412,23 +412,15 @@ def _build_rag_settings(
             coerce_float(data.get("hybrid_vector_weight"), 0.65), 0.0
         ),
         hybrid_text_weight=max(coerce_float(data.get("hybrid_text_weight"), 0.35), 0.0),
-        embedding_backend=coerce_str(data.get("embedding_backend"), "ollama"),
-        ollama_base_url=coerce_str(
-            data.get("ollama_base_url"), defaults.ollama_host_default
-        ),
-        ollama_embedding_model=coerce_str(data.get("ollama_embedding_model"), ""),
-        hf_embedding_model=coerce_str(data.get("hf_embedding_model"), ""),
         vector_index_metric=coerce_str(data.get("vector_index_metric"), "cosine"),
         vector_index_type=coerce_str(data.get("vector_index_type"), "IVF_FLAT"),
-        reset_vector_collection=coerce_bool(data.get("reset_vector_collection"), False),
-        cloud_provider=coerce_str(data.get("cloud_provider"), defaults.llm_provider),
-        cloud_model=coerce_str(data.get("cloud_model"), defaults.cloud_model),
-        cloud_embedding_model=coerce_str(data.get("cloud_embedding_model"), ""),
-        use_cloud_embeddings=coerce_bool(data.get("use_cloud_embeddings"), False),
         vector_stream_batch_size=coerce_positive_int(
             data.get("vector_stream_batch_size"), 1024
         ),
-        embedding_max_workers=coerce_positive_int(data.get("embedding_max_workers"), 4),
+        embedding_device=coerce_str(data.get("embedding_device"), "auto"),
+        embedding_offline_mode=coerce_bool(
+            data.get("embedding_offline_mode"), False
+        ),
     )
 
 ###############################################################################

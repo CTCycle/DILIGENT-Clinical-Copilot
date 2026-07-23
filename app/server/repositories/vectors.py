@@ -10,6 +10,7 @@ from lancedb.db import DBConnection
 from lancedb.table import Table
 
 from common.utils.logger import logger
+from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 
 VECTOR_TABLE_SCHEMA = pa.schema(
     [
@@ -40,6 +41,7 @@ VECTOR_TABLE_SCHEMA = pa.schema(
         pa.field("vector_model_dimension", pa.int32()),
         pa.field("vector_model_mode", pa.string()),
         pa.field("vector_model_signature", pa.string()),
+        pa.field("embedding_fingerprint", pa.string()),
         pa.field("vectorized_at", pa.string()),
     ]
 )
@@ -149,26 +151,22 @@ class LanceVectorDatabase:
         if not records:
             logger.info("No embedding records to persist into LanceDB")
             return
-        embedding_length = 0
-        first_embedding = records[0].get("embedding")
-        if isinstance(first_embedding, list):
-            embedding_length = len(first_embedding)
-        if embedding_length > 0:
-            self.configure_embedding_size(embedding_length)
-        if self.embedding_size is not None and self.embedding_size > 0:
-            records, discarded = self._filter_records_by_embedding_size(
-                records,
-                self.embedding_size,
+        invalid_dimensions = [
+            len(record.get("embedding", []))
+            for record in records
+            if isinstance(record.get("embedding"), list)
+            and len(record["embedding"]) != CANONICAL_EMBEDDING_CONFIG.dimension
+        ]
+        if invalid_dimensions:
+            raise ValueError(
+                f"Embedding dimension must be {CANONICAL_EMBEDDING_CONFIG.dimension}; "
+                "the index build was aborted before persistence."
             )
-            if discarded:
-                logger.warning(
-                    "Discarded %d embeddings with unexpected dimension (expected %d)",
-                    discarded,
-                    self.embedding_size,
-                )
-            if not records:
-                return
-            self.ensure_fixed_embedding_schema(self.embedding_size)
+        for record in records:
+            if record.get("embedding_fingerprint") != CANONICAL_EMBEDDING_CONFIG.fingerprint:
+                raise ValueError("Embedding fingerprint does not match canonical configuration")
+        self.configure_embedding_size(CANONICAL_EMBEDDING_CONFIG.dimension)
+        self.ensure_fixed_embedding_schema(CANONICAL_EMBEDDING_CONFIG.dimension)
         table = self.get_table()
         table.add(records)
         self.ensure_vector_index(table)
@@ -464,6 +462,21 @@ class LanceVectorDatabase:
         if active_signature not in signatures:
             raise ValueError(
                 "Embedding model mismatch detected. Rebuild the RAG vector store with the active embedding model."
+            )
+
+    def assert_embedding_fingerprint_matches(self, expected_fingerprint: str) -> None:
+        """Reject missing, mixed, or incompatible canonical vector metadata."""
+        if not self.has_collection():
+            raise ValueError("RAG vector collection is missing")
+        records = self.load_embeddings()
+        fingerprints = {
+            str(row.get("embedding_fingerprint") or "").strip()
+            for row in records
+        }
+        fingerprints.discard("")
+        if fingerprints != {expected_fingerprint}:
+            raise ValueError(
+                "RAG vector collection has missing, mixed, or incompatible embedding fingerprints"
             )
 
     # -------------------------------------------------------------------------

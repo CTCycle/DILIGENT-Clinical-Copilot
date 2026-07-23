@@ -4,6 +4,7 @@ import {
   AccessKeyRecord,
   ConnectivityCheckRequest,
   ConnectivityCheckResponse,
+  EmbeddingStatusResponse,
   JobStartResponse,
   JobStatusResponse,
   ModelConfigStateResponse,
@@ -46,6 +47,13 @@ export async function updateModelConfigState(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchEmbeddingStatus(): Promise<EmbeddingStatusResponse> {
+  return requestJson<EmbeddingStatusResponse>(`${API_BASE_URL}/model-config/embedding-status`, {
+    method: "GET",
+    cache: "no-store",
   });
 }
 

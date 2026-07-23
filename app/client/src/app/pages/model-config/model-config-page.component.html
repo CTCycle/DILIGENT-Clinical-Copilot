@@ -570,42 +570,20 @@
                 <input id="rag-batch-size" type="number" min="1" step="1" [ngModel]="draftRagSettings().embedding_batch_size" (ngModelChange)="setDraftRagNumber('embedding_batch_size', $event)" />
               </div>
               <div class="model-config-rag-setting-row">
-                <label for="rag-max-workers">
-                  Embedding max workers
-                  <small>Maximum concurrent embedding workers</small>
+                <label for="rag-embedding-device">
+                  Embedding device
+                  <small>Runtime device selection for the canonical model</small>
                 </label>
-                <input id="rag-max-workers" type="number" min="1" step="1" [ngModel]="draftRagSettings().embedding_max_workers" (ngModelChange)="setDraftRagNumber('embedding_max_workers', $event)" />
-              </div>
-              <div class="model-config-rag-setting-row">
-                <label for="rag-use-cloud">
-                  Use cloud embeddings
-                  <small>Use the configured cloud embedding service</small>
-                </label>
-                <input id="rag-use-cloud" class="model-config-rag-checkbox" type="checkbox" [ngModel]="draftRagSettings().use_cloud_embeddings" (ngModelChange)="setDraftRagBoolean('use_cloud_embeddings', $event)" />
-              </div>
-              <div class="model-config-rag-setting-row">
-                <label for="rag-cloud-provider">
-                  Cloud provider
-                  <small>Select embedding provider</small>
-                </label>
-                <select id="rag-cloud-provider" [ngModel]="draftRagSettings().cloud_provider" (ngModelChange)="setDraftRagText('cloud_provider', $event)">
-                  <option value="openai">openai</option>
-                  <option value="gemini">gemini</option>
+                <select id="rag-embedding-device" [ngModel]="draftRagSettings().embedding_device" (ngModelChange)="setDraftRagText('embedding_device', $event)">
+                  <option value="auto">Automatic</option>
+                  <option value="cpu">CPU</option>
+                  <option value="cuda">CUDA</option>
+                  <option value="mps">Apple MPS</option>
                 </select>
               </div>
               <div class="model-config-rag-setting-row">
-                <label for="rag-cloud-model">
-                  Cloud embedding model
-                  <small>Model used for cloud embeddings</small>
-                </label>
-                <input id="rag-cloud-model" type="text" [ngModel]="draftRagSettings().cloud_embedding_model" (ngModelChange)="setDraftRagText('cloud_embedding_model', $event)" />
-              </div>
-              <div class="model-config-rag-setting-row">
-                <label for="rag-ollama-model">
-                  Ollama embedding model
-                  <small>Model used for local embeddings</small>
-                </label>
-                <input id="rag-ollama-model" type="text" [ngModel]="draftRagSettings().ollama_embedding_model" (ngModelChange)="setDraftRagText('ollama_embedding_model', $event)" />
+                <label for="rag-embedding-offline">Offline model loading</label>
+                <input id="rag-embedding-offline" type="checkbox" [ngModel]="draftRagSettings().embedding_offline_mode" (ngModelChange)="setDraftRagBoolean('embedding_offline_mode', $event)" />
               </div>
             </section>
             }
@@ -624,56 +602,6 @@
                   }
                 </select>
               </div>
-              <div class="model-config-rag-setting-row">
-                <label for="rag-hf-model">
-                  HF embedding model
-                  <small>Optional Hugging Face embedding model</small>
-                </label>
-                <input id="rag-hf-model" type="text" [ngModel]="draftRagSettings().hf_embedding_model" (ngModelChange)="setDraftRagText('hf_embedding_model', $event)" />
-              </div>
-            </section>
-            }
-
-            @if (activeRagSettingsSection() === 'advanced') {
-            <section class="model-config-rag-settings-section">
-              <h3>Advanced Settings</h3>
-              <div class="model-config-rag-setting-row">
-                <label for="rag-embedding-backend">
-                  Embedding backend
-                  <small>Backend used to resolve embedding requests</small>
-                </label>
-                <input id="rag-embedding-backend" type="text" [ngModel]="draftRagSettings().embedding_backend" (ngModelChange)="setDraftRagText('embedding_backend', $event)" />
-              </div>
-              <div class="model-config-rag-setting-row">
-                <label for="rag-reset-collection">
-                  Reset vector collection
-                  <small>Clear indexed vectors before a full re-embedding pass</small>
-                </label>
-                <input id="rag-reset-collection" class="model-config-rag-checkbox" type="checkbox" [ngModel]="draftRagSettings().reset_vector_collection" (ngModelChange)="setDraftRagBoolean('reset_vector_collection', $event)" />
-              </div>
-            </section>
-            }
-
-            @if (activeRagSettingsSection() === 'providers') {
-            <section class="model-config-rag-settings-section">
-              <h3>Cloud Provider Settings</h3>
-              <div class="model-config-rag-setting-row">
-                <label for="rag-provider-cloud-provider">
-                  Cloud provider
-                  <small>Select embedding provider</small>
-                </label>
-                <select id="rag-provider-cloud-provider" [ngModel]="draftRagSettings().cloud_provider" (ngModelChange)="setDraftRagText('cloud_provider', $event)">
-                  <option value="openai">openai</option>
-                  <option value="gemini">gemini</option>
-                </select>
-              </div>
-              <div class="model-config-rag-setting-row">
-                <label for="rag-provider-cloud-model">
-                  Cloud embedding model
-                  <small>Model used when cloud embeddings are enabled</small>
-                </label>
-                <input id="rag-provider-cloud-model" type="text" [ngModel]="draftRagSettings().cloud_embedding_model" (ngModelChange)="setDraftRagText('cloud_embedding_model', $event)" />
-              </div>
             </section>
             }
 
@@ -688,11 +616,12 @@
                 <input id="rag-stream-batch" type="number" min="1" step="1" [ngModel]="draftRagSettings().vector_stream_batch_size" (ngModelChange)="setDraftRagNumber('vector_stream_batch_size', $event)" />
               </div>
               <div class="model-config-rag-setting-row">
-                <label for="rag-active-model">
-                  Active RAG model
-                  <small>Embedding model currently detected from the vector store</small>
-                </label>
-                <input id="rag-active-model" type="text" [ngModel]="currentRagModelLabel()" disabled />
+                <label>Canonical embedding model</label>
+                <span>{{ currentRagModelLabel() }}</span>
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label>Index status</label>
+                <span>{{ embeddingIndex()?.status || 'reindex_required' }}</span>
               </div>
             </section>
             }

@@ -7,7 +7,9 @@
     "hybrid_vector_weight": 0.65,
     "hybrid_text_weight": 0.35,
     "vector_index_metric": "cosine",
-    "vector_index_type": "IVF_FLAT"
+      "vector_index_type": "IVF_FLAT",
+      "embedding_device": "auto",
+      "embedding_offline_mode": false
   },
   "runtime": {
     "default_llm_timeout": 3600.0,

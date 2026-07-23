@@ -2,20 +2,18 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from typing import Any
 
 from common.constants import DEFAULT_EMBEDDING_BATCH_SIZE
 from common.utils.logger import logger
-from configurations.startup import get_server_settings
 from domain.documents import Document
 from repositories.serialization.document_serializer import DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
-from common.utils.chunking import SmartDocumentChunker
+from common.utils.chunking import TokenWindowDocumentChunker
 from common.utils.embedding_model import EmbeddingModelSpec
 from common.utils.seed_terms import load_seed_term_catalog
-from services.retrieval.embeddings import EmbeddingGenerator
+from services.retrieval.embeddings import CanonicalEmbeddingGenerator
 
 ###############################################################################
 class VectorSerializer:
@@ -27,15 +25,7 @@ class VectorSerializer:
         vector_database: LanceVectorDatabase,
         chunk_size: int,
         chunk_overlap: int,
-        embedding_backend: str,
-        ollama_base_url: str | None = None,
-        ollama_model: str | None = None,
-        hf_model: str | None = None,
-        use_cloud_embeddings: bool = False,
-        cloud_provider: str | None = None,
-        cloud_embedding_model: str | None = None,
         embedding_batch_size: int | None = None,
-        embedding_workers: int | None = None,
         progress_callback: Callable[[float, str], None] | None = None,
     ) -> None:
         if not isinstance(vector_database, LanceVectorDatabase):
@@ -43,19 +33,12 @@ class VectorSerializer:
         self.vector_database = vector_database
         self.documents_path = documents_path
         self.document_serializer = DocumentSerializer(documents_path)
-        self.chunker = SmartDocumentChunker(
-            target_chars=chunk_size,
-            max_chars=max(chunk_size, chunk_size + chunk_overlap),
-            overlap_chars=chunk_overlap,
+        self.embedding_generator = CanonicalEmbeddingGenerator()
+        self.chunker = TokenWindowDocumentChunker(
+            tokenizer_provider=self.embedding_generator.runtime.get_tokenizer,
+            target_tokens=chunk_size,
+            overlap_tokens=chunk_overlap,
             seed_catalog=load_seed_term_catalog(),
-        )
-        self.embedding_generator = EmbeddingGenerator(
-            backend=embedding_backend,
-            ollama_base_url=ollama_base_url,
-            ollama_model=ollama_model,
-            use_cloud_embeddings=use_cloud_embeddings,
-            cloud_provider=cloud_provider,
-            cloud_embedding_model=cloud_embedding_model,
         )
         resolved_batch_size = (
             DEFAULT_EMBEDDING_BATCH_SIZE
@@ -63,12 +46,6 @@ class VectorSerializer:
             else embedding_batch_size
         )
         self.embedding_batch_size = max(int(resolved_batch_size), 1)
-        resolved_workers = (
-            get_server_settings().rag.embedding_max_workers
-            if embedding_workers is None
-            else embedding_workers
-        )
-        self.embedding_workers = max(int(resolved_workers), 1)
         self.progress_callback = progress_callback
         self.model_spec = self.embedding_generator.resolve_active_embedding_model_spec()
 
@@ -122,21 +99,11 @@ class VectorSerializer:
                 batch_iter.append(batch)
         total_batches = len(batch_iter)
         completed_batches = 0
-        with ThreadPoolExecutor(max_workers=self.embedding_workers) as executor:
-            futures = [
-                executor.submit(self._embed_chunk_batch, batch_chunks)
-                for batch_chunks in batch_iter
-            ]
-            for future in as_completed(futures):
-                records, batch_ids = future.result()
-                completed_batches += 1
-                document_ids.update(batch_ids)
-                if not records:
-                    self.report_batch_progress(
-                        completed_batches=completed_batches,
-                        total_batches=total_batches,
-                    )
-                    continue
+        for batch_chunks in batch_iter:
+            records, batch_ids = self._embed_chunk_batch(batch_chunks)
+            completed_batches += 1
+            document_ids.update(batch_ids)
+            if records:
                 self.vector_database.upsert_embeddings(records)
                 total_records += len(records)
                 self.report_batch_progress(
@@ -286,6 +253,7 @@ class VectorSerializer:
                     "vector_model_dimension": model_spec.dimension,
                     "vector_model_mode": model_spec.mode,
                     "vector_model_signature": model_spec.signature,
+                    "embedding_fingerprint": model_spec.signature,
                     "vectorized_at": datetime.now(UTC).isoformat(),
                 }
             )
