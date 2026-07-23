@@ -85,7 +85,11 @@ class InspectionUpdateConfigMixin:
     # -------------------------------------------------------------------------
     def get_effective_rag_documents_path(self) -> str:
         manifest = self.read_rag_manifest()
-        manifest_path = str(manifest.get("documents_path") or "").strip()
+        source = manifest.get("source")
+        source_path = source.get("documents_path") if isinstance(source, dict) else None
+        manifest_path = str(
+            manifest.get("documents_path") or source_path or ""
+        ).strip()
         if manifest_path:
             return manifest_path
         config = self.load_runtime_config()
