@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-07-19
+Last updated: 2026-07-23
 
 Sampling behavior is owned by `services/llm/generation_policy.py`.
 
@@ -15,7 +15,7 @@ Sampling behavior is owned by `services/llm/generation_policy.py`.
   - `ClinicalSessionService` (in `app/server/services/session/session_service.py`) composes behavior from mixins in `consultation.py` and `extraction_pipeline.py`.
   - Clinical and revision workflow helper code shared across session paths lives in `app/server/services/session/workflow_shared.py`; revision workflows must not import from first-run workflow modules.
   - Drug resolution lives in `app/server/services/clinical/drug_resolution/` and owns local-first RxNav catalog candidate generation, LiverTox candidate generation, deterministic acceptance policy, and prepared-input serialization.
-- RAG vector serialization lives in app/server/services/rag/vector_serializer.py; canonical model loading and query/document encoding live in app/server/services/retrieval/embedding_runtime.py.
+- RAG vector serialization lives in app/server/services/rag/vector_serializer.py; canonical Granite multilingual ONNX loading, artifact verification, and query/document encoding live in app/server/services/retrieval/embedding_runtime.py.
   - `app/server/services/text/vocabulary.py` provides cache-facing text normalization business access and does not manage SQLAlchemy sessions directly.
   - `app/server/services/llm/ollama_runtime.py` owns canonical Ollama runtime aliases, errors, environment helpers, message normalization, and exception mapping. Ollama service modules must import these definitions instead of duplicating or monkey-patching them.
   - `app/server/services/llm/structured.py` owns strict JSON object extraction, schema validation, and bounded one-repair structured-output adaptation helpers for provider responses.

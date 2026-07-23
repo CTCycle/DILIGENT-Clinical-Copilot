@@ -1,0 +1,20 @@
+{
+  "documents": [
+    {"id": "en", "language": "en", "text": "Drug induced liver injury may present with elevated alanine aminotransferase and jaundice."},
+    {"id": "it", "language": "it", "text": "Il danno epatico indotto da farmaci può presentarsi con aumento delle transaminasi e ittero."},
+    {"id": "de", "language": "de", "text": "Arzneimittelbedingte Leberschädigung kann mit erhöhten Transaminasen und Ikterus auftreten."},
+    {"id": "fr", "language": "fr", "text": "Une hépatotoxicité médicamenteuse peut provoquer une élévation des transaminases et un ictère."},
+    {"id": "es", "language": "es", "text": "La lesión hepática inducida por fármacos puede causar elevación de transaminasas e ictericia."},
+    {"id": "ja", "language": "ja", "text": "薬物性肝障害はトランスアミナーゼ上昇と黄疸を伴うことがあります。"}
+  ],
+  "queries": [
+    {"id": "en-same", "language": "en", "text": "drug induced liver injury and jaundice", "positive": "en"},
+    {"id": "it-same", "language": "it", "text": "danno epatico indotto da farmaci e ittero", "positive": "it"},
+    {"id": "de-same", "language": "de", "text": "Arzneimittelbedingte Leberschädigung und Ikterus", "positive": "de"},
+    {"id": "fr-same", "language": "fr", "text": "hépatotoxicité médicamenteuse et ictère", "positive": "fr"},
+    {"id": "es-same", "language": "es", "text": "lesión hepática inducida por fármacos e ictericia", "positive": "es"},
+    {"id": "ja-same", "language": "ja", "text": "薬物性肝障害と黄疸", "positive": "ja"},
+    {"id": "it-cross", "language": "it", "text": "danno epatico causato da medicinali", "positive": "fr"},
+    {"id": "de-cross", "language": "de", "text": "Leberschädigung durch Arzneimittel", "positive": "fr"}
+  ]
+}

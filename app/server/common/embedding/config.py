@@ -18,6 +18,11 @@ class CanonicalEmbeddingConfig:
     schema_version: int
     model_id: str
     revision: str
+    runtime_backend: str
+    artifact_path: str
+    artifact_sha256: str
+    quantization: str
+    execution_provider: str
     dimension: int
     pooling: str
     normalize: bool
@@ -54,16 +59,21 @@ class CanonicalEmbeddingConfig:
 
 
 CANONICAL_EMBEDDING_CONFIG = CanonicalEmbeddingConfig(
-    schema_version=1,
-    model_id="ibm-granite/granite-embedding-small-english-r2",
-    revision="2ab6fa8ea2d674564defd37171ae19079b864b33",
+    schema_version=2,
+    model_id="ibm-granite/granite-embedding-97m-multilingual-r2",
+    revision="c61e626a6255c490879d0af885078b61929d51f6",
+    runtime_backend="onnxruntime",
+    artifact_path="onnx/model_quint8_avx2.onnx",
+    artifact_sha256="a6022dd8220ea6f6595562a1328ee216f4a94faa55362f2f4747c80f1e78772e",
+    quantization="uint8-avx2",
+    execution_provider="CPUExecutionProvider",
     dimension=384,
     pooling="cls",
     normalize=True,
     query_prefix="",
     document_prefix="",
     distance_metric="cosine",
-    maximum_model_tokens=8192,
+    maximum_model_tokens=32768,
     maximum_query_tokens=1024,
     default_chunk_tokens=512,
     default_chunk_overlap_tokens=64,

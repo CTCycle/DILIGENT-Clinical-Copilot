@@ -45,9 +45,9 @@ from services.retrieval.settings import (
 )
 from services.retrieval.embedding_runtime import get_embedding_runtime
 
+
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
-
     # -------------------------------------------------------------------------
     def load_snapshot(self) -> ModelConfigSnapshot: ...
 
@@ -64,6 +64,7 @@ class ModelConfigSnapshotStore(Protocol):
         ollama_seed: int | None | object = ...,
         rag_settings: dict[str, object] | object = ...,
     ) -> ModelConfigSnapshot: ...
+
 
 ###############################################################################
 class ModelConfigService:
@@ -438,9 +439,6 @@ class ModelConfigService:
                 payload.get("vector_stream_batch_size"),
                 current.vector_stream_batch_size,
             ),
-            "embedding_device": coerce_str(
-                payload.get("embedding_device"), current.embedding_device
-            ),
             "embedding_offline_mode": coerce_bool(
                 payload.get("embedding_offline_mode"), current.embedding_offline_mode
             ),
@@ -565,7 +563,10 @@ class ModelConfigService:
                         f"A model is required for the local '{role_name}' role."
                     )
                 continue
-            if model_name not in self.local_model_names and not snapshot.use_cloud_models:
+            if (
+                model_name not in self.local_model_names
+                and not snapshot.use_cloud_models
+            ):
                 raise ServiceValidationError(
                     f"Model '{model_name}' is not supported for role '{role_name}'."
                 )
@@ -738,9 +739,9 @@ class ModelConfigService:
     def build_embedding_runtime_status() -> EmbeddingRuntimeStatus:
         status = get_embedding_runtime().status()
         return EmbeddingRuntimeStatus(
-            model_display_name="Granite Embedding Small English R2",
+            model_display_name="Granite Embedding 97M Multilingual R2",
             model_revision=CANONICAL_EMBEDDING_CONFIG.revision,
-            device=str(status["device"]),
+            device=str(status["execution_provider"]),
             cache_status=str(status["cache_status"]),
             loaded=bool(status["loaded"]),
         )
@@ -752,7 +753,7 @@ class ModelConfigService:
             return EmbeddingIndexStatus(status="reindex_required")
         try:
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             return EmbeddingIndexStatus(status="corrupt")
         if not isinstance(payload, dict):
             return EmbeddingIndexStatus(status="corrupt")
@@ -838,7 +839,9 @@ class ModelConfigService:
                     if cached:
                         catalog_updated_at, models = cached
                         status = "cached"
-                        message = "Showing models from the last successful provider refresh."
+                        message = (
+                            "Showing models from the last successful provider refresh."
+                        )
                     else:
                         models = self._configured_provider_models(
                             snapshot, item.provider_id
@@ -858,7 +861,9 @@ class ModelConfigService:
                     if cached:
                         catalog_updated_at, models = cached
                         status = "cached"
-                        message = "Showing models from the last successful provider refresh."
+                        message = (
+                            "Showing models from the last successful provider refresh."
+                        )
                     else:
                         models = self._configured_provider_models(
                             snapshot, item.provider_id
@@ -924,7 +929,9 @@ class ModelConfigService:
                     "catalog_message": (
                         "Provider catalog refresh is deferred; showing the configured model."
                     ),
-                    "models": sorted(models.values(), key=lambda model: model.id.casefold()),
+                    "models": sorted(
+                        models.values(), key=lambda model: model.id.casefold()
+                    ),
                 }
             )
             break
