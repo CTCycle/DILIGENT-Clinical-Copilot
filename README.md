@@ -143,7 +143,9 @@ The structured assessment retains details such as longitudinal events, Hy's Law 
 Use the copy or export actions only after a human reviewer has verified the result and added any required local attribution.
 
 ![Dashboard view](assets/figures/dashboard.png)
+![Dashboard view](assets/figures/dashboard-dark-theme.png)
 _The DILI Agent workspace combines structured case input with assessment actions and report output._
+
 
 ## Work with saved sessions
 
@@ -159,7 +161,7 @@ Open **Clinical Sessions** to find persisted work by identifier, date, or availa
 Manual report edits do not create a new official version. Review provenance and persisted evidence before approving an LLM-assisted revision.
 
 ![Session dashboard](assets/figures/session-inspection.png)
-_Clinical Sessions shows a persisted review workspace; the displayed case content is intentionally blurred._
+_Clinical Sessions shows a persisted review workspace._
 
 ## Use the timeline and data inspection views
 
@@ -182,19 +184,6 @@ _Data Inspection presents curated resource records, status, and maintenance info
 | A session is missing | Confirm the assessment completed and that local persistence was initialized. |
 
 Clinical jobs are process-local. Saved sessions remain durable, but an active job identifier cannot be recovered after a backend restart.
-
-## Development and validation
-
-The repository includes focused model-configuration regression commands:
-
-```cmd
-app\tests\run_tests.bat modelconfig
-app\tests\run_tests.bat modelconfigfull
-```
-
-`modelconfig` runs the focused model-configuration slice. `modelconfigfull` runs model-configuration tests, the complete application-flow suite, and the model-configuration API suite. The project tests are designed not to require local or cloud LLM calls.
-
-For implementation and operational detail, start with [the documentation index](assets/docs/project_index.md), then use the focused guides for [getting started](assets/docs/user/getting_started.md), [model setup](assets/docs/user/model_setup.md), [DILI assessment workflow](assets/docs/user/dili_assessment_workflow.md), [sessions, timeline, and data](assets/docs/user/sessions_timeline_and_data.md), and [runtime troubleshooting](assets/docs/runtime/troubleshooting.md).
 
 ## Project status and license
 
