@@ -2,6 +2,7 @@
 app/resources/sources/archives/**
 app/resources/sources/documents/**
 app/resources/sources/vectors/**
+app/resources/models/embeddings/**
 app/resources/logs/**
 app/client/node_modules/
 app/client/dist/

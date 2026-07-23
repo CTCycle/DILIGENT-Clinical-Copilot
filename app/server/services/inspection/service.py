@@ -292,7 +292,9 @@ class DataInspectionService(
             rag_settings = build_effective_rag_settings()
             vector_db = LanceVectorDatabase(
                 database_path=str(VECTOR_DB_PATH),
-                collection_name=rag_settings.vector_collection_name,
+                collection_name=read_active_collection_name(
+                    str(rag_settings.vector_collection_name)
+                ),
                 metric=rag_settings.vector_index_metric,
                 index_type=rag_settings.vector_index_type,
                 stream_batch_size=rag_settings.vector_stream_batch_size,
