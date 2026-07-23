@@ -6,9 +6,11 @@ import pandas as pd
 from domain.clinical import DrugEntry, PatientDrugs
 from services.clinical.drug_identity import DrugIdentityResolver
 from services.clinical.drug_resolution import DrugResolutionService
+from services.clinical.match_resolution import conservative_fuzzy_livertox_match
 from services.clinical.matches_core import LiverToxMatcher
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.text.normalization import normalize_drug_query_name
+
 
 ###############################################################################
 def build_livertox_df() -> pd.DataFrame:
@@ -49,6 +51,7 @@ def build_livertox_df() -> pd.DataFrame:
         ]
     )
 
+
 ###############################################################################
 def test_exact_canonical_match_works() -> None:
     matcher = LiverToxMatcher(build_livertox_df())
@@ -57,6 +60,7 @@ def test_exact_canonical_match_works() -> None:
     assert result.status == "matched"
     assert result.matched_name == "Acetaminophen"
     assert result.reason == "exact_canonical"
+
 
 ###############################################################################
 def test_alias_resolution_works() -> None:
@@ -67,6 +71,7 @@ def test_alias_resolution_works() -> None:
     assert result.matched_name == "Acetaminophen"
     assert result.reason == "exact_alias"
 
+
 ###############################################################################
 def test_small_typo_resolves_to_unique_authoritative_match() -> None:
     matcher = LiverToxMatcher(build_livertox_df())
@@ -76,6 +81,7 @@ def test_small_typo_resolves_to_unique_authoritative_match() -> None:
     assert result.matched_name == "Acetaminophen"
     assert result.reason == "spelling_correction"
 
+
 ###############################################################################
 def test_one_sided_name_fragment_is_not_joined_to_evidence() -> None:
     matcher = LiverToxMatcher(build_livertox_df())
@@ -83,6 +89,7 @@ def test_one_sided_name_fragment_is_not_joined_to_evidence() -> None:
 
     assert result.status in {"missing", "ambiguous"}
     assert result.matched_name is None
+
 
 ###############################################################################
 def test_small_typo_stays_ambiguous_when_multiple_authoritative_candidates_exist() -> (
@@ -116,6 +123,7 @@ def test_small_typo_stays_ambiguous_when_multiple_authoritative_candidates_exist
     assert result.reason == "ambiguous_spelling_correction"
     assert result.candidate_names == ["Metforman", "Metformin"]
 
+
 ###############################################################################
 def test_no_match_is_safe_and_explicit() -> None:
     matcher = LiverToxMatcher(build_livertox_df())
@@ -124,6 +132,7 @@ def test_no_match_is_safe_and_explicit() -> None:
     assert result.status == "missing"
     assert result.matched_name is None
     assert result.confidence is None
+
 
 ###############################################################################
 def test_excerpt_attached_only_for_valid_match_confidence() -> None:
@@ -148,6 +157,7 @@ def test_excerpt_attached_only_for_valid_match_confidence() -> None:
     assert missing["missing_livertox"] is True
     assert missing["extracted_excerpts"] == []
 
+
 ###############################################################################
 def test_duplicate_drugs_from_sources_are_merged_by_canonical_name() -> None:
     drugs = PatientDrugs(
@@ -165,6 +175,7 @@ def test_duplicate_drugs_from_sources_are_merged_by_canonical_name() -> None:
     payload = next(iter(resolved.values()))
     assert payload["accepted_livertox_name"] == "Acetaminophen"
     assert payload["origins"] == ["therapy", "anamnesis"]
+
 
 ###############################################################################
 def test_preparation_resolves_catalog_identity_candidates_before_livertox_lookup() -> (
@@ -260,6 +271,7 @@ def test_preparation_resolves_catalog_identity_candidates_before_livertox_lookup
 
     assert {"Prednisone", "Abiraterone", "Tamsulosin", "Leuprolide"} <= canonical_names
 
+
 ###############################################################################
 def test_component_splitting_keeps_units_and_drops_noise() -> None:
     assert DrugIdentityResolver.split_components("Trialmed 4500 IU/ml") == [
@@ -276,6 +288,7 @@ def test_component_splitting_keeps_units_and_drops_noise() -> None:
         "Alphamed",
         "Betamed",
     ]
+
 
 ###############################################################################
 def test_catalog_alias_quality_rejects_formulation_pollution() -> None:
@@ -320,6 +333,7 @@ def test_catalog_alias_quality_rejects_formulation_pollution() -> None:
     assert cholecalciferol.matched_name == "Cholecalciferol"
     assert calcium.matched_name != "Diazepam"
 
+
 ###############################################################################
 def test_prepare_inputs_handles_empty_drugs_without_crashing() -> None:
     preparation = ClinicalKnowledgePreparation()
@@ -333,6 +347,7 @@ def test_prepare_inputs_handles_empty_drugs_without_crashing() -> None:
     )
 
     assert prepared is None
+
 
 ###############################################################################
 def test_matcher_keeps_matching_when_nbk_id_is_missing() -> None:
@@ -355,6 +370,7 @@ def test_matcher_keeps_matching_when_nbk_id_is_missing() -> None:
     assert result.status == "matched"
     assert result.matched_name == "Diazepam"
     assert result.nbk_id is None
+
 
 ###############################################################################
 def test_repeated_nbk_ids_are_not_collapsed_across_monographs() -> None:
@@ -388,6 +404,7 @@ def test_repeated_nbk_ids_are_not_collapsed_across_monographs() -> None:
     assert exact.nbk_id == "NBKSHARED"
     assert shared_alias.status == "ambiguous"
     assert shared_alias.candidate_names == ["Alphaquine", "Betazole"]
+
 
 ###############################################################################
 def test_related_excerpt_is_used_when_matched_monograph_excerpt_is_missing() -> None:
@@ -429,6 +446,7 @@ def test_related_excerpt_is_used_when_matched_monograph_excerpt_is_missing() -> 
         )
     )
 
+
 ###############################################################################
 def test_query_normalization_handles_brands_and_manufacturers() -> None:
     assert (
@@ -440,6 +458,7 @@ def test_query_normalization_handles_brands_and_manufacturers() -> None:
     assert normalize_drug_query_name("Levetiracetam dal 27.08.2024") == "levetiracetam"
     assert normalize_drug_query_name("Nozinan dal 11.09.2024") == "levomepromazine"
     assert normalize_drug_query_name("Morfina gtt 5 3/die") == "morfina"
+
 
 ###############################################################################
 def test_mapping_prefers_excerpt_row_for_duplicate_normalized_drug() -> None:
@@ -485,6 +504,7 @@ def test_mapping_prefers_excerpt_row_for_duplicate_normalized_drug() -> None:
     assert entry["matched_livertox_row"]["nbk_id"] == "NBK0002"
     assert "useful diazepam excerpt" in entry["extracted_excerpts"][0].lower()
 
+
 ###############################################################################
 def test_query_normalization_high_value_aliases_are_deterministic() -> None:
     assert normalize_drug_query_name("Co-amoxi 1g") == "amoxicillin clavulanate"
@@ -505,6 +525,7 @@ def test_query_normalization_high_value_aliases_are_deterministic() -> None:
     assert normalize_drug_query_name("dal") == ""
     assert normalize_drug_query_name("entrambi e il") == ""
     assert normalize_drug_query_name("rialzo a") == ""
+
 
 ###############################################################################
 def test_matcher_prefers_combo_for_bactrim_brand_disambiguation() -> None:
@@ -547,6 +568,7 @@ def test_matcher_prefers_combo_for_bactrim_brand_disambiguation() -> None:
         not result.rejected_candidate_names
         or "Trimethoprim-Sulfamethoxazole" not in result.rejected_candidate_names
     )
+
 
 ###############################################################################
 def test_matcher_handles_source_backed_spelling_aliases() -> None:
@@ -611,6 +633,7 @@ def test_matcher_handles_source_backed_spelling_aliases() -> None:
         "normalized_exact",
     }
 
+
 ###############################################################################
 def test_matcher_accepts_small_authoritative_name_misspellings() -> None:
     frame = pd.DataFrame(
@@ -672,6 +695,7 @@ def test_matcher_accepts_small_authoritative_name_misspellings() -> None:
     assert esomeprazolo.matched_name == "Esomeprazole"
     assert morfina.status == "missing"
 
+
 ###############################################################################
 def test_matcher_keeps_unsafe_multilingual_fallbacks_unresolved() -> None:
     frame = pd.DataFrame(
@@ -718,6 +742,7 @@ def test_matcher_keeps_unsafe_multilingual_fallbacks_unresolved() -> None:
     assert insulin.status in {"missing", "ambiguous"}
     assert insulin.matched_name != "Folic Acid"
 
+
 ###############################################################################
 def test_identity_resolution_does_not_manufacture_prefix_or_stem_queries() -> None:
     frame = pd.DataFrame(
@@ -753,6 +778,7 @@ def test_identity_resolution_does_not_manufacture_prefix_or_stem_queries() -> No
     assert all(
         candidate.canonical_candidate != "diazepam" for candidate in levothyroxine
     )
+
 
 ###############################################################################
 def test_known_italian_drug_aliases_normalize_before_matching() -> None:
@@ -795,6 +821,7 @@ def test_known_italian_drug_aliases_normalize_before_matching() -> None:
         "Sulfamethoxazole Trimethoprim",
     ]
 
+
 ###############################################################################
 def test_formulation_words_are_removed_from_livertox_query() -> None:
     frame = pd.DataFrame(
@@ -815,6 +842,7 @@ def test_formulation_words_are_removed_from_livertox_query() -> None:
 
     assert result.status == "matched"
     assert result.matched_name == "Boswellia Serrata"
+
 
 ###############################################################################
 def test_matcher_prefers_full_latin_script_combination_before_components() -> None:
@@ -856,6 +884,7 @@ def test_matcher_prefers_full_latin_script_combination_before_components() -> No
     assert piperacillin.status == "matched"
     assert piperacillin.matched_name == "Piperacillin Tazobactam"
 
+
 ###############################################################################
 def test_mapping_classifies_matched_no_excerpt_separately_from_missing_match() -> None:
     frame = pd.DataFrame(
@@ -885,6 +914,7 @@ def test_mapping_classifies_matched_no_excerpt_separately_from_missing_match() -
     assert missing["match_status"] == "missing_match"
     assert missing["missing_livertox"] is True
 
+
 ###############################################################################
 def test_preparation_expands_regimen_into_multiple_components() -> None:
     drugs = PatientDrugs(
@@ -910,6 +940,7 @@ def test_preparation_expands_regimen_into_multiple_components() -> None:
             assert "binimetinib|encorafenib" in payload["regimen_group_ids"]
         if payload["canonical_name"] in {"dabrafenib", "trametinib"}:
             assert "dabrafenib|trametinib" in payload["regimen_group_ids"]
+
 
 ###############################################################################
 def test_catalog_retry_resolves_ambiguous_match_via_catalog_alias() -> None:
@@ -959,6 +990,7 @@ def test_catalog_retry_resolves_ambiguous_match_via_catalog_alias() -> None:
         "normalized_exact_ranked",
     }
 
+
 ###############################################################################
 def test_ambiguous_retry_preserves_original_when_catalog_does_not_help() -> None:
     """When catalog aliases still cannot resolve an ambiguous match,
@@ -989,3 +1021,91 @@ def test_ambiguous_retry_preserves_original_when_catalog_does_not_help() -> None
     assert result.status == "ambiguous"
     assert "DrugAlpha" in result.candidate_names
     assert "DrugBeta" in result.candidate_names
+
+
+###############################################################################
+def _build_rxnav_livertox_df() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0001",
+                "drug_name": "Acetaminophen",
+                "excerpt": "Acetaminophen can cause dose-related liver injury.",
+                "synonyms": "Paracetamol; Tylenol",
+                "ingredient": "Acetaminophen",
+                "brand_name": "Tylenol",
+            },
+            {
+                "nbk_id": "NBK0002",
+                "drug_name": "Omeprazole",
+                "excerpt": "Omeprazole has rare liver injury reports.",
+                "synonyms": "Losec",
+                "ingredient": "Omeprazole",
+                "brand_name": "Losec",
+            },
+        ]
+    )
+
+
+###############################################################################
+def test_conservative_fuzzy_livertox_match_high_threshold() -> None:
+    assert (
+        conservative_fuzzy_livertox_match(
+            ["acetaminophenn"],
+            ["Acetaminophen", "Omeprazole"],
+        )
+        == "Acetaminophen"
+    )
+    assert (
+        conservative_fuzzy_livertox_match(
+            ["zzzzz"],
+            ["Acetaminophen", "Omeprazole"],
+        )
+        is None
+    )
+
+
+###############################################################################
+def test_prepare_inputs_resolves_direct_livertox_alias() -> None:
+    prep = ClinicalKnowledgePreparation()
+    prep.livertox_matcher = LiverToxMatcher(_build_rxnav_livertox_df())
+    prepared = asyncio.run(
+        prep.prepare_inputs(
+            PatientDrugs(entries=[DrugEntry(name="Tylenol")]),
+            clinical_context="",
+            pattern_score=None,
+        )
+    )
+    assert prepared is not None
+    payload = next(iter(prepared.resolved_drugs.values()))
+    assert payload["accepted_livertox_name"] == "Acetaminophen"
+    assert payload["decision_status"] == "accepted_livertox_without_rxnav"
+
+
+###############################################################################
+def test_livertox_match_audit_flags_missing_ambiguous_and_low_confidence() -> None:
+    preparation = ClinicalKnowledgePreparation()
+    issues = preparation.build_match_audit_issues(
+        {
+            "drug-a": {
+                "raw_mentions": ["Drug A"],
+                "missing_livertox": True,
+                "match_status": "missing_match",
+                "rxnav_validated": False,
+                "rxnav_rxcui": None,
+            },
+            "drug-b": {
+                "raw_mentions": ["Drug B"],
+                "ambiguous_match": True,
+                "match_confidence": 0.4,
+                "rxnav_validated": True,
+                "rxnav_rxcui": "123",
+            },
+        }
+    )
+
+    codes = {issue.code for issue in issues}
+    assert "livertox_match_missing" in codes
+    assert "livertox_match_ambiguous" in codes
+    assert "livertox_match_low_confidence" in codes
+    assert "rxnav_alias_not_validated" in codes

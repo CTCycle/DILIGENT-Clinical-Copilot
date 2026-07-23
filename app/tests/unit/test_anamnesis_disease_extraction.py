@@ -15,6 +15,7 @@ from domain.clinical import (
     PatientDrugs,
     PatientLabTimeline,
 )
+from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.clinical.disease import DiseaseExtractor
 from services.session.session_service import ClinicalSessionService
 
@@ -233,3 +234,35 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
     assert "# Pattern" in context
     assert "2025-04-14" in context
     assert "class=mixed | R=1.67" in context
+
+###############################################################################
+def test_disease_evidence_validation_sets_span_and_attribution() -> None:
+    extractor = DiseaseExtractor()
+    entry = DiseaseContextEntry(name="diabetes", evidence="diabetes mellitus")
+
+    result = extractor.validate_entry_evidence(
+        entry,
+        "History of diabetes mellitus in the patient.",
+    )
+
+    assert result.source_span == [11, 28]
+    assert result.confidence == "high"
+    assert result.attribution == "patient"
+
+###############################################################################
+def test_deterministic_disease_extraction_captures_hepatic_and_oncologic_context() -> (
+    None
+):
+    text = (
+        "High grade ovarian serous carcinoma con carcinosi peritoneale.\n"
+        "Steatosi epatica cronica documentata.\n"
+        "Sospetta polmonite recente.\n"
+    )
+
+    result = extract_deterministic_diseases(text)
+    names = [entry.name for entry in result.context.entries]
+
+    assert any("carcinoma" in name.lower() for name in names)
+    assert "Carcinosi peritoneale" in names
+    assert "Steatosi epatica" in names
+    assert "Polmonite" in names

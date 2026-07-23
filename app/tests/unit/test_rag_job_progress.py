@@ -5,8 +5,10 @@ from typing import Any
 
 from services.inspection import update_jobs as update_jobs_module
 from services.inspection.service import DataInspectionService
+from services.rag.vector_serializer import VectorSerializer
 from services.runtime.jobs import JobManager
 from repositories.serialization.data import DataSerializer
+
 
 ###############################################################################
 def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
@@ -59,3 +61,20 @@ def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
         time.sleep(0.01)
 
     assert "Embedded and persisted batch 2/4" in observed_messages
+
+
+###############################################################################
+def test_batch_progress_scales_through_embedding_window() -> None:
+    events: list[tuple[float, str]] = []
+    serializer = object.__new__(VectorSerializer)
+    serializer.progress_callback = lambda progress, message: events.append(
+        (progress, message)
+    )
+
+    serializer.report_batch_progress(completed_batches=1, total_batches=4)
+    serializer.report_batch_progress(completed_batches=4, total_batches=4)
+
+    assert events == [
+        (44.5, "Embedded and persisted batch 1/4"),
+        (88.0, "Embedded and persisted batch 4/4"),
+    ]

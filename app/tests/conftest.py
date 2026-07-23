@@ -183,11 +183,6 @@ def base_url() -> str:
     return UI_BASE_URL
 
 ###############################################################################
-@pytest.fixture(scope="session")
-def api_base_url() -> str:
-    """Returns the base URL of the API."""
-    return API_BASE_URL
-
 ###############################################################################
 @pytest.fixture
 def api_context(playwright):
