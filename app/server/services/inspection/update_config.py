@@ -20,6 +20,7 @@ from services.text.vocabulary import (
     upsert_text_normalization_term_payload,
 )
 
+
 ###############################################################################
 class InspectionUpdateConfigMixin:
     RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"
@@ -51,7 +52,13 @@ class InspectionUpdateConfigMixin:
         manifest_path = self.rag_manifest_path()
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         libraries: dict[str, str] = {}
-        for package in ("sentence-transformers", "transformers", "tokenizers", "torch", "lancedb"):
+        for package in (
+            "onnxruntime",
+            "tokenizers",
+            "numpy",
+            "huggingface-hub",
+            "lancedb",
+        ):
             try:
                 libraries[package.replace("-", "_")] = version(package)
             except PackageNotFoundError:
@@ -87,9 +94,7 @@ class InspectionUpdateConfigMixin:
         manifest = self.read_rag_manifest()
         source = manifest.get("source")
         source_path = source.get("documents_path") if isinstance(source, dict) else None
-        manifest_path = str(
-            manifest.get("documents_path") or source_path or ""
-        ).strip()
+        manifest_path = str(manifest.get("documents_path") or source_path or "").strip()
         if manifest_path:
             return manifest_path
         config = self.load_runtime_config()
@@ -182,7 +187,6 @@ class InspectionUpdateConfigMixin:
                 "chunk_overlap": int(rag_settings.chunk_overlap),
                 "embedding_batch_size": int(rag_settings.embedding_batch_size),
                 "vector_stream_batch_size": int(rag_settings.vector_stream_batch_size),
-                "embedding_device": rag_settings.embedding_device,
                 "embedding_offline_mode": bool(rag_settings.embedding_offline_mode),
             }
             return {

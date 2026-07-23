@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import unicodedata
 from collections.abc import Coroutine
 from difflib import SequenceMatcher
 from typing import Any, Literal, Protocol, cast
@@ -29,19 +30,21 @@ from services.retrieval.embedding_runtime import get_embedding_runtime
 ProviderName = Literal["openai", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]
 
+
 ###############################################################################
 class EmbeddingModelMismatchError(RuntimeError):
     pass
 
+
 ###############################################################################
 class Reranker(Protocol):
-
     # -------------------------------------------------------------------------
     def predict(self, pairs: list[tuple[str, str]]) -> list[float]: ...
 
+
 ###############################################################################
 class LocalHeuristicReranker:
-    TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
+    TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
     KNOWN_PROFILES = frozenset(
         {
             "lightweight-balanced-v1",
@@ -149,7 +152,11 @@ class LocalHeuristicReranker:
     # -------------------------------------------------------------------------
     @classmethod
     def normalize_text(cls, value: str) -> str:
-        return " ".join(cls.TOKEN_PATTERN.findall((value or "").casefold()))
+        return " ".join(
+            cls.TOKEN_PATTERN.findall(
+                unicodedata.normalize("NFKC", value or "").casefold()
+            )
+        )
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -177,6 +184,7 @@ class LocalHeuristicReranker:
             return 0.0
         return matches / len(query_bigrams)
 
+
 ###############################################################################
 def _map_embedding_exception(
     exc: Exception,
@@ -202,9 +210,9 @@ def _map_embedding_exception(
         return OllamaError(f"Failed to request Ollama embeddings: {exc}")
     return LLMError(f"Failed to request cloud embeddings: {exc}")
 
+
 ###############################################################################
 class CloudEmbeddingGenerator:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -279,9 +287,9 @@ class CloudEmbeddingGenerator:
             raise LLMError("Mismatch between cloud embeddings and inputs")
         return normalized
 
+
 ###############################################################################
 class OllamaEmbeddingGenerator:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -338,6 +346,7 @@ class OllamaEmbeddingGenerator:
             raise OllamaError("Mismatch between Ollama embeddings and inputs")
         return normalized
 
+
 ###############################################################################
 def select_embedding_provider(
     *,
@@ -379,9 +388,9 @@ def select_embedding_provider(
 
     raise ValueError(f"Unsupported embedding backend: {backend}")
 
+
 ###############################################################################
 class EmbeddingGenerator:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -479,16 +488,16 @@ class CanonicalEmbeddingGenerator:
 
     def resolve_active_embedding_model_spec(self) -> EmbeddingModelSpec:
         return EmbeddingModelSpec(
-            provider="sentence-transformers",
+            provider="onnxruntime",
             model_name=CANONICAL_EMBEDDING_CONFIG.model_id,
             dimension=CANONICAL_EMBEDDING_CONFIG.dimension,
             mode="canonical",
             signature=CANONICAL_EMBEDDING_CONFIG.fingerprint,
         )
 
+
 ###############################################################################
 class SimilaritySearch:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -541,7 +550,9 @@ class SimilaritySearch:
             if strict_match is not None:
                 strict_match(model_spec.signature)
             else:
-                self.vector_database.assert_query_model_matches_index(model_spec.signature)
+                self.vector_database.assert_query_model_matches_index(
+                    model_spec.signature
+                )
         except Exception as exc:  # noqa: BLE001
             raise EmbeddingModelMismatchError(
                 "Active embedding model does not match indexed vectors. Rebuild the RAG vector store."

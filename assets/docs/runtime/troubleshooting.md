@@ -1,8 +1,12 @@
 # Runtime Troubleshooting
-Last updated: 2026-06-05
+Last updated: 2026-07-23
 
 ## Scope
 This file covers recurring local startup and launch failures.
+
+## RAG Embedding Cache Is Missing or Invalid
+
+The canonical runtime uses only the pinned Granite 97M multilingual ONNX artifact at `app/resources/models/embeddings/<revision>/onnx/model_quint8_avx2.onnx`. A missing cache requires network access followed by a RAG rebuild. A dependency error requires reinstalling the synchronized Python environment. For an invalid digest or incomplete snapshot, remove only that revision directory and rebuild. The runtime never substitutes another artifact or backend; disable RAG for the current assessment while repairing the cache.
 
 ## Expected Local Ports
 - Backend: `127.0.0.1:7690`

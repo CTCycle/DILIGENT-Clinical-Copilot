@@ -10,9 +10,9 @@ from services.rag.vector_serializer import VectorSerializer
 from repositories.vectors import LanceVectorDatabase
 from services.retrieval.settings import build_effective_rag_settings
 
+
 ###############################################################################
 class RagEmbeddingUpdater:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -84,7 +84,7 @@ class RagEmbeddingUpdater:
         summary["generation_id"] = self.generation_id
         summary["collection_name"] = self.vector_collection_name
         logger.info(
-            "RAG embeddings refreshed using sentence-transformers (%d documents, %d chunks)",
+            "RAG embeddings refreshed using the multilingual Granite ONNX runtime (%d documents, %d chunks)",
             summary.get("documents", 0),
             summary.get("chunks", 0),
         )
