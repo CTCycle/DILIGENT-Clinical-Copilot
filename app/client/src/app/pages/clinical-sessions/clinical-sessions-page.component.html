@@ -459,7 +459,7 @@
               @if (revisionModelError()) { <p class="clinical-session-panel-note is-error">{{ revisionModelError() }}</p> }
             </section>
             @if (revisionStatus()) { <p class="clinical-session-panel-note">{{ revisionStatus() }}</p> }
-            @if (revisionVersionId() !== null && !revisionRunning()) { <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="recordRevisionReview('approved')">Approve by human</button><button type="button" class="btn" (click)="recordRevisionReview('rejected')">Reject</button></div> }
+            @if (revisionReviewAvailable()) { <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="recordRevisionReview('approved')">Approve by human</button><button type="button" class="btn" (click)="recordRevisionReview('rejected')">Reject</button></div> }
             @if (revisionSteps().length) { <h4>Agent trace</h4><ul class="clinical-session-side-list">@for (step of revisionSteps(); track step.step_name) { <li><strong>{{ step.step_name }}</strong><small>{{ step.status }}</small></li> }</ul> }
             @if (revisionArtifacts().length) { <h4>Draft artifacts</h4><ul class="clinical-session-side-list">@for (artifact of revisionArtifacts(); track artifact.artifact_key) { <li><strong>{{ artifact.artifact_key || 'artifact' }}</strong><small>{{ artifact.status || 'recorded' }}</small></li> }</ul> }
           </div>        }

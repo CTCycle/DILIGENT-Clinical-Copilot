@@ -196,6 +196,7 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
     }
 
 
+###############################################################################
 def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
@@ -243,6 +244,7 @@ def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> 
     }
 
 
+###############################################################################
 def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
@@ -271,6 +273,39 @@ def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
     started = service.start_revision_job(session_id, SessionRevisionRequest())
 
     assert started["job_type"] == service.REVISION_JOB_TYPE
+
+
+###############################################################################
+def test_manual_edit_skips_orphaned_revision_version_numbers(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+
+    serializer.create_revision_version_shell(
+        session_id,
+        reviewer_note="First failed revision.",
+        configuration={"model": "deepseek-v4-flash"},
+        pipeline_run_id="failed-revision-1",
+    )
+    serializer.create_revision_version_shell(
+        session_id,
+        reviewer_note="Second failed revision.",
+        configuration={"model": "deepseek-v4-flash"},
+        pipeline_run_id="failed-revision-2",
+    )
+
+    serializer.update_current_report_text_with_manual_audit(
+        session_id,
+        report_text="Manually corrected after failed revisions.",
+        edited_fields=["report_text"],
+        reviewer_note="Corrected wording.",
+        edited_by="Unit test",
+        metadata={},
+    )
+
+    version = serializer.get_version_record_for_session(session_id)
+    assert version is not None
+    assert version["version_number"] == 4
+    assert version["revision_kind"] == "manual_edit"
 
 ###############################################################################
 class SlowRevisionRunner:

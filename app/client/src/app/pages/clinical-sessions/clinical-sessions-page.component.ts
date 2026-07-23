@@ -161,6 +161,11 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionVersionId = signal<number | null>(null);
   readonly revisionSteps = signal<RevisionPipelineStep[]>([]);
   readonly revisionArtifacts = signal<RevisionArtifact[]>([]);
+  readonly revisionReviewAvailable = computed(() => (
+    this.revisionVersionId() !== null
+    && !this.revisionRunning()
+    && !['cancelled', 'failed'].includes(this.revisionStatus().trim().toLowerCase())
+  ));
   readonly revisionModelLoading = signal(false);
   readonly revisionModelError = signal<string | null>(null);
   readonly revisionModelConfig = signal<ModelConfigStateResponse | null>(null);
@@ -469,6 +474,9 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   async startRevision(): Promise<void> {
     const detail = this.selected();
     if (!detail || this.revisionRunning()) return;
+    this.revisionVersionId.set(null);
+    this.revisionSteps.set([]);
+    this.revisionArtifacts.set([]);
     this.revisionRunning.set(true);
     this.revisionStatus.set('Starting revision agent...');
     this.revisionPollCancelled = false;
@@ -509,7 +517,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (!detail || versionId === null) return;
     try {
       await updateRevisionClinicalReview(detail.session_id, versionId, {
-        clinical_review_status: status,
+        clinical_review_status: status === 'approved' ? 'approved_by_human' : 'rejected_by_human',
         reviewed_by: this.manualEditEditedBy().trim() || null,
         reviewer_note: this.revisionInstruction().trim() || null,
       });

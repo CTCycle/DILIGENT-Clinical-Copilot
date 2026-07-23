@@ -3,7 +3,6 @@ from __future__ import annotations
 from domain.llm.providers import CloudModelDescriptor
 from services.llm.transports.routed_gateway import RoutedGatewayTransport
 
-
 ###############################################################################
 def _transport(models_path: str = "/zen/go/v1/models") -> RoutedGatewayTransport:
     return RoutedGatewayTransport(
@@ -12,7 +11,6 @@ def _transport(models_path: str = "/zen/go/v1/models") -> RoutedGatewayTransport
         models_path=models_path,
         timeout=1.0,
     )
-
 
 ###############################################################################
 def test_opencode_go_deepseek_flash_uses_documented_chat_endpoint() -> None:
@@ -25,7 +23,6 @@ def test_opencode_go_deepseek_flash_uses_documented_chat_endpoint() -> None:
 
     assert endpoint == "chat/completions"
 
-
 ###############################################################################
 def test_opencode_go_anthropic_models_use_messages_endpoint() -> None:
     endpoint = _transport()._resolve_transport_endpoint(
@@ -33,7 +30,6 @@ def test_opencode_go_anthropic_models_use_messages_endpoint() -> None:
     )
 
     assert endpoint == "messages"
-
 
 ###############################################################################
 def test_other_routed_gateways_still_require_model_endpoint_metadata() -> None:

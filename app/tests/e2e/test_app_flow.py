@@ -671,7 +671,6 @@ def test_timetable_invalid_session_id_shows_validation_error(page: Page, base_ur
     page.goto(f"{base_url}/sessions/0/timetable")
     expect(page.locator(".error-note")).to_contain_text("Invalid session id.")
 
-
 ###############################################################################
 def test_timetable_deterministic_chronology_inspector_and_cluster_layout(
     page: Page, base_url: str

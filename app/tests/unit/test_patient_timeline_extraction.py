@@ -148,6 +148,7 @@ def test_timeline_uses_the_single_explicit_date_in_source_evidence() -> None:
     assert normalized[0].event_date == "2026-07-21"
 
 
+###############################################################################
 def test_timeline_preserves_precise_model_date_when_evidence_only_matches_year() -> None:
     extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
     event = PatientTimelineEvent(
@@ -164,7 +165,6 @@ def test_timeline_preserves_precise_model_date_when_evidence_only_matches_year()
 
     assert normalized[0].event_date == "2026-07-18"
     assert normalized[0].date_precision == "day"
-
 
 ###############################################################################
 def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens() -> None:
@@ -194,7 +194,6 @@ def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens(
     assert normalized[0].date_precision == "month"
     assert normalized[1].event_date is None
 
-
 ###############################################################################
 def test_timeline_date_interval_validates_calendar_days_and_reversed_ranges() -> None:
     assert normalize_timeline_interval("2024-02-29") is not None
@@ -215,7 +214,6 @@ def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
     assert "Source payload SHA-256:" in prompt
     assert "'a':" not in prompt
 
-
 ###############################################################################
 def test_timeline_model_override_validation_requires_an_unambiguous_runtime_model() -> None:
     assert SessionTimelineModelOverrides(
@@ -231,7 +229,6 @@ def test_timeline_model_override_validation_requires_an_unambiguous_runtime_mode
         SessionTimelineModelOverrides(use_cloud_services=False)
     with pytest.raises(ValueError):
         SessionTimelineModelOverrides(use_cloud_services=True, llm_provider="openai")
-
 
 ###############################################################################
 def test_timeline_preview_includes_evidence_and_timing_quality_counts() -> None:

@@ -9,7 +9,6 @@ from services.llm.generation_policy import (
     validate_catalog,
 )
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     ("model", "reasoning", "expected"),
@@ -32,7 +31,6 @@ def test_local_policy_matrix(model: str, reasoning: bool, expected: float) -> No
     )
     assert policy.temperature == expected
 
-
 ###############################################################################
 def test_restricted_and_unknown_models_use_defaults() -> None:
     for provider, model in (("anthropic", "claude-opus-4-6"), ("gemini", "gemini-3-pro"), ("ollama", "new-model:1b")):
@@ -43,7 +41,6 @@ def test_restricted_and_unknown_models_use_defaults() -> None:
         )
         assert policy.temperature is None
         assert policy.uses_model_default
-
 
 ###############################################################################
 def test_openai_and_deepseek_are_purpose_specific() -> None:
@@ -68,7 +65,6 @@ def test_openai_and_deepseek_are_purpose_specific() -> None:
         model="gpt-4.1-mini",
     ).temperature is None
 
-
 ###############################################################################
 def test_gpt5_and_gpt_oss_omit_temperature() -> None:
     for provider, model in (("openai", "gpt-5"), ("openai", "gpt-5.1"), ("ollama", "gpt-oss:20b")):
@@ -78,7 +74,6 @@ def test_gpt5_and_gpt_oss_omit_temperature() -> None:
             model=model,
         )
         assert policy.temperature is None
-
 
 ###############################################################################
 def test_policy_is_immutable_and_catalog_validates() -> None:

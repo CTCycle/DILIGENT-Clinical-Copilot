@@ -8,7 +8,6 @@ from typing import Any
 
 from common.catalogs.model_choices import get_clinical_model_choices, get_text_extraction_model_choices
 
-
 ###############################################################################
 class GenerationPurpose(StrEnum):
     STRUCTURED_EXTRACTION = "structured_extraction"
@@ -16,14 +15,12 @@ class GenerationPurpose(StrEnum):
     JSON_REPAIR = "json_repair"
     CONNECTIVITY_CHECK = "connectivity_check"
 
-
 ###############################################################################
 class PolicyMatchKind(StrEnum):
     EXACT_MODEL = "exact_model"
     MODEL_FAMILY = "model_family"
     PROVIDER = "provider"
     FALLBACK = "fallback"
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -42,7 +39,6 @@ class GenerationPolicy:
 _CATALOG_PATH = Path(__file__).resolve().parents[3] / "resources" / "catalogs" / "llm_generation_policies.json"
 _LOCAL_CATALOG_PATH = Path(__file__).resolve().parents[3] / "resources" / "catalogs" / "local_models.json"
 
-
 ###############################################################################
 def _load_catalog() -> dict[str, Any]:
     with _CATALOG_PATH.open(encoding="utf-8") as handle:
@@ -53,7 +49,6 @@ def _load_catalog() -> dict[str, Any]:
 
 
 _CATALOG = _load_catalog()
-
 
 ###############################################################################
 def _values(rule: dict[str, Any], purpose: GenerationPurpose, reasoning_enabled: bool) -> float | None:
@@ -72,7 +67,6 @@ def _values(rule: dict[str, Any], purpose: GenerationPurpose, reasoning_enabled:
         return selected["all"]
     return selected.get(purpose.value)
 
-
 ###############################################################################
 def _policy(
     *, provider: str, model: str, purpose: GenerationPurpose, temperature: float | None,
@@ -89,7 +83,6 @@ def _policy(
         match_kind=match_kind,
         rationale=rationale,
     )
-
 
 ###############################################################################
 def resolve_generation_policy(
@@ -130,7 +123,6 @@ def resolve_generation_policy(
     return _policy(provider=normalized_provider, model=normalized_model, purpose=purpose,
                    temperature=None, match_kind=PolicyMatchKind.FALLBACK,
                    rationale="Unknown model uses the provider/model default")
-
 
 ###############################################################################
 def validate_catalog() -> None:

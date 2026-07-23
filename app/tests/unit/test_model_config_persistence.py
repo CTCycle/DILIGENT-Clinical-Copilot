@@ -44,6 +44,7 @@ def test_model_config_serializer_has_no_clean_break_migration() -> None:
     assert not hasattr(ModelConfigSerializer, "migrate_cloud_selection_clean_break")
 
 
+###############################################################################
 def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
     engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'model-config.db'}")
     Base.metadata.create_all(engine)
