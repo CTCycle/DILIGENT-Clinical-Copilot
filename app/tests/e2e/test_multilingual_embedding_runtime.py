@@ -12,6 +12,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+###############################################################################
 def test_pinned_multilingual_runtime_contract() -> None:
     assert importlib.util.find_spec("torch") is None
     assert importlib.util.find_spec("sentence_transformers") is None

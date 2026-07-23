@@ -98,7 +98,6 @@ def test_canonical_sqlite_database_environment_contract(monkeypatch) -> None:  #
     assert payload["database"]["write_batch_size"] == 250
     assert payload["database"]["read_page_size"] == 500
 
-
 ###############################################################################
 def test_environment_snapshot_from_os_env_uses_domain_models(monkeypatch) -> None:
     env_names = [

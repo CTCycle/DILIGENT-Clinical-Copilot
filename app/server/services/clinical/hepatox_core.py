@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
-import inspect
 import re
 from collections.abc import Callable
 from datetime import date
@@ -69,10 +68,6 @@ class HepatoxConsultation:
             "clinical"
         )
         self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
-        try:
-            chat_signature = inspect.signature(self.llm_client.chat)
-        except (TypeError, ValueError):
-            chat_signature = None
         self.chat_supports_temperature = False
         self.similarity_search: SimilaritySearch | None = None
         rag_settings = build_effective_rag_settings()

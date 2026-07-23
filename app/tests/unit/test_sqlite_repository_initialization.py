@@ -91,7 +91,6 @@ def test_sqlite_repository_does_not_seed_catalogs_during_construction(
         engine.dispose()
         shutil.rmtree(temp_root, ignore_errors=True)
 
-
 ###############################################################################
 def test_sqlite_repository_exposes_orm_session_factory(
     monkeypatch, tmp_path: Path

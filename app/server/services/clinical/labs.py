@@ -30,6 +30,20 @@ from services.llm.provider_factory import select_llm_provider
 from services.text.vocabulary import get_text_normalization_snapshot
 
 ###############################################################################
+def _sanitize_optional_text(
+    value: str | float | int | None,
+    *,
+    max_length: int,
+) -> str | None:
+    if value is None:
+        return None
+    text = re.sub(r"\s+", " ", str(value)).strip()
+    if not text:
+        return None
+    return text[:max_length]
+
+
+###############################################################################
 RATE_LIMIT_WAIT_HINT_RE = re.compile(
     r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
     re.IGNORECASE,
@@ -649,18 +663,6 @@ class ClinicalLabExtractor:
     def normalize_local_payload(
         parsed: LocalLabExtractionPayload,
     ) -> LabExtractionPayload:
-        def sanitize_optional_text(
-            value: str | float | int | None,
-            *,
-            max_length: int,
-        ) -> str | None:
-            if value is None:
-                return None
-            text = re.sub(r"\s+", " ", str(value)).strip()
-            if not text:
-                return None
-            return text[:max_length]
-
         onset_context = None
         if parsed.onset_context is not None:
             raw_onset_basis = (
@@ -680,12 +682,12 @@ class ClinicalLabExtractor:
             else:
                 onset_basis = "unknown"
             onset_context = LiverInjuryOnsetContext(
-                onset_date=sanitize_optional_text(
+                onset_date=_sanitize_optional_text(
                     parsed.onset_context.onset_date,
                     max_length=120,
                 ),
                 onset_basis=onset_basis,
-                evidence=sanitize_optional_text(
+                evidence=_sanitize_optional_text(
                     parsed.onset_context.evidence,
                     max_length=500,
                 ),
@@ -694,12 +696,12 @@ class ClinicalLabExtractor:
             entries=[
                 ClinicalLabEntry(
                     marker_name=entry.marker_name,
-                    value_text=sanitize_optional_text(entry.value_text, max_length=100),
-                    unit=sanitize_optional_text(entry.unit, max_length=50),
-                    sample_date=sanitize_optional_text(
+                    value_text=_sanitize_optional_text(entry.value_text, max_length=100),
+                    unit=_sanitize_optional_text(entry.unit, max_length=50),
+                    sample_date=_sanitize_optional_text(
                         entry.sample_date, max_length=120
                     ),
-                    evidence=sanitize_optional_text(entry.evidence, max_length=500),
+                    evidence=_sanitize_optional_text(entry.evidence, max_length=500),
                     source="laboratory_analysis",
                 )
                 for entry in parsed.entries

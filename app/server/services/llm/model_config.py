@@ -45,9 +45,9 @@ from services.retrieval.settings import (
 )
 from services.retrieval.embedding_runtime import get_embedding_runtime
 
-
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
+
     # -------------------------------------------------------------------------
     def load_snapshot(self) -> ModelConfigSnapshot: ...
 
@@ -64,7 +64,6 @@ class ModelConfigSnapshotStore(Protocol):
         ollama_seed: int | None | object = ...,
         rag_settings: dict[str, object] | object = ...,
     ) -> ModelConfigSnapshot: ...
-
 
 ###############################################################################
 class ModelConfigService:
@@ -735,6 +734,7 @@ class ModelConfigService:
             updated_at=snapshot.updated_at,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_embedding_runtime_status() -> EmbeddingRuntimeStatus:
         status = get_embedding_runtime().status()
@@ -746,6 +746,7 @@ class ModelConfigService:
             loaded=bool(status["loaded"]),
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_embedding_index_status() -> EmbeddingIndexStatus:
         manifest_path = VECTOR_DB_PATH / "rag_index_manifest.json"

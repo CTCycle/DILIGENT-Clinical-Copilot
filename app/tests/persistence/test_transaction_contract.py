@@ -35,7 +35,6 @@ def test_configuration_singleton_is_unique(persistence_session) -> None:  # type
         "clinical_model": "contract"
     }
 
-
 ###############################################################################
 def test_drug_identifier_composite_unique_constraint(persistence_session) -> None:  # type: ignore[no-untyped-def]
     drug = Drug(canonical_name="Test Drug", canonical_name_norm="test drug")

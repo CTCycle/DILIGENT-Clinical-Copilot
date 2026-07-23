@@ -227,7 +227,6 @@ class InspectionRevisionScaffoldMixin:
             return False
         run = self.serializer.get_revision_run_by_job_id(job_id)
         if run is not None:
-            configuration = run.get("configuration")
             self.serializer.cancel_revision_run(pipeline_run_id=run["pipeline_run_id"])
         return True
 

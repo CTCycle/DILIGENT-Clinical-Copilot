@@ -57,6 +57,7 @@ class ModelConfigEndpoint:
     ) -> ConnectivityCheckResponse:
         return await self.service.check_connectivity(payload)
 
+    # -------------------------------------------------------------------------
     async def get_embedding_status(self) -> EmbeddingStatusResponse:
         return await self.service.get_embedding_status()
 

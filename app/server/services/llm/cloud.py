@@ -23,13 +23,18 @@ from services.llm.structured import (
     parse_json_object_strict,
 )
 from domain.llm.providers import CloudModelDescriptor, CloudProviderId
+from domain.llm.transports import ChatRequest
 from services.llm.provider_registry import provider_registry
 from services.llm.transports.anthropic_messages import AnthropicMessagesTransport
-from services.llm.transports.base import ChatRequest, CloudTransport
+from services.llm.transports.base import CloudTransport
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.routed_gateway import RoutedGatewayTransport
 
 ProviderName = CloudProviderId
+
+###############################################################################
+def _list_gemini_models_sync(client: genai.Client) -> list[Any]:
+    return list(client.models.list())
 
 ###############################################################################
 class LLMError(RuntimeError):
@@ -209,11 +214,8 @@ class CloudLLMClient:
         if self.gemini_client is None:
             raise LLMError("Gemini client is not configured")
 
-        def list_models() -> list[Any]:
-            return list(self.gemini_client.models.list())
-
         try:
-            raw_models = await asyncio.to_thread(list_models)
+            raw_models = await asyncio.to_thread(_list_gemini_models_sync, self.gemini_client)
         except Exception as exc:  # noqa: BLE001
             raise self._map_provider_exception(exc) from exc
 

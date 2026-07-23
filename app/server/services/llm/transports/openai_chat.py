@@ -3,12 +3,8 @@ from __future__ import annotations
 import httpx
 
 from domain.llm.providers import CloudModelDescriptor
-from services.llm.transports.base import (
-    ChatRequest,
-    ChatResult,
-    ConnectivityResult,
-    StructuredTransportMixin,
-)
+from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
+from services.llm.transports.base import StructuredTransportMixin
 
 ###############################################################################
 class OpenAIChatTransport(StructuredTransportMixin):
