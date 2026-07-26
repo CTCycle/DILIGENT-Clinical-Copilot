@@ -10,7 +10,7 @@ from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
 )
-from repositories.serialization.data import DataSerializer
+from repository_fixtures import build_repository_graph
 from services.text import vocabulary as vocabulary_module
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
@@ -73,7 +73,9 @@ def test_session_learning_promotes_only_direct_high_confidence_aliases() -> None
     engine = create_engine("sqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, future=True, expire_on_commit=False)
-    serializer = DataSerializer(engine=engine, session_factory=factory)
+    serializer = build_repository_graph(
+        engine=engine, session_factory=factory
+    ).clinical_session_repository
 
     db_session = factory()
     try:

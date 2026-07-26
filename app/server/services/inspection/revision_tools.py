@@ -19,9 +19,12 @@ class RevisionToolRegistry:
 
     # -------------------------------------------------------------------------
     def __init__(
-        self, *, serializer: Any, session: dict[str, Any], context: dict[str, Any]
+        self, *, clinical_session_repository: Any, session_revision_repository: Any,
+        knowledge_repository: Any, session: dict[str, Any], context: dict[str, Any]
     ) -> None:
-        self.serializer = serializer
+        self.clinical_session_repository = clinical_session_repository
+        self.session_revision_repository = session_revision_repository
+        self.knowledge_repository = knowledge_repository
         self.session = session
         self.context = context
 
@@ -47,7 +50,7 @@ class RevisionToolRegistry:
             return {"items": self.session.get("manual_edit_history") or []}
         if name == "read_version_lineage":
             return {
-                "items": self.serializer.list_session_versions(
+                "items": self.session_revision_repository.list_session_versions(
                     int(self.session["session_id"])
                 )
             }
@@ -55,19 +58,19 @@ class RevisionToolRegistry:
             return self._payload_path(str(arguments.get("path") or ""))
         if name == "get_livertox_excerpt":
             return {
-                "item": self.serializer.get_livertox_excerpt(
+                "item": self.knowledge_repository.get_livertox_excerpt(
                     self._positive_int(arguments.get("drug_id"))
                 )
             }
         if name == "get_drug_knowledge_bundle":
             return {
-                "item": self.serializer.get_drug_knowledge_bundle(
+                "item": self.knowledge_repository.get_drug_knowledge_bundle(
                     self._positive_int(arguments.get("drug_id"))
                 )
             }
         if name == "search_livertox_catalog":
             return {
-                "items": self.serializer.list_livertox_catalog(
+                "items": self.knowledge_repository.list_livertox_catalog(
                     search=str(arguments.get("query") or ""), offset=0, limit=10
                 )[0]
             }

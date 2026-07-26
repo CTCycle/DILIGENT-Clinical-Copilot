@@ -30,7 +30,7 @@ def _report_progress(
 
 ###############################################################################
 class InspectionTimelineMixin:
-    serializer: Any
+    session_timeline_repository: Any
     timeline_extractor: Any
     timeline_generation_lock: Any
     timeline_generation_inflight: set[int]
@@ -39,7 +39,7 @@ class InspectionTimelineMixin:
 
     # -------------------------------------------------------------------------
     def get_session_timeline(self, session_id: int) -> PatientTimeline | None:
-        payload = self.serializer.get_latest_session_timeline_record(session_id)
+        payload = self.session_timeline_repository.get_latest_session_timeline_record(session_id)
         if not isinstance(payload, dict):
             return None
         try:
@@ -58,7 +58,7 @@ class InspectionTimelineMixin:
         session_id: int,
         timeline_id: int,
     ) -> PatientTimeline | None:
-        payload = self.serializer.get_session_timeline_record(session_id, timeline_id)
+        payload = self.session_timeline_repository.get_session_timeline_record(session_id, timeline_id)
         if not isinstance(payload, dict):
             return None
         try:
@@ -74,11 +74,11 @@ class InspectionTimelineMixin:
 
     # -------------------------------------------------------------------------
     def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
-        return self.serializer.list_session_timelines(session_id)
+        return self.session_timeline_repository.list_session_timelines(session_id)
 
     # -------------------------------------------------------------------------
     def delete_session_timeline(self, session_id: int, timeline_id: int) -> bool:
-        return self.serializer.delete_session_timeline_record(session_id, timeline_id)
+        return self.session_timeline_repository.delete_session_timeline_record(session_id, timeline_id)
 
     # -------------------------------------------------------------------------
     def _build_timeline_runtime_settings(
@@ -227,7 +227,7 @@ class InspectionTimelineMixin:
                 return cached
         try:
             _report_progress(progress_callback, 5, "Preparing session timeline source")
-            source = self.serializer.get_session_timeline_source(session_id)
+            source = self.session_timeline_repository.get_session_timeline_source(session_id)
             if source is None:
                 return None
             timeline_timeout_s = max(
@@ -306,7 +306,7 @@ class InspectionTimelineMixin:
             else:
                 _report_progress(progress_callback, 82, "Timeline events extracted")
             _report_progress(progress_callback, 92, "Saving generated timeline")
-            persisted = self.serializer.create_session_timeline_record(
+            persisted = self.session_timeline_repository.create_session_timeline_record(
                 session_id,
                 timeline.model_dump(mode="json"),
             )

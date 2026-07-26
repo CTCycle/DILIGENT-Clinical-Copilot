@@ -41,7 +41,10 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
         models: list[CloudModelDescriptor] = []
         after_id: str | None = None
         while True:
-            page = await self.client.models.list(limit=100, after_id=after_id)
+            if after_id is None:
+                page = await self.client.models.list(limit=100)
+            else:
+                page = await self.client.models.list(limit=100, after_id=after_id)
             models.extend(
                 CloudModelDescriptor(id=item.id, display_name=item.display_name)
                 for item in page.data

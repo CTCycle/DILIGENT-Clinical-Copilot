@@ -416,12 +416,12 @@ def _validate_knowledge_bases(
     blocking: list[ClinicalInputPreflightIssue],
 ) -> None:
     try:
-        livertox_rows, _ = service.serializer.list_livertox_catalog(
+        livertox_rows, _ = service.session_repository.knowledge_repository.list_livertox_catalog(
             search=None,
             offset=0,
             limit=1,
         )
-        rxnav_rows, _ = service.serializer.list_rxnav_catalog(
+        rxnav_rows, _ = service.session_repository.drug_catalog_repository.list_rxnav_catalog(
             search=None,
             offset=0,
             limit=1,
@@ -545,10 +545,10 @@ def _validate_persistence(
     service: Any,
     blocking: list[ClinicalInputPreflightIssue],
 ) -> None:
-    if not hasattr(service.serializer, "session_factory"):
+    if not hasattr(service.session_repository, "session_factory"):
         return
     try:
-        with service.serializer.session_factory() as db_session:
+        with service.session_repository.session_factory() as db_session:
             db_session.connection()
     except Exception as exc:  # noqa: BLE001
         logger.warning(

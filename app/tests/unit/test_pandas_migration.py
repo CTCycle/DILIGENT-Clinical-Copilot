@@ -11,7 +11,7 @@ from repositories.schemas.clinical import (
     ClinicalSession,
     ClinicalSessionResult,
 )
-from repositories.serialization.data import DataSerializer
+from repository_fixtures import build_repository_graph
 from services.clinical.livertox import LiverToxData
 from services.updater import livertox_parse
 from services.updater.livertox_core import LiverToxUpdater
@@ -41,7 +41,7 @@ class LookupStub:
 def build_serializer() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
-    serializer = DataSerializer(engine=engine)
+    serializer = build_repository_graph(engine=engine).clinical_session_repository
     return serializer, engine
 
 ###############################################################################
@@ -198,7 +198,10 @@ def test_livertox_data_keeps_internal_dataframe_copies_isolated() -> None:
 
 ###############################################################################
 def test_master_list_sanitization_handles_string_dtype_inputs() -> None:
-    updater = LiverToxUpdater(sources_path=".", redownload=False)
+    graph = build_repository_graph()
+    updater = LiverToxUpdater(
+        sources_path=".", redownload=False, knowledge_repository=graph.knowledge_repository
+    )
     raw = pd.DataFrame(
         {
             "Count": pd.Series(["2", "0"], dtype="string"),

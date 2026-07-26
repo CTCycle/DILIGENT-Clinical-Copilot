@@ -28,6 +28,9 @@ from services.inspection.revision_tools import RevisionToolRegistry
 from services.llm.provider_factory import select_llm_provider
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.generation_policy import GenerationPurpose
+from repositories.clinical_session_repository import ClinicalSessionRepository
+from repositories.knowledge_repository import KnowledgeRepository
+from repositories.session_revision_repository import SessionRevisionRepository
 
 REVISION_AGENT_PROMPT_VERSION = "revision-agent-issue-scan-v1"
 REVISION_AGENT_SCHEMA_NAME = "revision_issue_scan_result"
@@ -146,10 +149,14 @@ class RevisionAgentRunner:
     def __init__(
         self,
         *,
-        serializer: Any,
+        clinical_session_repository: ClinicalSessionRepository,
+        session_revision_repository: SessionRevisionRepository,
+        knowledge_repository: KnowledgeRepository,
         structured_call: StructuredCall | None = None,
     ) -> None:
-        self.serializer = serializer
+        self.clinical_session_repository = clinical_session_repository
+        self.session_revision_repository = session_revision_repository
+        self.knowledge_repository = knowledge_repository
         self.structured_call = structured_call
 
     # -------------------------------------------------------------------------
@@ -170,7 +177,7 @@ class RevisionAgentRunner:
             session=session,
             request=request,
         )
-        step = self.serializer.start_revision_step(
+        step = self.session_revision_repository.start_revision_step(
             pipeline_run_id=pipeline_run_id,
             step_name=REVISION_AGENT_STEP_NAME,
             step_index=1,
@@ -211,7 +218,7 @@ class RevisionAgentRunner:
             )
             payload = result.model_dump(mode="json")
             latency_ms = int((perf_counter() - started) * 1000)
-            self.serializer.complete_revision_step(
+            self.session_revision_repository.complete_revision_step(
                 pipeline_run_id=pipeline_run_id,
                 step_name=REVISION_AGENT_STEP_NAME,
                 attempt_number=attempt_number,
@@ -224,7 +231,7 @@ class RevisionAgentRunner:
                 output_payload=payload,
                 latency_ms=latency_ms,
             )
-            artifact = self.serializer.persist_revision_agent_issue_scan(
+            artifact = self.session_revision_repository.persist_revision_agent_issue_scan(
                 pipeline_run_id=pipeline_run_id,
                 revision_version_id=revision_version_id,
                 payload={
@@ -240,7 +247,7 @@ class RevisionAgentRunner:
                 },
             )
             completed_at = datetime.now(UTC)
-            self.serializer.create_or_update_revision_run(
+            self.session_revision_repository.create_or_update_revision_run(
                 pipeline_run_id=pipeline_run_id,
                 session_id=int(session["session_id"]),
                 root_session_id=int(model_configuration["root_session_id"]),
@@ -264,14 +271,14 @@ class RevisionAgentRunner:
         except Exception:
             latency_ms = int((perf_counter() - started) * 1000)
             error = {"message": "Revision agent issue scan failed."}
-            self.serializer.fail_revision_step(
+            self.session_revision_repository.fail_revision_step(
                 pipeline_run_id=pipeline_run_id,
                 step_name=REVISION_AGENT_STEP_NAME,
                 attempt_number=attempt_number,
                 error=error,
                 latency_ms=latency_ms,
             )
-            self.serializer.fail_revision_run(
+            self.session_revision_repository.fail_revision_run(
                 pipeline_run_id=pipeline_run_id,
                 error=error,
             )
@@ -291,7 +298,7 @@ class RevisionAgentRunner:
     ) -> dict[str, Any]:
         del job_id
         runtime = resolve_revision_agent_runtime(request.model_overrides)
-        lineage = self.serializer.list_session_versions(int(session["session_id"]))
+        lineage = self.session_revision_repository.list_session_versions(int(session["session_id"]))
         context = build_revision_context(
             session=session,
             manual_edits=session.get("manual_edit_history") or [],
@@ -300,10 +307,14 @@ class RevisionAgentRunner:
             instruction=request.revision_instruction,
         )
         registry = RevisionToolRegistry(
-            serializer=self.serializer, session=session, context=context
+            clinical_session_repository=self.clinical_session_repository,
+            session_revision_repository=self.session_revision_repository,
+            knowledge_repository=self.knowledge_repository,
+            session=session,
+            context=context,
         )
         manifest = registry.manifest(request.allowed_tools)
-        self.serializer.persist_revision_artifact(
+        self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
             artifact_key="revision_agent_context",
@@ -313,7 +324,7 @@ class RevisionAgentRunner:
             runtime, planner_prompt(context, manifest), RevisionAgentPlan
         )
         plan.tasks = plan.tasks[: request.max_tasks]
-        self.serializer.persist_revision_artifact(
+        self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
             artifact_key="revision_agent_plan",
@@ -322,7 +333,7 @@ class RevisionAgentRunner:
         observations: list[dict[str, Any]] = []
         tool_calls = 0
         for task_index, task in enumerate(plan.tasks, start=1):
-            step = self.serializer.start_revision_step(
+            step = self.session_revision_repository.start_revision_step(
                 pipeline_run_id=pipeline_run_id,
                 step_name=f"revision_agent_task_{task_index}",
                 step_index=task_index + 1,
@@ -365,7 +376,7 @@ class RevisionAgentRunner:
                     )
                     observations.append(task_observations[-1])
                     tool_calls += 1
-                self.serializer.complete_revision_step(
+                self.session_revision_repository.complete_revision_step(
                     pipeline_run_id=pipeline_run_id,
                     step_name=f"revision_agent_task_{task_index}",
                     attempt_number=attempt,
@@ -374,7 +385,7 @@ class RevisionAgentRunner:
                     output_payload={"observations": task_observations},
                 )
             except Exception as exc:
-                self.serializer.fail_revision_step(
+                self.session_revision_repository.fail_revision_step(
                     pipeline_run_id=pipeline_run_id,
                     step_name=f"revision_agent_task_{task_index}",
                     attempt_number=attempt,
@@ -383,7 +394,7 @@ class RevisionAgentRunner:
                 raise
             if tool_calls >= request.max_tool_iterations:
                 break
-        self.serializer.persist_revision_artifact(
+        self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
             artifact_key="revision_agent_tool_trace",
@@ -400,7 +411,7 @@ class RevisionAgentRunner:
             raise ValueError(
                 "Revision draft text must equal deterministic patch output."
             )
-        self.serializer.persist_revision_artifact(
+        self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
             artifact_key="revision_agent_draft_report",
@@ -411,7 +422,7 @@ class RevisionAgentRunner:
             qa_prompt(context, draft.model_dump(mode="json")),
             RevisionAgentQaResult,
         )
-        self.serializer.persist_revision_artifact(
+        self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
             artifact_key="revision_agent_qa",
@@ -422,11 +433,11 @@ class RevisionAgentRunner:
         version_status = "qa_failed" if qa.blocking_issues else "llm_qa_passed"
         if not request.dry_run:
             root_session_id = int(model_configuration["root_session_id"])
-            revised_session_id = self.serializer.save_clinical_session(
+            revised_session_id = self.clinical_session_repository.save_clinical_session(
                 {
                     "patient_name": session.get("patient_name"),
                     "session_timestamp": datetime.now(UTC),
-                    "version": self.serializer.get_next_session_version(
+                    "version": self.clinical_session_repository.get_next_session_version(
                         root_session_id
                     ),
                     "root_session_id": root_session_id,
@@ -455,7 +466,7 @@ class RevisionAgentRunner:
             )
             if revised_session_id is None:
                 raise RuntimeError("Revision draft could not be persisted.")
-            self.serializer.finalize_revision_version(
+            self.session_revision_repository.finalize_revision_version(
                 pipeline_run_id=pipeline_run_id,
                 persisted_session_id=revised_session_id,
                 model_configuration=model_configuration,
@@ -463,7 +474,7 @@ class RevisionAgentRunner:
                 llm_qa_status="failed" if qa.blocking_issues else "passed",
                 clinical_review_status="not_reviewed",
             )
-        self.serializer.create_or_update_revision_run(
+        self.session_revision_repository.create_or_update_revision_run(
             pipeline_run_id=pipeline_run_id,
             session_id=int(session["session_id"]),
             root_session_id=int(model_configuration["root_session_id"]),
@@ -510,7 +521,6 @@ class RevisionAgentRunner:
                 system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
                 schema=schema,
-                purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
                 use_json_mode=True,
                 max_repair_attempts=1,
             )
@@ -545,7 +555,6 @@ class RevisionAgentRunner:
                 system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
                 schema=RevisionIssueScanResult,
-                purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
                 use_json_mode=True,
                 max_repair_attempts=1,
             )

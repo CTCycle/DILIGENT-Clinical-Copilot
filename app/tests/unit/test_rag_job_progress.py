@@ -7,7 +7,7 @@ from services.inspection import update_jobs as update_jobs_module
 from services.inspection.service import DataInspectionService
 from services.rag.vector_serializer import VectorSerializer
 from services.runtime.jobs import JobManager
-from repositories.serialization.data import DataSerializer
+from repository_fixtures import build_repository_graph
 
 ###############################################################################
 def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
@@ -35,7 +35,15 @@ def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
                 "loaded_documents": 2,
             }
 
-    service = DataInspectionService(serializer=DataSerializer(), jobs=JobManager())
+    graph = build_repository_graph()
+    service = DataInspectionService(
+        clinical_session_repository=graph.clinical_session_repository,
+        drug_catalog_repository=graph.drug_catalog_repository,
+        knowledge_repository=graph.knowledge_repository,
+        session_timeline_repository=graph.session_timeline_repository,
+        session_revision_repository=graph.session_revision_repository,
+        jobs=JobManager(),
+    )
     monkeypatch.setattr(
         update_jobs_module,
         "RagEmbeddingUpdater",

@@ -13,6 +13,15 @@ from domain.clinical import (
 )
 from services.clinical.matches_core import LiverToxMatcher
 from services.clinical.preparation import ClinicalKnowledgePreparation
+from repository_fixtures import build_repository_graph
+
+###############################################################################
+def build_preparation() -> ClinicalKnowledgePreparation:
+    graph = build_repository_graph()
+    return ClinicalKnowledgePreparation(
+        knowledge_repository=graph.knowledge_repository,
+        drug_catalog_repository=graph.drug_catalog_repository,
+    )
 
 ###############################################################################
 def test_prepare_inputs_exposes_resolution_audit_payload() -> None:
@@ -40,7 +49,7 @@ def test_prepare_inputs_exposes_resolution_audit_payload() -> None:
             }
         ]
     )
-    preparation = ClinicalKnowledgePreparation()
+    preparation = build_preparation()
     preparation.livertox_matcher = LiverToxMatcher(frame, drugs_catalog_df=catalog)
 
     prepared = asyncio.run(
@@ -101,7 +110,7 @@ def test_brand_and_qualified_names_resolve_through_catalog_normalization(
             }
         ]
     )
-    preparation = ClinicalKnowledgePreparation()
+    preparation = build_preparation()
     preparation.livertox_matcher = LiverToxMatcher(frame, drugs_catalog_df=catalog)
 
     prepared = asyncio.run(
@@ -131,7 +140,7 @@ def test_brand_qualified_duplicate_mentions_are_merged() -> None:
             }
         ]
     )
-    preparation = ClinicalKnowledgePreparation()
+    preparation = build_preparation()
     preparation.livertox_matcher = LiverToxMatcher(frame)
 
     prepared = asyncio.run(
@@ -154,7 +163,7 @@ def test_brand_qualified_duplicate_mentions_are_merged() -> None:
 
 ###############################################################################
 def test_catalog_missing_medication_label_reaches_resolution_policy() -> None:
-    preparation = ClinicalKnowledgePreparation()
+    preparation = build_preparation()
     preparation.livertox_matcher = LiverToxMatcher(
         pd.DataFrame(
             [
@@ -186,7 +195,7 @@ def test_catalog_missing_medication_label_reaches_resolution_policy() -> None:
 
 ###############################################################################
 def test_two_edit_international_spelling_resolves_uniquely() -> None:
-    preparation = ClinicalKnowledgePreparation()
+    preparation = build_preparation()
     preparation.livertox_matcher = LiverToxMatcher(
         pd.DataFrame(
             [
@@ -264,7 +273,7 @@ def test_llm_combination_identity_candidates_remain_ambiguous() -> None:
             ]
         )
     )
-    preparation = ClinicalKnowledgePreparation()
+    preparation = build_preparation()
     preparation.livertox_matcher = LiverToxMatcher(frame)
 
     prepared = asyncio.run(
@@ -301,7 +310,7 @@ def test_single_llm_identity_is_accepted_only_after_local_validation() -> None:
             ]
         )
     )
-    preparation = ClinicalKnowledgePreparation()
+    preparation = build_preparation()
     preparation.livertox_matcher = LiverToxMatcher(
         pd.DataFrame(
             [
@@ -358,7 +367,7 @@ def test_unvalidated_llm_identity_remains_unresolved() -> None:
             ]
         )
     )
-    preparation = ClinicalKnowledgePreparation()
+    preparation = build_preparation()
     preparation.livertox_matcher = LiverToxMatcher(
         pd.DataFrame(
             [

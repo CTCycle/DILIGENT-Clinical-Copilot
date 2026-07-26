@@ -2,10 +2,19 @@ from __future__ import annotations
 
 from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
+from repository_fixtures import build_repository_graph
 
 ###############################################################################
 def test_rag_preview_includes_vector_model(monkeypatch) -> None:
-    service = DataInspectionService(jobs=JobManager())
+    graph = build_repository_graph()
+    service = DataInspectionService(
+        clinical_session_repository=graph.clinical_session_repository,
+        drug_catalog_repository=graph.drug_catalog_repository,
+        knowledge_repository=graph.knowledge_repository,
+        session_timeline_repository=graph.session_timeline_repository,
+        session_revision_repository=graph.session_revision_repository,
+        jobs=JobManager(),
+    )
 
     monkeypatch.setattr(
         "services.inspection.service.DocumentSerializer.collect_document_paths",

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 
-from repositories.serialization.data import DataSerializer
+from repository_fixtures import build_repository_graph
 
 ###############################################################################
 def test_concurrent_session_writes_remain_isolated(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     def save(index: int) -> int:
-        serializer = DataSerializer(engine=persistence_engine)
-        session_id = serializer.save_clinical_session(
+        repository = build_repository_graph(engine=persistence_engine).clinical_session_repository
+        session_id = repository.save_clinical_session(
             {"patient_name": f"Concurrent Patient {index}"}
         )
         assert session_id is not None
@@ -17,8 +17,8 @@ def test_concurrent_session_writes_remain_isolated(persistence_engine) -> None: 
     with ThreadPoolExecutor(max_workers=4) as executor:
         session_ids = list(executor.map(save, range(4)))
 
-    serializer = DataSerializer(engine=persistence_engine)
-    items, total = serializer.list_sessions(
+    repository = build_repository_graph(engine=persistence_engine).clinical_session_repository
+    items, total = repository.list_sessions(
         search="Concurrent Patient",
         status_filter=None,
         date_mode=None,

@@ -109,7 +109,11 @@ class FakeRequest:
 ###############################################################################
 def build_service(serializer: FakeSerializer) -> DataInspectionService:
     return DataInspectionService(
-        serializer=serializer,
+        clinical_session_repository=serializer,
+        drug_catalog_repository=serializer,
+        knowledge_repository=serializer,
+        session_timeline_repository=serializer,
+        session_revision_repository=serializer,
         timeline_extractor=object(),
         jobs=object(),  # type: ignore[arg-type]
     )
