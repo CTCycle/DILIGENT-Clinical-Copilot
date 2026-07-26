@@ -821,7 +821,7 @@ async def process_single_patient_workflow(
     persisted_session_id = None
     try:
         persisted_session_id = await asyncio.to_thread(
-            service.serializer.save_clinical_session,
+            service.session_repository.save_clinical_session,
             {
                 "patient_name": payload.name,
                 "patient_visit_date": payload.visit_date,
@@ -851,7 +851,7 @@ async def process_single_patient_workflow(
         )
         if persisted_session_id is not None:
             consume_signal = getattr(
-                service.serializer, "consume_vocabulary_change_signal", None
+                service.session_repository, "consume_vocabulary_change_signal", None
             )
             if callable(consume_signal) and consume_signal():
                 invalidate_text_normalization_snapshot()
@@ -861,7 +861,7 @@ async def process_single_patient_workflow(
                 session_id=persisted_session_id,
             ).model_dump()
             await asyncio.to_thread(
-                service.serializer.upsert_session_result_payload,
+                service.session_repository.upsert_session_result_payload,
                 persisted_session_id,
                 result_payload,
             )

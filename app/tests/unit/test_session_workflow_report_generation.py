@@ -46,7 +46,7 @@ class FakeDrugsParser:
         return text
 
 ###############################################################################
-class FakeSerializer:
+class FakeSessionRepository:
 
     # -------------------------------------------------------------------------
     def save_clinical_session(self, payload: dict[str, Any]) -> int | None:
@@ -68,7 +68,7 @@ class FakeClinicalService:
     def __init__(self) -> None:
         self.drugs_parser = FakeDrugsParser()
         self.pattern_analyzer = FakePatternAnalyzer()
-        self.serializer = FakeSerializer()
+        self.session_repository = FakeSessionRepository()
         self.lab_extractor = SimpleNamespace(
             extract_explicit_hepatic_pattern=lambda text: (
                 "cholestatic"
@@ -310,7 +310,7 @@ def test_workflow_does_not_recreate_bibliography_outside_report_finalizer() -> N
                     "final_report": "Relazione narrativa senza bibliografia.",
                 },
             )
-            clinical_session.report_finalizer = ReportFinalizer(clinical_session)
+            clinical_session.report_finalizer = ReportFinalizer()
             return clinical_session, "Relazione narrativa senza bibliografia."
 
     payload = PatientData(
@@ -367,7 +367,7 @@ def test_workflow_fails_when_persistence_returns_no_session_id() -> None:
         laboratory_analysis="ALT 100 U/L, ALP 120 U/L.",
     )
     service = FakeClinicalService()
-    service.serializer.save_clinical_session = lambda payload: None
+    service.session_repository.save_clinical_session = lambda payload: None
 
     with pytest.raises(ClinicalPersistenceError):
         asyncio.run(
@@ -488,7 +488,7 @@ def test_workflow_marks_blocking_faithfulness_result_as_failed(
     assert any(
         issue["code"] == "faithfulness_gate_blocked" for issue in result["issues"]
     )
-    assert service.serializer.saved_payload["session_status"] == "failed"
+    assert service.session_repository.saved_payload["session_status"] == "failed"
 
 ###############################################################################
 def test_failed_clinical_job_payload_omits_phi_by_default() -> None:

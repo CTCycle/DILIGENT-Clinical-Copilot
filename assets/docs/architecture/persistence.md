@@ -17,7 +17,7 @@ Last updated: 2026-07-26
 - Patient timeline history is persisted only in `clinical_session_timelines`; session result payloads are not a timeline read source.
 - Timeline generation metadata stays on persisted timeline records and does not rewrite original clinical-session runtime metadata.
 - Evidence-locked DILI artifacts in the database-backed session result payload are `normalized_document`, `extraction_artifact`, `fact_graph`, `faithfulness_audit`, generated report metadata, discrepancy report, and `dili_evidence_bundle_index`.
-- Successful clinical workflows require persistence. Serializer failures, missing persisted IDs, and failed upserts are service dependency failures rather than silent in-memory success.
+- Successful clinical workflows require persistence. Repository failures, missing persisted IDs, and failed upserts are service dependency failures rather than silent in-memory success.
 - SQLite enables foreign keys, a 30-second busy timeout, and WAL journaling.
 - SQLAlchemy update timestamps use an application-level update hook shared by SQLite and PostgreSQL.
 - Version listing and detail reads are side-effect-free; synchronization is reserved for explicit write paths.
@@ -27,14 +27,14 @@ Last updated: 2026-07-26
 - Canonical drug identifiers use `drug_identifiers` with unique `(identifier_system, identifier_value)` ownership.
 - `application_configuration` is the fixed-ID singleton for validated configuration payloads, and `reference_catalog_manifests` records installed manifest state.
 
-## Focused Repository Ownership (Migration Target)
+## Focused Repository Ownership
 
 - `KnowledgeRepository` owns evidence data.
 - `DrugCatalogRepository` owns RxNav data.
 - `ClinicalSessionRepository` owns session-result persistence.
 - `SessionTimelineRepository` owns timeline rows.
 - `SessionRevisionRepository` owns revision data, steps, and artifacts.
-- Feature-specific file serialization remains separate from SQLAlchemy persistence. These focused repositories are the migration target; `DataSerializer` remains the current aggregate boundary until all call sites are migrated.
+- Feature-specific file serialization remains separate from SQLAlchemy persistence. `RepositoryContext` supplies the shared engine/session factory, and application services receive only the focused repositories they need. Transactions remain explicit at the repository boundary, including atomic session persistence and batch ingestion.
 
 ## Reference Catalog Persistence
 

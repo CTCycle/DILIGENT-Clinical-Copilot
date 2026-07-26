@@ -237,6 +237,7 @@ class AnalysisRunner:
             progress_callback=progress_callback,
             prepare_fn=self.prepare_drug_assessment,
             finalize_fn=self.consultation.report_finalizer.finalize_patient_report,
+            generate_conclusion=self.consultation.drug_analysis.generate_conclusion,
         )
 
     # -------------------------------------------------------------------------
@@ -274,6 +275,7 @@ class AnalysisRunner:
             progress_callback=progress_callback,
             prepare_fn=self.prepare_revision_drug_assessment,
             finalize_fn=self.consultation.report_finalizer.finalize_revision_patient_report,
+            generate_conclusion=self.consultation.drug_analysis.generate_revision_conclusion,
         )
 
     # -------------------------------------------------------------------------
@@ -290,6 +292,7 @@ class AnalysisRunner:
         progress_callback: Callable[[str, float], None] | None,
         prepare_fn,
         finalize_fn,
+        generate_conclusion,
     ) -> PatientDrugClinicalReport:
         entries: list[DrugClinicalAssessment] = []
         llm_jobs: list[tuple[int, Any]] = []
@@ -337,20 +340,20 @@ class AnalysisRunner:
                         entry.drug_name,
                         outcome,
                     )
-                    entry.paragraph = consultation.build_error_paragraph(entry)
+                    entry.paragraph = consultation.report_finalizer.build_error_paragraph(entry)
                 else:
                     normalized_outcome = (
                         outcome.strip()
                         if isinstance(outcome, str)
                         else str(outcome).strip()
                     )
-                    normalized_outcome = consultation.remove_redundant_report_sentence(
+                    normalized_outcome = consultation.report_finalizer.remove_redundant_report_sentence(
                         normalized_outcome
                     )
                     entry.paragraph = (
                         normalized_outcome
                         if normalized_outcome
-                        else consultation.build_error_paragraph(entry)
+                        else consultation.report_finalizer.build_error_paragraph(entry)
                     )
                 completed += 1
                 consultation.emit_progress(
@@ -371,6 +374,7 @@ class AnalysisRunner:
             entries,
             clinical_context=normalized_context,
             report_language=report_language,
+            generate_conclusion=generate_conclusion,
         )
         consultation.emit_progress(
             progress_callback, stage="report_composition", fraction=1.0
@@ -467,7 +471,7 @@ class AnalysisRunner:
             missing_livertox=missing_livertox,
             ambiguous_match=ambiguous_match,
         )
-        suspension = consultation.evaluate_suspension(drug_entry, visit_date)
+        suspension = consultation.exposure_timeline.evaluate_suspension(drug_entry, visit_date)
         matched_lvt_row = matched_row if isinstance(matched_row, dict) else None
         rucam = rucam_by_key.get(normalized_drug_key)
         source_context_summary = summarize_drug_source_context(drug_entry)
@@ -544,7 +548,7 @@ class AnalysisRunner:
         excerpt = consultation.rag_support.select_excerpt(excerpts_list)
         if excerpt is None or entry.missing_livertox:
             entry.missing_livertox = True
-            entry.paragraph = consultation.build_missing_excerpt_paragraph(entry)
+            entry.paragraph = consultation.report_finalizer.build_missing_excerpt_paragraph(entry)
             return entry, None
         rag_bundle = await consultation.rag_support.fetch_rag_documents(
             rag_query, drug_entry.name or ""
@@ -600,7 +604,7 @@ class AnalysisRunner:
         excerpt = consultation.rag_support.select_excerpt(excerpts_list)
         if excerpt is None or entry.missing_livertox:
             entry.missing_livertox = True
-            entry.paragraph = consultation.build_missing_excerpt_paragraph(entry)
+            entry.paragraph = consultation.report_finalizer.build_missing_excerpt_paragraph(entry)
             return entry, None
         rag_bundle = await consultation.rag_support.fetch_rag_documents(
             rag_query, drug_entry.name or ""

@@ -42,6 +42,7 @@ def test_collect_monographs_deduplicates_duplicate_basenames(tmp_path: Path) -> 
         redownload=False,
         archive_name=archive_path.name,
         monograph_max_workers=1,
+        knowledge_repository=object(),  # type: ignore[arg-type]
     )
     records = livertox_module.collect_monographs(updater, str(archive_path))
 
@@ -94,6 +95,7 @@ def test_collect_monographs_streams_parallel_batches(
         redownload=False,
         archive_name=archive_path.name,
         monograph_max_workers=3,
+        knowledge_repository=object(),  # type: ignore[arg-type]
     )
     records = livertox_module.collect_monographs(updater, str(archive_path))
 
@@ -111,6 +113,7 @@ def test_collect_monographs_honors_cancellation(tmp_path: Path) -> None:
         redownload=False,
         archive_name=archive_path.name,
         monograph_max_workers=1,
+        knowledge_repository=object(),  # type: ignore[arg-type]
     )
 
     with pytest.raises(RuntimeError, match="cancelled"):

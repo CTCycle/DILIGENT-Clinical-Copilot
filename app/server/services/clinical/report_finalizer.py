@@ -1,35 +1,38 @@
 from __future__ import annotations
 
-import asyncio
 import re
-from typing import Any
+from typing import Any, Awaitable, Callable
 
-from common.prompts.clinical_assessment import (
-    LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
-    LIVERTOX_CONCLUSION_USER_PROMPT,
-    LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
-    LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
-)
-from common.utils.logger import logger
 from domain.clinical.entities import (
     DrugClinicalAssessment,
     PatientLabTimeline,
     RagDocumentReference,
 )
-from services.llm.generation_policy import GenerationPurpose
 from services.clinical.report_language import (
+    evidence_quality_label,
+    limitation_label,
     phrase,
+    rucam_summary_text,
 )
 from services.clinical.report_language import report_heading
 from services.text.vocabulary import get_text_normalization_snapshot
+from services.clinical.hepatox_constants import (
+    BIBLIOGRAPHY_LINE_RE,
+    DRIFT_SECTION_LINE_RE,
+    LIVERTOX_TITLE_LINE_RE,
+    NOT_AVAILABLE_TEXT,
+    REDUNDANT_REPORT_LINE_RE,
+    REPORT_LABEL_LINE_RE,
+    STRUCTURED_DILI_SECTION_LINE_RE,
+)
 
 ###############################################################################
 class ReportFinalizer:
     """Builds the final patient report and conclusion from per-drug assessments."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, consultation: Any) -> None:
-        self.consultation = consultation
+    def __init__(self) -> None:
+        pass
 
     # -------------------------------------------------------------------------
     async def _build_and_finalize_report(
@@ -40,7 +43,6 @@ class ReportFinalizer:
         report_language: str,
         generate_conclusion_fn,
     ) -> str | None:
-        consultation = self.consultation
         matched_entries: list[DrugClinicalAssessment] = []
         unresolved_entries: list[DrugClinicalAssessment] = []
         for entry in entries:
@@ -50,7 +52,7 @@ class ReportFinalizer:
             unresolved_entries.append(entry)
 
         matched_sections = [
-            consultation.render_matched_drug_section(
+            self.render_matched_drug_section(
                 entry, report_language=report_language
             )
             for entry in matched_entries
@@ -63,7 +65,7 @@ class ReportFinalizer:
             self.sanitize_generated_text(section, references)
             for section in matched_sections
         ]
-        unresolved_section = consultation.render_unresolved_mentions_section(
+        unresolved_section = self.render_unresolved_mentions_section(
             unresolved_entries,
             report_language=report_language,
         )
@@ -109,13 +111,209 @@ class ReportFinalizer:
         for assessment in assessments:
             lines.extend(
                 [
-                    self.consultation.render_matched_drug_section(
+                    self.render_matched_drug_section(
                         assessment, report_language=language
                     ),
                     "",
                 ]
             )
         return "\n".join(lines).strip()
+
+    @staticmethod
+    def remove_redundant_report_sentence(text: str) -> str:
+        if not text:
+            return ""
+        cleaned_lines: list[str] = []
+        for raw_line in text.splitlines():
+            if STRUCTURED_DILI_SECTION_LINE_RE.match(raw_line.strip()):
+                break
+            compact = re.sub(r"[\s*_`#:\-]+", " ", raw_line).strip()
+            if compact and REDUNDANT_REPORT_LINE_RE.search(compact):
+                continue
+            cleaned_lines.append(raw_line)
+        cleaned = "\n".join(cleaned_lines).strip()
+        return re.sub(r"\n{3,}", "\n\n", cleaned)
+
+    def render_matched_drug_section(
+        self, entry: DrugClinicalAssessment, *, report_language: str = "en"
+    ) -> str:
+        score = self.resolve_livertox_score(entry.matched_livertox_row)
+        title = self.format_drug_heading(entry.drug_name, score)
+        body = self.sanitize_renderable_body(entry)
+        if not body:
+            body = self.build_fallback_technical_note(entry, report_language=report_language)
+        localized_rucam = (
+            rucam_summary_text(entry.rucam, report_language)
+            if entry.rucam is not None
+            else phrase("rucam_not_calculated", report_language)
+        )
+        clinical_commentary = self.render_clinical_commentary(
+            entry, report_language=report_language
+        )
+        return (
+            f"**{title}**\n\n{clinical_commentary}\n\n"
+            f"**RUCAM**: {localized_rucam}\n\n"
+            f"**{phrase('report_label', report_language)}**\n\n{body}\n\n"
+            f"**{phrase('bibliography_source', report_language)}**: {self.bibliography_source_label()}"
+        ).strip()
+
+    @staticmethod
+    def render_clinical_commentary(
+        entry: DrugClinicalAssessment, *, report_language: str = "en"
+    ) -> str:
+        quality = evidence_quality_label(
+            entry.evidence_quality or phrase("unknown", report_language), report_language
+        )
+        matched_name = (
+            str(entry.matched_livertox_row.get("drug_name") or "").strip()
+            if isinstance(entry.matched_livertox_row, dict)
+            else ""
+        )
+        target = matched_name or entry.canonical_name or phrase("not_available", report_language)
+        segments = [
+            phrase("commentary_evidence_match", report_language, quality=quality, target=target)
+        ]
+        if entry.evidence_warnings:
+            segments.append(
+                phrase(
+                    "commentary_evidence_warnings",
+                    report_language,
+                    warnings="; ".join(entry.evidence_warnings[:3]),
+                )
+            )
+        else:
+            segments.append(phrase("commentary_no_evidence_warnings", report_language))
+        review_claims = [claim for claim in entry.claims if claim.requires_review]
+        limitations = list(entry.narrative.limitations if entry.narrative else [])
+        if entry.rucam is not None and entry.rucam.total_score is None:
+            segments.append(phrase("commentary_rucam_not_assessable", report_language))
+        if limitations:
+            segments.append(
+                phrase(
+                    "commentary_limitations",
+                    report_language,
+                    limitations="; ".join(
+                        limitation_label(item, report_language) for item in limitations[:3]
+                    ),
+                )
+            )
+        segments.append(
+            phrase(
+                "commentary_review_required" if review_claims or limitations else "commentary_no_review_required",
+                report_language,
+            )
+        )
+        return f"**{phrase('clinical_commentary', report_language)}**: " + " ".join(segments)
+
+    def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:
+        text = entry.paragraph.strip() if entry.paragraph else ""
+        if not text:
+            return ""
+        expected_name = (entry.drug_name or "").strip().lower()
+        lines: list[str] = []
+        for raw_line in text.splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                if lines and lines[-1]:
+                    lines.append("")
+                continue
+            compact = re.sub(r"[\s*_`#:\-]+", " ", stripped).strip()
+            if REDUNDANT_REPORT_LINE_RE.search(compact) or REPORT_LABEL_LINE_RE.match(stripped):
+                continue
+            if BIBLIOGRAPHY_LINE_RE.match(stripped) or stripped == "---":
+                continue
+            if stripped.lower().startswith("## global synthesis") or DRIFT_SECTION_LINE_RE.match(stripped) or STRUCTURED_DILI_SECTION_LINE_RE.match(stripped):
+                break
+            title_match = LIVERTOX_TITLE_LINE_RE.match(stripped)
+            if title_match:
+                if expected_name and expected_name not in stripped.lower():
+                    continue
+                continue
+            lines.append(raw_line.rstrip())
+        sanitized = re.sub(r"\n{3,}", "\n\n", "\n".join(lines).strip()).strip()
+        if "local livertox excerpt not available" in re.sub(r"\s+", " ", sanitized).lower():
+            return ""
+        return sanitized
+
+    def build_fallback_technical_note(self, entry: DrugClinicalAssessment, *, report_language: str = "en") -> str:
+        if entry.suspension.excluded:
+            return self.build_excluded_paragraph(entry, report_language)
+        if entry.ambiguous_match:
+            return self.build_ambiguous_match_paragraph(entry, report_language)
+        if entry.missing_livertox:
+            return phrase("matched_no_excerpt", report_language) if entry.matched_livertox_row else phrase("livertox_missing", report_language)
+        return self.build_error_paragraph(entry, report_language)
+
+    def render_unresolved_mentions_section(self, entries: list[DrugClinicalAssessment], *, report_language: str = "en") -> str | None:
+        if not entries:
+            return None
+        lines = [f"## {report_heading('unresolved_mentions', report_language)}", ""]
+        for entry in entries:
+            label = (entry.drug_name or "").strip() or phrase("unnamed_drug", report_language)
+            reason = self.describe_unresolved_entry(entry, report_language)
+            rucam = rucam_summary_text(entry.rucam, report_language) if entry.rucam is not None else phrase("rucam_not_calculated", report_language)
+            technical = self.build_fallback_technical_note(entry, report_language=report_language)
+            context = reason if technical.strip() == reason.strip() else f"{technical} {reason}"
+            recommendation = (
+                "Il farmaco deve rimanere nella diagnosi differenziale solo in base alla cronologia clinica disponibile; prima di attribuire causalità sono necessari verifica dell'esposizione, andamento dopo sospensione e revisione delle cause alternative."
+                if report_language.lower().startswith("it")
+                else "The drug should remain in the differential diagnosis only to the extent supported by the available timeline; exposure verification, the course after withdrawal, and competing-cause review are required before causality is assigned."
+            )
+            lines.extend([f"### {label}", "", f"{context} {rucam}. {recommendation}", ""])
+        return "\n".join(lines).strip()
+
+    def describe_unresolved_entry(self, entry: DrugClinicalAssessment, report_language: str = "en") -> str:
+        status = (entry.match_status or "").strip().lower()
+        if status in {"ambiguous", "ambiguous_match"} or entry.ambiguous_match:
+            candidates = ", ".join(entry.match_candidates) if entry.match_candidates else phrase("rucam_insufficient_data", report_language)
+            return f"{phrase('livertox_ambiguous', report_language)} {phrase('candidate_matches', report_language, candidates=candidates)} {phrase('manual_curation', report_language)}"
+        if status in {"missing", "missing_match"}:
+            return phrase("no_matching_record", report_language)
+        if status == "matched_no_excerpt":
+            return phrase("matched_no_excerpt", report_language)
+        if entry.missing_livertox:
+            return phrase("matched_no_excerpt", report_language) if entry.matched_livertox_row else phrase("livertox_missing", report_language)
+        return phrase("deterministic_section_unavailable", report_language)
+
+    def build_excluded_paragraph(self, entry: DrugClinicalAssessment, report_language: str = "en") -> str:
+        suspension = entry.suspension
+        if report_language.startswith("it"):
+            detail = f"La terapia è stata sospesa il {suspension.suspension_date.isoformat()} molto prima della visita; questa esposizione è stata quindi esclusa dalla valutazione attiva di causalità DILI." if suspension.suspension_date is not None else "La terapia risulta sospesa molto prima della visita ed è stata esclusa dalla valutazione attiva di causalità DILI."
+            return f"{detail} È consigliata una verifica manuale della latenza se l'esposizione torna clinicamente rilevante."
+        detail = f"The therapy was suspended on {suspension.suspension_date.isoformat()} well before the visit, so this exposure was excluded from active DILI causality assessment." if suspension.suspension_date is not None else "The therapy was reported as suspended well before the visit and was excluded from active DILI causality assessment."
+        return f"{detail} Manual latency verification is suggested if the exposure history becomes clinically relevant again."
+
+    @staticmethod
+    def build_missing_excerpt_paragraph(entry: DrugClinicalAssessment, report_language: str = "en") -> str:
+        _ = entry
+        return phrase("livertox_missing", report_language)
+
+    def build_ambiguous_match_paragraph(self, entry: DrugClinicalAssessment, report_language: str = "en") -> str:
+        candidates = ", ".join(entry.match_candidates) if entry.match_candidates else phrase("rucam_insufficient_data", report_language)
+        return f"{phrase('livertox_ambiguous', report_language)} {phrase('candidate_matches', report_language, candidates=candidates)} {phrase('manual_curation', report_language)}"
+
+    @staticmethod
+    def build_error_paragraph(entry: DrugClinicalAssessment, report_language: str = "en") -> str:
+        _ = entry
+        return phrase("rucam_insufficient_data", report_language)
+
+    @staticmethod
+    def resolve_livertox_score(metadata: dict[str, Any] | None) -> str:
+        if not metadata:
+            return NOT_AVAILABLE_TEXT
+        score = metadata.get("likelihood_score")
+        if score is None:
+            return NOT_AVAILABLE_TEXT
+        text = str(score).strip()
+        if not text or text.lower() == "nan":
+            return NOT_AVAILABLE_TEXT
+        return text.upper() if text.isalpha() else text
+
+    @staticmethod
+    def format_drug_heading(drug_name: str, score: str) -> str:
+        normalized_name = drug_name.strip() if drug_name else ""
+        normalized_score = score.strip() if score else ""
+        return f"{normalized_name or 'Unnamed drug'} - LiverTox score {normalized_score or NOT_AVAILABLE_TEXT}"
 
     # -------------------------------------------------------------------------
     def render_laboratory_section(
@@ -146,85 +344,19 @@ class ReportFinalizer:
         return "\n".join(lines).strip()
 
     # -------------------------------------------------------------------------
-    async def _run_conclusion(
-        self,
-        *,
-        clinical_context: str,
-        multi_drug_report: str,
-        report_language: str,
-        system_template: str,
-        user_template: str,
-    ) -> str | None:
-        consultation = self.consultation
-        report_body = multi_drug_report.strip()
-        if not report_body:
-            return None
-        context_body = clinical_context.strip()
-        if not context_body:
-            context_body = "No clinical context was provided."
-        user_prompt = user_template.format(
-            report_language=consultation.escape_braces(report_language),
-            clinical_context=consultation.escape_braces(context_body),
-            multi_drug_report=consultation.escape_braces(report_body),
-        )
-        messages = [
-            {"role": "system", "content": system_template.strip()},
-            {"role": "user", "content": user_prompt},
-        ]
-        chat_kwargs: dict[str, Any] = {
-            "model": consultation.llm_model,
-            "messages": messages,
-            "purpose": GenerationPurpose.CLINICAL_SYNTHESIS,
-        }
-        raw_response: Any = None
-        for attempt in range(1, consultation.analysis_retry_attempts + 1):
-            try:
-                raw_response = await consultation.llm_client.chat(**chat_kwargs)
-                break
-            except Exception as exc:
-                if attempt >= consultation.analysis_retry_attempts:
-                    logger.error("Failed to generate clinical conclusion: %s", exc)
-                    return None
-                delay = consultation.analysis_runner.retry_backoff_seconds(
-                    attempt, exc=exc
-                )
-                logger.warning(
-                    "Retrying clinical conclusion generation after error (attempt %d/%d, delay %.2fs): %s",
-                    attempt,
-                    consultation.analysis_retry_attempts,
-                    delay,
-                    exc,
-                )
-                await asyncio.sleep(delay)
-        conclusion = consultation.drug_analysis.coerce_chat_text(raw_response).strip()
-        if conclusion and not consultation.is_materially_in_report_language(
-            conclusion, report_language
-        ):
-            logger.warning(
-                "Language mismatch detected for global conclusion (target=%s); applying one repair pass",
-                report_language,
-            )
-            repaired = await consultation.rag_support.repair_language_once(
-                source_text=conclusion,
-                report_language=report_language,
-            )
-            if repaired:
-                conclusion = repaired
-        return conclusion or None
-
-    # -------------------------------------------------------------------------
     async def finalize_patient_report(
         self,
         entries: list[DrugClinicalAssessment],
         *,
         clinical_context: str | None,
         report_language: str,
+        generate_conclusion: Callable[..., Awaitable[str | None]],
     ) -> str | None:
         return await self._build_and_finalize_report(
             entries,
             clinical_context=clinical_context,
             report_language=report_language,
-            generate_conclusion_fn=self.generate_conclusion,
+            generate_conclusion_fn=generate_conclusion,
         )
 
     # -------------------------------------------------------------------------
@@ -234,44 +366,13 @@ class ReportFinalizer:
         *,
         clinical_context: str | None,
         report_language: str,
+        generate_conclusion: Callable[..., Awaitable[str | None]],
     ) -> str | None:
         return await self._build_and_finalize_report(
             entries,
             clinical_context=clinical_context,
             report_language=report_language,
-            generate_conclusion_fn=self.generate_revision_conclusion,
-        )
-
-    # -------------------------------------------------------------------------
-    async def generate_conclusion(
-        self,
-        *,
-        clinical_context: str,
-        multi_drug_report: str,
-        report_language: str,
-    ) -> str | None:
-        return await self._run_conclusion(
-            clinical_context=clinical_context,
-            multi_drug_report=multi_drug_report,
-            report_language=report_language,
-            system_template=LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
-            user_template=LIVERTOX_CONCLUSION_USER_PROMPT,
-        )
-
-    # -------------------------------------------------------------------------
-    async def generate_revision_conclusion(
-        self,
-        *,
-        clinical_context: str,
-        multi_drug_report: str,
-        report_language: str,
-    ) -> str | None:
-        return await self._run_conclusion(
-            clinical_context=clinical_context,
-            multi_drug_report=multi_drug_report,
-            report_language=report_language,
-            system_template=LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
-            user_template=LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
+            generate_conclusion_fn=generate_conclusion,
         )
 
     # -------------------------------------------------------------------------

@@ -71,9 +71,10 @@ def build_matcher(*, excerpt: str = "LiverTox excerpt.") -> LiverToxMatcher:
 ###############################################################################
 def test_prepare_inputs_enriches_resolved_drugs_with_knowledge() -> None:
     preparation = object.__new__(ClinicalKnowledgePreparation)
-    preparation.serializer = SerializerStub()  # type: ignore[assignment]
+    preparation.knowledge_repository = SerializerStub()  # type: ignore[assignment]
+    preparation.drug_catalog_repository = preparation.knowledge_repository  # type: ignore[assignment]
     preparation.knowledge_composer = ClinicalKnowledgeComposer(
-        serializer=preparation.serializer  # type: ignore[arg-type]
+        knowledge_repository=preparation.knowledge_repository  # type: ignore[arg-type]
     )
     preparation.livertox_matcher = build_matcher()
 
@@ -95,9 +96,10 @@ def test_prepare_inputs_enriches_resolved_drugs_with_knowledge() -> None:
 ###############################################################################
 def test_prepare_inputs_handles_missing_livertox_monographs() -> None:
     preparation = object.__new__(ClinicalKnowledgePreparation)
-    preparation.serializer = SerializerStub()  # type: ignore[assignment]
+    preparation.knowledge_repository = SerializerStub()  # type: ignore[assignment]
+    preparation.drug_catalog_repository = preparation.knowledge_repository  # type: ignore[assignment]
     preparation.knowledge_composer = ClinicalKnowledgeComposer(
-        serializer=preparation.serializer  # type: ignore[arg-type]
+        knowledge_repository=preparation.knowledge_repository  # type: ignore[arg-type]
     )
     preparation.livertox_matcher = build_matcher(excerpt="")
 

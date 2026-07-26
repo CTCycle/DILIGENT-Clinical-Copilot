@@ -32,13 +32,15 @@ from services.clinical.analysis_runner import (
 from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.pattern_analyzer import HepatotoxicityPatternAnalyzer
 from services.clinical.report_finalizer import ReportFinalizer
+from services.clinical.exposure_timeline import ExposureTimelineService
 from services.clinical.rag_support import RagSupportService
 
 ###############################################################################
 def build_test_consultation() -> HepatoxConsultation:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     consultation.analysis_runner = AnalysisRunner(consultation)
-    consultation.report_finalizer = ReportFinalizer(consultation)
+    consultation.report_finalizer = ReportFinalizer()
+    consultation.exposure_timeline = ExposureTimelineService()
     consultation.rag_support = RagSupportService(consultation)
     return consultation
 
@@ -111,7 +113,7 @@ def test_evaluate_suspension_marks_anamnesis_mentions_as_uncertain_exposure() ->
         historical_flag=True,
     )
 
-    suspension = consultation.evaluate_suspension(entry, visit_date=date(2025, 4, 14))
+    suspension = consultation.exposure_timeline.evaluate_suspension(entry, visit_date=date(2025, 4, 14))
 
     assert suspension.suspended is False
     assert suspension.note is not None
@@ -122,15 +124,15 @@ def test_evaluate_suspension_marks_anamnesis_mentions_as_uncertain_exposure() ->
 def test_parse_timeline_date_uses_visit_year_for_partial_dates() -> None:
     consultation = build_test_consultation()
 
-    parsed = consultation.parse_timeline_date("14-04", visit_date=date(2025, 4, 20))
+    parsed = consultation.exposure_timeline.parse_timeline_date("14-04", visit_date=date(2025, 4, 20))
 
     assert parsed == date(2025, 4, 14)
 
 ###############################################################################
 def test_format_visit_date_anchor_handles_missing_and_present_values() -> None:
-    assert HepatoxConsultation.format_visit_date_anchor(None) == "Not provided."
+    assert ExposureTimelineService.format_visit_date_anchor(None) == "Not provided."
     assert (
-        HepatoxConsultation.format_visit_date_anchor(date(2025, 4, 14)) == "2025-04-14"
+        ExposureTimelineService.format_visit_date_anchor(date(2025, 4, 14)) == "2025-04-14"
     )
 
 ###############################################################################
@@ -270,7 +272,7 @@ def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> N
         ),
     )
 
-    rendered = consultation.render_matched_drug_section(entry)
+    rendered = consultation.report_finalizer.render_matched_drug_section(entry)
 
     assert "**RUCAM**: Structured RUCAM score: 6 (probable)." in rendered
     assert "Local evidence match: weak_alias_or_class_match" in rendered
@@ -284,7 +286,6 @@ def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
         _ = kwargs
         return "Integrated recommendations."
 
-    consultation.report_finalizer.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
     report = asyncio.run(
         consultation.report_finalizer.finalize_patient_report(
             [
@@ -297,6 +298,7 @@ def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
             ],
             clinical_context="Clinical context",
             report_language="en",
+            generate_conclusion=fake_generate_conclusion,
         )
     )
 
@@ -314,7 +316,6 @@ def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_se
         _ = kwargs
         return None
 
-    consultation.report_finalizer.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
     report = asyncio.run(
         consultation.report_finalizer.finalize_patient_report(
             [
@@ -347,6 +348,7 @@ def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_se
             ],
             clinical_context="Clinical context",
             report_language="en",
+            generate_conclusion=fake_generate_conclusion,
         )
     )
 
@@ -367,7 +369,6 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
         _ = kwargs
         return None
 
-    consultation.report_finalizer.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
     report = asyncio.run(
         consultation.report_finalizer.finalize_patient_report(
             [
@@ -381,6 +382,7 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
             ],
             clinical_context="Clinical context",
             report_language="en",
+            generate_conclusion=fake_generate_conclusion,
         )
     )
 
@@ -401,7 +403,6 @@ def test_finalize_patient_report_renders_accepted_resolution_status_as_matched()
         _ = kwargs
         return None
 
-    consultation.report_finalizer.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
     report = asyncio.run(
         consultation.report_finalizer.finalize_patient_report(
             [
@@ -416,6 +417,7 @@ def test_finalize_patient_report_renders_accepted_resolution_status_as_matched()
             ],
             clinical_context="Clinical context",
             report_language="en",
+            generate_conclusion=fake_generate_conclusion,
         )
     )
 
@@ -546,7 +548,7 @@ def test_build_drug_assessment_base_normalizes_oversized_match_reason() -> None:
 ###############################################################################
 def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
     consultation = build_test_consultation()
-    section = consultation.render_unresolved_mentions_section(
+    section = consultation.report_finalizer.render_unresolved_mentions_section(
         [
             DrugClinicalAssessment(
                 drug_name="UnknownX",
@@ -576,7 +578,7 @@ def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
 ###############################################################################
 def test_unresolved_candidate_details_render_names_without_raw_payloads() -> None:
     consultation = build_test_consultation()
-    section = consultation.render_unresolved_mentions_section(
+    section = consultation.report_finalizer.render_unresolved_mentions_section(
         [
             DrugClinicalAssessment(
                 drug_name="Diazepam",
@@ -605,7 +607,7 @@ def test_sanitize_renderable_body_removes_structured_dili_section() -> None:
         ),
     )
 
-    sanitized = consultation.sanitize_renderable_body(entry)
+    sanitized = consultation.report_finalizer.sanitize_renderable_body(entry)
 
     assert sanitized == "Clinical narrative before appendix."
 
@@ -619,7 +621,7 @@ def test_remove_redundant_report_sentence_truncates_structured_dili_section() ->
         "```\n"
     )
 
-    cleaned = HepatoxConsultation.remove_redundant_report_sentence(raw)
+    cleaned = ReportFinalizer.remove_redundant_report_sentence(raw)
 
     assert cleaned == "Clinical narrative before appendix."
 
@@ -703,7 +705,7 @@ def test_missing_evidence_claim_requires_review_and_renders_warning() -> None:
     assert narrative.claims[0].confidence == "low"
     assert narrative.claims[0].requires_review is True
     assert all(claim.confidence != "high" for claim in narrative.claims)
-    rendered = HepatoxConsultation.render_clinical_commentary(entry)
+    rendered = ReportFinalizer.render_clinical_commentary(entry)
     assert "Clinical commentary" in rendered
     assert "Clinical review is required" in rendered
     assert "insufficient follow-up labs" in rendered

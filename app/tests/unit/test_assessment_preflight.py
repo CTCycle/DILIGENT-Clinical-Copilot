@@ -70,7 +70,7 @@ def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch) 
         ),
     )
     monkeypatch.setattr(
-        service.serializer, "list_livertox_catalog", lambda **kwargs: ([], 0)
+        service.session_repository.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([], 0)
     )
     request = ClinicalSessionRequest(
         clinical_input=_valid_input(),
@@ -93,10 +93,10 @@ def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> 
         lambda: False,
     )
     monkeypatch.setattr(
-        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.session_repository.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
-        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([], 0)
+        service.session_repository.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([], 0)
     )
     request = ClinicalSessionRequest(
         clinical_input=_valid_input(),
@@ -119,10 +119,10 @@ def test_malformed_sections_block_job_start(monkeypatch) -> None:
         lambda: False,
     )
     monkeypatch.setattr(
-        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.session_repository.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
-        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.session_repository.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     request = ClinicalSessionRequest(
         clinical_input="ANAMNESIS\nonly anamnesis\n",
@@ -206,10 +206,10 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
-        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.session_repository.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
-        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.session_repository.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
         "services.session.preflight._validate_provider_key", lambda blocking: None
@@ -250,10 +250,10 @@ def test_preflight_does_not_warn_when_deterministic_disease_matching_is_empty(
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
-        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.session_repository.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
-        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.session_repository.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
         "services.session.preflight._validate_provider_key", lambda blocking: None
@@ -333,10 +333,10 @@ def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
-        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.session_repository.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
-        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.session_repository.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
         "services.session.preflight._validate_provider_key", lambda blocking: None

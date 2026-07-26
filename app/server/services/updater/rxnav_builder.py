@@ -15,7 +15,7 @@ import pandas as pd
 
 from common.paths import RXNAV_CURATED_ALIASES_PATH
 from common.utils.logger import logger
-from repositories.serialization.data import DataSerializer
+from repositories.drug_catalog_repository import DrugCatalogRepository
 from common.utils.text_utils import normalize_drug_name
 from services.text.vocabulary import get_text_normalization_snapshot
 from services.updater.rxnav_client import (
@@ -44,7 +44,7 @@ class RxNavDrugCatalogBuilder:
         self,
         rx_client: RxNavClient | None = None,
         *,
-        serializer: DataSerializer | None = None,
+        drug_catalog_repository: DrugCatalogRepository,
         curated_aliases_path: str | None = None,
     ) -> None:
         vocabulary = get_text_normalization_snapshot()
@@ -61,7 +61,7 @@ class RxNavDrugCatalogBuilder:
         self.rxcui_cache: dict[str, list[str]] = {}
         self.total_records: int | None = None
         self.last_logged_count = 0
-        self.serializer = serializer or DataSerializer()
+        self.drug_catalog_repository = drug_catalog_repository
         resolved_path = (
             Path(curated_aliases_path)
             if curated_aliases_path is not None
@@ -463,7 +463,7 @@ class RxNavDrugCatalogBuilder:
         frame = pd.DataFrame(batch)
         if frame.empty:
             return
-        self.serializer.upsert_drugs_catalog_records(
+        self.drug_catalog_repository.upsert_drugs_catalog_records(
             frame,
             curated_aliases_by_canonical=self.curated_aliases_by_canonical,
         )
