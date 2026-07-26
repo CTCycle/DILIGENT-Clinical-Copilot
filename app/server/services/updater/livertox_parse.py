@@ -490,7 +490,7 @@ def strip_punctuation(value: str) -> str:
 
 ###############################################################################
 def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
-    sanitized = self.serializer.sanitize_livertox_records(entries)
+    sanitized = self.knowledge_repository.sanitize_livertox_records(entries)
     if sanitized.empty:
         sanitized = pd.DataFrame(columns=["nbk_id", "drug_name", "excerpt", "synonyms"])
     sanitized = sanitized.copy()

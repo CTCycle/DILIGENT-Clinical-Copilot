@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from repositories.serialization.data import DataSerializer
+from repositories.knowledge_repository import KnowledgeRepository
 
 ###############################################################################
 class ClinicalKnowledgeComposer:
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, serializer: DataSerializer | None = None) -> None:
-        self.serializer = serializer or DataSerializer()
+    def __init__(self, *, knowledge_repository: KnowledgeRepository) -> None:
+        self.knowledge_repository = knowledge_repository
 
     # -------------------------------------------------------------------------
     def enrich_resolved_drugs(
@@ -22,12 +22,12 @@ class ClinicalKnowledgeComposer:
                 payload["drug_id"] = None
                 payload["knowledge_prompt"] = ""
                 continue
-            drug_id = self.serializer.to_int(matched_row.get("drug_id"))
+            drug_id = self.knowledge_repository.to_int(matched_row.get("drug_id"))
             payload["drug_id"] = drug_id
             if drug_id is None:
                 payload["knowledge_prompt"] = ""
                 continue
-            bundle = self.serializer.get_drug_knowledge_bundle(drug_id)
+            bundle = self.knowledge_repository.get_drug_knowledge_bundle(drug_id)
             livertox_excerpt = self.select_livertox_excerpt(payload)
             if not livertox_excerpt:
                 livertox_excerpt = str(bundle.get("livertox_excerpt") or "")

@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from common.paths import ARCHIVES_PATH
-from repositories.serialization.data import DataSerializer
+from repositories.drug_catalog_repository import DrugCatalogRepository
+from repositories.knowledge_repository import KnowledgeRepository
 from services.runtime.jobs import JobManager
 from services.updater.embeddings import RagEmbeddingUpdater
 from services.updater.livertox_core import LiverToxUpdater
@@ -73,7 +74,8 @@ class DataInspectionUpdateJobRunner:
     def __init__(
         self,
         *,
-        serializer: DataSerializer,
+        drug_catalog_repository: DrugCatalogRepository,
+        knowledge_repository: KnowledgeRepository,
         jobs: JobManager,
         report_phase_by_target: Callable[[str, str, int, str], None],
         report_job_progress: Callable[
@@ -81,7 +83,8 @@ class DataInspectionUpdateJobRunner:
         ],
         write_rag_manifest: Callable[[dict[str, Any], str], Path],
     ) -> None:
-        self.serializer = serializer
+        self.drug_catalog_repository = drug_catalog_repository
+        self.knowledge_repository = knowledge_repository
         self.jobs = jobs
         self.report_phase_by_target = report_phase_by_target
         self.report_job_progress = report_job_progress
@@ -108,7 +111,7 @@ class DataInspectionUpdateJobRunner:
             max_concurrency=_override_int(override_values, "rxnav_max_concurrency"),
         )
         builder = RxNavDrugCatalogBuilder(
-            serializer=self.serializer, rx_client=rx_client
+            drug_catalog_repository=self.drug_catalog_repository, rx_client=rx_client
         )
         self.report_phase_by_target(
             job_id, "rxnav", 20, "Processing aliases and synonyms"
@@ -137,7 +140,7 @@ class DataInspectionUpdateJobRunner:
         updater = LiverToxUpdater(
             str(ARCHIVES_PATH),
             redownload=bool(_override_bool(override_values, "redownload") or False),
-            serializer=self.serializer,
+            knowledge_repository=self.knowledge_repository,
             archive_name=_override_str(override_values, "livertox_archive"),
             monograph_max_workers=_override_int(
                 override_values, "livertox_monograph_max_workers"

@@ -5,7 +5,7 @@ from domain.clinical import (
     HepatotoxicityPatternScore,
     PatientData,
 )
-from services.clinical.hepatox_core import HepatoxConsultation
+from services.clinical.report_finalizer import ReportFinalizer
 from services.clinical.language import detect_clinical_language
 from services.clinical.validation import build_validation_bundle
 from services.session.session_shared import NarrativeBuilder
@@ -64,8 +64,7 @@ def test_narrative_builder_does_not_force_english_for_italian() -> None:
 
 ###############################################################################
 def test_italian_clinician_report_wrappers_do_not_use_english_labels() -> None:
-    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
-    rendered = consultation.render_matched_drug_section(
+    rendered = ReportFinalizer().render_matched_drug_section(
         DrugClinicalAssessment(
             drug_name="Paracetamolo",
             match_status="matched",

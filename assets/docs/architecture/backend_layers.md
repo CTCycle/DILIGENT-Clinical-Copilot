@@ -45,7 +45,7 @@ Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and
   - Shared pure-utility modules (text normalization, chunking, seed terms, embedding model specs, list deduplication) live under `app/server/common/utils/` (`text_utils.py`, `chunking.py`, `seed_terms.py`, `embedding_model.py`) and are the canonical single source of truth — service modules import from here rather than duplicating logic.
   - Endpoint-layer request validation lives in `app/server/api/session_validation.py`.
   - Catalog snapshot provider (`common/catalogs/provider.py`) provides cross-layer access to reference catalog data through a cached getter. Application lifespan explicitly calls `initialize_reference_catalog_provider()` before startup validation; service imports do not register providers as a side effect.
-  - Focused persistence repositories are the planned ownership boundary for clinical-session, timeline, revision, knowledge, and drug-catalog operations; the current migration from `DataSerializer` remains pending.
+  - `RepositoryContext` constructs the shared SQLAlchemy engine/session factory. Focused repositories own clinical-session, timeline, revision, knowledge, and drug-catalog operations; there is no aggregate `DataSerializer` boundary.
   - Deterministic exposure-date parsing and suspension evaluation are the planned responsibility of `ExposureTimelineService`; the extraction remains pending.
   - Catalog manifest loading (`common/catalogs/manifest_loader.py`) handles file I/O for catalog JSON manifests, decoupled from persistence logic.
   - Constants that depend on external catalog files (e.g., `CLOUD_MODEL_CHOICES`) are exposed as lazy accessor functions (`get_cloud_model_choices()`) to avoid import-time I/O side effects.
@@ -77,7 +77,7 @@ Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and
 - Resolution statuses are `accepted_exact_livertox`, `accepted_rxnav_validated`, `accepted_livertox_without_rxnav`, `ambiguous_requires_review`, `missing_rxnav`, `missing_livertox`, and `rejected_false_positive`.
 - Persisted audit artifacts include section extraction audit, extraction strategy decisions, hepatic pattern resolution, and match audit details.
 - Persisted clinical results include a readable `final_report` that uses the per-drug clinical consultation narrative and appends a concise deterministic DILI adjudication summary. The full rendered deterministic dossier is persisted separately as `pipeline_artifacts.structured_dili_report`, while `dili_evidence_bundle` remains the structured audit contract.
-- Successful clinical jobs require database persistence. If the serializer cannot return a persisted session id, the workflow fails with a service dependency error rather than returning an unpersisted success.
+- Successful clinical jobs require database persistence. If `ClinicalSessionRepository` cannot return a persisted session id, the workflow fails with a service dependency error rather than returning an unpersisted success.
 
 ### `POST /api/clinical/validate-input`
 - `app/server/api/session.py`

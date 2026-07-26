@@ -9,6 +9,7 @@ from services.clinical.drug_resolution import DrugResolutionService
 from services.clinical.match_resolution import conservative_fuzzy_livertox_match
 from services.clinical.matches_core import LiverToxMatcher
 from services.clinical.preparation import ClinicalKnowledgePreparation
+from repository_fixtures import build_repository_graph
 from services.text.normalization import normalize_drug_query_name
 
 ###############################################################################
@@ -323,7 +324,11 @@ def test_catalog_alias_quality_rejects_formulation_pollution() -> None:
 
 ###############################################################################
 def test_prepare_inputs_handles_empty_drugs_without_crashing() -> None:
-    preparation = ClinicalKnowledgePreparation()
+    graph = build_repository_graph()
+    preparation = ClinicalKnowledgePreparation(
+        knowledge_repository=graph.knowledge_repository,
+        drug_catalog_repository=graph.drug_catalog_repository,
+    )
 
     prepared = asyncio.run(
         preparation.prepare_inputs(
@@ -1033,7 +1038,11 @@ def test_conservative_fuzzy_livertox_match_high_threshold() -> None:
 
 ###############################################################################
 def test_prepare_inputs_resolves_direct_livertox_alias() -> None:
-    prep = ClinicalKnowledgePreparation()
+    graph = build_repository_graph()
+    prep = ClinicalKnowledgePreparation(
+        knowledge_repository=graph.knowledge_repository,
+        drug_catalog_repository=graph.drug_catalog_repository,
+    )
     prep.livertox_matcher = LiverToxMatcher(_build_rxnav_livertox_df())
     prepared = asyncio.run(
         prep.prepare_inputs(
@@ -1049,7 +1058,11 @@ def test_prepare_inputs_resolves_direct_livertox_alias() -> None:
 
 ###############################################################################
 def test_livertox_match_audit_flags_missing_ambiguous_and_low_confidence() -> None:
-    preparation = ClinicalKnowledgePreparation()
+    graph = build_repository_graph()
+    preparation = ClinicalKnowledgePreparation(
+        knowledge_repository=graph.knowledge_repository,
+        drug_catalog_repository=graph.drug_catalog_repository,
+    )
     issues = preparation.build_match_audit_issues(
         {
             "drug-a": {

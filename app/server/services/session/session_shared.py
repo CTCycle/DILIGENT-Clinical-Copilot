@@ -444,7 +444,7 @@ async def execute_clinical_job(
     except ClinicalPipelineValidationError as exc:
         serialized_issues = [issue.model_dump() for issue in exc.issues]
         await asyncio.to_thread(
-            service.serializer.save_clinical_session,
+            service.session_repository.save_clinical_session,
             build_failed_session_payload(
                 payload=payload,
                 patient_image_base64=patient_image_base64,
@@ -471,7 +471,7 @@ async def execute_clinical_job(
             message=str(exc).strip() or "Clinical analysis failed unexpectedly.",
         ).model_dump()
         await asyncio.to_thread(
-            service.serializer.save_clinical_session,
+            service.session_repository.save_clinical_session,
             build_failed_session_payload(
                 payload=payload,
                 patient_image_base64=patient_image_base64,
@@ -563,5 +563,5 @@ def run_clinical_job(
         result["runtime_settings"]["runtime_snapshot_hash"] = runtime_snapshot_hash
         session_id = result.get("session_id")
         if isinstance(session_id, int):
-            service.serializer.upsert_session_result_payload(session_id, result)
+            service.session_repository.upsert_session_result_payload(session_id, result)
     return result

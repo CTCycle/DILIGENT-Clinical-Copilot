@@ -12,7 +12,11 @@ from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.inspection import InspectionJobPhase
-from repositories.serialization.data import DataSerializer
+from repositories.clinical_session_repository import ClinicalSessionRepository
+from repositories.drug_catalog_repository import DrugCatalogRepository
+from repositories.knowledge_repository import KnowledgeRepository
+from repositories.session_revision_repository import SessionRevisionRepository
+from repositories.session_timeline_repository import SessionTimelineRepository
 from repositories.serialization.document_serializer import DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
 from services.retrieval.settings import build_effective_rag_settings
@@ -82,24 +86,37 @@ class DataInspectionService(
     def __init__(
         self,
         *,
-        serializer: DataSerializer | None = None,
+        clinical_session_repository: ClinicalSessionRepository,
+        drug_catalog_repository: DrugCatalogRepository,
+        knowledge_repository: KnowledgeRepository,
+        session_timeline_repository: SessionTimelineRepository,
+        session_revision_repository: SessionRevisionRepository,
         timeline_extractor: PatientTimelineExtractor | None = None,
         jobs: JobManager,
     ) -> None:
-        self.serializer = serializer or DataSerializer()
+        self.clinical_session_repository = clinical_session_repository
+        self.drug_catalog_repository = drug_catalog_repository
+        self.knowledge_repository = knowledge_repository
+        self.session_timeline_repository = session_timeline_repository
+        self.session_revision_repository = session_revision_repository
         self.timeline_extractor = timeline_extractor or PatientTimelineExtractor()
         self.jobs = jobs
         self.timeline_generation_lock = Lock()
         self.timeline_generation_inflight: set[int] = set()
         self.timeline_generation_cooldown_until: dict[int, float] = {}
         self.update_job_runner = DataInspectionUpdateJobRunner(
-            serializer=self.serializer,
+            drug_catalog_repository=self.drug_catalog_repository,
+            knowledge_repository=self.knowledge_repository,
             jobs=self.jobs,
             report_phase_by_target=self._report_phase_by_target_for_runner,
             report_job_progress=self._report_job_progress_for_runner,
             write_rag_manifest=self._write_rag_manifest_for_runner,
         )
-        self.revision_agent_runner = RevisionAgentRunner(serializer=self.serializer)
+        self.revision_agent_runner = RevisionAgentRunner(
+            clinical_session_repository=self.clinical_session_repository,
+            session_revision_repository=self.session_revision_repository,
+            knowledge_repository=self.knowledge_repository,
+        )
 
     # -------------------------------------------------------------------------
     def list_sessions(
@@ -112,7 +129,7 @@ class DataInspectionService(
         offset: int,
         limit: int,
     ) -> dict[str, Any]:
-        items, total = self.serializer.list_sessions(
+        items, total = self.clinical_session_repository.list_sessions(
             search=search,
             status_filter=status_filter,
             date_mode=date_mode,
@@ -129,11 +146,11 @@ class DataInspectionService(
 
     # -------------------------------------------------------------------------
     def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
-        return self.serializer.get_session_detail(session_id)
+        return self.clinical_session_repository.get_session_detail(session_id)
 
     # -------------------------------------------------------------------------
     def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
-        return self.serializer.list_session_versions(session_id)
+        return self.session_revision_repository.list_session_versions(session_id)
 
     # -------------------------------------------------------------------------
     def get_session_version_detail(
@@ -142,14 +159,14 @@ class DataInspectionService(
         *,
         version_id: int,
     ) -> dict[str, Any] | None:
-        return self.serializer.get_session_version_detail(
+        return self.session_revision_repository.get_session_version_detail(
             session_id,
             version_id=version_id,
         )
 
     # -------------------------------------------------------------------------
     def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
-        return self.serializer.list_manual_report_edits(session_id)
+        return self.session_revision_repository.list_manual_report_edits(session_id)
 
     # -------------------------------------------------------------------------
     def update_session(
@@ -164,7 +181,7 @@ class DataInspectionService(
     ) -> dict[str, Any] | None:
         resolved_report_text = str(report_text or "").strip() or None
         if resolved_report_text is not None:
-            updated = self.serializer.update_current_report_text_with_manual_audit(
+            updated = self.session_revision_repository.update_current_report_text_with_manual_audit(
                 session_id,
                 report_text=resolved_report_text,
                 edited_fields=edited_fields,
@@ -173,7 +190,7 @@ class DataInspectionService(
                 metadata=metadata,
             )
             return updated["session"] if isinstance(updated, dict) else None
-        return self.serializer.update_session_metadata(
+        return self.session_revision_repository.update_session_metadata(
             session_id,
             metadata=metadata,
         )
@@ -189,7 +206,7 @@ class DataInspectionService(
         edited_by: str | None,
         metadata: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
-        return self.serializer.update_current_report_text_with_manual_audit(
+        return self.session_revision_repository.update_current_report_text_with_manual_audit(
             session_id,
             report_text=report_text,
             edited_fields=edited_fields,
@@ -200,7 +217,7 @@ class DataInspectionService(
 
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
-        return self.serializer.delete_session(session_id)
+        return self.clinical_session_repository.delete_session(session_id)
 
     # -------------------------------------------------------------------------
     def normalize_text(self, value: Any) -> str | None:
@@ -222,7 +239,7 @@ class DataInspectionService(
         offset: int,
         limit: int,
     ) -> dict[str, Any]:
-        items, total = self.serializer.list_rxnav_catalog(
+        items, total = self.drug_catalog_repository.list_rxnav_catalog(
             search=search,
             offset=offset,
             limit=limit,
@@ -236,7 +253,7 @@ class DataInspectionService(
 
     # -------------------------------------------------------------------------
     def get_rxnav_alias_groups(self, drug_id: int) -> dict[str, Any] | None:
-        return self.serializer.get_rxnav_alias_groups(drug_id)
+        return self.drug_catalog_repository.get_rxnav_alias_groups(drug_id)
 
     # -------------------------------------------------------------------------
     def update_rxnav_drug_name(
@@ -245,7 +262,7 @@ class DataInspectionService(
         *,
         drug_name: str,
     ) -> dict[str, Any] | None:
-        return self.serializer.update_rxnav_drug_name(
+        return self.drug_catalog_repository.update_rxnav_drug_name(
             drug_id,
             drug_name=drug_name,
         )
@@ -258,7 +275,7 @@ class DataInspectionService(
         offset: int,
         limit: int,
     ) -> dict[str, Any]:
-        items, total = self.serializer.list_livertox_catalog(
+        items, total = self.knowledge_repository.list_livertox_catalog(
             search=search,
             offset=offset,
             limit=limit,
@@ -272,11 +289,11 @@ class DataInspectionService(
 
     # -------------------------------------------------------------------------
     def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
-        return self.serializer.get_livertox_excerpt(drug_id)
+        return self.knowledge_repository.get_livertox_excerpt(drug_id)
 
     # -------------------------------------------------------------------------
     def delete_drug(self, drug_id: int) -> bool:
-        return self.serializer.delete_drug_with_cleanup(drug_id)
+        return self.drug_catalog_repository.delete_drug_with_cleanup(drug_id)
 
     # -------------------------------------------------------------------------
     def list_rag_documents(
@@ -597,7 +614,7 @@ class DataInspectionService(
         model_overrides: Any = None,
     ) -> dict[str, Any]:
         safe_session_id = int(session_id)
-        if self.serializer.get_session_timeline_source(safe_session_id) is None:
+        if self.session_timeline_repository.get_session_timeline_source(safe_session_id) is None:
             raise KeyError(safe_session_id)
         scope_key = f"session_timeline:{safe_session_id}"
         if self.jobs.is_job_running(self.SESSION_TIMELINE_JOB_TYPE, scope_key=scope_key):
