@@ -41,11 +41,13 @@ MAX_JSON_CHARS = 30000
 
 StructuredCall = Callable[..., Any]
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RevisionAgentRuntime:
     provider: str
     model: str
+
 
 ###############################################################################
 def _clip_text(value: Any, limit: int) -> str:
@@ -54,6 +56,7 @@ def _clip_text(value: Any, limit: int) -> str:
         return text
     return f"{text[:limit]}\n\n[TRUNCATED: {len(text) - limit} characters omitted]"
 
+
 ###############################################################################
 def _safe_json(value: Any, limit: int = MAX_JSON_CHARS) -> str:
     try:
@@ -61,6 +64,7 @@ def _safe_json(value: Any, limit: int = MAX_JSON_CHARS) -> str:
     except TypeError:
         serialized = json.dumps(str(value), ensure_ascii=False)
     return _clip_text(serialized, limit)
+
 
 ###############################################################################
 def resolve_revision_agent_runtime(
@@ -73,6 +77,7 @@ def resolve_revision_agent_runtime(
         provider=provider,
         model=model,
     )
+
 
 ###############################################################################
 def build_revision_agent_user_prompt(
@@ -134,9 +139,9 @@ def build_revision_agent_user_prompt(
         f"{_safe_json(packet, MAX_TEXT_CHARS + MAX_REPORT_CHARS + MAX_JSON_CHARS)}"
     )
 
+
 ###############################################################################
 class RevisionAgentRunner:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -256,7 +261,7 @@ class RevisionAgentRunner:
                 "issue_scan": payload,
                 "artifacts": artifact,
             }
-        except Exception as exc:
+        except Exception:
             latency_ms = int((perf_counter() - started) * 1000)
             error = {"message": "Revision agent issue scan failed."}
             self.serializer.fail_revision_step(
@@ -270,7 +275,7 @@ class RevisionAgentRunner:
                 pipeline_run_id=pipeline_run_id,
                 error=error,
             )
-            raise exc
+            raise
 
     # -------------------------------------------------------------------------
     def run_agentic(
@@ -346,7 +351,9 @@ class RevisionAgentRunner:
                         break
                     try:
                         observation = registry.execute(
-                            decision.tool_name, decision.arguments, request.allowed_tools
+                            decision.tool_name,
+                            decision.arguments,
+                            request.allowed_tools,
                         )
                     except ValueError as exc:
                         observation = {

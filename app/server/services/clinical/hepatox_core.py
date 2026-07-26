@@ -1,5 +1,4 @@
 from __future__ import annotations
-# ruff: noqa: E402
 
 import asyncio
 from datetime import datetime
@@ -37,8 +36,7 @@ from services.clinical.drug_analysis import DrugAnalysisService
 from services.clinical import hepatox_scoring
 from services.clinical.rag_support import RagRetrievalBundle, RagSupportService
 from services.clinical.report_finalizer import ReportFinalizer
-
-from services.clinical.hepatox_constants import (  # noqa: E402
+from services.clinical.hepatox_constants import (
     BIBLIOGRAPHY_LINE_RE,
     DRIFT_SECTION_LINE_RE,
     LIVERTOX_TITLE_LINE_RE,
