@@ -27,14 +27,14 @@ Last updated: 2026-07-26
 - Canonical drug identifiers use `drug_identifiers` with unique `(identifier_system, identifier_value)` ownership.
 - `application_configuration` is the fixed-ID singleton for validated configuration payloads, and `reference_catalog_manifests` records installed manifest state.
 
-## Focused Repository Ownership
+## Focused Repository Ownership (Migration Target)
 
 - `KnowledgeRepository` owns evidence data.
 - `DrugCatalogRepository` owns RxNav data.
 - `ClinicalSessionRepository` owns session-result persistence.
 - `SessionTimelineRepository` owns timeline rows.
 - `SessionRevisionRepository` owns revision data, steps, and artifacts.
-- Feature-specific file serialization remains separate from SQLAlchemy persistence. The former `DataSerializer` aggregate facade is not a supported repository boundary.
+- Feature-specific file serialization remains separate from SQLAlchemy persistence. These focused repositories are the migration target; `DataSerializer` remains the current aggregate boundary until all call sites are migrated.
 
 ## Reference Catalog Persistence
 

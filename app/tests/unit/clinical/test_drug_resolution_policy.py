@@ -16,6 +16,7 @@ from repositories.serialization.data import DataSerializer
 from services.clinical.drug_resolution import DrugResolutionService
 from services.clinical.matches_core import LiverToxMatcher
 
+
 ###############################################################################
 def _livertox_frame() -> pd.DataFrame:
     return pd.DataFrame(
@@ -122,6 +123,7 @@ def _livertox_frame() -> pd.DataFrame:
         ]
     )
 
+
 ###############################################################################
 def _catalog_frame() -> pd.DataFrame:
     return pd.DataFrame(
@@ -193,17 +195,20 @@ def _catalog_frame() -> pd.DataFrame:
         ]
     )
 
+
 ###############################################################################
 def _resolver() -> DrugResolutionService:
     return DrugResolutionService(
         LiverToxMatcher(_livertox_frame(), drugs_catalog_df=_catalog_frame())
     )
 
+
 ###############################################################################
 def _resolve_one(name: str) -> dict:
     resolved = _resolver().resolve(PatientDrugs(entries=[DrugEntry(name=name)]))
     assert resolved
     return next(iter(resolved.values()))
+
 
 ###############################################################################
 def test_exact_generic_drug_gets_resolution_decision() -> None:
@@ -214,6 +219,7 @@ def test_exact_generic_drug_gets_resolution_decision() -> None:
     assert payload["accepted_livertox_nbk_id"] == "NBK001"
     assert payload["resolution_decision"]["accepted_livertox_name"] == "Acetaminophen"
 
+
 ###############################################################################
 def test_brand_alias_maps_to_rxcui_and_livertox_monograph() -> None:
     payload = _resolve_one("Tylenol")
@@ -221,6 +227,7 @@ def test_brand_alias_maps_to_rxcui_and_livertox_monograph() -> None:
     assert payload["decision_status"] == "accepted_rxnav_validated"
     assert payload["rxnav_validation_status"] in {"brand_to_rxcui", "alias_to_rxcui"}
     assert payload["accepted_livertox_name"] == "Acetaminophen"
+
 
 ###############################################################################
 def test_catalog_backed_product_labels_resolve_to_livertox_monographs_with_excerpts() -> (
@@ -242,12 +249,14 @@ def test_catalog_backed_product_labels_resolve_to_livertox_monographs_with_excer
         assert payload["missing_livertox"] is False
         assert payload["extracted_excerpts"]
 
+
 ###############################################################################
 def test_opaque_product_label_is_not_guessed_without_source_backing() -> None:
     payload = _resolve_one("Unmapped Pharma Brand")
 
     assert payload["accepted_livertox_name"] is None
     assert payload["missing_livertox"] is True
+
 
 ###############################################################################
 def test_combination_product_preserves_parent_and_components() -> None:
@@ -263,6 +272,7 @@ def test_combination_product_preserves_parent_and_components() -> None:
         item["accepted_livertox_name"] == "Amoxicillin" for item in resolved.values()
     )
 
+
 ###############################################################################
 def test_ambiguous_alias_requires_review() -> None:
     payload = _resolve_one("SharedAlias")
@@ -270,6 +280,7 @@ def test_ambiguous_alias_requires_review() -> None:
     assert payload["decision_status"] == "ambiguous_requires_review"
     assert payload["requires_human_review"] is True
     assert payload["accepted_livertox_name"] is None
+
 
 ###############################################################################
 def test_broad_category_is_not_concrete_drug_match() -> None:
@@ -282,12 +293,14 @@ def test_broad_category_is_not_concrete_drug_match() -> None:
     assert payload["accepted_rxnav_rxcui"] is None
     assert payload["accepted_livertox_name"] is None
 
+
 ###############################################################################
 def test_false_positive_lab_text_is_rejected_before_matching() -> None:
     payload = _resolve_one("ALT")
 
     assert payload["decision_status"] == "rejected_false_positive"
     assert payload["missing_livertox"] is True
+
 
 ###############################################################################
 def test_candidates_from_another_extracted_drug_do_not_contaminate_mention() -> None:
@@ -312,6 +325,7 @@ def test_candidates_from_another_extracted_drug_do_not_contaminate_mention() -> 
 
 ###############################################################################
 # DB match-cache integration tests
+
 
 ###############################################################################
 def _build_cache_db() -> tuple[DataSerializer, Drug, LiverToxMonograph]:
@@ -353,6 +367,7 @@ def _build_cache_db() -> tuple[DataSerializer, Drug, LiverToxMonograph]:
         session.commit()
     return serializer, drug, monograph
 
+
 ###############################################################################
 def test_db_cache_hit_returns_cached_result() -> None:
     serializer, drug, monograph = _build_cache_db()
@@ -369,9 +384,12 @@ def test_db_cache_hit_returns_cached_result() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
-        normalized_drug_key=key,
-    )
+
+    def cache_lookup(key: str):
+        return serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,
@@ -389,6 +407,7 @@ def test_db_cache_hit_returns_cached_result() -> None:
         "accepted_exact_livertox",
         "accepted_livertox_without_rxnav",
     }
+
 
 ###############################################################################
 def test_db_cache_miss_falls_through_to_pipeline() -> None:
@@ -414,9 +433,12 @@ def test_db_cache_miss_falls_through_to_pipeline() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
-        normalized_drug_key=key,
-    )
+
+    def cache_lookup(key: str):
+        return serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,
@@ -428,6 +450,7 @@ def test_db_cache_miss_falls_through_to_pipeline() -> None:
     assert "cache_hit_previous_match" not in payload.get("match_reason", "")
     assert payload["accepted_livertox_name"] == "Acetaminophen"
     assert payload["missing_livertox"] is False
+
 
 ###############################################################################
 def test_db_cache_low_confidence_not_used() -> None:
@@ -454,9 +477,12 @@ def test_db_cache_low_confidence_not_used() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
-        normalized_drug_key=key,
-    )
+
+    def cache_lookup(key: str):
+        return serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,
@@ -469,6 +495,7 @@ def test_db_cache_low_confidence_not_used() -> None:
     assert payload["accepted_livertox_name"] == "Acetaminophen"
     assert payload["missing_livertox"] is False
     assert payload["extracted_excerpts"] == ["Fresh Acetaminophen excerpt."]
+
 
 ###############################################################################
 def test_db_cache_uses_previously_resolved_rxcui() -> None:
@@ -529,9 +556,12 @@ def test_db_cache_uses_previously_resolved_rxcui() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
-        normalized_drug_key=key,
-    )
+
+    def cache_lookup(key: str):
+        return serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,
