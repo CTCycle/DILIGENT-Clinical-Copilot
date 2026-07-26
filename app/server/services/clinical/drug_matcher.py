@@ -5,8 +5,8 @@ from typing import Any
 from common.utils.logger import logger
 from domain.clinical.matching import LiverToxMatch, MonographRecord
 
-# Sentinel used to distinguish cache hits from None-valued cache entries.
-CACHE_MISS = object()
+from common.utils.bounded_cache import CACHE_MISS
+
 
 ###############################################################################
 class DrugMatcher:

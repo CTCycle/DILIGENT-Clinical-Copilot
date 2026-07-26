@@ -4,11 +4,10 @@ import logging
 import logging.config
 import os
 from datetime import datetime
+from functools import lru_cache
 from typing import Any
 
 from common.paths import LOGS_PATH
-
-_logging_configured: bool = False
 
 ###############################################################################
 LOG_CONFIG: dict[str, Any] = {
@@ -48,12 +47,10 @@ LOG_CONFIG: dict[str, Any] = {
     },
 }
 
+
 ###############################################################################
+@lru_cache(maxsize=1)
 def configure_logging() -> None:
-    global _logging_configured
-    if _logging_configured:
-        return
-    _logging_configured = True
 
     LOGS_PATH.mkdir(parents=True, exist_ok=True)
     current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
