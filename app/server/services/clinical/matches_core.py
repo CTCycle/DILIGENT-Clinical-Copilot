@@ -124,11 +124,6 @@ class DrugsLookup:
         return self.drug_name_service.build_unique_keys(values, normalize_fn)
 
     # -------------------------------------------------------------------------
-    def resolve_source_backed_query_variants(self, normalized_query: str) -> list[str]:
-        return self.drug_name_service.resolve_source_backed_query_variants(
-            normalized_query
-        )
-
     # -------------------------------------------------------------------------
     def has_trusted_exact_key(self, normalized_key: str, data: LiverToxData) -> bool:
         return self.drug_name_service.has_trusted_exact_key(normalized_key, data)

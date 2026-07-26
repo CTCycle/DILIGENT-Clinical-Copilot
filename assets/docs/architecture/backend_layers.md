@@ -45,8 +45,8 @@ Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and
   - Shared pure-utility modules (text normalization, chunking, seed terms, embedding model specs, list deduplication) live under `app/server/common/utils/` (`text_utils.py`, `chunking.py`, `seed_terms.py`, `embedding_model.py`) and are the canonical single source of truth — service modules import from here rather than duplicating logic.
   - Endpoint-layer request validation lives in `app/server/api/session_validation.py`.
   - Catalog snapshot provider (`common/catalogs/provider.py`) provides cross-layer access to reference catalog data through a cached getter. Application lifespan explicitly calls `initialize_reference_catalog_provider()` before startup validation; service imports do not register providers as a side effect.
-  - Focused persistence repositories own their respective clinical-session, timeline, revision, knowledge, and drug-catalog operations; the former `DataSerializer` compatibility facade is not part of the target architecture.
-  - Clinical exposure date parsing and suspension evaluation belong in deterministic `ExposureTimelineService`; report rendering belongs in `ReportFinalizer`.
+  - Focused persistence repositories are the planned ownership boundary for clinical-session, timeline, revision, knowledge, and drug-catalog operations; the current migration from `DataSerializer` remains pending.
+  - Deterministic exposure-date parsing and suspension evaluation are the planned responsibility of `ExposureTimelineService`; the extraction remains pending.
   - Catalog manifest loading (`common/catalogs/manifest_loader.py`) handles file I/O for catalog JSON manifests, decoupled from persistence logic.
   - Constants that depend on external catalog files (e.g., `CLOUD_MODEL_CHOICES`) are exposed as lazy accessor functions (`get_cloud_model_choices()`) to avoid import-time I/O side effects.
   - Logger configuration (`common/utils/logger.py`) defers file handler setup and `dictConfig` calls until `configure_logging()` is invoked during `initialize_settings()`, avoiding import-time side effects and global logging reconfiguration.

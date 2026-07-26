@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 
 from common import paths
@@ -10,6 +9,7 @@ from configurations.startup import (
     initialize_environment,
     reset_app_settings_cache,
 )
+
 
 ###############################################################################
 def test_initialize_environment_preserves_process_environment_precedence(
@@ -28,6 +28,7 @@ def test_initialize_environment_preserves_process_environment_precedence(
     assert environment.get_dotenv_injected_keys()
     assert "TEST_DOTENV_VAR" in environment.get_dotenv_injected_keys()
     assert os.environ.get("FASTAPI_HOST") == "127.0.0.1"
+
 
 ###############################################################################
 def test_initialize_environment_creates_env_from_example_when_missing(
@@ -48,6 +49,7 @@ def test_initialize_environment_creates_env_from_example_when_missing(
         encoding="utf-8"
     )
     assert os.environ.get("TEST_DOTENV_VAR") == "enabled"
+
 
 ###############################################################################
 def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(

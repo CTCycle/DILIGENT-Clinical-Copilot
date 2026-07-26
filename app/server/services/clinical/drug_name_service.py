@@ -75,10 +75,6 @@ class DrugNameService:
         return unique
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def resolve_source_backed_query_variants(normalized_query: str) -> list[str]:
-        return []
-
     # -------------------------------------------------------------------------
     def has_trusted_exact_key(self, normalized_key: str, data: LiverToxData) -> bool:
         return (

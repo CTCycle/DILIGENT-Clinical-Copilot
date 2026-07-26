@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import json
 import importlib.util
 import os
 from pathlib import Path
 
 import pytest
+
+from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
+from services.retrieval.embedding_runtime import get_embedding_runtime
 
 pytestmark = pytest.mark.skipif(
     os.getenv("DILIGENT_RUN_EMBEDDING_INTEGRATION") != "1",
@@ -16,12 +20,8 @@ pytestmark = pytest.mark.skipif(
 def test_pinned_multilingual_runtime_contract() -> None:
     assert importlib.util.find_spec("torch") is None
     assert importlib.util.find_spec("sentence_transformers") is None
-    from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
-    from services.retrieval.embedding_runtime import get_embedding_runtime
 
     fixture = Path(__file__).parents[1] / "fixtures" / "rag_multilingual_retrieval.json"
-    import json
-
     data = json.loads(fixture.read_text(encoding="utf-8"))
     runtime = get_embedding_runtime()
     documents = data["documents"]
