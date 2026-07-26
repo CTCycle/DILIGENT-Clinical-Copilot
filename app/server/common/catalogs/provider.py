@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import lru_cache
 
 from domain.catalogs import ReferenceCatalogSnapshot
 
+
 ###############################################################################
 class _CatalogProvider:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._impl: Callable[[], ReferenceCatalogSnapshot] | None = None
@@ -18,6 +19,10 @@ class _CatalogProvider:
         impl: Callable[[], ReferenceCatalogSnapshot],
         invalidate: Callable[[], None] | None = None,
     ) -> None:
+        if self._impl is not None and (
+            self._impl != impl or self._invalidate != invalidate
+        ):
+            raise RuntimeError("Catalog snapshot provider is already registered")
         self._impl = impl
         self._invalidate = invalidate
 
@@ -36,4 +41,6 @@ class _CatalogProvider:
             self._invalidate()
 
 
-catalog_provider = _CatalogProvider()
+@lru_cache(maxsize=1)
+def get_catalog_provider() -> _CatalogProvider:
+    return _CatalogProvider()

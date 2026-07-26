@@ -1,9 +1,6 @@
 from __future__ import annotations
-# ruff: noqa: E402
-
 import re
-from collections import OrderedDict
-from typing import Any, Generic, Iterable, TypeVar
+from typing import Any, Iterable
 
 import pandas as pd
 
@@ -15,10 +12,10 @@ from domain.clinical.matching import (
 )
 from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.livertox import LiverToxData
+from common.utils.bounded_cache import BoundedCache
+from services.clinical.drug_matcher import DrugMatcher
+from services.clinical.drug_name_service import DrugNameService
 
-KT = TypeVar("KT")
-VT = TypeVar("VT")
-CACHE_MISS = object()
 
 ###############################################################################
 def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
@@ -29,40 +26,6 @@ def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
     )
     return tuple(value.strip().upper() for value in values if value.strip())
 
-###############################################################################
-class BoundedCache(Generic[KT, VT]):
-    __slots__ = ("limit", "store")
-
-    # -------------------------------------------------------------------------
-    def __init__(self, limit: int) -> None:
-        self.limit = max(int(limit), 1)
-        self.store: OrderedDict[KT, VT] = OrderedDict()
-
-    # -------------------------------------------------------------------------
-    def get(self, key: KT, default: Any = CACHE_MISS) -> Any:
-        if key not in self.store:
-            return default
-        value = self.store.pop(key)
-        self.store[key] = value
-        return value
-
-    # -------------------------------------------------------------------------
-    def put(self, key: KT, value: VT) -> None:
-        if self.limit <= 0:
-            return
-        if key in self.store:
-            self.store.pop(key)
-        elif len(self.store) >= self.limit:
-            self.store.popitem(last=False)
-        self.store[key] = value
-
-    # -------------------------------------------------------------------------
-    def clear(self) -> None:
-        self.store.clear()
-
-
-from services.clinical.drug_matcher import DrugMatcher
-from services.clinical.drug_name_service import DrugNameService
 
 ###############################################################################
 class DrugsLookup:
@@ -515,9 +478,9 @@ class DrugsLookup:
     def require_data(self) -> LiverToxData:
         return self.drug_name_service.require_data()
 
+
 ###############################################################################
 class LiverToxMatcher:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from common.utils.languages import resolve_supported_language_code
+from common.utils.languages import (
+    SUPPORTED_REPORT_LANGUAGES,
+    resolve_supported_language_code,
+)
 from domain.clinical.entities import DrugRucamAssessment
 
-SUPPORTED_REPORT_LANGUAGE_CODES = ("en", "it", "es", "fr", "de", "pt")
 
 _EVIDENCE_QUALITY_LABELS = {
     "direct_match_with_excerpt": {
@@ -307,12 +309,12 @@ _PHRASES = {
     },
 }
 
+
 ###############################################################################
 def resolve_report_language(code: str | None) -> str:
     resolved = resolve_supported_language_code(code)
-    if resolved == "en" and (code or "").strip().lower().startswith("pt"):
-        return "pt"
-    return resolved if resolved in SUPPORTED_REPORT_LANGUAGE_CODES else "en"
+    return resolved if resolved in SUPPORTED_REPORT_LANGUAGES else "en"
+
 
 ###############################################################################
 def phrase(key: str, language: str, **values: object) -> str:
@@ -322,17 +324,20 @@ def phrase(key: str, language: str, **values: object) -> str:
         raise KeyError(f"Missing phrase key: {key}")
     return table[key].format(**values)
 
+
 ###############################################################################
 def evidence_quality_label(value: str, language: str) -> str:
     lang = resolve_report_language(language)
     labels = _EVIDENCE_QUALITY_LABELS.get((value or "").strip())
     return labels.get(lang, labels["en"]) if labels else value
 
+
 ###############################################################################
 def limitation_label(value: str, language: str) -> str:
     lang = resolve_report_language(language)
     labels = _LIMITATION_LABELS.get((value or "").strip().casefold())
     return labels.get(lang, labels["en"]) if labels else value
+
 
 ###############################################################################
 def rucam_summary_text(assessment: DrugRucamAssessment, language: str) -> str:
@@ -348,9 +353,11 @@ def rucam_summary_text(assessment: DrugRucamAssessment, language: str) -> str:
         category=assessment.causality_category,
     )
 
+
 ###############################################################################
 def report_heading(key: str, language: str) -> str:
     return phrase(key, language)
+
 
 ###############################################################################
 def requires_language_repair(text: str, expected_language: str) -> bool:

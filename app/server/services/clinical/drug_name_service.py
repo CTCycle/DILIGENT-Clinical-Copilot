@@ -17,7 +17,8 @@ from common.utils.text_utils import (
 )
 from services.text.vocabulary import get_text_normalization_snapshot
 
-CACHE_MISS = object()
+from common.utils.bounded_cache import CACHE_MISS
+
 
 ###############################################################################
 class DrugNameService:

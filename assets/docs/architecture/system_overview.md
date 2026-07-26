@@ -1,5 +1,5 @@
 # System Overview
-Last updated: 2026-07-14
+Last updated: 2026-07-26
 
 ## System Summary
 DILIGENT is a local-first clinical application with:

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 from domain.clinical.entities import DrugRucamAssessment
+from common.utils.languages import SUPPORTED_REPORT_LANGUAGES
 from services.clinical.hepatox_scoring import is_materially_in_report_language
 from services.clinical.report_language import (
-    SUPPORTED_REPORT_LANGUAGE_CODES,
     phrase,
     resolve_report_language,
     rucam_summary_text,
@@ -27,7 +27,7 @@ def test_required_phrase_keys_exist_for_supported_languages() -> None:
         "report_section_summary",
         "report_section_per_drug",
     }
-    for lang in SUPPORTED_REPORT_LANGUAGE_CODES:
+    for lang in SUPPORTED_REPORT_LANGUAGES:
         for key in keys:
             if key == "rucam_structured_score":
                 assert phrase(key, lang, score=6, category="probable")
