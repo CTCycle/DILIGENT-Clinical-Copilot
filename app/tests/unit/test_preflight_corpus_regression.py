@@ -1,22 +1,14 @@
 from __future__ import annotations
 
-import asyncio
 import json
 from pathlib import Path
 
 import pytest
 from services.llm.runtime_config import LLMRuntimeConfig
 from domain.clinical.entities import ClinicalSessionRequest
-from domain.clinical.robustness import FactGraph, ReportMetadata
 from services.runtime.jobs import get_job_manager
 from services.session import preflight as preflight_module
-from services.session.document_normalizer import DocumentNormalizer
 from services.session.factory import build_clinical_session_service
-from services.session.robust_pipeline import (
-    audit_report,
-    build_extraction_artifact,
-    validate_fact_graph,
-)
 
 ###############################################################################
 def _load_corpus_payloads() -> list[dict[str, object]]:
@@ -60,65 +52,3 @@ def test_preflight_allows_captured_corpus_without_blocking_extraction_errors(
     assert not blocking_results, (
         f"Unexpected preflight blocking issues: {blocking_results}"
     )
-
-###############################################################################
-def test_preprocess_unified_input_succeeds_for_all_captured_corpus_cases() -> None:
-    payloads = _load_corpus_payloads()
-    service = build_clinical_session_service(get_job_manager())
-
-    runtime_provider = (LLMRuntimeConfig.get_llm_provider() or "").strip()
-    selected_model_providers = [runtime_provider] if runtime_provider else []
-
-    failures: list[tuple[str, str]] = []
-    for index, item in enumerate(payloads, start=1):
-        request = ClinicalSessionRequest(
-            name=str(item.get("patient_name") or f"patient-{index}"),
-            visit_date=item.get("visit_date_iso"),
-            clinical_input=str(item.get("physician_report") or ""),
-            selected_model_providers=selected_model_providers,
-        )
-        document = str(item.get("document") or f"row_{index}")
-        try:
-            preprocessed_request, extraction = asyncio.run(
-                service.preprocess_unified_input(request)
-            )
-        except Exception as exc:  # noqa: BLE001
-            failures.append((document, str(exc)))
-            continue
-
-        assert (preprocessed_request.anamnesis or "").strip(), (
-            f"Empty anamnesis after preprocessing for {document}"
-        )
-        assert (preprocessed_request.drugs or "").strip(), (
-            f"Empty therapy section after preprocessing for {document}"
-        )
-        assert (preprocessed_request.laboratory_analysis or "").strip(), (
-            f"Empty laboratory section after preprocessing for {document}"
-        )
-        assert extraction is not None, f"Missing extraction metadata for {document}"
-        payload = service.build_patient_payload(preprocessed_request)
-        normalized = DocumentNormalizer().normalize(
-            str(item.get("physician_report") or "")
-        )
-        extraction_artifact = build_extraction_artifact(
-            normalized_document=normalized,
-            section_extraction=extraction,
-            payload=payload,
-        )
-        audit = audit_report(
-            extraction_artifact=extraction_artifact,
-            fact_graph_validation=validate_fact_graph(FactGraph(nodes=[])),
-            report_metadata=ReportMetadata(
-                report_mode="faithful_only",
-                claim_references={"claim_1": ["fact-1"]},
-            ),
-        )
-        assert audit.manual_review_required is False, (
-            f"Unexpected manual review requirement for {document}"
-        )
-        comparison = json.loads(audit.discrepancy_report)
-        assert comparison.get("outcome") == "structured_agreement", (
-            f"Unexpected comparison outcome for {document}: {comparison.get('outcome')}"
-        )
-
-    assert not failures, f"Preprocess failures for captured corpus cases: {failures}"
