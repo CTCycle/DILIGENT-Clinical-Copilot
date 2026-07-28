@@ -231,9 +231,11 @@ class RevisionAgentRunner:
                 output_payload=payload,
                 latency_ms=latency_ms,
             )
-            artifact = self.session_revision_repository.persist_revision_agent_issue_scan(
+            artifact = self.session_revision_repository.persist_revision_artifact(
                 pipeline_run_id=pipeline_run_id,
                 revision_version_id=revision_version_id,
+                artifact_key="revision_agent_issue_scan",
+                status="requires_human_review",
                 payload={
                     **payload,
                     "metadata": {

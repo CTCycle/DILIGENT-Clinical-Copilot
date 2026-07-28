@@ -30,18 +30,13 @@ from services.clinical.hepatox_constants import (
 class ReportFinalizer:
     """Builds the final patient report and conclusion from per-drug assessments."""
 
-    # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        pass
-
-    # -------------------------------------------------------------------------
     async def _build_and_finalize_report(
         self,
         entries: list[DrugClinicalAssessment],
         *,
         clinical_context: str | None,
         report_language: str,
-        generate_conclusion_fn,
+        generate_conclusion_fn: Callable[..., Awaitable[str | None]],
     ) -> str | None:
         matched_entries: list[DrugClinicalAssessment] = []
         unresolved_entries: list[DrugClinicalAssessment] = []
@@ -344,23 +339,7 @@ class ReportFinalizer:
         return "\n".join(lines).strip()
 
     # -------------------------------------------------------------------------
-    async def finalize_patient_report(
-        self,
-        entries: list[DrugClinicalAssessment],
-        *,
-        clinical_context: str | None,
-        report_language: str,
-        generate_conclusion: Callable[..., Awaitable[str | None]],
-    ) -> str | None:
-        return await self._build_and_finalize_report(
-            entries,
-            clinical_context=clinical_context,
-            report_language=report_language,
-            generate_conclusion_fn=generate_conclusion,
-        )
-
-    # -------------------------------------------------------------------------
-    async def finalize_revision_patient_report(
+    async def finalize_report(
         self,
         entries: list[DrugClinicalAssessment],
         *,

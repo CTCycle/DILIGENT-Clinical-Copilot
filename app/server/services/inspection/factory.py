@@ -14,13 +14,16 @@ def build_data_inspection_service(job_manager: JobManager) -> DataInspectionServ
     context = RepositoryContext.create()
     drug_catalog_repository = DrugCatalogRepository(context)
     knowledge_repository = KnowledgeRepository(context, drug_catalog_repository)
+    clinical_session_repository = ClinicalSessionRepository(
+        context, drug_catalog_repository, knowledge_repository
+    )
     return DataInspectionService(
-        clinical_session_repository=ClinicalSessionRepository(
-            context, drug_catalog_repository, knowledge_repository
-        ),
+        clinical_session_repository=clinical_session_repository,
         drug_catalog_repository=drug_catalog_repository,
         knowledge_repository=knowledge_repository,
         session_timeline_repository=SessionTimelineRepository(context),
-        session_revision_repository=SessionRevisionRepository(context),
+        session_revision_repository=SessionRevisionRepository(
+            context, clinical_session_repository
+        ),
         jobs=job_manager,
     )

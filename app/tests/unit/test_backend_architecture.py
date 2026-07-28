@@ -30,7 +30,15 @@ def test_schema_ownership_and_removed_tables_are_canonical() -> None:
     assert "clinical_session_drugs" not in source
 
 ###############################################################################
-MAX_BACKEND_FILE_LINES = 1200
+MAX_BACKEND_FILE_LINES = 1000
+
+FOCUSED_REPOSITORIES = {
+    "clinical_session_repository.py": "ClinicalSessionRepository",
+    "drug_catalog_repository.py": "DrugCatalogRepository",
+    "knowledge_repository.py": "KnowledgeRepository",
+    "session_timeline_repository.py": "SessionTimelineRepository",
+    "session_revision_repository.py": "SessionRevisionRepository",
+}
 
 
 def _module_name(node: ast.Import | ast.ImportFrom) -> str:
@@ -99,6 +107,61 @@ def test_backend_does_not_use_dynamic_application_imports() -> None:
                 assert node.func.attr != "import_module", (
                     f"{path.relative_to(SERVER_ROOT)}:{node.lineno}: import_module"
                 )
+
+
+def test_persistence_code_does_not_use_dynamic_attribute_dispatch() -> None:
+    paths = [
+        SERVER_ROOT / "repositories" / file_name
+        for file_name in FOCUSED_REPOSITORIES
+    ] + [SERVER_ROOT / "repositories" / "serialization" / "session_revision_serializers.py"]
+    for path in paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                assert node.func.id != "getattr", (
+                    f"{path.relative_to(SERVER_ROOT)}:{node.lineno}: getattr"
+                )
+
+
+def test_persistence_code_does_not_import_deleted_compatibility_modules() -> None:
+    forbidden = {"repositories.serialization.data"}
+    for path in python_files(SERVER_ROOT):
+        for node in _imports(path):
+            assert _module_name(node) not in forbidden, (
+                f"{path.relative_to(SERVER_ROOT)}:{node.lineno}: {_module_name(node)}"
+            )
+
+
+def test_focused_repositories_do_not_forward_to_serialization_modules() -> None:
+    repository_root = SERVER_ROOT / "repositories"
+    for file_name, class_name in FOCUSED_REPOSITORIES.items():
+        path = repository_root / file_name
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        classes = [node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == class_name]
+        assert classes, f"{path.relative_to(SERVER_ROOT)}: missing {class_name}"
+        for method in classes[0].body:
+            if not isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if method.name.startswith("_"):
+                continue
+            statements = [statement for statement in method.body if not isinstance(statement, ast.Expr) or not isinstance(statement.value, ast.Constant)]
+            if len(statements) != 1:
+                continue
+            statement = statements[0]
+            call = statement.value if isinstance(statement, ast.Return) else statement.value if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call) else None
+            if not isinstance(call, ast.Call):
+                continue
+            target = ast.unparse(call.func)
+            if isinstance(call.func, ast.Attribute) and isinstance(
+                call.func.value, ast.Name
+            ) and call.func.value.id == "self":
+                raise AssertionError(
+                    f"{path.relative_to(SERVER_ROOT)}:{method.lineno}: "
+                    f"{method.name} is a one-line repository forwarding wrapper"
+                )
+            assert "serialization" not in target, (
+                f"{path.relative_to(SERVER_ROOT)}:{method.lineno}: {method.name} -> {target}"
+            )
 
 
 def test_backend_layer_dependencies() -> None:

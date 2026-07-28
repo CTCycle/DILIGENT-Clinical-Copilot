@@ -9,7 +9,7 @@ from domain.patient_timeline import (
     PatientTimelineExtraction,
     SessionTimelineModelOverrides,
 )
-from repositories.serialization.session_timelines import _build_timeline_preview_payload
+from repositories.serialization.session_timelines import build_timeline_preview_payload
 from domain.patient_timeline import PatientTimeline
 from domain.timeline_dates import normalize_timeline_interval
 from services.clinical.timeline import PatientTimelineExtractor
@@ -231,7 +231,7 @@ def test_timeline_model_override_validation_requires_an_unambiguous_runtime_mode
 
 ###############################################################################
 def test_timeline_preview_includes_evidence_and_timing_quality_counts() -> None:
-    preview = _build_timeline_preview_payload(
+    preview = build_timeline_preview_payload(
         PatientTimeline(
             timeline_id=3,
             session_id=2,

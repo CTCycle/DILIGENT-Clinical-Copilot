@@ -1,5 +1,5 @@
 # System Overview
-Last updated: 2026-07-26
+Last updated: 2026-07-28
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
@@ -74,4 +74,4 @@ Maintained source-level structure, with build and cache artifacts omitted:
   - Current routes: `/`, `/clinical-sessions`, `/data`, `/model-config`, `/sessions/:sessionId/timetable`.
 - Windows launcher and maintenance entry point: `start_on_windows.ps1`.
 
-Backend ownership is explicit: API endpoints call services, services orchestrate domain contracts, and repositories own persistence. The local database is recreated with `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs` when a clean schema cutover is required.
+Backend ownership is explicit: API endpoints call services, services orchestrate domain contracts, and focused repositories own persistence. Repository helpers are pure serializers and value converters, while the deterministic `ExposureTimelineService` and explicitly injected Hepatox subservices remain independent of the HTTP layer. The local database is recreated with `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs` when a clean schema cutover is required.

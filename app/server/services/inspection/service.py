@@ -1,11 +1,10 @@
 from __future__ import annotations
-from datetime import UTC, date, datetime
+from datetime import date
 from functools import partial
 from pathlib import Path
 from threading import Lock
 from typing import Any, Literal
 
-from common.constants import DOCUMENT_SUPPORTED_EXTENSIONS
 from common.paths import VECTOR_DB_PATH
 from common.embedding.manifest import read_active_collection_name
 from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
@@ -21,15 +20,6 @@ from repositories.serialization.document_serializer import DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
 from services.retrieval.settings import build_effective_rag_settings
 from services.clinical.timeline import PatientTimelineExtractor
-from services.inspection.normalization import (
-    extract_lab_marker as extract_lab_marker_value,
-)
-from services.inspection.normalization import (
-    first_iso_date as first_iso_date_value,
-)
-from services.inspection.normalization import (
-    normalize_text as normalize_text_value,
-)
 from services.inspection.timeline import InspectionTimelineMixin
 from services.inspection.update_jobs import DataInspectionUpdateJobRunner
 from services.inspection.update_config import InspectionUpdateConfigMixin
@@ -220,18 +210,6 @@ class DataInspectionService(
         return self.clinical_session_repository.delete_session(session_id)
 
     # -------------------------------------------------------------------------
-    def normalize_text(self, value: Any) -> str | None:
-        return normalize_text_value(value)
-
-    # -------------------------------------------------------------------------
-    def first_iso_date(self, value: Any) -> str | None:
-        return first_iso_date_value(value)
-
-    # -------------------------------------------------------------------------
-    def extract_lab_marker(self, text: str) -> str | None:
-        return extract_lab_marker_value(text)
-
-    # -------------------------------------------------------------------------
     def list_rxnav_catalog(
         self,
         *,
@@ -327,29 +305,20 @@ class DataInspectionService(
                         vector_model_by_file[file_name] = f"{provider}:{model_name}"
                     elif model_name:
                         vector_model_by_file[file_name] = model_name
-        except Exception:
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Unable to load vector metadata for inspection listing (%s): %s",
+                type(exc).__name__,
+                exc,
+            )
             vector_model_by_file = {}
         items: list[dict[str, Any]] = []
-        supported_ext = {entry.lower() for entry in DOCUMENT_SUPPORTED_EXTENSIONS}
         for path in serializer.collect_document_paths():
-            file_path = Path(path)
-            suffix = file_path.suffix.lower()
-            try:
-                stat = file_path.stat()
-                modified = datetime.fromtimestamp(stat.st_mtime, UTC).isoformat()
-                size = int(stat.st_size)
-            except OSError:
-                modified = datetime.fromtimestamp(0, UTC).isoformat()
-                size = 0
+            metadata = serializer.build_listing_metadata(path)
             items.append(
                 {
-                    "path": str(file_path),
-                    "file_name": file_path.name,
-                    "extension": suffix,
-                    "file_size": size,
-                    "last_modified": modified,
-                    "supported_for_ingestion": suffix in supported_ext,
-                    "vector_model": vector_model_by_file.get(file_path.name),
+                    **metadata,
+                    "vector_model": vector_model_by_file.get(metadata["file_name"]),
                 }
             )
         items.sort(key=lambda item: str(item["path"]).casefold())
