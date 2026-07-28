@@ -12,6 +12,7 @@ from repositories.knowledge_repository import KnowledgeRepository
 from repositories.session_revision_repository import SessionRevisionRepository
 from repositories.session_timeline_repository import SessionTimelineRepository
 
+###############################################################################
 @dataclass(frozen=True, slots=True)
 class RepositoryGraph:
     context: RepositoryContext
@@ -22,6 +23,7 @@ class RepositoryGraph:
     session_revision_repository: SessionRevisionRepository
 
 
+###############################################################################
 def build_repository_graph(
     *, engine: Engine | None = None, session_factory: sessionmaker | None = None
 ) -> RepositoryGraph:

@@ -11,7 +11,6 @@ from services.catalogs.runtime import (
     initialize_reference_catalog_provider,
 )
 
-
 ###############################################################################
 def test_runtime_snapshot_values_and_metadata() -> None:
     snapshot = _build_snapshot(
@@ -43,6 +42,7 @@ def test_runtime_snapshot_values_and_metadata() -> None:
     )
 
 
+###############################################################################
 def test_catalog_provider_registration_is_explicit_and_isolated() -> None:
     get_catalog_provider.cache_clear()
     provider = get_catalog_provider()

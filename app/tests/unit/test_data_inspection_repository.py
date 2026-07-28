@@ -32,6 +32,7 @@ def build_repository_graph_for_test() -> tuple[Any, Any]:
     Base.metadata.create_all(engine)
     return build_repository_graph(engine=engine), engine
 
+###############################################################################
 def build_service(repository_graph: Any, *, jobs: JobManager, timeline_extractor: Any | None = None) -> DataInspectionService:
     graph = build_repository_graph(
         engine=repository_graph.context.engine, session_factory=repository_graph.context.session_factory

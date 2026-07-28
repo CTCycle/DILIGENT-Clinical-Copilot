@@ -16,7 +16,6 @@ from common.utils.bounded_cache import BoundedCache
 from services.clinical.drug_matcher import DrugMatcher
 from services.clinical.drug_name_service import DrugNameService
 
-
 ###############################################################################
 def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
     values = get_reference_catalog_snapshot().values(
@@ -25,7 +24,6 @@ def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
         key="default",
     )
     return tuple(value.strip().upper() for value in values if value.strip())
-
 
 ###############################################################################
 class DrugsLookup:
@@ -123,7 +121,6 @@ class DrugsLookup:
     ) -> list[str]:
         return self.drug_name_service.build_unique_keys(values, normalize_fn)
 
-    # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
     def has_trusted_exact_key(self, normalized_key: str, data: LiverToxData) -> bool:
         return self.drug_name_service.has_trusted_exact_key(normalized_key, data)
@@ -473,9 +470,9 @@ class DrugsLookup:
     def require_data(self) -> LiverToxData:
         return self.drug_name_service.require_data()
 
-
 ###############################################################################
 class LiverToxMatcher:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

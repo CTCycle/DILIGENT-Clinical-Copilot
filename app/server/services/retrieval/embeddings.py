@@ -469,7 +469,6 @@ class EmbeddingGenerator:
                 asyncio.set_event_loop(previous_loop)
         return loop.run_until_complete(coroutine)
 
-
 ###############################################################################
 class CanonicalEmbeddingGenerator:
     """Synchronous adapter over the shared local embedding runtime."""

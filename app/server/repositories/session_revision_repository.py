@@ -40,7 +40,10 @@ from repositories.serialization.session_result_data import (
 )
 
 
+###############################################################################
 class SessionRevisionRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         context: RepositoryContext,
@@ -51,6 +54,7 @@ class SessionRevisionRepository:
         self.session_factory = context.session_factory
         self.clinical_session_repository = clinical_session_repository
 
+    # -------------------------------------------------------------------------
     def _root_session_id(self, db_session: Session, session_id: int) -> int | None:
         root = db_session.execute(
             select(ClinicalSessionVersion.root_session_id)
@@ -60,6 +64,7 @@ class SessionRevisionRepository:
         ).scalar_one_or_none()
         return int(root) if root is not None else int(session_id)
 
+    # -------------------------------------------------------------------------
     def _manual_edit_row(self, row: ClinicalSessionVersion) -> dict[str, Any]:
         metadata = parse_session_result_payload(row.metadata_json) or {}
         audit = metadata.get("manual_edit_audit")
@@ -80,6 +85,7 @@ class SessionRevisionRepository:
             "metadata": audit.get("metadata", {}),
         }
 
+    # -------------------------------------------------------------------------
     def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
         with self.session_factory() as db_session:
             root_session_id = self._root_session_id(db_session, int(session_id))
@@ -90,6 +96,7 @@ class SessionRevisionRepository:
             ).scalars().all()
             return [serialize_version_row(row) for row in rows]
 
+    # -------------------------------------------------------------------------
     def get_session_version_detail(
         self, session_id: int, *, version_id: int
     ) -> dict[str, Any] | None:
@@ -107,6 +114,7 @@ class SessionRevisionRepository:
                 ),
             }
 
+    # -------------------------------------------------------------------------
     def get_version_record_for_session(self, session_id: int) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             row = db_session.execute(
@@ -117,10 +125,12 @@ class SessionRevisionRepository:
             ).scalar_one_or_none()
             return serialize_version_row(row) if row is not None else None
 
+    # -------------------------------------------------------------------------
     def get_latest_version_record_for_session(self, session_id: int) -> dict[str, Any] | None:
         versions = self.list_session_versions(session_id)
         return versions[-1] if versions else None
 
+    # -------------------------------------------------------------------------
     def get_next_session_version(self, root_session_id: int) -> int:
         with self.session_factory() as db_session:
             maximum = db_session.execute(
@@ -130,6 +140,7 @@ class SessionRevisionRepository:
             ).scalar_one_or_none()
             return int(maximum or 1) + 1
 
+    # -------------------------------------------------------------------------
     def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
         with self.session_factory() as db_session:
             rows = db_session.execute(
@@ -142,6 +153,7 @@ class SessionRevisionRepository:
             ).scalars().all()
             return [self._manual_edit_row(row) for row in rows]
 
+    # -------------------------------------------------------------------------
     def update_current_report_text_with_manual_audit(
         self,
         session_id: int,
@@ -235,6 +247,7 @@ class SessionRevisionRepository:
             "audit": audits[0],
         }
 
+    # -------------------------------------------------------------------------
     def create_revision_version_shell(
         self,
         session_id: int,
@@ -283,6 +296,7 @@ class SessionRevisionRepository:
             db_session.refresh(shell)
             return serialize_version_row(shell)
 
+    # -------------------------------------------------------------------------
     def create_or_update_revision_run(
         self,
         *,
@@ -356,6 +370,7 @@ class SessionRevisionRepository:
             db_session.refresh(row)
             return serialize_revision_run_row(row)
 
+    # -------------------------------------------------------------------------
     def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             row = db_session.execute(
@@ -365,6 +380,7 @@ class SessionRevisionRepository:
             ).scalar_one_or_none()
             return serialize_revision_run_row(row) if row is not None else None
 
+    # -------------------------------------------------------------------------
     def get_revision_run_by_job_id(self, job_id: str) -> dict[str, Any] | None:
         safe_job_id = job_id.strip()
         if not safe_job_id:
@@ -380,6 +396,7 @@ class SessionRevisionRepository:
                     return serialize_revision_run_row(row)
         return None
 
+    # -------------------------------------------------------------------------
     def list_revision_runs_by_status(self, status: str) -> list[dict[str, Any]]:
         with self.session_factory() as db_session:
             rows = db_session.execute(
@@ -389,6 +406,7 @@ class SessionRevisionRepository:
             ).scalars().all()
             return [serialize_revision_run_row(row) for row in rows]
 
+    # -------------------------------------------------------------------------
     def fail_revision_run(self, *, pipeline_run_id: str, error: dict[str, Any] | None = None) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             row = db_session.execute(
@@ -406,6 +424,7 @@ class SessionRevisionRepository:
             db_session.refresh(row)
             return serialize_revision_run_row(row)
 
+    # -------------------------------------------------------------------------
     def cancel_revision_run(self, *, pipeline_run_id: str) -> None:
         with self.session_factory() as db_session:
             row = db_session.execute(
@@ -419,6 +438,7 @@ class SessionRevisionRepository:
                 row.error_json = serialize_json_payload({"message": "Revision was cancelled."})
             db_session.commit()
 
+    # -------------------------------------------------------------------------
     def start_revision_step(
         self,
         *,
@@ -483,6 +503,7 @@ class SessionRevisionRepository:
             db_session.refresh(row)
             return serialize_revision_step_row(row)
 
+    # -------------------------------------------------------------------------
     def complete_revision_step(self, *, pipeline_run_id: str, step_name: str, attempt_number: int | None = None, status: str = "completed", output_summary: dict[str, Any] | None = None, output_payload: Any = None, token_usage: dict[str, Any] | None = None, latency_ms: int | None = None, completed_at: datetime | None = None, retry_count: int | None = None) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             row = db_session.execute(
@@ -510,6 +531,7 @@ class SessionRevisionRepository:
             db_session.refresh(row)
             return serialize_revision_step_row(row)
 
+    # -------------------------------------------------------------------------
     def fail_revision_step(self, *, pipeline_run_id: str, step_name: str, attempt_number: int | None = None, error: dict[str, Any] | None = None, latency_ms: int | None = None, completed_at: datetime | None = None) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             row = db_session.execute(
@@ -533,6 +555,7 @@ class SessionRevisionRepository:
             db_session.refresh(row)
             return serialize_revision_step_row(row)
 
+    # -------------------------------------------------------------------------
     def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
         with self.session_factory() as db_session:
             rows = db_session.execute(
@@ -542,6 +565,7 @@ class SessionRevisionRepository:
             ).scalars().all()
             return [serialize_revision_step_row(row) for row in rows]
 
+    # -------------------------------------------------------------------------
     def persist_revision_artifact(self, *, pipeline_run_id: str, revision_version_id: int, artifact_key: str, payload: dict[str, Any], status: str = "derived") -> list[dict[str, Any]]:
         with self.session_factory() as db_session:
             row = create_revision_artifact_row(
@@ -557,6 +581,7 @@ class SessionRevisionRepository:
             db_session.refresh(row)
             return [serialize_revision_artifact_row(row)]
 
+    # -------------------------------------------------------------------------
     def persist_revision_artifacts(self, *, pipeline_run_id: str, revision_version_id: int, result_payload: dict[str, Any]) -> list[dict[str, Any]]:
         created: list[dict[str, Any]] = []
         structured_case = result_payload.get("structured_case")
@@ -574,12 +599,14 @@ class SessionRevisionRepository:
                     created.extend(self.persist_revision_artifact(pipeline_run_id=pipeline_run_id, revision_version_id=revision_version_id, artifact_key=str(key), payload=value))
         return created
 
+    # -------------------------------------------------------------------------
     def list_revision_artifacts_for_version(self, *, revision_version_id: int, include_superseded: bool = False) -> list[dict[str, Any]]:
         with self.session_factory() as db_session:
             statement = select(ClinicalSessionRevisionArtifact).where(ClinicalSessionRevisionArtifact.revision_version_id == int(revision_version_id))
             rows = db_session.execute(statement.order_by(ClinicalSessionRevisionArtifact.created_at.asc(), ClinicalSessionRevisionArtifact.id.asc())).scalars().all()
             return [serialize_revision_artifact_row(row) for row in rows if include_superseded or row.status != "superseded"]
 
+    # -------------------------------------------------------------------------
     def persist_revision_entities(self, *, pipeline_run_id: str, revision_version_id: int, source_version_id: int | None, result_payload: dict[str, Any]) -> list[dict[str, Any]]:
         created: list[dict[str, Any]] = []
         structured_case = result_payload.get("structured_case")
@@ -600,6 +627,7 @@ class SessionRevisionRepository:
                     created.append(serialize_revision_entity_row(row))
         return created
 
+    # -------------------------------------------------------------------------
     def list_revision_entities_for_version(self, *, revision_version_id: int, include_superseded: bool = False) -> list[dict[str, Any]]:
         with self.session_factory() as db_session:
             rows = db_session.execute(
@@ -612,6 +640,7 @@ class SessionRevisionRepository:
             ).scalars().all()
             return [serialize_revision_entity_row(row) for row in rows if include_superseded or row.status != "superseded"]
 
+    # -------------------------------------------------------------------------
     def record_revision_review_action(self, *, revision_version_id: int, clinical_review_status: str, reviewer_note: str | None, reviewed_by: str | None, metadata: dict[str, Any] | None = None) -> dict[str, Any] | None:
         if clinical_review_status not in {"under_review", "approved_by_human", "rejected_by_human"}:
             raise ValueError("Unsupported clinical review status")
@@ -630,6 +659,7 @@ class SessionRevisionRepository:
             db_session.refresh(row)
             return serialize_revision_review_row(row)
 
+    # -------------------------------------------------------------------------
     def list_revision_reviews_for_version(self, *, revision_version_id: int) -> list[dict[str, Any]]:
         with self.session_factory() as db_session:
             rows = db_session.execute(
@@ -639,6 +669,7 @@ class SessionRevisionRepository:
             ).scalars().all()
             return [serialize_revision_review_row(row) for row in rows]
 
+    # -------------------------------------------------------------------------
     def finalize_revision_version(self, *, pipeline_run_id: str, persisted_session_id: int, model_configuration: dict[str, Any] | None = None, version_status: str = "requires_human_review", llm_qa_status: str = "not_run", clinical_review_status: str = "not_reviewed") -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             row = db_session.execute(select(ClinicalSessionVersion).where(ClinicalSessionVersion.pipeline_run_id == str(pipeline_run_id))).scalar_one_or_none()
@@ -655,6 +686,7 @@ class SessionRevisionRepository:
             db_session.refresh(row)
             return serialize_version_row(row)
 
+    # -------------------------------------------------------------------------
     def update_session_metadata(self, session_id: int, *, metadata: dict[str, Any] | None) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             session = db_session.get(ClinicalSession, int(session_id))

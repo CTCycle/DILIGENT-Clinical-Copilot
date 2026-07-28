@@ -33,7 +33,10 @@ from repositories.schemas.knowledge import (
 )
 
 
+###############################################################################
 class KnowledgeRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self, context: RepositoryContext, drug_catalog_repository: DrugCatalogRepository
     ) -> None:
@@ -42,6 +45,7 @@ class KnowledgeRepository:
         self.engine = context.engine
         self.session_factory = context.session_factory
 
+    # -------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:
         rows = self.prepare_livertox_rows(records)
         if not rows:
@@ -137,6 +141,7 @@ class KnowledgeRepository:
                 db_session.rollback()
                 raise
 
+    # -------------------------------------------------------------------------
     def get_livertox_records(self) -> pd.DataFrame:
         with self.session_factory() as db_session:
             drugs = (
@@ -189,6 +194,7 @@ class KnowledgeRepository:
             return pd.DataFrame(columns=LIVERTOX_COLUMNS)
         return frame.where(pd.notnull(frame), cast(Any, None)).reindex(columns=LIVERTOX_COLUMNS)
 
+    # -------------------------------------------------------------------------
     def get_livertox_master_list(self) -> pd.DataFrame:
         frame = self.get_livertox_records()
         if frame.empty:
@@ -200,6 +206,7 @@ class KnowledgeRepository:
             .reset_index(drop=True)
         )
 
+    # -------------------------------------------------------------------------
     def list_livertox_catalog(
         self, *, search: str | None, offset: int, limit: int
     ) -> tuple[list[dict[str, Any]], int]:
@@ -249,6 +256,7 @@ class KnowledgeRepository:
                 for row in rows
             ], total
 
+    # -------------------------------------------------------------------------
     def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             row = db_session.execute(
@@ -268,6 +276,7 @@ class KnowledgeRepository:
                 "last_update": repository_values.normalize_date(row.last_update),
             }
 
+    # -------------------------------------------------------------------------
     def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
         safe_drug_id = int(drug_id)
         with self.session_factory() as db_session:
@@ -300,6 +309,7 @@ class KnowledgeRepository:
                 ],
             }
 
+    # -------------------------------------------------------------------------
     def resolve_drug_id_from_match_cache(
         self, db_session: Session, *, normalized_drug_key: str
     ) -> int | None:
@@ -337,6 +347,7 @@ class KnowledgeRepository:
             return None
         return int(cache.drug_id)
 
+    # -------------------------------------------------------------------------
     def upsert_high_confidence_kb_match_cache(
         self,
         db_session: Session,
@@ -413,6 +424,7 @@ class KnowledgeRepository:
         existing.invalidation_reason = None
         existing.updated_at = now
 
+    # -------------------------------------------------------------------------
     def load_livertox_match_from_db_cache(
         self, *, normalized_drug_key: str
     ) -> dict[str, Any] | None:
@@ -466,6 +478,7 @@ class KnowledgeRepository:
                 "evidence": evidence,
             }
 
+    # -------------------------------------------------------------------------
     def prepare_livertox_rows(self, records: pd.DataFrame) -> list[dict[str, Any]]:
         if records.empty:
             return []
@@ -488,6 +501,7 @@ class KnowledgeRepository:
         prepared.sort(key=self.livertox_row_sort_key)
         return prepared
 
+    # -------------------------------------------------------------------------
     def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
         frame = pd.DataFrame(records)
         if frame.empty:
@@ -513,6 +527,7 @@ class KnowledgeRepository:
             subset=["nbk_id", "drug_name"], keep="first"
         ).reset_index(drop=True)
 
+    # -------------------------------------------------------------------------
     def upsert_livertox_monograph(
         self, *, db_session: Session, drug_id: int, row: dict[str, Any]
     ) -> None:
@@ -539,18 +554,23 @@ class KnowledgeRepository:
         monograph.source_url = repository_values.normalize_string(row.get("source_url"))
         monograph.source_last_modified = repository_values.normalize_string(row.get("source_last_modified"))
 
+    # -------------------------------------------------------------------------
     def get_monograph_by_key(self, db_session: Session, monograph_key: str) -> LiverToxMonograph | None:
         return db_session.execute(DrugRepositoryQueries.monograph_by_key(monograph_key)).scalars().first()
 
+    # -------------------------------------------------------------------------
     def get_monograph_by_drug_id(self, db_session: Session, drug_id: int) -> LiverToxMonograph | None:
         return db_session.execute(DrugRepositoryQueries.monograph_by_drug_id(drug_id)).scalars().first()
 
+    # -------------------------------------------------------------------------
     def extract_text_candidates(self, value: Any) -> list[str]:
         return self.drug_catalog_repository.extract_text_candidates(value)
 
+    # -------------------------------------------------------------------------
     def extract_synonym_candidates(self, value: Any) -> list[str]:
         return self.drug_catalog_repository.extract_synonym_candidates(value)
 
+    # -------------------------------------------------------------------------
     def group_aliases_by_kind(self, aliases: list[DrugAlias]) -> dict[str, set[str]]:
         grouped: dict[str, set[str]] = {}
         for alias in aliases:
@@ -560,6 +580,7 @@ class KnowledgeRepository:
                 grouped.setdefault(alias_kind.casefold(), set()).add(alias_value)
         return grouped
 
+    # -------------------------------------------------------------------------
     def alias_model_values_for_kind(self, aliases: list[DrugAlias], alias_kind: str) -> set[str]:
         return {
             normalized
@@ -569,10 +590,12 @@ class KnowledgeRepository:
             if normalized is not None
         }
 
+    # -------------------------------------------------------------------------
     def first_alias_model_value(self, aliases: list[DrugAlias], alias_kind: str) -> str | None:
         values = sorted(self.alias_model_values_for_kind(aliases, alias_kind), key=str.casefold)
         return values[0] if values else None
 
+    # -------------------------------------------------------------------------
     def first_alias_model_term_type(self, aliases: list[DrugAlias]) -> str | None:
         for alias in aliases:
             value = repository_values.normalize_string(alias.term_type)
@@ -580,15 +603,18 @@ class KnowledgeRepository:
                 return value
         return None
 
+    # -------------------------------------------------------------------------
     def livertox_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
         return tuple(
             self.to_sortable_text(row.get(key))
             for key in ("_canonical_name_norm", "_source_last_modified", "_source_url", "_last_update", "_drug_name")
         )
 
+    # -------------------------------------------------------------------------
     def to_sortable_text(self, value: Any) -> str:
         return "" if value is None else str(value).casefold()
 
+    # -------------------------------------------------------------------------
     def build_livertox_monograph_key(self, row: dict[str, Any]) -> str:
         payload = {
             "drug_name_norm": repository_values.normalize_string(row.get("_canonical_name_norm")) or "",
@@ -600,6 +626,7 @@ class KnowledgeRepository:
             json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
 
+    # -------------------------------------------------------------------------
     def _build_search_pattern(self, search: str | None) -> str | None:
         normalized = repository_values.normalize_string(search)
         if normalized is None:
@@ -607,6 +634,7 @@ class KnowledgeRepository:
         escaped = normalized.casefold().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         return f"%{escaped}%"
 
+    # -------------------------------------------------------------------------
     def _is_valid_drug_name_text(self, value: str) -> bool:
         ingestion = get_server_settings().ingestion
         return (
