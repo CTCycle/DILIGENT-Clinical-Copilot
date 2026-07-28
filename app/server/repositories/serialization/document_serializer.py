@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 import zipfile
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
@@ -37,6 +37,26 @@ class DocumentSerializer:
                 logger.debug("Skipping unsupported document '%s'", candidate.name)
         collected.sort()
         return collected
+
+    # -------------------------------------------------------------------------
+    def build_listing_metadata(self, file_path: str | Path) -> dict[str, Any]:
+        path = Path(file_path)
+        try:
+            stat = path.stat()
+            file_size = int(stat.st_size)
+            modified = datetime.fromtimestamp(stat.st_mtime, UTC).isoformat()
+        except OSError:
+            file_size = 0
+            modified = datetime.fromtimestamp(0, UTC).isoformat()
+        extension = path.suffix.lower()
+        return {
+            "path": str(path),
+            "file_name": path.name,
+            "extension": extension,
+            "file_size": file_size,
+            "last_modified": modified,
+            "supported_for_ingestion": extension in self.SUPPORTED_EXTENSIONS,
+        }
 
     # -------------------------------------------------------------------------
     def load_documents(self) -> list[Document]:
@@ -149,7 +169,7 @@ class DocumentSerializer:
             try:
                 with path.open("r", encoding=encoding) as handle:
                     text = handle.read()
-            except OSError, UnicodeDecodeError:
+            except (OSError, UnicodeDecodeError):
                 continue
             return text.strip()
         logger.error("Failed to read text file '%s'", file_path)
@@ -222,7 +242,7 @@ class DocumentSerializer:
         try:
             core_xml = archive.read("docProps/core.xml")
             tree = ElementTree.fromstring(core_xml)
-        except KeyError, ElementTree.ParseError:
+        except (KeyError, ElementTree.ParseError):
             return Path(file_path).stem
         namespaces = {"dc": "http://purl.org/dc/elements/1.1/"}
         node = tree.find("dc:title", namespaces)

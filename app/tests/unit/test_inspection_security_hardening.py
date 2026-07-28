@@ -15,7 +15,7 @@ from domain.inspection import (
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from repository_fixtures import build_repository_graph
+from repositories.drug_catalog_repository import _build_search_pattern
 from services.inspection import DataInspectionService
 
 ###############################################################################
@@ -42,9 +42,7 @@ def test_catalog_search_filter_rejects_oversized_values() -> None:
 
 ###############################################################################
 def test_search_pattern_escapes_like_wildcards() -> None:
-    service = build_repository_graph().drug_catalog_repository
-
-    pattern = service.build_search_pattern(r"  100%_match\check  ")
+    pattern = _build_search_pattern(r"  100%_match\check  ")
 
     assert pattern == r"%100\%\_match\\check%"
 

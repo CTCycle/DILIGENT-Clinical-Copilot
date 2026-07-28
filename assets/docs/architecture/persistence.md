@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-07-26
+Last updated: 2026-07-28
 
 ## Relational Database
 
@@ -35,6 +35,7 @@ Last updated: 2026-07-26
 - `SessionTimelineRepository` owns timeline rows.
 - `SessionRevisionRepository` owns revision data, steps, and artifacts.
 - Feature-specific file serialization remains separate from SQLAlchemy persistence. `RepositoryContext` supplies the shared engine/session factory, and application services receive only the focused repositories they need. Transactions remain explicit at the repository boundary, including atomic session persistence and batch ingestion.
+- Repository serialization modules are pure row and payload conversion helpers; focused repositories own database queries and transactions and use `repositories.values` for canonical normalization.
 
 ## Reference Catalog Persistence
 

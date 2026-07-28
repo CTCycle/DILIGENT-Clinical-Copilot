@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Callable
 from datetime import date
 from typing import Any
 
+from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
-    DrugClinicalAssessment,
-    DrugEntry,
-    DrugRucamAssessment,
-    PatientDrugClinicalReport,
     PatientDrugs,
     PatientRucamAssessmentBundle,
     PipelineIssue,
@@ -20,10 +16,13 @@ from services.clinical.preparation import HepatoxPreparedInputs
 from services.llm.provider_factory import initialize_llm_client
 from services.retrieval.embeddings import SimilaritySearch
 from services.retrieval.settings import build_effective_rag_settings
-from services.text.normalization import normalize_drug_query_name
-from services.clinical.analysis_runner import AnalysisRunner
+from services.clinical.analysis_runner import (
+    AnalysisRunner,
+    emit_progress,
+    resolve_livertox_data_for_entry,
+)
 from services.clinical.drug_analysis import DrugAnalysisService
-from services.clinical.rag_support import RagRetrievalBundle, RagSupportService
+from services.clinical.rag_support import RagSupportService
 from services.clinical.report_finalizer import ReportFinalizer
 from services.clinical.exposure_timeline import ExposureTimelineService
 
@@ -36,12 +35,15 @@ class HepatoxConsultation:
         drugs: PatientDrugs,
         *,
         patient_name: str | None = None,
-        timeout_s: float = get_server_settings().runtime.clinical_llm_timeout,
+        timeout_s: float | None = None,
     ) -> None:
         self.drugs = drugs
+        if timeout_s is None:
+            timeout_s = get_server_settings().runtime.clinical_llm_timeout
         self.timeout_s = timeout_s
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
-        self.MAX_EXCERPT_LENGTH = get_server_settings().runtime.max_excerpt_length
+        runtime_settings = get_server_settings().runtime
+        self.MAX_EXCERPT_LENGTH = runtime_settings.max_excerpt_length
         self.patient_name = (patient_name or "").strip() or None
         provider, model_candidate = LLMRuntimeConfig.resolve_provider_and_model(
             "clinical"
@@ -61,7 +63,7 @@ class HepatoxConsultation:
             1,
             int(
                 getattr(
-                    get_server_settings().runtime,
+                    runtime_settings,
                     "clinical_llm_max_concurrency",
                     default_parallel_analyses,
                 )
@@ -70,7 +72,7 @@ class HepatoxConsultation:
         default_retry_attempts = 1
         configured_retry_attempts = int(
             getattr(
-                get_server_settings().runtime,
+                runtime_settings,
                 "clinical_llm_retry_attempts",
                 default_retry_attempts,
             )
@@ -81,10 +83,32 @@ class HepatoxConsultation:
 
         # Focused sub-services
         self.exposure_timeline = ExposureTimelineService()
-        self.analysis_runner = AnalysisRunner(self)
-        self.drug_analysis = DrugAnalysisService(self)
         self.report_finalizer = ReportFinalizer()
-        self.rag_support = RagSupportService(self)
+        self.rag_support = RagSupportService(
+            similarity_search=self.similarity_search,
+            max_excerpt_length=self.MAX_EXCERPT_LENGTH,
+            rag_candidate_k=self.rag_candidate_k,
+            rag_top_n=self.rag_top_n,
+            rag_use_reranking=self.rag_use_reranking,
+            pipeline_issues=self.pipeline_issues,
+        )
+        self.drug_analysis = DrugAnalysisService(
+            llm_client=self.llm_client,
+            llm_model=self.llm_model,
+            exposure_timeline=self.exposure_timeline,
+            retry_attempts=self.analysis_retry_attempts,
+        )
+        self.analysis_runner = AnalysisRunner(
+            drugs=self.drugs,
+            exposure_timeline=self.exposure_timeline,
+            drug_analysis=self.drug_analysis,
+            rag_support=self.rag_support,
+            report_finalizer=self.report_finalizer,
+            max_parallel_analyses=self.max_parallel_analyses,
+            pipeline_issues=self.pipeline_issues,
+            resolve_livertox_data_for_entry=resolve_livertox_data_for_entry,
+            emit_progress=emit_progress,
+        )
 
     # -------------------------------------------------------------------------
     async def run_analysis(
@@ -97,14 +121,23 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
-        return await self.analysis_runner.run_analysis(
-            prepared_inputs=prepared_inputs,
+        if prepared_inputs is None:
+            logger.info("No prepared inputs provided; skipping hepatotoxicity consultation")
+            return None
+        if not prepared_inputs.resolved_drugs:
+            logger.info("No matched drugs available for hepatotoxicity consultation")
+            return None
+        report = await self.analysis_runner.compile_clinical_assessment(
+            prepared_inputs.resolved_drugs,
+            clinical_context=prepared_inputs.clinical_context,
             visit_date=visit_date,
             report_language=report_language,
+            pattern_prompt=prepared_inputs.pattern_prompt,
             rag_query=rag_query,
             rucam_bundle=rucam_bundle,
             progress_callback=progress_callback,
         )
+        return report.model_dump()
 
     # -------------------------------------------------------------------------
     async def run_revision_analysis(
@@ -117,226 +150,27 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
-        return await self.analysis_runner.run_revision_analysis(
-            prepared_inputs=prepared_inputs,
+        if prepared_inputs is None:
+            logger.info("No prepared inputs provided; skipping revision hepatotoxicity consultation")
+            return None
+        if not prepared_inputs.resolved_drugs:
+            logger.info("No matched drugs available for revision hepatotoxicity consultation")
+            return None
+        report = await self.analysis_runner.compile_revision_clinical_assessment(
+            prepared_inputs.resolved_drugs,
+            clinical_context=prepared_inputs.clinical_context,
             visit_date=visit_date,
             report_language=report_language,
+            pattern_prompt=prepared_inputs.pattern_prompt,
             rag_query=rag_query,
             rucam_bundle=rucam_bundle,
             progress_callback=progress_callback,
         )
-
-    # -------------------------------------------------------------------------
-    async def compile_clinical_assessment(
-        self,
-        resolved_drugs: dict[str, dict[str, Any]],
-        *,
-        clinical_context: str | None,
-        visit_date: date | None,
-        report_language: str,
-        pattern_prompt: str,
-        rag_query: dict[str, str] | None = None,
-        rucam_bundle: PatientRucamAssessmentBundle | None = None,
-        progress_callback: Callable[[str, float], None] | None = None,
-    ) -> PatientDrugClinicalReport:
-        return await self.analysis_runner.compile_clinical_assessment(
-            resolved_drugs,
-            clinical_context=clinical_context,
-            visit_date=visit_date,
-            report_language=report_language,
-            pattern_prompt=pattern_prompt,
-            rag_query=rag_query,
-            rucam_bundle=rucam_bundle,
-            progress_callback=progress_callback,
-        )
-
-    # -------------------------------------------------------------------------
-    async def compile_revision_clinical_assessment(
-        self,
-        resolved_drugs: dict[str, dict[str, Any]],
-        *,
-        clinical_context: str | None,
-        visit_date: date | None,
-        report_language: str,
-        pattern_prompt: str,
-        rag_query: dict[str, str] | None = None,
-        rucam_bundle: PatientRucamAssessmentBundle | None = None,
-        progress_callback: Callable[[str, float], None] | None = None,
-    ) -> PatientDrugClinicalReport:
-        return await self.analysis_runner.compile_revision_clinical_assessment(
-            resolved_drugs,
-            clinical_context=clinical_context,
-            visit_date=visit_date,
-            report_language=report_language,
-            pattern_prompt=pattern_prompt,
-            rag_query=rag_query,
-            rucam_bundle=rucam_bundle,
-            progress_callback=progress_callback,
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def emit_progress(
-        progress_callback: Callable[[str, float], None] | None,
-        *,
-        stage: str,
-        fraction: float,
-    ) -> None:
-        if progress_callback is None:
-            return
-        bounded_fraction = min(1.0, max(0.0, float(fraction)))
-        progress_callback(stage, bounded_fraction)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    async def execute_indexed_job(index: int, coroutine: Any) -> tuple[int, Any]:
-        return await AnalysisRunner.execute_indexed_job(index, coroutine)
-
-    # -------------------------------------------------------------------------
-    async def execute_bounded_job(
-        self,
-        index: int,
-        coroutine: Any,
-        semaphore: asyncio.Semaphore,
-    ) -> tuple[int, Any]:
-        return await self.analysis_runner.execute_bounded_job(
-            index, coroutine, semaphore
-        )
-
-    # -------------------------------------------------------------------------
-    async def prepare_drug_assessment(
-        self,
-        *,
-        idx: int,
-        drug_entry: DrugEntry,
-        resolved_drugs: dict[str, dict[str, Any]],
-        visit_date: date | None,
-        report_language: str,
-        normalized_context: str,
-        pattern_summary: str,
-        rag_query: dict[str, str] | None,
-        rucam_by_key: dict[str, DrugRucamAssessment],
-    ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
-        return await self.analysis_runner.prepare_drug_assessment(
-            idx=idx,
-            drug_entry=drug_entry,
-            resolved_drugs=resolved_drugs,
-            visit_date=visit_date,
-            report_language=report_language,
-            normalized_context=normalized_context,
-            pattern_summary=pattern_summary,
-            rag_query=rag_query,
-            rucam_by_key=rucam_by_key,
-        )
-
-    # -------------------------------------------------------------------------
-    async def prepare_revision_drug_assessment(
-        self,
-        *,
-        idx: int,
-        drug_entry: DrugEntry,
-        resolved_drugs: dict[str, dict[str, Any]],
-        visit_date: date | None,
-        report_language: str,
-        normalized_context: str,
-        pattern_summary: str,
-        rag_query: dict[str, str] | None,
-        rucam_by_key: dict[str, DrugRucamAssessment],
-    ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
-        return await self.analysis_runner.prepare_revision_drug_assessment(
-            idx=idx,
-            drug_entry=drug_entry,
-            resolved_drugs=resolved_drugs,
-            visit_date=visit_date,
-            report_language=report_language,
-            normalized_context=normalized_context,
-            pattern_summary=pattern_summary,
-            rag_query=rag_query,
-            rucam_by_key=rucam_by_key,
-        )
-
-    # -------------------------------------------------------------------------
-    def resolve_livertox_data_for_entry(
-        self,
-        *,
-        raw_name: str,
-        normalized_key: str,
-        resolved_drugs: dict[str, dict[str, Any]],
-    ) -> dict[str, Any]:
-        return self.analysis_runner.resolve_livertox_data_for_entry(
-            raw_name=raw_name,
-            normalized_key=normalized_key,
-            resolved_drugs=resolved_drugs,
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def livertox_payload_rank(payload: dict[str, Any]) -> int:
-        return AnalysisRunner.livertox_payload_rank(payload)
-
-    # -------------------------------------------------------------------------
-    async def fetch_rag_documents(
-        self, rag_query: dict[str, str] | None, drug_name: str
-    ) -> RagRetrievalBundle | None:
-        if (
-            type(self).search_supporting_documents
-            is not HepatoxConsultation.search_supporting_documents
-        ):
-            if not rag_query:
-                return None
-            normalized_key = normalize_drug_query_name(drug_name)
-            drug_rag_query = rag_query.get(drug_name) or rag_query.get(normalized_key)
-            if drug_rag_query is None:
-                for key, value in rag_query.items():
-                    if normalize_drug_query_name(key) == normalized_key:
-                        drug_rag_query = value
-                        break
-            if not drug_rag_query:
-                return None
-            try:
-                return await asyncio.to_thread(
-                    self.search_supporting_documents,
-                    drug_rag_query,
-                )
-            except Exception as exc:
-                self.record_rag_retrieval_issue(drug_name=drug_name, error=exc)
-                return None
-        return await self.rag_support.fetch_rag_documents(rag_query, drug_name)
-
-    # -------------------------------------------------------------------------
-    def record_rag_retrieval_issue(self, *, drug_name: str, error: Exception) -> None:
-        self.rag_support.record_rag_retrieval_issue(drug_name=drug_name, error=error)
-
-    # -------------------------------------------------------------------------
-    def ensure_similarity_search(self) -> bool:
-        return self.rag_support.ensure_similarity_search()
-
-    # -------------------------------------------------------------------------
-    def select_excerpt(self, excerpts: list[str]) -> str | None:
-        return self.rag_support.select_excerpt(excerpts)
-
-    # -------------------------------------------------------------------------
-    def search_supporting_documents(
-        self, query_text: str | Any
-    ) -> RagRetrievalBundle | None:
-        return self.rag_support.search_supporting_documents(query_text)
-
-    # -------------------------------------------------------------------------
-    def format_similarity_fragment(
-        self, index: int, record: dict[str, Any]
-    ) -> str | None:
-        return self.rag_support.format_similarity_fragment(index, record)
-
-    # -------------------------------------------------------------------------
-    def format_similarity_header(
-        self,
-        index: int,
-        *,
-        distance: Any,
-        rerank_score: Any = None,
-    ) -> str:
-        return self.rag_support.format_similarity_header(
-            index, distance=distance, rerank_score=rerank_score
-        )
-
-    # -------------------------------------------------------------------------
+        payload = report.model_dump()
+        payload["revision_consultation_metadata"] = {
+            "drug_analysis_entrypoint": "request_revision_drug_analysis",
+            "report_finalization_entrypoint": "finalize_report",
+            "conclusion_entrypoint": "generate_revision_conclusion",
+            "synthesis_mode": "revision_comparison_aware",
+        }
+        return payload

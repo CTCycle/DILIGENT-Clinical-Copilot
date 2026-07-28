@@ -754,7 +754,7 @@ class ModelConfigService:
             return EmbeddingIndexStatus(status="reindex_required")
         try:
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except OSError, json.JSONDecodeError:
+        except (OSError, json.JSONDecodeError):
             return EmbeddingIndexStatus(status="corrupt")
         if not isinstance(payload, dict):
             return EmbeddingIndexStatus(status="corrupt")

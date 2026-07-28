@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import date
 from typing import Any
 
@@ -17,16 +18,34 @@ from common.prompts.clinical_assessment import (
 )
 from common.utils.logger import logger
 from domain.clinical.entities import DrugRucamAssessment, DrugSuspensionContext
-from services.llm.generation_policy import GenerationPurpose
 from services.clinical import hepatox_scoring
+from services.clinical.exposure_timeline import ExposureTimelineService
+from services.llm.cloud import CloudLLMClient
+from services.llm.generation_policy import GenerationPurpose
+from services.llm.ollama_client import OllamaClient
+
+RATE_LIMIT_WAIT_HINT_RE = re.compile(
+    r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
+    re.IGNORECASE,
+)
 
 ###############################################################################
 class DrugAnalysisService:
     """Handles per-drug LLM consultation — building prompts, calling the LLM, parsing responses."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, consultation: Any) -> None:
-        self.consultation = consultation
+    def __init__(
+        self,
+        *,
+        llm_client: OllamaClient | CloudLLMClient,
+        llm_model: str,
+        exposure_timeline: ExposureTimelineService,
+        retry_attempts: int,
+    ) -> None:
+        self.llm_client = llm_client
+        self.llm_model = llm_model
+        self.exposure_timeline = exposure_timeline
+        self.retry_attempts = max(int(retry_attempts), 1)
 
     # -------------------------------------------------------------------------
     async def _build_and_run_drug_analysis(
@@ -50,14 +69,13 @@ class DrugAnalysisService:
         system_template: str,
         user_template: str,
     ) -> str:
-        consultation = self.consultation
-        start_details = consultation.exposure_timeline.format_start_prompt(suspension)
-        suspension_details = consultation.exposure_timeline.format_suspension_prompt(suspension)
+        start_details = self.exposure_timeline.format_start_prompt(suspension)
+        suspension_details = self.exposure_timeline.format_suspension_prompt(suspension)
         timeline_note = (
             suspension.note
             or "No explicit timeline notes were available from extraction metadata."
         )
-        visit_date_anchor = consultation.exposure_timeline.format_visit_date_anchor(visit_date)
+        visit_date_anchor = self.exposure_timeline.format_visit_date_anchor(visit_date)
         score, metadata_block = self.prepare_metadata_prompt(metadata)
         retrieved_documents_block = (
             f"Retrieved documents:\n{rag_context.strip()}"
@@ -102,29 +120,26 @@ class DrugAnalysisService:
             {"role": "system", "content": system_template.strip()},
             {"role": "user", "content": user_prompt},
         ]
-        chat_kwargs: dict[str, Any] = {
-            "model": consultation.llm_model,
-            "messages": messages,
-            "purpose": GenerationPurpose.CLINICAL_SYNTHESIS,
-        }
         raw_response: Any = None
-        for attempt in range(1, consultation.analysis_retry_attempts + 1):
+        for attempt in range(1, self.retry_attempts + 1):
             try:
-                raw_response = await consultation.llm_client.chat(**chat_kwargs)
+                raw_response = await self._chat(
+                    model=self.llm_model,
+                    messages=messages,
+                    purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
+                )
                 break
             except Exception as exc:
-                if attempt >= consultation.analysis_retry_attempts:
+                if attempt >= self.retry_attempts:
                     raise RuntimeError(
                         f"LLM analysis failed for {drug_name}: {exc}"
                     ) from exc
-                delay = consultation.analysis_runner.retry_backoff_seconds(
-                    attempt, exc=exc
-                )
+                delay = self.retry_backoff_seconds(attempt, exc=exc)
                 logger.warning(
                     "Retrying LLM analysis for '%s' after error (attempt %d/%d, delay %.2fs): %s",
                     drug_name,
                     attempt,
-                    consultation.analysis_retry_attempts,
+                    self.retry_attempts,
                     delay,
                     exc,
                 )
@@ -138,7 +153,7 @@ class DrugAnalysisService:
                 drug_name,
                 report_language,
             )
-            repaired_text = await consultation.rag_support.repair_language_once(
+            repaired_text = await self.repair_language_once(
                 source_text=response_text,
                 report_language=report_language,
             )
@@ -284,22 +299,22 @@ class DrugAnalysisService:
             )},
         ]
         raw_response: Any = None
-        for attempt in range(1, self.consultation.analysis_retry_attempts + 1):
+        for attempt in range(1, self.retry_attempts + 1):
             try:
-                raw_response = await self.consultation.llm_client.chat(
-                    model=self.consultation.llm_model,
+                raw_response = await self._chat(
+                    model=self.llm_model,
                     messages=messages,
                     purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
                 )
                 break
             except Exception as exc:
-                if attempt >= self.consultation.analysis_retry_attempts:
+                if attempt >= self.retry_attempts:
                     logger.error("Failed to generate clinical conclusion: %s", exc)
                     return None
-                await asyncio.sleep(self.consultation.analysis_runner.retry_backoff_seconds(attempt, exc=exc))
+                await asyncio.sleep(self.retry_backoff_seconds(attempt, exc=exc))
         conclusion = self.coerce_chat_text(raw_response).strip()
         if conclusion and not self.is_materially_in_report_language(conclusion, report_language):
-            repaired = await self.consultation.rag_support.repair_language_once(
+            repaired = await self.repair_language_once(
                 source_text=conclusion, report_language=report_language
             )
             if repaired:
@@ -319,6 +334,70 @@ class DrugAnalysisService:
             system_template=LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
             user_template=LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
         )
+
+    async def repair_language_once(
+        self,
+        *,
+        source_text: str,
+        report_language: str,
+    ) -> str:
+        language_map = "en=English, it=Italian, de=German, fr=French, es=Spanish"
+        repair_system = (
+            "You rewrite clinical text into the requested language only. "
+            "Do not add new clinical facts."
+        )
+        repair_user = (
+            f"Target language code: {report_language}\n"
+            f"Language map: {language_map}\n"
+            "Rewrite the text entirely in the target language. "
+            "Do not produce bilingual output. Keep drug names and direct quotes unchanged.\n\n"
+            f"Text:\n{source_text}"
+        )
+        repaired = await self._chat(
+            model=self.llm_model,
+            messages=[
+                {"role": "system", "content": repair_system},
+                {"role": "user", "content": repair_user},
+            ],
+            purpose=GenerationPurpose.JSON_REPAIR,
+        )
+        return self.coerce_chat_text(repaired).strip()
+
+    async def _chat(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+        purpose: GenerationPurpose,
+    ) -> dict[str, Any] | str:
+        if isinstance(self.llm_client, CloudLLMClient):
+            return await self.llm_client.chat(
+                model=model,
+                messages=messages,
+                purpose=purpose,
+            )
+        return await self.llm_client.chat(model=model, messages=messages)
+
+    @staticmethod
+    def extract_rate_limit_wait_hint_seconds(exc: Exception) -> float | None:
+        match = RATE_LIMIT_WAIT_HINT_RE.search(str(exc))
+        if match is None:
+            return None
+        try:
+            parsed = float(match.group(1))
+        except (TypeError, ValueError):
+            return None
+        return min(parsed + 0.25, 30.0) if parsed > 0 else None
+
+    def retry_backoff_seconds(
+        self, attempt: int, *, exc: Exception | None = None
+    ) -> float:
+        if exc is not None:
+            hinted_wait = self.extract_rate_limit_wait_hint_seconds(exc)
+            if hinted_wait is not None:
+                return hinted_wait
+        normalized_attempt = max(int(attempt), 1)
+        return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
 
     # -------------------------------------------------------------------------
     @staticmethod

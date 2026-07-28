@@ -25,18 +25,6 @@ class ModelConfigSerializer:
     """Persist the validated model configuration as one singleton document."""
 
     MODEL_CONFIG_PAYLOAD_SCHEMA_VERSION = 3
-    LEGACY_RAG_FIELDS = frozenset(
-        {
-            "embedding_backend",
-            "ollama_embedding_model",
-            "hf_embedding_model",
-            "use_cloud_embeddings",
-            "cloud_provider",
-            "cloud_embedding_model",
-            "embedding_max_workers",
-            "reset_vector_collection",
-        }
-    )
     RAG_OPERATIONAL_FIELDS = frozenset(
         {
             "chunk_size",
@@ -197,16 +185,15 @@ class ModelConfigSerializer:
                     json.dumps(payload, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
-        except OSError, json.JSONDecodeError:
+        except (OSError, json.JSONDecodeError):
             logger.warning("Unable to mark the existing RAG manifest for reindexing")
 
     # -------------------------------------------------------------------------
-    @staticmethod
     @staticmethod
     def normalize_optional_seed(value: object) -> int | None:
         if value is None:
             return None
         try:
             return max(0, int(str(value).strip()))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None

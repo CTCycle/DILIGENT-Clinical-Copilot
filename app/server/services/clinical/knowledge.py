@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from repositories import values as repository_values
+
 from repositories.knowledge_repository import KnowledgeRepository
 
 ###############################################################################
@@ -22,7 +24,7 @@ class ClinicalKnowledgeComposer:
                 payload["drug_id"] = None
                 payload["knowledge_prompt"] = ""
                 continue
-            drug_id = self.knowledge_repository.to_int(matched_row.get("drug_id"))
+            drug_id = repository_values.to_int(matched_row.get("drug_id"))
             payload["drug_id"] = drug_id
             if drug_id is None:
                 payload["knowledge_prompt"] = ""
