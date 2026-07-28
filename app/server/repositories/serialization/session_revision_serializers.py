@@ -34,15 +34,18 @@ REVISION_DILI_ASSESSMENT_SCHEMA_NAME = "revised_dili_assessment"
 REVISION_ENTITY_SCHEMA_VERSION = "1"
 
 
+###############################################################################
 def build_text_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+###############################################################################
 def build_payload_hash(payload: Any) -> str:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+###############################################################################
 def normalize_text_key(value: str | None) -> str | None:
     normalized = repository_values.normalize_string(value)
     if normalized is None:
@@ -50,10 +53,12 @@ def normalize_text_key(value: str | None) -> str | None:
     return normalized.casefold()
 
 
+###############################################################################
 def default_version_status(*, is_latest: bool) -> str:
     return "current" if is_latest else "superseded"
 
 
+###############################################################################
 def sync_preserved_version_status(
     existing_status: str | None, *, is_latest_completed: bool
 ) -> str:
@@ -65,26 +70,32 @@ def sync_preserved_version_status(
     return normalized
 
 
+###############################################################################
 def validate_revised_drug_payload(payload: Any) -> RevisedDrugPayload:
     return RevisedDrugPayload.model_validate(payload)
 
 
+###############################################################################
 def validate_revised_disease_payload(payload: Any) -> RevisedDiseasePayload:
     return RevisedDiseasePayload.model_validate(payload)
 
 
+###############################################################################
 def validate_revised_lab_payload(payload: Any) -> RevisedLabPayload:
     return RevisedLabPayload.model_validate(payload)
 
 
+###############################################################################
 def validate_revision_livertox_decision(payload: Any) -> RevisionLiverToxDecision:
     return RevisionLiverToxDecision.model_validate(payload)
 
 
+###############################################################################
 def validate_revised_dili_assessment(payload: Any) -> RevisedDiliAssessment:
     return RevisedDiliAssessment.model_validate(payload)
 
 
+###############################################################################
 def serialize_version_row(row: ClinicalSessionVersion) -> dict[str, Any]:
     return {
         "version_id": int(row.id),
@@ -105,6 +116,7 @@ def serialize_version_row(row: ClinicalSessionVersion) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def serialize_revision_run_row(row: ClinicalSessionRevisionRun) -> dict[str, Any]:
     return {
         "pipeline_run_id": row.pipeline_run_id,
@@ -134,6 +146,7 @@ def serialize_revision_run_row(row: ClinicalSessionRevisionRun) -> dict[str, Any
     }
 
 
+###############################################################################
 def serialize_revision_step_row(row: ClinicalSessionRevisionStep) -> dict[str, Any]:
     return {
         "pipeline_run_id": row.pipeline_run_id,
@@ -165,6 +178,7 @@ def serialize_revision_step_row(row: ClinicalSessionRevisionStep) -> dict[str, A
     }
 
 
+###############################################################################
 def serialize_revision_artifact_row(row: ClinicalSessionRevisionArtifact) -> dict[str, Any]:
     return {
         "revision_version_id": int(row.revision_version_id),
@@ -181,6 +195,7 @@ def serialize_revision_artifact_row(row: ClinicalSessionRevisionArtifact) -> dic
     }
 
 
+###############################################################################
 def serialize_revision_entity_row(row: ClinicalSessionRevisionArtifact) -> dict[str, Any]:
     artifact_payload = parse_session_result_payload(row.payload_json) or {}
     entity = artifact_payload.get("entity")
@@ -214,6 +229,7 @@ def serialize_revision_entity_row(row: ClinicalSessionRevisionArtifact) -> dict[
     }
 
 
+###############################################################################
 def serialize_revision_review_row(row: ClinicalSessionRevisionReview) -> dict[str, Any]:
     return {
         "revision_version_id": int(row.revision_version_id),
@@ -232,6 +248,7 @@ def serialize_revision_review_row(row: ClinicalSessionRevisionReview) -> dict[st
     }
 
 
+###############################################################################
 def create_revision_artifact_row(
     *,
     revision_version_id: int,
@@ -258,6 +275,7 @@ def create_revision_artifact_row(
     )
 
 
+###############################################################################
 def create_revision_entity_row(
     *,
     revision_version_id: int,

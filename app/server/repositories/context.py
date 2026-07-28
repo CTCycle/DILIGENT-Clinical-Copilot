@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from repositories.database.session import resolve_engine, resolve_session_factory
 
 
+###############################################################################
 @dataclass(frozen=True, slots=True)
 class RepositoryContext:
     """Immutable database handles shared by one repository composition root."""
@@ -15,6 +16,7 @@ class RepositoryContext:
     engine: Engine
     session_factory: sessionmaker[Session]
 
+    # -------------------------------------------------------------------------
     @classmethod
     def create(
         cls,

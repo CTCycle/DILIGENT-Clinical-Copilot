@@ -151,6 +151,7 @@ def normalize_visit_date(
         return today
     return normalized
 
+###############################################################################
 class PayloadSanitizationService:
 
     # -------------------------------------------------------------------------

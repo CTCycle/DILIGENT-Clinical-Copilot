@@ -29,6 +29,7 @@ CLAIM_EVIDENCE_TRUNCATION_MARKER = " [truncated]"
 MATCH_REASON_MAX_LENGTH = 100
 DrugAssessmentBase: TypeAlias = tuple[DrugClinicalAssessment, str, list[str]]
 
+###############################################################################
 def emit_progress(
     progress_callback: Callable[[str, float], None] | None,
     *,
@@ -40,6 +41,7 @@ def emit_progress(
     bounded_fraction = min(1.0, max(0.0, float(fraction)))
     progress_callback(stage, bounded_fraction)
 
+###############################################################################
 def livertox_payload_rank(payload: dict[str, Any]) -> int:
     status = str(payload.get("match_status") or "").strip().lower()
     if status in {
@@ -66,6 +68,7 @@ def livertox_payload_rank(payload: dict[str, Any]) -> int:
         return 1
     return 0
 
+###############################################################################
 def resolve_livertox_data_for_entry(
     *,
     raw_name: str,

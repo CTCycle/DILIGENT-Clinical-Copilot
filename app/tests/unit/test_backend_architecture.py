@@ -41,12 +41,14 @@ FOCUSED_REPOSITORIES = {
 }
 
 
+###############################################################################
 def _module_name(node: ast.Import | ast.ImportFrom) -> str:
     if isinstance(node, ast.Import):
         return ", ".join(alias.name for alias in node.names)
     return node.module or "."
 
 
+###############################################################################
 def _imports(path: Path) -> list[ast.Import | ast.ImportFrom]:
     return [
         node
@@ -55,12 +57,14 @@ def _imports(path: Path) -> list[ast.Import | ast.ImportFrom]:
     ]
 
 
+###############################################################################
 def test_backend_files_do_not_exceed_line_limit() -> None:
     for path in python_files(SERVER_ROOT):
         lines = len(path.read_text(encoding="utf-8").splitlines())
         assert lines <= MAX_BACKEND_FILE_LINES, f"{path.relative_to(SERVER_ROOT)}: {lines} lines"
 
 
+###############################################################################
 def test_backend_imports_are_module_level() -> None:
     for path in python_files(SERVER_ROOT):
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -73,6 +77,7 @@ def test_backend_imports_are_module_level() -> None:
             )
 
 
+###############################################################################
 def test_backend_does_not_define_nested_functions() -> None:
     for path in python_files(SERVER_ROOT):
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -84,6 +89,7 @@ def test_backend_does_not_define_nested_functions() -> None:
                     assert False, f"{path.relative_to(SERVER_ROOT)}:{child.lineno}: nested function"
 
 
+###############################################################################
 def test_backend_does_not_use_global_or_nonlocal_statements() -> None:
     for path in python_files(SERVER_ROOT):
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -93,12 +99,14 @@ def test_backend_does_not_use_global_or_nonlocal_statements() -> None:
             )
 
 
+###############################################################################
 def test_backend_does_not_suppress_import_order() -> None:
     for path in python_files(SERVER_ROOT):
         text = path.read_text(encoding="utf-8")
         assert "noqa: E402" not in text, path.relative_to(SERVER_ROOT)
 
 
+###############################################################################
 def test_backend_does_not_use_dynamic_application_imports() -> None:
     for path in python_files(SERVER_ROOT):
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -109,6 +117,7 @@ def test_backend_does_not_use_dynamic_application_imports() -> None:
                 )
 
 
+###############################################################################
 def test_persistence_code_does_not_use_dynamic_attribute_dispatch() -> None:
     paths = [
         SERVER_ROOT / "repositories" / file_name
@@ -123,6 +132,7 @@ def test_persistence_code_does_not_use_dynamic_attribute_dispatch() -> None:
                 )
 
 
+###############################################################################
 def test_persistence_code_does_not_import_deleted_compatibility_modules() -> None:
     forbidden = {"repositories.serialization.data"}
     for path in python_files(SERVER_ROOT):
@@ -132,6 +142,7 @@ def test_persistence_code_does_not_import_deleted_compatibility_modules() -> Non
             )
 
 
+###############################################################################
 def test_focused_repositories_do_not_forward_to_serialization_modules() -> None:
     repository_root = SERVER_ROOT / "repositories"
     for file_name, class_name in FOCUSED_REPOSITORIES.items():
@@ -164,6 +175,7 @@ def test_focused_repositories_do_not_forward_to_serialization_modules() -> None:
             )
 
 
+###############################################################################
 def test_backend_layer_dependencies() -> None:
     forbidden = {
         "api": ("repositories", "sqlalchemy"),

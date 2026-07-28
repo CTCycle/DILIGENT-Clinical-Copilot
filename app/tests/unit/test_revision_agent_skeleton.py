@@ -52,6 +52,7 @@ def save_revision_source_session(serializer: Any) -> int:
     assert session_id is not None
     return int(session_id)
 
+###############################################################################
 def build_service(serializer: Any, jobs: JobManager) -> DataInspectionService:
     graph = build_repository_graph(
         engine=serializer.context.engine, session_factory=serializer.context.session_factory
@@ -65,6 +66,7 @@ def build_service(serializer: Any, jobs: JobManager) -> DataInspectionService:
         jobs=jobs,
     )
 
+###############################################################################
 def build_runner(serializer: Any, **kwargs: Any) -> RevisionAgentRunner:
     graph = build_repository_graph(
         engine=serializer.context.engine, session_factory=serializer.context.session_factory

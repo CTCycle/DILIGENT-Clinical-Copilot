@@ -10,6 +10,7 @@ from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
 
 
+###############################################################################
 def build_data_inspection_service(job_manager: JobManager) -> DataInspectionService:
     context = RepositoryContext.create()
     drug_catalog_repository = DrugCatalogRepository(context)

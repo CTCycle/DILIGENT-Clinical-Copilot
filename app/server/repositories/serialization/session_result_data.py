@@ -14,6 +14,7 @@ from common.utils.logger import logger
 from repositories import values as repository_values
 
 
+###############################################################################
 def decode_patient_image(value: Any) -> bytes | None:
     normalized = repository_values.normalize_string(value)
     if normalized is None:
@@ -28,6 +29,7 @@ def decode_patient_image(value: Any) -> bytes | None:
         return None
 
 
+###############################################################################
 def parse_datetime(value: Any) -> datetime | None:
     if value is None:
         return None
@@ -41,6 +43,7 @@ def parse_datetime(value: Any) -> datetime | None:
     return parsed.to_pydatetime() if hasattr(parsed, "to_pydatetime") else parsed
 
 
+###############################################################################
 def parse_session_result_payload(payload_json: str | None) -> dict[str, Any] | None:
     normalized_payload = repository_values.normalize_string(payload_json)
     if normalized_payload is None:
@@ -52,6 +55,7 @@ def parse_session_result_payload(payload_json: str | None) -> dict[str, Any] | N
     return parsed if isinstance(parsed, dict) else None
 
 
+###############################################################################
 def serialize_json_payload(payload: Any) -> str | None:
     if payload is None:
         return None

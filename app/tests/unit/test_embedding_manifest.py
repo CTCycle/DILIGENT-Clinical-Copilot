@@ -6,7 +6,6 @@ from common.embedding.manifest import (
     build_embedding_index_manifest,
 )
 
-
 ###############################################################################
 def test_manifest_contains_strict_canonical_metadata() -> None:
     manifest = build_embedding_index_manifest(
@@ -24,7 +23,6 @@ def test_manifest_contains_strict_canonical_metadata() -> None:
     assert manifest["model"]["revision"] == CANONICAL_EMBEDDING_CONFIG.revision
     assert manifest["chunking"]["target_tokens"] == 512
     assert manifest["embedding_fingerprint"] != CANONICAL_EMBEDDING_CONFIG.fingerprint
-
 
 ###############################################################################
 def test_mismatched_manifest_is_rejected() -> None:

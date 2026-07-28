@@ -5,7 +5,10 @@ from datetime import date, datetime
 from domain.clinical.entities import DrugEntry, DrugSuspensionContext
 
 
+###############################################################################
 class ExposureTimelineService:
+
+    # -------------------------------------------------------------------------
     def evaluate_suspension(self, entry: DrugEntry, visit_date: date | None) -> DrugSuspensionContext:
         start_reported = bool(entry.therapy_start_status) or bool(entry.therapy_start_date)
         start_date = self.parse_start_date(entry.therapy_start_date, visit_date)
@@ -62,6 +65,7 @@ class ExposureTimelineService:
             start_note=start_note,
         )
 
+    # -------------------------------------------------------------------------
     def parse_timeline_date(self, raw_date: str | None, visit_date: date | None) -> date | None:
         if raw_date is None:
             return None
@@ -88,12 +92,15 @@ class ExposureTimelineService:
                     return parsed
         return None
 
+    # -------------------------------------------------------------------------
     def parse_suspension_date(self, raw_date: str | None, visit_date: date | None) -> date | None:
         return self.parse_timeline_date(raw_date, visit_date)
 
+    # -------------------------------------------------------------------------
     def parse_start_date(self, raw_date: str | None, visit_date: date | None) -> date | None:
         return self.parse_timeline_date(raw_date, visit_date)
 
+    # -------------------------------------------------------------------------
     def format_start_note(self, *, start_reported: bool, start_date: date | None, start_interval_days: int | None, visit_date: date | None) -> str:
         if not start_reported:
             return "Therapy start was not documented; assume chronic exposure unless another source clarifies the onset."
@@ -107,6 +114,7 @@ class ExposureTimelineService:
             return f"Therapy started on {start_date.isoformat()}, coinciding with the clinical visit."
         return f"Therapy started on {start_date.isoformat()}, roughly {self.humanize_interval(start_interval_days)} before the visit."
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def humanize_interval(days: int) -> str:
         if days <= 1:
@@ -121,6 +129,7 @@ class ExposureTimelineService:
             return f"{round(months, 1):g} months"
         return f"{round(days / 365.25, 1):g} years"
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def try_parse_date(value: str) -> date | None:
         cleaned = value.strip()
@@ -137,6 +146,7 @@ class ExposureTimelineService:
                 continue
         return None
 
+    # -------------------------------------------------------------------------
     def format_suspension_prompt(self, suspension: DrugSuspensionContext) -> str:
         if not suspension.suspended:
             return "Active therapy; no suspension reported."
@@ -150,6 +160,7 @@ class ExposureTimelineService:
             return f"Suspended on {suspension.suspension_date.isoformat()} (same day as the visit); residual exposure is expected."
         return f"Suspended on {suspension.suspension_date.isoformat()} ({suspension.interval_days} days before the visit); compare with LiverTox latency guidance."
 
+    # -------------------------------------------------------------------------
     def format_start_prompt(self, suspension: DrugSuspensionContext) -> str:
         if suspension.start_note:
             return suspension.start_note
@@ -157,6 +168,7 @@ class ExposureTimelineService:
             return "Therapy start was reported, but no reliable date was available."
         return "No therapy start information was detected; treat the exposure window as chronic unless contradicted."
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def format_visit_date_anchor(visit_date: date | None) -> str:
         return "Not provided." if visit_date is None else visit_date.isoformat()

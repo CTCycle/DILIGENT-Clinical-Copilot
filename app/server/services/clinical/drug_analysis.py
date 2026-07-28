@@ -241,14 +241,17 @@ class DrugAnalysisService:
             user_template=LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def escape_braces(value: str) -> str:
         return value.replace("{", "{{").replace("}", "}}")
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def is_materially_in_report_language(text: str, report_language: str) -> bool:
         return hepatox_scoring.is_materially_in_report_language(text, report_language)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def resolve_livertox_score(metadata: dict[str, Any] | None) -> str:
         if not metadata:
@@ -256,6 +259,7 @@ class DrugAnalysisService:
         score = str(metadata.get("likelihood_score") or "").strip()
         return score.upper() if score and score.isalpha() else score or "Not available"
 
+    # -------------------------------------------------------------------------
     def prepare_metadata_prompt(self, metadata: dict[str, Any] | None) -> tuple[str, str]:
         score = self.resolve_livertox_score(metadata)
         details = [f"- Likelihood score: {score}"]
@@ -274,6 +278,7 @@ class DrugAnalysisService:
             details.append("- No additional LiverTox metadata was available.")
         return score, "\n".join(details)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def format_rucam_prompt_block(rucam: DrugRucamAssessment | None) -> str:
         if rucam is None:
@@ -285,6 +290,7 @@ class DrugAnalysisService:
             f"- Key limitations: {limitations}"
         )
 
+    # -------------------------------------------------------------------------
     async def _run_conclusion(self, *, clinical_context: str, multi_drug_report: str, report_language: str, system_template: str, user_template: str) -> str | None:
         report_body = multi_drug_report.strip()
         if not report_body:
@@ -321,6 +327,7 @@ class DrugAnalysisService:
                 conclusion = repaired
         return conclusion or None
 
+    # -------------------------------------------------------------------------
     async def generate_conclusion(self, **kwargs: Any) -> str | None:
         return await self._run_conclusion(
             **kwargs,
@@ -328,6 +335,7 @@ class DrugAnalysisService:
             user_template=LIVERTOX_CONCLUSION_USER_PROMPT,
         )
 
+    # -------------------------------------------------------------------------
     async def generate_revision_conclusion(self, **kwargs: Any) -> str | None:
         return await self._run_conclusion(
             **kwargs,
@@ -335,6 +343,7 @@ class DrugAnalysisService:
             user_template=LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
         )
 
+    # -------------------------------------------------------------------------
     async def repair_language_once(
         self,
         *,
@@ -363,6 +372,7 @@ class DrugAnalysisService:
         )
         return self.coerce_chat_text(repaired).strip()
 
+    # -------------------------------------------------------------------------
     async def _chat(
         self,
         *,
@@ -378,6 +388,7 @@ class DrugAnalysisService:
             )
         return await self.llm_client.chat(model=model, messages=messages)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def extract_rate_limit_wait_hint_seconds(exc: Exception) -> float | None:
         match = RATE_LIMIT_WAIT_HINT_RE.search(str(exc))
@@ -389,6 +400,7 @@ class DrugAnalysisService:
             return None
         return min(parsed + 0.25, 30.0) if parsed > 0 else None
 
+    # -------------------------------------------------------------------------
     def retry_backoff_seconds(
         self, attempt: int, *, exc: Exception | None = None
     ) -> float:
