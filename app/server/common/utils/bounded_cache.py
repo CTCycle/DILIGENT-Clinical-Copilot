@@ -10,15 +10,18 @@ ValueT = TypeVar("ValueT")
 CACHE_MISS = object()
 
 
+###############################################################################
 class BoundedCache(Generic[KeyT, ValueT]):
     """Small deterministic least-recently-used cache."""
 
     __slots__ = ("limit", "store")
 
+    # -------------------------------------------------------------------------
     def __init__(self, limit: int) -> None:
         self.limit = max(int(limit), 1)
         self.store: OrderedDict[KeyT, ValueT] = OrderedDict()
 
+    # -------------------------------------------------------------------------
     def get(self, key: KeyT, default: object = CACHE_MISS) -> object:
         if key not in self.store:
             return default
@@ -26,6 +29,7 @@ class BoundedCache(Generic[KeyT, ValueT]):
         self.store[key] = value
         return value
 
+    # -------------------------------------------------------------------------
     def put(self, key: KeyT, value: ValueT) -> None:
         if key in self.store:
             self.store.pop(key)
@@ -33,5 +37,6 @@ class BoundedCache(Generic[KeyT, ValueT]):
             self.store.popitem(last=False)
         self.store[key] = value
 
+    # -------------------------------------------------------------------------
     def clear(self) -> None:
         self.store.clear()

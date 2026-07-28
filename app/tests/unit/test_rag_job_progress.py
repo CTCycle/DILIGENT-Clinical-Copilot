@@ -11,12 +11,14 @@ from repository_fixtures import build_repository_graph
 
 ###############################################################################
 def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
+    captured_documents_path: list[str | None] = []
 
     ###############################################################################
     class FakeRagEmbeddingUpdater:
 
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
+            captured_documents_path.append(kwargs.get("documents_path"))
             self.documents_path = r"C:\rag"
             self.progress_callback = kwargs["progress_callback"]
 
@@ -50,6 +52,11 @@ def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
         FakeRagEmbeddingUpdater,
     )
     monkeypatch.setattr(service, "write_rag_manifest", lambda **_: None)
+    monkeypatch.setattr(
+        service,
+        "get_effective_rag_documents_path",
+        lambda: r"C:\persisted\rag",
+    )
 
     payload = service.start_update_job(service.RAG_JOB_TYPE)
     job_id = str(payload["job_id"])
@@ -68,6 +75,7 @@ def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
         time.sleep(0.01)
 
     assert "Embedded and persisted batch 2/4" in observed_messages
+    assert captured_documents_path == [r"C:\persisted\rag"]
 
 ###############################################################################
 def test_batch_progress_scales_through_embedding_window() -> None:

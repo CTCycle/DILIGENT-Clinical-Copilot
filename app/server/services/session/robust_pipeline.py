@@ -375,8 +375,10 @@ def audit_report(
     extraction_artifact: ExtractionArtifact,
     fact_graph_validation: FactGraphValidation,
     report_metadata: ReportMetadata,
+    additional_blocking_issues: list[dict[str, Any]] | None = None,
 ) -> FaithfulnessAudit:
     blocking_issues = list(fact_graph_validation.hard_issues)
+    blocking_issues.extend(additional_blocking_issues or [])
     non_blocking_issues = list(fact_graph_validation.soft_issues)
     contamination = extraction_artifact.contamination_flags
     # Confidence below 0.5 indicates materially weak extraction quality.
