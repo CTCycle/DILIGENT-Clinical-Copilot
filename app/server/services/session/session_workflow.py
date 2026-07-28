@@ -549,6 +549,10 @@ async def process_single_patient_workflow(
         extraction_artifact=extraction_artifact,
         fact_graph_validation=fact_graph_validation,
         report_metadata=report_metadata,
+        additional_blocking_issues=DiliEvidenceBuilder.audit_generated_narrative(
+            clinical_narrative=llm_clinical_summary,
+            bundle=dili_evidence_bundle,
+        ),
     )
     try:
         report_comparison_payload = json.loads(faithfulness_audit.discrepancy_report)

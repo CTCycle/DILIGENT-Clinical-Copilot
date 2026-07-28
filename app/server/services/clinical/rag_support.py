@@ -69,8 +69,16 @@ class RagSupportService:
                 self.search_supporting_documents,
                 drug_rag_query,
             )
-        except EmbeddingModelMismatchError:
-            raise
+        except EmbeddingModelMismatchError as exc:
+            logger.warning(
+                "RAG retrieval unavailable for drug '%s' because the active embedding "
+                "model does not match the indexed vectors; continuing without "
+                "supporting documents: %s",
+                drug_name,
+                exc,
+            )
+            self.record_rag_retrieval_issue(drug_name=drug_name, error=exc)
+            return None
         except Exception as exc:
             logger.warning(
                 "RAG retrieval unavailable for drug '%s'; continuing without supporting documents: %s",

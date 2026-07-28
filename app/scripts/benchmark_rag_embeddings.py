@@ -22,7 +22,6 @@ from services.retrieval.embedding_runtime import (  # noqa: E402
     get_embedding_runtime,
 )  # noqa: E402
 
-
 ###############################################################################
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -113,7 +112,6 @@ def main() -> int:
         and result.get("normalization_failures") == 0
         else 1
     )
-
 
 ###############################################################################
 def _version(package: str) -> str:

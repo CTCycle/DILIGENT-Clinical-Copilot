@@ -47,7 +47,6 @@ LOG_CONFIG: dict[str, Any] = {
     },
 }
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def configure_logging() -> None:

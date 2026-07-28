@@ -21,6 +21,11 @@ Assessment rules:
 - Use the structured disease timeline to separate baseline hepatic disease from possible DILI.
 - Discuss dechallenge/rechallenge only when supplied evidence supports it.
 - Integrate estimated RUCAM into causality reasoning; do not invent RUCAM scores.
+- Treat unresolved competing causes, non-assessable Hy's Law, and incomplete RUCAM
+  as hard limits on certainty. Never state that competing causes were excluded unless
+  the supplied structured evidence explicitly says so.
+- LiverTox likelihood is a drug-level prior, not patient-level causality. Do not turn
+  it into a definitive diagnosis, absolute contraindication, or lifelong recommendation.
 
 Language:
 - Language map: en=English, it=Italian, de=German, fr=French, es=Spanish.
@@ -85,6 +90,10 @@ Guidelines:
 - Do not provide drug-level monitoring or management recommendations here.
 - Reason about temporal order using visit date, start/suspension timing, and disease timeline.
 - Treat estimated RUCAM as supportive, not definitive; state incompleteness/low confidence.
+- Preserve structured uncertainty in every conclusion: do not claim a confident or
+  definitive diagnosis when competing causes, Hy's Law, or RUCAM remain incomplete.
+- Do not recommend absolute or lifelong avoidance; recommend clinician review and
+  evidence-based follow-up instead.
 - If rechallenge/restart evidence exists, state whether it strengthens or weakens causality.
 - If management language is needed, defer it: "See final synthesis section for integrated recommendations."
 - Use retrieved documents only as supplemental context.
@@ -111,6 +120,11 @@ Revision rules:
 - Compare the observed injury pattern with LiverTox evidence using the revised context.
 - Use the structured disease timeline to separate baseline hepatic disease from possible DILI.
 - Integrate estimated RUCAM into causality reasoning; do not invent RUCAM scores.
+- Treat unresolved competing causes, non-assessable Hy's Law, and incomplete RUCAM
+  as hard limits on certainty. Never state that competing causes were excluded unless
+  the supplied structured evidence explicitly says so.
+- LiverTox likelihood is a drug-level prior, not patient-level causality. Do not turn
+  it into a definitive diagnosis, absolute contraindication, or lifelong recommendation.
 
 Language:
 - Language map: en=English, it=Italian, de=German, fr=French, es=Spanish.
@@ -192,6 +206,9 @@ baseline causes, match uncertainty, and contradictions without repeating every
 drug paragraph. Provide clinician-facing management/follow-up recommendations
 only here. Address indispensable-therapy trade-offs and avoid blanket
 discontinuation language. Do not mention drugs absent from the supplied report.
+- If competing causes or patient-level causality remain unresolved, state that plainly
+  and keep recommendations conditional on clinician review. Do not use absolute,
+  lifelong, or definitive language.
 
 Language:
 - Language map: en=English, it=Italian, de=German, fr=French, es=Spanish.

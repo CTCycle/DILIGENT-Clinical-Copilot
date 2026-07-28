@@ -280,7 +280,6 @@ class SmartDocumentChunker:
         slug = re.sub(r"[^a-z0-9]+", "-", value.casefold()).strip("-")
         return slug[:48] or "section"
 
-
 ###############################################################################
 class TokenWindowDocumentChunker:
     """Chunk documents by the canonical model tokenizer, not characters."""

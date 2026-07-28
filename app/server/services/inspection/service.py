@@ -506,7 +506,10 @@ class DataInspectionService(
     def run_rag_update_job(
         self, job_id: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        return self.update_job_runner.run_rag_update_job(job_id, overrides)
+        override_values = dict(overrides or {})
+        if not str(override_values.get("documents_path") or "").strip():
+            override_values["documents_path"] = self.get_effective_rag_documents_path()
+        return self.update_job_runner.run_rag_update_job(job_id, override_values)
 
     # -------------------------------------------------------------------------
     def start_update_job(

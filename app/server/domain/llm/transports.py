@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
 
-
 ###############################################################################
 class ChatRequest(BaseModel):
     model: str
@@ -14,12 +13,10 @@ class ChatRequest(BaseModel):
     options: dict[str, Any] = {}
     json_mode: bool = False
 
-
 ###############################################################################
 class ChatResult(BaseModel):
     content: str
     reasoning_content: str | None = None
-
 
 ###############################################################################
 class StructuredRequest(BaseModel, Generic[T]):
@@ -27,13 +24,11 @@ class StructuredRequest(BaseModel, Generic[T]):
     messages: list[dict[str, str]]
     schema_type: type[T]
 
-
 ###############################################################################
 class ConnectivityResult(BaseModel):
     ok: bool
     response_preview: str | None = None
     error: str | None = None
-
 
 ###############################################################################
 class EmbeddingRequest(BaseModel):
