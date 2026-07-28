@@ -29,16 +29,13 @@ REQUIRED_SNAPSHOT_FILES = frozenset(
     }
 )
 
-
 ###############################################################################
 class EmbeddingRuntimeError(RuntimeError):
     """Base error for unavailable or invalid embedding runtime state."""
 
-
 ###############################################################################
 class EmbeddingRuntimeUnavailable(EmbeddingRuntimeError):
     """Raised when dependencies, the snapshot, or the ONNX contract is invalid."""
-
 
 ###############################################################################
 class EmbeddingVectorValidationError(EmbeddingRuntimeError):
@@ -49,9 +46,9 @@ SnapshotDownloader = Callable[..., str | Path]
 SessionFactory = Callable[..., Any]
 TokenizerFactory = Callable[..., Any]
 
-
 ###############################################################################
 class _ChunkingTokenizer:
+
     # -------------------------------------------------------------------------
     def __init__(self, tokenizer: Any) -> None:
         self._tokenizer = tokenizer
@@ -68,9 +65,9 @@ class _ChunkingTokenizer:
             self._tokenizer.decode(list(ids), skip_special_tokens=skip_special_tokens)
         )
 
-
 ###############################################################################
 class EmbeddingRuntime:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -350,17 +347,19 @@ class EmbeddingRuntime:
         return result
 
 
+###############################################################################
 def _default_snapshot_downloader(**kwargs: object) -> str:
     return str(cast(Any, snapshot_download)(**kwargs))
 
 
+###############################################################################
 def _default_tokenizer_factory(path: str) -> Any:
     return Tokenizer.from_file(path)
 
 
+###############################################################################
 def _default_session_factory(path: str, **kwargs: object) -> Any:
     return cast(Any, onnxruntime.InferenceSession)(path, **kwargs)
-
 
 ###############################################################################
 @lru_cache(maxsize=1)
@@ -370,7 +369,6 @@ def get_embedding_runtime() -> EmbeddingRuntime:
         offline_mode=rag.embedding_offline_mode,
         batch_size=rag.embedding_batch_size,
     )
-
 
 ###############################################################################
 def close_embedding_runtime() -> None:

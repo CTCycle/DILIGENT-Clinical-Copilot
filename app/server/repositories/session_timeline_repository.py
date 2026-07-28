@@ -22,12 +22,16 @@ from repositories.serialization.session_timelines import (
 from repositories.values import normalize_string
 
 
+###############################################################################
 class SessionTimelineRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self, context: RepositoryContext) -> None:
         self.context = context
         self.engine = context.engine
         self.session_factory = context.session_factory
 
+    # -------------------------------------------------------------------------
     def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
         safe_session_id = int(session_id)
         with self.session_factory() as db_session:
@@ -52,6 +56,7 @@ class SessionTimelineRepository:
                     previews.append(build_timeline_preview_payload(timeline))
             return previews
 
+    # -------------------------------------------------------------------------
     def get_session_timeline_record(
         self, session_id: int, timeline_id: int
     ) -> dict[str, Any] | None:
@@ -69,6 +74,7 @@ class SessionTimelineRepository:
             timeline = timeline_from_row(row, session_id=safe_session_id)
             return timeline.model_dump(mode="json") if timeline is not None else None
 
+    # -------------------------------------------------------------------------
     def get_latest_session_timeline_record(
         self, session_id: int
     ) -> dict[str, Any] | None:
@@ -92,6 +98,7 @@ class SessionTimelineRepository:
             timeline = timeline_from_row(row, session_id=safe_session_id)
             return timeline.model_dump(mode="json") if timeline is not None else None
 
+    # -------------------------------------------------------------------------
     def create_session_timeline_record(
         self, session_id: int, payload: dict[str, Any]
     ) -> dict[str, Any] | None:
@@ -128,6 +135,7 @@ class SessionTimelineRepository:
                 }
             ).model_dump(mode="json")
 
+    # -------------------------------------------------------------------------
     def delete_session_timeline_record(self, session_id: int, timeline_id: int) -> bool:
         with self.session_factory() as db_session:
             row = db_session.execute(
@@ -142,6 +150,7 @@ class SessionTimelineRepository:
             db_session.commit()
             return True
 
+    # -------------------------------------------------------------------------
     def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
         safe_session_id = int(session_id)
         with self.session_factory() as db_session:

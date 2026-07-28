@@ -9,6 +9,7 @@ from typing import Any
 import pandas as pd
 
 
+###############################################################################
 def normalize_string(value: Any) -> str | None:
     if isinstance(value, str):
         normalized = value.strip()
@@ -27,6 +28,7 @@ def normalize_string(value: Any) -> str | None:
     return normalized
 
 
+###############################################################################
 def normalize_date_value(value: Any) -> date | None:
     normalized = normalize_string(value)
     if not normalized:
@@ -45,11 +47,13 @@ def normalize_date_value(value: Any) -> date | None:
     return None if pd.isna(parsed) else parsed.date()
 
 
+###############################################################################
 def normalize_date(value: Any) -> str | None:
     parsed = normalize_date_value(value)
     return parsed.isoformat() if parsed is not None else normalize_string(value)
 
 
+###############################################################################
 def normalize_flag(value: Any) -> int | None:
     normalized = normalize_string(value)
     if normalized is None:
@@ -65,15 +69,18 @@ def normalize_flag(value: Any) -> int | None:
         return None
 
 
+###############################################################################
 def normalize_session_status(value: Any) -> str:
     normalized = normalize_string(value)
     return "failed" if normalized and normalized.casefold() == "failed" else "successful"
 
 
+###############################################################################
 def join_values(values: set[str]) -> str | None:
     return "; ".join(sorted({item.strip() for item in values if item.strip()})) or None
 
 
+###############################################################################
 def to_int(value: Any) -> int | None:
     normalized = normalize_string(value)
     try:
@@ -82,6 +89,7 @@ def to_int(value: Any) -> int | None:
         return None
 
 
+###############################################################################
 def to_float(value: Any) -> float | None:
     normalized = normalize_string(value)
     try:

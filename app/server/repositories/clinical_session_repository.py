@@ -31,6 +31,7 @@ from repositories.serialization import session_result_data
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
 
+###############################################################################
 def _build_search_pattern(value: str | None) -> str | None:
     normalized = repository_values.normalize_string(value)
     if normalized is None:
@@ -39,7 +40,10 @@ def _build_search_pattern(value: str | None) -> str | None:
     return f"%{escaped}%"
 
 
+###############################################################################
 class ClinicalSessionRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         context: RepositoryContext,
@@ -53,6 +57,7 @@ class ClinicalSessionRepository:
         self.session_factory = context.session_factory
         self._vocabulary_changed = False
 
+    # -------------------------------------------------------------------------
     def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         if not session_data:
             logger.warning("Skipping clinical session save; payload is empty")
@@ -134,6 +139,7 @@ class ClinicalSessionRepository:
         finally:
             db_session.close()
 
+    # -------------------------------------------------------------------------
     def list_sessions(
         self,
         *,
@@ -255,6 +261,7 @@ class ClinicalSessionRepository:
         finally:
             db_session.close()
 
+    # -------------------------------------------------------------------------
     def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         safe_session_id = int(session_id)
         db_session = self.session_factory()
@@ -308,6 +315,7 @@ class ClinicalSessionRepository:
         finally:
             db_session.close()
 
+    # -------------------------------------------------------------------------
     def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             payload_json = db_session.execute(
@@ -317,6 +325,7 @@ class ClinicalSessionRepository:
             ).scalar_one_or_none()
             return session_result_data.parse_session_result_payload(payload_json)
 
+    # -------------------------------------------------------------------------
     def upsert_session_result_payload(
         self, session_id: int, payload: dict[str, Any]
     ) -> bool:
@@ -343,6 +352,7 @@ class ClinicalSessionRepository:
             db_session.commit()
             return True
 
+    # -------------------------------------------------------------------------
     def update_session_text_and_metadata(
         self,
         session_id: int,
@@ -381,6 +391,7 @@ class ClinicalSessionRepository:
             db_session.commit()
         return self.get_session_detail(safe_session_id)
 
+    # -------------------------------------------------------------------------
     def update_session_metadata(
         self, session_id: int, *, metadata: dict[str, Any] | None
     ) -> dict[str, Any] | None:
@@ -394,6 +405,7 @@ class ClinicalSessionRepository:
             db_session.commit()
         return self.get_session_detail(safe_session_id)
 
+    # -------------------------------------------------------------------------
     def get_next_session_version(self, root_session_id: int) -> int:
         with self.session_factory() as db_session:
             max_version = db_session.execute(
@@ -403,6 +415,7 @@ class ClinicalSessionRepository:
             ).scalar_one_or_none()
             return int(max_version or 1) + 1
 
+    # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
         safe_session_id = int(session_id)
         with self.session_factory() as db_session:
@@ -461,6 +474,7 @@ class ClinicalSessionRepository:
             db_session.commit()
             return True
 
+    # -------------------------------------------------------------------------
     def persist_session_sections(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
@@ -485,6 +499,7 @@ class ClinicalSessionRepository:
                     )
                 )
 
+    # -------------------------------------------------------------------------
     def persist_session_labs(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
@@ -533,6 +548,7 @@ class ClinicalSessionRepository:
                 )
             )
 
+    # -------------------------------------------------------------------------
     def persist_session_drugs(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> bool:
@@ -642,6 +658,7 @@ class ClinicalSessionRepository:
             )
         return vocabulary_changed
 
+    # -------------------------------------------------------------------------
     def persist_session_result_payload(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
@@ -663,6 +680,7 @@ class ClinicalSessionRepository:
             current_version.total_duration = repository_values.to_float(payload.get("total_duration"))
             current_version.metadata_json = session_result_data.serialize_json_payload(payload.get("metadata"))
 
+    # -------------------------------------------------------------------------
     def consume_vocabulary_change_signal(self) -> bool:
         changed = self._vocabulary_changed
         self._vocabulary_changed = False

@@ -9,6 +9,7 @@ from repositories.schemas.clinical import ClinicalSessionTimeline
 from repositories.values import normalize_string
 
 
+###############################################################################
 def parse_timeline_payload(payload_json: str | None) -> dict[str, Any] | None:
     normalized_payload = normalize_string(payload_json)
     if normalized_payload is None:
@@ -20,6 +21,7 @@ def parse_timeline_payload(payload_json: str | None) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+###############################################################################
 def serialize_timeline_payload(payload: Any) -> str | None:
     if payload is None:
         return None
@@ -31,6 +33,7 @@ def serialize_timeline_payload(payload: Any) -> str | None:
         return normalize_string(payload)
 
 
+###############################################################################
 def validate_timeline_payload(payload: dict[str, Any] | None) -> PatientTimeline | None:
     if not isinstance(payload, dict):
         return None
@@ -40,6 +43,7 @@ def validate_timeline_payload(payload: dict[str, Any] | None) -> PatientTimeline
         return None
 
 
+###############################################################################
 def build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
     dated_events = [event.event_date for event in payload.events if event.event_date]
     sorted_dates = sorted(dated_events, key=timeline_date_sort_key)
@@ -69,6 +73,7 @@ def build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
     ).model_dump(mode="json")
 
 
+###############################################################################
 def timeline_from_row(
     row: ClinicalSessionTimeline,
     *,

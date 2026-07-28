@@ -1,6 +1,7 @@
 from common.utils.bounded_cache import CACHE_MISS, BoundedCache
 
 
+###############################################################################
 def test_cache_hit_and_miss_sentinel_identity() -> None:
     cache: BoundedCache[str, int] = BoundedCache(2)
     assert cache.get("missing") is CACHE_MISS
@@ -8,6 +9,7 @@ def test_cache_hit_and_miss_sentinel_identity() -> None:
     assert cache.get("a") == 1
 
 
+###############################################################################
 def test_replacement_refreshes_recency_and_evicts_oldest_key() -> None:
     cache: BoundedCache[str, int] = BoundedCache(2)
     cache.put("a", 1)
@@ -20,6 +22,7 @@ def test_replacement_refreshes_recency_and_evicts_oldest_key() -> None:
     assert cache.get("c") == 3
 
 
+###############################################################################
 def test_clear_and_non_positive_limits() -> None:
     cache: BoundedCache[str, int] = BoundedCache(0)
     cache.put("a", 1)

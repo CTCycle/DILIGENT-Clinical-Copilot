@@ -30,6 +30,7 @@ from services.clinical.hepatox_constants import (
 class ReportFinalizer:
     """Builds the final patient report and conclusion from per-drug assessments."""
 
+    # -------------------------------------------------------------------------
     async def _build_and_finalize_report(
         self,
         entries: list[DrugClinicalAssessment],
@@ -114,6 +115,7 @@ class ReportFinalizer:
             )
         return "\n".join(lines).strip()
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def remove_redundant_report_sentence(text: str) -> str:
         if not text:
@@ -129,6 +131,7 @@ class ReportFinalizer:
         cleaned = "\n".join(cleaned_lines).strip()
         return re.sub(r"\n{3,}", "\n\n", cleaned)
 
+    # -------------------------------------------------------------------------
     def render_matched_drug_section(
         self, entry: DrugClinicalAssessment, *, report_language: str = "en"
     ) -> str:
@@ -152,6 +155,7 @@ class ReportFinalizer:
             f"**{phrase('bibliography_source', report_language)}**: {self.bibliography_source_label()}"
         ).strip()
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def render_clinical_commentary(
         entry: DrugClinicalAssessment, *, report_language: str = "en"
@@ -200,6 +204,7 @@ class ReportFinalizer:
         )
         return f"**{phrase('clinical_commentary', report_language)}**: " + " ".join(segments)
 
+    # -------------------------------------------------------------------------
     def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:
         text = entry.paragraph.strip() if entry.paragraph else ""
         if not text:
@@ -230,6 +235,7 @@ class ReportFinalizer:
             return ""
         return sanitized
 
+    # -------------------------------------------------------------------------
     def build_fallback_technical_note(self, entry: DrugClinicalAssessment, *, report_language: str = "en") -> str:
         if entry.suspension.excluded:
             return self.build_excluded_paragraph(entry, report_language)
@@ -239,6 +245,7 @@ class ReportFinalizer:
             return phrase("matched_no_excerpt", report_language) if entry.matched_livertox_row else phrase("livertox_missing", report_language)
         return self.build_error_paragraph(entry, report_language)
 
+    # -------------------------------------------------------------------------
     def render_unresolved_mentions_section(self, entries: list[DrugClinicalAssessment], *, report_language: str = "en") -> str | None:
         if not entries:
             return None
@@ -257,6 +264,7 @@ class ReportFinalizer:
             lines.extend([f"### {label}", "", f"{context} {rucam}. {recommendation}", ""])
         return "\n".join(lines).strip()
 
+    # -------------------------------------------------------------------------
     def describe_unresolved_entry(self, entry: DrugClinicalAssessment, report_language: str = "en") -> str:
         status = (entry.match_status or "").strip().lower()
         if status in {"ambiguous", "ambiguous_match"} or entry.ambiguous_match:
@@ -270,6 +278,7 @@ class ReportFinalizer:
             return phrase("matched_no_excerpt", report_language) if entry.matched_livertox_row else phrase("livertox_missing", report_language)
         return phrase("deterministic_section_unavailable", report_language)
 
+    # -------------------------------------------------------------------------
     def build_excluded_paragraph(self, entry: DrugClinicalAssessment, report_language: str = "en") -> str:
         suspension = entry.suspension
         if report_language.startswith("it"):
@@ -278,20 +287,24 @@ class ReportFinalizer:
         detail = f"The therapy was suspended on {suspension.suspension_date.isoformat()} well before the visit, so this exposure was excluded from active DILI causality assessment." if suspension.suspension_date is not None else "The therapy was reported as suspended well before the visit and was excluded from active DILI causality assessment."
         return f"{detail} Manual latency verification is suggested if the exposure history becomes clinically relevant again."
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_missing_excerpt_paragraph(entry: DrugClinicalAssessment, report_language: str = "en") -> str:
         _ = entry
         return phrase("livertox_missing", report_language)
 
+    # -------------------------------------------------------------------------
     def build_ambiguous_match_paragraph(self, entry: DrugClinicalAssessment, report_language: str = "en") -> str:
         candidates = ", ".join(entry.match_candidates) if entry.match_candidates else phrase("rucam_insufficient_data", report_language)
         return f"{phrase('livertox_ambiguous', report_language)} {phrase('candidate_matches', report_language, candidates=candidates)} {phrase('manual_curation', report_language)}"
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_error_paragraph(entry: DrugClinicalAssessment, report_language: str = "en") -> str:
         _ = entry
         return phrase("rucam_insufficient_data", report_language)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def resolve_livertox_score(metadata: dict[str, Any] | None) -> str:
         if not metadata:
@@ -304,6 +317,7 @@ class ReportFinalizer:
             return NOT_AVAILABLE_TEXT
         return text.upper() if text.isalpha() else text
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def format_drug_heading(drug_name: str, score: str) -> str:
         normalized_name = drug_name.strip() if drug_name else ""
