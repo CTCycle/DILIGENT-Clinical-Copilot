@@ -25,13 +25,13 @@ from common.constants import (
     FASTAPI_ROOT_ENDPOINT,
     FASTAPI_SPA_FALLBACK_ENDPOINT,
     FASTAPI_TITLE,
-    FASTAPI_VERSION,
 )
 from common.paths import (
     CLIENT_ASSETS_PATH,
     CLIENT_DIST_PATH,
     CLIENT_INDEX_FILE_PATH,
 )
+from common.version import resolve_application_version
 from configurations.startup import (
     get_server_settings,
     initialize_settings,
@@ -98,7 +98,7 @@ def create_app() -> FastAPI:
 
     application = FastAPI(
         title=FASTAPI_TITLE,
-        version=FASTAPI_VERSION,
+        version=resolve_application_version(),
         description=FASTAPI_DESCRIPTION,
         docs_url=FASTAPI_DOCS_URL,
         redoc_url=FASTAPI_REDOC_URL,

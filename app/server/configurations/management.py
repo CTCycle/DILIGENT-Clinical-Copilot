@@ -20,7 +20,6 @@ from common.constants import (
     DEFAULT_EMBEDDING_BATCH_SIZE,
     FASTAPI_DESCRIPTION,
     FASTAPI_TITLE,
-    FASTAPI_VERSION,
     OLLAMA_DEFAULT_HOST,
     OLLAMA_DEFAULT_PORT,
     OLLAMA_DEFAULT_SCHEME,
@@ -31,6 +30,7 @@ from common.catalogs.model_choices import (
     get_text_extraction_model_choices,
 )
 from common.paths import CONFIGURATIONS_FILE
+from common.version import resolve_application_version
 from common.utils.types import (
     coerce_bool,
     coerce_float,
@@ -234,7 +234,7 @@ def _default_llm_runtime_defaults(
 def _build_fastapi_settings() -> FastAPISettings:
     return FastAPISettings(
         title=FASTAPI_TITLE,
-        version=FASTAPI_VERSION,
+        version=resolve_application_version(),
         description=FASTAPI_DESCRIPTION,
     )
 

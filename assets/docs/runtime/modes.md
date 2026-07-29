@@ -1,5 +1,5 @@
 # Runtime Modes
-Last updated: 2026-07-11
+Last updated: 2026-07-29
 
 ## Supported Modes
 ### Local Application
@@ -10,6 +10,14 @@ Last updated: 2026-07-11
   - API: `127.0.0.1:7690`
   - UI: `127.0.0.1:9847`
 - Template ports from `settings/.env.example` use the same defaults.
+
+### Packaged Windows Desktop
+- Tauri shell: `app/desktop/src-tauri`.
+- Backend: embedded PyInstaller onedir runtime, launched on `127.0.0.1` with an OS-selected port.
+- Frontend: Angular production files served by the packaged FastAPI backend.
+- Runtime dependencies: no Python, Node.js, npm, Rust, uv, or source checkout is required on the target machine.
+- Persistent data: `%LOCALAPPDATA%\DILIGENT\data`.
+- Extracted immutable runtime: `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>`.
 
 ### Containerized Runtime
 - Not supported in the current codebase.

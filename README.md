@@ -42,6 +42,18 @@ Download `DILIGENT-Clinical-Copilot-3.0.0.zip` from the [v3.0.0 GitHub release](
 
 The release asset contains the verified repository source at the release commit. It is not a desktop installer and does not contain a Windows executable.
 
+## Windows desktop release
+
+Published desktop releases provide a portable executable and MSI that do not require a separate Python, Node.js, Rust, npm, uv, or source checkout on the target machine. The portable executable extracts its verified runtime under `%LOCALAPPDATA%\DILIGENT\runtime` and stores user data under `%LOCALAPPDATA%\DILIGENT\data`.
+
+For maintainers building a release on Windows x64:
+
+```powershell
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.1.0 -DesktopTarget All
+```
+
+Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Add `-OfflineWebView2` only when building an MSI that must install WebView2 without network access. See [desktop release documentation](assets/docs/runtime/desktop_release.md) for artifact validation and cleanup.
+
 ## Start the application
 
 ### Windows

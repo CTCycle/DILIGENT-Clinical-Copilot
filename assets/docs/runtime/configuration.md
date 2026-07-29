@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-07-23
+Last updated: 2026-07-29
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled automatic generation policy immediately before each LLM call.
@@ -8,6 +8,18 @@ source-controlled automatic generation policy immediately before each LLM call.
 - Active env file: `settings/.env`
 - Env template: `settings/.env.example`
 - Structured operational settings: `settings/configurations.json`
+
+## Desktop-only environment variables
+
+- `DILIGENT_DESKTOP=true`
+- `DILIGENT_RELEASE_VERSION=major.minor.patch`
+- `DILIGENT_RUNTIME_ROOT=<absolute extracted immutable runtime root>`
+- `DILIGENT_DATA_ROOT=<absolute persistent user-data root>`
+- `DILIGENT_SQLITE_PATH=<absolute data database path>`
+- `DILIGENT_ACCESS_KEY_MATERIAL_FILE=<absolute protected key-material path>`
+- `RELOAD=false`
+
+Packaged mode requires `DILIGENT_RUNTIME_ROOT` and `DILIGENT_DATA_ROOT` together. Relative or partial desktop roots are rejected; source-mode paths are never used as a fallback.
 
 ## Default Local Ports
 - Backend: `127.0.0.1:7690`

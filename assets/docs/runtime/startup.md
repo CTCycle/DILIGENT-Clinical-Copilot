@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-07-16
+Last updated: 2026-07-29
 
 ## Recommended Local Startup
 On Windows, use:
@@ -20,6 +20,10 @@ The launcher:
 - provides database, test, log, cache, and uninstall maintenance options
 
 Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
+
+## Packaged desktop startup
+
+The Windows portable executable and MSI use the Tauri shell. On first launch the shell verifies the embedded runtime archive, extracts it to a versioned hash directory under `%LOCALAPPDATA%\DILIGENT\runtime`, creates persistent data directories under `%LOCALAPPDATA%\DILIGENT\data`, starts the packaged backend, waits for its atomic ready file and `/api/health`, and then navigates the hidden splash window to the local backend origin. The backend is owned by a Windows Job Object and is terminated when the shell exits.
 
 ## Manual Backend Startup
 From repository root:
