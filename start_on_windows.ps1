@@ -2,6 +2,8 @@
 param(
     [ValidateSet('Launch', 'Install', 'InitializeDatabase', 'Test', 'Uninstall', 'BuildDesktopRelease', 'RemoveDesktopRelease')]
     [string]$Action,
+    [ValidateSet('Standard', 'Development')]
+    [string]$InstallationType,
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string]$Version,
     [ValidateSet('Portable', 'Msi', 'All')]
@@ -275,7 +277,11 @@ function Set-LauncherEnvironment {
 }
 
 function Install-ApplicationDependencies {
-    param([bool]$BuildFrontend = $true)
+    param(
+        [bool]$BuildFrontend = $true,
+        [ValidateSet('Standard', 'Development')]
+        [string]$InstallationType = 'Standard'
+    )
 
     Initialize-PortableRuntimes
     Import-DotEnv
@@ -283,7 +289,7 @@ function Install-ApplicationDependencies {
 
     Write-Step 'Installing Python dependencies'
     $syncArguments = @('sync', '--python', $PythonExe)
-    if ($env:OPTIONAL_DEPENDENCIES -eq 'true') {
+    if ($InstallationType -eq 'Development') {
         $syncArguments += '--all-extras'
     }
     try {
@@ -409,7 +415,7 @@ function Start-Application {
     Set-LauncherEnvironment
     if (-not (Test-DependenciesReady)) {
         Write-Step 'Required application environments are missing or unusable; installing dependencies'
-        Install-ApplicationDependencies -BuildFrontend $alwaysRebuild
+        Install-ApplicationDependencies -BuildFrontend $alwaysRebuild -InstallationType 'Standard'
     }
     else {
         Write-Ok 'Application environments are ready; skipped dependency installation'
@@ -481,7 +487,11 @@ function Start-Application {
 }
 
 function Install-OrUpdateApplication {
-    Install-ApplicationDependencies
+    $selectedInstallationType = $InstallationType
+    if (-not $selectedInstallationType) {
+        $selectedInstallationType = Read-InstallationType
+    }
+    Install-ApplicationDependencies -InstallationType $selectedInstallationType
     if (Test-Path -LiteralPath $UvCacheDir) {
         Write-Step 'Pruning uv cache'
         Remove-Item -LiteralPath $UvCacheDir -Recurse -Force
@@ -568,6 +578,15 @@ function Uninstall-Application {
     }
     Remove-PythonCaches
     Write-Ok 'Application runtimes and generated dependencies removed; settings and user data were preserved'
+}
+
+function Read-InstallationType {
+    $selection = (Read-Host 'Installation type [1=Development, 2=Standard]').Trim()
+    switch ($selection) {
+        '1' { return 'Development' }
+        '2' { return 'Standard' }
+        default { throw 'Invalid installation type. Enter 1 for Development or 2 for Standard.' }
+    }
 }
 
 function Assert-DesktopParameterContract {
