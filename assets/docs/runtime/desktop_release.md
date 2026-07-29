@@ -21,9 +21,9 @@ The runtime allowlist excludes source code, tests, documentation, credentials, `
 For the current v3.0.0 release:
 
 ```text
-releases/DILIGENT-v3.0.0-windows-x64-portable.exe
-releases/DILIGENT-v3.0.0-windows-x64.msi
-releases/DILIGENT-v3.0.0-windows-x64.sha256
+release/DILIGENT-v3.0.0-windows-x64-portable.exe
+release/DILIGENT-v3.0.0-windows-x64.msi
+release/DILIGENT-v3.0.0-windows-x64.sha256
 ```
 
 The portable executable is a single distribution file for no-install use. The MSI installs the same Tauri shell and packaged runtime. The `.sha256` file contains one SHA-256 entry per published artifact and must be checked before distribution.
@@ -61,7 +61,9 @@ Run on a Windows x64 host with Rust/Cargo, the Windows build toolchain, the pinn
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a clean worktree by default; use `-AllowDirtyTree` only when the dirty state is intentional and recorded. `-OfflineWebView2` is valid only with `-DesktopTarget Msi` or `All` and changes the MSI WebView2 installation mode.
 
-The build refuses to publish if the frozen backend, runtime manifest, artifact size, or MSI metadata checks fail. The portable artifact is the raw Tauri release executable copied to the `releases/` directory after those checks.
+Final desktop artifacts are written directly to `release/`. Intermediate desktop staging remains under `release/.staging/`; Tauri's native Cargo output remains under `app/desktop/src-tauri/target/release/`.
+
+The build refuses to publish if the frozen backend, runtime manifest, artifact size, or MSI metadata checks fail. The portable artifact is the raw Tauri release executable copied to `release/` after those checks.
 
 ## Validation
 

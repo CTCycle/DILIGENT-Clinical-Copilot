@@ -8,7 +8,7 @@ This file captures the repeatable regression slice for model configuration and a
 
 After a Windows desktop release build, validate the published portable artifact separately from source-mode tests:
 
-1. Verify `releases\DILIGENT-v<version>-windows-x64-portable.exe` and the matching `.sha256` entry.
+1. Verify `release\DILIGENT-v<version>-windows-x64-portable.exe` and the matching `.sha256` entry.
 2. Open the portable EXE and confirm a responding window titled `DILIGENT Clinical Copilot`.
 3. Confirm `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>\extraction.complete` exists.
 4. Read `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json` and request `/api/health` on its recorded port.

@@ -48,9 +48,9 @@ The source archive contains the verified repository at the release commit. It is
 The v3.0.0 release also publishes these Windows x64 desktop artifacts:
 
 ```text
-releases/DILIGENT-v3.0.0-windows-x64-portable.exe
-releases/DILIGENT-v3.0.0-windows-x64.msi
-releases/DILIGENT-v3.0.0-windows-x64.sha256
+release/DILIGENT-v3.0.0-windows-x64-portable.exe
+release/DILIGENT-v3.0.0-windows-x64.msi
+release/DILIGENT-v3.0.0-windows-x64.sha256
 ```
 
 The portable executable is a single-file Tauri application. It does not require a separate Python, Node.js, Rust, npm, uv, or source checkout on the target machine. On first launch it verifies and extracts the embedded PyInstaller backend and Angular assets under `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>`, starts the backend on a random localhost port, and opens the desktop window. User settings, database, logs, models, source documents, vectors, exports, state, and access-key material remain under `%LOCALAPPDATA%\DILIGENT\data`.

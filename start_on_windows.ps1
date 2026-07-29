@@ -36,9 +36,9 @@ $script:PythonVersion = '3.14.2'
 $script:NodeVersion = '22.13.0'
 $script:DesktopDir = Join-Path $RepoRoot 'app/desktop'
 $script:DesktopTauriDir = Join-Path $DesktopDir 'src-tauri'
-$script:DesktopBuildDir = Join-Path $RepoRoot 'build/desktop'
+$script:DesktopBuildDir = Join-Path $RepoRoot 'release/.staging'
 $script:DesktopGeneratedDir = Join-Path $DesktopTauriDir 'generated'
-$script:ReleasesDir = Join-Path $RepoRoot 'releases'
+$script:DesktopArtifactsDir = Join-Path $RepoRoot 'release'
 $script:DesktopStageRoot = Join-Path $DesktopBuildDir 'staging'
 $script:DesktopNpmCmd = Join-Path $NodeDir 'npm.cmd'
 $script:DesktopTauriCli = Join-Path $DesktopDir 'node_modules/.bin/tauri.cmd'
@@ -790,10 +790,10 @@ function Test-MsiMetadata {
 
 function Publish-DesktopArtifacts {
     param([Parameter(Mandatory = $true)][string]$Version)
-    New-Item -ItemType Directory -Path $ReleasesDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $DesktopArtifactsDir -Force | Out-Null
     $releasePrefix = "DILIGENT-v$Version-windows-x64"
-    $portable = Join-Path $ReleasesDir "$releasePrefix-portable.exe"
-    $msi = Join-Path $ReleasesDir "$releasePrefix.msi"
+    $portable = Join-Path $DesktopArtifactsDir "$releasePrefix-portable.exe"
+    $msi = Join-Path $DesktopArtifactsDir "$releasePrefix.msi"
     $rawExe = Get-ChildItem -LiteralPath (Join-Path $DesktopTauriDir 'target/release') -Filter '*.exe' -File -ErrorAction SilentlyContinue | Where-Object Name -notmatch 'uninstall' | Select-Object -First 1
     if ($DesktopTarget -in @('Portable', 'All')) {
         if ($null -eq $rawExe) { throw 'Tauri raw executable was not found' }
@@ -814,10 +814,10 @@ function Publish-DesktopArtifacts {
 function Write-DesktopChecksums {
     param([Parameter(Mandatory = $true)][string]$Version)
     $prefix = "DILIGENT-v$Version-windows-x64"
-    $checksumPath = Join-Path $ReleasesDir "$prefix.sha256"
+    $checksumPath = Join-Path $DesktopArtifactsDir "$prefix.sha256"
     $lines = @()
     foreach ($artifact in @("$prefix-portable.exe", "$prefix.msi")) {
-        $path = Join-Path $ReleasesDir $artifact
+        $path = Join-Path $DesktopArtifactsDir $artifact
         if (Test-Path -LiteralPath $path) { $lines += "SHA256  $artifact"; $lines += ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() + "  $artifact") }
     }
     Set-Content -LiteralPath $checksumPath -Value $lines -Encoding ascii
@@ -839,7 +839,7 @@ function Build-DesktopRelease {
         $configuration = New-TauriReleaseConfiguration -Version $resolvedVersion
         Build-TauriApplication -ConfigurationPath $configuration -Version $resolvedVersion
         Publish-DesktopArtifacts -Version $resolvedVersion
-        Write-Ok "Desktop release $resolvedVersion published under $ReleasesDir"
+        Write-Ok "Desktop release $resolvedVersion published under $DesktopArtifactsDir"
     }
     finally {
         if (Test-Path -LiteralPath $stageRoot) { Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue }
@@ -847,8 +847,8 @@ function Build-DesktopRelease {
 }
 
 function Get-DesktopReleaseVersions {
-    if (-not (Test-Path -LiteralPath $ReleasesDir)) { return @() }
-    Get-ChildItem -LiteralPath $ReleasesDir -File | ForEach-Object {
+    if (-not (Test-Path -LiteralPath $DesktopArtifactsDir)) { return @() }
+    Get-ChildItem -LiteralPath $DesktopArtifactsDir -File | ForEach-Object {
         if ($_.Name -match '^DILIGENT-v(\d+\.\d+\.\d+)-windows-x64') { $Matches[1] }
     } | Sort-Object -Unique
 }
@@ -856,11 +856,11 @@ function Get-DesktopReleaseVersions {
 function Remove-DesktopRelease {
     Assert-DesktopParameterContract
     if ($AllDesktopReleases) {
-        if (Test-Path -LiteralPath $ReleasesDir) { Get-ChildItem -LiteralPath $ReleasesDir -File | Where-Object Name -match '^DILIGENT-v\d+\.\d+\.\d+-windows-x64' | Remove-Item -Force }
+        if (Test-Path -LiteralPath $DesktopArtifactsDir) { Get-ChildItem -LiteralPath $DesktopArtifactsDir -File | Where-Object Name -match '^DILIGENT-v\d+\.\d+\.\d+-windows-x64' | Remove-Item -Force }
     }
     else {
         foreach ($suffix in @('-portable.exe', '.msi', '.sha256')) {
-            $target = Join-Path $ReleasesDir "DILIGENT-v$Version-windows-x64$suffix"
+            $target = Join-Path $DesktopArtifactsDir "DILIGENT-v$Version-windows-x64$suffix"
             if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force }
         }
     }
@@ -870,8 +870,25 @@ function Remove-DesktopRelease {
     Write-Ok 'Desktop release artifacts and generated desktop build state removed; installed applications and user data were preserved'
 }
 
+$script:MenuContentWidth = 72
+$script:MenuFramePadding = 4
+
 function Write-MenuRule {
-    Write-Host '  +------------------------------------------------------------------+' -ForegroundColor DarkCyan
+    $rule = '-' * ($script:MenuContentWidth + $script:MenuFramePadding)
+    Write-Host ('  +{0}+' -f $rule) -ForegroundColor DarkCyan
+}
+
+function Write-MenuLine {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Text,
+        [ConsoleColor]$Color = [ConsoleColor]::Gray
+    )
+
+    $displayText = $Text
+    if ($displayText.Length -gt $script:MenuContentWidth) {
+        $displayText = $displayText.Substring(0, $script:MenuContentWidth - 3) + '...'
+    }
+    Write-Host ('  |  ' + $displayText.PadRight($script:MenuContentWidth) + '  |') -ForegroundColor $Color
 }
 
 function Write-MenuOption {
@@ -882,32 +899,32 @@ function Write-MenuOption {
     )
 
     $content = '{0}  {1,-31} {2}' -f $Number, $Label, $Description
-    Write-Host ('  |  {0,-62}  |' -f $content) -ForegroundColor Gray
+    Write-MenuLine -Text $content
 }
 
 function Show-MainMenu {
     Write-Host ''
     Write-MenuRule
-    Write-Host ('  |  {0,-62}  |' -f 'DILIGENT  /  CLINICAL COPILOT') -ForegroundColor Cyan
-    Write-Host ('  |  {0,-62}  |' -f 'Local development and maintenance console') -ForegroundColor DarkGray
+    Write-MenuLine -Text 'DILIGENT  /  CLINICAL COPILOT' -Color Cyan
+    Write-MenuLine -Text 'Local development and maintenance console' -Color DarkGray
     Write-MenuRule
-    Write-Host ('  |  {0,-62}  |' -f '') -ForegroundColor DarkCyan
-    Write-Host ('  |  {0,-62}  |' -f 'APPLICATION') -ForegroundColor Yellow
+    Write-MenuLine -Text '' -Color DarkCyan
+    Write-MenuLine -Text 'APPLICATION' -Color Yellow
     Write-MenuOption -Number '1.' -Label 'Launch application' -Description 'Start local services'
-    Write-Host ('  |  {0,-62}  |' -f '') -ForegroundColor DarkCyan
-    Write-Host ('  |  {0,-62}  |' -f 'MAINTENANCE') -ForegroundColor Yellow
+    Write-MenuLine -Text '' -Color DarkCyan
+    Write-MenuLine -Text 'MAINTENANCE' -Color Yellow
     Write-MenuOption -Number '2.' -Label 'Install / update dependencies' -Description 'Sync runtimes + packages'
     Write-MenuOption -Number '3.' -Label 'Initialize database' -Description 'Prepare local data store'
     Write-MenuOption -Number '4.' -Label 'Run test suite' -Description 'Execute project checks'
     Write-MenuOption -Number '5.' -Label 'Remove logs' -Description 'Delete application logs'
     Write-MenuOption -Number '6.' -Label 'Clear cache' -Description 'Remove temporary caches'
     Write-MenuOption -Number '7.' -Label 'Uninstall application' -Description 'Remove generated files'
-    Write-Host ('  |  {0,-62}  |' -f '') -ForegroundColor DarkCyan
-    Write-Host ('  |  {0,-62}  |' -f 'DESKTOP RELEASE') -ForegroundColor Yellow
+    Write-MenuLine -Text '' -Color DarkCyan
+    Write-MenuLine -Text 'DESKTOP RELEASE' -Color Yellow
     Write-MenuOption -Number '8.' -Label 'Build desktop release' -Description 'Create portable / MSI packages'
     Write-MenuOption -Number '9.' -Label 'Remove desktop release artifacts' -Description 'Delete generated release state'
-    Write-Host ('  |  {0,-62}  |' -f '') -ForegroundColor DarkCyan
-    Write-Host ('  |  {0,-62}  |' -f '10. Exit') -ForegroundColor Gray
+    Write-MenuLine -Text '' -Color DarkCyan
+    Write-MenuLine -Text '10. Exit'
     Write-MenuRule
 }
 

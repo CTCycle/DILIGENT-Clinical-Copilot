@@ -7,7 +7,7 @@ This file covers recurring local startup and launch failures.
 ## Portable Desktop Window Does Not Appear
 ### Symptom
 
-Opening `releases\DILIGENT-v<version>-windows-x64-portable.exe` produces no visible window and no backend process.
+Opening `release\DILIGENT-v<version>-windows-x64-portable.exe` produces no visible window and no backend process.
 
 ### Checks
 
