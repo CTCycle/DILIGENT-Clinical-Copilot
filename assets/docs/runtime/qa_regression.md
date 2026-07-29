@@ -1,8 +1,20 @@
 # QA Regression
-Last updated: 2026-06-03
+Last updated: 2026-07-29
 
 ## Scope
 This file captures the repeatable regression slice for model configuration and app-flow validation.
+
+## Packaged desktop smoke test
+
+After a Windows desktop release build, validate the published portable artifact separately from source-mode tests:
+
+1. Verify `releases\DILIGENT-v<version>-windows-x64-portable.exe` and the matching `.sha256` entry.
+2. Open the portable EXE and confirm a responding window titled `DILIGENT Clinical Copilot`.
+3. Confirm `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>\extraction.complete` exists.
+4. Read `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json` and request `/api/health` on its recorded port.
+5. Confirm `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log` contains successful startup and static-asset requests.
+
+This smoke test does not replace MSI install/upgrade/uninstall, offline WebView2, code-signing, or clean-machine distribution testing. Packaged desktop uses a random backend port and should not be tested through the source-mode `7690`/`9847` URLs.
 
 ## Recommended Runner
 
