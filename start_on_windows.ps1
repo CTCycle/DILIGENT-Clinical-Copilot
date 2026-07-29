@@ -754,6 +754,12 @@ function New-TauriReleaseConfiguration {
     param([Parameter(Mandatory = $true)][string]$Version)
     $configuration = Get-Content -LiteralPath (Join-Path $DesktopTauriDir 'tauri.conf.json') -Raw | ConvertFrom-Json
     $configuration.version = $Version
+    $configuration.bundle | Add-Member -MemberType NoteProperty -Name 'icon' -Value @(
+        (Join-Path $DesktopTauriDir 'icons/icon.ico'),
+        (Join-Path $DesktopTauriDir 'icons/32x32.png'),
+        (Join-Path $DesktopTauriDir 'icons/128x128.png'),
+        (Join-Path $DesktopTauriDir 'icons/128x128@2x.png')
+    ) -Force
     $configuration.bundle.windows.webviewInstallMode.type = if ($OfflineWebView2) { 'offlineInstaller' } else { 'embedBootstrapper' }
     $path = Join-Path $DesktopBuildDir "tauri-$Version-$PID.json"
     $configuration | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $path -Encoding utf8
@@ -762,6 +768,10 @@ function New-TauriReleaseConfiguration {
 
 function Build-TauriApplication {
     param([Parameter(Mandatory = $true)][string]$ConfigurationPath, [Parameter(Mandatory = $true)][string]$Version)
+    if ([string]::IsNullOrWhiteSpace($env:CARGO_BUILD_JOBS)) {
+        $env:CARGO_BUILD_JOBS = '1'
+        Write-Info 'Using one Cargo build job to keep release compilation within host memory limits.'
+    }
     Invoke-Checked -FilePath $DesktopTauriCli -WorkingDirectory $DesktopDir -ArgumentList @('build', '--config', $ConfigurationPath, '--no-bundle')
     if ($DesktopTarget -in @('Msi', 'All')) {
         Invoke-Checked -FilePath $DesktopTauriCli -WorkingDirectory $DesktopDir -ArgumentList @('bundle', '--config', $ConfigurationPath, '--bundles', 'msi')
