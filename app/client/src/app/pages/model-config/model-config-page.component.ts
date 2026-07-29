@@ -18,6 +18,7 @@ import {
   AccessKeyProvider,
   CloudProvider,
   ModelConfigStateResponse,
+  ModelConfigPersistResponse,
   ModelConfigUpdateRequest,
   RagSettings,
   RuntimeSettings,
@@ -48,6 +49,7 @@ import {
 } from './model-config.types';
 
 const MODEL_BATCH_SIZE = 12;
+type SaveOperation = 'configuration' | 'reasoning' | 'rag';
 
 const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
   openai: 'OpenAI',
@@ -132,7 +134,11 @@ export class ModelConfigPageComponent implements OnInit {
   readonly rerankerProfileOptions = RERANKER_PROFILE_OPTIONS;
 
   readonly isLoading = signal(true);
-  readonly isSaving = signal(false);
+  readonly savingOperations = signal<ReadonlySet<SaveOperation>>(new Set());
+  readonly isSaving = computed(() => this.savingOperations().size > 0);
+  readonly isConfigurationSaving = computed(() => this.savingOperations().has('configuration'));
+  readonly isReasoningSaving = computed(() => this.savingOperations().has('reasoning'));
+  readonly isRagSaving = computed(() => this.savingOperations().has('rag'));
   readonly localModels = signal<ModelConfigStateResponse['local_models']>([]);
   readonly cloudChoices = signal(resolveCloudChoices(undefined));
   readonly cloudProviders = signal<ModelConfigStateResponse['cloud_providers']>([]);
@@ -159,6 +165,11 @@ export class ModelConfigPageComponent implements OnInit {
   readonly draftConfig = signal<DraftRuntimeConfig>(resolveDraftFromSettings(this.appState.state().diliAgent.settings));
   readonly lastUpdatedAt = signal<string | null>(null);
   private reasoningSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly saveRevisions: Record<SaveOperation, number> = {
+    configuration: 0,
+    reasoning: 0,
+    rag: 0,
+  };
 
   @HostListener('document:keydown.escape')
   closeRagSettingsOnEscape(): void {
@@ -265,7 +276,7 @@ export class ModelConfigPageComponent implements OnInit {
   });
 
   readonly ragSettingsSaveDisabled = computed(
-    () => this.isSaving() || this.isLoading() || !!this.ragSettingsValidationMessage(),
+    () => this.isRagSaving() || this.isLoading() || !!this.ragSettingsValidationMessage(),
   );
 
   readonly lastSavedLabel = computed(() => {
@@ -358,7 +369,7 @@ export class ModelConfigPageComponent implements OnInit {
 
     return (
       this.isLoading() ||
-      this.isSaving() ||
+      this.isConfigurationSaving() ||
       !hasPendingChanges ||
       (draft.useCloudServices && !this.draftCloudModel())
     );
@@ -416,17 +427,57 @@ export class ModelConfigPageComponent implements OnInit {
     this.previewReasoningLevel.set(state.settings.reasoning ? 2 : 0);
   }
 
-  async persistConfigPatch(patch: ModelConfigUpdateRequest, successMessage = '', syncDraft = true): Promise<void> {
-    this.isSaving.set(true);
+  async persistConfigPatch(
+    patch: ModelConfigUpdateRequest,
+    successMessage = '',
+    syncDraft = true,
+    operation: SaveOperation = 'configuration',
+  ): Promise<void> {
+    const revision = ++this.saveRevisions[operation];
+    this.savingOperations.update((current) => new Set(current).add(operation));
     try {
       const payload = await updateModelConfigState(patch);
-      this.applyConfigToState(payload, syncDraft);
+      if (revision !== this.saveRevisions[operation]) return;
+      this.applyPersistedConfigToState(payload, patch, syncDraft);
       this.statusMessage.set(successMessage);
     } catch (error) {
       this.statusMessage.set(formatUnknownError(error, 'Unable to save model settings.'));
     } finally {
-      this.isSaving.set(false);
+      if (revision === this.saveRevisions[operation]) {
+        this.savingOperations.update((current) => {
+          const next = new Set(current);
+          next.delete(operation);
+          return next;
+        });
+      }
     }
+  }
+
+  private applyPersistedConfigToState(
+    payload: ModelConfigPersistResponse,
+    patch: ModelConfigUpdateRequest,
+    syncDraft: boolean,
+  ): void {
+    this.lastUpdatedAt.set(payload.updated_at);
+    const current = this.appState.state().diliAgent.settings;
+    const nextSettings: RuntimeSettings = { ...current };
+    if ('use_cloud_services' in patch) nextSettings.useCloudServices = payload.use_cloud_services;
+    if ('llm_provider' in patch) nextSettings.provider = payload.llm_provider;
+    if ('cloud_model' in patch || 'llm_provider' in patch) nextSettings.cloudModel = payload.cloud_model;
+    if ('clinical_model' in patch) nextSettings.clinicalModel = payload.clinical_model || '';
+    if ('text_extraction_model' in patch) nextSettings.textExtractionModel = payload.text_extraction_model || '';
+    if ('ollama_reasoning' in patch) nextSettings.reasoning = payload.ollama_reasoning;
+    this.appState.updateDiliAgent({ settings: nextSettings });
+    if ('rag_settings' in patch) {
+      const nextRagSettings = this.normalizeRagSettings(payload.rag_settings);
+      this.ragSettings.set(nextRagSettings);
+      if (!this.ragSettingsModalOpen()) this.draftRagSettings.set({ ...nextRagSettings });
+    }
+    this.previewCloudModelOverrides.update((previous) => ({
+      ...previous,
+      [nextSettings.provider]: nextSettings.cloudModel || undefined,
+    }));
+    if (syncDraft) this.draftConfig.set(resolveDraftFromSettings(nextSettings));
   }
 
   private normalizeRagSettings(settings: Partial<RagSettings> | null | undefined): DraftRagSettings {
@@ -594,6 +645,7 @@ export class ModelConfigPageComponent implements OnInit {
       { rag_settings: { ...this.draftRagSettings() } },
       'RAG settings saved.',
       false,
+      'rag',
     );
     this.ragSettingsModalOpen.set(false);
   }
@@ -634,7 +686,7 @@ export class ModelConfigPageComponent implements OnInit {
       clearTimeout(this.reasoningSaveTimer);
     }
     this.reasoningSaveTimer = setTimeout(() => {
-      void this.persistConfigPatch({ ollama_reasoning: enabled }, 'Extra parameters saved.', false);
+      void this.persistConfigPatch({ ollama_reasoning: enabled }, 'Extra parameters saved.', false, 'reasoning');
       this.reasoningSaveTimer = null;
     }, 250);
   }

@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Query, Response, status
 
 from domain.model_configs import (
+    ModelConfigPersistResponse,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
     ConnectivityCheckRequest,
@@ -47,7 +48,7 @@ class ModelConfigEndpoint:
     async def update_state(
         self,
         payload: ModelConfigUpdateRequest = Body(...),
-    ) -> ModelConfigStateResponse:
+    ) -> ModelConfigPersistResponse:
         return await self.service.update_state(payload)
 
     # -------------------------------------------------------------------------
@@ -74,7 +75,7 @@ class ModelConfigEndpoint:
             "",
             self.update_state,
             methods=["PUT"],
-            response_model=ModelConfigStateResponse,
+            response_model=ModelConfigPersistResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

@@ -37,9 +37,8 @@ def upsert_application_configuration(
             "updated_at": func.now(),
         },
     )
-    db_session.execute(statement)
-    db_session.flush()
-    row = db_session.get(ApplicationConfiguration, 1)
+    result = db_session.execute(statement.returning(ApplicationConfiguration))
+    row = result.scalar_one_or_none()
     if row is None:
         raise RuntimeError("Application configuration upsert did not return a row")
     return row

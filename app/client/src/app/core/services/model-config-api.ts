@@ -8,6 +8,7 @@ import {
   JobStartResponse,
   JobStatusResponse,
   ModelConfigStateResponse,
+  ModelConfigPersistResponse,
   ModelConfigUpdateRequest,
   OllamaPullJobResult,
 } from "../models/types";
@@ -40,8 +41,8 @@ export async function fetchModelConfigState(
 
 export async function updateModelConfigState(
   payload: ModelConfigUpdateRequest,
-): Promise<ModelConfigStateResponse> {
-  return requestJson<ModelConfigStateResponse>(`${API_BASE_URL}/model-config`, {
+): Promise<ModelConfigPersistResponse> {
+  return requestJson<ModelConfigPersistResponse>(`${API_BASE_URL}/model-config`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",

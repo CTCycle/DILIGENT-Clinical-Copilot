@@ -1,8 +1,11 @@
 # API Surface
-Last updated: 2026-07-22
+Last updated: 2026-07-29
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
-does not expose sampling temperature.
+does not expose sampling temperature. `GET` returns the rich catalog and
+runtime-status view. `PUT` is a persistence-only response containing the
+saved configuration and timestamp; catalog and embedding refreshes remain
+explicit GET/status operations.
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
