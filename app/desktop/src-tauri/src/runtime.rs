@@ -60,7 +60,10 @@ fn safe_member_path(name: &str) -> Result<PathBuf, String> {
 fn sha256_file(path: &Path) -> Result<String, String> {
     let mut file = fs::File::open(path).map_err(|error| error.to_string())?;
     let mut digest = Sha256::new();
-    let mut buffer = [0_u8; 1024 * 1024];
+    // Keep the hashing buffer on the heap. The Windows GUI subsystem uses a
+    // relatively small default thread stack, so a 1 MiB stack array can
+    // overflow before the desktop window is created.
+    let mut buffer = vec![0_u8; 1024 * 1024];
     loop {
         let count = file.read(&mut buffer).map_err(|error| error.to_string())?;
         if count == 0 {
