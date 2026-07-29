@@ -34,7 +34,6 @@ Packaged mode requires `DILIGENT_RUNTIME_ROOT` and `DILIGENT_DATA_ROOT` together
 - `RELOAD=false`
 - `ALWAYS_REBUILD=true` (rebuilds the frontend at application startup when `true`; skips that build when `false`)
 - `BACKEND_LOGS_VISIBLE=true` (defaults to `true` when absent)
-- `OPTIONAL_DEPENDENCIES=true`
 
 ## Operational Settings By Source
 - `settings/.env`
