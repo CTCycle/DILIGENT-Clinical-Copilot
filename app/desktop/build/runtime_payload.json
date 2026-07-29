@@ -17,5 +17,5 @@
     { "source": "settings/configurations.json", "destination": "settings/configurations.json", "required": true }
   ],
   "forbidden_extensions": [".env", ".db", ".log", ".pyc"],
-  "forbidden_directories": [".git", ".github", "assets", "node_modules", ".venv", "runtimes", "releases", "target", "__pycache__", ".pytest_cache", ".angular"]
+  "forbidden_directories": [".git", ".github", "assets", "node_modules", ".venv", "runtimes", "release", "target", "__pycache__", ".pytest_cache", ".angular"]
 }
