@@ -56,6 +56,18 @@ export type ModelConfigStateResponse = {
   updated_at: string | null;
 };
 
+export type ModelConfigPersistResponse = {
+  use_cloud_services: boolean;
+  llm_provider: CloudProvider;
+  cloud_model: string | null;
+  clinical_model: string | null;
+  text_extraction_model: string | null;
+  ollama_reasoning: boolean;
+  ollama_seed: number | null;
+  rag_settings: RagSettings;
+  updated_at: string | null;
+};
+
 export type EmbeddingRuntimeStatus = {
   model_display_name: string;
   model_revision: string;

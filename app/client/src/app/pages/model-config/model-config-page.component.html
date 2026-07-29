@@ -19,7 +19,7 @@
                   aria-label="Local Models (Ollama)"
                   [checked]="!draftConfig().useCloudServices"
                   (change)="handleCloudSwitchChange(false)"
-                  [disabled]="isSaving() || isLoading()"
+                  [disabled]="isConfigurationSaving() || isLoading()"
                 />
                 <svg class="model-config-option-icon" viewBox="0 0 24 24" aria-hidden="true">
                   <rect x="7" y="5.5" width="10" height="13" rx="1.75" />
@@ -40,7 +40,7 @@
                   aria-label="Cloud Models"
                   [checked]="draftConfig().useCloudServices"
                   (change)="handleCloudSwitchChange(true)"
-                  [disabled]="isSaving() || isLoading()"
+                  [disabled]="isConfigurationSaving() || isLoading()"
                 />
                 <svg class="model-config-option-icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M7.25 17.75h9.4a3.85 3.85 0 0 0 .68-7.64 5.56 5.56 0 0 0-10.76 1.54 3.08 3.08 0 0 0 .68 6.1Z" />
@@ -74,7 +74,7 @@
               aria-label="Configure RAG settings"
               title="Configure RAG settings"
               (click)="openRagSettingsPanel()"
-              [disabled]="isSaving() || isLoading()"
+              [disabled]="isRagSaving() || isLoading()"
             >
               Configure
             </button>
@@ -87,13 +87,13 @@
             icon="reasoning"
             [checked]="reasoningEnabled()"
             [reasoningLevel]="reasoningLevel()"
-            [disabled]="isSaving() || isLoading()"
+            [disabled]="isReasoningSaving() || isLoading()"
             [reasoningLayout]="true"
             (reasoningLevelChange)="handleReasoningLevelChange($event)"
           ></app-model-config-toggle-card>
         </section>
 
-        <section class="model-config-catalog-panel" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
+        <section class="model-config-catalog-panel" [class.is-disabled]="isConfigurationSaving() || isLoading()" [attr.aria-disabled]="isConfigurationSaving() || isLoading()">
           <div class="model-config-panel-heading">
             <h2>{{ draftConfig().useCloudServices ? 'Cloud Model Catalog' : 'Local Model Catalog' }}</h2>
           </div>
@@ -116,7 +116,7 @@
                 aria-label="Cloud provider"
                 [ngModel]="draftProvider()"
                 (ngModelChange)="handleProviderChange($event)"
-                [disabled]="isSaving() || isLoading()"
+                [disabled]="isConfigurationSaving() || isLoading()"
               >
                 @for (provider of cloudProviderOptions(); track provider) {
                   <option [value]="provider">{{ resolveProviderLabel(provider) }}</option>
@@ -134,7 +134,7 @@
               aria-label="Refresh model catalog"
               title="Refresh model catalog"
               (click)="loadModelConfig(false, true)"
-              [disabled]="isSaving() || isLoading()"
+              [disabled]="isConfigurationSaving() || isLoading()"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M20 11a8 8 0 0 0-13.8-4.9L4 8.3M4 5v3.3h3.3M4 13a8 8 0 0 0 13.8 4.9L20 15.7M20 19v-3.3h-3.3" />
@@ -256,7 +256,7 @@
                           [attr.aria-label]="'Install ' + model.name"
                           [attr.title]="modelStatus(model) === 'Installed' ? 'Already installed' : 'Install model'"
                           (click)="pullModelByName(model.name)"
-                          [disabled]="isSaving() || isLoading() || appState.state().diliAgent.isPulling || modelStatus(model) === 'Installed'"
+                          [disabled]="isConfigurationSaving() || isLoading() || appState.state().diliAgent.isPulling || modelStatus(model) === 'Installed'"
                         >
                           <span class="model-config-action-label">{{ progressForModel(model.name) ? 'Installing...' : 'Install' }}</span>
                           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>
@@ -265,14 +265,14 @@
                           role="clinical"
                           [modelName]="model.name"
                           [selected]="draftConfig().clinicalModel === model.name"
-                          [disabled]="isSaving() || isLoading() || !isModelRoleSelectable(model)"
+                          [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
                           (roleSelected)="handleRoleSelection($event, model.name)"
                         />
                         <app-model-role-action-button
                           role="text_extraction"
                           [modelName]="model.name"
                           [selected]="draftConfig().textExtractionModel === model.name"
-                          [disabled]="isSaving() || isLoading() || !isModelRoleSelectable(model)"
+                          [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
                           (roleSelected)="handleRoleSelection($event, model.name)"
                         />
                       </div>
@@ -312,14 +312,14 @@
                           role="clinical"
                           [modelName]="modelName"
                           [selected]="draftConfig().clinicalModel === modelName"
-                          [disabled]="isSaving() || isLoading()"
+                          [disabled]="isConfigurationSaving() || isLoading()"
                           (roleSelected)="handleRoleSelection($event, modelName)"
                         />
                         <app-model-role-action-button
                           role="text_extraction"
                           [modelName]="modelName"
                           [selected]="draftConfig().textExtractionModel === modelName"
-                          [disabled]="isSaving() || isLoading()"
+                          [disabled]="isConfigurationSaving() || isLoading()"
                           (roleSelected)="handleRoleSelection($event, modelName)"
                         />
                       </div>
@@ -357,7 +357,7 @@
                   }
                 </span>
               </div>
-              <button type="button" class="model-config-test-btn" (click)="openKeys(provider)" [disabled]="isSaving() || isLoading()">
+              <button type="button" class="model-config-test-btn" (click)="openKeys(provider)" [disabled]="isConfigurationSaving() || isLoading()">
                 Manage keys
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <circle cx="12" cy="12" r="8.25" />
@@ -411,7 +411,7 @@
         <div class="model-config-summary-actions">
           <button class="btn btn-primary model-config-save-btn" type="button" (click)="handleSaveConfiguration()" [disabled]="saveDisabled()">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.75h12.25L19.25 7v12.25H4.75V4.75H5Z" /><path d="M8 4.75v5h7v-5M8 15h8" /></svg>
-            {{ isSaving() ? 'Saving...' : 'Save Configuration' }}
+            {{ isConfigurationSaving() ? 'Saving...' : 'Save Configuration' }}
           </button>
           <small class="model-config-saved-note">Last saved: {{ lastSavedLabel() }}</small>
         </div>
@@ -632,7 +632,7 @@
           <span [class.is-error]="ragSettingsValidationMessage()">{{ ragSettingsValidationMessage() || 'Ready to save.' }}</span>
           <div>
             <button type="button" class="model-config-rag-modal-primary" (click)="saveRagSettings()" [disabled]="ragSettingsSaveDisabled()">
-              {{ isSaving() ? 'Saving...' : 'Save settings' }}
+              {{ isRagSaving() ? 'Saving...' : 'Save settings' }}
             </button>
             <button type="button" class="model-config-rag-modal-secondary" (click)="closeRagSettingsPanel()">Cancel</button>
           </div>
