@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-07-28
+Last updated: 2026-07-29
 
 ## Relational Database
 
@@ -51,8 +51,11 @@ Last updated: 2026-07-28
 
 ## Filesystem Resources
 
-- `app/resources/sources` contains source catalogs, documents, and archives.
-- `app/resources/catalogs` contains JSON seed manifests for database-backed reference catalogs.
+- In development, `app/resources/sources` contains source catalogs, documents, archives, vectors, models, and logs.
+- In packaged desktop mode, immutable catalogs and Angular assets live under the extracted runtime; databases, logs, models, source documents, vectors, exports, state, and access-key material live under `%LOCALAPPDATA%\DILIGENT\data`.
+- `app/resources/catalogs` contains JSON seed manifests for database-backed reference catalogs and is copied to the immutable packaged runtime.
+
+The extracted runtime is versioned and hash-addressed so it can be replaced during upgrades. The persistent data root is intentionally outside the runtime and is not removed by desktop artifact cleanup or MSI uninstall.
 
 ## Access Key Persistence
 
