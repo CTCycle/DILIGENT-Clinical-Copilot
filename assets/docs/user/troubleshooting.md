@@ -1,5 +1,15 @@
 # User Troubleshooting
-Last updated: 2026-07-11
+Last updated: 2026-07-29
+
+## Windows desktop app does not open
+
+- Confirm that you are opening the current `DILIGENT-v<version>-windows-x64-portable.exe` or launching the application installed by the matching MSI.
+- Check **Event Viewer → Windows Logs → Application** for an error naming the portable executable.
+- Inspect `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log` and `state\desktop-backend-ready.json`.
+- If the runtime contains stale `.extract-*` directories, close DILIGENT and remove only those temporary directories under `%LOCALAPPDATA%\DILIGENT\runtime\<version>`, then retry.
+- The portable app uses the system WebView2 runtime. An MSI built with the standard bootstrapper may need network access for WebView2; use an offline-WebView2 MSI when network access is unavailable.
+
+Packaged desktop startup uses a random localhost backend port, so the development ports below are not a packaged health check. Read the port from `desktop-backend-ready.json` and request `/api/health` on that port.
 
 ## Browser Page Does Not Load
 - Check whether the frontend is available at:
