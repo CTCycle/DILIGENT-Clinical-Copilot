@@ -21,6 +21,8 @@ source-controlled automatic generation policy immediately before each LLM call.
 
 Packaged mode requires `DILIGENT_RUNTIME_ROOT` and `DILIGENT_DATA_ROOT` together. Relative or partial desktop roots are rejected; source-mode paths are never used as a fallback.
 
+The Tauri shell sets these desktop-only variables when it starts the frozen backend. Operators should not add them to `settings/.env` or override them manually. Packaged desktop chooses a free localhost port and records it in `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`; the packaged log is `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log`.
+
 ## Default Local Ports
 - Backend: `127.0.0.1:7690`
 - Frontend: `127.0.0.1:9847`
@@ -59,6 +61,11 @@ authentication, and provider-side errors still fail promptly.
 - Local runs serve the frontend from a preview or dev process.
 - `BACKEND_LOGS_VISIBLE=true` opens a dedicated backend terminal; `false` keeps it hidden. The launcher defaults to visible logs when the key is absent.
 - The frontend preview runs without a visible terminal window.
+
+## Packaged Desktop Runtime
+- The packaged Tauri shell does not read the development UI/API port settings for its backend listener.
+- The immutable runtime is addressed by version and payload digest under `%LOCALAPPDATA%\DILIGENT\runtime`.
+- Mutable settings, database, logs, models, vectors, exports, state, and access-key material live under `%LOCALAPPDATA%\DILIGENT\data`.
 
 ## Feature Toggles
 - Cloud-versus-local model usage is runtime-configured through model configuration APIs.

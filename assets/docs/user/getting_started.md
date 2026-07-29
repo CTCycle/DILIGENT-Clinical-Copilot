@@ -1,5 +1,5 @@
 # Getting Started
-Last updated: 2026-07-11
+Last updated: 2026-07-29
 
 ## Purpose
 DILIGENT is a local clinical copilot interface for Drug-Induced Liver Injury review workflows. It helps users enter clinical context, configure model providers, inspect local data, run DILI-oriented analysis, and review saved sessions.
@@ -15,7 +15,9 @@ Use this documentation if you need to:
 - inspect local clinical datasets
 
 ## Before You Begin
-- Install and start the application according to `README.md`.
+- Choose either the Windows desktop package or source/development startup described in `README.md`.
+- For desktop use, open `DILIGENT-v<version>-windows-x64-portable.exe` for no-install operation or install the matching `.msi`. Verify the matching `.sha256` file before distributing an artifact.
+- The portable desktop app does not require Python, Node.js, Rust, npm, uv, or a source checkout. It stores user data under `%LOCALAPPDATA%\DILIGENT\data`.
 - Default local UI URL:
 
 ```text
@@ -57,13 +59,19 @@ Typical journey:
 10. Inspect or update local data resources if needed.
 
 ## Start The Application
+### Packaged Windows desktop
+
+Open the portable EXE, or launch the application installed by the MSI. The Tauri shell verifies and extracts its embedded runtime, starts the packaged backend, waits for health readiness, and then shows the desktop window. Packaged startup does not use the development URLs below.
+
+### Source/development mode
+
 On Windows, open PowerShell in the repository root and run:
 
 ```powershell
 .\start_on_windows.ps1
 ```
 
-Expected result:
+Expected source-mode result:
 - backend process starts
 - frontend process starts
 - browser opens to the DILIGENT UI
@@ -89,3 +97,5 @@ settings/.env
 ```
 
 Confirm backend and frontend host or port values are correct for the local environment. If they change, restart the application so both processes use the same configuration.
+
+For packaged startup failures, inspect `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log` and `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`. See [runtime troubleshooting](../runtime/troubleshooting.md) for extraction, health, and WebView2 checks.
