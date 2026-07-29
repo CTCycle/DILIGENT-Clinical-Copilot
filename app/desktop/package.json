@@ -1,0 +1,11 @@
+{
+  "name": "diligent-desktop-build",
+  "private": true,
+  "version": "3.0.0",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4"
+  }
+}

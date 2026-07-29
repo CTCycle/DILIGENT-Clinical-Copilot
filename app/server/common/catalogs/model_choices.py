@@ -3,14 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from common.paths import RESOURCES_PATH
+from common.paths import CATALOGS_PATH
 from common.utils.catalog_loader import CatalogLoader
 from domain.llm.providers import CloudProviderDefinition
 
 ###############################################################################
 def get_cloud_model_choices() -> dict[str, list[str]]:
     payload = json.loads(
-        (Path(RESOURCES_PATH) / "catalogs" / "cloud_providers.json").read_text(
+        (Path(CATALOGS_PATH) / "cloud_providers.json").read_text(
             encoding="utf-8"
         )
     )
