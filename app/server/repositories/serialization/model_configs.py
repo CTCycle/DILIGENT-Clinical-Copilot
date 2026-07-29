@@ -85,6 +85,7 @@ class ModelConfigSerializer:
     def save_snapshot(
         self,
         *,
+        base_snapshot: ModelConfigSnapshot | None = None,
         clinical_model: str | None | object = UNSET,
         text_extraction_model: str | None | object = UNSET,
         use_cloud_models: bool | object = UNSET,
@@ -94,7 +95,7 @@ class ModelConfigSerializer:
         ollama_seed: int | None | object = UNSET,
         rag_settings: dict[str, object] | object = UNSET,
     ) -> ModelConfigSnapshot:
-        current = asdict(self.load_snapshot())
+        current = asdict(base_snapshot or self.load_snapshot())
         current.pop("updated_at", None)
         updates = {
             "clinical_model": clinical_model,
@@ -116,10 +117,12 @@ class ModelConfigSerializer:
             current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
         )
         current["rag_settings"] = self.migrate_rag_settings(current.get("rag_settings"))
-        self.application_configuration.save(
-            current, schema_version=self.MODEL_CONFIG_PAYLOAD_SCHEMA_VERSION
+        saved_payload, updated_at = self.application_configuration.save(
+            current,
+            schema_version=self.MODEL_CONFIG_PAYLOAD_SCHEMA_VERSION,
+            return_metadata=True,
         )
-        return self.load_snapshot()
+        return self.snapshot_from_payload(saved_payload, updated_at=updated_at)
 
     # -------------------------------------------------------------------------
     @classmethod

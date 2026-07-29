@@ -77,6 +77,20 @@ class ModelConfigStateResponse(BaseModel):
     updated_at: datetime | None = None
 
 ###############################################################################
+class ModelConfigPersistResponse(BaseModel):
+    """Configuration values returned after a persistence-only update."""
+
+    use_cloud_services: bool
+    llm_provider: CloudProviderId
+    cloud_model: str | None
+    text_extraction_model: str | None
+    clinical_model: str | None
+    ollama_reasoning: bool
+    ollama_seed: int | None
+    rag_settings: dict[str, object]
+    updated_at: datetime | None = None
+
+###############################################################################
 class EmbeddingStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

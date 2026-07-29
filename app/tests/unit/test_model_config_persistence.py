@@ -34,7 +34,8 @@ class InMemorySerializer:
 
     # -------------------------------------------------------------------------
     def save_snapshot(self, **updates: Any) -> ModelConfigSnapshot:
-        data = self.snapshot.__dict__.copy()
+        base_snapshot = updates.pop("base_snapshot", None)
+        data = (base_snapshot or self.snapshot).__dict__.copy()
         data.update(updates)
         self.snapshot = ModelConfigSnapshot(**data)
         return self.snapshot
@@ -352,8 +353,119 @@ def test_model_config_cloud_save_does_not_refresh_remote_catalogs_or_ollama(
     )
 
     assert response.llm_provider == "openai"
-    openai = next(provider for provider in response.cloud_providers if provider.id == "openai")
-    assert [model.id for model in openai.models] == ["gpt-4.1-mini"]
+    assert response.cloud_model == "gpt-4.1-mini"
+    assert not hasattr(response, "cloud_providers")
+
+###############################################################################
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"ollama_reasoning": True},
+        {"rag_settings": {"use_hybrid_search": False}},
+    ],
+)
+def test_local_option_saves_do_not_probe_ollama(
+    monkeypatch, patch: dict[str, object]
+) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="qwen3.5:2b",
+            text_extraction_model="qwen3.5:2b",
+            use_cloud_models=False,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            rag_settings={"use_hybrid_search": True},
+            updated_at=datetime.now(),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+
+    async def unexpected_probe() -> set[str]:
+        raise AssertionError("option persistence must not probe Ollama")
+
+    monkeypatch.setattr(service, "list_available_ollama_models", unexpected_probe)
+
+    response = asyncio.run(
+        service.update_state(ModelConfigUpdateRequest.model_validate(patch))
+    )
+
+    assert response.updated_at is not None
+
+###############################################################################
+def test_local_model_save_reuses_cached_availability(monkeypatch) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="gpt-4.1-mini",
+            text_extraction_model="gpt-4.1-mini",
+            use_cloud_models=True,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            updated_at=datetime.now(),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+    service._available_local_models = {"qwen3.5:2b"}
+
+    class UnexpectedOllamaClient:
+        async def __aenter__(self):
+            raise AssertionError("cached availability must avoid Ollama")
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(model_config_module, "OllamaClient", UnexpectedOllamaClient)
+    response = asyncio.run(
+        service.update_state(
+            ModelConfigUpdateRequest(
+                use_cloud_services=False,
+                clinical_model="qwen3.5:2b",
+                text_extraction_model="qwen3.5:2b",
+            )
+        )
+    )
+
+    assert response.use_cloud_services is False
+    assert serializer.snapshot.clinical_model == "qwen3.5:2b"
+
+###############################################################################
+def test_cold_local_model_save_lists_ollama_once(monkeypatch) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="gpt-4.1-mini",
+            text_extraction_model="gpt-4.1-mini",
+            use_cloud_models=True,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            updated_at=datetime.now(),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+    calls = 0
+
+    class FakeOllamaClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def list_models(self):
+            nonlocal calls
+            calls += 1
+            return ["qwen3.5:2b"]
+
+    monkeypatch.setattr(model_config_module, "OllamaClient", FakeOllamaClient)
+    asyncio.run(
+        service.update_state(
+            ModelConfigUpdateRequest(
+                use_cloud_services=False,
+                clinical_model="qwen3.5:2b",
+                text_extraction_model="qwen3.5:2b",
+            )
+        )
+    )
+
+    assert calls == 1
 
 ###############################################################################
 def test_model_config_service_rejects_stale_local_roles_in_cloud_mode() -> None:

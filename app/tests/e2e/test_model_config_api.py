@@ -36,3 +36,20 @@ def test_model_config_put_rejects_removed_temperature_field(
     assert any("cloud_temperature" in str(item.get("loc", [])) for item in detail)
 
 ###############################################################################
+def test_model_config_put_returns_persisted_values_without_catalog_refresh(
+    api_context: APIRequestContext,
+):
+    response = api_context.put(
+        "/api/model-config",
+        data={"ollama_reasoning": True},
+    )
+    assert response.status == 200
+    payload = response.json()
+    assert payload["ollama_reasoning"] is True
+    assert "updated_at" in payload
+    assert "local_models" not in payload
+    assert "cloud_providers" not in payload
+    assert "embedding_runtime" not in payload
+    assert "embedding_index" not in payload
+
+###############################################################################

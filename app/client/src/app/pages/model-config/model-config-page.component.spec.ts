@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelConfigPageComponent } from './model-config-page.component';
+import { ModelConfigPersistResponse } from '../../core/models/types';
 
 describe('ModelConfigPageComponent', () => {
   let fixture: ComponentFixture<ModelConfigPageComponent>;
@@ -79,5 +80,42 @@ describe('ModelConfigPageComponent', () => {
     expect(component.draftConfig().clinicalModel).toBe('');
     expect(component.draftConfig().textExtractionModel).toBe('');
     expect(component.modelSearchQuery()).toBe('');
+  });
+
+  it('applies a persistence response without replacing catalog state', () => {
+    const localCatalog = [{
+      name: 'qwen3.5:2b',
+      family: 'qwen',
+      description: 'local',
+      available_in_ollama: true,
+      recommended_for_local_extraction: true,
+      recommended_rank: 0,
+    }];
+    const cloudCatalog = component.cloudProviders();
+    component.localModels.set(localCatalog);
+    component.cloudProviders.set(cloudCatalog);
+    const payload: ModelConfigPersistResponse = {
+      use_cloud_services: false,
+      llm_provider: 'openai',
+      cloud_model: null,
+      clinical_model: 'qwen3.5:2b',
+      text_extraction_model: 'qwen3.5:2b',
+      ollama_reasoning: true,
+      ollama_seed: 42,
+      rag_settings: component.ragSettings(),
+      updated_at: new Date().toISOString(),
+    };
+    const apply = (component as unknown as {
+      applyPersistedConfigToState(
+        response: ModelConfigPersistResponse,
+        patch: { clinical_model: string },
+        syncDraft: boolean,
+      ): void;
+    }).applyPersistedConfigToState.bind(component);
+
+    apply(payload, { clinical_model: 'qwen3.5:2b' }, true);
+
+    expect(component.localModels()).toBe(localCatalog);
+    expect(component.cloudProviders()).toBe(cloudCatalog);
   });
 });

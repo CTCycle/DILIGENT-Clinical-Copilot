@@ -23,9 +23,16 @@ def _runtime_rag_settings() -> dict[str, object]:
 ###############################################################################
 def build_effective_rag_settings(
     overrides: dict[str, object] | None = None,
+    *,
+    persisted_settings: dict[str, object] | None = None,
 ) -> RagSettings:
     base = get_server_settings().rag
-    data = {**_runtime_rag_settings(), **dict(overrides or {})}
+    persisted = (
+        dict(persisted_settings)
+        if persisted_settings is not None
+        else _runtime_rag_settings()
+    )
+    data = {**persisted, **dict(overrides or {})}
 
     selected_count = coerce_positive_int(
         data.get("retrieval_selected_count"), base.retrieval_selected_count
