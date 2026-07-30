@@ -1,5 +1,5 @@
 # DILIGENT Clinical Copilot
-Last updated: 2026-07-29
+Last updated: 2026-07-30
 
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-Polyform%20Noncommercial%201.0.0-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
@@ -111,7 +111,7 @@ If you change ports or related runtime settings, update `settings/.env` and rest
 
 ## Configure models and access keys
 
-Open **Model Configurations** from the sidebar before starting an assessment.
+Open **Configurations** from the sidebar before starting an assessment.
 
 1. Choose whether the assessment will use a local or cloud provider.
 2. Choose compatible models for the clinical and text-extraction roles.
@@ -122,6 +122,9 @@ Open **Model Configurations** from the sidebar before starting an assessment.
 For local use, DILIGENT works with chat-capable Ollama models. Ollama must expose `/api/chat`; older `/api/generate` fallback behaviour is not supported. For cloud use, the active provider key is used to load its model catalog. The interface displays key fingerprints and metadata rather than the secret after it is saved.
 
 Changing between local and cloud modes requires compatible model roles. The application rejects a configuration that persists cloud-only models under local mode, preventing the model-role mismatch that would otherwise fail later during report generation.
+
+![Configurations](assets/figures/models-configuration.png)
+_Configurations brings runtime selection, RAG settings, model catalogs, and provider keys into one workspace._
 
 ## Run a DILI assessment
 
