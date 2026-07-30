@@ -13,10 +13,10 @@ struct BackendState(Mutex<Option<backend::BackendProcess>>);
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            let version = env!("CARGO_PKG_VERSION");
-            let paths = runtime::prepare_runtime(version).map_err(std::io::Error::other)?;
+            let version = app.package_info().version.to_string();
+            let paths = runtime::prepare_runtime(&version).map_err(std::io::Error::other)?;
             let process =
-                backend::BackendProcess::start(&paths, version).map_err(std::io::Error::other)?;
+                backend::BackendProcess::start(&paths, &version).map_err(std::io::Error::other)?;
             let base_url = process.base_url().to_owned();
             app.manage(BackendState(Mutex::new(Some(process))));
             let window =
