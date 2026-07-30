@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Query, Response, status
+from fastapi import APIRouter, Body, Path, Response, status
 
 from domain.model_configs import (
     ModelConfigPersistResponse,
+    ModelCatalogOperationResponse,
+    CatalogProviderId,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
     ConnectivityCheckRequest,
@@ -33,16 +35,13 @@ class ModelConfigEndpoint:
     async def get_state(
         self,
         response: Response,
-        include_local_availability: Annotated[bool | None, Query()] = None,
     ) -> ModelConfigStateResponse:
         response.headers["Cache-Control"] = (
             "no-store, no-cache, max-age=0, must-revalidate"
         )
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
-        return await self.service.get_state(
-            include_local_availability=include_local_availability,
-        )
+        return await self.service.get_state()
 
     # -------------------------------------------------------------------------
     async def update_state(
@@ -50,6 +49,20 @@ class ModelConfigEndpoint:
         payload: ModelConfigUpdateRequest = Body(...),
     ) -> ModelConfigPersistResponse:
         return await self.service.update_state(payload)
+
+    # -------------------------------------------------------------------------
+    async def load_catalog(
+        self,
+        provider: Annotated[CatalogProviderId, Path()],
+    ) -> ModelCatalogOperationResponse:
+        return await self.service.load_catalog(provider)
+
+    # -------------------------------------------------------------------------
+    async def refresh_catalog(
+        self,
+        provider: Annotated[CatalogProviderId, Path()],
+    ) -> ModelCatalogOperationResponse:
+        return await self.service.load_catalog(provider, force_refresh=True)
 
     # -------------------------------------------------------------------------
     async def check_connectivity(
@@ -69,6 +82,20 @@ class ModelConfigEndpoint:
             self.get_state,
             methods=["GET"],
             response_model=ModelConfigStateResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/catalogs/{provider}/load",
+            self.load_catalog,
+            methods=["POST"],
+            response_model=ModelCatalogOperationResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/catalogs/{provider}/refresh",
+            self.refresh_catalog,
+            methods=["POST"],
+            response_model=ModelCatalogOperationResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

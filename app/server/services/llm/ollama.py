@@ -25,6 +25,7 @@ from services.llm.ollama_client import (
     OllamaError,
     OllamaTimeout,
 )
+from services.llm.model_config import ModelConfigService
 from services.runtime.jobs import (
     JobManager,
 )
@@ -178,6 +179,15 @@ async def pull_model_async(
                 )
             else:
                 await client.pull(name, stream=stream)
+
+        catalog_service = ModelConfigService()
+        catalog_service.catalog_cache.merge_model(
+            provider_id="ollama",
+            configuration_fingerprint=catalog_service.catalog_configuration_fingerprint(
+                "ollama"
+            ),
+            model={"id": name, "display_name": name},
+        )
 
         if job_id is not None:
             jobs.update_progress(job_id, 100.0)

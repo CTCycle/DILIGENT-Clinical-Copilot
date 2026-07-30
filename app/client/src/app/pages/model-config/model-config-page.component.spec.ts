@@ -118,4 +118,38 @@ describe('ModelConfigPageComponent', () => {
     expect(component.localModels()).toBe(localCatalog);
     expect(component.cloudProviders()).toBe(cloudCatalog);
   });
+
+  it('coalesces refresh clicks and preserves the refresh error state', async () => {
+    component.draftConfig.set({
+      useCloudServices: true,
+      provider: 'openai',
+      cloudModel: 'gpt-4.1-mini',
+      clinicalModel: 'gpt-4.1-mini',
+      textExtractionModel: 'gpt-4.1-mini',
+    });
+    vi.spyOn(component as unknown as { applyConfigToState: (...args: unknown[]) => void }, 'applyConfigToState')
+      .mockImplementation(() => undefined);
+    let resolveRefresh!: (value: Response) => void;
+    const refreshPromise = new Promise<Response>((resolve) => { resolveRefresh = resolve; });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockReturnValue(refreshPromise as never);
+
+    const first = component.refreshSelectedCatalog();
+    await Promise.resolve();
+    const second = component.refreshSelectedCatalog();
+
+    expect(component.catalogProviderInFlight()).toBe('openai');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    resolveRefresh(new Response(JSON.stringify({
+      outcome: 'failed',
+      catalog_provider: 'openai',
+      error: 'Provider unavailable',
+      state: {},
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    await Promise.all([first, second]);
+    fetchSpy.mockRestore();
+
+    expect(component.catalogProviderInFlight()).toBeNull();
+    expect(component.statusMessage()).toContain('Provider unavailable');
+  });
 });

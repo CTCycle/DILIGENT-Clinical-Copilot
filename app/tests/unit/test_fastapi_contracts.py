@@ -78,6 +78,14 @@ def test_clean_break_routes_are_canonical() -> None:
     assert "/api/inspection/sessions/{session_id}/timeline" not in paths
 
 ###############################################################################
+def test_model_catalog_routes_are_explicit_and_provider_scoped() -> None:
+    paths = app.openapi()["paths"]
+    assert "/api/model-config/catalogs/{provider}/load" in paths
+    assert "/api/model-config/catalogs/{provider}/refresh" in paths
+    get_parameters = paths["/api/model-config"]["get"].get("parameters", [])
+    assert not any(item.get("name") == "include_local_availability" for item in get_parameters)
+
+###############################################################################
 def test_openrouter_is_not_supported_provider() -> None:
     assert "openrouter" not in get_args(ProviderName)
 
