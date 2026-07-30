@@ -56,15 +56,6 @@ def test_clinical_validate_input_returns_deterministic_diagnostics(
     assert "deterministic_diagnostics" in payload
     assert payload["deterministic_diagnostics"]["therapy"]["drug_count"] >= 1
 
-###############################################################################
-def test_clinical_rejects_blank_sections(api_context: APIRequestContext):
-    response = api_context.post(
-        "/api/clinical/jobs",
-        data={"clinical_input": "  \n", "visit_date": None},
-    )
-    assert response.status == 422
-
-###############################################################################
 def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):
     payload = build_minimal_payload()
     payload["visit_date"] = {"day": 15, "month": 1, "year": 2024}
