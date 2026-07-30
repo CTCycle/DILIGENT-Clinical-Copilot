@@ -41,7 +41,6 @@ def test_runtime_snapshot_values_and_metadata() -> None:
         == "token"
     )
 
-
 ###############################################################################
 def test_catalog_provider_registration_is_explicit_and_isolated() -> None:
     get_catalog_provider.cache_clear()

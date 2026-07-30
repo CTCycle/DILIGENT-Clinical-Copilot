@@ -30,7 +30,6 @@ from repositories.schemas.clinical import (
 from repositories.serialization import session_result_data
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
-
 ###############################################################################
 def _build_search_pattern(value: str | None) -> str | None:
     normalized = repository_values.normalize_string(value)
@@ -38,7 +37,6 @@ def _build_search_pattern(value: str | None) -> str | None:
         return None
     escaped = re.sub(r"([%_\\])", r"\\\1", normalized.casefold())
     return f"%{escaped}%"
-
 
 ###############################################################################
 class ClinicalSessionRepository:
