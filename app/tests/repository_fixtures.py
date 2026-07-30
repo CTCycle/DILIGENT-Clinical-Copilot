@@ -22,7 +22,6 @@ class RepositoryGraph:
     session_timeline_repository: SessionTimelineRepository
     session_revision_repository: SessionRevisionRepository
 
-
 ###############################################################################
 def build_repository_graph(
     *, engine: Engine | None = None, session_factory: sessionmaker | None = None

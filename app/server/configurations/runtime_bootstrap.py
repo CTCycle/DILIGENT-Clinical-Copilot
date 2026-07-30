@@ -7,6 +7,7 @@ from pathlib import Path
 from common.runtime_layout import resolve_runtime_layout
 
 
+###############################################################################
 def copy_initial_file_if_missing(source: Path, destination: Path) -> bool:
     """Atomically seed one persistent file without overwriting user data."""
     if destination.exists():
@@ -23,6 +24,7 @@ def copy_initial_file_if_missing(source: Path, destination: Path) -> bool:
     return True
 
 
+###############################################################################
 def create_mutable_resource_directories() -> None:
     layout = resolve_runtime_layout()
     mutable_root = layout.mutable_resources_root
@@ -38,6 +40,7 @@ def create_mutable_resource_directories() -> None:
         (mutable_root / relative_path).mkdir(parents=True, exist_ok=True)
 
 
+###############################################################################
 def ensure_runtime_data_layout() -> None:
     layout = resolve_runtime_layout()
     if not layout.packaged:

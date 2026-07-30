@@ -14,6 +14,7 @@ import uvicorn
 _VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
 
 
+###############################################################################
 def _absolute_environment_path(name: str) -> Path:
     value = os.getenv(name, "").strip()
     if not value:
@@ -24,6 +25,7 @@ def _absolute_environment_path(name: str) -> Path:
     return path.resolve()
 
 
+###############################################################################
 def _validate_desktop_environment() -> str:
     _absolute_environment_path("DILIGENT_RUNTIME_ROOT")
     _absolute_environment_path("DILIGENT_DATA_ROOT")
@@ -33,6 +35,7 @@ def _validate_desktop_environment() -> str:
     return version
 
 
+###############################################################################
 def _write_ready_file(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
@@ -43,6 +46,7 @@ def _write_ready_file(path: Path, payload: dict[str, Any]) -> None:
         temporary.unlink(missing_ok=True)
 
 
+###############################################################################
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="DILIGENT packaged backend")
     parser.add_argument("--ready-file", type=Path, required=True)
@@ -50,6 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+###############################################################################
 def run_desktop_backend(*, ready_file: Path, host: str = "127.0.0.1") -> None:
     if host != "127.0.0.1":
         raise ValueError("Desktop backend host must be 127.0.0.1")
@@ -86,6 +91,7 @@ def run_desktop_backend(*, ready_file: Path, host: str = "127.0.0.1") -> None:
         server_socket.close()
 
 
+###############################################################################
 def main() -> None:
     arguments = build_parser().parse_args()
     run_desktop_backend(ready_file=arguments.ready_file, host=arguments.host)

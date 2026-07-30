@@ -346,16 +346,13 @@ class EmbeddingRuntime:
             result.append(vector)
         return result
 
-
 ###############################################################################
 def _default_snapshot_downloader(**kwargs: object) -> str:
     return str(cast(Any, snapshot_download)(**kwargs))
 
-
 ###############################################################################
 def _default_tokenizer_factory(path: str) -> Any:
     return Tokenizer.from_file(path)
-
 
 ###############################################################################
 def _default_session_factory(path: str, **kwargs: object) -> Any:

@@ -8,7 +8,6 @@ from domain.timeline_dates import timeline_date_sort_key
 from repositories.schemas.clinical import ClinicalSessionTimeline
 from repositories.values import normalize_string
 
-
 ###############################################################################
 def parse_timeline_payload(payload_json: str | None) -> dict[str, Any] | None:
     normalized_payload = normalize_string(payload_json)
@@ -19,7 +18,6 @@ def parse_timeline_payload(payload_json: str | None) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return payload if isinstance(payload, dict) else None
-
 
 ###############################################################################
 def serialize_timeline_payload(payload: Any) -> str | None:
@@ -32,7 +30,6 @@ def serialize_timeline_payload(payload: Any) -> str | None:
     except (TypeError, ValueError):
         return normalize_string(payload)
 
-
 ###############################################################################
 def validate_timeline_payload(payload: dict[str, Any] | None) -> PatientTimeline | None:
     if not isinstance(payload, dict):
@@ -41,7 +38,6 @@ def validate_timeline_payload(payload: dict[str, Any] | None) -> PatientTimeline
         return PatientTimeline.model_validate(payload)
     except Exception:
         return None
-
 
 ###############################################################################
 def build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
@@ -71,7 +67,6 @@ def build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
         ),
         undated_event_count=sum(1 for event in payload.events if not event.event_date),
     ).model_dump(mode="json")
-
 
 ###############################################################################
 def timeline_from_row(

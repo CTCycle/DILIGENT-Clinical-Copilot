@@ -40,7 +40,6 @@ class _CatalogProvider:
         if self._invalidate is not None:
             self._invalidate()
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def get_catalog_provider() -> _CatalogProvider:

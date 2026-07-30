@@ -45,6 +45,7 @@ class ApplicationConfigurationSerializer:
         return_metadata: Literal[False] = False,
     ) -> dict[str, Any]: ...
 
+    # -------------------------------------------------------------------------
     @overload
     def save(
         self,
@@ -54,6 +55,7 @@ class ApplicationConfigurationSerializer:
         return_metadata: Literal[True],
     ) -> tuple[dict[str, Any], Any]: ...
 
+    # -------------------------------------------------------------------------
     def save(
         self,
         payload: dict[str, Any],

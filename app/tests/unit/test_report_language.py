@@ -51,7 +51,6 @@ def test_rucam_summary_text_returns_localized_or_safe_text() -> None:
 def test_unsupported_language_code_resolves_to_english() -> None:
     assert resolve_report_language("xx") == "en"
 
-
 ###############################################################################
 def test_portuguese_is_renderable_but_not_deterministically_detectable() -> None:
     assert resolve_supported_language_code("pt-BR") == "pt"
