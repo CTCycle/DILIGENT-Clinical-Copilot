@@ -1,11 +1,12 @@
 # System Overview
-Last updated: 2026-07-14
+Last updated: 2026-07-29
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
 - FastAPI backend in `app/server`
 - Angular standalone frontend in `app/client`
 - PowerShell launcher and maintenance menu in `start_on_windows.ps1`
+- Isolated Windows desktop release project under `app/desktop`
 
 Primary flow:
 1. The user submits clinical data in the Angular UI.
@@ -61,6 +62,9 @@ Maintained source-level structure, with build and cache artifacts omitted:
 |       |-- conftest.py
 |       |-- unit/
 |       `-- e2e/
+|-- app/desktop/
+|   |-- build/                 # runtime payload and PyInstaller inputs
+|   `-- src-tauri/             # Tauri shell, backend lifecycle, and extraction
 `-- assets/docs/
     `-- project_index.md
 ```
@@ -74,4 +78,11 @@ Maintained source-level structure, with build and cache artifacts omitted:
   - Current routes: `/`, `/clinical-sessions`, `/data`, `/model-config`, `/sessions/:sessionId/timetable`.
 - Windows launcher and maintenance entry point: `start_on_windows.ps1`.
 
-Backend ownership is explicit: API endpoints call services, services orchestrate domain contracts, and repositories own persistence. The local database is recreated with `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs` when a clean schema cutover is required.
+### Runtime entry points
+
+- Development: `start_on_windows.ps1` starts Uvicorn and the Angular preview server on the configured development ports.
+- Packaged desktop: the Tauri shell in `app/desktop/src-tauri` extracts a verified runtime, starts `DILIGENTBackend.exe` on a random localhost port, and loads the Angular build served by FastAPI. Node.js is not part of the packaged runtime.
+
+The release pipeline produces a no-install portable EXE, an MSI, and a SHA-256 manifest. The EXE and MSI share the same embedded deterministic runtime archive; the shell keeps mutable user data outside that archive under `%LOCALAPPDATA%\DILIGENT\data`.
+
+Backend ownership is explicit: API endpoints call services, services orchestrate domain contracts, and focused repositories own persistence. Repository helpers are pure serializers and value converters, while the deterministic `ExposureTimelineService` and explicitly injected Hepatox subservices remain independent of the HTTP layer. The local database is recreated with `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs` when a clean schema cutover is required.

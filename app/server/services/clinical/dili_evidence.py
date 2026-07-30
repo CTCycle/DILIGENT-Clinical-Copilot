@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 
 from domain.clinical.dili import (
@@ -25,6 +26,132 @@ from services.text.normalization import normalize_drug_query_name
 
 ###############################################################################
 class DiliEvidenceBuilder:
+
+    _COMPETING_CAUSES_EXCLUDED_PHRASES = (
+        "no competing causes",
+        "competing causes have been excluded",
+        "competing causes were excluded",
+        "competing causes have been effectively excluded",
+        "competing causes were effectively excluded",
+        "all competing causes were excluded",
+        "alternative causes have been excluded",
+        "alternative causes were excluded",
+        "viral hepatitis ruled out",
+        "viral hepatitis was ruled out",
+    )
+    _HYS_LAW_ASSERTION_PHRASES = (
+        "hy's law pattern",
+        "meets hy's law",
+        "meets the criteria for hy's law",
+        "hy's law criteria are met",
+    )
+    _DEFINITIVE_CAUSALITY_PHRASES = (
+        "definitively caused",
+        "causal relationship is certain",
+        "absolutely contraindicated",
+        "contraindicated for life",
+        "lifelong avoidance",
+        "strict lifelong",
+    )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def audit_generated_narrative(
+        cls,
+        *,
+        clinical_narrative: str | None,
+        bundle: DiliEvidenceBundle,
+    ) -> list[dict[str, str]]:
+        """Return blocking issues for prose that contradicts structured evidence."""
+
+        text = re.sub(r"\s+", " ", str(clinical_narrative or "")).strip().casefold()
+        text = text.replace("’", "'").replace("‘", "'")
+        if not text:
+            return []
+
+        issues: list[dict[str, str]] = []
+        if (
+            not bundle.differential.all_major_causes_excluded
+            and cls._contains_any(text, cls._COMPETING_CAUSES_EXCLUDED_PHRASES)
+        ):
+            issues.append(
+                {
+                    "code": "clinical_narrative_contradicts_competing_causes",
+                    "message": (
+                        "Generated narrative states that competing causes were excluded "
+                        "although the structured DILI differential remains unresolved."
+                    ),
+                }
+            )
+
+        if (
+            bundle.hys_law.status != "meets_criteria"
+            and cls._contains_any(text, cls._HYS_LAW_ASSERTION_PHRASES)
+        ):
+            issues.append(
+                {
+                    "code": "clinical_narrative_overstates_hys_law",
+                    "message": (
+                        "Generated narrative asserts a Hy's Law pattern although the "
+                        f"structured status is {bundle.hys_law.status}."
+                    ),
+                }
+            )
+
+        causality_is_limited = any(
+            exposure.causality is None
+            or exposure.causality.category in {"possible", "unlikely", "unassessable"}
+            or exposure.rucam is None
+            or exposure.rucam.total_score is None
+            for exposure in bundle.exposures
+        )
+        if causality_is_limited and cls._contains_unsupported_definitive_language(text):
+            issues.append(
+                {
+                    "code": "clinical_narrative_overstates_causality",
+                    "message": (
+                        "Generated narrative uses definitive diagnosis or absolute "
+                        "avoidance language while structured causality remains limited."
+                    ),
+                }
+            )
+
+        if (
+            causality_is_limited
+            and re.search(r"\bthis patient\b.{0,100}\blikelihood score\s+[a-e]\b", text)
+        ):
+            issues.append(
+                {
+                    "code": "clinical_narrative_conflates_livertox_likelihood",
+                    "message": (
+                        "Generated narrative applies a drug-level LiverTox likelihood "
+                        "grade as if it were patient-level causality."
+                    ),
+                }
+            )
+
+        return issues
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _contains_any(text: str, phrases: Sequence[str]) -> bool:
+        return any(phrase in text for phrase in phrases)
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _contains_unsupported_definitive_language(cls, text: str) -> bool:
+        if cls._contains_any(text, cls._DEFINITIVE_CAUSALITY_PHRASES):
+            return True
+        for match in re.finditer(r"\b(?:confident|definitive) diagnosis\b", text):
+            preceding_text = text[max(0, match.start() - 80) : match.start()]
+            following_text = text[match.end() : match.end() + 80]
+            if re.search(
+                r"\b(?:not|cannot|can't|no|without|unable|uncertain|unassessable)\b",
+                f"{preceding_text} {following_text}",
+            ):
+                continue
+            return True
+        return False
 
     # -------------------------------------------------------------------------
     def build(

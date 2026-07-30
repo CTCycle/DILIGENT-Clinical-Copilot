@@ -11,7 +11,7 @@ from sqlalchemy import create_engine
 
 from domain.inspection import RevisionIssueScanResult, SessionRevisionRequest
 from repositories.schemas.base import Base
-from repositories.serialization.data import DataSerializer
+from repository_fixtures import build_repository_graph
 from services.inspection.revision_agent import (
     RevisionAgentRunner,
     build_revision_agent_user_prompt,
@@ -21,16 +21,16 @@ from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
 
 ###############################################################################
-def build_file_serializer(tmp_path: Path) -> DataSerializer:
+def build_file_serializer(tmp_path: Path) -> Any:
     engine = create_engine(
         f"sqlite+pysqlite:///{tmp_path / 'revision.db'}", future=True
     )
     Base.metadata.create_all(engine)
-    return DataSerializer(engine=engine)
+    return build_repository_graph(engine=engine)
 
 ###############################################################################
-def save_revision_source_session(serializer: DataSerializer) -> int:
-    session_id = serializer.save_clinical_session(
+def save_revision_source_session(serializer: Any) -> int:
+    session_id = serializer.clinical_session_repository.save_clinical_session(
         {
             "patient_name": "Revision Patient",
             "session_timestamp": datetime(2026, 1, 15, 10, 0),
@@ -51,6 +51,32 @@ def save_revision_source_session(serializer: DataSerializer) -> int:
     )
     assert session_id is not None
     return int(session_id)
+
+###############################################################################
+def build_service(serializer: Any, jobs: JobManager) -> DataInspectionService:
+    graph = build_repository_graph(
+        engine=serializer.context.engine, session_factory=serializer.context.session_factory
+    )
+    return DataInspectionService(
+        clinical_session_repository=graph.clinical_session_repository,
+        drug_catalog_repository=graph.drug_catalog_repository,
+        knowledge_repository=graph.knowledge_repository,
+        session_timeline_repository=graph.session_timeline_repository,
+        session_revision_repository=graph.session_revision_repository,
+        jobs=jobs,
+    )
+
+###############################################################################
+def build_runner(serializer: Any, **kwargs: Any) -> RevisionAgentRunner:
+    graph = build_repository_graph(
+        engine=serializer.context.engine, session_factory=serializer.context.session_factory
+    )
+    return RevisionAgentRunner(
+        clinical_session_repository=graph.clinical_session_repository,
+        session_revision_repository=graph.session_revision_repository,
+        knowledge_repository=graph.knowledge_repository,
+        **kwargs,
+    )
 
 ###############################################################################
 def fake_issue_scan_call(**kwargs: Any) -> dict[str, Any]:
@@ -146,9 +172,9 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
     jobs = JobManager()
-    service = DataInspectionService(serializer=serializer, jobs=jobs)
-    service.revision_agent_runner = RevisionAgentRunner(
-        serializer=serializer,
+    service = build_service(serializer, jobs)
+    service.revision_agent_runner = build_runner(
+        serializer,
         structured_call=fake_issue_scan_call,
     )
 
@@ -195,7 +221,6 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
         "revision_agent_qa",
     }
 
-
 ###############################################################################
 def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -221,9 +246,9 @@ def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> 
             "task_complete": True,
         }
 
-    service = DataInspectionService(serializer=serializer, jobs=JobManager())
-    service.revision_agent_runner = RevisionAgentRunner(
-        serializer=serializer,
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = build_runner(
+        serializer,
         structured_call=structured_call,
     )
 
@@ -243,13 +268,12 @@ def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> 
         "invalid_tool_input": True,
     }
 
-
 ###############################################################################
 def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
 
-    serializer.update_current_report_text_with_manual_audit(
+    serializer.session_revision_repository.update_current_report_text_with_manual_audit(
         session_id,
         report_text="Manually corrected DILI report.",
         edited_fields=["report_text"],
@@ -258,15 +282,15 @@ def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
         metadata={},
     )
 
-    version = serializer.get_version_record_for_session(session_id)
+    version = serializer.session_revision_repository.get_version_record_for_session(session_id)
 
     assert version is not None
     assert version["version_number"] == 2
     assert version["revision_kind"] == "manual_edit"
 
-    service = DataInspectionService(serializer=serializer, jobs=JobManager())
-    service.revision_agent_runner = RevisionAgentRunner(
-        serializer=serializer,
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = build_runner(
+        serializer,
         structured_call=fake_issue_scan_call,
     )
 
@@ -274,26 +298,25 @@ def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
 
     assert started["job_type"] == service.REVISION_JOB_TYPE
 
-
 ###############################################################################
 def test_manual_edit_skips_orphaned_revision_version_numbers(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
 
-    serializer.create_revision_version_shell(
+    serializer.session_revision_repository.create_revision_version_shell(
         session_id,
         reviewer_note="First failed revision.",
         configuration={"model": "deepseek-v4-flash"},
         pipeline_run_id="failed-revision-1",
     )
-    serializer.create_revision_version_shell(
+    serializer.session_revision_repository.create_revision_version_shell(
         session_id,
         reviewer_note="Second failed revision.",
         configuration={"model": "deepseek-v4-flash"},
         pipeline_run_id="failed-revision-2",
     )
 
-    serializer.update_current_report_text_with_manual_audit(
+    serializer.session_revision_repository.update_current_report_text_with_manual_audit(
         session_id,
         report_text="Manually corrected after failed revisions.",
         edited_fields=["report_text"],
@@ -302,7 +325,7 @@ def test_manual_edit_skips_orphaned_revision_version_numbers(tmp_path: Path) -> 
         metadata={},
     )
 
-    version = serializer.get_version_record_for_session(session_id)
+    version = serializer.session_revision_repository.get_version_record_for_session(session_id)
     assert version is not None
     assert version["version_number"] == 4
     assert version["revision_kind"] == "manual_edit"
@@ -326,7 +349,7 @@ class FailingRevisionRunner:
 def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
-    service = DataInspectionService(serializer=serializer, jobs=JobManager())
+    service = build_service(serializer, JobManager())
     service.revision_agent_runner = FailingRevisionRunner()
 
     started = service.start_revision_job(session_id, SessionRevisionRequest())
@@ -348,17 +371,17 @@ def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
 def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
-    source_version = serializer.get_version_record_for_session(session_id)
+    source_version = serializer.session_revision_repository.get_version_record_for_session(session_id)
     assert source_version is not None
     pipeline_run_id = "synthetic-delete-run"
-    shell = serializer.create_revision_version_shell(
+    shell = serializer.session_revision_repository.create_revision_version_shell(
         session_id,
         reviewer_note="Synthetic cleanup validation.",
         configuration={},
         pipeline_run_id=pipeline_run_id,
     )
     assert shell is not None
-    serializer.create_or_update_revision_run(
+    serializer.session_revision_repository.create_or_update_revision_run(
         pipeline_run_id=pipeline_run_id,
         session_id=session_id,
         root_session_id=session_id,
@@ -371,15 +394,15 @@ def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
         status="failed",
     )
 
-    assert serializer.delete_session(session_id) is True
-    assert serializer.get_session_detail(session_id) is None
-    assert serializer.get_revision_run(pipeline_run_id) is None
+    assert serializer.clinical_session_repository.delete_session(session_id) is True
+    assert serializer.clinical_session_repository.get_session_detail(session_id) is None
+    assert serializer.session_revision_repository.get_revision_run(pipeline_run_id) is None
 
 ###############################################################################
 def test_revision_job_rejects_same_root_concurrent_start(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
-    service = DataInspectionService(serializer=serializer, jobs=JobManager())
+    service = build_service(serializer, JobManager())
     service.revision_agent_runner = SlowRevisionRunner()
 
     started = service.start_revision_job(session_id, SessionRevisionRequest())

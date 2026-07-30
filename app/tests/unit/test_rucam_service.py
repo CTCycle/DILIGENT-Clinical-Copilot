@@ -13,7 +13,6 @@ from domain.clinical import (
 )
 from services.clinical.rucam import RucamScoreEstimator
 
-
 ###############################################################################
 def _base_inputs() -> tuple[PatientData, PatientDrugs, PatientLabTimeline]:
     payload = PatientData(
@@ -46,7 +45,6 @@ def _base_inputs() -> tuple[PatientData, PatientDrugs, PatientLabTimeline]:
     )
     return payload, drugs, timeline
 
-
 ###############################################################################
 def test_source_reported_rucam_score_is_used_directly() -> None:
     estimator = RucamScoreEstimator()
@@ -74,7 +72,6 @@ def test_source_reported_rucam_score_is_used_directly() -> None:
     assert item.total_score == 8
     assert item.calculation_method == "source_reported"
     assert item.data_sufficient is True
-
 
 ###############################################################################
 def test_laboratory_history_rucam_score_has_priority() -> None:
@@ -105,7 +102,6 @@ def test_laboratory_history_rucam_score_has_priority() -> None:
     assert item.calculation_method == "source_reported"
     assert item.score_source == "laboratory_history"
 
-
 ###############################################################################
 def test_livertox_likelihood_score_is_not_treated_as_rucam() -> None:
     estimator = RucamScoreEstimator()
@@ -125,7 +121,6 @@ def test_livertox_likelihood_score_is_not_treated_as_rucam() -> None:
     )
     item = bundle.entries[0]
     assert item.calculation_method != "source_reported"
-
 
 ###############################################################################
 def test_insufficient_data_returns_not_calculated_assessment() -> None:
@@ -149,7 +144,6 @@ def test_insufficient_data_returns_not_calculated_assessment() -> None:
     assert item.calculation_method == "not_calculated"
     assert item.data_sufficient is False
 
-
 ###############################################################################
 def test_select_pattern_anchor_returns_qualifying_lab() -> None:
     estimator = RucamScoreEstimator()
@@ -170,7 +164,6 @@ def test_select_pattern_anchor_returns_qualifying_lab() -> None:
     assert anchor.source == "qualifying_lab"
     assert anchor.is_score_eligible is True
 
-
 ###############################################################################
 def test_visit_proxy_anchor_is_not_score_eligible() -> None:
     estimator = RucamScoreEstimator()
@@ -180,7 +173,6 @@ def test_visit_proxy_anchor_is_not_score_eligible() -> None:
     )
     assert anchor.source == "visit_proxy"
     assert anchor.is_score_eligible is False
-
 
 ###############################################################################
 def test_suspension_only_high_likelihood_timing_is_not_scored_incompatible() -> None:
@@ -206,14 +198,12 @@ def test_suspension_only_high_likelihood_timing_is_not_scored_incompatible() -> 
     assert component.status == "not_assessable"
     assert "do not establish latency" in (component.rationale or "")
 
-
 ###############################################################################
 def test_low_positive_rucam_scores_are_indeterminate() -> None:
     estimator = RucamScoreEstimator()
     assert estimator.resolve_causality_bucket(1) == "indeterminate"
     assert estimator.resolve_causality_bucket(2) == "indeterminate"
     assert estimator.resolve_causality_bucket(0) == "excluded"
-
 
 ###############################################################################
 def test_rechallenge_component_carries_supporting_text_when_present() -> None:
@@ -227,7 +217,6 @@ def test_rechallenge_component_carries_supporting_text_when_present() -> None:
     assert component.status in {"scored", "not_assessable"}
     assert component.evidence
 
-
 ###############################################################################
 def test_rucam_component_accepts_relative_exposure_date_phrase() -> None:
     evidence_date = "21 days before synthetic laboratory elevation"
@@ -239,7 +228,6 @@ def test_rucam_component_accepts_relative_exposure_date_phrase() -> None:
     )
 
     assert component.evidence_date == evidence_date
-
 
 ###############################################################################
 def _inputs():
@@ -270,7 +258,6 @@ def _inputs():
     )
     return payload, analysis_drugs, timeline
 
-
 ###############################################################################
 def test_provided_rucam_score_is_used_directly() -> None:
     estimator = RucamScoreEstimator()
@@ -289,7 +276,6 @@ def test_provided_rucam_score_is_used_directly() -> None:
     )
     assert bundle.entries[0].total_score == 7
     assert bundle.entries[0].calculation_method == "source_reported"
-
 
 ###############################################################################
 def test_incomplete_inputs_skip_calculation() -> None:

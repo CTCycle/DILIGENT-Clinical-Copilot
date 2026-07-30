@@ -11,7 +11,8 @@ from repositories.schemas.clinical import (
     ClinicalSession,
     ClinicalSessionResult,
 )
-from repositories.serialization.data import DataSerializer
+from repository_fixtures import build_repository_graph
+from repositories.values import normalize_date
 from services.clinical.livertox import LiverToxData
 from services.updater import livertox_parse
 from services.updater.livertox_core import LiverToxUpdater
@@ -41,15 +42,14 @@ class LookupStub:
 def build_serializer() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
-    serializer = DataSerializer(engine=engine)
+    serializer = build_repository_graph(engine=engine).clinical_session_repository
     return serializer, engine
 
 ###############################################################################
 def test_normalize_date_uses_explicit_units_for_numeric_timestamps() -> None:
-    serializer, _ = build_serializer()
-    assert serializer.normalize_date("1735689600") == "2025-01-01"
-    assert serializer.normalize_date("1735689600000") == "2025-01-01"
-    assert serializer.normalize_date("20250101") == "2025-01-01"
+    assert normalize_date("1735689600") == "2025-01-01"
+    assert normalize_date("1735689600000") == "2025-01-01"
+    assert normalize_date("20250101") == "2025-01-01"
 
 ###############################################################################
 def test_save_clinical_session_preserves_row_append_order() -> None:
@@ -198,7 +198,10 @@ def test_livertox_data_keeps_internal_dataframe_copies_isolated() -> None:
 
 ###############################################################################
 def test_master_list_sanitization_handles_string_dtype_inputs() -> None:
-    updater = LiverToxUpdater(sources_path=".", redownload=False)
+    graph = build_repository_graph()
+    updater = LiverToxUpdater(
+        sources_path=".", redownload=False, knowledge_repository=graph.knowledge_repository
+    )
     raw = pd.DataFrame(
         {
             "Count": pd.Series(["2", "0"], dtype="string"),

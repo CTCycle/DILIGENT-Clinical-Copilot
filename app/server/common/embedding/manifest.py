@@ -14,7 +14,7 @@ from common.embedding.config import (
 )
 from common.paths import RAG_ACTIVE_GENERATION_POINTER_PATH
 
-
+###############################################################################
 @dataclass(frozen=True, slots=True)
 class EmbeddingIndexManifest:
     manifest_version: int
@@ -29,6 +29,7 @@ class EmbeddingIndexManifest:
     source: dict[str, Any]
     built_at: str
 
+    # -------------------------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:
         return {
             "manifest_version": self.manifest_version,
@@ -45,7 +46,7 @@ class EmbeddingIndexManifest:
             "built_at": self.built_at,
         }
 
-
+###############################################################################
 def build_embedding_index_manifest(
     *,
     generation_id: str,
@@ -101,7 +102,7 @@ def build_embedding_index_manifest(
         built_at=datetime.now(UTC).isoformat(),
     )
 
-
+###############################################################################
 def assert_manifest_compatible(
     manifest: dict[str, Any],
     *,
@@ -120,7 +121,7 @@ def assert_manifest_compatible(
     if model.get("distance_metric") != "cosine":
         raise ValueError("RAG index distance metric is incompatible")
 
-
+###############################################################################
 def read_active_collection_name(default: str) -> str:
     try:
         payload = json.loads(

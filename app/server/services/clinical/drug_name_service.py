@@ -17,7 +17,7 @@ from common.utils.text_utils import (
 )
 from services.text.vocabulary import get_text_normalization_snapshot
 
-CACHE_MISS = object()
+from common.utils.bounded_cache import CACHE_MISS
 
 ###############################################################################
 class DrugNameService:
@@ -72,11 +72,6 @@ class DrugNameService:
             seen.add(key)
             unique.append(key)
         return unique
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def resolve_source_backed_query_variants(normalized_query: str) -> list[str]:
-        return []
 
     # -------------------------------------------------------------------------
     def has_trusted_exact_key(self, normalized_key: str, data: LiverToxData) -> bool:

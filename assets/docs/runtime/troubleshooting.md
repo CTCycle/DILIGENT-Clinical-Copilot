@@ -1,8 +1,38 @@
 # Runtime Troubleshooting
-Last updated: 2026-07-23
+Last updated: 2026-07-29
 
 ## Scope
 This file covers recurring local startup and launch failures.
+
+## Portable Desktop Window Does Not Appear
+### Symptom
+
+Opening `release\DILIGENT-v<version>-windows-x64-portable.exe` produces no visible window and no backend process.
+
+### Checks
+
+1. Check **Event Viewer → Windows Logs → Application** for an `Application Error` entry naming the portable executable.
+2. Inspect `%LOCALAPPDATA%\DILIGENT\runtime\<version>` for a hash directory containing `extraction.complete`.
+3. Inspect `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log` and `state\desktop-backend-ready.json`.
+
+The packaged shell extracts the runtime before starting the backend. A stale `.extract-*` directory means extraction or validation was interrupted; close any running DILIGENT process and remove only those temporary directories under the matching version before retrying. Do not remove `%LOCALAPPDATA%\DILIGENT\data` unless a full user-data reset is intentional.
+
+If Event Viewer reports exception `0xc00000fd` (stack overflow) from the portable executable, use a newly built artifact from the current release pipeline. This indicates an obsolete desktop binary, not a model provider or development-port failure.
+
+## Packaged Backend Health Fails
+
+The packaged backend uses a random localhost port rather than `7690`. Read the port from:
+
+```powershell
+$ready = Get-Content "$env:LOCALAPPDATA\DILIGENT\data\state\desktop-backend-ready.json" | ConvertFrom-Json
+Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$($ready.port)/api/health"
+```
+
+If the ready file is absent, inspect the packaged backend log. If it is present but health fails, close the desktop application and retry after confirming that no stale `DILIGENTBackend.exe` remains.
+
+## WebView2 Is Unavailable
+
+The portable executable uses the system WebView2 runtime. The standard MSI uses the WebView2 bootstrapper and may require network access during installation. Maintainers can build an MSI with `-OfflineWebView2` when an offline installer is available. This setting applies only to MSI packaging, not the portable EXE.
 
 ## RAG Embedding Cache Is Missing or Invalid
 

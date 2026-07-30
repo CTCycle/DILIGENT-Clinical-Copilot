@@ -19,6 +19,4 @@ export type RagSettingsSectionKey =
   | 'chunking'
   | 'embeddings'
   | 'models'
-  | 'advanced'
-  | 'providers'
   | 'storage';

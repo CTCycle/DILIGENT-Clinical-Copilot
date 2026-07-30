@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 import json
-from pathlib import Path
 from typing import Any
 
 from common.catalogs.model_choices import get_clinical_model_choices, get_text_extraction_model_choices
+from common.paths import CATALOGS_PATH
 
 ###############################################################################
 class GenerationPurpose(StrEnum):
@@ -36,8 +36,8 @@ class GenerationPolicy:
     rationale: str
 
 
-_CATALOG_PATH = Path(__file__).resolve().parents[3] / "resources" / "catalogs" / "llm_generation_policies.json"
-_LOCAL_CATALOG_PATH = Path(__file__).resolve().parents[3] / "resources" / "catalogs" / "local_models.json"
+_CATALOG_PATH = CATALOGS_PATH / "llm_generation_policies.json"
+_LOCAL_CATALOG_PATH = CATALOGS_PATH / "local_models.json"
 
 ###############################################################################
 def _load_catalog() -> dict[str, Any]:

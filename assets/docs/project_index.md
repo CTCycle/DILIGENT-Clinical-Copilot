@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-07-11
+Last updated: 2026-07-29
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -58,6 +58,8 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
   - Immutable provider/model/task sampling policy and run provenance.
 - `runtime/deployment.md`
   - Local deployment constraints and dependency notes.
+- `runtime/desktop_release.md`
+  - Windows Tauri packaging, artifacts, extraction, and release validation.
 - `runtime/troubleshooting.md`
   - Startup failures, port conflicts, backend launch recovery steps, and Angular sandbox-build fallback guidance for `spawn EPERM`.
 - `runtime/qa_regression.md`

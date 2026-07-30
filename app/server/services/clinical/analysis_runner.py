@@ -13,16 +13,94 @@ from domain.clinical.entities import (
     DrugRucamAssessment,
     PatientDrugClinicalReport,
     PatientLabTimeline,
+    PatientDrugs,
     PatientRucamAssessmentBundle,
+    PipelineIssue,
 )
 from services.clinical.match_quality import classify_match_evidence
-from services.clinical.preparation import HepatoxPreparedInputs
+from services.clinical.drug_analysis import DrugAnalysisService
+from services.clinical.exposure_timeline import ExposureTimelineService
+from services.clinical.rag_support import RagSupportService
+from services.clinical.report_finalizer import ReportFinalizer
 from services.text.normalization import normalize_drug_query_name
 
 CLAIM_EVIDENCE_QUOTE_MAX_LENGTH = 1000
 CLAIM_EVIDENCE_TRUNCATION_MARKER = " [truncated]"
 MATCH_REASON_MAX_LENGTH = 100
 DrugAssessmentBase: TypeAlias = tuple[DrugClinicalAssessment, str, list[str]]
+
+###############################################################################
+def emit_progress(
+    progress_callback: Callable[[str, float], None] | None,
+    *,
+    stage: str,
+    fraction: float,
+) -> None:
+    if progress_callback is None:
+        return
+    bounded_fraction = min(1.0, max(0.0, float(fraction)))
+    progress_callback(stage, bounded_fraction)
+
+###############################################################################
+def livertox_payload_rank(payload: dict[str, Any]) -> int:
+    status = str(payload.get("match_status") or "").strip().lower()
+    if status in {
+        "matched_with_excerpt",
+        "accepted_exact_livertox",
+        "accepted_rxnav_validated",
+        "accepted_livertox_without_rxnav",
+    }:
+        return 4
+    if status in {"matched_no_excerpt", "matched", "match"}:
+        return 3
+    if status in {
+        "ambiguous",
+        "ambiguous_match",
+        "ambiguous_requires_review",
+    } or payload.get("ambiguous_match"):
+        return 2
+    if status in {
+        "missing",
+        "missing_match",
+        "missing_livertox",
+        "rejected_false_positive",
+    } or payload.get("missing_livertox"):
+        return 1
+    return 0
+
+###############################################################################
+def resolve_livertox_data_for_entry(
+    *,
+    raw_name: str,
+    normalized_key: str,
+    resolved_drugs: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    exact = resolved_drugs.get(normalized_key)
+    if exact is not None and livertox_payload_rank(exact) >= 3:
+        return exact
+    raw_name_normalized = raw_name.strip().casefold()
+    grouped = [
+        payload
+        for payload in resolved_drugs.values()
+        if isinstance(payload.get("raw_mentions"), list)
+        and any(
+            isinstance(mention, str)
+            and mention.strip().casefold() == raw_name_normalized
+            for mention in payload["raw_mentions"]
+        )
+    ]
+    if not grouped:
+        return exact or {}
+    grouped.sort(
+        key=lambda payload: (
+            livertox_payload_rank(payload),
+            len(str(payload.get("normalized_name") or "").split()),
+        ),
+        reverse=True,
+    )
+    if exact is not None and livertox_payload_rank(exact) >= livertox_payload_rank(grouped[0]):
+        return exact
+    return grouped[0]
 
 ###############################################################################
 def claim_safe_evidence_quote(value: str | None) -> str | None:
@@ -71,8 +149,28 @@ class AnalysisRunner:
     """Orchestrates the top-level analysis workflow — runs the full drug assessment pipeline."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, consultation: Any) -> None:
-        self.consultation = consultation
+    def __init__(
+        self,
+        *,
+        drugs: PatientDrugs,
+        exposure_timeline: ExposureTimelineService,
+        drug_analysis: DrugAnalysisService,
+        rag_support: RagSupportService,
+        report_finalizer: ReportFinalizer,
+        max_parallel_analyses: int,
+        pipeline_issues: list[PipelineIssue],
+        resolve_livertox_data_for_entry: Callable[..., dict[str, Any]],
+        emit_progress: Callable[..., None],
+    ) -> None:
+        self.drugs = drugs
+        self.exposure_timeline = exposure_timeline
+        self.drug_analysis = drug_analysis
+        self.rag_support = rag_support
+        self.report_finalizer = report_finalizer
+        self.max_parallel_analyses = max(int(max_parallel_analyses), 1)
+        self.pipeline_issues = pipeline_issues
+        self.resolve_livertox_data_for_entry = resolve_livertox_data_for_entry
+        self.emit_progress = emit_progress
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -132,83 +230,6 @@ class AnalysisRunner:
         )
 
     # -------------------------------------------------------------------------
-    async def run_analysis(
-        self,
-        *,
-        prepared_inputs: HepatoxPreparedInputs | None,
-        visit_date: date | None = None,
-        report_language: str = "en",
-        rag_query: dict[str, str] | None = None,
-        rucam_bundle: PatientRucamAssessmentBundle | None = None,
-        progress_callback: Callable[[str, float], None] | None = None,
-    ) -> dict[str, Any] | None:
-        if prepared_inputs is None:
-            logger.info(
-                "No prepared inputs provided; skipping hepatotoxicity consultation"
-            )
-            return None
-        resolved_mapping = prepared_inputs.resolved_drugs
-        if not resolved_mapping:
-            logger.info("No matched drugs available for hepatotoxicity consultation")
-            return None
-        logger.info("Running clinical hepatotoxicity assessment for matched drugs")
-        report = await self.compile_clinical_assessment(
-            resolved_mapping,
-            clinical_context=prepared_inputs.clinical_context,
-            visit_date=visit_date,
-            report_language=report_language,
-            pattern_prompt=prepared_inputs.pattern_prompt,
-            rag_query=rag_query,
-            rucam_bundle=rucam_bundle,
-            progress_callback=progress_callback,
-        )
-        return report.model_dump()
-
-    # -------------------------------------------------------------------------
-    async def run_revision_analysis(
-        self,
-        *,
-        prepared_inputs: HepatoxPreparedInputs | None,
-        visit_date: date | None = None,
-        report_language: str = "en",
-        rag_query: dict[str, str] | None = None,
-        rucam_bundle: PatientRucamAssessmentBundle | None = None,
-        progress_callback: Callable[[str, float], None] | None = None,
-    ) -> dict[str, Any] | None:
-        if prepared_inputs is None:
-            logger.info(
-                "No prepared inputs provided; skipping revision hepatotoxicity consultation"
-            )
-            return None
-        resolved_mapping = prepared_inputs.resolved_drugs
-        if not resolved_mapping:
-            logger.info(
-                "No matched drugs available for revision hepatotoxicity consultation"
-            )
-            return None
-        logger.info(
-            "Running revision clinical hepatotoxicity assessment for matched drugs"
-        )
-        report = await self.compile_revision_clinical_assessment(
-            resolved_mapping,
-            clinical_context=prepared_inputs.clinical_context,
-            visit_date=visit_date,
-            report_language=report_language,
-            pattern_prompt=prepared_inputs.pattern_prompt,
-            rag_query=rag_query,
-            rucam_bundle=rucam_bundle,
-            progress_callback=progress_callback,
-        )
-        payload = report.model_dump()
-        payload["revision_consultation_metadata"] = {
-            "drug_analysis_entrypoint": "request_revision_drug_analysis",
-            "report_finalization_entrypoint": "finalize_revision_patient_report",
-            "conclusion_entrypoint": "generate_revision_conclusion",
-            "synthesis_mode": "revision_comparison_aware",
-        }
-        return payload
-
-    # -------------------------------------------------------------------------
     async def compile_clinical_assessment(
         self,
         resolved_drugs: dict[str, dict[str, Any]],
@@ -236,7 +257,8 @@ class AnalysisRunner:
             rucam_bundle=rucam_bundle,
             progress_callback=progress_callback,
             prepare_fn=self.prepare_drug_assessment,
-            finalize_fn=self.consultation.report_finalizer.finalize_patient_report,
+            finalize_fn=self.report_finalizer.finalize_report,
+            generate_conclusion=self.drug_analysis.generate_conclusion,
         )
 
     # -------------------------------------------------------------------------
@@ -273,7 +295,8 @@ class AnalysisRunner:
             rucam_bundle=rucam_bundle,
             progress_callback=progress_callback,
             prepare_fn=self.prepare_revision_drug_assessment,
-            finalize_fn=self.consultation.report_finalizer.finalize_revision_patient_report,
+            finalize_fn=self.report_finalizer.finalize_report,
+            generate_conclusion=self.drug_analysis.generate_revision_conclusion,
         )
 
     # -------------------------------------------------------------------------
@@ -290,6 +313,7 @@ class AnalysisRunner:
         progress_callback: Callable[[str, float], None] | None,
         prepare_fn,
         finalize_fn,
+        generate_conclusion,
     ) -> PatientDrugClinicalReport:
         entries: list[DrugClinicalAssessment] = []
         llm_jobs: list[tuple[int, Any]] = []
@@ -300,8 +324,7 @@ class AnalysisRunner:
                 if normalized_key:
                     rucam_by_key[normalized_key] = item
 
-        consultation = self.consultation
-        for idx, drug_entry in enumerate(consultation.drugs.entries):
+        for idx, drug_entry in enumerate(self.drugs.entries):
             entry, job = await prepare_fn(
                 idx=idx,
                 drug_entry=drug_entry,
@@ -317,11 +340,11 @@ class AnalysisRunner:
             if job:
                 llm_jobs.append(job)
 
-        consultation.emit_progress(
+        self.emit_progress(
             progress_callback, stage="llm_analysis", fraction=0.0
         )
         if llm_jobs:
-            semaphore = asyncio.Semaphore(consultation.max_parallel_analyses)
+            semaphore = asyncio.Semaphore(self.max_parallel_analyses)
             pending_tasks = [
                 asyncio.create_task(self.execute_bounded_job(idx, task, semaphore))
                 for idx, task in llm_jobs
@@ -337,42 +360,43 @@ class AnalysisRunner:
                         entry.drug_name,
                         outcome,
                     )
-                    entry.paragraph = consultation.build_error_paragraph(entry)
+                    entry.paragraph = self.report_finalizer.build_error_paragraph(entry)
                 else:
                     normalized_outcome = (
                         outcome.strip()
                         if isinstance(outcome, str)
                         else str(outcome).strip()
                     )
-                    normalized_outcome = consultation.remove_redundant_report_sentence(
+                    normalized_outcome = self.report_finalizer.remove_redundant_report_sentence(
                         normalized_outcome
                     )
                     entry.paragraph = (
                         normalized_outcome
                         if normalized_outcome
-                        else consultation.build_error_paragraph(entry)
+                        else self.report_finalizer.build_error_paragraph(entry)
                     )
                 completed += 1
-                consultation.emit_progress(
+                self.emit_progress(
                     progress_callback,
                     stage="llm_analysis",
                     fraction=completed / total if total else 1.0,
                 )
         else:
-            consultation.emit_progress(
+            self.emit_progress(
                 progress_callback, stage="llm_analysis", fraction=1.0
             )
 
         logger.info("Composing final clinical report for current patient")
-        consultation.emit_progress(
+        self.emit_progress(
             progress_callback, stage="report_composition", fraction=0.0
         )
         final_report = await finalize_fn(
             entries,
             clinical_context=normalized_context,
             report_language=report_language,
+            generate_conclusion=generate_conclusion,
         )
-        consultation.emit_progress(
+        self.emit_progress(
             progress_callback, stage="report_composition", fraction=1.0
         )
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
@@ -404,11 +428,13 @@ class AnalysisRunner:
         visit_date: date | None,
         pattern_summary: str,
         rucam_by_key: dict[str, DrugRucamAssessment],
-        consultation: Any,
+        resolve_livertox_data_for_entry: Callable[..., dict[str, Any]],
+        exposure_timeline: ExposureTimelineService,
+        rag_support: RagSupportService,
     ) -> DrugAssessmentBase:
         raw_name = drug_entry.name or ""
         normalized_drug_key = normalize_drug_query_name(raw_name)
-        livertox_data = consultation.resolve_livertox_data_for_entry(
+        livertox_data = resolve_livertox_data_for_entry(
             raw_name=raw_name,
             normalized_key=normalized_drug_key,
             resolved_drugs=resolved_drugs,
@@ -453,7 +479,7 @@ class AnalysisRunner:
         if match_confidence is not None:
             try:
                 match_confidence = float(match_confidence)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 match_confidence = None
         match_reason, match_notes = normalize_match_reason(
             livertox_data.get("match_reason"),
@@ -467,7 +493,7 @@ class AnalysisRunner:
             missing_livertox=missing_livertox,
             ambiguous_match=ambiguous_match,
         )
-        suspension = consultation.evaluate_suspension(drug_entry, visit_date)
+        suspension = exposure_timeline.evaluate_suspension(drug_entry, visit_date)
         matched_lvt_row = matched_row if isinstance(matched_row, dict) else None
         rucam = rucam_by_key.get(normalized_drug_key)
         source_context_summary = summarize_drug_source_context(drug_entry)
@@ -475,7 +501,7 @@ class AnalysisRunner:
         pattern_compatibility = assess_pattern_compatibility(
             drug_entry,
             pattern_summary,
-            consultation.rag_support.select_excerpt(excerpts_list),
+            rag_support.select_excerpt(excerpts_list),
         )
         extraction_metadata = [
             *extraction_metadata,
@@ -530,30 +556,31 @@ class AnalysisRunner:
         rag_query: dict[str, str] | None,
         rucam_by_key: dict[str, DrugRucamAssessment],
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
-        consultation = self.consultation
         entry, knowledge_prompt, excerpts_list = await self.build_drug_assessment_base(
             drug_entry=drug_entry,
             resolved_drugs=resolved_drugs,
             visit_date=visit_date,
             pattern_summary=pattern_summary,
             rucam_by_key=rucam_by_key,
-            consultation=consultation,
+            resolve_livertox_data_for_entry=self.resolve_livertox_data_for_entry,
+            exposure_timeline=self.exposure_timeline,
+            rag_support=self.rag_support,
         )
         if entry.paragraph:
             return entry, None
-        excerpt = consultation.rag_support.select_excerpt(excerpts_list)
+        excerpt = self.rag_support.select_excerpt(excerpts_list)
         if excerpt is None or entry.missing_livertox:
             entry.missing_livertox = True
-            entry.paragraph = consultation.build_missing_excerpt_paragraph(entry)
+            entry.paragraph = self.report_finalizer.build_missing_excerpt_paragraph(entry)
             return entry, None
-        rag_bundle = await consultation.rag_support.fetch_rag_documents(
+        rag_bundle = await self.rag_support.fetch_rag_documents(
             rag_query, drug_entry.name or ""
         )
         rag_context = rag_bundle.context_text if rag_bundle is not None else None
         entry.rag_references = (
             list(rag_bundle.references) if rag_bundle is not None else []
         )
-        job = consultation.drug_analysis.request_drug_analysis(
+        job = self.drug_analysis.request_drug_analysis(
             drug_name=drug_entry.name,
             canonical_name=entry.canonical_name or drug_entry.name,
             origins=entry.origins,
@@ -586,30 +613,31 @@ class AnalysisRunner:
         rag_query: dict[str, str] | None,
         rucam_by_key: dict[str, DrugRucamAssessment],
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
-        consultation = self.consultation
         entry, knowledge_prompt, excerpts_list = await self.build_drug_assessment_base(
             drug_entry=drug_entry,
             resolved_drugs=resolved_drugs,
             visit_date=visit_date,
             pattern_summary=pattern_summary,
             rucam_by_key=rucam_by_key,
-            consultation=consultation,
+            resolve_livertox_data_for_entry=self.resolve_livertox_data_for_entry,
+            exposure_timeline=self.exposure_timeline,
+            rag_support=self.rag_support,
         )
         if entry.paragraph:
             return entry, None
-        excerpt = consultation.rag_support.select_excerpt(excerpts_list)
+        excerpt = self.rag_support.select_excerpt(excerpts_list)
         if excerpt is None or entry.missing_livertox:
             entry.missing_livertox = True
-            entry.paragraph = consultation.build_missing_excerpt_paragraph(entry)
+            entry.paragraph = self.report_finalizer.build_missing_excerpt_paragraph(entry)
             return entry, None
-        rag_bundle = await consultation.rag_support.fetch_rag_documents(
+        rag_bundle = await self.rag_support.fetch_rag_documents(
             rag_query, drug_entry.name or ""
         )
         rag_context = rag_bundle.context_text if rag_bundle is not None else None
         entry.rag_references = (
             list(rag_bundle.references) if rag_bundle is not None else []
         )
-        job = consultation.drug_analysis.request_revision_drug_analysis(
+        job = self.drug_analysis.request_revision_drug_analysis(
             drug_name=drug_entry.name,
             canonical_name=entry.canonical_name or drug_entry.name,
             origins=entry.origins,
@@ -627,88 +655,6 @@ class AnalysisRunner:
             report_language=report_language,
         )
         return entry, (idx, job)
-
-    # -------------------------------------------------------------------------
-    def resolve_livertox_data_for_entry(
-        self,
-        *,
-        raw_name: str,
-        normalized_key: str,
-        resolved_drugs: dict[str, dict[str, Any]],
-    ) -> dict[str, Any]:
-        exact = resolved_drugs.get(normalized_key)
-        if exact is not None and self.livertox_payload_rank(exact) >= 3:
-            return exact
-
-        raw_name_normalized = raw_name.strip().casefold()
-        grouped: list[dict[str, Any]] = []
-        for payload in resolved_drugs.values():
-            raw_mentions = payload.get("raw_mentions", [])
-            if not isinstance(raw_mentions, list):
-                continue
-            if any(
-                isinstance(mention, str)
-                and mention.strip().casefold() == raw_name_normalized
-                for mention in raw_mentions
-            ):
-                grouped.append(payload)
-        if not grouped:
-            return exact or {}
-        grouped.sort(
-            key=lambda payload: (
-                self.livertox_payload_rank(payload),
-                len(str(payload.get("normalized_name") or "").split()),
-            ),
-            reverse=True,
-        )
-        if exact is not None and self.livertox_payload_rank(
-            exact
-        ) >= self.livertox_payload_rank(grouped[0]):
-            return exact
-        return grouped[0]
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def livertox_payload_rank(payload: dict[str, Any]) -> int:
-        status = str(payload.get("match_status") or "").strip().lower()
-        if status in {
-            "matched_with_excerpt",
-            "accepted_exact_livertox",
-            "accepted_rxnav_validated",
-            "accepted_livertox_without_rxnav",
-        }:
-            return 4
-        if status == "matched_no_excerpt":
-            return 3
-        if status in {"matched", "match"}:
-            return 3
-        if status in {
-            "ambiguous",
-            "ambiguous_match",
-            "ambiguous_requires_review",
-        } or payload.get("ambiguous_match"):
-            return 2
-        if status in {
-            "missing",
-            "missing_match",
-            "missing_livertox",
-            "rejected_false_positive",
-        } or payload.get("missing_livertox"):
-            return 1
-        return 0
-
-    # -------------------------------------------------------------------------
-    def retry_backoff_seconds(
-        self, attempt: int, *, exc: Exception | None = None
-    ) -> float:
-        if exc is not None:
-            hinted_wait = (
-                self.consultation.rag_support.extract_rate_limit_wait_hint_seconds(exc)
-            )
-            if hinted_wait is not None:
-                return hinted_wait
-        normalized_attempt = max(int(attempt), 1)
-        return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
 
 ###############################################################################
 def summarize_drug_source_context(entry: DrugEntry) -> str:

@@ -2,10 +2,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from domain.llm.providers import CloudProviderDescriptor, CloudProviderId
+
+CatalogProviderId = Literal[
+    "ollama",
+    "openai",
+    "gemini",
+    "deepseek",
+    "anthropic",
+    "opencode_zen",
+    "opencode_go",
+]
+CatalogStatus = Literal[
+    "available", "cached", "not_loaded", "unavailable", "authentication_required"
+]
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -28,6 +42,19 @@ class LocalModelCard(BaseModel):
     available_in_ollama: bool
     recommended_for_local_extraction: bool = False
     recommended_rank: int | None = None
+
+###############################################################################
+class LocalCatalogMetadata(BaseModel):
+    status: CatalogStatus
+    updated_at: datetime | None = None
+    message: str | None = None
+
+###############################################################################
+class ModelCatalogOperationResponse(BaseModel):
+    catalog_provider: CatalogProviderId
+    outcome: Literal["cached", "refreshed", "failed"]
+    error: str | None = None
+    state: "ModelConfigStateResponse"
 
 ###############################################################################
 class ModelConfigUpdateRequest(BaseModel):
@@ -64,6 +91,7 @@ class EmbeddingIndexStatus(BaseModel):
 class ModelConfigStateResponse(BaseModel):
     local_models: list[LocalModelCard]
     cloud_providers: list[CloudProviderDescriptor]
+    local_catalog: LocalCatalogMetadata
     use_cloud_services: bool
     llm_provider: CloudProviderId
     cloud_model: str | None
@@ -74,6 +102,20 @@ class ModelConfigStateResponse(BaseModel):
     rag_settings: dict[str, object]
     embedding_runtime: EmbeddingRuntimeStatus
     embedding_index: EmbeddingIndexStatus
+    updated_at: datetime | None = None
+
+###############################################################################
+class ModelConfigPersistResponse(BaseModel):
+    """Configuration values returned after a persistence-only update."""
+
+    use_cloud_services: bool
+    llm_provider: CloudProviderId
+    cloud_model: str | None
+    text_extraction_model: str | None
+    clinical_model: str | None
+    ollama_reasoning: bool
+    ollama_seed: int | None
+    rag_settings: dict[str, object]
     updated_at: datetime | None = None
 
 ###############################################################################

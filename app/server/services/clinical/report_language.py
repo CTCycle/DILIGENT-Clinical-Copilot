@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from common.utils.languages import resolve_supported_language_code
+from common.utils.languages import (
+    SUPPORTED_REPORT_LANGUAGES,
+    resolve_supported_language_code,
+)
 from domain.clinical.entities import DrugRucamAssessment
 
-SUPPORTED_REPORT_LANGUAGE_CODES = ("en", "it", "es", "fr", "de", "pt")
 
 _EVIDENCE_QUALITY_LABELS = {
     "direct_match_with_excerpt": {
@@ -310,9 +312,7 @@ _PHRASES = {
 ###############################################################################
 def resolve_report_language(code: str | None) -> str:
     resolved = resolve_supported_language_code(code)
-    if resolved == "en" and (code or "").strip().lower().startswith("pt"):
-        return "pt"
-    return resolved if resolved in SUPPORTED_REPORT_LANGUAGE_CODES else "en"
+    return resolved if resolved in SUPPORTED_REPORT_LANGUAGES else "en"
 
 ###############################################################################
 def phrase(key: str, language: str, **values: object) -> str:

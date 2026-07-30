@@ -51,6 +51,14 @@ def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
 ) -> None:
     service = SimpleNamespace(
         apply_persisted_runtime_configuration=lambda: None,
+        session_repository=SimpleNamespace(
+            knowledge_repository=SimpleNamespace(
+                list_livertox_catalog=lambda **kwargs: ([{"id": 1}], 1),
+            ),
+            drug_catalog_repository=SimpleNamespace(
+                list_rxnav_catalog=lambda **kwargs: ([{"id": 1}], 1),
+            ),
+        ),
         serializer=SimpleNamespace(
             list_livertox_catalog=lambda **kwargs: ([{"id": 1}], 1),
             list_rxnav_catalog=lambda **kwargs: ([{"id": 1}], 1),

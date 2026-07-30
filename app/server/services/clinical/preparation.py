@@ -14,7 +14,8 @@ from domain.clinical.entities import (
     PipelineIssue,
 )
 from domain.clinical.extras import HepatoxPreparedInputs
-from repositories.serialization.data import DataSerializer
+from repositories.drug_catalog_repository import DrugCatalogRepository
+from repositories.knowledge_repository import KnowledgeRepository
 from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.drug_resolution import DrugResolutionService
 from services.llm.generation_policy import GenerationPurpose
@@ -36,9 +37,17 @@ RxNav and LiverTox evidence before accepting it.
 """.strip()
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        self.serializer = DataSerializer()
-        self.knowledge_composer = ClinicalKnowledgeComposer(serializer=self.serializer)
+    def __init__(
+        self,
+        *,
+        knowledge_repository: KnowledgeRepository,
+        drug_catalog_repository: DrugCatalogRepository,
+    ) -> None:
+        self.knowledge_repository = knowledge_repository
+        self.drug_catalog_repository = drug_catalog_repository
+        self.knowledge_composer = ClinicalKnowledgeComposer(
+            knowledge_repository=knowledge_repository
+        )
         self.livertox_matcher: LiverToxMatcher | None = None
 
     # -------------------------------------------------------------------------
@@ -59,7 +68,7 @@ RxNav and LiverTox evidence before accepting it.
             return None
         resolver = DrugResolutionService(
             self.livertox_matcher,
-            cache_lookup=lambda key: self.serializer.load_livertox_match_from_db_cache(
+            cache_lookup=lambda key: self.knowledge_repository.load_livertox_match_from_db_cache(
                 normalized_drug_key=key,
             ),
         )
@@ -460,7 +469,7 @@ RxNav and LiverTox evidence before accepting it.
         if self.livertox_matcher is not None:
             return True
         try:
-            dataset = await asyncio.to_thread(self.serializer.get_livertox_records)
+            dataset = await asyncio.to_thread(self.knowledge_repository.get_livertox_records)
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed loading LiverTox monographs from database: %s", exc)
             self.livertox_matcher = None
@@ -471,7 +480,7 @@ RxNav and LiverTox evidence before accepting it.
             )
             self.livertox_matcher = None
             return False
-        catalog_stream = self.serializer.stream_drugs_catalog()
+        catalog_stream = self.knowledge_repository.drug_catalog_repository.stream_drugs_catalog()
         try:
             self.livertox_matcher = await asyncio.to_thread(
                 LiverToxMatcher,

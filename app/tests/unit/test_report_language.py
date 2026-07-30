@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import pytest
 from domain.clinical.entities import DrugRucamAssessment
+from common.utils.languages import (
+    DETECTABLE_REPORT_LANGUAGES,
+    SUPPORTED_REPORT_LANGUAGES,
+    resolve_supported_language_code,
+)
 from services.clinical.hepatox_scoring import is_materially_in_report_language
 from services.clinical.report_language import (
-    SUPPORTED_REPORT_LANGUAGE_CODES,
     phrase,
     resolve_report_language,
     rucam_summary_text,
@@ -27,7 +31,7 @@ def test_required_phrase_keys_exist_for_supported_languages() -> None:
         "report_section_summary",
         "report_section_per_drug",
     }
-    for lang in SUPPORTED_REPORT_LANGUAGE_CODES:
+    for lang in SUPPORTED_REPORT_LANGUAGES:
         for key in keys:
             if key == "rucam_structured_score":
                 assert phrase(key, lang, score=6, category="probable")
@@ -46,6 +50,12 @@ def test_rucam_summary_text_returns_localized_or_safe_text() -> None:
 ###############################################################################
 def test_unsupported_language_code_resolves_to_english() -> None:
     assert resolve_report_language("xx") == "en"
+
+###############################################################################
+def test_portuguese_is_renderable_but_not_deterministically_detectable() -> None:
+    assert resolve_supported_language_code("pt-BR") == "pt"
+    assert "pt" in SUPPORTED_REPORT_LANGUAGES
+    assert "pt" not in DETECTABLE_REPORT_LANGUAGES
 
 ###############################################################################
 def test_missing_phrase_key_raises_deterministic_error() -> None:

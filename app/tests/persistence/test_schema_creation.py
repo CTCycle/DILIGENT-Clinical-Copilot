@@ -13,6 +13,7 @@ def test_canonical_persistence_tables_exist(persistence_engine: Engine) -> None:
         "clinical_drug_mentions",
         "drug_identifiers",
         "application_configuration",
+        "provider_model_catalog_cache",
         "reference_catalog_manifests",
     }.issubset(tables)
 

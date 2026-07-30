@@ -12,7 +12,8 @@ from repositories.schemas.knowledge import (
     KbMatchCache,
     LiverToxMonograph,
 )
-from repositories.serialization.data import DataSerializer
+from repositories.knowledge_repository import KnowledgeRepository
+from repository_fixtures import build_repository_graph
 from services.clinical.drug_resolution import DrugResolutionService
 from services.clinical.matches_core import LiverToxMatcher
 
@@ -314,10 +315,10 @@ def test_candidates_from_another_extracted_drug_do_not_contaminate_mention() -> 
 # DB match-cache integration tests
 
 ###############################################################################
-def _build_cache_db() -> tuple[DataSerializer, Drug, LiverToxMonograph]:
+def _build_cache_db() -> tuple[KnowledgeRepository, Drug, LiverToxMonograph]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
-    serializer = DataSerializer(engine=engine)
+    serializer = build_repository_graph(engine=engine).knowledge_repository
     factory = sessionmaker(bind=engine, future=True)
     with factory() as session:
         drug = Drug(
@@ -369,9 +370,12 @@ def test_db_cache_hit_returns_cached_result() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
-        normalized_drug_key=key,
-    )
+
+    def cache_lookup(key: str):
+        return serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,
@@ -414,9 +418,12 @@ def test_db_cache_miss_falls_through_to_pipeline() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
-        normalized_drug_key=key,
-    )
+
+    def cache_lookup(key: str):
+        return serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,
@@ -454,9 +461,12 @@ def test_db_cache_low_confidence_not_used() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
-        normalized_drug_key=key,
-    )
+
+    def cache_lookup(key: str):
+        return serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,
@@ -474,7 +484,7 @@ def test_db_cache_low_confidence_not_used() -> None:
 def test_db_cache_uses_previously_resolved_rxcui() -> None:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
-    serializer = DataSerializer(engine=engine)
+    serializer = build_repository_graph(engine=engine).knowledge_repository
     factory = sessionmaker(bind=engine, future=True)
     with factory() as session:
         drug = Drug(
@@ -529,9 +539,12 @@ def test_db_cache_uses_previously_resolved_rxcui() -> None:
         ]
     )
     matcher = LiverToxMatcher(frame)
-    cache_lookup = lambda key: serializer.load_livertox_match_from_db_cache(
-        normalized_drug_key=key,
-    )
+
+    def cache_lookup(key: str):
+        return serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+
     resolver = DrugResolutionService(
         matcher,
         cache_lookup=cache_lookup,

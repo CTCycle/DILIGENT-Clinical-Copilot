@@ -54,10 +54,10 @@ def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
-        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.session_repository.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
-        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.session_repository.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     request = ClinicalSessionRequest(
         clinical_input=(
@@ -240,7 +240,7 @@ def test_run_revision_consultation_uses_revision_analysis_entrypoint(
                 "final_report": "Revision synthesis report",
                 "revision_consultation_metadata": {
                     "drug_analysis_entrypoint": "request_revision_drug_analysis",
-                    "report_finalization_entrypoint": "finalize_revision_patient_report",
+"report_finalization_entrypoint": "finalize_report",
                     "conclusion_entrypoint": "generate_revision_conclusion",
                     "synthesis_mode": "revision_comparison_aware",
                 },
@@ -277,7 +277,7 @@ def test_run_revision_consultation_uses_revision_analysis_entrypoint(
     )
     assert (
         payload_metadata["report_finalization_entrypoint"]
-        == "finalize_revision_patient_report"
+== "finalize_report"
     )
     assert payload_metadata["conclusion_entrypoint"] == "generate_revision_conclusion"
     assert payload_metadata["synthesis_mode"] == "revision_comparison_aware"

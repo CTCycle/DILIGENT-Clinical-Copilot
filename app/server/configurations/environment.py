@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from common import paths
 from common.utils.logger import logger
 from domain.bootstrap import EnvironmentBootstrapState
+from configurations.runtime_bootstrap import ensure_runtime_data_layout
 
 ###############################################################################
 @lru_cache(maxsize=1)
@@ -34,6 +35,7 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
             return env_path if env_path.exists() else None
 
         previous_keys = set(os.environ.keys())
+        ensure_runtime_data_layout()
         if not env_path.exists():
             example_path = paths.ENV_EXAMPLE_PATH
             if not example_path.exists():

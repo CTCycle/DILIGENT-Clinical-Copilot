@@ -1,7 +1,9 @@
 # Backend Layers
-Last updated: 2026-07-23
+Last updated: 2026-07-28
 
 Sampling behavior is owned by `services/llm/generation_policy.py`.
+
+Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and Brave.
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -42,7 +44,11 @@ Sampling behavior is owned by `services/llm/generation_policy.py`.
   - Provider-key cryptography lives under `app/server/common/security/cryptography.py`.
   - Shared pure-utility modules (text normalization, chunking, seed terms, embedding model specs, list deduplication) live under `app/server/common/utils/` (`text_utils.py`, `chunking.py`, `seed_terms.py`, `embedding_model.py`) and are the canonical single source of truth — service modules import from here rather than duplicating logic.
   - Endpoint-layer request validation lives in `app/server/api/session_validation.py`.
-  - Catalog snapshot provider (`common/catalogs/provider.py`) provides cross-layer access to reference catalog data through a registered provider pattern — service-layer runtime (`services/catalogs/runtime.py`) registers itself as the provider during import.
+  - Catalog snapshot provider (`common/catalogs/provider.py`) provides cross-layer access to reference catalog data through a cached getter. Application lifespan explicitly calls `initialize_reference_catalog_provider()` before startup validation; service imports do not register providers as a side effect.
+  - `RepositoryContext` constructs the shared SQLAlchemy engine/session factory. Focused repositories own clinical-session, timeline, revision, knowledge, and drug-catalog operations; there is no aggregate `DataSerializer` boundary.
+  - `ExposureTimelineService` owns deterministic exposure-date parsing and suspension evaluation without repository, FastAPI, or LLM dependencies.
+  - Focused repository helpers contain pure value normalization, serialization, and row conversion; SQLAlchemy transactions remain in the focused repositories.
+  - Hepatox subservices receive explicit typed capabilities and shared issue state; they do not reach back through a parent consultation facade.
   - Catalog manifest loading (`common/catalogs/manifest_loader.py`) handles file I/O for catalog JSON manifests, decoupled from persistence logic.
   - Constants that depend on external catalog files (e.g., `CLOUD_MODEL_CHOICES`) are exposed as lazy accessor functions (`get_cloud_model_choices()`) to avoid import-time I/O side effects.
   - Logger configuration (`common/utils/logger.py`) defers file handler setup and `dictConfig` calls until `configure_logging()` is invoked during `initialize_settings()`, avoiding import-time side effects and global logging reconfiguration.
@@ -61,7 +67,7 @@ Sampling behavior is owned by `services/llm/generation_policy.py`.
 ### `POST /api/clinical/jobs`
 - `app/server/api/session.py`
 - `app/server/services/session/session_service.py`
-- `app/server/repositories/serialization/data.py` and DB repositories
+- `app/server/repositories/clinical_session_repository.py`
 - Performs clinical preflight before job creation, normalizes the submitted document, applies deterministic section-first extraction before clinical LLM extraction, persists evidence-locked pipeline artifacts in `session_result_payload`, and returns artifact and gate summaries through the job result.
 - Core section extraction is deterministic only and preserves verbatim source slices with heading spans, body spans, char spans, match strategy, confidence, source hash, and review flags.
 - Low-confidence section extraction blocks preflight below `0.65`; review-required section extraction returns non-blocking preflight issues that the frontend must acknowledge before starting the job.
@@ -73,7 +79,7 @@ Sampling behavior is owned by `services/llm/generation_policy.py`.
 - Resolution statuses are `accepted_exact_livertox`, `accepted_rxnav_validated`, `accepted_livertox_without_rxnav`, `ambiguous_requires_review`, `missing_rxnav`, `missing_livertox`, and `rejected_false_positive`.
 - Persisted audit artifacts include section extraction audit, extraction strategy decisions, hepatic pattern resolution, and match audit details.
 - Persisted clinical results include a readable `final_report` that uses the per-drug clinical consultation narrative and appends a concise deterministic DILI adjudication summary. The full rendered deterministic dossier is persisted separately as `pipeline_artifacts.structured_dili_report`, while `dili_evidence_bundle` remains the structured audit contract.
-- Successful clinical jobs require database persistence. If the serializer cannot return a persisted session id, the workflow fails with a service dependency error rather than returning an unpersisted success.
+- Successful clinical jobs require database persistence. If `ClinicalSessionRepository` cannot return a persisted session id, the workflow fails with a service dependency error rather than returning an unpersisted success.
 
 ### `POST /api/clinical/validate-input`
 - `app/server/api/session.py`
@@ -83,12 +89,12 @@ Sampling behavior is owned by `services/llm/generation_policy.py`.
 ### `GET /api/inspection/sessions`
 - `app/server/api/data_inspection.py`
 - `app/server/services/inspection/service.py`
-- `app/server/repositories/serialization/data.py`
+- `app/server/repositories/clinical_session_repository.py` and `app/server/repositories/session_revision_repository.py`
 
 ### `GET|PUT /api/inspection/sessions/{session_id}`
 - `app/server/api/data_inspection.py`
 - `app/server/services/inspection/service.py`
-- `app/server/repositories/serialization/data.py`
+- `app/server/repositories/session_revision_repository.py`
 - Session detail is the single session read surface for original text, parsed sections, metadata, AI preview payload, and revision audit data.
 
 ### `POST /api/inspection/sessions/{session_id}/revision/jobs`
@@ -97,7 +103,7 @@ Sampling behavior is owned by `services/llm/generation_policy.py`.
 - `app/server/services/inspection/service.py`
 - `app/server/services/inspection/revision_scaffold.py`
 - `app/server/services/inspection/revision_agent.py`
-- `app/server/repositories/serialization/data.py`
+- `app/server/repositories/session_revision_repository.py`
 - Revision jobs currently implement the revision-agent skeleton only. They create a draft revision version shell, persist a revision run, and execute one single-model `revision_agent_issue_scan` step.
 - The revision agent reviews the persisted session input, sections, generated report, result payload, optional selected text, and user instructions. It produces a structured issue inventory covering missing context, mismatched context, hallucination risk, ambiguity, unsupported claims, chronology gaps, and future tool needs.
 - The skeleton does not rewrite the clinical report, rerun deterministic DILI adjudication, persist revised entities, or execute tools. Future tool routing is represented only as inert `tool_intents` in the issue-scan artifact.

@@ -8,6 +8,9 @@ import {
   JobStartResponse,
   JobStatusResponse,
   ModelConfigStateResponse,
+  ModelCatalogOperationResponse,
+  CatalogProvider,
+  ModelConfigPersistResponse,
   ModelConfigUpdateRequest,
   OllamaPullJobResult,
 } from "../models/types";
@@ -19,16 +22,8 @@ import {
 
 const ACCESS_KEYS_TIMEOUT_SECONDS = 15;
 
-export async function fetchModelConfigState(
-  includeLocalAvailability?: boolean,
-): Promise<ModelConfigStateResponse> {
-  const queryString =
-    typeof includeLocalAvailability === "boolean"
-      ? buildQueryString({
-          include_local_availability: includeLocalAvailability ? "true" : "false",
-        })
-      : "";
-  return requestJson<ModelConfigStateResponse>(`${API_BASE_URL}/model-config${queryString}`, {
+export async function fetchModelConfigState(): Promise<ModelConfigStateResponse> {
+  return requestJson<ModelConfigStateResponse>(`${API_BASE_URL}/model-config`, {
     method: "GET",
     cache: "no-store",
     headers: {
@@ -40,14 +35,32 @@ export async function fetchModelConfigState(
 
 export async function updateModelConfigState(
   payload: ModelConfigUpdateRequest,
-): Promise<ModelConfigStateResponse> {
-  return requestJson<ModelConfigStateResponse>(`${API_BASE_URL}/model-config`, {
+): Promise<ModelConfigPersistResponse> {
+  return requestJson<ModelConfigPersistResponse>(`${API_BASE_URL}/model-config`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
   });
+}
+
+export async function loadModelCatalog(
+  provider: CatalogProvider,
+): Promise<ModelCatalogOperationResponse> {
+  return requestJson<ModelCatalogOperationResponse>(
+    `${API_BASE_URL}/model-config/catalogs/${encodeURIComponent(provider)}/load`,
+    { method: "POST" },
+  );
+}
+
+export async function refreshModelCatalog(
+  provider: CatalogProvider,
+): Promise<ModelCatalogOperationResponse> {
+  return requestJson<ModelCatalogOperationResponse>(
+    `${API_BASE_URL}/model-config/catalogs/${encodeURIComponent(provider)}/refresh`,
+    { method: "POST" },
+  );
 }
 
 export async function fetchEmbeddingStatus(): Promise<EmbeddingStatusResponse> {

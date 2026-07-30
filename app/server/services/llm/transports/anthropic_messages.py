@@ -6,12 +6,8 @@ from anthropic import AsyncAnthropic
 from anthropic.types import MessageParam
 
 from domain.llm.providers import CloudModelDescriptor
-from services.llm.transports.base import (
-    ChatRequest,
-    ChatResult,
-    ConnectivityResult,
-    StructuredTransportMixin,
-)
+from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
+from services.llm.transports.base import StructuredTransportMixin
 
 ###############################################################################
 class AnthropicMessagesTransport(StructuredTransportMixin):
@@ -41,11 +37,17 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
         return ChatResult(content=text)
 
     # -------------------------------------------------------------------------
-    async def list_models(self) -> list[CloudModelDescriptor]:
+    async def list_models(
+        self, *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
+        del force_refresh
         models: list[CloudModelDescriptor] = []
         after_id: str | None = None
         while True:
-            page = await self.client.models.list(limit=100, after_id=after_id)
+            if after_id is None:
+                page = await self.client.models.list(limit=100)
+            else:
+                page = await self.client.models.list(limit=100, after_id=after_id)
             models.extend(
                 CloudModelDescriptor(id=item.id, display_name=item.display_name)
                 for item in page.data

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 
 from common import paths
@@ -17,7 +16,7 @@ def test_initialize_environment_preserves_process_environment_precedence(
 ) -> None:
     dotenv_path = tmp_path / ".env"
     dotenv_path.write_text(
-        "DILIGENT_TAURI_MODE=true\nFASTAPI_HOST=0.0.0.0\n", encoding="utf-8"
+        "TEST_DOTENV_VAR=enabled\nFASTAPI_HOST=0.0.0.0\n", encoding="utf-8"
     )
     monkeypatch.setattr(paths, "ENV_FILE_PATH", dotenv_path)
     monkeypatch.setenv("FASTAPI_HOST", "127.0.0.1")
@@ -26,7 +25,7 @@ def test_initialize_environment_preserves_process_environment_precedence(
     initialize_environment()
 
     assert environment.get_dotenv_injected_keys()
-    assert "DILIGENT_TAURI_MODE" in environment.get_dotenv_injected_keys()
+    assert "TEST_DOTENV_VAR" in environment.get_dotenv_injected_keys()
     assert os.environ.get("FASTAPI_HOST") == "127.0.0.1"
 
 ###############################################################################
@@ -36,7 +35,7 @@ def test_initialize_environment_creates_env_from_example_when_missing(
     dotenv_path = tmp_path / ".env"
     example_path = tmp_path / ".env.example"
     example_path.write_text(
-        "DILIGENT_TAURI_MODE=true\nFASTAPI_HOST=127.0.0.1\n", encoding="utf-8"
+        "TEST_DOTENV_VAR=enabled\nFASTAPI_HOST=127.0.0.1\n", encoding="utf-8"
     )
     monkeypatch.setattr(paths, "ENV_FILE_PATH", dotenv_path)
     monkeypatch.setattr(paths, "ENV_EXAMPLE_PATH", example_path)
@@ -47,7 +46,7 @@ def test_initialize_environment_creates_env_from_example_when_missing(
     assert dotenv_path.read_text(encoding="utf-8") == example_path.read_text(
         encoding="utf-8"
     )
-    assert os.environ.get("DILIGENT_TAURI_MODE") == "true"
+    assert os.environ.get("TEST_DOTENV_VAR") == "enabled"
 
 ###############################################################################
 def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(

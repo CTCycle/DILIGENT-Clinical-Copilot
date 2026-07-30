@@ -85,6 +85,20 @@ def test_accepts_common_variants() -> None:
     assert missing_required_section_names(sections) == []
 
 ###############################################################################
+def test_clinical_question_heading_does_not_duplicate_anamnesis() -> None:
+    text = (
+        "## Anamnesis\nA\n\n"
+        "## Clinical question\nAssess compatibility with DILI.\n\n"
+        "## Therapy\nT\n\n"
+        "## Laboratory history\nL"
+    )
+
+    sections = extract_required_dili_sections(text)
+
+    assert missing_required_section_names(sections) == []
+    assert sections["anamnesis"].text == "A"
+
+###############################################################################
 def test_mixed_language_therapy_heading_is_inferred_from_section_body() -> None:
     text = (
         "## Anamnesis\n"

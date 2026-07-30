@@ -7,12 +7,8 @@ from google import genai
 from google.genai import types
 
 from domain.llm.providers import CloudModelDescriptor
-from services.llm.transports.base import (
-    ChatRequest,
-    ChatResult,
-    ConnectivityResult,
-    StructuredTransportMixin,
-)
+from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
+from services.llm.transports.base import StructuredTransportMixin
 
 ###############################################################################
 class GeminiTransport(StructuredTransportMixin):
@@ -48,7 +44,10 @@ class GeminiTransport(StructuredTransportMixin):
         return ChatResult(content=str(response.text or ""))
 
     # -------------------------------------------------------------------------
-    async def list_models(self) -> list[CloudModelDescriptor]:
+    async def list_models(
+        self, *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
+        del force_refresh
         page = await asyncio.to_thread(lambda: list(self.client.models.list()))
         return [
             CloudModelDescriptor(

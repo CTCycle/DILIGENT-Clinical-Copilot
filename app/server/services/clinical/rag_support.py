@@ -13,7 +13,6 @@ from services.retrieval.embeddings import (
     SimilaritySearch,
 )
 from services.text.normalization import normalize_drug_query_name
-from services.llm.generation_policy import GenerationPurpose
 
 RATE_LIMIT_WAIT_HINT_RE = re.compile(
     r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
@@ -31,8 +30,22 @@ class RagSupportService:
     """RAG document retrieval, similarity search, and language repair utilities."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, consultation: Any) -> None:
-        self.consultation = consultation
+    def __init__(
+        self,
+        *,
+        similarity_search: SimilaritySearch | None,
+        max_excerpt_length: int,
+        rag_candidate_k: int,
+        rag_top_n: int,
+        rag_use_reranking: bool,
+        pipeline_issues: list[PipelineIssue],
+    ) -> None:
+        self.similarity_search = similarity_search
+        self.max_excerpt_length = int(max_excerpt_length)
+        self.rag_candidate_k = int(rag_candidate_k)
+        self.rag_top_n = int(rag_top_n)
+        self.rag_use_reranking = bool(rag_use_reranking)
+        self.pipeline_issues = pipeline_issues
         self._retrieval_issue_lock = threading.Lock()
         self._retrieval_failed_drugs: list[str] = []
 
@@ -56,8 +69,16 @@ class RagSupportService:
                 self.search_supporting_documents,
                 drug_rag_query,
             )
-        except EmbeddingModelMismatchError:
-            raise
+        except EmbeddingModelMismatchError as exc:
+            logger.warning(
+                "RAG retrieval unavailable for drug '%s' because the active embedding "
+                "model does not match the indexed vectors; continuing without "
+                "supporting documents: %s",
+                drug_name,
+                exc,
+            )
+            self.record_rag_retrieval_issue(drug_name=drug_name, error=exc)
+            return None
         except Exception as exc:
             logger.warning(
                 "RAG retrieval unavailable for drug '%s'; continuing without supporting documents: %s",
@@ -80,12 +101,10 @@ class RagSupportService:
                 f"{'s' if count != 1 else ''}: {failed_names}."
             )
             raw_line = f"{failed_names}: {error}"
-            if not hasattr(self.consultation, "pipeline_issues"):
-                self.consultation.pipeline_issues = []
             existing = next(
                 (
                     issue
-                    for issue in self.consultation.pipeline_issues
+                    for issue in self.pipeline_issues
                     if issue.code == "rag_retrieval_unavailable"
                 ),
                 None,
@@ -94,7 +113,7 @@ class RagSupportService:
                 existing.message = message
                 existing.raw_line = raw_line
                 return
-            self.consultation.pipeline_issues.append(
+            self.pipeline_issues.append(
                 PipelineIssue(
                     severity="warning",
                     code="rag_retrieval_unavailable",
@@ -106,13 +125,13 @@ class RagSupportService:
 
     # -------------------------------------------------------------------------
     def ensure_similarity_search(self) -> bool:
-        if self.consultation.similarity_search is not None:
+        if self.similarity_search is not None:
             return True
         try:
-            self.consultation.similarity_search = SimilaritySearch()
+            self.similarity_search = SimilaritySearch()
         except Exception as exc:
             logger.error("Failed to initialize similarity search: %s", exc)
-            self.consultation.similarity_search = None
+            self.similarity_search = None
             return False
         return True
 
@@ -122,9 +141,9 @@ class RagSupportService:
         if not excerpts:
             return None
         combined = "\n\n".join(excerpts)
-        if len(combined) <= self.consultation.MAX_EXCERPT_LENGTH:
+        if len(combined) <= self.max_excerpt_length:
             return combined
-        truncated = combined[: self.consultation.MAX_EXCERPT_LENGTH]
+        truncated = combined[: self.max_excerpt_length]
         cutoff = truncated.rfind("\n")
         if cutoff > 2000:
             truncated = truncated[:cutoff]
@@ -140,15 +159,14 @@ class RagSupportService:
         if not normalized or not self.ensure_similarity_search():
             return None
 
-        consultation = self.consultation
         results = (
-            consultation.similarity_search.search_with_reranking(
+            self.similarity_search.search_with_reranking(
                 normalized,
-                candidate_k=consultation.rag_candidate_k,
-                final_top_n=consultation.rag_top_n,
-                use_reranking=consultation.rag_use_reranking,
+                candidate_k=self.rag_candidate_k,
+                final_top_n=self.rag_top_n,
+                use_reranking=self.rag_use_reranking,
             )
-            if consultation.similarity_search
+            if self.similarity_search
             else None
         )
         if not results:
@@ -201,14 +219,12 @@ class RagSupportService:
 
     # -------------------------------------------------------------------------
     def record_low_relevance_issue(self, excluded_count: int) -> None:
-        if not hasattr(self.consultation, "pipeline_issues"):
-            self.consultation.pipeline_issues = []
         if any(
             issue.code == "rag_low_relevance_excluded"
-            for issue in self.consultation.pipeline_issues
+            for issue in self.pipeline_issues
         ):
             return
-        self.consultation.pipeline_issues.append(
+        self.pipeline_issues.append(
             PipelineIssue(
                 severity="warning",
                 code="rag_low_relevance_excluded",
@@ -219,37 +235,6 @@ class RagSupportService:
                 field="rag",
             )
         )
-
-    # -------------------------------------------------------------------------
-    async def repair_language_once(
-        self,
-        *,
-        source_text: str,
-        report_language: str,
-    ) -> str:
-        consultation = self.consultation
-        language_map = "en=English, it=Italian, de=German, fr=French, es=Spanish"
-        repair_system = (
-            "You rewrite clinical text into the requested language only. "
-            "Do not add new clinical facts."
-        )
-        repair_user = (
-            f"Target language code: {report_language}\n"
-            f"Language map: {language_map}\n"
-            "Rewrite the text entirely in the target language. "
-            "Do not produce bilingual output. Keep drug names and direct quotes unchanged.\n\n"
-            f"Text:\n{source_text}"
-        )
-        chat_kwargs: dict[str, Any] = {
-            "model": consultation.llm_model,
-            "messages": [
-                {"role": "system", "content": repair_system},
-                {"role": "user", "content": repair_user},
-            ],
-            "purpose": GenerationPurpose.JSON_REPAIR,
-        }
-        repaired = await consultation.llm_client.chat(**chat_kwargs)
-        return consultation.drug_analysis.coerce_chat_text(repaired).strip()
 
     # -------------------------------------------------------------------------
     @staticmethod
