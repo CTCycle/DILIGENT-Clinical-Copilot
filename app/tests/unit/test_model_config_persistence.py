@@ -16,6 +16,9 @@ from services.llm.cloud import LLMError
 from services.llm.model_config import ModelConfigService
 from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
 from repositories.serialization.model_configs import ModelConfigSerializer
+from repositories.serialization.provider_model_catalog_cache import (
+    ProviderModelCatalogCacheSerializer,
+)
 from repositories.schemas.base import Base
 from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import get_job_manager
@@ -132,15 +135,6 @@ def test_model_config_state_survives_provider_catalog_drift(monkeypatch) -> None
         )
     )
     service = ModelConfigService(serializer=serializer)
-    monkeypatch.setitem(
-        ModelConfigService._provider_catalog_cache,
-        "deepseek",
-        (
-            datetime.now(UTC),
-            [CloudModelDescriptor(id="deepseek-chat", display_name="DeepSeek Chat")],
-        ),
-    )
-
     async def fake_discover_provider_descriptors() -> list[CloudProviderDescriptor]:
         return ModelConfigService.build_provider_descriptors()
 
@@ -151,7 +145,7 @@ def test_model_config_state_survives_provider_catalog_drift(monkeypatch) -> None
     )
 
     response = asyncio.run(
-        service.get_state(include_local_availability=False)
+        service.get_state()
     )
 
     assert response.llm_provider == "deepseek"
@@ -188,20 +182,23 @@ def test_model_config_catalog_keeps_configured_model_when_refresh_fails(
             return None
 
         # -------------------------------------------------------------------------
-        async def list_model_descriptors(self) -> list[CloudModelDescriptor]:
+        async def list_model_descriptors(self, **_: Any) -> list[CloudModelDescriptor]:
             raise LLMError("provider catalog unavailable")
 
     monkeypatch.setattr(model_config_module, "CloudLLMClient", FailingCloudClient)
-    descriptors = asyncio.run(
-        ModelConfigService(serializer=serializer).discover_provider_descriptors()
+    service = ModelConfigService(serializer=serializer)
+    monkeypatch.setattr(
+        service,
+        "catalog_configuration_fingerprint",
+        lambda _provider: "openai-test-fingerprint",
     )
-    openai = next(item for item in descriptors if item.id == "openai")
+    operation = asyncio.run(service.load_catalog("openai", force_refresh=True))
+    openai = next(item for item in operation.state.cloud_providers if item.id == "openai")
 
+    assert operation.outcome == "failed"
     assert openai.catalog_status == "unavailable"
     assert [model.id for model in openai.models] == ["gpt-4.1-mini"]
-    assert openai.catalog_message == (
-        "Provider catalog unavailable; showing the configured model."
-    )
+    assert openai.catalog_message == "provider catalog unavailable"
 
 ###############################################################################
 def test_model_config_service_rejects_switching_cloud_model_roles_to_local_mode(
@@ -404,20 +401,10 @@ def test_local_model_save_reuses_cached_availability(monkeypatch) -> None:
         )
     )
     service = ModelConfigService(serializer=serializer)
-    service._available_local_models = {"qwen3.5:2b"}
+    async def cached_availability() -> set[str]:
+        return {"qwen3.5:2b"}
 
-    ###############################################################################
-    class UnexpectedOllamaClient:
-
-        # -------------------------------------------------------------------------
-        async def __aenter__(self):
-            raise AssertionError("cached availability must avoid Ollama")
-
-        # -------------------------------------------------------------------------
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    monkeypatch.setattr(model_config_module, "OllamaClient", UnexpectedOllamaClient)
+    monkeypatch.setattr(service, "list_available_ollama_models", cached_availability)
     response = asyncio.run(
         service.update_state(
             ModelConfigUpdateRequest(
@@ -432,7 +419,7 @@ def test_local_model_save_reuses_cached_availability(monkeypatch) -> None:
     assert serializer.snapshot.clinical_model == "qwen3.5:2b"
 
 ###############################################################################
-def test_cold_local_model_save_lists_ollama_once(monkeypatch) -> None:
+def test_cold_local_catalog_loads_ollama_once(monkeypatch) -> None:
     serializer = InMemorySerializer(
         ModelConfigSnapshot(
             clinical_model="gpt-4.1-mini",
@@ -464,16 +451,16 @@ def test_cold_local_model_save_lists_ollama_once(monkeypatch) -> None:
             return ["qwen3.5:2b"]
 
     monkeypatch.setattr(model_config_module, "OllamaClient", FakeOllamaClient)
-    asyncio.run(
-        service.update_state(
-            ModelConfigUpdateRequest(
-                use_cloud_services=False,
-                clinical_model="qwen3.5:2b",
-                text_extraction_model="qwen3.5:2b",
-            )
-        )
+    monkeypatch.setattr(
+        service,
+        "catalog_configuration_fingerprint",
+        lambda _provider: "ollama-test-fingerprint",
     )
+    first = asyncio.run(service.load_catalog("ollama"))
+    second = asyncio.run(service.load_catalog("ollama"))
 
+    assert first.outcome == "refreshed"
+    assert second.outcome == "cached"
     assert calls == 1
 
 ###############################################################################
@@ -558,14 +545,14 @@ def test_model_config_service_prioritizes_recommended_installed_local_models(
         fake_list_available_ollama_models,
     )
 
-    response = asyncio.run(service.get_state(include_local_availability=True))
+    response = asyncio.run(service.get_state())
 
     assert response.local_models[0].name == "qwen3.5:2b"
     assert response.local_models[0].recommended_for_local_extraction is True
     assert response.local_models[1].name == "qwen3.5:9b"
 
 ###############################################################################
-def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) -> None:
+def test_failed_ollama_catalog_load_is_persisted_without_retry(monkeypatch) -> None:
     serializer = InMemorySerializer(
         ModelConfigSnapshot(
             clinical_model="gpt-oss:20b",
@@ -595,22 +582,17 @@ def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) ->
                 "Failed to list Ollama models: All connection attempts failed"
             )
 
-    warnings: list[str] = []
-    times = iter([10.0, 20.0, 135.0])
-
     monkeypatch.setattr(model_config_module, "OllamaClient", FailingOllamaClient)
-    monkeypatch.setattr(model_config_module, "monotonic", lambda: next(times))
     monkeypatch.setattr(
-        model_config_module.logger,
-        "warning",
-        lambda message, exc: warnings.append(f"{message}::{exc}"),
+        service,
+        "catalog_configuration_fingerprint",
+        lambda _provider: "ollama-failure-fingerprint",
     )
+    first = asyncio.run(service.load_catalog("ollama", force_refresh=True))
+    second = asyncio.run(service.load_catalog("ollama"))
 
-    asyncio.run(service.list_available_ollama_models())
-    asyncio.run(service.list_available_ollama_models())
-    asyncio.run(service.list_available_ollama_models())
-
-    assert len(warnings) == 2
+    assert first.outcome == "failed"
+    assert second.outcome == "cached"
 
 ###############################################################################
 def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> None:
@@ -696,7 +678,6 @@ def test_connectivity_check_reports_llm_error(monkeypatch) -> None:
 
 ###############################################################################
 def test_provider_catalog_uses_last_successful_models_when_refresh_fails(monkeypatch) -> None:
-    ModelConfigService._provider_catalog_cache.clear()
     failures: set[str] = set()
 
     ###############################################################################
@@ -718,22 +699,200 @@ def test_provider_catalog_uses_last_successful_models_when_refresh_fails(monkeyp
             return False
 
         # -------------------------------------------------------------------------
-        async def list_model_descriptors(self) -> list[CloudModelDescriptor]:
+        async def list_model_descriptors(self, **_: Any) -> list[CloudModelDescriptor]:
+            if self.provider in failures:
+                raise LLMError("Provider request failed")
             return [CloudModelDescriptor(id=f"{self.provider}-model", display_name="Model")]
 
     monkeypatch.setattr(model_config_module, "CloudLLMClient", FakeCloudLLMClient)
     service = ModelConfigService()
+    monkeypatch.setattr(
+        service,
+        "catalog_configuration_fingerprint",
+        lambda provider: f"{provider}-test-fingerprint",
+    )
 
-    first = asyncio.run(service.discover_provider_descriptors())
-    assert next(item for item in first if item.id == "deepseek").catalog_status == "available"
+    first = asyncio.run(service.load_catalog("deepseek", force_refresh=True))
+    assert first.outcome == "refreshed"
 
     failures.add("deepseek")
-    second = asyncio.run(service.discover_provider_descriptors())
-    deepseek = next(item for item in second if item.id == "deepseek")
+    second = asyncio.run(service.load_catalog("deepseek", force_refresh=True))
+    deepseek = next(item for item in second.state.cloud_providers if item.id == "deepseek")
+    assert second.outcome == "failed"
     assert deepseek.catalog_status == "cached"
     assert [item.id for item in deepseek.models] == ["deepseek-model"]
-    assert deepseek.catalog_message == "Showing models from the last successful provider refresh."
-    ModelConfigService._provider_catalog_cache.clear()
+    assert "Latest refresh failed" in (deepseek.catalog_message or "")
+
+###############################################################################
+def test_empty_ollama_catalog_is_saved_as_a_valid_empty_result(monkeypatch, tmp_path) -> None:
+    service = _catalog_test_service(
+        tmp_path,
+        ModelConfigSnapshot(
+            clinical_model="gpt-oss:20b",
+            text_extraction_model="qwen3:14b",
+            use_cloud_models=False,
+            cloud_provider="openai",
+            cloud_model=None,
+            updated_at=datetime.now(),
+        ),
+    )
+
+    class EmptyOllamaClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def list_models(self):
+            return []
+
+    monkeypatch.setattr(model_config_module, "OllamaClient", EmptyOllamaClient)
+    monkeypatch.setattr(
+        service,
+        "catalog_configuration_fingerprint",
+        lambda _provider: "empty-ollama-fingerprint",
+    )
+
+    result = asyncio.run(service.load_catalog("ollama", force_refresh=True))
+    cached = asyncio.run(service.load_catalog("ollama"))
+
+    assert result.outcome == "refreshed"
+    assert cached.outcome == "cached"
+    assert cached.state.local_catalog.status == "available"
+    assert not {model.name for model in cached.state.local_models if model.available_in_ollama}
+
+###############################################################################
+def _catalog_test_service(tmp_path, snapshot: ModelConfigSnapshot) -> ModelConfigService:
+    engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'catalog-cache.db'}")
+    Base.metadata.create_all(engine)
+    return ModelConfigService(
+        serializer=InMemorySerializer(snapshot),
+        catalog_cache=ProviderModelCatalogCacheSerializer(engine=engine),
+    )
+
+###############################################################################
+def test_catalog_provider_switching_keeps_provider_specific_lists(
+    monkeypatch, tmp_path
+) -> None:
+    service = _catalog_test_service(
+        tmp_path,
+        ModelConfigSnapshot(
+            clinical_model="gpt-4.1-mini",
+            text_extraction_model="gpt-4.1-mini",
+            use_cloud_models=True,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            updated_at=datetime.now(UTC),
+        ),
+    )
+
+    class FakeCloudClient:
+        def __init__(self, *, provider: str, **_: Any) -> None:
+            self.provider = provider
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_: Any) -> None:
+            return None
+
+        async def list_model_descriptors(self, **_: Any) -> list[CloudModelDescriptor]:
+            return [
+                CloudModelDescriptor(
+                    id=f"{self.provider}-model", display_name=self.provider
+                )
+            ]
+
+    monkeypatch.setattr(model_config_module, "CloudLLMClient", FakeCloudClient)
+    monkeypatch.setattr(
+        service,
+        "catalog_configuration_fingerprint",
+        lambda provider: f"{provider}-fingerprint",
+    )
+
+    asyncio.run(service.load_catalog("openai", force_refresh=True))
+    asyncio.run(service.load_catalog("deepseek", force_refresh=True))
+    state = asyncio.run(service.get_state())
+
+    openai = next(item for item in state.cloud_providers if item.id == "openai")
+    deepseek = next(item for item in state.cloud_providers if item.id == "deepseek")
+    assert [item.id for item in openai.models] == ["openai-model"]
+    assert [item.id for item in deepseek.models] == ["deepseek-model"]
+
+###############################################################################
+def test_concurrent_catalog_loads_share_one_provider_fetch(monkeypatch, tmp_path) -> None:
+    service = _catalog_test_service(
+        tmp_path,
+        ModelConfigSnapshot(
+            clinical_model="gpt-4.1-mini",
+            text_extraction_model="gpt-4.1-mini",
+            use_cloud_models=True,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            updated_at=datetime.now(UTC),
+        ),
+    )
+    calls = 0
+
+    class FakeCloudClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_: Any) -> None:
+            return None
+
+        async def list_model_descriptors(self, **_: Any) -> list[CloudModelDescriptor]:
+            nonlocal calls
+            calls += 1
+            await asyncio.sleep(0)
+            return [CloudModelDescriptor(id="openai-model", display_name="OpenAI")]
+
+    monkeypatch.setattr(model_config_module, "CloudLLMClient", FakeCloudClient)
+    monkeypatch.setattr(
+        service, "catalog_configuration_fingerprint", lambda _provider: "same-fingerprint"
+    )
+
+    async def run_concurrent():
+        return await asyncio.gather(
+            service.load_catalog("openai", force_refresh=True),
+            service.load_catalog("openai", force_refresh=True),
+        )
+
+    first, second = asyncio.run(run_concurrent())
+
+    assert first.outcome == "refreshed"
+    assert second.outcome == "refreshed"
+    assert calls == 1
+
+###############################################################################
+def test_catalog_fingerprint_change_invalidates_saved_models(tmp_path) -> None:
+    service = _catalog_test_service(
+        tmp_path,
+        ModelConfigSnapshot(
+            clinical_model="gpt-4.1-mini",
+            text_extraction_model="gpt-4.1-mini",
+            use_cloud_models=True,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            updated_at=datetime.now(UTC),
+        ),
+    )
+    service.catalog_cache.save_success(
+        provider_id="openai",
+        configuration_fingerprint="old-fingerprint",
+        models=[{"id": "old-model", "display_name": "Old"}],
+    )
+    service.catalog_configuration_fingerprint = lambda _provider: "new-fingerprint"  # type: ignore[method-assign]
+
+    state = asyncio.run(service.get_state())
+    openai = next(item for item in state.cloud_providers if item.id == "openai")
+
+    assert openai.catalog_status == "not_loaded"
+    assert openai.models == []
 
 ###############################################################################
 def test_cloud_runtime_uses_cloud_model_when_role_models_are_local() -> None:

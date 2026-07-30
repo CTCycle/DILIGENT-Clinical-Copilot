@@ -187,9 +187,11 @@ class CloudLLMClient:
         return [item.id for item in await self.list_model_descriptors()]
 
     # -------------------------------------------------------------------------
-    async def list_model_descriptors(self) -> list[CloudModelDescriptor]:
+    async def list_model_descriptors(
+        self, *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
         if self.transport is not None:
-            return await self.transport.list_models()
+            return await self.transport.list_models(force_refresh=force_refresh)
         if self.provider == "openai":
             try:
                 resp = await self.client.get("/models")

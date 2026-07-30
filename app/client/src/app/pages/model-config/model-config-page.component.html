@@ -19,7 +19,7 @@
                   aria-label="Local Models (Ollama)"
                   [checked]="!draftConfig().useCloudServices"
                   (change)="handleCloudSwitchChange(false)"
-                  [disabled]="isConfigurationSaving() || isLoading()"
+                  [disabled]="isConfigurationSaving() || isLoading() || !!catalogProviderInFlight()"
                 />
                 <svg class="model-config-option-icon" viewBox="0 0 24 24" aria-hidden="true">
                   <rect x="7" y="5.5" width="10" height="13" rx="1.75" />
@@ -40,7 +40,7 @@
                   aria-label="Cloud Models"
                   [checked]="draftConfig().useCloudServices"
                   (change)="handleCloudSwitchChange(true)"
-                  [disabled]="isConfigurationSaving() || isLoading()"
+                  [disabled]="isConfigurationSaving() || isLoading() || !!catalogProviderInFlight()"
                 />
                 <svg class="model-config-option-icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M7.25 17.75h9.4a3.85 3.85 0 0 0 .68-7.64 5.56 5.56 0 0 0-10.76 1.54 3.08 3.08 0 0 0 .68 6.1Z" />
@@ -116,7 +116,7 @@
                 aria-label="Cloud provider"
                 [ngModel]="draftProvider()"
                 (ngModelChange)="handleProviderChange($event)"
-                [disabled]="isConfigurationSaving() || isLoading()"
+                [disabled]="isConfigurationSaving() || isLoading() || !!catalogProviderInFlight()"
               >
                 @for (provider of cloudProviderOptions(); track provider) {
                   <option [value]="provider">{{ resolveProviderLabel(provider) }}</option>
@@ -133,8 +133,8 @@
               type="button"
               aria-label="Refresh model catalog"
               title="Refresh model catalog"
-              (click)="loadModelConfig(false, true)"
-              [disabled]="isConfigurationSaving() || isLoading()"
+              (click)="refreshSelectedCatalog()"
+              [disabled]="isConfigurationSaving() || isLoading() || !!catalogProviderInFlight()"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M20 11a8 8 0 0 0-13.8-4.9L4 8.3M4 5v3.3h3.3M4 13a8 8 0 0 0 13.8 4.9L20 15.7M20 19v-3.3h-3.3" />
@@ -193,6 +193,11 @@
               Quantized (Q*)
             </button>
           </div>
+          @if (localCatalog().message) {
+          <p class="model-config-cloud-filter-note" [class.is-warning]="localCatalog().status !== 'available'">
+            {{ localCatalog().message }}
+          </p>
+          }
           } @else {
           <p class="model-config-cloud-filter-note" [class.is-warning]="selectedCloudProvider()?.catalog_status !== 'available'">
             {{ cloudCatalogMessage() || 'Tag filters are available only for local catalog metadata.' }}
@@ -425,7 +430,7 @@
     [provider]="openProviderModal() || 'openai'"
     [providerLabel]="resolveProviderLabel(openProviderModal() || 'openai')"
     (closed)="closeKeys()"
-    (keysChanged)="loadModelConfig(false, true)"
+    (keysChanged)="loadModelConfig(false)"
   ></app-access-key-modal>
 
   @if (ragSettingsModalOpen()) {

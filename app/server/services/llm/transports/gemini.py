@@ -44,7 +44,10 @@ class GeminiTransport(StructuredTransportMixin):
         return ChatResult(content=str(response.text or ""))
 
     # -------------------------------------------------------------------------
-    async def list_models(self) -> list[CloudModelDescriptor]:
+    async def list_models(
+        self, *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
+        del force_refresh
         page = await asyncio.to_thread(lambda: list(self.client.models.list()))
         return [
             CloudModelDescriptor(

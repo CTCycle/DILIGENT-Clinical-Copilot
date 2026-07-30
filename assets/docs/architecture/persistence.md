@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-07-29
+Last updated: 2026-07-30
 
 ## Relational Database
 
@@ -73,6 +73,10 @@ The extracted runtime is versioned and hash-addressed so it can be replaced duri
 
 - A newly initialized database receives canonical model defaults.
 - Existing provider and model selections are read as stored; unsupported values fail validation and are not silently translated.
+- Provider model catalogs are persisted in `provider_model_catalog_cache`, keyed by provider and a fingerprint of the catalog endpoint plus the active credential (or normalized Ollama endpoint). Secrets are never stored.
+- `GET /api/model-config` reads cached catalog state only. The provider-specific `load` operation contacts a provider only for a cold cache, while `refresh` is the explicit replacement operation.
+- Failed attempts are persisted with sanitized metadata. A failed cloud refresh preserves the last valid list; an empty Ollama installation is a valid cached result. Endpoint or active-key changes invalidate the old scope without affecting inactive credentials.
+- The same SQLAlchemy schema is initialized for development and packaged desktop runtimes, so the persisted catalog survives navigation and application restarts without startup polling.
 
 ## Agentic Revision Artifacts
 

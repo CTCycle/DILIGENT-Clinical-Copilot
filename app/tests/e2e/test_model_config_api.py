@@ -18,6 +18,13 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
     assert "cloud_model" in payload
     assert "clinical_model" in payload
     assert "text_extraction_model" in payload
+    assert payload["local_catalog"]["status"] in {
+        "available",
+        "cached",
+        "not_loaded",
+        "unavailable",
+        "authentication_required",
+    }
     assert "cloud_temperature" not in payload
     assert "ollama_temperature" not in payload
 

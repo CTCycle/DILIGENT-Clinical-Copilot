@@ -37,7 +37,10 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
         return ChatResult(content=text)
 
     # -------------------------------------------------------------------------
-    async def list_models(self) -> list[CloudModelDescriptor]:
+    async def list_models(
+        self, *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
+        del force_refresh
         models: list[CloudModelDescriptor] = []
         after_id: str | None = None
         while True:

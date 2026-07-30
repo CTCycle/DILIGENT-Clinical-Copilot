@@ -38,11 +38,13 @@ class RoutedGatewayTransport(StructuredTransportMixin):
         self._transports: list[CloudTransport] = []
 
     # -------------------------------------------------------------------------
-    async def list_models(self) -> list[CloudModelDescriptor]:
+    async def list_models(
+        self, *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
         key_fingerprint = hashlib.sha256(self.api_key.encode("utf-8")).hexdigest()[:16]
         cache_key = f"{self.base_url}{self.models_path}:{key_fingerprint}"
         cached = self._cache.get(cache_key)
-        if cached and cached[0] > datetime.now(UTC):
+        if not force_refresh and cached and cached[0] > datetime.now(UTC):
             self._models = {item.id: item for item in cached[1]}
             return list(cached[1])
         try:
@@ -55,7 +57,7 @@ class RoutedGatewayTransport(StructuredTransportMixin):
                 response = await client.get(self.models_path)
                 response.raise_for_status()
         except Exception:
-            if cached:
+            if cached and not force_refresh:
                 self._models = {item.id: item for item in cached[1]}
                 return list(cached[1])
             raise

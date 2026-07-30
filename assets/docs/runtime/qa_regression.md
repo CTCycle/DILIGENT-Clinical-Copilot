@@ -1,5 +1,5 @@
 # QA Regression
-Last updated: 2026-07-29
+Last updated: 2026-07-30
 
 ## Scope
 This file captures the repeatable regression slice for model configuration and app-flow validation.
@@ -13,6 +13,7 @@ After a Windows desktop release build, validate the published portable artifact 
 3. Confirm `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>\extraction.complete` exists.
 4. Read `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json` and request `/api/health` on its recorded port.
 5. Confirm `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log` contains successful startup and static-asset requests.
+6. Open Model Configurations twice and confirm the second read uses the persisted provider catalog without a provider request. Click **Refresh** once and confirm only that action replaces the catalog. Repeat with a freshly initialized database to verify the cold-load path.
 
 This smoke test does not replace MSI install/upgrade/uninstall, offline WebView2, code-signing, or clean-machine distribution testing. Packaged desktop uses a random backend port and should not be tested through the source-mode `7690`/`9847` URLs.
 
@@ -94,7 +95,7 @@ $env:APP_TEST_BACKEND_URL='http://127.0.0.1:7690'
 
 ## Expected Pass Signatures
 - Model-config unit pass:
-  - `3 passed`
+  - `31 passed`
 - Focused E2E slice:
   - `7 passed, 3 deselected`
 - Full model-config plus app-flow pass:

@@ -39,7 +39,10 @@ class OpenAIChatTransport(StructuredTransportMixin):
         )
 
     # -------------------------------------------------------------------------
-    async def list_models(self) -> list[CloudModelDescriptor]:
+    async def list_models(
+        self, *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
+        del force_refresh
         response = await self.client.get("models")
         response.raise_for_status()
         return [
