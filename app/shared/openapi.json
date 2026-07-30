@@ -3,7 +3,7 @@
   "info": {
     "title": "DILI Backend",
     "description": "FastAPI backend",
-    "version": "1.0.0"
+    "version": "3.0.0"
   },
   "paths": {
     "/api/clinical/section-template": {
@@ -2804,24 +2804,6 @@
         ],
         "summary": "Get State",
         "operationId": "get_state_api_model_config_get",
-        "parameters": [
-          {
-            "name": "include_local_availability",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Include Local Availability"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2829,6 +2811,35 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ModelConfigStateResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "model-config"
+        ],
+        "summary": "Update State",
+        "operationId": "update_state_api_model_config_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelConfigUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConfigPersistResponse"
                 }
               }
             }
@@ -2844,30 +2855,93 @@
             }
           }
         }
-      },
-      "put": {
+      }
+    },
+    "/api/model-config/catalogs/{provider}/load": {
+      "post": {
         "tags": [
           "model-config"
         ],
-        "summary": "Update State",
-        "operationId": "update_state_api_model_config_put",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ModelConfigUpdateRequest"
-              }
+        "summary": "Load Catalog",
+        "operationId": "load_catalog_api_model_config_catalogs__provider__load_post",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "ollama",
+                "openai",
+                "gemini",
+                "deepseek",
+                "anthropic",
+                "opencode_zen",
+                "opencode_go"
+              ],
+              "type": "string",
+              "title": "Provider"
             }
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ModelConfigStateResponse"
+                  "$ref": "#/components/schemas/ModelCatalogOperationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/model-config/catalogs/{provider}/refresh": {
+      "post": {
+        "tags": [
+          "model-config"
+        ],
+        "summary": "Refresh Catalog",
+        "operationId": "refresh_catalog_api_model_config_catalogs__provider__refresh_post",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "ollama",
+                "openai",
+                "gemini",
+                "deepseek",
+                "anthropic",
+                "opencode_zen",
+                "opencode_go"
+              ],
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCatalogOperationResponse"
                 }
               }
             }
@@ -3627,6 +3701,7 @@
             "enum": [
               "available",
               "cached",
+              "not_loaded",
               "unavailable",
               "authentication_required"
             ],
@@ -4316,7 +4391,7 @@
           "embedding_model": {
             "type": "string",
             "title": "Embedding Model",
-            "default": "ibm-granite/granite-embedding-small-english-r2"
+            "default": "ibm-granite/granite-embedding-97m-multilingual-r2"
           },
           "embedding_revision": {
             "type": "string",
@@ -4459,6 +4534,49 @@
           "excerpt"
         ],
         "title": "LiverToxExcerptResponse"
+      },
+      "LocalCatalogMetadata": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "cached",
+              "not_loaded",
+              "unavailable",
+              "authentication_required"
+            ],
+            "title": "Status"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "LocalCatalogMetadata"
       },
       "LocalModelCard": {
         "properties": {
@@ -4686,6 +4804,149 @@
         ],
         "title": "ManualReportEditResponse"
       },
+      "ModelCatalogOperationResponse": {
+        "properties": {
+          "catalog_provider": {
+            "type": "string",
+            "enum": [
+              "ollama",
+              "openai",
+              "gemini",
+              "deepseek",
+              "anthropic",
+              "opencode_zen",
+              "opencode_go"
+            ],
+            "title": "Catalog Provider"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "cached",
+              "refreshed",
+              "failed"
+            ],
+            "title": "Outcome"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ModelConfigStateResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "catalog_provider",
+          "outcome",
+          "state"
+        ],
+        "title": "ModelCatalogOperationResponse"
+      },
+      "ModelConfigPersistResponse": {
+        "properties": {
+          "use_cloud_services": {
+            "type": "boolean",
+            "title": "Use Cloud Services"
+          },
+          "llm_provider": {
+            "type": "string",
+            "enum": [
+              "openai",
+              "gemini",
+              "deepseek",
+              "anthropic",
+              "opencode_zen",
+              "opencode_go"
+            ],
+            "title": "Llm Provider"
+          },
+          "cloud_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cloud Model"
+          },
+          "text_extraction_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Extraction Model"
+          },
+          "clinical_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Model"
+          },
+          "ollama_reasoning": {
+            "type": "boolean",
+            "title": "Ollama Reasoning"
+          },
+          "ollama_seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ollama Seed"
+          },
+          "rag_settings": {
+            "$ref": "#/components/schemas/RagSettingsResponse"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "use_cloud_services",
+          "llm_provider",
+          "cloud_model",
+          "text_extraction_model",
+          "clinical_model",
+          "ollama_reasoning",
+          "ollama_seed",
+          "rag_settings"
+        ],
+        "title": "ModelConfigPersistResponse",
+        "description": "Configuration values returned after a persistence-only update."
+      },
       "ModelConfigStateResponse": {
         "properties": {
           "local_models": {
@@ -4701,6 +4962,9 @@
             },
             "type": "array",
             "title": "Cloud Providers"
+          },
+          "local_catalog": {
+            "$ref": "#/components/schemas/LocalCatalogMetadata"
           },
           "use_cloud_services": {
             "type": "boolean",
@@ -4767,9 +5031,7 @@
             "title": "Ollama Seed"
           },
           "rag_settings": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Rag Settings"
+            "$ref": "#/components/schemas/RagSettingsResponse"
           },
           "embedding_runtime": {
             "$ref": "#/components/schemas/EmbeddingRuntimeStatus"
@@ -4794,6 +5056,7 @@
         "required": [
           "local_models",
           "cloud_providers",
+          "local_catalog",
           "use_cloud_services",
           "llm_provider",
           "cloud_model",
@@ -4898,14 +5161,12 @@
           "rag_settings": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/RagSettingsUpdateRequest"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Rag Settings"
+            ]
           }
         },
         "additionalProperties": false,
@@ -5436,6 +5697,214 @@
           "backend"
         ],
         "title": "RagReadiness"
+      },
+      "RagSettingsResponse": {
+        "properties": {
+          "chunk_size": {
+            "type": "integer",
+            "title": "Chunk Size"
+          },
+          "chunk_overlap": {
+            "type": "integer",
+            "title": "Chunk Overlap"
+          },
+          "embedding_batch_size": {
+            "type": "integer",
+            "title": "Embedding Batch Size"
+          },
+          "use_hybrid_search": {
+            "type": "boolean",
+            "title": "Use Hybrid Search"
+          },
+          "use_reranking": {
+            "type": "boolean",
+            "title": "Use Reranking"
+          },
+          "retrieval_candidate_count": {
+            "type": "integer",
+            "title": "Retrieval Candidate Count"
+          },
+          "retrieval_selected_count": {
+            "type": "integer",
+            "title": "Retrieval Selected Count"
+          },
+          "reranker_model": {
+            "type": "string",
+            "title": "Reranker Model"
+          },
+          "hybrid_vector_weight": {
+            "type": "number",
+            "title": "Hybrid Vector Weight"
+          },
+          "hybrid_text_weight": {
+            "type": "number",
+            "title": "Hybrid Text Weight"
+          },
+          "vector_stream_batch_size": {
+            "type": "integer",
+            "title": "Vector Stream Batch Size"
+          },
+          "embedding_offline_mode": {
+            "type": "boolean",
+            "title": "Embedding Offline Mode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "chunk_size",
+          "chunk_overlap",
+          "embedding_batch_size",
+          "use_hybrid_search",
+          "use_reranking",
+          "retrieval_candidate_count",
+          "retrieval_selected_count",
+          "reranker_model",
+          "hybrid_vector_weight",
+          "hybrid_text_weight",
+          "vector_stream_batch_size",
+          "embedding_offline_mode"
+        ],
+        "title": "RagSettingsResponse"
+      },
+      "RagSettingsUpdateRequest": {
+        "properties": {
+          "chunk_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chunk Size"
+          },
+          "chunk_overlap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chunk Overlap"
+          },
+          "embedding_batch_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Batch Size"
+          },
+          "use_hybrid_search": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Use Hybrid Search"
+          },
+          "use_reranking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Use Reranking"
+          },
+          "retrieval_candidate_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Candidate Count"
+          },
+          "retrieval_selected_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Selected Count"
+          },
+          "reranker_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reranker Model"
+          },
+          "hybrid_vector_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hybrid Vector Weight"
+          },
+          "hybrid_text_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hybrid Text Weight"
+          },
+          "vector_stream_batch_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Stream Batch Size"
+          },
+          "embedding_offline_mode": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Offline Mode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RagSettingsUpdateRequest"
       },
       "ReferenceCatalogRuntimeObservationResponse": {
         "properties": {

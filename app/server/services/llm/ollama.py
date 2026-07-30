@@ -20,12 +20,15 @@ from domain.jobs import (
     JobStatusResponse,
 )
 from domain.models import ModelListResponse
+from repositories.serialization.provider_model_catalog_cache import (
+    ProviderModelCatalogCacheSerializer,
+)
+from services.llm import model_catalog
 from services.llm.ollama_client import (
     OllamaClient,
     OllamaError,
     OllamaTimeout,
 )
-from services.llm.model_config import ModelConfigService
 from services.runtime.jobs import (
     JobManager,
 )
@@ -180,10 +183,10 @@ async def pull_model_async(
             else:
                 await client.pull(name, stream=stream)
 
-        catalog_service = ModelConfigService()
-        catalog_service.catalog_cache.merge_model(
+        catalog_cache = ProviderModelCatalogCacheSerializer()
+        catalog_cache.merge_model(
             provider_id="ollama",
-            configuration_fingerprint=catalog_service.catalog_configuration_fingerprint(
+            configuration_fingerprint=model_catalog.catalog_configuration_fingerprint(
                 "ollama"
             ),
             model={"id": name, "display_name": name},
