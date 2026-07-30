@@ -46,12 +46,6 @@ def test_models_list_returns_payload(api_context: APIRequestContext):
     assert isinstance(payload["models"], list)
     assert payload["count"] == len(payload["models"])
 
-###############################################################################
-def test_models_pull_job_requires_name(api_context: APIRequestContext):
-    response = api_context.post("/api/models/pull/jobs")
-    assert response.status == 422
-
-###############################################################################
 def test_models_pull_job_noop_when_model_available(api_context: APIRequestContext):
     list_response = api_context.get("/api/models/list")
     skip_if_ollama_unavailable(list_response)

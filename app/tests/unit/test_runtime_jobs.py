@@ -3,6 +3,8 @@ from __future__ import annotations
 import threading
 import time
 
+import pytest
+
 from services.runtime.jobs import JobManager
 from services.session.session_service import ClinicalSessionService
 
@@ -50,20 +52,19 @@ def test_clinical_cancel_response_converts_job_snapshot_to_success_bool() -> Non
     assert response.job_id == "job-123"
 
 ###############################################################################
-def test_runner_accepts_named_job_id() -> None:
-    assert JobManager().runner_accepts_job_id(accepts_named_job_id)
-
-###############################################################################
-def test_runner_accepts_kwargs() -> None:
-    assert JobManager().runner_accepts_job_id(accepts_kwargs)
-
-###############################################################################
-def test_runner_rejects_callable_without_job_id() -> None:
-    assert not JobManager().runner_accepts_job_id(accepts_no_job_id)
-
-###############################################################################
-def test_runner_rejects_non_inspectable_callable() -> None:
-    assert not JobManager().runner_accepts_job_id(len)
+@pytest.mark.parametrize(
+    ("runner", "expected"),
+    [
+        (accepts_named_job_id, True),
+        (accepts_kwargs, True),
+        (accepts_no_job_id, False),
+        (len, False),
+    ],
+)
+def test_runner_job_id_detection_covers_supported_and_rejected_callables(
+    runner, expected: bool
+) -> None:  # type: ignore[no-untyped-def]
+    assert JobManager().runner_accepts_job_id(runner) is expected
 
 ###############################################################################
 def test_running_cancel_transitions_to_cancelled_immediately() -> None:
