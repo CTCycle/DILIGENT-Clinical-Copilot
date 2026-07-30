@@ -24,7 +24,7 @@ class SessionRevisionValidationError(ValueError):
 
 ###############################################################################
 class InspectionRevisionScaffoldMixin:
-    serializer: Any
+    session_revision_repository: Any
     jobs: Any
     revision_agent_runner: Any
     REVISION_JOB_TYPE: str
@@ -40,13 +40,13 @@ class InspectionRevisionScaffoldMixin:
         try:
             result = self.revision_agent_runner.run_agentic(**kwargs)
         except Exception:
-            self.serializer.fail_revision_run(
+            self.session_revision_repository.fail_revision_run(
                 pipeline_run_id=pipeline_run_id,
                 error={"message": "Revision processing failed. Retry the revision if needed."},
             )
             raise
         if self.jobs.should_stop(job_id):
-            self.serializer.cancel_revision_run(pipeline_run_id=pipeline_run_id)
+            self.session_revision_repository.cancel_revision_run(pipeline_run_id=pipeline_run_id)
         return result
 
     # -------------------------------------------------------------------------
@@ -85,7 +85,7 @@ class InspectionRevisionScaffoldMixin:
             raise SessionRevisionValidationError(
                 "Session has no clinical text available for revision."
             )
-        source_version = self.serializer.get_version_record_for_session(session_id)
+        source_version = self.session_revision_repository.get_version_record_for_session(session_id)
         if source_version is None:
             raise SessionRevisionValidationError(
                 "Session version could not be prepared for revision."
@@ -108,7 +108,7 @@ class InspectionRevisionScaffoldMixin:
             "model_overrides": dict(revision_request.model_overrides or {}),
             "metadata": dict(revision_request.metadata or {}),
         }
-        shell = self.serializer.create_revision_version_shell(
+        shell = self.session_revision_repository.create_revision_version_shell(
             session_id,
             reviewer_note=revision_request.revision_instruction,
             configuration=model_configuration,
@@ -121,7 +121,7 @@ class InspectionRevisionScaffoldMixin:
             )
         revision_version_id = int(shell["revision_version_id"])
         model_configuration["revision_version_id"] = revision_version_id
-        self.serializer.create_or_update_revision_run(
+        self.session_revision_repository.create_or_update_revision_run(
             pipeline_run_id=pipeline_run_id,
             session_id=int(session_id),
             root_session_id=root_session_id,
@@ -150,7 +150,7 @@ class InspectionRevisionScaffoldMixin:
             scope_key=scope_key,
         )
         model_configuration["job_id"] = job_id
-        self.serializer.create_or_update_revision_run(
+        self.session_revision_repository.create_or_update_revision_run(
             pipeline_run_id=pipeline_run_id,
             session_id=int(session_id),
             root_session_id=root_session_id,
@@ -197,10 +197,10 @@ class InspectionRevisionScaffoldMixin:
         payload = self.get_job_status(job_id, expected_type=self.REVISION_JOB_TYPE)
         if payload is not None:
             return payload
-        run = self.serializer.get_revision_run_by_job_id(job_id)
+        run = self.session_revision_repository.get_revision_run_by_job_id(job_id)
         if run is None:
             return None
-        self.serializer.fail_revision_run(
+        self.session_revision_repository.fail_revision_run(
             pipeline_run_id=str(run["pipeline_run_id"]),
             error={"message": REVISION_JOB_MISSING_STATUS_MESSAGE},
         )
@@ -225,19 +225,18 @@ class InspectionRevisionScaffoldMixin:
         cancelled = self.cancel_job(job_id, expected_type=self.REVISION_JOB_TYPE)
         if not cancelled:
             return False
-        run = self.serializer.get_revision_run_by_job_id(job_id)
+        run = self.session_revision_repository.get_revision_run_by_job_id(job_id)
         if run is not None:
-            configuration = run.get("configuration")
-            self.serializer.cancel_revision_run(pipeline_run_id=run["pipeline_run_id"])
+            self.session_revision_repository.cancel_revision_run(pipeline_run_id=run["pipeline_run_id"])
         return True
 
     # -------------------------------------------------------------------------
     def get_revision_run(self, pipeline_run_id: str) -> dict[str, Any] | None:
-        return self.serializer.get_revision_run(pipeline_run_id)
+        return self.session_revision_repository.get_revision_run(pipeline_run_id)
 
     # -------------------------------------------------------------------------
     def list_revision_steps(self, pipeline_run_id: str) -> list[dict[str, Any]]:
-        return self.serializer.list_revision_steps(pipeline_run_id)
+        return self.session_revision_repository.list_revision_steps(pipeline_run_id)
 
     # -------------------------------------------------------------------------
     def list_revision_artifacts(
@@ -249,7 +248,7 @@ class InspectionRevisionScaffoldMixin:
         detail = self.get_session_version_detail(session_id, version_id=version_id)
         if detail is None:
             raise SessionRevisionNotFoundError("Revision version not found.")
-        return self.serializer.list_revision_artifacts_for_version(
+        return self.session_revision_repository.list_revision_artifacts_for_version(
             revision_version_id=version_id,
         )
 
@@ -263,7 +262,7 @@ class InspectionRevisionScaffoldMixin:
         detail = self.get_session_version_detail(session_id, version_id=version_id)
         if detail is None:
             raise SessionRevisionNotFoundError("Revision version not found.")
-        return self.serializer.list_revision_entities_for_version(
+        return self.session_revision_repository.list_revision_entities_for_version(
             revision_version_id=version_id,
         )
 
@@ -277,7 +276,7 @@ class InspectionRevisionScaffoldMixin:
         detail = self.get_session_version_detail(session_id, version_id=version_id)
         if detail is None:
             raise SessionRevisionNotFoundError("Revision version not found.")
-        return self.serializer.list_revision_reviews_for_version(
+        return self.session_revision_repository.list_revision_reviews_for_version(
             revision_version_id=version_id,
         )
 
@@ -295,7 +294,7 @@ class InspectionRevisionScaffoldMixin:
         detail = self.get_session_version_detail(session_id, version_id=version_id)
         if detail is None:
             raise SessionRevisionNotFoundError("Revision version not found.")
-        return self.serializer.record_revision_review_action(
+        return self.session_revision_repository.record_revision_review_action(
             revision_version_id=version_id,
             clinical_review_status=clinical_review_status,
             reviewer_note=reviewer_note,

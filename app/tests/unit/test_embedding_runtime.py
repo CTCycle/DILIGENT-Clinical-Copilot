@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
+import services.retrieval.embedding_runtime as embedding_runtime_module
 from services.retrieval.embedding_runtime import (
     EmbeddingRuntime,
     EmbeddingRuntimeUnavailable,
@@ -16,16 +17,21 @@ from services.retrieval.embedding_runtime import (
     REQUIRED_SNAPSHOT_FILES,
 )
 
-
+###############################################################################
 class FakeTokenizer:
+
+    # -------------------------------------------------------------------------
     def encode(self, text: str, *, add_special_tokens: bool = True):
         return SimpleNamespace(ids=[len(text) + 1, 2, 3])
 
+    # -------------------------------------------------------------------------
     def decode(self, ids, *, skip_special_tokens: bool = True) -> str:
         return "decoded " + " ".join(map(str, ids))
 
-
+###############################################################################
 class FakeSession:
+
+    # -------------------------------------------------------------------------
     def __init__(self, output=None, *, token_type_ids: bool = False):
         self.output = (
             output
@@ -43,21 +49,25 @@ class FakeSession:
         self._outputs = [SimpleNamespace(name="last_hidden_state")]
         self.calls = []
 
+    # -------------------------------------------------------------------------
     def get_inputs(self):
         return self._inputs
 
+    # -------------------------------------------------------------------------
     def get_outputs(self):
         return self._outputs
 
+    # -------------------------------------------------------------------------
     def get_providers(self):
         return ["CPUExecutionProvider"]
 
+    # -------------------------------------------------------------------------
     def run(self, names, inputs):
         self.calls.append(inputs)
         batch = inputs["input_ids"].shape[0]
         return [np.tile(self.output, (batch, 1, 1))]
 
-
+###############################################################################
 def _runtime(tmp_path: Path, *, session=None, batch_size=2, config=None):
     config = config or CANONICAL_EMBEDDING_CONFIG
     snapshot = tmp_path / config.revision
@@ -79,16 +89,13 @@ def _runtime(tmp_path: Path, *, session=None, batch_size=2, config=None):
         session_factory=lambda path, **kwargs: session,
     ), session
 
-
+###############################################################################
 def test_runtime_is_lazy_reuses_session_and_exposes_chunking_adapter(
     tmp_path: Path,
 ) -> None:
     runtime, session = _runtime(tmp_path)
     assert runtime.loaded is False
-    assert (
-        runtime.status()["cache_status"] == "dependency_missing"
-        or runtime.status()["cache_status"] == "available"
-    )
+    assert runtime.status()["cache_status"] == "available"
     vectors = runtime.embed_documents(["document", "second", "third"])
     assert len(vectors) == 3 and len(vectors[0]) == 384
     assert runtime.loaded is True
@@ -96,13 +103,13 @@ def test_runtime_is_lazy_reuses_session_and_exposes_chunking_adapter(
     assert runtime.get_tokenizer().decode([1, 2]) == "decoded 1 2"
     assert len(session.calls) == 2
 
-
+###############################################################################
 def test_offline_runtime_rejects_incomplete_cache(tmp_path: Path) -> None:
     runtime = EmbeddingRuntime(cache_directory=tmp_path, offline_mode=True)
     with pytest.raises(EmbeddingRuntimeUnavailable, match="incomplete"):
         runtime.embed_documents(["document"])
 
-
+###############################################################################
 def test_runtime_rejects_corrupted_artifact(tmp_path: Path) -> None:
     runtime, _ = _runtime(tmp_path)
     artifact = (
@@ -114,14 +121,14 @@ def test_runtime_rejects_corrupted_artifact(tmp_path: Path) -> None:
     with pytest.raises(EmbeddingRuntimeUnavailable, match="SHA-256"):
         runtime.embed_documents(["document"])
 
-
+###############################################################################
 def test_runtime_rejects_wrong_dimension(tmp_path: Path) -> None:
     output = np.zeros((1, 3, 12), dtype=np.float32)
     runtime, _ = _runtime(tmp_path, session=FakeSession(output))
     with pytest.raises(EmbeddingVectorValidationError, match="dimension"):
         runtime.embed_documents(["document"])
 
-
+###############################################################################
 def test_runtime_close_releases_session_and_can_be_recreated(tmp_path: Path) -> None:
     runtime, _ = _runtime(tmp_path)
     runtime.embed_queries(["query"])
@@ -129,3 +136,53 @@ def test_runtime_close_releases_session_and_can_be_recreated(tmp_path: Path) -> 
     assert runtime.loaded is False
     with pytest.raises(Exception, match="shutting down"):
         runtime.embed_queries(["query"])
+
+###############################################################################
+def test_cached_accessor_reuses_and_close_clears_runtime(monkeypatch) -> None:
+    created = []
+
+    ###############################################################################
+    class FakeRuntime:
+
+        # -------------------------------------------------------------------------
+        def __init__(self, **kwargs):
+            created.append(self)
+            self.closed = False
+
+        # -------------------------------------------------------------------------
+        def close(self) -> None:
+            self.closed = True
+
+    monkeypatch.setattr(
+        embedding_runtime_module,
+        "EmbeddingRuntime",
+        FakeRuntime,
+    )
+    monkeypatch.setattr(
+        embedding_runtime_module,
+        "build_effective_rag_settings",
+        lambda: SimpleNamespace(embedding_offline_mode=True, embedding_batch_size=4),
+    )
+    embedding_runtime_module.get_embedding_runtime.cache_clear()
+    try:
+        first = embedding_runtime_module.get_embedding_runtime()
+        assert embedding_runtime_module.get_embedding_runtime() is first
+        assert len(created) == 1
+
+        embedding_runtime_module.close_embedding_runtime()
+        assert first.closed is True
+        second = embedding_runtime_module.get_embedding_runtime()
+        assert second is not first
+        assert len(created) == 2
+    finally:
+        embedding_runtime_module.get_embedding_runtime.cache_clear()
+
+###############################################################################
+def test_close_before_first_accessor_use_is_noop(monkeypatch) -> None:
+    monkeypatch.setattr(
+        embedding_runtime_module,
+        "build_effective_rag_settings",
+        lambda: pytest.fail("runtime should not be constructed"),
+    )
+    embedding_runtime_module.get_embedding_runtime.cache_clear()
+    embedding_runtime_module.close_embedding_runtime()

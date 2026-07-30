@@ -26,7 +26,7 @@ from domain.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
-from repositories.serialization.data import DataSerializer
+from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
@@ -94,7 +94,7 @@ class ClinicalSessionService(
         lab_extractor: ClinicalLabExtractor,
         pattern_analyzer: HepatotoxicityPatternAnalyzer,
         rucam_estimator: RucamScoreEstimator,
-        serializer: DataSerializer,
+        session_repository: ClinicalSessionRepository,
         payload_sanitizer: PayloadSanitizationService,
         input_preparator: ClinicalKnowledgePreparation | None = None,
         clinical_input_extractor: ClinicalInputExtractor | None = None,
@@ -106,9 +106,11 @@ class ClinicalSessionService(
         self.lab_extractor = lab_extractor
         self.pattern_analyzer = pattern_analyzer
         self.rucam_estimator = rucam_estimator
-        self.serializer = serializer
+        self.session_repository = session_repository
         self.payload_sanitizer = payload_sanitizer
-        self.input_preparator = input_preparator or ClinicalKnowledgePreparation()
+        if input_preparator is None:
+            raise ValueError("input_preparator is required")
+        self.input_preparator = input_preparator
         self.clinical_input_extractor = (
             clinical_input_extractor or ClinicalInputExtractor()
         )
@@ -391,7 +393,7 @@ class ClinicalSessionService(
         if not request_payload.visit_date:
             raise ServiceValidationError("Visit date is required.")
 
-        livertox_rows, _ = self.serializer.list_livertox_catalog(
+        livertox_rows, _ = self.session_repository.knowledge_repository.list_livertox_catalog(
             search=None, offset=0, limit=1
         )
         if not livertox_rows:
@@ -399,7 +401,7 @@ class ClinicalSessionService(
                 "LiverTox catalog is empty. Run the LiverTox update job from Data "
                 "Inspection before clinical analysis."
             )
-        rxnav_rows, _ = self.serializer.list_rxnav_catalog(
+        rxnav_rows, _ = self.session_repository.drug_catalog_repository.list_rxnav_catalog(
             search=None, offset=0, limit=1
         )
         if not rxnav_rows:

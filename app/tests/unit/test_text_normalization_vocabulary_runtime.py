@@ -10,11 +10,10 @@ from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
 )
-from repositories.serialization.data import DataSerializer
+from repository_fixtures import build_repository_graph
 from services.text import vocabulary as vocabulary_module
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
-
 
 ###############################################################################
 def test_runtime_upsert_list_and_deactivate_term() -> None:
@@ -48,7 +47,6 @@ def test_runtime_upsert_list_and_deactivate_term() -> None:
     )
     assert rows[0]["is_active"] is False
 
-
 ###############################################################################
 def test_seed_mapping_categories_are_loaded() -> None:
     # Smoke check: default snapshot exposes the new mapping fields.
@@ -56,7 +54,6 @@ def test_seed_mapping_categories_are_loaded() -> None:
     assert isinstance(snapshot.lab_marker_aliases, dict)
     assert isinstance(snapshot.brand_combo_preferences, dict)
     assert isinstance(snapshot.knowledge_source_references, dict)
-
 
 ###############################################################################
 def test_detects_keywords_and_stopwords_from_catalog() -> None:
@@ -71,13 +68,14 @@ def test_detects_keywords_and_stopwords_from_catalog() -> None:
     )
     assert isinstance(matches["matched_term_counts"], dict)
 
-
 ###############################################################################
 def test_session_learning_promotes_only_direct_high_confidence_aliases() -> None:
     engine = create_engine("sqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, future=True, expire_on_commit=False)
-    serializer = DataSerializer(engine=engine, session_factory=factory)
+    serializer = build_repository_graph(
+        engine=engine, session_factory=factory
+    ).clinical_session_repository
 
     db_session = factory()
     try:

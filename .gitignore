@@ -56,3 +56,16 @@ Thumbs.db
 *.exe
 *.gz
 !.gitkeep
+# Desktop release artifacts
+release/**
+!release/.gitkeep
+
+# Desktop generated build inputs
+app/desktop/node_modules/
+app/desktop/src-tauri/generated/**
+!app/desktop/src-tauri/generated/.gitkeep
+app/desktop/src-tauri/target/
+!app/desktop/package-lock.json
+!app/desktop/src-tauri/Cargo.lock
+!app/desktop/build/
+!app/desktop/build/**

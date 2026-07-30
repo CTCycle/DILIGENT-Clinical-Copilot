@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-07-21
+Last updated: 2026-07-28
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -77,6 +77,14 @@ Blocking faithfulness issues are finalization blockers. The workflow may retain
 generated artifacts for audit, but the persisted session status must not remain
 `successful` when blocking faithfulness issues exist. Such cases require human
 review before clinical reliance.
+
+Generated clinical narrative is also checked against the authoritative evidence
+bundle before finalization. If the narrative claims that unresolved competing
+causes were excluded, asserts Hy's Law when the structured status is not
+`meets_criteria`, conflates LiverTox likelihood with patient-level causality, or
+uses definitive/lifelong causality language while structured causality is limited,
+the workflow records a blocking faithfulness issue and persists the session as
+requiring human review rather than `successful`.
 
 Longitudinal adjudication is clinically conservative by default: dose changes,
 restart or rechallenge mentions, first symptoms, bilirubin or jaundice timing,

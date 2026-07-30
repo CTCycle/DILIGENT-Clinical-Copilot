@@ -3,12 +3,8 @@ from __future__ import annotations
 import httpx
 
 from domain.llm.providers import CloudModelDescriptor
-from services.llm.transports.base import (
-    ChatRequest,
-    ChatResult,
-    ConnectivityResult,
-    StructuredTransportMixin,
-)
+from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
+from services.llm.transports.base import StructuredTransportMixin
 
 ###############################################################################
 class OpenAIChatTransport(StructuredTransportMixin):
@@ -43,7 +39,10 @@ class OpenAIChatTransport(StructuredTransportMixin):
         )
 
     # -------------------------------------------------------------------------
-    async def list_models(self) -> list[CloudModelDescriptor]:
+    async def list_models(
+        self, *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
+        del force_refresh
         response = await self.client.get("models")
         response.raise_for_status()
         return [

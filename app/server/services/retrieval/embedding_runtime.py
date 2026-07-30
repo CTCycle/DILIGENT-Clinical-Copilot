@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 import hashlib
-import importlib
 import math
 import threading
 from collections.abc import Callable, Sequence
+from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+
+import numpy
+import onnxruntime
+from huggingface_hub import snapshot_download
+from tokenizers import Tokenizer
 
 from common.embedding.config import CANONICAL_EMBEDDING_CONFIG, CanonicalEmbeddingConfig
 from common.paths import EMBEDDING_MODELS_PATH
+from services.retrieval.settings import build_effective_rag_settings
 
 REQUIRED_SNAPSHOT_FILES = frozenset(
     {
@@ -23,15 +29,15 @@ REQUIRED_SNAPSHOT_FILES = frozenset(
     }
 )
 
-
+###############################################################################
 class EmbeddingRuntimeError(RuntimeError):
     """Base error for unavailable or invalid embedding runtime state."""
 
-
+###############################################################################
 class EmbeddingRuntimeUnavailable(EmbeddingRuntimeError):
     """Raised when dependencies, the snapshot, or the ONNX contract is invalid."""
 
-
+###############################################################################
 class EmbeddingVectorValidationError(EmbeddingRuntimeError):
     """Raised when inference violates the canonical vector contract."""
 
@@ -40,23 +46,29 @@ SnapshotDownloader = Callable[..., str | Path]
 SessionFactory = Callable[..., Any]
 TokenizerFactory = Callable[..., Any]
 
-
+###############################################################################
 class _ChunkingTokenizer:
+
+    # -------------------------------------------------------------------------
     def __init__(self, tokenizer: Any) -> None:
         self._tokenizer = tokenizer
 
+    # -------------------------------------------------------------------------
     def encode(self, text: str, add_special_tokens: bool = False) -> list[int]:
         encoded = self._tokenizer.encode(text, add_special_tokens=add_special_tokens)
         ids = getattr(encoded, "ids", encoded)
         return [int(value) for value in ids]
 
+    # -------------------------------------------------------------------------
     def decode(self, ids: Sequence[int], skip_special_tokens: bool = True) -> str:
         return str(
             self._tokenizer.decode(list(ids), skip_special_tokens=skip_special_tokens)
         )
 
-
+###############################################################################
 class EmbeddingRuntime:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -73,8 +85,8 @@ class EmbeddingRuntime:
         self.offline_mode = bool(offline_mode)
         self.batch_size = max(int(batch_size), 1)
         self._snapshot_downloader = snapshot_downloader
-        self._session_factory = session_factory
-        self._tokenizer_factory = tokenizer_factory
+        self._session_factory = session_factory or _default_session_factory
+        self._tokenizer_factory = tokenizer_factory or _default_tokenizer_factory
         self._session: Any | None = None
         self._inference_tokenizer: Any | None = None
         self._chunking_tokenizer: _ChunkingTokenizer | None = None
@@ -82,28 +94,21 @@ class EmbeddingRuntime:
         self._lock = threading.RLock()
         self._closed = False
 
+    # -------------------------------------------------------------------------
     @property
     def loaded(self) -> bool:
         return self._session is not None
 
+    # -------------------------------------------------------------------------
     def status(self) -> dict[str, object]:
         snapshot = self._cached_snapshot_path()
-        dependency_missing = (
-            self._optional_module("numpy") is None
-            or self._optional_module("tokenizers") is None
-            or self._optional_module("onnxruntime") is None
-        )
         cache_status = "missing"
         if self._has_required_files(snapshot):
             try:
                 self._verify_artifact(snapshot / self.config.artifact_path)
-                cache_status = (
-                    "dependency_missing" if dependency_missing else "available"
-                )
+                cache_status = "available"
             except EmbeddingRuntimeUnavailable:
                 cache_status = "invalid"
-        elif dependency_missing and snapshot.is_dir():
-            cache_status = "dependency_missing"
         return {
             "model_id": self.config.model_id,
             "model_revision": self.config.revision,
@@ -114,22 +119,26 @@ class EmbeddingRuntime:
             "loaded": self.loaded,
         }
 
+    # -------------------------------------------------------------------------
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         return self._encode(
             texts, self.config.document_prefix, self.config.maximum_model_tokens
         )
 
+    # -------------------------------------------------------------------------
     def embed_queries(self, texts: Sequence[str]) -> list[list[float]]:
         return self._encode(
             texts, self.config.query_prefix, self.config.maximum_query_tokens
         )
 
+    # -------------------------------------------------------------------------
     def get_tokenizer(self) -> Any:
         with self._lock:
             self._ensure_loaded()
             assert self._chunking_tokenizer is not None
             return self._chunking_tokenizer
 
+    # -------------------------------------------------------------------------
     def close(self) -> None:
         with self._lock:
             self._closed = True
@@ -137,6 +146,7 @@ class EmbeddingRuntime:
             self._inference_tokenizer = None
             self._chunking_tokenizer = None
 
+    # -------------------------------------------------------------------------
     def _encode(
         self, texts: Sequence[str], prefix: str, limit: int
     ) -> list[list[float]]:
@@ -158,7 +168,6 @@ class EmbeddingRuntime:
                 width = max((len(row) for row in ids), default=1)
                 input_ids = [[*row, *([0] * (width - len(row)))] for row in ids]
                 attention = [[*row, *([0] * (width - len(row)))] for row in masks]
-                numpy = self._required_module("numpy")
                 inputs = {
                     "input_ids": numpy.asarray(input_ids, dtype=numpy.int64),
                     "attention_mask": numpy.asarray(attention, dtype=numpy.int64),
@@ -193,14 +202,17 @@ class EmbeddingRuntime:
                 all_vectors.extend(self._validate_vectors(vectors.tolist(), len(batch)))
             return all_vectors
 
+    # -------------------------------------------------------------------------
     def _ensure_loaded(self) -> tuple[Any, Any]:
         if self._session is not None and self._inference_tokenizer is not None:
             return self._session, self._inference_tokenizer
         snapshot = self._resolve_snapshot()
         artifact = snapshot / self.config.artifact_path
         self._verify_artifact(artifact)
-        tokenizer_factory = self._tokenizer_factory or self._default_tokenizer_factory
-        session_factory = self._session_factory or self._default_session_factory
+        tokenizer_factory = self._tokenizer_factory
+        session_factory = self._session_factory
+        assert tokenizer_factory is not None
+        assert session_factory is not None
         try:
             tokenizer = tokenizer_factory(str(snapshot / "tokenizer.json"))
             session = session_factory(
@@ -218,6 +230,7 @@ class EmbeddingRuntime:
         self._session = session
         return session, tokenizer
 
+    # -------------------------------------------------------------------------
     def _resolve_snapshot(self) -> Path:
         cached = self._cached_snapshot_path()
         if self._has_required_files(cached):
@@ -226,7 +239,7 @@ class EmbeddingRuntime:
             raise EmbeddingRuntimeUnavailable(
                 "Canonical embedding cache is incomplete in offline mode"
             )
-        downloader = self._snapshot_downloader or self._default_snapshot_downloader
+        downloader = self._snapshot_downloader or _default_snapshot_downloader
         try:
             result = downloader(
                 repo_id=self.config.model_id,
@@ -248,15 +261,18 @@ class EmbeddingRuntime:
             )
         return cached
 
+    # -------------------------------------------------------------------------
     def _cached_snapshot_path(self) -> Path:
         return self.cache_directory / self.config.revision
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _has_required_files(snapshot: Path) -> bool:
         return snapshot.is_dir() and all(
             (snapshot / item).is_file() for item in REQUIRED_SNAPSHOT_FILES
         )
 
+    # -------------------------------------------------------------------------
     def _verify_artifact(self, artifact: Path) -> None:
         stat = artifact.stat()
         marker = (str(artifact), stat.st_size, stat.st_mtime_ns)
@@ -272,6 +288,7 @@ class EmbeddingRuntime:
             )
         self._verified_artifact = marker
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _select_hidden(session: Any, outputs: Sequence[Any], numpy: Any) -> Any:
         metadata = list(session.get_outputs())
@@ -289,6 +306,7 @@ class EmbeddingRuntime:
             )
         return candidates[0]
 
+    # -------------------------------------------------------------------------
     def _validate_session(self, session: Any) -> None:
         providers = (
             list(session.get_providers()) if hasattr(session, "get_providers") else []
@@ -301,6 +319,7 @@ class EmbeddingRuntime:
                 "ONNX model must declare input_ids and attention_mask"
             )
 
+    # -------------------------------------------------------------------------
     def _validate_vectors(self, rows: Any, expected: int) -> list[list[float]]:
         if not isinstance(rows, list) or len(rows) != expected:
             raise EmbeddingVectorValidationError(
@@ -327,67 +346,33 @@ class EmbeddingRuntime:
             result.append(vector)
         return result
 
-    @staticmethod
-    def _optional_module(name: str) -> Any | None:
-        try:
-            return importlib.import_module(name)
-        except ImportError:
-            return None
+###############################################################################
+def _default_snapshot_downloader(**kwargs: object) -> str:
+    return str(cast(Any, snapshot_download)(**kwargs))
 
-    @staticmethod
-    def _required_module(name: str) -> Any:
-        module = EmbeddingRuntime._optional_module(name)
-        if module is None:
-            raise EmbeddingRuntimeUnavailable(
-                f"Embedding dependency is unavailable: {name}"
-            )
-        return module
+###############################################################################
+def _default_tokenizer_factory(path: str) -> Any:
+    return Tokenizer.from_file(path)
 
-    @staticmethod
-    def _default_snapshot_downloader(**kwargs: object) -> str:
-        return str(
-            getattr(importlib.import_module("huggingface_hub"), "snapshot_download")(
-                **kwargs
-            )
-        )
+###############################################################################
+def _default_session_factory(path: str, **kwargs: object) -> Any:
+    return cast(Any, onnxruntime.InferenceSession)(path, **kwargs)
 
-    @staticmethod
-    def _default_tokenizer_factory(path: str) -> Any:
-        return getattr(importlib.import_module("tokenizers"), "Tokenizer").from_file(
-            path
-        )
-
-    @staticmethod
-    def _default_session_factory(path: str, **kwargs: object) -> Any:
-        return getattr(importlib.import_module("onnxruntime"), "InferenceSession")(
-            path, **kwargs
-        )
-
-
-_EMBEDDING_RUNTIME: EmbeddingRuntime | None = None
-_EMBEDDING_RUNTIME_LOCK = threading.Lock()
-
-
+###############################################################################
+@lru_cache(maxsize=1)
 def get_embedding_runtime() -> EmbeddingRuntime:
-    global _EMBEDDING_RUNTIME
-    with _EMBEDDING_RUNTIME_LOCK:
-        if _EMBEDDING_RUNTIME is None:
-            from services.retrieval.settings import build_effective_rag_settings
+    rag = build_effective_rag_settings()
+    return EmbeddingRuntime(
+        offline_mode=rag.embedding_offline_mode,
+        batch_size=rag.embedding_batch_size,
+    )
 
-            rag = build_effective_rag_settings()
-            _EMBEDDING_RUNTIME = EmbeddingRuntime(
-                offline_mode=rag.embedding_offline_mode,
-                batch_size=rag.embedding_batch_size,
-            )
-        return _EMBEDDING_RUNTIME
-
-
+###############################################################################
 def close_embedding_runtime() -> None:
-    global _EMBEDDING_RUNTIME
-    with _EMBEDDING_RUNTIME_LOCK:
-        if _EMBEDDING_RUNTIME is not None:
-            _EMBEDDING_RUNTIME.close()
-            _EMBEDDING_RUNTIME = None
+    if get_embedding_runtime.cache_info().currsize == 0:
+        return
+    get_embedding_runtime().close()
+    get_embedding_runtime.cache_clear()
 
 
 __all__ = [

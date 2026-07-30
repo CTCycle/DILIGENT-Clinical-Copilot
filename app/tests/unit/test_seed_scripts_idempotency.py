@@ -12,7 +12,7 @@ from repositories.schemas.knowledge import (
     LiverToxMonograph,
 )
 from repositories.schemas.configuration import ReferenceCatalogEntry
-from repositories.serialization.data import DataSerializer
+from repository_fixtures import build_repository_graph
 from services.text.vocabulary import record_text_normalization_observation
 from services.updater import livertox_index
 from services.updater.livertox_core import LiverToxUpdater
@@ -23,8 +23,7 @@ from sqlalchemy.orm import sessionmaker
 def build_serializer() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
-    serializer = DataSerializer(engine=engine)
-    return serializer, engine
+    return build_repository_graph(engine=engine), engine
 
 ###############################################################################
 def fetch_counts(engine: Any) -> tuple[int, int, int, int]:
@@ -58,9 +57,9 @@ def test_rxnav_upsert_idempotent_twice() -> None:
         },
     ]
 
-    serializer.upsert_drugs_catalog_records(payload)
+    serializer.drug_catalog_repository.upsert_drugs_catalog_records(payload)
     first_counts = fetch_counts(engine)
-    serializer.upsert_drugs_catalog_records(payload)
+    serializer.drug_catalog_repository.upsert_drugs_catalog_records(payload)
     second_counts = fetch_counts(engine)
 
     assert first_counts == second_counts
@@ -87,7 +86,7 @@ def test_rxnav_upsert_allows_multiple_rxcui_for_same_canonical() -> None:
         },
     ]
 
-    serializer.upsert_drugs_catalog_records(payload)
+    serializer.drug_catalog_repository.upsert_drugs_catalog_records(payload)
 
     factory = sessionmaker(bind=engine, future=True)
     with factory() as db_session:
@@ -117,7 +116,7 @@ def test_rxnav_upsert_persists_curated_aliases_with_separate_provenance() -> Non
         ]
     }
 
-    serializer.upsert_drugs_catalog_records(
+    serializer.drug_catalog_repository.upsert_drugs_catalog_records(
         payload,
         curated_aliases_by_canonical=curated_aliases,
     )
@@ -146,14 +145,14 @@ def test_rxnav_upsert_is_atomic_across_the_batch() -> None:
     factory = sessionmaker(bind=engine, future=True)
 
     with factory() as db_session:
-        serializer.ensure_drug(
+        serializer.drug_catalog_repository.ensure_drug(
             db_session,
             canonical_name="Drug One",
             canonical_name_norm="drug one",
             rxnorm_rxcui="111",
             livertox_nbk_id=None,
         )
-        serializer.ensure_drug(
+        serializer.drug_catalog_repository.ensure_drug(
             db_session,
             canonical_name="Drug Two",
             canonical_name_norm="drug two",
@@ -182,7 +181,9 @@ def test_rxnav_upsert_is_atomic_across_the_batch() -> None:
     ]
 
     with pytest.raises(RuntimeError):
-        serializer.upsert_drugs_catalog_records(payload, commit_interval=1)
+        serializer.drug_catalog_repository.upsert_drugs_catalog_records(
+            payload, commit_interval=1
+        )
 
     with factory() as db_session:
         drugs = db_session.execute(select(Drug)).scalars().all()
@@ -215,9 +216,9 @@ def test_livertox_upsert_idempotent_twice() -> None:
         ]
     )
 
-    serializer.save_livertox_records(frame)
+    serializer.knowledge_repository.save_livertox_records(frame)
     first_counts = fetch_counts(engine)
-    serializer.save_livertox_records(frame)
+    serializer.knowledge_repository.save_livertox_records(frame)
     second_counts = fetch_counts(engine)
 
     assert first_counts == second_counts
@@ -225,7 +226,11 @@ def test_livertox_upsert_idempotent_twice() -> None:
 ###############################################################################
 def test_livertox_duplicate_nbk_is_nulled() -> None:
     serializer, _ = build_serializer()
-    updater = LiverToxUpdater(sources_path=".", redownload=False, serializer=serializer)
+    updater = LiverToxUpdater(
+        sources_path=".",
+        redownload=False,
+        knowledge_repository=serializer.knowledge_repository,
+    )
     frame = pd.DataFrame(
         [
             {
@@ -262,7 +267,7 @@ def test_livertox_does_not_match_by_nbk() -> None:
     serializer, engine = build_serializer()
     factory = sessionmaker(bind=engine, future=True)
     with factory() as db_session:
-        existing = serializer.ensure_drug(
+        existing = serializer.drug_catalog_repository.ensure_drug(
             db_session,
             canonical_name="Drug Alpha",
             canonical_name_norm="drug alpha",
@@ -273,7 +278,7 @@ def test_livertox_does_not_match_by_nbk() -> None:
         db_session.commit()
 
     with factory() as db_session:
-        created = serializer.ensure_drug(
+        created = serializer.drug_catalog_repository.ensure_drug(
             db_session,
             canonical_name="Drug Beta",
             canonical_name_norm="drug beta",
@@ -296,14 +301,14 @@ def test_ensure_drug_conflict_raises() -> None:
     factory = sessionmaker(bind=engine, future=True)
 
     with factory() as db_session:
-        serializer.ensure_drug(
+        serializer.drug_catalog_repository.ensure_drug(
             db_session,
             canonical_name="Drug One",
             canonical_name_norm="drug one",
             rxnorm_rxcui="111",
             livertox_nbk_id=None,
         )
-        serializer.ensure_drug(
+        serializer.drug_catalog_repository.ensure_drug(
             db_session,
             canonical_name="Drug Two",
             canonical_name_norm="drug two",
@@ -314,7 +319,7 @@ def test_ensure_drug_conflict_raises() -> None:
 
     with factory() as db_session:
         with pytest.raises(RuntimeError):
-            serializer.ensure_drug(
+            serializer.drug_catalog_repository.ensure_drug(
                 db_session,
                 canonical_name="Drug Two",
                 canonical_name_norm="drug two",

@@ -169,7 +169,6 @@ def test_therapy_hybrid_fallback_uses_complete_block_context(monkeypatch) -> Non
     assert captured["source_text"] == source
     assert [entry.name for entry in entries] == ["Amoxicillin/clavulanate"]
 
-
 ###############################################################################
 def test_cross_source_duplicates_keep_best_entry_and_merge_provenance() -> None:
     therapy = PatientDrugs(

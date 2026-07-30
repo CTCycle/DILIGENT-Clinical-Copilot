@@ -12,7 +12,6 @@ from configurations.startup import get_server_settings
 from domain.settings.configuration import RagSettings
 from repositories.serialization.model_configs import ModelConfigSerializer
 
-
 ###############################################################################
 def _runtime_rag_settings() -> dict[str, object]:
     try:
@@ -21,13 +20,19 @@ def _runtime_rag_settings() -> dict[str, object]:
         return {}
     return dict(snapshot.rag_settings or {})
 
-
 ###############################################################################
 def build_effective_rag_settings(
     overrides: dict[str, object] | None = None,
+    *,
+    persisted_settings: dict[str, object] | None = None,
 ) -> RagSettings:
     base = get_server_settings().rag
-    data = {**_runtime_rag_settings(), **dict(overrides or {})}
+    persisted = (
+        dict(persisted_settings)
+        if persisted_settings is not None
+        else _runtime_rag_settings()
+    )
+    data = {**persisted, **dict(overrides or {})}
 
     selected_count = coerce_positive_int(
         data.get("retrieval_selected_count"), base.retrieval_selected_count
@@ -74,7 +79,6 @@ def build_effective_rag_settings(
             ),
         }
     )
-
 
 ###############################################################################
 def rag_settings_payload(settings: RagSettings | None = None) -> dict[str, Any]:

@@ -24,6 +24,19 @@ export type LocalModelCard = {
   recommended_rank: number | null;
 };
 
+export type CatalogProvider = CloudProvider | "ollama";
+export type CatalogStatus =
+  | "available"
+  | "cached"
+  | "not_loaded"
+  | "unavailable"
+  | "authentication_required";
+export type LocalCatalogMetadata = {
+  status: CatalogStatus;
+  updated_at: string | null;
+  message: string | null;
+};
+
 export type RagSettings = {
   chunk_size: number;
   chunk_overlap: number;
@@ -43,6 +56,7 @@ export type RagSettings = {
 export type ModelConfigStateResponse = {
   local_models: LocalModelCard[];
   cloud_providers: CloudProviderDescriptor[];
+  local_catalog: LocalCatalogMetadata;
   use_cloud_services: boolean;
   llm_provider: string;
   cloud_model: string | null;
@@ -53,6 +67,18 @@ export type ModelConfigStateResponse = {
   rag_settings: RagSettings;
   embedding_runtime: EmbeddingRuntimeStatus;
   embedding_index: EmbeddingIndexStatus;
+  updated_at: string | null;
+};
+
+export type ModelConfigPersistResponse = {
+  use_cloud_services: boolean;
+  llm_provider: CloudProvider;
+  cloud_model: string | null;
+  clinical_model: string | null;
+  text_extraction_model: string | null;
+  ollama_reasoning: boolean;
+  ollama_seed: number | null;
+  rag_settings: RagSettings;
   updated_at: string | null;
 };
 
@@ -117,10 +143,17 @@ export type CloudProviderDescriptor = {
   display_name: string;
   credential_scope: AccessKeyProvider;
   capabilities: ProviderCapabilities;
-  catalog_status: "available" | "cached" | "unavailable" | "authentication_required";
+  catalog_status: CatalogStatus;
   catalog_updated_at?: string | null;
   catalog_message?: string | null;
   models: CloudModelDescriptor[];
+};
+
+export type ModelCatalogOperationResponse = {
+  catalog_provider: CatalogProvider;
+  outcome: "cached" | "refreshed" | "failed";
+  error: string | null;
+  state: ModelConfigStateResponse;
 };
 
 export type ConnectivityCheckRequest = { provider: CloudProvider; model: string };

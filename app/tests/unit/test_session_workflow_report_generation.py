@@ -24,7 +24,6 @@ from services.clinical.report_finalizer import ReportFinalizer
 from services.session.session_service import ClinicalSessionService
 from services.session.workflow_shared import ClinicalPersistenceError
 
-
 ###############################################################################
 class FakePatternAnalyzer:
 
@@ -38,7 +37,6 @@ class FakePatternAnalyzer:
             else "Not available"
         }
 
-
 ###############################################################################
 class FakeDrugsParser:
     model = "test-parser"
@@ -47,9 +45,8 @@ class FakeDrugsParser:
     def clean_text(self, text: str) -> str:
         return text
 
-
 ###############################################################################
-class FakeSerializer:
+class FakeSessionRepository:
 
     # -------------------------------------------------------------------------
     def save_clinical_session(self, payload: dict[str, Any]) -> int | None:
@@ -63,7 +60,6 @@ class FakeSerializer:
         self.upserted_session_id = session_id
         self.upserted_payload = payload
 
-
 ###############################################################################
 class FakeClinicalService:
     JOB_TYPE = "clinical"
@@ -72,7 +68,7 @@ class FakeClinicalService:
     def __init__(self) -> None:
         self.drugs_parser = FakeDrugsParser()
         self.pattern_analyzer = FakePatternAnalyzer()
-        self.serializer = FakeSerializer()
+        self.session_repository = FakeSessionRepository()
         self.lab_extractor = SimpleNamespace(
             extract_explicit_hepatic_pattern=lambda text: (
                 "cholestatic"
@@ -201,7 +197,6 @@ class FakeClinicalService:
                 serialized.append(dict(issue))
         return serialized
 
-
 ###############################################################################
 def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
     payload = PatientData(
@@ -279,7 +274,6 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
         "final_report_has_bibliography": False,
     }
 
-
 ###############################################################################
 def test_workflow_does_not_recreate_bibliography_outside_report_finalizer() -> None:
 
@@ -316,7 +310,7 @@ def test_workflow_does_not_recreate_bibliography_outside_report_finalizer() -> N
                     "final_report": "Relazione narrativa senza bibliografia.",
                 },
             )
-            clinical_session.report_finalizer = ReportFinalizer(clinical_session)
+            clinical_session.report_finalizer = ReportFinalizer()
             return clinical_session, "Relazione narrativa senza bibliografia."
 
     payload = PatientData(
@@ -363,7 +357,6 @@ def test_workflow_does_not_recreate_bibliography_outside_report_finalizer() -> N
         ]
     }
 
-
 ###############################################################################
 def test_workflow_fails_when_persistence_returns_no_session_id() -> None:
     payload = PatientData(
@@ -374,7 +367,7 @@ def test_workflow_fails_when_persistence_returns_no_session_id() -> None:
         laboratory_analysis="ALT 100 U/L, ALP 120 U/L.",
     )
     service = FakeClinicalService()
-    service.serializer.save_clinical_session = lambda payload: None
+    service.session_repository.save_clinical_session = lambda payload: None
 
     with pytest.raises(ClinicalPersistenceError):
         asyncio.run(
@@ -387,7 +380,6 @@ def test_workflow_fails_when_persistence_returns_no_session_id() -> None:
                 report_mode="faithful_only",
             ),
         )
-
 
 ###############################################################################
 def test_failed_session_payload_omits_raw_clinical_text_and_base64_image() -> None:
@@ -421,7 +413,6 @@ def test_failed_session_payload_omits_raw_clinical_text_and_base64_image() -> No
         "laboratory_analysis": len(payload.laboratory_analysis or ""),
     }
 
-
 ###############################################################################
 def test_runtime_timeout_respects_provider_cap(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -436,7 +427,6 @@ def test_runtime_timeout_respects_provider_cap(monkeypatch) -> None:
     )
 
     assert timeout == 30.0
-
 
 ###############################################################################
 def test_runtime_timeout_allows_thirty_minute_cloud_clinical_budget(
@@ -453,7 +443,6 @@ def test_runtime_timeout_allows_thirty_minute_cloud_clinical_budget(
     )
 
     assert timeout == 1800.0
-
 
 ###############################################################################
 def test_workflow_marks_blocking_faithfulness_result_as_failed(
@@ -499,8 +488,7 @@ def test_workflow_marks_blocking_faithfulness_result_as_failed(
     assert any(
         issue["code"] == "faithfulness_gate_blocked" for issue in result["issues"]
     )
-    assert service.serializer.saved_payload["session_status"] == "failed"
-
+    assert service.session_repository.saved_payload["session_status"] == "failed"
 
 ###############################################################################
 def test_failed_clinical_job_payload_omits_phi_by_default() -> None:

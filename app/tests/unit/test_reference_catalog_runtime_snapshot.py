@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from types import MappingProxyType
 
-from domain.catalogs import CatalogEntry
-from services.catalogs.runtime import _build_snapshot
+import pytest
+
+from common.catalogs.provider import get_catalog_provider
+from domain.catalogs import CatalogEntry, ReferenceCatalogSnapshot
+from services.catalogs.runtime import (
+    _build_snapshot,
+    initialize_reference_catalog_provider,
+)
 
 ###############################################################################
 def test_runtime_snapshot_values_and_metadata() -> None:
@@ -34,3 +40,29 @@ def test_runtime_snapshot_values_and_metadata() -> None:
         ]
         == "token"
     )
+
+###############################################################################
+def test_catalog_provider_registration_is_explicit_and_isolated() -> None:
+    get_catalog_provider.cache_clear()
+    provider = get_catalog_provider()
+    snapshot = _build_snapshot([])
+    invalidated: list[bool] = []
+
+    with pytest.raises(RuntimeError, match="not registered"):
+        provider.get_snapshot()
+
+    def load_snapshot() -> ReferenceCatalogSnapshot:
+        return snapshot
+
+    def invalidate() -> None:
+        invalidated.append(True)
+
+    provider.register(load_snapshot, invalidate=invalidate)
+    assert provider.get_snapshot() is snapshot
+    provider.invalidate()
+    assert invalidated == [True]
+    provider.register(load_snapshot, invalidate=invalidate)
+
+    get_catalog_provider.cache_clear()
+    assert get_catalog_provider() is not provider
+    initialize_reference_catalog_provider()

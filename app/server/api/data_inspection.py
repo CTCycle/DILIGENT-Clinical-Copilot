@@ -7,14 +7,14 @@ from api.inspection.rag import InspectionRagEndpoint
 from api.inspection.revisions import InspectionRevisionEndpoint
 from api.inspection.sessions import InspectionSessionEndpoint
 from api.inspection.timeline import InspectionTimelineEndpoint
-from services.inspection.service import DataInspectionService
+from services.inspection.factory import build_data_inspection_service
 from services.runtime.jobs import get_job_manager
 
 router = APIRouter(prefix="/inspection", tags=["inspection"])
 
 ###############################################################################
 def register_inspection_routes(router: APIRouter) -> None:
-    service = DataInspectionService(jobs=get_job_manager())
+    service = build_data_inspection_service(get_job_manager())
     InspectionSessionEndpoint(router=router, service=service).add_routes()
     InspectionRevisionEndpoint(router=router, service=service).add_routes()
     InspectionTimelineEndpoint(router=router, service=service).add_routes()

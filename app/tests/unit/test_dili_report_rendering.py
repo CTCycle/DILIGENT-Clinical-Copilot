@@ -7,7 +7,6 @@ from domain.clinical.entities import (
     PatientLabTimeline,
     RagDocumentReference,
 )
-from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.report_language import phrase, report_heading, rucam_summary_text
 from services.clinical.report_finalizer import ReportFinalizer
 
@@ -34,7 +33,7 @@ def test_missing_data_labels_are_stable() -> None:
 
 ###############################################################################
 def test_deterministic_laboratory_section_rendering() -> None:
-    finalizer = ReportFinalizer(object())
+    finalizer = ReportFinalizer()
     section = finalizer.render_laboratory_section(
         PatientLabTimeline(
             entries=[
@@ -53,7 +52,7 @@ def test_deterministic_laboratory_section_rendering() -> None:
 
 ###############################################################################
 def test_deterministic_bibliography_section_rendering() -> None:
-    finalizer = ReportFinalizer(object())
+    finalizer = ReportFinalizer()
     section = finalizer.render_bibliography_section(
         [
             {
@@ -69,7 +68,7 @@ def test_deterministic_bibliography_section_rendering() -> None:
 
 ###############################################################################
 def test_rag_bibliography_section_deduplicates_and_merges_ranges() -> None:
-    finalizer = ReportFinalizer(object())
+    finalizer = ReportFinalizer()
     section = finalizer.build_rag_bibliography_section(
         [
             DrugClinicalAssessment(
@@ -102,7 +101,7 @@ def test_rag_bibliography_section_deduplicates_and_merges_ranges() -> None:
 
 ###############################################################################
 def test_rag_bibliography_uses_location_not_available_when_missing() -> None:
-    finalizer = ReportFinalizer(object())
+    finalizer = ReportFinalizer()
     section = finalizer.build_rag_bibliography_section(
         [
             DrugClinicalAssessment(
@@ -120,7 +119,7 @@ def test_rag_bibliography_uses_location_not_available_when_missing() -> None:
 
 ###############################################################################
 def test_rag_bibliography_omits_raw_retrieved_text() -> None:
-    finalizer = ReportFinalizer(object())
+    finalizer = ReportFinalizer()
     entry = DrugClinicalAssessment(
         drug_name="Drug A",
         extracted_excerpts=[
@@ -139,7 +138,7 @@ def test_rag_bibliography_omits_raw_retrieved_text() -> None:
 
 ###############################################################################
 def test_rag_bibliography_absent_when_no_references_exist() -> None:
-    finalizer = ReportFinalizer(object())
+    finalizer = ReportFinalizer()
     section = finalizer.build_rag_bibliography_section(
         [DrugClinicalAssessment(drug_name="Drug A")],
         report_language="en",

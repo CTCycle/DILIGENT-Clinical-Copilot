@@ -1,5 +1,5 @@
 # Local Deployment
-Last updated: 2026-07-23
+Last updated: 2026-07-29
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
@@ -11,9 +11,25 @@ Last updated: 2026-07-23
 ## Dependency Locks
 - `runtimes/uv.lock`
 - `app/client/package-lock.json`
+- `app/desktop/package-lock.json`
+- `app/desktop/src-tauri/Cargo.lock`
 
 ## Deployment Constraints
 - Network deployment, reverse proxies, and unauthenticated multi-user access are unsupported.
 - No supported container deployment path exists.
 - Backend resources and the frontend build must remain aligned within the local repository checkout.
 - Offline deployments must pre-populate and verify `app/resources/models/embeddings/<revision>/`; a complete rebuild is mandatory after this model migration.
+
+## Windows desktop distribution
+
+Build from a Windows x64 host with Rust/Cargo, the Windows build toolchain, and the pinned frontend/backend dependencies:
+
+```powershell
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.0.0 -DesktopTarget All
+```
+
+The build produces `DILIGENT-v<version>-windows-x64-portable.exe`, `DILIGENT-v<version>-windows-x64.msi`, and a matching `.sha256` file under `release/`. The portable EXE is a single-file Tauri distribution; the MSI installs the same shell and packaged runtime. Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Add `-OfflineWebView2` only for an MSI when an offline WebView2 installer is required. Release builds reject dirty worktrees unless `-AllowDirtyTree` is supplied.
+
+The portable executable embeds the PyInstaller backend and deterministic runtime archive. At runtime it extracts immutable content to `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>`, starts the backend on a random localhost port, and keeps mutable user data under `%LOCALAPPDATA%\DILIGENT\data`. It uses the system WebView2 runtime. MSI uninstall removes installed program files but preserves `%LOCALAPPDATA%\DILIGENT\data`.
+
+Before distribution, verify the `.sha256` file and perform a Windows host smoke test of the portable EXE. Clean-machine, MSI upgrade/uninstall, WebView2 offline, code-signing, and enterprise deployment tests are separate release gates.

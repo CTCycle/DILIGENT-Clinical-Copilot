@@ -2,28 +2,30 @@ from __future__ import annotations
 
 import pandas as pd
 
-from repositories.serialization import evidence_data
+from repositories.drug_catalog_repository import DrugCatalogRepository
 
 ###############################################################################
 def test_stream_drugs_catalog_uses_paged_repository_function(monkeypatch) -> None:
-    serializer = object()
+    repository = object.__new__(DrugCatalogRepository)
     calls: list[tuple[int, int | None]] = []
 
     def fake_get_drugs_catalog(
-        observed_serializer: object,
+        observed_repository: DrugCatalogRepository,
         *,
         offset: int = 0,
         limit: int | None = None,
     ) -> pd.DataFrame:
-        assert observed_serializer is serializer
+        assert observed_repository is repository
         calls.append((offset, limit))
         if offset == 0:
             return pd.DataFrame([{"rxcui": "1", "name": "Example"}])
         return pd.DataFrame()
 
-    monkeypatch.setattr(evidence_data, "get_drugs_catalog", fake_get_drugs_catalog)
+    monkeypatch.setattr(
+        DrugCatalogRepository, "get_drugs_catalog", fake_get_drugs_catalog
+    )
 
-    pages = list(evidence_data.stream_drugs_catalog(serializer, page_size=1000))
+    pages = list(repository.stream_drugs_catalog(page_size=1000))
 
     assert len(pages) == 1
     assert pages[0].to_dict(orient="records") == [

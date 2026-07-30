@@ -20,8 +20,17 @@ from services.inspection.normalization import (
 from services.inspection.runtime import coerce_optional_str
 
 ###############################################################################
+def _report_progress(
+    callback: Callable[[float, str], None] | None,
+    progress: float,
+    message: str,
+) -> None:
+    if callback is not None:
+        callback(progress, message)
+
+###############################################################################
 class InspectionTimelineMixin:
-    serializer: Any
+    session_timeline_repository: Any
     timeline_extractor: Any
     timeline_generation_lock: Any
     timeline_generation_inflight: set[int]
@@ -30,7 +39,7 @@ class InspectionTimelineMixin:
 
     # -------------------------------------------------------------------------
     def get_session_timeline(self, session_id: int) -> PatientTimeline | None:
-        payload = self.serializer.get_latest_session_timeline_record(session_id)
+        payload = self.session_timeline_repository.get_latest_session_timeline_record(session_id)
         if not isinstance(payload, dict):
             return None
         try:
@@ -49,7 +58,7 @@ class InspectionTimelineMixin:
         session_id: int,
         timeline_id: int,
     ) -> PatientTimeline | None:
-        payload = self.serializer.get_session_timeline_record(session_id, timeline_id)
+        payload = self.session_timeline_repository.get_session_timeline_record(session_id, timeline_id)
         if not isinstance(payload, dict):
             return None
         try:
@@ -65,11 +74,11 @@ class InspectionTimelineMixin:
 
     # -------------------------------------------------------------------------
     def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
-        return self.serializer.list_session_timelines(session_id)
+        return self.session_timeline_repository.list_session_timelines(session_id)
 
     # -------------------------------------------------------------------------
     def delete_session_timeline(self, session_id: int, timeline_id: int) -> bool:
-        return self.serializer.delete_session_timeline_record(session_id, timeline_id)
+        return self.session_timeline_repository.delete_session_timeline_record(session_id, timeline_id)
 
     # -------------------------------------------------------------------------
     def _build_timeline_runtime_settings(
@@ -195,10 +204,6 @@ class InspectionTimelineMixin:
         model_overrides: SessionTimelineModelOverrides | None = None,
         progress_callback: Callable[[float, str], None] | None = None,
     ) -> PatientTimeline | None:
-        def report_progress(progress: float, message: str) -> None:
-            if progress_callback is not None:
-                progress_callback(progress, message)
-
         safe_session_id = int(session_id)
         now = time.monotonic()
         with self.timeline_generation_lock:
@@ -221,8 +226,8 @@ class InspectionTimelineMixin:
                     self.timeline_generation_inflight.discard(safe_session_id)
                 return cached
         try:
-            report_progress(5, "Preparing session timeline source")
-            source = self.serializer.get_session_timeline_source(session_id)
+            _report_progress(progress_callback, 5, "Preparing session timeline source")
+            source = self.session_timeline_repository.get_session_timeline_source(session_id)
             if source is None:
                 return None
             timeline_timeout_s = max(
@@ -235,7 +240,7 @@ class InspectionTimelineMixin:
             requested_runtime_settings = self._build_timeline_runtime_settings(
                 source=source, model_overrides=model_overrides
             )
-            report_progress(15, "Configuring timeline model")
+            _report_progress(progress_callback, 15, "Configuring timeline model")
             source_model = (
                 requested_runtime_settings["cloud_model"]
                 if requested_runtime_settings["use_cloud_services"]
@@ -243,7 +248,7 @@ class InspectionTimelineMixin:
             )
 
             try:
-                report_progress(25, "Extracting clinical timeline events")
+                _report_progress(progress_callback, 25, "Extracting clinical timeline events")
                 with LLMRuntimeConfig.override_for_run(requested_runtime_settings):
                     timeline = asyncio.run(
                         asyncio.wait_for(
@@ -297,11 +302,11 @@ class InspectionTimelineMixin:
                         "model_provider": requested_runtime_settings["llm_provider"],
                     }
                 )
-                report_progress(82, "Using deterministic fallback chronology")
+                _report_progress(progress_callback, 82, "Using deterministic fallback chronology")
             else:
-                report_progress(82, "Timeline events extracted")
-            report_progress(92, "Saving generated timeline")
-            persisted = self.serializer.create_session_timeline_record(
+                _report_progress(progress_callback, 82, "Timeline events extracted")
+            _report_progress(progress_callback, 92, "Saving generated timeline")
+            persisted = self.session_timeline_repository.create_session_timeline_record(
                 session_id,
                 timeline.model_dump(mode="json"),
             )
@@ -309,9 +314,9 @@ class InspectionTimelineMixin:
                 self.timeline_generation_cooldown_until.pop(safe_session_id, None)
             if isinstance(persisted, dict):
                 validated = PatientTimeline.model_validate(persisted)
-                report_progress(98, "Timeline saved")
+                _report_progress(progress_callback, 98, "Timeline saved")
                 return validated
-            report_progress(98, "Timeline saved")
+            _report_progress(progress_callback, 98, "Timeline saved")
             return timeline
         finally:
             with self.timeline_generation_lock:

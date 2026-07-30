@@ -20,24 +20,11 @@ from repositories.serialization.application_configuration import (
 ModelRoleType = Literal["clinical", "text_extraction", "cloud"]
 UNSET = object()
 
-
 ###############################################################################
 class ModelConfigSerializer:
     """Persist the validated model configuration as one singleton document."""
 
     MODEL_CONFIG_PAYLOAD_SCHEMA_VERSION = 3
-    LEGACY_RAG_FIELDS = frozenset(
-        {
-            "embedding_backend",
-            "ollama_embedding_model",
-            "hf_embedding_model",
-            "use_cloud_embeddings",
-            "cloud_provider",
-            "cloud_embedding_model",
-            "embedding_max_workers",
-            "reset_vector_collection",
-        }
-    )
     RAG_OPERATIONAL_FIELDS = frozenset(
         {
             "chunk_size",
@@ -98,6 +85,7 @@ class ModelConfigSerializer:
     def save_snapshot(
         self,
         *,
+        base_snapshot: ModelConfigSnapshot | None = None,
         clinical_model: str | None | object = UNSET,
         text_extraction_model: str | None | object = UNSET,
         use_cloud_models: bool | object = UNSET,
@@ -107,7 +95,7 @@ class ModelConfigSerializer:
         ollama_seed: int | None | object = UNSET,
         rag_settings: dict[str, object] | object = UNSET,
     ) -> ModelConfigSnapshot:
-        current = asdict(self.load_snapshot())
+        current = asdict(base_snapshot or self.load_snapshot())
         current.pop("updated_at", None)
         updates = {
             "clinical_model": clinical_model,
@@ -129,10 +117,12 @@ class ModelConfigSerializer:
             current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
         )
         current["rag_settings"] = self.migrate_rag_settings(current.get("rag_settings"))
-        self.application_configuration.save(
-            current, schema_version=self.MODEL_CONFIG_PAYLOAD_SCHEMA_VERSION
+        saved_payload, updated_at = self.application_configuration.save(
+            current,
+            schema_version=self.MODEL_CONFIG_PAYLOAD_SCHEMA_VERSION,
+            return_metadata=True,
         )
-        return self.load_snapshot()
+        return self.snapshot_from_payload(saved_payload, updated_at=updated_at)
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -178,11 +168,13 @@ class ModelConfigSerializer:
         normalized = str(value).strip()
         return normalized or None
 
+    # -------------------------------------------------------------------------
     @classmethod
     def migrate_rag_settings(cls, value: object) -> dict[str, object]:
         source = value if isinstance(value, dict) else {}
         return {key: source[key] for key in cls.RAG_OPERATIONAL_FIELDS if key in source}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def mark_index_reindex_required() -> None:
         manifest_path = VECTOR_DB_PATH / "rag_index_manifest.json"
@@ -196,16 +188,15 @@ class ModelConfigSerializer:
                     json.dumps(payload, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
-        except OSError, json.JSONDecodeError:
+        except (OSError, json.JSONDecodeError):
             logger.warning("Unable to mark the existing RAG manifest for reindexing")
 
     # -------------------------------------------------------------------------
-    @staticmethod
     @staticmethod
     def normalize_optional_seed(value: object) -> int | None:
         if value is None:
             return None
         try:
             return max(0, int(str(value).strip()))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None

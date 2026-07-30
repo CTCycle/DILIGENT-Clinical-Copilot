@@ -1,8 +1,16 @@
 # User Checklists
-Last updated: 2026-07-11
+Last updated: 2026-07-29
+
+## Windows desktop launch checklist
+
+1. Verify the portable EXE or MSI against the matching `.sha256` file.
+2. Open the portable EXE, or launch the installed MSI application.
+3. Confirm the window title is `DILIGENT Clinical Copilot` and the window responds.
+4. If startup fails, inspect `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log` and `state\desktop-backend-ready.json`.
+5. Confirm the ready-file port returns `200` from `/api/health`.
 
 ## Recommended End-to-end Journey
-1. Start DILIGENT with `start_on_windows.ps1` and choose **Launch application**.
+1. Start DILIGENT with the packaged desktop app, or run `start_on_windows.ps1` for source/development mode.
 2. Confirm the UI opens.
 3. Confirm backend health at `/api/health`.
 4. Open **Model Configurations**.

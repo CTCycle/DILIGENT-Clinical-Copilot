@@ -69,7 +69,6 @@ class ClinicalSessionExtractionPipelineMixin:
         timeout_s = self._resolve_runtime_timeout(
             base_timeout_s=float(getattr(self.drugs_parser, "timeout_s", 1.0))
         )
-        lookup_timed_out = False
         try:
             therapy_drugs = await asyncio.wait_for(
                 self.drugs_parser.extract_drugs_from_therapy(
@@ -622,6 +621,7 @@ class ClinicalSessionExtractionPipelineMixin:
             if LLMRuntimeConfig.is_cloud_enabled()
             else float(runtime.local_llm_timeout_cap),
         )
+        lookup_timed_out = False
         try:
             prepared_inputs = await asyncio.wait_for(
                 self.input_preparator.prepare_inputs(
