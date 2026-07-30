@@ -9,6 +9,7 @@ import pytest
 import desktop_entry
 
 
+###############################################################################
 def test_host_is_restricted_to_localhost(monkeypatch, tmp_path) -> None:
     with pytest.raises(ValueError, match="127.0.0.1"):
         desktop_entry.run_desktop_backend(
@@ -17,6 +18,7 @@ def test_host_is_restricted_to_localhost(monkeypatch, tmp_path) -> None:
         )
 
 
+###############################################################################
 def test_desktop_entry_writes_dynamic_ready_file_and_cleans_up(
     monkeypatch,
     tmp_path,
@@ -31,10 +33,14 @@ def test_desktop_entry_writes_dynamic_ready_file_and_cleans_up(
     monkeypatch.setitem(sys.modules, "app", fake_app)
     observed: dict[str, object] = {}
 
+    ###############################################################################
     class FakeServer:
+
+        # -------------------------------------------------------------------------
         def __init__(self, config) -> None:
             observed["config"] = config
 
+        # -------------------------------------------------------------------------
         def run(self, *, sockets) -> None:
             observed["sockets"] = sockets
             ready_file = tmp_path / "ready.json"
@@ -53,6 +59,7 @@ def test_desktop_entry_writes_dynamic_ready_file_and_cleans_up(
     assert not ready_file.exists()
 
 
+###############################################################################
 def test_invalid_packaged_environment_fails_before_importing_app(
     monkeypatch,
     tmp_path,

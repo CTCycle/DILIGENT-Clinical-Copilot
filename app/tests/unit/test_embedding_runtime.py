@@ -137,7 +137,6 @@ def test_runtime_close_releases_session_and_can_be_recreated(tmp_path: Path) -> 
     with pytest.raises(Exception, match="shutting down"):
         runtime.embed_queries(["query"])
 
-
 ###############################################################################
 def test_cached_accessor_reuses_and_close_clears_runtime(monkeypatch) -> None:
     created = []
@@ -177,7 +176,6 @@ def test_cached_accessor_reuses_and_close_clears_runtime(monkeypatch) -> None:
         assert len(created) == 2
     finally:
         embedding_runtime_module.get_embedding_runtime.cache_clear()
-
 
 ###############################################################################
 def test_close_before_first_accessor_use_is_noop(monkeypatch) -> None:

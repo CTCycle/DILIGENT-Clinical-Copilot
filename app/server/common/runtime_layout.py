@@ -6,6 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 
 
+###############################################################################
 @dataclass(frozen=True, slots=True)
 class RuntimeLayout:
     """Absolute filesystem roots for source and packaged executions."""
@@ -20,6 +21,7 @@ class RuntimeLayout:
     client_dist_root: Path
 
 
+###############################################################################
 def _resolve_required_absolute_environment_path(name: str) -> Path:
     value = os.getenv(name, "").strip()
     if not value:
@@ -30,6 +32,7 @@ def _resolve_required_absolute_environment_path(name: str) -> Path:
     return path.resolve()
 
 
+###############################################################################
 def _resolve_source_layout() -> RuntimeLayout:
     repository_root = Path(__file__).resolve().parents[3]
     application_root = repository_root / "app"
@@ -46,6 +49,7 @@ def _resolve_source_layout() -> RuntimeLayout:
     )
 
 
+###############################################################################
 def _resolve_packaged_layout() -> RuntimeLayout:
     runtime_root = _resolve_required_absolute_environment_path(
         "DILIGENT_RUNTIME_ROOT"
@@ -64,6 +68,7 @@ def _resolve_packaged_layout() -> RuntimeLayout:
     )
 
 
+###############################################################################
 @lru_cache(maxsize=1)
 def resolve_runtime_layout() -> RuntimeLayout:
     runtime_root_set = bool(os.getenv("DILIGENT_RUNTIME_ROOT", "").strip())

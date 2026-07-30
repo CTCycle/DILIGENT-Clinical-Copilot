@@ -59,7 +59,6 @@ def reload_reference_catalog_snapshot(repository=None) -> ReferenceCatalogSnapsh
 def reset_reference_catalog_snapshot_for_tests() -> None:
     _cached_reference_catalog_snapshot.cache_clear()
 
-
 ###############################################################################
 def initialize_reference_catalog_provider() -> None:
     get_catalog_provider().register(

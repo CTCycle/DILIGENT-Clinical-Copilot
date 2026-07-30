@@ -130,7 +130,6 @@ async def extract_from_payload(
     extractor.emit_progress(progress_callback, 1.0)
     return PatientLabTimeline(entries=normalized), onset_context
 
-
 ###############################################################################
 async def extract_from_payload_with_audit(
     extractor: Any,

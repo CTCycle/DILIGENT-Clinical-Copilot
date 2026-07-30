@@ -406,10 +406,14 @@ def test_local_model_save_reuses_cached_availability(monkeypatch) -> None:
     service = ModelConfigService(serializer=serializer)
     service._available_local_models = {"qwen3.5:2b"}
 
+    ###############################################################################
     class UnexpectedOllamaClient:
+
+        # -------------------------------------------------------------------------
         async def __aenter__(self):
             raise AssertionError("cached availability must avoid Ollama")
 
+        # -------------------------------------------------------------------------
         async def __aexit__(self, exc_type, exc, tb):
             return False
 
@@ -442,13 +446,18 @@ def test_cold_local_model_save_lists_ollama_once(monkeypatch) -> None:
     service = ModelConfigService(serializer=serializer)
     calls = 0
 
+    ###############################################################################
     class FakeOllamaClient:
+
+        # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
 
+        # -------------------------------------------------------------------------
         async def __aexit__(self, exc_type, exc, tb):
             return False
 
+        # -------------------------------------------------------------------------
         async def list_models(self):
             nonlocal calls
             calls += 1

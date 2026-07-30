@@ -4,7 +4,6 @@ from datetime import date, datetime
 
 from domain.clinical.entities import DrugEntry, DrugSuspensionContext
 
-
 ###############################################################################
 class ExposureTimelineService:
 
