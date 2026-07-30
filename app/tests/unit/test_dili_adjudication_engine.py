@@ -122,6 +122,73 @@ def test_structured_dossier_preserves_missing_competing_causes() -> None:
     assert bundle.manual_review_required is True
 
 ###############################################################################
+def test_generated_narrative_safety_gate_blocks_unsupported_certainty() -> None:
+    bundle = DiliEvidenceBuilder().build(
+        payload=PatientData(
+            anamnesis="Jaundice and fatigue.",
+            drugs="Drug A started 2026-01-01 and stopped 2026-01-20.",
+            laboratory_analysis="ALT 240 U/L, ALP 120 U/L, bilirubin 3 mg/dL.",
+        ),
+        drugs=PatientDrugs(
+            entries=[DrugEntry(name="Drug A", therapy_start_date="2026-01-01")]
+        ),
+        labs=PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=240,
+                    upper_limit_normal=40,
+                    sample_date="2026-01-15",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALP",
+                    value=120,
+                    upper_limit_normal=120,
+                    sample_date="2026-01-15",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="BILIRUBIN",
+                    value=3,
+                    upper_limit_normal=1,
+                    sample_date="2026-01-16",
+                    source="laboratory_analysis",
+                ),
+            ]
+        ),
+        resolved_drugs=None,
+        rucam_bundle=PatientRucamAssessmentBundle(entries=[]),
+    )
+
+    issues = DiliEvidenceBuilder.audit_generated_narrative(
+        clinical_narrative=(
+            "Viral hepatitis was ruled out and there are no competing causes. "
+            "This is a confident diagnosis with lifelong avoidance required. "
+            "The Hy's Law pattern is confirmed."
+        ),
+        bundle=bundle,
+    )
+
+    assert {issue["code"] for issue in issues} == {
+        "clinical_narrative_contradicts_competing_causes",
+        "clinical_narrative_overstates_hys_law",
+        "clinical_narrative_overstates_causality",
+    }
+
+    safe_issues = DiliEvidenceBuilder.audit_generated_narrative(
+        clinical_narrative=(
+            "A definitive diagnosis cannot be made with absolute certainty; "
+            "manual review remains required."
+        ),
+        bundle=bundle,
+    )
+
+    assert "clinical_narrative_overstates_causality" not in {
+        issue["code"] for issue in safe_issues
+    }
+
+###############################################################################
 def test_report_has_required_fda_style_sections() -> None:
     bundle = DiliEvidenceBuilder().build(
         payload=PatientData(drugs="Drug A"),

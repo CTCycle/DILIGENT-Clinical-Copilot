@@ -213,7 +213,6 @@ def test_external_material_does_not_duplicate_on_reopen(monkeypatch) -> None:  #
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 
-
 ###############################################################################
 def _sqlite_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -233,7 +232,6 @@ def _sqlite_settings() -> DatabaseSettings:
         select_page_size=1000,
     )
 
-
 ###############################################################################
 def _postgres_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -252,7 +250,6 @@ def _postgres_settings() -> DatabaseSettings:
         insert_commit_interval=100,
         select_page_size=1000,
     )
-
 
 ###############################################################################
 def test_run_database_initialization_uses_sqlite_path_when_embedded(
@@ -280,7 +277,6 @@ def test_run_database_initialization_uses_sqlite_path_when_embedded(
     initializer.run_database_initialization()
 
     assert calls == ["sqlite"]
-
 
 ###############################################################################
 def test_run_database_initialization_uses_postgres_path_when_external(

@@ -39,7 +39,7 @@ LAB_VALUE_RE = re.compile(
 )
 DATE_VALUE_RE = re.compile(r"\b\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?\b")
 GENERIC_HEADING_SEMANTIC_PREFIXES: Mapping[str, tuple[str, ...]] = {
-    "anamnesis": ("anamn", "histor", "clinic", "present", "complain"),
+    "anamnesis": ("anamn", "histor", "present", "complain"),
     "therapy": ("therap", "terapi", "medicat", "pharmac", "farmac", "drug", "treat"),
     "laboratory_history": (
         "labor",
@@ -305,6 +305,8 @@ def classify_dili_heading(
 ) -> SectionHeadingMatch | None:
     normalized = normalize_heading_text(raw_heading)
     if not normalized:
+        return None
+    if normalized == "clinical question":
         return None
 
     candidates: list[SectionHeadingMatch] = []

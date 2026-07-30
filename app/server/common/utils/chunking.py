@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 from common.utils.seed_terms import SeedTermCatalog, detect_seed_matches
 
@@ -280,10 +280,11 @@ class SmartDocumentChunker:
         slug = re.sub(r"[^a-z0-9]+", "-", value.casefold()).strip("-")
         return slug[:48] or "section"
 
-
+###############################################################################
 class TokenWindowDocumentChunker:
     """Chunk documents by the canonical model tokenizer, not characters."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -297,6 +298,7 @@ class TokenWindowDocumentChunker:
         self.overlap_tokens = max(min(overlap_tokens, self.target_tokens - 1), 0)
         self.seed_catalog = seed_catalog
 
+    # -------------------------------------------------------------------------
     def chunk_document(
         self,
         text: str,
@@ -313,7 +315,7 @@ class TokenWindowDocumentChunker:
         if not callable(encode) or not callable(decode):
             raise TypeError("Canonical tokenizer must provide encode and decode")
         source_text = text or ""
-        token_ids = list(encode(source_text, add_special_tokens=False))
+        token_ids = list(cast(Iterable[int], encode(source_text, add_special_tokens=False)))
         if not token_ids:
             return []
         step = max(self.target_tokens - self.overlap_tokens, 1)

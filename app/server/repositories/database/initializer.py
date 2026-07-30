@@ -12,7 +12,7 @@ from common.catalogs.manifest_loader import (
     iter_catalog_manifest_paths,
     load_catalog_manifest,
 )
-from common.catalogs.provider import catalog_provider
+from common.catalogs.provider import get_catalog_provider
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.catalogs import CatalogSeedResult
@@ -141,7 +141,7 @@ def initialize_sqlite_database(
             result.manifests_seeded,
             result.entries_written,
         )
-        catalog_provider.invalidate()
+        get_catalog_provider().invalidate()
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
 
 ###############################################################################
@@ -206,7 +206,7 @@ def ensure_postgres_database(
                 result.manifests_seeded,
                 result.entries_written,
             )
-            catalog_provider.invalidate()
+            get_catalog_provider().invalidate()
     logger.info("Ensured PostgreSQL tables exist in %s", target_database)
 
     return target_database

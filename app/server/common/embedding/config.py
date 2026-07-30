@@ -12,7 +12,7 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Any
 
-
+###############################################################################
 @dataclass(frozen=True, slots=True)
 class CanonicalEmbeddingConfig:
     schema_version: int
@@ -36,11 +36,13 @@ class CanonicalEmbeddingConfig:
     output_dtype: str
     trust_remote_code: bool
 
+    # -------------------------------------------------------------------------
     def to_canonical_dict(self) -> dict[str, Any]:
         """Return the stable, JSON-compatible semantic contract."""
 
         return asdict(self)
 
+    # -------------------------------------------------------------------------
     def to_canonical_json(self) -> str:
         """Serialize the contract deterministically for hashing and manifests."""
 
@@ -51,6 +53,7 @@ class CanonicalEmbeddingConfig:
             separators=(",", ":"),
         )
 
+    # -------------------------------------------------------------------------
     @property
     def fingerprint(self) -> str:
         """Return the SHA-256 identity of this complete semantic contract."""
@@ -81,7 +84,7 @@ CANONICAL_EMBEDDING_CONFIG = CanonicalEmbeddingConfig(
     trust_remote_code=False,
 )
 
-
+###############################################################################
 def canonical_embedding_fingerprint(
     config: CanonicalEmbeddingConfig = CANONICAL_EMBEDDING_CONFIG,
 ) -> str:

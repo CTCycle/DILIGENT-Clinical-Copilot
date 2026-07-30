@@ -8,7 +8,7 @@ from typing import Any
 from common.constants import LIVERTOX_BASE_URL
 from common.paths import ARCHIVES_PATH
 from configurations.startup import get_server_settings
-from repositories.serialization.data import DataSerializer
+from repositories.knowledge_repository import KnowledgeRepository
 from services.updater import (
     livertox_common,
     livertox_download,
@@ -28,7 +28,7 @@ class LiverToxUpdater:
         redownload: bool,
         archive_name: str | None = None,
         monograph_max_workers: int | None = None,
-        serializer: DataSerializer | None = None,
+        knowledge_repository: KnowledgeRepository,
     ) -> None:
         self.supported_extensions = livertox_common.SUPPORTED_MONOGRAPH_EXTENSIONS
         self.http_headers = dict(livertox_common.DEFAULT_HTTP_HEADERS)
@@ -36,7 +36,7 @@ class LiverToxUpdater:
         self.chunk_size = livertox_common.DOWNLOAD_CHUNK_SIZE
         self.sources_path = str(Path(sources_path).resolve())
         self.redownload = redownload
-        self.serializer = serializer or DataSerializer()
+        self.knowledge_repository = knowledge_repository
         self.excerpt_sanitizer = LiverToxExcerptSanitizer()
         self.header_row = 1
         self.base_url = LIVERTOX_BASE_URL
@@ -140,7 +140,7 @@ class LiverToxUpdater:
             progress=95.0,
             message="Persisting LiverTox records",
         )
-        self.serializer.save_livertox_records(final_dataset)
+        self.knowledge_repository.save_livertox_records(final_dataset)
         payload = {**master_metadata, **archive_metadata, **local_info}
         payload["processed_entries"] = len(final_dataset.index)
         payload["records"] = len(final_dataset.index)

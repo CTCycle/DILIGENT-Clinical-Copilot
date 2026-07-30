@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from repositories.serialization.data import DataSerializer
+from repository_fixtures import build_repository_graph
 
 ###############################################################################
 def test_session_crud_round_trip(persistence_engine) -> None:  # type: ignore[no-untyped-def]
-    serializer = DataSerializer(engine=persistence_engine)
+    serializer = build_repository_graph(engine=persistence_engine).clinical_session_repository
     session_id = serializer.save_clinical_session(
         {
             "patient_name": "CRUD Patient",

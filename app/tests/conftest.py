@@ -19,6 +19,7 @@ import pytest
 
 from common import paths as common_paths
 from repositories.database import sqlite as sqlite_module
+from services.catalogs.runtime import initialize_reference_catalog_provider
 
 ###############################################################################
 def _configure_test_embedded_database_path() -> None:
@@ -44,6 +45,7 @@ def _configure_playwright_node_runtime() -> None:
 
 _configure_playwright_node_runtime()
 _configure_test_embedded_database_path()
+initialize_reference_catalog_provider()
 
 ###############################################################################
 class WorkspaceTempPathFactory:
@@ -182,7 +184,6 @@ def base_url() -> str:
     """Returns the base URL of the UI."""
     return UI_BASE_URL
 
-###############################################################################
 ###############################################################################
 @pytest.fixture
 def api_context(playwright):

@@ -7,7 +7,7 @@ from typing import Any
 
 from common.paths import CONFIGURATIONS_FILE
 from common.utils.languages import (
-    SUPPORTED_REPORT_LANGUAGES,
+    DETECTABLE_REPORT_LANGUAGES,
     TOKEN_PATTERN,
     get_language_diacritic_hints,
     get_language_function_hints,
@@ -36,7 +36,7 @@ class ClinicalLanguageDetector:
     # -------------------------------------------------------------------------
     @classmethod
     def score_text_by_language(cls, text: str) -> dict[str, float]:
-        scores: dict[str, float] = dict.fromkeys(SUPPORTED_REPORT_LANGUAGES, 0.0)
+        scores: dict[str, float] = dict.fromkeys(DETECTABLE_REPORT_LANGUAGES, 0.0)
         tokens = cls.tokenize(text)
         if not tokens:
             return scores
@@ -49,7 +49,7 @@ class ClinicalLanguageDetector:
         runtime_phrase_hints = get_language_phrase_hints()
         runtime_function_hints = get_language_function_hints()
         runtime_diacritic_hints = get_language_diacritic_hints()
-        for lang_code in SUPPORTED_REPORT_LANGUAGES:
+        for lang_code in DETECTABLE_REPORT_LANGUAGES:
             hints = runtime_language_hints.get(lang_code, set())
             function_hints = runtime_function_hints.get(lang_code, set())
             phrase_hints = runtime_phrase_hints.get(lang_code, ())
@@ -83,7 +83,7 @@ class ClinicalLanguageDetector:
         try:
             with CONFIGURATIONS_FILE.open("r", encoding="utf-8") as handle:
                 payload = json.load(handle)
-        except OSError, TypeError, ValueError:
+        except (OSError, TypeError, ValueError):
             return thresholds
 
         config = payload.get("clinical_language_detection")

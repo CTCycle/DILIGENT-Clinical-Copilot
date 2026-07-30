@@ -69,7 +69,7 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
   async loadModelConfiguration(): Promise<void> {
     this.modelConfigLoading.set(true); this.modelConfigError.set(null);
     try {
-      const config = await fetchModelConfigState(true);
+      const config = await fetchModelConfigState();
       this.modelConfig.set(config);
       this.provider.set(config.use_cloud_services
         ? config.cloud_providers.find((item) => item.id === config.llm_provider)?.id || config.cloud_providers[0]?.id || 'ollama'

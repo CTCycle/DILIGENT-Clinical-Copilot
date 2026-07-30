@@ -63,7 +63,10 @@ class SerializerStub:
 ###############################################################################
 def test_prefetch_concept_queries_fetches_unique_cache_misses() -> None:
     rx_client = RxClientStub()
-    builder = RxNavDrugCatalogBuilder(rx_client=rx_client)
+    builder = RxNavDrugCatalogBuilder(
+        rx_client=rx_client,
+        drug_catalog_repository=SerializerStub(),  # type: ignore[arg-type]
+    )
     concepts: list[dict[str, Any]] = [
         {"fullName": "Acetaminophen 500 MG Tablet", "rxcui": "161"},
         {"fullName": "Acetaminophen 325 MG Tablet", "rxcui": "161"},
@@ -84,7 +87,10 @@ def test_prefetch_concept_queries_fetches_unique_cache_misses() -> None:
 
 ###############################################################################
 def test_persist_catalog_prefetches_by_batch() -> None:
-    builder = RxNavDrugCatalogBuilder(rx_client=RxClientStub())
+    builder = RxNavDrugCatalogBuilder(
+        rx_client=RxClientStub(),
+        drug_catalog_repository=SerializerStub(),  # type: ignore[arg-type]
+    )
     builder.BATCH_SIZE = 2
     prefetch_batch_sizes: list[int] = []
     persisted_batch_sizes: list[int] = []
@@ -150,7 +156,7 @@ def test_curated_aliases_are_loaded_and_forwarded_to_serializer(
     serializer_stub = SerializerStub()
     builder = RxNavDrugCatalogBuilder(
         rx_client=RxClientStub(),
-        serializer=serializer_stub,  # type: ignore[arg-type]
+        drug_catalog_repository=serializer_stub,  # type: ignore[arg-type]
         curated_aliases_path=str(curated_file),
     )
     assert builder.curated_aliases_by_canonical["metformin"] == [

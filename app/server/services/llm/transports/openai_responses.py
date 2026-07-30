@@ -3,12 +3,8 @@ from __future__ import annotations
 from openai import AsyncOpenAI
 
 from domain.llm.providers import CloudModelDescriptor
-from services.llm.transports.base import (
-    ChatRequest,
-    ChatResult,
-    ConnectivityResult,
-    StructuredTransportMixin,
-)
+from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
+from services.llm.transports.base import StructuredTransportMixin
 
 ###############################################################################
 class OpenAIResponsesTransport(StructuredTransportMixin):
@@ -30,7 +26,10 @@ class OpenAIResponsesTransport(StructuredTransportMixin):
         return ChatResult(content=response.output_text)
 
     # -------------------------------------------------------------------------
-    async def list_models(self) -> list[CloudModelDescriptor]:
+    async def list_models(
+        self, *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
+        del force_refresh
         page = await self.client.models.list()
         return [
             CloudModelDescriptor(id=item.id, display_name=item.id) for item in page.data

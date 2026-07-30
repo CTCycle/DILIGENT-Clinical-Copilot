@@ -4,11 +4,11 @@ from collections import Counter
 
 from sqlalchemy import event
 
-from repositories.serialization.data import DataSerializer
+from repository_fixtures import build_repository_graph
 
 ###############################################################################
 def test_session_listing_uses_bounded_query_shape(persistence_engine) -> None:  # type: ignore[no-untyped-def]
-    serializer = DataSerializer(engine=persistence_engine)
+    serializer = build_repository_graph(engine=persistence_engine).clinical_session_repository
     for index in range(3):
         serializer.save_clinical_session({"patient_name": f"Count {index}"})
 

@@ -1,4 +1,5 @@
 # DILIGENT Clinical Copilot
+Last updated: 2026-07-30
 
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-Polyform%20Noncommercial%201.0.0-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
@@ -38,15 +39,41 @@ The supported deployment profile is local, single-user operation. Network deploy
 
 ## Get the source release
 
-Download `DILIGENT-Clinical-Copilot-3.0.0.zip` from the [v3.0.0 GitHub release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.0.0), extract it, and follow the startup instructions below.
+Download `DILIGENT-Clinical-Copilot-3.0.0.zip` from the [v3.0.0 GitHub release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.0.0), extract it, and follow the source-startup instructions below.
 
-The release asset contains the verified repository source at the release commit. It is not a desktop installer and does not contain a Windows executable.
+The source archive contains the verified repository at the release commit. It is intended for development and local launcher-based operation; it is separate from the Windows desktop packages.
+
+## Windows desktop release
+
+The v3.0.0 release also publishes these Windows x64 desktop artifacts:
+
+```text
+release/DILIGENT-v3.0.0-windows-x64-portable.exe
+release/DILIGENT-v3.0.0-windows-x64.msi
+release/DILIGENT-v3.0.0-windows-x64.sha256
+```
+
+The portable executable is a single-file Tauri application. It does not require a separate Python, Node.js, Rust, npm, uv, or source checkout on the target machine. On first launch it verifies and extracts the embedded PyInstaller backend and Angular assets under `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>`, starts the backend on a random localhost port, and opens the desktop window. User settings, database, logs, models, source documents, vectors, exports, state, and access-key material remain under `%LOCALAPPDATA%\DILIGENT\data`.
+
+The MSI installs the same Tauri shell and packaged runtime. It may use the configured WebView2 bootstrapper; an offline WebView2 installer is available only when the maintainer builds with `-OfflineWebView2`.
+
+To use the published desktop build, download the portable EXE for no-install use or the MSI for an installed shortcut. Verify the matching `.sha256` file before distribution. Desktop startup does not use the development ports `7690` and `9847`.
+
+For maintainers building a release on Windows x64:
+
+```powershell
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.0.0 -DesktopTarget All
+```
+
+Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a Windows x64 host and a clean worktree unless `-AllowDirtyTree` is supplied explicitly. Add `-OfflineWebView2` only when building an MSI that must install WebView2 without network access. See [desktop release documentation](assets/docs/runtime/desktop_release.md) for the build pipeline, artifact validation, runtime layout, and cleanup.
 
 ## Start the application
 
 ### Windows
 
-Open PowerShell in the extracted repository folder and run:
+For the packaged desktop release, open the downloaded portable EXE or launch the installed MSI application. The Tauri shell performs runtime extraction and backend health checks before showing the window; no PowerShell launcher or development server is required.
+
+For source/development operation, open PowerShell in the extracted repository folder and run:
 
 ```powershell
 .\start_on_windows.ps1
@@ -84,7 +111,7 @@ If you change ports or related runtime settings, update `settings/.env` and rest
 
 ## Configure models and access keys
 
-Open **Model Configurations** from the sidebar before starting an assessment.
+Open **Configurations** from the sidebar before starting an assessment.
 
 1. Choose whether the assessment will use a local or cloud provider.
 2. Choose compatible models for the clinical and text-extraction roles.
@@ -95,6 +122,9 @@ Open **Model Configurations** from the sidebar before starting an assessment.
 For local use, DILIGENT works with chat-capable Ollama models. Ollama must expose `/api/chat`; older `/api/generate` fallback behaviour is not supported. For cloud use, the active provider key is used to load its model catalog. The interface displays key fingerprints and metadata rather than the secret after it is saved.
 
 Changing between local and cloud modes requires compatible model roles. The application rejects a configuration that persists cloud-only models under local mode, preventing the model-role mismatch that would otherwise fail later during report generation.
+
+![Configurations](assets/figures/models-configuration.png)
+_Configurations brings runtime selection, RAG settings, model catalogs, and provider keys into one workspace._
 
 ## Run a DILI assessment
 

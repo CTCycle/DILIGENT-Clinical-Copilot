@@ -464,6 +464,7 @@ class LanceVectorDatabase:
                 "Embedding model mismatch detected. Rebuild the RAG vector store with the active embedding model."
             )
 
+    # -------------------------------------------------------------------------
     def assert_embedding_fingerprint_matches(self, expected_fingerprint: str) -> None:
         """Reject missing, mixed, or incompatible canonical vector metadata."""
         if not self.has_collection():

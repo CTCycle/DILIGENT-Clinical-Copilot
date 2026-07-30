@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+from common.paths import CATALOGS_PATH
 from common.utils.catalog_loader import CatalogLoader
-from services.llm.provider_registry import provider_registry
+from domain.llm.providers import CloudProviderDefinition
 
 ###############################################################################
 def get_cloud_model_choices() -> dict[str, list[str]]:
-    return {item.provider_id: list(item.models) for item in provider_registry.all()}
+    payload = json.loads(
+        (Path(CATALOGS_PATH) / "cloud_providers.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    definitions = (
+        CloudProviderDefinition.model_validate(item) for item in payload["providers"]
+    )
+    return {item.provider_id: list(item.models) for item in definitions}
 
 ###############################################################################
 def get_text_extraction_model_choices() -> list[str]:

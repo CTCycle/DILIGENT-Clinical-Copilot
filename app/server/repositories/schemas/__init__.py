@@ -16,6 +16,7 @@ from repositories.schemas.clinical import (
 )
 from repositories.schemas.configuration import (
     ApplicationConfiguration,
+    ProviderModelCatalogCache,
     ReferenceCatalogEntry,
     ReferenceCatalogManifest,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "ClinicalSessionTimeline",
     "ClinicalSessionVersion",
     "ApplicationConfiguration",
+    "ProviderModelCatalogCache",
     "ReferenceCatalogEntry",
     "ReferenceCatalogManifest",
     "Drug",

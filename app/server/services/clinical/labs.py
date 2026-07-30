@@ -24,10 +24,24 @@ from domain.clinical.extractor_contracts import (
 )
 from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.lab_normalization import get_marker_aliases
-from services.clinical.extraction_strategy import decide_extraction_strategy
+from services.clinical import labs_extraction
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
 from services.text.vocabulary import get_text_normalization_snapshot
+
+###############################################################################
+def _sanitize_optional_text(
+    value: str | float | int | None,
+    *,
+    max_length: int,
+) -> str | None:
+    if value is None:
+        return None
+    text = re.sub(r"\s+", " ", str(value)).strip()
+    if not text:
+        return None
+    return text[:max_length]
+
 
 ###############################################################################
 RATE_LIMIT_WAIT_HINT_RE = re.compile(
@@ -649,18 +663,6 @@ class ClinicalLabExtractor:
     def normalize_local_payload(
         parsed: LocalLabExtractionPayload,
     ) -> LabExtractionPayload:
-        def sanitize_optional_text(
-            value: str | float | int | None,
-            *,
-            max_length: int,
-        ) -> str | None:
-            if value is None:
-                return None
-            text = re.sub(r"\s+", " ", str(value)).strip()
-            if not text:
-                return None
-            return text[:max_length]
-
         onset_context = None
         if parsed.onset_context is not None:
             raw_onset_basis = (
@@ -680,12 +682,12 @@ class ClinicalLabExtractor:
             else:
                 onset_basis = "unknown"
             onset_context = LiverInjuryOnsetContext(
-                onset_date=sanitize_optional_text(
+                onset_date=_sanitize_optional_text(
                     parsed.onset_context.onset_date,
                     max_length=120,
                 ),
                 onset_basis=onset_basis,
-                evidence=sanitize_optional_text(
+                evidence=_sanitize_optional_text(
                     parsed.onset_context.evidence,
                     max_length=500,
                 ),
@@ -694,12 +696,12 @@ class ClinicalLabExtractor:
             entries=[
                 ClinicalLabEntry(
                     marker_name=entry.marker_name,
-                    value_text=sanitize_optional_text(entry.value_text, max_length=100),
-                    unit=sanitize_optional_text(entry.unit, max_length=50),
-                    sample_date=sanitize_optional_text(
+                    value_text=_sanitize_optional_text(entry.value_text, max_length=100),
+                    unit=_sanitize_optional_text(entry.unit, max_length=50),
+                    sample_date=_sanitize_optional_text(
                         entry.sample_date, max_length=120
                     ),
-                    evidence=sanitize_optional_text(entry.evidence, max_length=500),
+                    evidence=_sanitize_optional_text(entry.evidence, max_length=500),
                     source="laboratory_analysis",
                 )
                 for entry in parsed.entries
@@ -904,147 +906,12 @@ class ClinicalLabExtractor:
         already_cleaned: bool = False,
         progress_callback: Callable[[float], None] | None = None,
     ) -> tuple[PatientLabTimeline, LiverInjuryOnsetContext | None]:
-        primary_labs_text = (
-            (payload.laboratory_analysis or "")
-            if already_cleaned
-            else self.clean_text(payload.laboratory_analysis)
+        return await labs_extraction.extract_from_payload(
+            self,
+            payload,
+            already_cleaned=already_cleaned,
+            progress_callback=progress_callback,
         )
-        deterministic_entries: list[ClinicalLabEntry] = []
-        timeline_entries: list[ClinicalLabEntry] = []
-        onset_context: LiverInjuryOnsetContext | None = None
-        self.emit_progress(progress_callback, 0.0)
-
-        deterministic_entries.extend(
-            self.extract_entries_from_text(
-                text=primary_labs_text,
-                source="laboratory_analysis",
-                visit_date=payload.visit_date,
-            )
-        )
-        self.emit_progress(progress_callback, 0.2)
-
-        merged_source_text = primary_labs_text
-        if merged_source_text:
-            try:
-                await self.ensure_client()
-                if self.client is None:
-                    raise RuntimeError(
-                        "LLM client is not initialized for lab extraction"
-                    )
-                llm_unavailable = False
-                try:
-                    parsed = await self.llm_extract_full_text(
-                        text=merged_source_text,
-                        reinforced=False,
-                        expected_candidates=deterministic_entries,
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        (
-                            "Clinical lab extraction unavailable "
-                            "after %d attempts; using deterministic parser output only: %s"
-                        ),
-                        self.extraction_retry_attempts,
-                        exc,
-                    )
-                    parsed = LabExtractionPayload(entries=[], onset_context=None)
-                    llm_unavailable = True
-
-                # If the first LLM pass returns empty despite clear lab cues, retry once
-                # with a reinforced instruction before accepting an empty result.
-                if not parsed.entries and self.has_explicit_lab_signal(
-                    merged_source_text
-                ):
-                    try:
-                        reinforced = await self.llm_extract_full_text(
-                            text=merged_source_text,
-                            reinforced=True,
-                            expected_candidates=deterministic_entries,
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "Reinforced clinical lab extraction failed: %s",
-                            exc,
-                        )
-                    else:
-                        if reinforced.entries:
-                            parsed = reinforced
-
-                feedback, missing_candidates = (
-                    self.validate_lab_entries_against_candidates(
-                        list(parsed.entries),
-                        deterministic_entries,
-                    )
-                )
-                if feedback and deterministic_entries:
-                    try:
-                        reinforced = await self.llm_extract_full_text(
-                            text=merged_source_text,
-                            reinforced=True,
-                            expected_candidates=deterministic_entries,
-                            validation_feedback=feedback,
-                            previous_wrong_output=parsed.model_dump_json(),
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "Feedback clinical lab extraction failed: %s",
-                            exc,
-                        )
-                    else:
-                        parsed = reinforced
-                        feedback, missing_candidates = (
-                            self.validate_lab_entries_against_candidates(
-                                list(parsed.entries),
-                                deterministic_entries,
-                            )
-                        )
-
-                timeline_entries.extend(parsed.entries)
-                self.emit_progress(progress_callback, 0.7)
-                if (
-                    llm_unavailable
-                    or (not parsed.entries and deterministic_entries)
-                    or missing_candidates
-                ):
-                    if not parsed.entries and deterministic_entries:
-                        logger.warning(
-                            "LLM lab extraction returned no entries despite detectable lab markers; using deterministic lab parser output."
-                        )
-                    if missing_candidates:
-                        logger.warning(
-                            "LLM lab extraction missed %d grounded candidates after retry; merging deterministic fallback candidates.",
-                            len(missing_candidates),
-                        )
-                        timeline_entries.extend(missing_candidates)
-                    elif llm_unavailable or not parsed.entries:
-                        timeline_entries.extend(deterministic_entries)
-                onset_context = parsed.onset_context
-            except Exception as exc:
-                logger.warning(
-                    "Clinical lab extraction unavailable; using deterministic parser output only: %s",
-                    exc,
-                )
-                timeline_entries.extend(deterministic_entries)
-        else:
-            timeline_entries.extend(deterministic_entries)
-
-        self.emit_progress(progress_callback, 0.85)
-
-        normalized: list[ClinicalLabEntry] = []
-        seen: set[tuple[str, str, str, str]] = set()
-        for entry in timeline_entries:
-            prepared = self.normalize_entry(entry, visit_date=payload.visit_date)
-            if prepared is None:
-                continue
-            key = self.dedupe_key(prepared)
-            if key in seen:
-                continue
-            seen.add(key)
-            normalized.append(prepared)
-
-        normalized.sort(key=self.lab_entry_sort_key)
-        self.emit_progress(progress_callback, 1.0)
-        return PatientLabTimeline(entries=normalized), onset_context
 
     # -------------------------------------------------------------------------
     async def extract_from_payload_with_audit(
@@ -1054,43 +921,9 @@ class ClinicalLabExtractor:
         already_cleaned: bool = False,
         progress_callback: Callable[[float], None] | None = None,
     ) -> dict[str, Any]:
-        primary_labs_text = (
-            (payload.laboratory_analysis or "")
-            if already_cleaned
-            else self.clean_text(payload.laboratory_analysis)
-        )
-        deterministic_entries = self.extract_entries_from_text(
-            text=primary_labs_text,
-            source="laboratory_analysis",
-            visit_date=payload.visit_date,
-        )
-        meaningful_lab_lines = len(
-            [
-                line
-                for line in primary_labs_text.splitlines()
-                if line.strip() and self.has_explicit_lab_signal(line)
-            ]
-        )
-        decision = decide_extraction_strategy(
-            section="laboratory_history",
-            meaningful_line_count=meaningful_lab_lines,
-            parsed_line_count=len(deterministic_entries),
-            unresolved_line_count=max(
-                0, meaningful_lab_lines - len(deterministic_entries)
-            ),
-            evidence_span_count=len(deterministic_entries),
-        )
-        timeline, onset_context = await self.extract_from_payload(
+        return await labs_extraction.extract_from_payload_with_audit(
+            self,
             payload,
             already_cleaned=already_cleaned,
             progress_callback=progress_callback,
         )
-        return {
-            "lab_timeline": timeline,
-            "onset_context": onset_context,
-            "strategy": decision.strategy,
-            "decision": decision.model_dump(),
-            "unresolved_lines": [],
-            "confidence": decision.confidence,
-            "warnings": [],
-        }

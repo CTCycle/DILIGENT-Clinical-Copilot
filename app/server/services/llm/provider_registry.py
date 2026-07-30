@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from common.paths import RESOURCES_PATH
+from common.paths import CATALOGS_PATH
 from domain.llm.providers import CloudProviderDefinition, CloudProviderId
 
 ###############################################################################
@@ -21,7 +21,7 @@ class ProviderRegistry:
     # -------------------------------------------------------------------------
     @staticmethod
     def _load() -> tuple[CloudProviderDefinition, ...]:
-        path = Path(RESOURCES_PATH) / "catalogs" / "cloud_providers.json"
+        path = Path(CATALOGS_PATH) / "cloud_providers.json"
         payload = json.loads(path.read_text(encoding="utf-8"))
         return tuple(
             CloudProviderDefinition.model_validate(item)

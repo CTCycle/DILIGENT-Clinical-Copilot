@@ -6,7 +6,7 @@ import pandas as pd
 from sqlalchemy import event, select
 
 from repositories.schemas.knowledge import Drug, DrugAlias, DrugRxnormCode, LiverToxMonograph
-from repositories.serialization.data import DataSerializer
+from repository_fixtures import build_repository_graph
 
 ###############################################################################
 def test_rxnav_ingestion_uses_set_based_writes(persistence_engine) -> None:  # type: ignore[no-untyped-def]
@@ -33,8 +33,8 @@ def test_rxnav_ingestion_uses_set_based_writes(persistence_engine) -> None:  # t
     event.listen(persistence_engine, "before_cursor_execute", before_cursor_execute)
     event.listen(persistence_engine, "commit", after_commit)
     try:
-        serializer = DataSerializer(engine=persistence_engine)
-        serializer.upsert_drugs_catalog_records(
+        repository = build_repository_graph(engine=persistence_engine).drug_catalog_repository
+        repository.upsert_drugs_catalog_records(
             [
                 {
                     "rxcui": "1001",
@@ -95,8 +95,8 @@ def test_livertox_ingestion_uses_set_based_writes(persistence_engine) -> None:  
     event.listen(persistence_engine, "before_cursor_execute", before_cursor_execute)
     event.listen(persistence_engine, "commit", after_commit)
     try:
-        serializer = DataSerializer(engine=persistence_engine)
-        serializer.save_livertox_records(
+        repository = build_repository_graph(engine=persistence_engine).knowledge_repository
+        repository.save_livertox_records(
             pd.DataFrame(
                 [
                     {

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Iterable
 from dataclasses import replace
-from datetime import UTC, datetime
-from time import monotonic
+from datetime import datetime
 from typing import Any, Protocol, cast
 
 from common.exceptions import ServiceValidationError
@@ -20,11 +20,15 @@ from common.utils.types import (
     coerce_str,
 )
 from domain.model_configs import (
+    CatalogProviderId,
     EmbeddingIndexStatus,
     EmbeddingRuntimeStatus,
     EmbeddingStatusResponse,
     LocalModelCard,
+    LocalCatalogMetadata,
+    ModelCatalogOperationResponse,
     ModelConfigSnapshot,
+    ModelConfigPersistResponse,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
     ConnectivityCheckRequest,
@@ -33,8 +37,13 @@ from domain.model_configs import (
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
+from repositories.serialization.provider_model_catalog_cache import (
+    ProviderModelCatalogCacheRecord,
+    ProviderModelCatalogCacheSerializer,
+)
 from services.llm.cloud import CloudLLMClient, LLMError
 from services.llm.generation_policy import GenerationPurpose
+from services.llm import model_catalog
 from services.llm.provider_registry import provider_registry
 from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
 from domain.llm.providers import CloudProviderId
@@ -45,9 +54,9 @@ from services.retrieval.settings import (
 )
 from services.retrieval.embedding_runtime import get_embedding_runtime
 
-
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
+
     # -------------------------------------------------------------------------
     def load_snapshot(self) -> ModelConfigSnapshot: ...
 
@@ -55,6 +64,7 @@ class ModelConfigSnapshotStore(Protocol):
     def save_snapshot(
         self,
         *,
+        base_snapshot: ModelConfigSnapshot | None = None,
         clinical_model: str | None | object = ...,
         text_extraction_model: str | None | object = ...,
         use_cloud_models: bool | object = ...,
@@ -65,18 +75,17 @@ class ModelConfigSnapshotStore(Protocol):
         rag_settings: dict[str, object] | object = ...,
     ) -> ModelConfigSnapshot: ...
 
-
 ###############################################################################
 class ModelConfigService:
-    _OLLAMA_WARNING_COOLDOWN_SECONDS = 120.0
     _FAST_LOCAL_EXTRACTION_MODELS = ("qwen3.5:2b", "qwen3.5:9b")
-    _provider_catalog_cache: dict[
-        CloudProviderId, tuple[datetime, list[CloudModelDescriptor]]
-    ] = {}
-
     # -------------------------------------------------------------------------
-    def __init__(self, serializer: ModelConfigSnapshotStore | None = None) -> None:
+    def __init__(
+        self,
+        serializer: ModelConfigSnapshotStore | None = None,
+        catalog_cache: ProviderModelCatalogCacheSerializer | None = None,
+    ) -> None:
         self.serializer = serializer or ModelConfigSerializer()
+        self.catalog_cache = catalog_cache or ProviderModelCatalogCacheSerializer()
         self.local_model_catalog = cast(
             tuple[tuple[str, str, str], ...],
             CatalogLoader.get_catalog_records(
@@ -86,36 +95,28 @@ class ModelConfigService:
             ),
         )
         self.local_model_names = {name for name, _, _ in self.local_model_catalog}
-        self._last_ollama_warning_message: str | None = None
-        self._last_ollama_warning_at = 0.0
-        self._last_provider_descriptors: list[CloudProviderDescriptor] | None = None
+        self._catalog_tasks: dict[
+            CatalogProviderId, asyncio.Task[ModelCatalogOperationResponse]
+        ] = {}
 
     # -------------------------------------------------------------------------
-    async def get_state(
-        self,
-        *,
-        include_local_availability: bool | None = None,
-    ) -> ModelConfigStateResponse:
+    async def get_state(self) -> ModelConfigStateResponse:
         snapshot = self.ensure_defaults()
-        should_check_local_availability = (
-            include_local_availability
-            if include_local_availability is not None
-            else (not snapshot.use_cloud_models)
-        )
         local_models = await self.list_local_model_cards(
             selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
-            include_ollama_availability=should_check_local_availability,
         )
+        local_catalog = self.local_catalog_metadata()
         return self.build_response(
             snapshot=snapshot,
             local_models=local_models,
             cloud_providers=await self.discover_provider_descriptors(),
+            local_catalog=local_catalog,
         )
 
     # -------------------------------------------------------------------------
     async def update_state(
         self, payload: ModelConfigUpdateRequest
-    ) -> ModelConfigStateResponse:
+    ) -> ModelConfigPersistResponse:
         snapshot = self.ensure_defaults()
         fields_set = payload.model_fields_set
         local_roles_updated = self._local_roles_updated(fields_set)
@@ -124,8 +125,16 @@ class ModelConfigService:
             if "use_cloud_services" in fields_set
             else bool(snapshot.use_cloud_models)
         )
-        should_refresh_local_availability = not target_use_cloud_models
-        requires_local_model_availability = not target_use_cloud_models
+        requires_local_model_availability = (
+            not target_use_cloud_models
+            and (
+                local_roles_updated
+                or (
+                    "use_cloud_services" in fields_set
+                    and not target_use_cloud_models
+                )
+            )
+        )
         available_local_model_names = (
             await self.list_available_ollama_models()
             if requires_local_model_availability
@@ -145,24 +154,12 @@ class ModelConfigService:
 
         if updates:
             self.validate_current_snapshot(replace(snapshot, **updates))
-            snapshot = self.serializer.save_snapshot(**updates)
+            snapshot = self.serializer.save_snapshot(
+                base_snapshot=snapshot,
+                **updates,
+            )
 
-        should_check_local_availability = (
-            not snapshot.use_cloud_models or should_refresh_local_availability
-        )
-        local_models = await self.list_local_model_cards(
-            selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
-            include_ollama_availability=should_check_local_availability,
-        )
-        provider_descriptors = (
-            self._last_provider_descriptors
-            or self._build_save_provider_descriptors(snapshot)
-        )
-        return self.build_response(
-            snapshot=snapshot,
-            local_models=local_models,
-            cloud_providers=provider_descriptors,
-        )
+        return self.build_persist_response(snapshot)
 
     # -------------------------------------------------------------------------
     async def get_embedding_status(self) -> EmbeddingStatusResponse:
@@ -239,11 +236,8 @@ class ModelConfigService:
             local_model_names.add(snapshot.text_extraction_model)
         if not refresh_from_ollama:
             return local_model_names
-        local_models_for_validation = await self.list_local_model_cards(
-            selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
-            include_ollama_availability=True,
-        )
-        return {item.name for item in local_models_for_validation}
+        available_models = await self.list_available_ollama_models()
+        return local_model_names | available_models
 
     # -------------------------------------------------------------------------
     def _build_updates(
@@ -294,6 +288,7 @@ class ModelConfigService:
         self._collect_rag_settings_updates(
             payload=payload,
             fields_set=fields_set,
+            snapshot=snapshot,
             updates=updates,
         )
         return updates
@@ -378,18 +373,24 @@ class ModelConfigService:
         *,
         payload: ModelConfigUpdateRequest,
         fields_set: set[str],
+        snapshot: ModelConfigSnapshot,
         updates: dict[str, Any],
     ) -> None:
         if "rag_settings" not in fields_set or payload.rag_settings is None:
             return
         updates["rag_settings"] = ModelConfigService.normalize_rag_settings_patch(
-            payload.rag_settings
+            payload.rag_settings,
+            persisted_settings=snapshot.rag_settings,
         )
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def normalize_rag_settings_patch(payload: dict[str, object]) -> dict[str, object]:
-        current = build_effective_rag_settings()
+    def normalize_rag_settings_patch(
+        payload: dict[str, object],
+        *,
+        persisted_settings: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        current = build_effective_rag_settings(persisted_settings=persisted_settings)
         candidate_count = coerce_positive_int(
             payload.get("retrieval_candidate_count"),
             current.retrieval_candidate_count,
@@ -445,9 +446,8 @@ class ModelConfigService:
         }
 
     # -------------------------------------------------------------------------
-    @classmethod
     def resolve_role_model_selection(
-        cls,
+        self,
         *,
         role_name: str,
         model_name: str | None,
@@ -460,7 +460,7 @@ class ModelConfigService:
         if model_name is None:
             return None
         if use_cloud_models:
-            cloud_model_names = cls.known_provider_model_names(cloud_provider)
+            cloud_model_names = self.known_provider_model_names(cloud_provider)
             if not cloud_model_names:
                 if active_cloud_model and model_name == active_cloud_model:
                     return model_name
@@ -493,29 +493,31 @@ class ModelConfigService:
         except ValueError as exc:
             raise ServiceValidationError(str(exc)) from exc
 
-    # -------------------------------------------------------------------------
-    @classmethod
-    def resolve_cloud_model(cls, provider: str, model_name: str | None) -> str | None:
+    def resolve_cloud_model(self, provider: str, model_name: str | None) -> str | None:
         normalized = (model_name or "").strip()
         if not normalized:
             return None
-        known_models = cls.known_provider_model_names(provider)
+        known_models = self.known_provider_model_names(provider)
         if known_models and normalized not in known_models:
             raise ServiceValidationError(
                 f"Model '{normalized}' is not valid for provider '{provider}'."
             )
         return normalized
 
-    # -------------------------------------------------------------------------
-    @classmethod
-    def known_provider_model_names(cls, provider: str) -> set[str]:
+    def known_provider_model_names(self, provider: str) -> set[str]:
         definition = provider_registry.get(provider)
         if definition.models:
             return set(definition.models)
-        cached = cls._provider_catalog_cache.get(definition.provider_id)
-        return {item.id for item in cached[1]} if cached else set()
+        record = self.catalog_cache.get(
+            definition.provider_id,
+            self.catalog_configuration_fingerprint(definition.provider_id),
+        )
+        return {
+            str(item.get("id"))
+            for item in (record.models if record else [])
+            if str(item.get("id") or "").strip()
+        }
 
-    # -------------------------------------------------------------------------
     def ensure_defaults(self) -> ModelConfigSnapshot:
         snapshot = self.serializer.load_snapshot()
         defaults = get_server_settings().llm_defaults
@@ -542,7 +544,6 @@ class ModelConfigService:
         self.validate_current_snapshot(snapshot)
         return snapshot
 
-    # -------------------------------------------------------------------------
     def validate_current_snapshot(self, snapshot: ModelConfigSnapshot) -> None:
         provider = snapshot.cloud_provider
         cloud_model = self.normalize_optional_text(snapshot.cloud_model)
@@ -577,7 +578,6 @@ class ModelConfigService:
                     "Cloud mode requires both a provider and a model."
                 )
 
-    # -------------------------------------------------------------------------
     @staticmethod
     def normalize_optional_text(value: str | None) -> str | None:
         if value is None:
@@ -585,13 +585,11 @@ class ModelConfigService:
         normalized = value.strip()
         return normalized or None
 
-    # -------------------------------------------------------------------------
     @staticmethod
     def describe_local_model(model_name: str) -> str:
         family = model_name.split(":", maxsplit=1)[0].strip() or model_name
         return f"Installed local Ollama model from the {family} family."
 
-    # -------------------------------------------------------------------------
     @classmethod
     def local_recommendation_rank(cls, model_name: str) -> int | None:
         try:
@@ -599,7 +597,6 @@ class ModelConfigService:
         except ValueError:
             return None
 
-    # -------------------------------------------------------------------------
     @classmethod
     def build_local_model_card(
         cls,
@@ -638,47 +635,21 @@ class ModelConfigService:
 
     # -------------------------------------------------------------------------
     async def list_available_ollama_models(self) -> set[str]:
-        try:
-            async with OllamaClient() as client:
-                models = await client.list_models()
-        except OllamaError as exc:
-            self._log_ollama_availability_warning(exc)
-            return set()
-        except Exception:
-            logger.exception("Unexpected error while listing local Ollama models")
-            return set()
+        record = self._load_catalog_record("ollama")
         return {
-            model.strip()
-            for model in models
-            if isinstance(model, str) and model.strip()
+            str(item.get("id"))
+            for item in (record.models if record else [])
+            if str(item.get("id") or "").strip()
         }
-
-    # -------------------------------------------------------------------------
-    def _log_ollama_availability_warning(self, exc: OllamaError) -> None:
-        message = str(exc)
-        now = monotonic()
-        is_duplicate = message == self._last_ollama_warning_message
-        within_cooldown = (
-            now - self._last_ollama_warning_at < self._OLLAMA_WARNING_COOLDOWN_SECONDS
-        )
-        if is_duplicate and within_cooldown:
-            return
-        logger.warning("Unable to list local Ollama models: %s", exc)
-        self._last_ollama_warning_message = message
-        self._last_ollama_warning_at = now
 
     # -------------------------------------------------------------------------
     async def list_local_model_cards(
         self,
         *,
         selected_models: Iterable[str | None] = (),
-        include_ollama_availability: bool = True,
     ) -> list[LocalModelCard]:
-        available_models = (
-            await self.list_available_ollama_models()
-            if include_ollama_availability
-            else set()
-        )
+        available_models = await self.list_available_ollama_models()
+
         cards = [
             self.build_local_model_card(
                 name=name,
@@ -710,18 +681,45 @@ class ModelConfigService:
         return self.sort_local_model_cards(cards)
 
     # -------------------------------------------------------------------------
+    def build_persist_response(
+        self,
+        snapshot: ModelConfigSnapshot,
+    ) -> ModelConfigPersistResponse:
+        return ModelConfigPersistResponse(
+            use_cloud_services=bool(snapshot.use_cloud_models),
+            llm_provider=cast(CloudProviderId, self.resolve_provider(snapshot.cloud_provider)),
+            cloud_model=self.normalize_optional_text(snapshot.cloud_model),
+            clinical_model=snapshot.clinical_model,
+            text_extraction_model=snapshot.text_extraction_model,
+            ollama_reasoning=snapshot.ollama_reasoning,
+            ollama_seed=snapshot.ollama_seed,
+            rag_settings=rag_settings_payload(
+                build_effective_rag_settings(
+                    persisted_settings=snapshot.rag_settings,
+                )
+            ),
+            updated_at=snapshot.updated_at,
+        )
+
+    # -------------------------------------------------------------------------
     def build_response(
         self,
         *,
         snapshot: ModelConfigSnapshot,
         local_models: list[LocalModelCard],
         cloud_providers: list[CloudProviderDescriptor] | None = None,
+        local_catalog: LocalCatalogMetadata | None = None,
     ) -> ModelConfigStateResponse:
         provider = self.resolve_provider(snapshot.cloud_provider)
         cloud_model = self.normalize_optional_text(snapshot.cloud_model)
         return ModelConfigStateResponse(
             local_models=local_models,
-            cloud_providers=cloud_providers or self.build_provider_descriptors(),
+            cloud_providers=(
+                cloud_providers
+                if cloud_providers is not None
+                else self.build_provider_descriptors()
+            ),
+            local_catalog=local_catalog or self.local_catalog_metadata(),
             use_cloud_services=bool(snapshot.use_cloud_models),
             llm_provider=cast(CloudProviderId, provider),
             cloud_model=cloud_model,
@@ -735,6 +733,7 @@ class ModelConfigService:
             updated_at=snapshot.updated_at,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_embedding_runtime_status() -> EmbeddingRuntimeStatus:
         status = get_embedding_runtime().status()
@@ -746,6 +745,7 @@ class ModelConfigService:
             loaded=bool(status["loaded"]),
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_embedding_index_status() -> EmbeddingIndexStatus:
         manifest_path = VECTOR_DB_PATH / "rag_index_manifest.json"
@@ -753,7 +753,7 @@ class ModelConfigService:
             return EmbeddingIndexStatus(status="reindex_required")
         try:
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except OSError, json.JSONDecodeError:
+        except (OSError, json.JSONDecodeError):
             return EmbeddingIndexStatus(status="corrupt")
         if not isinstance(payload, dict):
             return EmbeddingIndexStatus(status="corrupt")
@@ -794,9 +794,7 @@ class ModelConfigService:
                 display_name=item.display_name,
                 credential_scope=item.credential_scope,
                 capabilities=item.capabilities,
-                catalog_status="available"
-                if item.models
-                else "authentication_required",
+                catalog_status="available" if item.models else "not_loaded",
                 models=[
                     CloudModelDescriptor(id=model, display_name=model)
                     for model in item.models
@@ -810,66 +808,41 @@ class ModelConfigService:
         descriptors: list[CloudProviderDescriptor] = []
         snapshot = self.ensure_defaults()
         for item in provider_registry.all():
-            catalog_updated_at: datetime | None = None
-            message: str | None = None
             if item.models:
                 models = [
                     CloudModelDescriptor(id=model, display_name=model)
                     for model in item.models
                 ]
                 status = "available"
+                catalog_updated_at = None
+                message = None
             else:
-                try:
-                    async with CloudLLMClient(
-                        provider=item.provider_id, timeout_s=15.0, max_retries=0
-                    ) as client:
-                        models = await client.list_model_descriptors()
-                    if models:
-                        catalog_updated_at = datetime.now(UTC)
-                        self._provider_catalog_cache[item.provider_id] = (
-                            catalog_updated_at,
-                            models,
-                        )
-                        status = "available"
-                    else:
-                        status = "unavailable"
-                        message = "This provider returned no models available for clinical text generation."
-                except LLMError as exc:
-                    cached = self._provider_catalog_cache.get(item.provider_id)
-                    if cached:
-                        catalog_updated_at, models = cached
-                        status = "cached"
-                        message = (
-                            "Showing models from the last successful provider refresh."
-                        )
-                    else:
-                        models = self._configured_provider_models(
-                            snapshot, item.provider_id
-                        )
-                        status = (
-                            "authentication_required"
-                            if "access key" in str(exc).lower()
-                            else "unavailable"
-                        )
-                        message = (
-                            "Add and activate an access key to load this provider's models."
-                            if status == "authentication_required"
-                            else self._configured_catalog_message(models)
-                        )
-                except Exception:
-                    cached = self._provider_catalog_cache.get(item.provider_id)
-                    if cached:
-                        catalog_updated_at, models = cached
-                        status = "cached"
-                        message = (
-                            "Showing models from the last successful provider refresh."
-                        )
-                    else:
-                        models = self._configured_provider_models(
-                            snapshot, item.provider_id
-                        )
-                        status = "unavailable"
-                        message = self._configured_catalog_message(models)
+                record = self._load_catalog_record(item.provider_id)
+                models = self._cloud_models_from_record(record)
+                if record is None:
+                    status = "not_loaded"
+                    catalog_updated_at = None
+                    message = "Refresh this provider to load its model catalog."
+                elif record.last_attempt_status == "success":
+                    status = "available"
+                    catalog_updated_at = record.last_success_at
+                    message = "Provider catalog loaded from the saved cache."
+                elif models:
+                    status = "cached"
+                    catalog_updated_at = record.last_success_at
+                    message = (
+                        "Showing models from the last successful provider refresh. "
+                        f"Latest refresh failed: {record.last_error or 'provider unavailable'}"
+                    )
+                else:
+                    status = (
+                        "authentication_required"
+                        if record.last_attempt_status == "authentication_required"
+                        else "unavailable"
+                    )
+                    catalog_updated_at = None
+                    message = record.last_error or self._configured_catalog_message(models)
+                    models = self._configured_provider_models(snapshot, item.provider_id)
             descriptors.append(
                 CloudProviderDescriptor(
                     id=item.provider_id,
@@ -882,8 +855,119 @@ class ModelConfigService:
                     models=models,
                 )
             )
-        self._last_provider_descriptors = descriptors
         return descriptors
+
+    def catalog_configuration_fingerprint(self, provider: CatalogProviderId) -> str:
+        return model_catalog.catalog_configuration_fingerprint(self, provider)
+
+    def _load_catalog_record(
+        self, provider: CatalogProviderId
+    ) -> ProviderModelCatalogCacheRecord | None:
+        return model_catalog.load_catalog_record(self, provider)
+
+    def local_catalog_metadata(self) -> LocalCatalogMetadata:
+        return model_catalog.local_catalog_metadata(self)
+
+    @staticmethod
+    def _cloud_models_from_record(
+        record: ProviderModelCatalogCacheRecord | None,
+    ) -> list[CloudModelDescriptor]:
+        return model_catalog.cloud_models_from_record(record)
+
+    async def load_catalog(
+        self, provider: CatalogProviderId, *, force_refresh: bool = False
+    ) -> ModelCatalogOperationResponse:
+        if provider != "ollama":
+            provider_registry.get(provider)
+        if not force_refresh and self._load_catalog_record(provider) is not None:
+            return ModelCatalogOperationResponse(
+                catalog_provider=provider,
+                outcome="cached",
+                state=await self.get_state(),
+            )
+        task = self._catalog_tasks.get(provider)
+        if task is None:
+            task = asyncio.create_task(self._fetch_catalog(provider))
+            self._catalog_tasks[provider] = task
+        try:
+            return await asyncio.shield(task)
+        finally:
+            if task.done() and self._catalog_tasks.get(provider) is task:
+                self._catalog_tasks.pop(provider, None)
+
+    async def _fetch_catalog(
+        self, provider: CatalogProviderId
+    ) -> ModelCatalogOperationResponse:
+        fingerprint = self.catalog_configuration_fingerprint(provider)
+        try:
+            if provider == "ollama":
+                async with OllamaClient() as client:
+                    names = await client.list_models()
+                models = [
+                    {"id": name.strip(), "display_name": name.strip()}
+                    for name in names
+                    if isinstance(name, str) and name.strip()
+                ]
+            else:
+                async with CloudLLMClient(
+                    provider=provider, timeout_s=15.0, max_retries=0
+                ) as client:
+                    descriptors = await client.list_model_descriptors(
+                        force_refresh=True
+                    )
+                if not descriptors:
+                    raise LLMError(
+                        "Provider returned no models available for clinical text generation."
+                    )
+                models = [item.model_dump(mode="json") for item in descriptors]
+            self.catalog_cache.save_success(
+                provider_id=provider,
+                configuration_fingerprint=fingerprint,
+                models=models,
+            )
+            return ModelCatalogOperationResponse(
+                catalog_provider=provider,
+                outcome="refreshed",
+                state=await self.get_state(),
+            )
+        except (LLMError, OllamaError) as exc:
+            message = self._sanitize_catalog_error(str(exc))
+            status = (
+                "authentication_required"
+                if "access key" in message.lower()
+                else "unavailable"
+            )
+            self.catalog_cache.save_failure(
+                provider_id=provider,
+                configuration_fingerprint=fingerprint,
+                status=status,
+                error=message,
+            )
+            return ModelCatalogOperationResponse(
+                catalog_provider=provider,
+                outcome="failed",
+                error=message,
+                state=await self.get_state(),
+            )
+        except Exception:
+            logger.exception("Unexpected error while refreshing %s model catalog", provider)
+            message = "The provider model catalog could not be refreshed."
+            self.catalog_cache.save_failure(
+                provider_id=provider,
+                configuration_fingerprint=fingerprint,
+                status="unavailable",
+                error=message,
+            )
+            return ModelCatalogOperationResponse(
+                catalog_provider=provider,
+                outcome="failed",
+                error=message,
+                state=await self.get_state(),
+            )
+
+    @staticmethod
+    def _sanitize_catalog_error(message: str) -> str:
+        return model_catalog.sanitize_catalog_error(message)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -905,37 +989,6 @@ class ModelConfigService:
             CloudModelDescriptor(id=model, display_name=model)
             for model in sorted(model_names, key=str.casefold)
         ]
-
-    # -------------------------------------------------------------------------
-    def _build_save_provider_descriptors(
-        self, snapshot: ModelConfigSnapshot
-    ) -> list[CloudProviderDescriptor]:
-        descriptors = self.build_provider_descriptors()
-        provider = self.resolve_provider(snapshot.cloud_provider)
-        configured_models = self._configured_provider_models(
-            snapshot, cast(CloudProviderId, provider)
-        )
-        if not configured_models:
-            return descriptors
-
-        for index, descriptor in enumerate(descriptors):
-            if descriptor.id != provider:
-                continue
-            models = {model.id: model for model in descriptor.models}
-            models.update({model.id: model for model in configured_models})
-            descriptors[index] = descriptor.model_copy(
-                update={
-                    "catalog_status": "unavailable",
-                    "catalog_message": (
-                        "Provider catalog refresh is deferred; showing the configured model."
-                    ),
-                    "models": sorted(
-                        models.values(), key=lambda model: model.id.casefold()
-                    ),
-                }
-            )
-            break
-        return descriptors
 
     # -------------------------------------------------------------------------
     @staticmethod
