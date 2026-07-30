@@ -1,22 +1,16 @@
-DILIGENT Clinical Copilot — Dual License
+DILIGENT Clinical Copilot
 
 Copyright (c) 2023–2025 Thomas Virdis
 
-This project is dual-licensed under the following terms:
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.
 
-1. Non-Commercial Use (Default)
-   This software is licensed under the Polyform Noncommercial License 1.0.0.
-   You may use, copy, modify, and share this software only for non-commercial purposes.
-   Full license text: https://polyformproject.org/licenses/noncommercial/1.0.0/
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+more details.
 
-2. Commercial Use
-   Commercial use of this software is not permitted under the Polyform Noncommercial License.
-   To obtain a commercial license, you must contact the copyright holder and agree
-   to separate terms.
-
-   Contact: [your email or website here]
-
-3. No Warranty
-   This software is provided “as-is,” without warranties or conditions of any kind,
-   express or implied, including but not limited to warranties of merchantability,
-   fitness for a particular purpose, or non-infringement.
+You should have received a copy of the GNU General Public License along with
+this program. If not, see <https://www.gnu.org/licenses/gpl-3.0.html>.
