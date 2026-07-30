@@ -2,20 +2,23 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Any
+
+from pydantic import ValidationError
 
 from common.constants import GEMINI_API_BASE, OPENAI_API_BASE
+from common.utils.logger import logger
 from configurations.startup import get_server_settings
+from domain.llm.providers import CloudModelDescriptor
 from domain.model_configs import CatalogProviderId, LocalCatalogMetadata
 from repositories.serialization.access_keys import AccessKeySerializer
 from repositories.serialization.provider_model_catalog_cache import (
     ProviderModelCatalogCacheRecord,
+    ProviderModelCatalogCacheSerializer,
 )
 from services.llm.provider_registry import provider_registry
-from domain.llm.providers import CloudModelDescriptor
 
 
-def catalog_configuration_fingerprint(service: Any, provider: CatalogProviderId) -> str:
+def catalog_configuration_fingerprint(provider: CatalogProviderId) -> str:
     if provider == "ollama":
         endpoint = str(
             get_server_settings().llm_defaults.ollama_host_default or ""
@@ -51,16 +54,15 @@ def catalog_configuration_fingerprint(service: Any, provider: CatalogProviderId)
 
 
 def load_catalog_record(
-    service: Any, provider: CatalogProviderId
+    catalog_cache: ProviderModelCatalogCacheSerializer, provider: CatalogProviderId
 ) -> ProviderModelCatalogCacheRecord | None:
-    return service.catalog_cache.get(
-        provider,
-        service.catalog_configuration_fingerprint(provider),
-    )
+    return catalog_cache.get(provider, catalog_configuration_fingerprint(provider))
 
 
-def local_catalog_metadata(service: Any) -> LocalCatalogMetadata:
-    record = load_catalog_record(service, "ollama")
+def local_catalog_metadata(
+    catalog_cache: ProviderModelCatalogCacheSerializer,
+) -> LocalCatalogMetadata:
+    record = load_catalog_record(catalog_cache, "ollama")
     if record is None:
         return LocalCatalogMetadata(
             status="not_loaded",
@@ -96,7 +98,8 @@ def cloud_models_from_record(
     for item in record.models:
         try:
             models.append(CloudModelDescriptor.model_validate(item))
-        except Exception:
+        except ValidationError:
+            logger.warning("Ignoring malformed cached provider model entry.")
             continue
     return models
 

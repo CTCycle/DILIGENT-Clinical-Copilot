@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-07-28
+Last updated: 2026-07-30
 
 Sampling behavior is owned by `services/llm/generation_policy.py`.
 
@@ -12,6 +12,8 @@ Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and
   - `app/server/api/data_inspection.py` is the aggregate inspection router, and focused inspection endpoint modules live under `app/server/api/inspection/`.
 - Service layer: `app/server/services/*`
   - Owns clinical orchestration, model orchestration, inspection workflows, and job control.
+  - `services/llm/model_config.py` owns model configuration orchestration and uses one persisted configuration snapshot per response; canonical RAG normalization lives in `services/retrieval/settings.py`.
+  - `services/llm/model_catalog.py` owns typed provider catalog projection and fingerprinting while receiving the catalog cache repository explicitly.
   - Inspection update orchestration is implemented in `app/server/services/inspection/update_jobs.py` through `DataInspectionUpdateJobRunner`.
   - `DataInspectionService` (in `app/server/services/inspection/service.py`) composes behavior from mixins in `update_config.py`, `revision_scaffold.py`, and `timeline.py`.
   - `ClinicalSessionService` (in `app/server/services/session/session_service.py`) composes behavior from mixins in `consultation.py` and `extraction_pipeline.py`.
@@ -35,6 +37,7 @@ Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and
   - Internal job state only. It is not a public domain contract and must not be imported by endpoints.
 - Repository layer: `app/server/repositories/*`
   - Owns SQL persistence, serialization, and vector store access.
+  - `ProviderModelCatalogCacheSerializer` persists successful and failed provider catalog attempts, including model entries, timestamps, status, and safe error text, through the SQLAlchemy configuration schema.
   - ORM ownership is split across `repositories/schemas/clinical.py`, `knowledge.py`, `security.py`, and `configuration.py`; all mappings register on the shared `Base.metadata`.
   - Access key persistence mapping and active key retrieval stay in `app/server/repositories/serialization/access_keys.py`.
   - Reference catalog persistence and seeding are implemented through `reference_catalog_entries` and `reference_catalog_seed_runs` in `app/server/repositories/serialization/catalogs.py`.

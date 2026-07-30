@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from domain.llm.providers import CloudProviderDescriptor, CloudProviderId
 
@@ -57,19 +57,49 @@ class ModelCatalogOperationResponse(BaseModel):
     state: "ModelConfigStateResponse"
 
 ###############################################################################
+class RagSettingsUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    chunk_size: int | None = None
+    chunk_overlap: int | None = None
+    embedding_batch_size: int | None = None
+    use_hybrid_search: bool | None = None
+    use_reranking: bool | None = None
+    retrieval_candidate_count: int | None = None
+    retrieval_selected_count: int | None = None
+    reranker_model: str | None = None
+    hybrid_vector_weight: float | None = None
+    hybrid_text_weight: float | None = None
+    vector_stream_batch_size: int | None = None
+    embedding_offline_mode: bool | None = None
+
+###############################################################################
+class RagSettingsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    chunk_size: int
+    chunk_overlap: int
+    embedding_batch_size: int
+    use_hybrid_search: bool
+    use_reranking: bool
+    retrieval_candidate_count: int
+    retrieval_selected_count: int
+    reranker_model: str
+    hybrid_vector_weight: float
+    hybrid_text_weight: float
+    vector_stream_batch_size: int
+    embedding_offline_mode: bool
+
+###############################################################################
 class ModelConfigUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     use_cloud_services: bool | None = None
     llm_provider: CloudProviderId | None = None
     cloud_model: str | None = None
-    text_extraction_model: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("text_extraction_model", "text_extraction_model"),
-    )
+    text_extraction_model: str | None = None
     clinical_model: str | None = None
     ollama_reasoning: bool | None = None
     ollama_seed: int | None = Field(default=None, ge=0)
-    rag_settings: dict[str, object] | None = None
+    rag_settings: RagSettingsUpdateRequest | None = None
 
 ###############################################################################
 class EmbeddingRuntimeStatus(BaseModel):
@@ -99,7 +129,7 @@ class ModelConfigStateResponse(BaseModel):
     clinical_model: str | None
     ollama_reasoning: bool
     ollama_seed: int | None
-    rag_settings: dict[str, object]
+    rag_settings: RagSettingsResponse
     embedding_runtime: EmbeddingRuntimeStatus
     embedding_index: EmbeddingIndexStatus
     updated_at: datetime | None = None
@@ -115,7 +145,7 @@ class ModelConfigPersistResponse(BaseModel):
     clinical_model: str | None
     ollama_reasoning: bool
     ollama_seed: int | None
-    rag_settings: dict[str, object]
+    rag_settings: RagSettingsResponse
     updated_at: datetime | None = None
 
 ###############################################################################
