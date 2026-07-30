@@ -71,7 +71,7 @@ class CloudProviderDescriptor(BaseModel):
     credential_scope: CredentialProviderId
     capabilities: ProviderCapabilities
     catalog_status: Literal[
-        "available", "cached", "unavailable", "authentication_required"
+        "available", "cached", "not_loaded", "unavailable", "authentication_required"
     ]
     catalog_updated_at: datetime | None = None
     catalog_message: str | None = None

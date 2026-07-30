@@ -411,7 +411,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.revisionModelLoading.set(true);
     this.revisionModelError.set(null);
     try {
-      const payload = await fetchModelConfigState(true);
+      const payload = await fetchModelConfigState();
       this.revisionModelConfig.set(payload);
       const configuredProvider = payload.cloud_providers.find((provider) => provider.id === payload.llm_provider)?.id;
       this.revisionModelProvider.set(payload.use_cloud_services ? configuredProvider || payload.cloud_providers[0]?.id || 'ollama' : 'ollama');

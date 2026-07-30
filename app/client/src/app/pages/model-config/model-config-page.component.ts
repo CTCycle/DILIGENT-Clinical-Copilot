@@ -16,6 +16,7 @@ import {
 } from '../../core/model-config';
 import {
   AccessKeyProvider,
+  CatalogProvider,
   CloudProvider,
   ModelConfigStateResponse,
   ModelConfigPersistResponse,
@@ -25,6 +26,8 @@ import {
 } from '../../core/models/types';
 import {
   fetchModelConfigState,
+  loadModelCatalog,
+  refreshModelCatalog,
   updateModelConfigState,
 } from '../../core/services/model-config-api';
 import {
@@ -140,6 +143,11 @@ export class ModelConfigPageComponent implements OnInit {
   readonly isReasoningSaving = computed(() => this.savingOperations().has('reasoning'));
   readonly isRagSaving = computed(() => this.savingOperations().has('rag'));
   readonly localModels = signal<ModelConfigStateResponse['local_models']>([]);
+  readonly localCatalog = signal<ModelConfigStateResponse['local_catalog']>({
+    status: 'not_loaded',
+    updated_at: null,
+    message: null,
+  });
   readonly cloudChoices = signal(resolveCloudChoices(undefined));
   readonly cloudProviders = signal<ModelConfigStateResponse['cloud_providers']>([]);
   readonly modelSearchQuery = signal('');
@@ -164,6 +172,7 @@ export class ModelConfigPageComponent implements OnInit {
   });
   readonly draftConfig = signal<DraftRuntimeConfig>(resolveDraftFromSettings(this.appState.state().diliAgent.settings));
   readonly lastUpdatedAt = signal<string | null>(null);
+  readonly catalogProviderInFlight = signal<CatalogProvider | null>(null);
   private reasoningSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly saveRevisions: Record<SaveOperation, number> = {
     configuration: 0,
@@ -380,12 +389,18 @@ export class ModelConfigPageComponent implements OnInit {
     this.applyPreviewDefaultState();
   }
 
-  async loadModelConfig(syncDraft = true, includeLocalAvailability: boolean = true): Promise<void> {
+  async loadModelConfig(
+    syncDraft = true,
+    initializeCatalog = false,
+  ): Promise<void> {
     this.isLoading.set(true);
     try {
-      const payload = await fetchModelConfigState(includeLocalAvailability);
+      const payload = await fetchModelConfigState();
       this.applyConfigToState(payload, syncDraft);
       this.statusMessage.set('');
+      if (initializeCatalog) {
+        await this.ensureSelectedCatalog();
+      }
     } catch (error) {
       this.statusMessage.set(formatUnknownError(error, 'Unable to load model settings.'));
     } finally {
@@ -395,6 +410,7 @@ export class ModelConfigPageComponent implements OnInit {
 
   private applyConfigToState(payload: ModelConfigStateResponse, syncDraft: boolean): void {
     this.localModels.set(payload.local_models || []);
+    this.localCatalog.set(payload.local_catalog);
     this.cloudProviders.set(payload.cloud_providers || []);
     this.lastUpdatedAt.set(payload.updated_at);
     this.embeddingRuntime.set(payload.embedding_runtime);
@@ -450,6 +466,49 @@ export class ModelConfigPageComponent implements OnInit {
           return next;
         });
       }
+    }
+  }
+
+  private selectedCatalogProvider(): CatalogProvider {
+    return this.draftConfig().useCloudServices ? this.draftProvider() : 'ollama';
+  }
+
+  private catalogStatus(provider: CatalogProvider): string {
+    if (provider === 'ollama') return this.localCatalog().status;
+    return this.cloudProviders().find((item) => item.id === provider)?.catalog_status || 'not_loaded';
+  }
+
+  private async ensureSelectedCatalog(): Promise<void> {
+    const provider = this.selectedCatalogProvider();
+    if (this.catalogStatus(provider) === 'not_loaded') {
+      await this.runCatalogOperation(provider, false);
+    }
+  }
+
+  async refreshSelectedCatalog(): Promise<void> {
+    await this.runCatalogOperation(this.selectedCatalogProvider(), true);
+  }
+
+  private async runCatalogOperation(
+    provider: CatalogProvider,
+    forceRefresh: boolean,
+  ): Promise<void> {
+    if (this.catalogProviderInFlight()) return;
+    this.catalogProviderInFlight.set(provider);
+    try {
+      const result = forceRefresh
+        ? await refreshModelCatalog(provider)
+        : await loadModelCatalog(provider);
+      this.applyConfigToState(result.state, false);
+      if (result.outcome === 'failed') {
+        this.statusMessage.set(`[ERROR] ${result.error || 'Unable to refresh the model catalog.'}`);
+      } else if (forceRefresh) {
+        this.statusMessage.set('Model catalog refreshed.');
+      }
+    } catch (error) {
+      this.statusMessage.set(formatUnknownError(error, 'Unable to refresh the model catalog.'));
+    } finally {
+      this.catalogProviderInFlight.set(null);
     }
   }
 
@@ -651,6 +710,7 @@ export class ModelConfigPageComponent implements OnInit {
   }
 
   handleProviderChange(provider: CloudProvider): void {
+    if (this.catalogProviderInFlight()) return;
     const resolvedProvider = resolveProvider(provider, this.cloudChoices());
     this.draftConfig.update((previous) => ({
       ...previous,
@@ -661,6 +721,7 @@ export class ModelConfigPageComponent implements OnInit {
     }));
     this.modelSearchQuery.set('');
     this.resetVisibleModelLimit();
+    void this.ensureSelectedCatalog();
   }
 
   handleCloudModelChange(modelName: string): void {
@@ -757,7 +818,7 @@ export class ModelConfigPageComponent implements OnInit {
       const description = error instanceof Error ? error.message : 'Failed to pull selected models.';
       failureMessage = description.startsWith('[ERROR]') ? description : `[ERROR] ${description}`;
     } finally {
-      await this.loadModelConfig(false, true);
+      await this.loadModelConfig(false);
       if (failureMessage) {
         this.statusMessage.set(failureMessage);
       }

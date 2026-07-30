@@ -26,7 +26,10 @@ class OpenAIResponsesTransport(StructuredTransportMixin):
         return ChatResult(content=response.output_text)
 
     # -------------------------------------------------------------------------
-    async def list_models(self) -> list[CloudModelDescriptor]:
+    async def list_models(
+        self, *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
+        del force_refresh
         page = await self.client.models.list()
         return [
             CloudModelDescriptor(id=item.id, display_name=item.id) for item in page.data

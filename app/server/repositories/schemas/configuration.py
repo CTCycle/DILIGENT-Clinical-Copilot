@@ -107,6 +107,26 @@ class ApplicationConfiguration(Base):
     )
 
 ###############################################################################
+class ProviderModelCatalogCache(Base):
+    __tablename__ = "provider_model_catalog_cache"
+
+    provider_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    configuration_fingerprint: Mapped[str] = mapped_column(String(128), nullable=False)
+    models: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    last_attempt_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+###############################################################################
 class ReferenceCatalogManifest(Base):
     __tablename__ = "reference_catalog_manifests"
 
