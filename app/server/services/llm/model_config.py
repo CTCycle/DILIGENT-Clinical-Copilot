@@ -7,52 +7,50 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Any, Protocol, cast
 
-from common.exceptions import ServiceValidationError
 from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
+from common.exceptions import ServiceValidationError
 from common.paths import VECTOR_DB_PATH
 from common.utils.catalog_loader import CatalogLoader
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
-from common.utils.types import (
-    coerce_bool,
-    coerce_float,
-    coerce_positive_int,
-    coerce_str,
+from domain.llm.providers import (
+    CloudModelDescriptor,
+    CloudProviderDescriptor,
+    CloudProviderId,
 )
 from domain.model_configs import (
     CatalogProviderId,
+    ConnectivityCheckRequest,
+    ConnectivityCheckResponse,
     EmbeddingIndexStatus,
     EmbeddingRuntimeStatus,
     EmbeddingStatusResponse,
-    LocalModelCard,
     LocalCatalogMetadata,
+    LocalModelCard,
     ModelCatalogOperationResponse,
-    ModelConfigSnapshot,
     ModelConfigPersistResponse,
+    ModelConfigSnapshot,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
-    ConnectivityCheckRequest,
-    ConnectivityCheckResponse,
 )
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
 from repositories.serialization.provider_model_catalog_cache import (
-    ProviderModelCatalogCacheRecord,
     ProviderModelCatalogCacheSerializer,
 )
+from services.llm import model_catalog
 from services.llm.cloud import CloudLLMClient, LLMError
 from services.llm.generation_policy import GenerationPurpose
-from services.llm import model_catalog
-from services.llm.provider_registry import provider_registry
-from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
-from domain.llm.providers import CloudProviderId
 from services.llm.ollama_client import OllamaClient, OllamaError
+from services.llm.provider_registry import provider_registry
+from services.retrieval.embedding_runtime import get_embedding_runtime
 from services.retrieval.settings import (
     build_effective_rag_settings,
+    normalize_rag_settings_patch,
     rag_settings_payload,
 )
-from services.retrieval.embedding_runtime import get_embedding_runtime
+
 
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
@@ -105,11 +103,11 @@ class ModelConfigService:
         local_models = await self.list_local_model_cards(
             selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
         )
-        local_catalog = self.local_catalog_metadata()
+        local_catalog = model_catalog.local_catalog_metadata(self.catalog_cache)
         return self.build_response(
             snapshot=snapshot,
             local_models=local_models,
-            cloud_providers=await self.discover_provider_descriptors(),
+            cloud_providers=await self.discover_provider_descriptors(snapshot),
             local_catalog=local_catalog,
         )
 
@@ -378,72 +376,10 @@ class ModelConfigService:
     ) -> None:
         if "rag_settings" not in fields_set or payload.rag_settings is None:
             return
-        updates["rag_settings"] = ModelConfigService.normalize_rag_settings_patch(
-            payload.rag_settings,
+        updates["rag_settings"] = normalize_rag_settings_patch(
+            payload.rag_settings.model_dump(exclude_unset=True),
             persisted_settings=snapshot.rag_settings,
         )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def normalize_rag_settings_patch(
-        payload: dict[str, object],
-        *,
-        persisted_settings: dict[str, object] | None = None,
-    ) -> dict[str, object]:
-        current = build_effective_rag_settings(persisted_settings=persisted_settings)
-        candidate_count = coerce_positive_int(
-            payload.get("retrieval_candidate_count"),
-            current.retrieval_candidate_count,
-        )
-        selected_count = coerce_positive_int(
-            payload.get("retrieval_selected_count"),
-            current.retrieval_selected_count,
-        )
-        if selected_count > candidate_count:
-            raise ServiceValidationError(
-                "Selected RAG documents cannot exceed retrieved RAG documents."
-            )
-        return {
-            "chunk_size": coerce_positive_int(
-                payload.get("chunk_size"), current.chunk_size
-            ),
-            "chunk_overlap": coerce_positive_int(
-                payload.get("chunk_overlap"), current.chunk_overlap
-            ),
-            "embedding_batch_size": coerce_positive_int(
-                payload.get("embedding_batch_size"), current.embedding_batch_size
-            ),
-            "use_hybrid_search": coerce_bool(
-                payload.get("use_hybrid_search"), current.use_hybrid_search
-            ),
-            "use_reranking": coerce_bool(
-                payload.get("use_reranking"), current.use_reranking
-            ),
-            "retrieval_candidate_count": candidate_count,
-            "retrieval_selected_count": selected_count,
-            "reranker_model": coerce_str(
-                payload.get("reranker_model"), current.reranker_model
-            ),
-            "hybrid_vector_weight": max(
-                coerce_float(
-                    payload.get("hybrid_vector_weight"), current.hybrid_vector_weight
-                ),
-                0.0,
-            ),
-            "hybrid_text_weight": max(
-                coerce_float(
-                    payload.get("hybrid_text_weight"), current.hybrid_text_weight
-                ),
-                0.0,
-            ),
-            "vector_stream_batch_size": coerce_positive_int(
-                payload.get("vector_stream_batch_size"),
-                current.vector_stream_batch_size,
-            ),
-            "embedding_offline_mode": coerce_bool(
-                payload.get("embedding_offline_mode"), current.embedding_offline_mode
-            ),
-        }
 
     # -------------------------------------------------------------------------
     def resolve_role_model_selection(
@@ -510,7 +446,7 @@ class ModelConfigService:
             return set(definition.models)
         record = self.catalog_cache.get(
             definition.provider_id,
-            self.catalog_configuration_fingerprint(definition.provider_id),
+            model_catalog.catalog_configuration_fingerprint(definition.provider_id),
         )
         return {
             str(item.get("id"))
@@ -635,7 +571,7 @@ class ModelConfigService:
 
     # -------------------------------------------------------------------------
     async def list_available_ollama_models(self) -> set[str]:
-        record = self._load_catalog_record("ollama")
+        record = model_catalog.load_catalog_record(self.catalog_cache, "ollama")
         return {
             str(item.get("id"))
             for item in (record.models if record else [])
@@ -719,7 +655,8 @@ class ModelConfigService:
                 if cloud_providers is not None
                 else self.build_provider_descriptors()
             ),
-            local_catalog=local_catalog or self.local_catalog_metadata(),
+            local_catalog=local_catalog
+            or model_catalog.local_catalog_metadata(self.catalog_cache),
             use_cloud_services=bool(snapshot.use_cloud_models),
             llm_provider=cast(CloudProviderId, provider),
             cloud_model=cloud_model,
@@ -727,7 +664,9 @@ class ModelConfigService:
             text_extraction_model=snapshot.text_extraction_model,
             ollama_reasoning=snapshot.ollama_reasoning,
             ollama_seed=snapshot.ollama_seed,
-            rag_settings=rag_settings_payload(build_effective_rag_settings()),
+            rag_settings=rag_settings_payload(
+                build_effective_rag_settings(persisted_settings=snapshot.rag_settings)
+            ),
             embedding_runtime=self.build_embedding_runtime_status(),
             embedding_index=self.build_embedding_index_status(),
             updated_at=snapshot.updated_at,
@@ -804,9 +743,10 @@ class ModelConfigService:
         ]
 
     # -------------------------------------------------------------------------
-    async def discover_provider_descriptors(self) -> list[CloudProviderDescriptor]:
+    async def discover_provider_descriptors(
+        self, snapshot: ModelConfigSnapshot
+    ) -> list[CloudProviderDescriptor]:
         descriptors: list[CloudProviderDescriptor] = []
-        snapshot = self.ensure_defaults()
         for item in provider_registry.all():
             if item.models:
                 models = [
@@ -817,8 +757,10 @@ class ModelConfigService:
                 catalog_updated_at = None
                 message = None
             else:
-                record = self._load_catalog_record(item.provider_id)
-                models = self._cloud_models_from_record(record)
+                record = model_catalog.load_catalog_record(
+                    self.catalog_cache, item.provider_id
+                )
+                models = model_catalog.cloud_models_from_record(record)
                 if record is None:
                     status = "not_loaded"
                     catalog_updated_at = None
@@ -857,29 +799,16 @@ class ModelConfigService:
             )
         return descriptors
 
-    def catalog_configuration_fingerprint(self, provider: CatalogProviderId) -> str:
-        return model_catalog.catalog_configuration_fingerprint(self, provider)
-
-    def _load_catalog_record(
-        self, provider: CatalogProviderId
-    ) -> ProviderModelCatalogCacheRecord | None:
-        return model_catalog.load_catalog_record(self, provider)
-
-    def local_catalog_metadata(self) -> LocalCatalogMetadata:
-        return model_catalog.local_catalog_metadata(self)
-
-    @staticmethod
-    def _cloud_models_from_record(
-        record: ProviderModelCatalogCacheRecord | None,
-    ) -> list[CloudModelDescriptor]:
-        return model_catalog.cloud_models_from_record(record)
-
     async def load_catalog(
         self, provider: CatalogProviderId, *, force_refresh: bool = False
     ) -> ModelCatalogOperationResponse:
         if provider != "ollama":
             provider_registry.get(provider)
-        if not force_refresh and self._load_catalog_record(provider) is not None:
+        if (
+            not force_refresh
+            and model_catalog.load_catalog_record(self.catalog_cache, provider)
+            is not None
+        ):
             return ModelCatalogOperationResponse(
                 catalog_provider=provider,
                 outcome="cached",
@@ -898,7 +827,7 @@ class ModelConfigService:
     async def _fetch_catalog(
         self, provider: CatalogProviderId
     ) -> ModelCatalogOperationResponse:
-        fingerprint = self.catalog_configuration_fingerprint(provider)
+        fingerprint = model_catalog.catalog_configuration_fingerprint(provider)
         try:
             if provider == "ollama":
                 async with OllamaClient() as client:
@@ -931,7 +860,7 @@ class ModelConfigService:
                 state=await self.get_state(),
             )
         except (LLMError, OllamaError) as exc:
-            message = self._sanitize_catalog_error(str(exc))
+            message = model_catalog.sanitize_catalog_error(str(exc))
             status = (
                 "authentication_required"
                 if "access key" in message.lower()
@@ -964,10 +893,6 @@ class ModelConfigService:
                 error=message,
                 state=await self.get_state(),
             )
-
-    @staticmethod
-    def _sanitize_catalog_error(message: str) -> str:
-        return model_catalog.sanitize_catalog_error(message)
 
     # -------------------------------------------------------------------------
     @staticmethod

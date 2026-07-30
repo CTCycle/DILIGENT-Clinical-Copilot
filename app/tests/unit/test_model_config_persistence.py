@@ -7,22 +7,27 @@ from typing import Any
 import pytest
 from sqlalchemy import create_engine, text
 
-from common.exceptions import ServiceValidationError
-from domain.model_configs import ModelConfigUpdateRequest
 import services.llm.model_config as model_config_module
-from services.llm.runtime_config import LLMRuntimeConfig
-from domain.model_configs import ConnectivityCheckRequest, ModelConfigSnapshot
-from services.llm.cloud import LLMError
-from services.llm.model_config import ModelConfigService
+from common.exceptions import ServiceValidationError
 from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
-from repositories.serialization.model_configs import ModelConfigSerializer
-from repositories.serialization.provider_model_catalog_cache import (
-    ProviderModelCatalogCacheSerializer,
+from domain.model_configs import (
+    ConnectivityCheckRequest,
+    ModelConfigSnapshot,
+    ModelConfigUpdateRequest,
 )
 from repositories.schemas.base import Base
+from repositories.serialization.model_configs import ModelConfigSerializer
+from repositories.serialization.provider_model_catalog_cache import (
+    ProviderModelCatalogCacheRecord,
+    ProviderModelCatalogCacheSerializer,
+)
+from services.llm.cloud import LLMError
+from services.llm.model_config import ModelConfigService
 from services.llm.ollama_client import OllamaError
+from services.llm.runtime_config import LLMRuntimeConfig
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
+
 
 ###############################################################################
 class InMemorySerializer:
@@ -135,7 +140,9 @@ def test_model_config_state_survives_provider_catalog_drift(monkeypatch) -> None
         )
     )
     service = ModelConfigService(serializer=serializer)
-    async def fake_discover_provider_descriptors() -> list[CloudProviderDescriptor]:
+    async def fake_discover_provider_descriptors(
+        _snapshot: ModelConfigSnapshot,
+    ) -> list[CloudProviderDescriptor]:
         return ModelConfigService.build_provider_descriptors()
 
     monkeypatch.setattr(
@@ -150,6 +157,65 @@ def test_model_config_state_survives_provider_catalog_drift(monkeypatch) -> None
 
     assert response.llm_provider == "deepseek"
     assert response.cloud_model == "gpt-4.1-mini"
+
+###############################################################################
+def test_model_config_state_returns_persisted_rag_settings(monkeypatch) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="qwen3.5:2b",
+            text_extraction_model="qwen3.5:2b",
+            use_cloud_models=False,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            rag_settings={
+                "use_hybrid_search": False,
+                "retrieval_candidate_count": 12,
+                "retrieval_selected_count": 4,
+                "reranker_model": "persisted-reranker",
+            },
+            updated_at=datetime.now(UTC),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+
+    async def fake_list_local_model_cards(**_: Any) -> list[Any]:
+        return []
+
+    async def fake_discover_provider_descriptors(
+        _snapshot: ModelConfigSnapshot,
+    ) -> list[CloudProviderDescriptor]:
+        return ModelConfigService.build_provider_descriptors()
+
+    monkeypatch.setattr(service, "list_local_model_cards", fake_list_local_model_cards)
+    monkeypatch.setattr(
+        service, "discover_provider_descriptors", fake_discover_provider_descriptors
+    )
+
+    response = asyncio.run(service.get_state())
+
+    assert response.rag_settings.use_hybrid_search is False
+    assert response.rag_settings.retrieval_candidate_count == 12
+    assert response.rag_settings.retrieval_selected_count == 4
+    assert response.rag_settings.reranker_model == "persisted-reranker"
+
+###############################################################################
+def test_malformed_cached_catalog_entry_is_skipped() -> None:
+    record = ProviderModelCatalogCacheRecord(
+        provider_id="openai",
+        configuration_fingerprint="test",
+        models=[
+            {"id": "valid-model", "display_name": "Valid model"},
+            {"display_name": "Malformed model"},
+        ],
+        last_success_at=None,
+        last_attempt_at=datetime.now(UTC),
+        last_attempt_status="success",
+        last_error=None,
+    )
+
+    models = model_config_module.model_catalog.cloud_models_from_record(record)
+
+    assert [model.id for model in models] == ["valid-model"]
 
 ###############################################################################
 def test_model_config_catalog_keeps_configured_model_when_refresh_fails(
@@ -188,7 +254,7 @@ def test_model_config_catalog_keeps_configured_model_when_refresh_fails(
     monkeypatch.setattr(model_config_module, "CloudLLMClient", FailingCloudClient)
     service = ModelConfigService(serializer=serializer)
     monkeypatch.setattr(
-        service,
+        model_config_module.model_catalog,
         "catalog_configuration_fingerprint",
         lambda _provider: "openai-test-fingerprint",
     )
@@ -452,7 +518,7 @@ def test_cold_local_catalog_loads_ollama_once(monkeypatch) -> None:
 
     monkeypatch.setattr(model_config_module, "OllamaClient", FakeOllamaClient)
     monkeypatch.setattr(
-        service,
+        model_config_module.model_catalog,
         "catalog_configuration_fingerprint",
         lambda _provider: "ollama-test-fingerprint",
     )
@@ -584,7 +650,7 @@ def test_failed_ollama_catalog_load_is_persisted_without_retry(monkeypatch) -> N
 
     monkeypatch.setattr(model_config_module, "OllamaClient", FailingOllamaClient)
     monkeypatch.setattr(
-        service,
+        model_config_module.model_catalog,
         "catalog_configuration_fingerprint",
         lambda _provider: "ollama-failure-fingerprint",
     )
@@ -707,7 +773,7 @@ def test_provider_catalog_uses_last_successful_models_when_refresh_fails(monkeyp
     monkeypatch.setattr(model_config_module, "CloudLLMClient", FakeCloudLLMClient)
     service = ModelConfigService()
     monkeypatch.setattr(
-        service,
+        model_config_module.model_catalog,
         "catalog_configuration_fingerprint",
         lambda provider: f"{provider}-test-fingerprint",
     )
@@ -749,7 +815,7 @@ def test_empty_ollama_catalog_is_saved_as_a_valid_empty_result(monkeypatch, tmp_
 
     monkeypatch.setattr(model_config_module, "OllamaClient", EmptyOllamaClient)
     monkeypatch.setattr(
-        service,
+        model_config_module.model_catalog,
         "catalog_configuration_fingerprint",
         lambda _provider: "empty-ollama-fingerprint",
     )
@@ -806,7 +872,7 @@ def test_catalog_provider_switching_keeps_provider_specific_lists(
 
     monkeypatch.setattr(model_config_module, "CloudLLMClient", FakeCloudClient)
     monkeypatch.setattr(
-        service,
+        model_config_module.model_catalog,
         "catalog_configuration_fingerprint",
         lambda provider: f"{provider}-fingerprint",
     )
@@ -853,7 +919,9 @@ def test_concurrent_catalog_loads_share_one_provider_fetch(monkeypatch, tmp_path
 
     monkeypatch.setattr(model_config_module, "CloudLLMClient", FakeCloudClient)
     monkeypatch.setattr(
-        service, "catalog_configuration_fingerprint", lambda _provider: "same-fingerprint"
+        model_config_module.model_catalog,
+        "catalog_configuration_fingerprint",
+        lambda _provider: "same-fingerprint",
     )
 
     async def run_concurrent():
@@ -869,7 +937,7 @@ def test_concurrent_catalog_loads_share_one_provider_fetch(monkeypatch, tmp_path
     assert calls == 1
 
 ###############################################################################
-def test_catalog_fingerprint_change_invalidates_saved_models(tmp_path) -> None:
+def test_catalog_fingerprint_change_invalidates_saved_models(tmp_path, monkeypatch) -> None:
     service = _catalog_test_service(
         tmp_path,
         ModelConfigSnapshot(
@@ -886,7 +954,11 @@ def test_catalog_fingerprint_change_invalidates_saved_models(tmp_path) -> None:
         configuration_fingerprint="old-fingerprint",
         models=[{"id": "old-model", "display_name": "Old"}],
     )
-    service.catalog_configuration_fingerprint = lambda _provider: "new-fingerprint"  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        model_config_module.model_catalog,
+        "catalog_configuration_fingerprint",
+        lambda _provider: "new-fingerprint",
+    )
 
     state = asyncio.run(service.get_state())
     openai = next(item for item in state.cloud_providers if item.id == "openai")

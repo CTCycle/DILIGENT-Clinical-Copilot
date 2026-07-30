@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-07-29
+Last updated: 2026-07-30
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -35,12 +35,17 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 ## Model Configuration Routes
 - `GET /api/model-config`
 - `PUT /api/model-config`
+- `POST /api/model-config/catalogs/{provider}/load`
+- `POST /api/model-config/catalogs/{provider}/refresh`
+- `GET /api/model-config/embedding-status`
 - `POST /api/model-config/connectivity-check`
 
 `GET /api/model-config` returns each cloud provider's model catalog together with
 freshness status and a user-safe message. Catalogs are refreshed through the
 provider's official model-list API; a successful in-process result is returned
-as `cached` if a later refresh fails. No catalog cache survives a backend restart.
+as `cached` if a later refresh fails. Successful and failed catalog attempts are
+persisted in the SQLAlchemy-backed provider catalog cache, so cached catalog
+state survives a backend restart.
 If a persisted model is no longer present in its provider's refreshed catalog,
 the GET response still returns that saved selection together with the current
 catalog so clients can present a valid replacement. Catalog membership remains
