@@ -1,5 +1,9 @@
 import { ClinicalFormState, ClinicalRequestPayload, RuntimeSettings } from "./models/types";
 
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export function sanitizeField(value: string): string | null {
   const normalized = value.trim();
   return normalized.length ? normalized : null;

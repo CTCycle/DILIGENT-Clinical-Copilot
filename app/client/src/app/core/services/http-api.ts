@@ -1,5 +1,6 @@
 import { HTTP_TIMEOUT_SECONDS } from "../constants";
 import { ApiResult } from "../models/types";
+import { isRecord } from "../utils";
 
 export const HTTP_TIMEOUT = HTTP_TIMEOUT_SECONDS;
 export const GENERIC_REQUEST_ERROR = "[ERROR] Request could not be completed. Please try again.";
@@ -19,10 +20,6 @@ const SENSITIVE_ERROR_FRAGMENTS = [
   "access key",
   "sql",
 ];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function isSafeUserFacingMessage(message: string): boolean {
   const candidate = message.trim();

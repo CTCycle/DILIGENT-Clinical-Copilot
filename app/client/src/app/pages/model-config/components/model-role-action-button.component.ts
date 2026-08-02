@@ -43,14 +43,6 @@ export class ModelRoleActionButtonComponent {
     return this.role === 'clinical' ? 'Clinical model selected' : 'Text extraction model selected';
   }
 
-  get hiddenLabel(): string {
-    return this.selected ? this.selectedLabel : `Set as ${this.roleLabel}`;
-  }
-
-  get visibleLabel(): string {
-    return this.role === 'clinical' ? 'Clinical' : 'Extraction';
-  }
-
   get ariaLabel(): string {
     return this.selected ? this.selectedLabel : `Set ${this.modelName} as ${this.roleLabel}`;
   }

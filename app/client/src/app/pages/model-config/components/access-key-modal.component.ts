@@ -1,12 +1,13 @@
 import { CommonModule } from '@angular/common';
 import {
-  ChangeDetectorRef,
   Component,
   EventEmitter,
   Input,
   OnChanges,
   Output,
   SimpleChanges,
+  computed,
+  signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -56,15 +57,13 @@ export class AccessKeyModalComponent implements OnChanges {
   @Output() closed = new EventEmitter<void>();
   @Output() keysChanged = new EventEmitter<void>();
 
-  keys: AccessKeyRecord[] = [];
-  isLoading = false;
-  isSaving = false;
-  newKeyValue = '';
-  errorMessage = '';
-  visibleRows: Record<number, boolean> = {};
+  readonly keys = signal<AccessKeyRecord[]>([]);
+  readonly isLoading = signal(false);
+  readonly isSaving = signal(false);
+  readonly newKeyValue = signal('');
+  readonly errorMessage = signal('');
+  readonly visibleRows = signal<Record<number, boolean>>({});
   private loadSequence = 0;
-
-  constructor(private readonly changeDetectorRef: ChangeDetectorRef) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     if ((changes['isOpen'] || changes['provider']) && this.isOpen) {
@@ -72,111 +71,100 @@ export class AccessKeyModalComponent implements OnChanges {
     }
   }
 
-  get sortedKeys(): AccessKeyRecord[] {
-    return [...this.keys].sort(
+  readonly sortedKeys = computed(() => [...this.keys()].sort(
       (left, right) => Number(right.is_active) - Number(left.is_active) || right.id - left.id,
-    );
-  }
+    ));
 
-  get hasKeys(): boolean {
-    return this.keys.length > 0;
-  }
-
-  get maskedKeyLabel(): string {
-    return MASKED_KEY_LABEL;
-  }
+  readonly hasKeys = computed(() => this.keys().length > 0);
 
   async loadKeys(): Promise<void> {
     const loadId = ++this.loadSequence;
-    this.isLoading = true;
-    this.errorMessage = '';
+    this.isLoading.set(true);
+    this.errorMessage.set('');
     try {
       const keys = await fetchAccessKeys(this.provider);
       if (loadId === this.loadSequence) {
-        this.keys = keys;
-        this.changeDetectorRef.markForCheck();
+        this.keys.set(keys);
       }
     } catch (error) {
       if (loadId === this.loadSequence) {
-        this.errorMessage = error instanceof Error ? error.message : 'Unable to load access keys.';
-        this.changeDetectorRef.markForCheck();
+        this.errorMessage.set(error instanceof Error ? error.message : 'Unable to load access keys.');
       }
     } finally {
       if (loadId === this.loadSequence) {
-        this.isLoading = false;
-        this.changeDetectorRef.detectChanges();
+        this.isLoading.set(false);
       }
     }
   }
 
   async addKey(): Promise<void> {
-    const candidate = this.newKeyValue.trim();
+    const candidate = this.newKeyValue().trim();
     if (!candidate) {
-      this.errorMessage = 'Please paste a key before adding.';
+      this.errorMessage.set('Please paste a key before adding.');
       return;
     }
     if (candidate.length < MIN_ACCESS_KEY_LENGTH) {
-      this.errorMessage = `Access keys must be at least ${MIN_ACCESS_KEY_LENGTH} characters.`;
+      this.errorMessage.set(`Access keys must be at least ${MIN_ACCESS_KEY_LENGTH} characters.`);
       return;
     }
-    this.isSaving = true;
-    this.errorMessage = '';
+    this.isSaving.set(true);
+    this.errorMessage.set('');
     try {
       await createAccessKey(this.provider, candidate);
-      this.newKeyValue = '';
+      this.newKeyValue.set('');
       await this.loadKeys();
       this.keysChanged.emit();
     } catch (error) {
-      this.errorMessage = error instanceof Error ? error.message : 'Unable to add access key.';
+      this.errorMessage.set(error instanceof Error ? error.message : 'Unable to add access key.');
     } finally {
-      this.isSaving = false;
+      this.isSaving.set(false);
     }
   }
 
   async activateKey(keyId: number): Promise<void> {
-    this.isSaving = true;
-    this.errorMessage = '';
+    this.isSaving.set(true);
+    this.errorMessage.set('');
     try {
       const activated = await activateAccessKey(keyId, this.provider);
-      this.keys = this.keys.map((item) => ({
+      this.keys.update((items) => items.map((item) => ({
         ...item,
         is_active: item.id === activated.id,
         updated_at: item.id === activated.id ? activated.updated_at : item.updated_at,
         last_used_at: item.id === activated.id ? activated.last_used_at : item.last_used_at,
-      }));
-      this.changeDetectorRef.detectChanges();
+      })));
       this.keysChanged.emit();
     } catch (error) {
-      this.errorMessage = error instanceof Error ? error.message : 'Unable to activate access key.';
+      this.errorMessage.set(error instanceof Error ? error.message : 'Unable to activate access key.');
     } finally {
-      this.isSaving = false;
+      this.isSaving.set(false);
     }
   }
 
   async deleteKey(keyId: number): Promise<void> {
-    this.isSaving = true;
-    this.errorMessage = '';
+    this.isSaving.set(true);
+    this.errorMessage.set('');
     try {
       await deleteAccessKey(keyId, this.provider);
-      this.keys = this.keys.filter((item) => item.id !== keyId);
-      const next = { ...this.visibleRows };
-      delete next[keyId];
-      this.visibleRows = next;
-      this.changeDetectorRef.detectChanges();
+      this.keys.update((items) => items.filter((item) => item.id !== keyId));
+      this.visibleRows.update((rows) => {
+        const next = { ...rows };
+        delete next[keyId];
+        return next;
+      });
       this.keysChanged.emit();
     } catch (error) {
-      this.errorMessage = error instanceof Error ? error.message : 'Unable to delete access key.';
+      this.errorMessage.set(error instanceof Error ? error.message : 'Unable to delete access key.');
     } finally {
-      this.isSaving = false;
+      this.isSaving.set(false);
     }
   }
 
   toggleVisibility(keyId: number): void {
-    this.visibleRows = { ...this.visibleRows, [keyId]: !this.visibleRows[keyId] };
+    this.visibleRows.update((rows) => ({ ...rows, [keyId]: !rows[keyId] }));
   }
 
   fingerprintLabel(item: AccessKeyRecord): string {
-    return this.visibleRows[item.id] ? obfuscateFingerprint(item.fingerprint) : MASKED_KEY_LABEL;
+    return this.visibleRows()[item.id] ? obfuscateFingerprint(item.fingerprint) : MASKED_KEY_LABEL;
   }
 
   lastUsedLabel(item: AccessKeyRecord): string {
@@ -188,7 +176,7 @@ export class AccessKeyModalComponent implements OnChanges {
   }
 
   visibilityActionLabel(item: AccessKeyRecord): string {
-    return this.visibleRows[item.id] ? 'Hide fingerprint' : 'Show fingerprint';
+    return this.visibleRows()[item.id] ? 'Hide fingerprint' : 'Show fingerprint';
   }
 }
 

@@ -547,6 +547,17 @@ export type InspectionDeleteResponse = {
 
 export type InspectionUpdateTarget = "rxnav" | "livertox" | "rag";
 
+export type InspectionUpdateOverridesByTarget = {
+  rxnav: InspectionRxNavOverrideRequest;
+  livertox: InspectionLiverToxOverrideRequest;
+  rag: InspectionRagUpdateRequest;
+};
+
+export type InspectionUpdateStartRequest =
+  | { target: "rxnav"; payload: InspectionUpdateOverridesByTarget["rxnav"] }
+  | { target: "livertox"; payload: InspectionUpdateOverridesByTarget["livertox"] }
+  | { target: "rag"; payload: InspectionUpdateOverridesByTarget["rag"] };
+
 export type InspectionUpdateConfigResponse = {
   target: InspectionUpdateTarget;
   defaults: Record<string, unknown>;
