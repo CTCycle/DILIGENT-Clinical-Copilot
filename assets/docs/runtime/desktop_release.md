@@ -1,5 +1,5 @@
 # DILIGENT Desktop Release
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Packaging architecture
 
@@ -16,9 +16,14 @@ The locked desktop toolchain is Tauri CLI `2.11.4`, Tauri crate `2.11.5`, Tauri 
 
 The runtime allowlist excludes source code, tests, documentation, credentials, `.env`, databases, logs, models, vectors, archives, documents, caches, and development runtimes. The packaged shell uses the system WebView2 runtime; the MSI can instead carry an offline WebView2 installer when built with `-OfflineWebView2`.
 
-## Published artifacts
+## Current source and artifact status
 
-For the current v3.0.0 release:
+The current source manifests report version `3.0.0`, but the latest local tag is
+`v2.4.0` and the checked-in `release/` directory contains the previous `v2.4.0`
+portable EXE, MSI, and checksum manifest. A `v3.0.0` build is an available build
+target, not evidence of publication.
+
+The expected output names for a verified `3.0.0` build are:
 
 ```text
 release/DILIGENT-v3.0.0-windows-x64-portable.exe
@@ -26,7 +31,7 @@ release/DILIGENT-v3.0.0-windows-x64.msi
 release/DILIGENT-v3.0.0-windows-x64.sha256
 ```
 
-The portable executable is a single distribution file for no-install use. The MSI installs the same Tauri shell and packaged runtime. The `.sha256` file contains one SHA-256 entry per published artifact and must be checked before distribution.
+The portable executable is a single distribution file for no-install use. The MSI installs the same Tauri shell and packaged runtime. The `.sha256` file contains one SHA-256 entry per built artifact and must be checked before distribution. Publication requires separate tag, remote-release, and download/hash evidence.
 
 ## Runtime and data layout
 
@@ -63,7 +68,7 @@ Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release 
 
 Final desktop artifacts are written directly to `release/`. Intermediate desktop staging remains under `release/.staging/`; Tauri's native Cargo output remains under `app/desktop/src-tauri/target/release/`.
 
-The build refuses to publish if the frozen backend, runtime manifest, artifact size, or MSI metadata checks fail. The portable artifact is the raw Tauri release executable copied to `release/` after those checks.
+The build refuses to complete if the frozen backend, runtime manifest, artifact size, or MSI metadata checks fail. The portable artifact is the raw Tauri release executable copied to `release/` after those checks; remote publication is a separate maintainer action.
 
 ## Validation
 

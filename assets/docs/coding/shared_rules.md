@@ -1,5 +1,5 @@
 # Shared Rules
-Last updated: 2026-06-03
+Last updated: 2026-08-02
 
 ## Cross-language Rules
 - Keep changes tightly scoped to the task.

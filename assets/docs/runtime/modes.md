@@ -1,5 +1,5 @@
 # Runtime Modes
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Supported Modes
 ### Local Application

@@ -1,5 +1,5 @@
 # Error Handling
-Last updated: 2026-07-11
+Last updated: 2026-08-02
 
 ## Scope
 Apply these rules across backend and frontend code.

@@ -1,5 +1,5 @@
 # User Checklists
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Windows desktop launch checklist
 
@@ -12,7 +12,7 @@ Last updated: 2026-07-29
 ## Recommended End-to-end Journey
 1. Start DILIGENT with the packaged desktop app, or run `start_on_windows.ps1` for source/development mode.
 2. Confirm the UI opens.
-3. Confirm backend health at `/api/health`.
+3. In source mode, confirm backend health at `http://127.0.0.1:7690/api/health`; in packaged mode, use the port recorded in `desktop-backend-ready.json`.
 4. Open **Model Configurations**.
 5. Select provider and model.
 6. Add and activate any required access key.

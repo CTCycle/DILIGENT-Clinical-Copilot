@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled automatic generation policy immediately before each LLM call.
@@ -34,7 +34,7 @@ The Tauri shell sets these desktop-only variables when it starts the frozen back
 - `UI_PORT=9847`
 - `VITE_API_BASE_URL=/api`
 - `RELOAD=false`
-- `ALWAYS_REBUILD=true` (rebuilds the frontend at application startup when `true`; skips that build when `false`)
+- `ALWAYS_REBUILD=false` in `settings/.env.example` (rebuilds the frontend at application startup when `true`; skips that build when `false`; the launcher treats an absent value as `true`)
 - `BACKEND_LOGS_VISIBLE=true` (defaults to `true` when absent)
 
 ## Operational Settings By Source

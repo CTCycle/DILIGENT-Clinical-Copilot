@@ -1,12 +1,12 @@
 # QA Regression
-Last updated: 2026-07-30
+Last updated: 2026-08-02
 
 ## Scope
 This file captures the repeatable regression slice for model configuration and app-flow validation.
 
 ## Packaged desktop smoke test
 
-After a Windows desktop release build, validate the published portable artifact separately from source-mode tests:
+After a Windows desktop release build, validate the built portable artifact separately from source-mode tests:
 
 1. Verify `release\DILIGENT-v<version>-windows-x64-portable.exe` and the matching `.sha256` entry.
 2. Open the portable EXE and confirm a responding window titled `DILIGENT Clinical Copilot`.
@@ -93,15 +93,13 @@ $env:APP_TEST_BACKEND_URL='http://127.0.0.1:7690'
 .\runtimes\uv\uv.exe run --directory app/server --with pytest --with pytest-playwright pytest ..\tests\e2e\test_model_config_api.py ..\tests\e2e\test_app_flow.py -q
 ```
 
-## Expected Pass Signatures
-- Model-config unit pass:
-  - `31 passed`
-- Focused E2E slice:
-  - `7 passed, 3 deselected`
-- Full model-config plus app-flow pass:
-  - `21 passed`
+## Expected pass criteria
 
-If results differ:
+- The selected unit, API, and app-flow tests complete with exit code `0`.
+- Model-configuration tests cover persisted state, provider catalog cache reuse, explicit refresh behavior, and save validation.
+- The UI remains usable after the provider catalog is unavailable; a cached valid catalog remains visible and an empty Ollama catalog is treated as a valid result.
+
+Test counts are intentionally not fixed here because the repository adds and removes focused cases as contracts evolve. If a current run fails:
 - Re-check backend and frontend health and port listeners.
 - Confirm `PLAYWRIGHT_NODEJS_PATH` is set by `app/tests/conftest.py` and points to `runtimes/nodejs/node.exe`.
 - If toggle or save tests fail, remove stale persisted runtime state and rerun once after cleanup.

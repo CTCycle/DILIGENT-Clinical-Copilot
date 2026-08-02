@@ -1,5 +1,5 @@
 # Model Setup
-Last updated: 2026-07-30
+Last updated: 2026-08-02
 
 Sampling settings are selected automatically according to the provider, model
 family, and operation. They are not user-configurable.
@@ -34,7 +34,7 @@ Expected behavior:
 - The application stores provider keys through the backend access-key service.
 - The UI should show fingerprints and metadata rather than the full secret after saving.
 - Only one key should be active for a provider at a time.
-- Cloud and Ollama catalogs are saved in the application database. Opening the page reuses the saved catalog and does not contact a provider again. Use **Refresh** when you explicitly want a new provider listing. If a refresh fails, the last valid cloud list remains visible; an empty Ollama installation is saved as an empty catalog.
+- Cloud and Ollama catalogs are saved in the application database. Opening the page reuses the saved catalog and does not contact a provider again. Use **Refresh** when you explicitly want a new provider listing. If a refresh fails, the last valid catalog remains visible; an empty Ollama installation is saved as an empty catalog. Catalog state is scoped by provider endpoint and active credential fingerprint, so changing credentials or endpoints starts a new cache scope without exposing secrets.
 
 Recommended workflow:
 1. Open **Model Configurations**.

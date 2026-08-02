@@ -1,6 +1,6 @@
 # Automatic generation policy
 
-Last updated: 2026-07-19
+Last updated: 2026-08-02
 
 DILIGENT selects sampling behavior automatically immediately before an LLM
 request. Operators configure providers, models, reasoning, and retrieval only.

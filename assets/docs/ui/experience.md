@@ -1,5 +1,5 @@
 # Experience
-Last updated: 2026-06-15
+Last updated: 2026-08-02
 
 ## Page Structure
 - Routes:
@@ -8,6 +8,7 @@ Last updated: 2026-06-15
   - `/data` for Data Inspection
   - `/model-config` for Model Configurations
   - `/sessions/:sessionId/timetable` for Patient Timeline
+  - `/sessions/:sessionId/timetable/:timelineId` for a saved timeline
 - App shell uses the root shell plus shared navigation through `NavSidebarComponent`.
 
 ## Core UX Rules
@@ -29,6 +30,8 @@ Last updated: 2026-06-15
 - Laboratory previews should show all retrieved `lab_timeline` occurrences when available.
 - Metadata UI should summarize `documents` and `images` from the same persisted metadata JSON.
 - Revision Mode should keep full-session reprocessing as the default while still allowing a selected excerpt and free-text revision instruction.
+- Model catalog reads reuse persisted state; **Refresh** is the explicit provider-contact action, and valid cached catalogs remain visible when a later refresh fails.
+- Access-key dialogs keep new keys inactive until explicit activation and expose only masked fingerprints after storage.
 
 ## Responsiveness
 - Preserve breakpoints around:

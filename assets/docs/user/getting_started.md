@@ -1,5 +1,5 @@
 # Getting Started
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Purpose
 DILIGENT is a local clinical copilot interface for Drug-Induced Liver Injury review workflows. It helps users enter clinical context, configure model providers, inspect local data, run DILI-oriented analysis, and review saved sessions.
@@ -18,19 +18,19 @@ Use this documentation if you need to:
 - Choose either the Windows desktop package or source/development startup described in `README.md`.
 - For desktop use, open `DILIGENT-v<version>-windows-x64-portable.exe` for no-install operation or install the matching `.msi`. Verify the matching `.sha256` file before distributing an artifact.
 - The portable desktop app does not require Python, Node.js, Rust, npm, uv, or a source checkout. It stores user data under `%LOCALAPPDATA%\DILIGENT\data`.
-- Default local UI URL:
+- Source-mode default UI URL:
 
 ```text
 http://127.0.0.1:9847
 ```
 
-- Default backend health URL:
+- Source-mode default backend health URL:
 
 ```text
 http://127.0.0.1:7690/api/health
 ```
 
-- If `settings/.env` uses different ports, use the local configured values instead.
+- If `settings/.env` uses different ports, use the local configured values instead. Packaged desktop uses a random localhost backend port recorded in `desktop-backend-ready.json`.
 
 ## Safety And Privacy Expectations
 - Confirm local policy for protected health information, external model providers, and audit requirements before using real clinical material.

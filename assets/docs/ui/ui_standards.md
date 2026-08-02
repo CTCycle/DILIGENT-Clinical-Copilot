@@ -1,5 +1,5 @@
 # UI Standards
-Last updated: 2026-06-17
+Last updated: 2026-08-02
 
 ## Spacing Scale
 - Use the root spacing tokens from `app/client/src/styles.scss`: `--space-xs` through `--space-3xl`.
