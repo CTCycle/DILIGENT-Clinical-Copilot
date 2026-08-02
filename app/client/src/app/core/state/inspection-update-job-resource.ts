@@ -2,22 +2,19 @@ import { effect, signal } from '@angular/core';
 
 import {
   InspectionLiverToxOverrideRequest,
+  InspectionUpdateOverridesByTarget,
   InspectionRagUpdateRequest,
   InspectionRxNavOverrideRequest,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobStatusResponse,
+  InspectionUpdateStartRequest,
   InspectionUpdateTarget,
   JobStartResponse,
 } from '../models/types';
 import { resolvePollIntervalMs } from '../services/clinical-api';
 import { JobPollingService } from '../services/job-polling.service';
 import { InspectionUpdateJobTrackerService } from './inspection-update-job-tracker.service';
-
-type InspectionUpdateOverridesByTarget = {
-  rxnav: InspectionRxNavOverrideRequest;
-  livertox: InspectionLiverToxOverrideRequest;
-  rag: InspectionRagUpdateRequest;
-};
+import { isRecord } from '../utils';
 
 type InspectionUpdateTargetActions<TTarget extends InspectionUpdateTarget> = {
   fetchConfig: () => Promise<InspectionUpdateConfigResponse>;
@@ -54,10 +51,6 @@ type InspectionUpdateTargetSnapshotMap = Record<
 export type InspectionUpdateTargetActionsMap = {
   [TTarget in InspectionUpdateTarget]: InspectionUpdateTargetActions<TTarget>;
 };
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 function readStringKey(payload: Record<string, unknown>, ...keys: string[]): string | null {
   for (const key of keys) {
@@ -278,7 +271,7 @@ export class InspectionUpdateJobResource {
     this.updateError.set(null);
     if (this.tracker) {
       try {
-        await this.tracker.start(target, this.buildStartPayload(target) as Record<string, unknown>);
+        await this.tracker.start(this.buildStartRequest(target));
       } catch (error) {
         this.patchTargetState(target, {
           running: false,
@@ -359,6 +352,16 @@ export class InspectionUpdateJobResource {
       throw new Error('Overrides must be a JSON object.');
     }
     return parsed as InspectionUpdateOverridesByTarget[TTarget];
+  }
+
+  private buildStartRequest(target: InspectionUpdateTarget): InspectionUpdateStartRequest {
+    if (target === 'rxnav') {
+      return { target, payload: this.buildStartPayload(target) };
+    }
+    if (target === 'livertox') {
+      return { target, payload: this.buildStartPayload(target) };
+    }
+    return { target, payload: this.buildStartPayload(target) };
   }
 
   private async pollUpdateJob(

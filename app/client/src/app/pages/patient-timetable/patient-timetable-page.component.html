@@ -15,10 +15,10 @@
     <section class="timetable-toolbar" aria-label="Timetable controls">
       <span class="toolbar-group">Range <strong>{{ rangeLabel() }}</strong></span>
       <span class="toolbar-group">Events <strong>{{ filteredEvents().length }}</strong></span>
-      <label class="toolbar-group">Evidence <select [value]="evidenceFilter()" (change)="setEvidenceFilter($any($event.target).value)"><option value="all">All events</option><option value="with_evidence">Has source evidence</option><option value="missing_evidence">Missing source evidence</option></select></label>
+      <app-timetable-filter-select label="Evidence" [value]="evidenceFilter()" [options]="evidenceFilterOptions" (valueChange)="setEvidenceFilter($event)"></app-timetable-filter-select>
       <label class="toolbar-group"><input type="checkbox" [checked]="showUncertainEvents()" (change)="toggleUncertainEvents()"> Show uncertain</label>
       <label class="toolbar-group"><input type="checkbox" [checked]="hideEmptyLanes()" (change)="toggleHideEmptyLanes()"> Hide empty lanes</label>
-      <label class="toolbar-group">Density <select [value]="density()" (change)="setDensity($any($event.target).value)"><option value="dense">Dense</option><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select></label>
+      <app-timetable-filter-select label="Density" [value]="density()" [options]="densityOptions" (valueChange)="setDensity($event)"></app-timetable-filter-select>
       <button type="button" class="btn-secondary" (click)="fitRange()">Fit range</button><button type="button" class="btn-secondary" (click)="selectPreviousEvent()" [disabled]="!hasPreviousEvent()">Previous event</button><button type="button" class="btn-secondary" (click)="selectNextEvent()" [disabled]="!hasNextEvent()">Next event</button>
       <span class="toolbar-group">Source <strong>{{ generationStatusLabel() }}</strong></span>
       <span class="toolbar-group">Model <strong>{{ sourceModelLabel() }}</strong></span>
@@ -52,7 +52,7 @@
             <button type="button" class="btn-secondary" (click)="zoomIn()" [disabled]="zoom() >= 2.5">Zoom in</button>
             <button type="button" class="btn-secondary" (click)="fitZoom()">Fit</button>
           </div>
-          <input class="timeline-scrollbar" type="range" min="0" [max]="scrollMax()" [value]="scrollOffset()" aria-label="Timeline horizontal position" (input)="setScrollOffset(+$any($event.target).value)">
+          <input class="timeline-scrollbar" type="range" min="0" [max]="scrollMax()" [value]="scrollOffset()" aria-label="Timeline horizontal position" (input)="handleScrollInput($event)">
           <div class="timeline-time-canvas" [style.width.%]="100 * zoom()">
           <div class="timeline-axis" aria-label="Timeline range">
             <div class="timeline-axis-line"></div>
