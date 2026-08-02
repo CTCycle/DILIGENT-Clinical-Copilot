@@ -1,11 +1,13 @@
 # Components And Patterns
-Last updated: 2026-07-17
+Last updated: 2026-08-02
 
 ## Page Layout Patterns
 - DILI page uses a responsive grid through `.stitch-dili-grid` and a sticky sidebar on desktop.
 - Model configuration uses a two-column or two-row layout through `.model-config-layout`.
 - Clinical Sessions uses a list-detail workspace with AI preview, session editing, metadata summaries, revision actions, and timeline actions.
 - Data Inspection uses tabbed sections with scroll-aware tables and lists for reference data and RAG resources.
+- Clinical Sessions keeps preview rendering and related view state in focused preview components; page-level orchestration should not reabsorb that logic.
+- Model Configurations and access-key dialogs use signal-backed local state, explicit loading/saving states, and provider-response sequencing.
 
 ## Shared Component Rules
 ### Buttons

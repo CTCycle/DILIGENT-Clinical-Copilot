@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Recommended Local Startup
 On Windows, use:
@@ -13,7 +13,7 @@ The launcher:
 - ensures portable Python, `uv`, and Node runtimes under `runtimes/`
 - runs `uv sync`
 - installs frontend dependencies
-- builds frontend dist at application startup when `ALWAYS_REBUILD=true`; skips that build when `false`
+- builds frontend dist at application startup when `ALWAYS_REBUILD` is `true`; skips that build when `false`
 - starts the backend with the synchronized virtual-environment Python and `uvicorn`
 - starts the frontend preview server
 - recreates a stale backend virtual environment when the repository has moved
@@ -23,7 +23,7 @@ Use this launcher as the default startup path for local development, Codex sessi
 
 ## Packaged desktop startup
 
-The Windows portable executable and MSI use the Tauri shell. Open the published portable EXE directly, or launch the application installed by the MSI; do not run the source launcher for packaged operation. On first launch the shell verifies the embedded runtime archive, extracts it to a versioned hash directory under `%LOCALAPPDATA%\DILIGENT\runtime`, creates persistent data directories under `%LOCALAPPDATA%\DILIGENT\data`, starts the packaged backend on a random localhost port, waits for its atomic ready file and `/api/health`, and then shows the desktop window. The backend is owned by a Windows Job Object and is terminated when the shell exits.
+The Windows portable executable and MSI use the Tauri shell. Open the verified portable EXE directly, or launch the application installed by the MSI; do not run the source launcher for packaged operation. On first launch the shell verifies the embedded runtime archive, extracts it to a versioned hash directory under `%LOCALAPPDATA%\DILIGENT\runtime`, creates persistent data directories under `%LOCALAPPDATA%\DILIGENT\data`, starts the packaged backend on a random localhost port, waits for its atomic ready file and `/api/health`, and then shows the desktop window. The backend is owned by a Windows Job Object and is terminated when the shell exits.
 
 The packaged desktop does not use the development ports `7690` and `9847`. If the window does not appear, inspect `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log`, confirm that `state\desktop-backend-ready.json` exists, and request `/api/health` on the recorded port. A successful launch leaves `runtime\<version>\<payload-sha256>\extraction.complete` in place.
 
@@ -38,7 +38,7 @@ Set-Location app/server
 Alternative runtime-managed path:
 
 ```powershell
-runtimes\uv\uv.exe run --python runtimes\python\python.exe python -m uvicorn DILIGENT.app:app --host 127.0.0.1 --port 7690
+runtimes\uv\uv.exe run --directory app/server python -m uvicorn app:app --host 127.0.0.1 --port 7690
 ```
 
 ## Manual Frontend Startup

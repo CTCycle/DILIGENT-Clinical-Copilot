@@ -1,5 +1,5 @@
 # Design Tokens
-Last updated: 2026-06-03
+Last updated: 2026-08-02
 
 ## Scope
 Frontend styling guidance applies to `app/client/src`.
@@ -36,6 +36,8 @@ Frontend styling guidance applies to `app/client/src`.
 - Core palette tokens:
   - `--color-brand`
   - `--color-brand-light`
+  - `--color-brand-ui`
+  - `--color-brand-ui-light`
   - `--color-brand-bg`
   - `--color-text-primary`
   - `--color-text-secondary`
@@ -46,4 +48,5 @@ Frontend styling guidance applies to `app/client/src`.
   - `--color-border`
   - `--color-border-subtle`
   - `--color-divider`
+- `--color-overlay` and warning-state tokens are also defined for modal backdrops and non-blocking limitations.
 - Semantic status tokens exist for info, success, and error text, background, and border states.

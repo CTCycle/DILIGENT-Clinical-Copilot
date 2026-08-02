@@ -1,5 +1,5 @@
 # Runtime Troubleshooting
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Scope
 This file covers recurring local startup and launch failures.
@@ -140,7 +140,7 @@ Get-NetTCPConnection -LocalPort 7690 -ErrorAction SilentlyContinue
 2. Validate whether the database copy is readable before replacing anything:
 
 ```powershell
-Copy-Item -LiteralPath app/resources/database.db -Destination assets/QAdatabase-recovery-check.db -Force
+Copy-Item -LiteralPath app/resources/database.db -Destination assets/QA/database-recovery-check.db -Force
 app/server/.venv/Scripts/python.exe -c "import sqlite3; c=sqlite3.connect('assets/QA/database-recovery-check.db'); print(c.execute('select count(*) from sqlite_master').fetchone()[0]); c.close()"
 ```
 

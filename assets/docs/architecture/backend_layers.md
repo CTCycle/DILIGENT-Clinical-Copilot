@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-07-30
+Last updated: 2026-08-02
 
 Sampling behavior is owned by `services/llm/generation_policy.py`.
 
@@ -65,6 +65,7 @@ Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and
   - API transport and domain-specific API clients.
 - `app/client/src/app/core/state/*`
   - Shared app state, theme or page state, and reusable frontend state resources.
+- Current page-local interaction state uses Angular `signal` and `computed` values in model configuration, access-key, and clinical-session preview components; API transport remains in the core service layer.
 
 ## Layered Request Paths
 ### `POST /api/clinical/jobs`

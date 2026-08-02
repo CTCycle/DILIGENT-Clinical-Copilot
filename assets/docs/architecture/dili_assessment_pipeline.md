@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-07-28
+Last updated: 2026-08-02
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -136,7 +136,9 @@ Clinical preflight reports whether the configured RAG embedding backend is ready
 
 If Ollama is unavailable, the DILI Agent offers three explicit choices: retry after starting Ollama, run the pending assessment once without RAG, or cancel. Running without RAG does not change the saved model configuration. Job submission repeats the readiness check to prevent a stale successful preflight from starting a RAG-enabled job after the dependency becomes unavailable.
 
-If retrieval becomes unavailable after a job starts, the report continues safely without supporting RAG documents and records one aggregated pipeline warning listing the affected drugs.`r`n`r`nWhen RAG is enabled, retrieved text is used only as hidden model context. The final report bibliography lists compact references to retrieved documents by filename and page number only.
+If retrieval becomes unavailable after a job starts, the report continues safely without supporting RAG documents and records one aggregated pipeline warning listing the affected drugs.
+
+When RAG is enabled, retrieved text is used only as hidden model context. The final report bibliography lists compact references to retrieved documents by filename and page number only.
 
 LiverTox input preparation is bounded for cloud and local providers. A timeout
 produces an explicit pipeline warning and safe evidence-free continuation instead

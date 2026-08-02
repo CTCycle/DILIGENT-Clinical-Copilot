@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-07-22
+Last updated: 2026-08-02
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -33,7 +33,7 @@ Important distinctions:
 - Frontend-derived display fallbacks are labeled as **Display fallback** or **Not backend-confirmed**. These values are navigation aids only and must not be interpreted as RxNav, LiverTox, RUCAM, or backend-confirmed clinical evidence.
 
 ## Use Patient Timeline
-Open **Patient Timeline** from the sidebar.
+Open **Patient Timeline** from the sidebar. Saved timeline previews open at `/sessions/:sessionId/timetable/:timelineId`; the route without `:timelineId` starts from the session workspace.
 
 Use it to review event order, clinical sequence, and patient chronology where data is available.
 

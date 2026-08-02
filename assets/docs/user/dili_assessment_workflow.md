@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-07-19
+Last updated: 2026-08-02
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
