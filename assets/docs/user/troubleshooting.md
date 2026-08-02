@@ -1,5 +1,5 @@
 # User Troubleshooting
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Windows desktop app does not open
 
@@ -9,7 +9,7 @@ Last updated: 2026-07-29
 - If the runtime contains stale `.extract-*` directories, close DILIGENT and remove only those temporary directories under `%LOCALAPPDATA%\DILIGENT\runtime\<version>`, then retry.
 - The portable app uses the system WebView2 runtime. An MSI built with the standard bootstrapper may need network access for WebView2; use an offline-WebView2 MSI when network access is unavailable.
 
-Packaged desktop startup uses a random localhost backend port, so the development ports below are not a packaged health check. Read the port from `desktop-backend-ready.json` and request `/api/health` on that port.
+Packaged desktop startup uses a random localhost backend port, so the development ports below are not a packaged health check. Read the port from `desktop-backend-ready.json` and request `/api/health` on that port. Source-mode startup uses the values from `settings/.env` (the template defaults are `7690` and `9847`).
 
 ## Browser Page Does Not Load
 - Check whether the frontend is available at:

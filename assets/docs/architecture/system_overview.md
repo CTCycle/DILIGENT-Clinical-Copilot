@@ -1,5 +1,5 @@
 # System Overview
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
@@ -26,7 +26,9 @@ Maintained source-level structure, with build and cache artifacts omitted:
 |   `-- configurations.json
 |-- app/
 |   |-- resources/
-|   |   |-- tools/
+|   |   |-- catalogs/
+|   |   |-- models/
+|   |   |-- logs/
 |   |   `-- sources/
 |   |-- server/
 |   |   |-- app.py
@@ -66,7 +68,11 @@ Maintained source-level structure, with build and cache artifacts omitted:
 |   |-- build/                 # runtime payload and PyInstaller inputs
 |   `-- src-tauri/             # Tauri shell, backend lifecycle, and extraction
 `-- assets/docs/
-    `-- project_index.md
+    |-- architecture/
+    |-- coding/
+    |-- runtime/
+    |-- ui/
+    `-- user/
 ```
 
 ## Application Entry Points
@@ -75,7 +81,7 @@ Maintained source-level structure, with build and cache artifacts omitted:
 - Frontend app: `app/client/src/main.ts`
   - Bootstraps Angular `App` with `appConfig`.
 - Frontend routing: `app/client/src/app/app.routes.ts`
-  - Current routes: `/`, `/clinical-sessions`, `/data`, `/model-config`, `/sessions/:sessionId/timetable`.
+- Current routes: `/`, `/clinical-sessions`, `/data`, `/model-config`, `/sessions/:sessionId/timetable`, and `/sessions/:sessionId/timetable/:timelineId`.
 - Windows launcher and maintenance entry point: `start_on_windows.ps1`.
 
 ### Runtime entry points

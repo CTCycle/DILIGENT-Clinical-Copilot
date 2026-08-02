@@ -1,5 +1,5 @@
 # Local Deployment
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
@@ -9,7 +9,7 @@ Last updated: 2026-07-29
 - Manual macOS and Linux startup requires compatible Python, Node.js, and npm installations.
 
 ## Dependency Locks
-- `runtimes/uv.lock`
+- `app/server/uv.lock`
 - `app/client/package-lock.json`
 - `app/desktop/package-lock.json`
 - `app/desktop/src-tauri/Cargo.lock`
@@ -22,7 +22,7 @@ Last updated: 2026-07-29
 
 ## Windows desktop distribution
 
-Build from a Windows x64 host with Rust/Cargo, the Windows build toolchain, and the pinned frontend/backend dependencies:
+Build from a Windows x64 host with Rust/Cargo, the Windows build toolchain, and the pinned frontend/backend dependencies. The current source manifests report version `3.0.0`:
 
 ```powershell
 .\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.0.0 -DesktopTarget All

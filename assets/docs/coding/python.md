@@ -1,10 +1,10 @@
 # Python Rules
-Last updated: 2026-06-03
+Last updated: 2026-08-02
 
 ## Runtime And Tooling
 - Target Python version: `>=3.14` from `pyproject.toml`.
 - Use `app/server/.venv` when available, otherwise `runtimes/.venv`.
-- Keep dependency resolution aligned with `uv` and `runtimes/uv.lock`.
+- Keep dependency resolution aligned with `uv` and `app/server/uv.lock`.
 - Preferred quality tools:
   - Ruff for lint and format
   - Pylance-compatible typing
@@ -40,6 +40,7 @@ Last updated: 2026-06-03
 - Do not place imports inside functions or classes.
 - Do not use conditional imports for application modules.
 - Do not retain module-level mutable service instances.
+- Keep provider catalog persistence behind the repository serializer; services should receive the cache capability explicitly rather than opening ad-hoc database sessions.
 - Keep Python files at or below 1000 physical lines.
 - Use classes to group cohesive behavior where appropriate.
 - Add comments only when they materially improve clarity or safety.

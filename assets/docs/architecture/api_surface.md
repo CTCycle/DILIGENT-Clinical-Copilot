@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-07-30
+Last updated: 2026-08-02
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
