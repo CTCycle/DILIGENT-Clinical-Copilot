@@ -41,7 +41,7 @@ import {
 } from '../../core/models/types';
 import { InspectionDetailResource } from '../../core/state/inspection-detail-resource';
 import { InspectionPagedResource } from '../../core/state/inspection-paged-resource';
-import { InspectionUpdateJobResource, InspectionUpdateTargetActionsMap, isRecord } from '../../core/state/inspection-update-job-resource';
+import { InspectionUpdateJobResource, InspectionUpdateTargetActionsMap } from '../../core/state/inspection-update-job-resource';
 import { InspectionUpdateJobTrackerService } from '../../core/state/inspection-update-job-tracker.service';
 import {
   InspectionViewId,
@@ -50,6 +50,7 @@ import {
   inspectionTabId,
   resolveRagDocumentsPath,
 } from '../../core/utils/inspection-formatting';
+import { isRecord } from '../../core/utils';
 
 const INSPECTION_VIEWS: InspectionViewOption[] = [
   {

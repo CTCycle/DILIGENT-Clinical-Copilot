@@ -1,4 +1,4 @@
-import { buildClinicalPayload } from './utils';
+import { buildClinicalPayload, isRecord } from './utils';
 import { ClinicalFormState, RuntimeSettings } from './models/types';
 
 describe('buildClinicalPayload', () => {
@@ -42,5 +42,14 @@ describe('buildClinicalPayload', () => {
 
     const payload = buildClinicalPayload(form, settings);
     expect(payload.selected_model_providers).toEqual(['ollama']);
+  });
+});
+
+describe('isRecord', () => {
+  it('narrows plain objects while excluding null and arrays', () => {
+    expect(isRecord({ value: 1 })).toBe(true);
+    expect(isRecord(null)).toBe(false);
+    expect(isRecord(['value'])).toBe(false);
+    expect(isRecord('value')).toBe(false);
   });
 });

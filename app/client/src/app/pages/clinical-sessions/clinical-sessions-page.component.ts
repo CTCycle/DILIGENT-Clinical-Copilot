@@ -38,7 +38,7 @@ import {
   RevisionPipelineStep,
 } from '../../core/models/types';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
-import { formatErrorMessage, formatUnknownError } from '../../core/utils';
+import { formatErrorMessage, formatUnknownError, isRecord } from '../../core/utils';
 import {
   DEFAULT_CLINICAL_SESSION_METADATA_TEXT,
   ClinicalSessionMetadataKey,
@@ -55,32 +55,20 @@ import {
   EditorCommandName,
   EditorViewMode,
 } from './clinical-sessions.types';
-
-type DetectedDrugEvidence = {
-  name: string;
-  liverTox: boolean;
-  rxNav: boolean;
-  inAnamnesis: boolean;
-  inTherapy: boolean;
-  temporalReference: string;
-  extractionFallback: boolean;
-  bibliographyLabel: string;
-  bibliographyFallback: boolean;
-};
-
-type LabTimelineRow = {
-  marker: string;
-  value: string;
-  unit: string;
-  upperLimit: string;
-  timing: string;
-  source: string;
-  evidence: string;
-};
-
-type DrugEvidenceDraft = DetectedDrugEvidence & {
-  hasPersistedMatch: boolean;
-};
+import {
+  buildPersistedDrugEvidence,
+  DetectedDrugEvidence,
+  diseaseTemporalLabel as previewDiseaseTemporalLabel,
+  LabTimelineRow,
+  normalizeDrugName,
+  previewDetectedDiseases as extractDetectedDiseases,
+  previewDetectedDrugs as extractDetectedDrugs,
+  previewHepatotoxicityPattern as extractHepatotoxicityPattern,
+  previewLaboratorySummary as extractLaboratorySummary,
+  previewLabTimeline as extractLabTimeline,
+  previewReport as extractReport,
+  resolveDrugBibliographyLabel,
+} from './clinical-session-preview';
 
 @Component({
   selector: 'app-clinical-sessions-page',
@@ -393,10 +381,14 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   private defaultReviewerLabel(detail: ClinicalSessionDetail): string {
-    const reviewer = this.stringValue(detail.metadata?.['reviewer']);
+    const reviewerValue = detail.metadata?.['reviewer'];
+    const reviewer = typeof reviewerValue === 'string' ? reviewerValue.trim() : '';
     if (reviewer) return reviewer;
-    const manualMetadata = this.recordValue(detail.metadata?.['manual_metadata']);
-    return this.stringValue(manualMetadata?.['reviewer']) || '';
+    const manualMetadata = isRecord(detail.metadata?.['manual_metadata'])
+      ? detail.metadata['manual_metadata']
+      : null;
+    const manualReviewer = manualMetadata?.['reviewer'];
+    return typeof manualReviewer === 'string' ? manualReviewer.trim() : '';
   }
 
   updateMetadataText(value: string): void {
@@ -602,8 +594,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   previewReport(detail: ClinicalSessionDetail): string {
-    const report = detail.official_report_text || detail.report || detail.result_payload?.['report'];
-    return typeof report === 'string' && report.trim() ? report.trim() : 'No AI report preview is available for this session.';
+    return extractReport(detail);
   }
 
   previewOfficialReport(detail: ClinicalSessionDetail): string {
@@ -615,14 +606,31 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   previewDetectedDrugs(detail: ClinicalSessionDetail): string[] {
-    const detected = detail.result_payload?.['detected_drugs'];
-    return Array.isArray(detected)
-      ? detected.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-      : [];
+    return extractDetectedDrugs(detail);
+  }
+
+  previewDetectedDiseases(detail: ClinicalSessionDetail): string[] {
+    return extractDetectedDiseases(detail);
+  }
+
+  previewLaboratorySummary(detail: ClinicalSessionDetail): Array<{ label: string; value: string }> {
+    return extractLaboratorySummary(detail);
+  }
+
+  previewLabTimeline(detail: ClinicalSessionDetail): LabTimelineRow[] {
+    return extractLabTimeline(detail);
+  }
+
+  previewHepatotoxicityPattern(detail: ClinicalSessionDetail): string {
+    return extractHepatotoxicityPattern(detail);
+  }
+
+  diseaseTemporalLabel(disease: string): string {
+    return previewDiseaseTemporalLabel(disease);
   }
 
   private async loadDetectedDrugEvidence(detail: ClinicalSessionDetail): Promise<void> {
-    const rows = this.buildPersistedDrugEvidence(detail);
+    const rows = buildPersistedDrugEvidence(detail);
     if (this.selected()?.session_id === detail.session_id) {
       this.detectedDrugEvidence.set(rows.map(({ hasPersistedMatch: _hasPersistedMatch, ...row }) => row));
     }
@@ -642,7 +650,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (this.selected()?.session_id === detail.session_id) {
       this.detectedDrugEvidence.set(rows.map(({ hasPersistedMatch: _hasPersistedMatch, ...row }) => ({
         ...row,
-        bibliographyLabel: this.resolveDrugBibliographyLabel(row, fallbackByName.get(row.name)),
+        bibliographyLabel: resolveDrugBibliographyLabel(row, fallbackByName.get(row.name)),
         bibliographyFallback: row.bibliographyFallback
           || (!row.liverTox && Boolean(fallbackByName.get(row.name)?.liverTox))
           || (!row.rxNav && Boolean(fallbackByName.get(row.name)?.rxNav)),
@@ -650,447 +658,20 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private buildPersistedDrugEvidence(detail: ClinicalSessionDetail): DrugEvidenceDraft[] {
-    const rows = new Map<string, DrugEvidenceDraft>();
-    const sections = this.sectionTextMap(detail);
-    const ensureRow = (name: string, options: { fallback?: boolean } = {}): DrugEvidenceDraft => {
-      const normalized = this.normalizeDrugName(name);
-      const key = normalized || name.trim().toLowerCase();
-      const existing = rows.get(key);
-      if (existing) {
-        existing.extractionFallback = existing.extractionFallback && Boolean(options.fallback);
-        return existing;
-      }
-      const next: DrugEvidenceDraft = {
-        name,
-        liverTox: false,
-        rxNav: false,
-        inAnamnesis: this.textContainsDrug(sections.anamnesis, name),
-        inTherapy: this.textContainsDrug(sections.therapy, name),
-        temporalReference: this.drugTemporalReference(name, detail),
-        extractionFallback: Boolean(options.fallback),
-        bibliographyLabel: 'No backend match',
-        bibliographyFallback: false,
-        hasPersistedMatch: false,
-      };
-      rows.set(key, next);
-      return next;
-    };
-
-    for (const name of this.previewDetectedDrugs(detail)) {
-      for (const candidate of this.expandDrugCandidates(name, detail)) {
-        ensureRow(candidate, { fallback: candidate !== name });
-      }
-    }
-
-    const structuredCase = this.recordValue(detail.result_payload?.['structured_case']);
-    const therapyDrugs = this.arrayValue(structuredCase?.['therapy_drugs']);
-    const anamnesisDrugs = [
-      ...this.arrayValue(structuredCase?.['anamnesis_drugs']),
-      ...this.arrayValue(detail.result_payload?.['anamnesis_drugs']),
-    ];
-    for (const item of therapyDrugs) {
-      const name = this.drugNameFromUnknown(item);
-      if (!name) continue;
-      for (const candidate of this.expandDrugCandidates(name, detail)) {
-        ensureRow(candidate, { fallback: candidate !== name }).inTherapy = true;
-      }
-    }
-    for (const item of anamnesisDrugs) {
-      const name = this.drugNameFromUnknown(item);
-      if (!name) continue;
-      ensureRow(name).inAnamnesis = true;
-    }
-
-    for (const item of this.arrayValue(detail.result_payload?.['matched_drugs'])) {
-      const record = this.recordValue(item);
-      if (!record) continue;
-      const name = this.stringValue(record['raw_drug_name'])
-        || this.stringValue(record['drug_name'])
-        || this.stringValue(record['matched_drug_name']);
-      if (!name) continue;
-      const expandedNames = this.expandDrugCandidates(name, detail);
-      for (const expandedName of expandedNames) {
-        ensureRow(expandedName, { fallback: expandedName !== name }).hasPersistedMatch = true;
-      }
-      if (this.looksLikeSentenceFragment(name) && expandedNames.length) continue;
-      const row = ensureRow(name);
-      const matchedName = this.stringValue(record['matched_drug_name']);
-      row.hasPersistedMatch = true;
-      row.name = row.name || matchedName || name;
-      row.liverTox = row.liverTox || this.hasLiverToxEvidence(record);
-      row.rxNav = row.rxNav || this.hasRxNavEvidence(record);
-      row.bibliographyLabel = this.resolveDrugBibliographyLabel(row);
-      row.inTherapy = row.inTherapy || this.originsContain(record, 'therapy') || this.rawMentionsContain(record, sections.therapy);
-      row.inAnamnesis = row.inAnamnesis || this.originsContain(record, 'anamnesis') || this.rawMentionsContain(record, sections.anamnesis);
-      row.temporalReference = this.drugTemporalReference(row.name, detail);
-    }
-
-    for (const row of rows.values()) {
-      if (!row.liverTox && this.hasLiverToxReportEvidence(detail, row.name)) {
-        row.liverTox = true;
-        row.bibliographyLabel = this.resolveDrugBibliographyLabel(row);
-      }
-    }
-
-    return [...rows.values()];
-  }
-
-  private resolveDrugBibliographyLabel(
-    row: Pick<DetectedDrugEvidence, 'liverTox' | 'rxNav'>,
-    fallback?: Partial<Pick<DetectedDrugEvidence, 'liverTox' | 'rxNav'>>,
-  ): string {
-    const backendLabels = [
-      row.liverTox ? 'LiverTox' : null,
-      row.rxNav ? 'RxNav' : null,
-    ].filter((label): label is string => Boolean(label));
-    if (backendLabels.length) return backendLabels.join(' + ');
-    const fallbackLabels = [
-      fallback?.liverTox ? 'LiverTox catalog fallback' : null,
-      fallback?.rxNav ? 'RxNav catalog fallback' : null,
-    ].filter((label): label is string => Boolean(label));
-    return fallbackLabels.length ? fallbackLabels.join(' + ') : 'No backend match';
-  }
-
-  private expandDrugCandidates(name: string, detail: ClinicalSessionDetail): string[] {
-    if (!this.looksLikeSentenceFragment(name)) return [name];
-    const sections = this.sectionTextMap(detail);
-    const source = `${sections.anamnesis}\n${sections.therapy}\n${detail.session_text}`;
-    const candidates = [
-      ...this.extractDrugsAfterStarting(source),
-      ...this.extractCurrentMedicationList(source),
-    ];
-    return candidates.length ? [...new Set(candidates)] : [name];
-  }
-
-  private looksLikeSentenceFragment(value: string): boolean {
-    const normalized = value.trim();
-    return normalized.split(/\s+/).length > 4 || /patient|suspected|injury|symptoms/i.test(normalized);
-  }
-
-  private extractDrugsAfterStarting(source: string): string[] {
-    const match = source.match(/\bafter starting\s+([^.\n]+?)(?:\.| symptoms| labs|$)/i);
-    return match?.[1] ? this.splitMedicationList(match[1]) : [];
-  }
-
-  private extractCurrentMedicationList(source: string): string[] {
-    const match = source.match(/\bcurrent medications are\s+([^.\n]+)/i);
-    return match?.[1] ? this.splitMedicationList(match[1]) : [];
-  }
-
-  private splitMedicationList(value: string): string[] {
-    const normalized = value
-      .replace(/\bamoxicillin\s+clavulanate\b/gi, 'amoxicillin clavulanate,')
-      .replace(/\batorvastatin\b/gi, 'atorvastatin,')
-      .replace(/\bramipril\b/gi, 'ramipril,');
-    return normalized
-      .replace(/\band\b/gi, ',')
-      .split(',')
-      .map((item) => item.trim().replace(/[.;:]$/g, ''))
-      .filter((item) => item.length > 2);
-  }
-
-  private drugTemporalReference(name: string, detail: ClinicalSessionDetail): string {
-    const structuredCase = this.recordValue(detail.result_payload?.['structured_case']);
-    const therapyDrugs = this.arrayValue(structuredCase?.['therapy_drugs']);
-    for (const item of therapyDrugs) {
-      const record = this.recordValue(item);
-      if (!record) continue;
-      const drugName = this.drugNameFromUnknown(record);
-      if (!drugName || this.normalizeDrugName(drugName) !== this.normalizeDrugName(name)) continue;
-      const startDate = this.stringValue(record['therapy_start_date']);
-      if (startDate && !this.looksLikeSentenceFragment(startDate)) return startDate;
-      const temporal = this.stringValue(record['temporal_classification']);
-      if (temporal) return temporal.replace(/_/g, ' ');
-    }
-    const sections = this.sectionTextMap(detail);
-    const source = `${sections.anamnesis}\n${sections.therapy}`;
-    if (this.textContainsDrug(source, name) && /\bafter starting\b/i.test(source)) return 'after starting';
-    if (this.textContainsDrug(source, name) && /\bcurrent medications?\b/i.test(source)) return 'current medication';
-    return 'time not specified';
-  }
-
-  private hasLiverToxEvidence(record: Record<string, unknown>): boolean {
-    if (this.recordValue(record['matched_livertox_row'])) return true;
-    if (this.stringValue(record['nbk_id'])) return true;
-    const status = this.stringValue(record['match_status'])?.toLowerCase();
-    if (status === 'matched_with_excerpt' || status === 'matched_no_excerpt' || status === 'matched') return true;
-    if (record['missing_livertox'] === false) return true;
-    const candidates = this.arrayValue(record['livertox_candidates']);
-    return candidates.some((candidate) => {
-      const item = this.recordValue(candidate);
-      return item?.['has_excerpt'] === true;
-    });
-  }
-
-  private hasLiverToxReportEvidence(detail: ClinicalSessionDetail, drugName: string): boolean {
-    const report = typeof detail.sections?.['final_report'] === 'string'
-      ? detail.sections['final_report']
-      : '';
-    const normalizedReport = report.toLowerCase();
-    const reportIndex = normalizedReport.indexOf(drugName.trim().toLowerCase());
-    if (reportIndex < 0) return false;
-    return /livertox/.test(normalizedReport.slice(reportIndex, reportIndex + 2400));
-  }
-
-  private hasRxNavEvidence(record: Record<string, unknown>): boolean {
-    if (this.stringValue(record['rxnorm_rxcui'])) return true;
-    if (this.stringValue(record['rxcui'])) return true;
-    const sources = this.arrayValue(record['sources']);
-    return sources.some((source) => this.stringValue(source)?.toLowerCase() === 'rxnav');
-  }
-
-  private originsContain(record: Record<string, unknown>, origin: 'therapy' | 'anamnesis'): boolean {
-    return this.arrayValue(record['origins']).some((value) => this.stringValue(value)?.toLowerCase().includes(origin));
-  }
-
-  private rawMentionsContain(record: Record<string, unknown>, text: string): boolean {
-    return this.arrayValue(record['raw_mentions']).some((value) => {
-      const mention = this.stringValue(value);
-      return mention ? this.textContainsDrug(text, mention) : false;
-    });
-  }
 
   private async catalogHasDrug(source: 'rxnav' | 'livertox', name: string): Promise<boolean> {
-    const normalized = this.normalizeDrugName(name);
+    const normalized = normalizeDrugName(name);
     const search = normalized || name;
     try {
       const payload = source === 'rxnav'
         ? await fetchInspectionRxNavCatalog({ search, offset: 0, limit: 5 })
         : await fetchInspectionLiverToxCatalog({ search, offset: 0, limit: 5 });
-      return payload.items.some((item) => this.normalizeDrugName(item.drug_name) === normalized);
+      return payload.items.some((item) => normalizeDrugName(item.drug_name) === normalized);
     } catch {
       return false;
     }
   }
 
-  private normalizeDrugName(value: string): string {
-    return value.toLowerCase().replace(/\([^)]*\)/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-  }
-
-  private sectionTextMap(detail: ClinicalSessionDetail): { anamnesis: string; therapy: string } {
-    const sections = detail.sections || {};
-    const anamnesis = typeof sections['anamnesis'] === 'string' ? sections['anamnesis'] : '';
-    const therapy = typeof sections['therapy'] === 'string'
-      ? sections['therapy']
-      : typeof sections['drugs'] === 'string'
-        ? sections['drugs']
-        : '';
-    return { anamnesis, therapy };
-  }
-
-  private textContainsDrug(text: string, drug: string): boolean {
-    if (!text.trim() || !drug.trim()) return false;
-    const normalizedText = this.normalizeDrugName(text);
-    const normalizedDrug = this.normalizeDrugName(drug);
-    if (!normalizedDrug) return false;
-    if (normalizedText.includes(normalizedDrug)) return true;
-    const firstToken = normalizedDrug.split(' ')[0] || '';
-    return firstToken.length > 3 && normalizedText.includes(firstToken);
-  }
-
-  private previewDetectedDiseases(detail: ClinicalSessionDetail): string[] {
-    const fromPayload = detail.result_payload?.['detected_diseases'];
-    const fromAnamnesis = detail.result_payload?.['anamnesis_diseases'];
-    const structuredCase = this.recordValue(detail.result_payload?.['structured_case']);
-    const structuredDiseases = structuredCase?.['anamnesis_diseases'];
-    const direct = this.collectDiseaseNames(fromPayload);
-    if (direct.length) return direct;
-    const anamnesis = this.collectDiseaseNames(fromAnamnesis);
-    if (anamnesis.length) return anamnesis;
-    const structured = this.collectDiseaseNames(structuredDiseases);
-    if (structured.length) return structured;
-    const fromSourceText = this.collectDiseasesFromSourceText(detail);
-    if (fromSourceText.length) return fromSourceText;
-    const report = this.previewReport(detail);
-    const lines = report.split(/\r?\n/);
-    const diseaseLine = lines.find((line) => /detected diseases?/i.test(line));
-    if (!diseaseLine) return [];
-    return diseaseLine
-      .split(':')
-      .slice(1)
-      .join(':')
-      .split(',')
-      .map((item) => item.replace(/[*-]/g, '').trim())
-      .filter((item) => item.length > 0);
-  }
-
-  private collectDiseasesFromSourceText(detail: ClinicalSessionDetail): string[] {
-    const sectionExtraction = this.recordValue(detail.result_payload?.['section_extraction']);
-    const candidates = [
-      detail.sections?.['anamnesis'],
-      detail.session_text,
-      this.stringValue(sectionExtraction?.['anamnesis']),
-    ];
-    const source = candidates
-      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-      .join('\n');
-    if (!source.trim()) return [];
-    const diseasePhrases: string[] = [];
-    const historyMatch = source.match(/\b(?:past history|medical history|history)\s+includes?\s+([^.\n]+)/i);
-    if (historyMatch?.[1]) {
-      diseasePhrases.push(...this.splitDiseasePhrase(historyMatch[1]));
-    }
-    const suspectedMatch = source.match(/\b(?:suspected|concern is)\s+([^.\n]*?(?:liver injury|hepatitis|cholestasis|hepatocellular pattern)[^.\n]*)/i);
-    if (suspectedMatch?.[1]) {
-      diseasePhrases.push(suspectedMatch[1].trim());
-    }
-    return [...new Set(diseasePhrases.map((item) => item.trim()).filter((item) => item.length > 0))];
-  }
-
-  private splitDiseasePhrase(value: string): string[] {
-    return value
-      .replace(/\band\b/gi, ',')
-      .split(',')
-      .map((item) => item.trim().replace(/[.;:]$/g, ''))
-      .filter((item) => item.length > 0);
-  }
-
-  diseaseTemporalLabel(disease: string): string {
-    const normalized = disease.toLowerCase();
-    if (normalized.includes('liver injury') || normalized.includes('hepatocellular')) return 'current concern';
-    return 'past history';
-  }
-
-  private collectDiseaseNames(value: unknown): string[] {
-    if (!Array.isArray(value)) return [];
-    const names = value
-      .map((item) => {
-        if (typeof item === 'string') return item.trim();
-        const record = this.recordValue(item);
-        if (!record) return '';
-        return this.stringValue(record['name']) || this.stringValue(record['disease_name']) || '';
-      })
-      .filter((name) => name.length > 0);
-    return [...new Set(names)];
-  }
-
-  private previewLabTimeline(detail: ClinicalSessionDetail): LabTimelineRow[] {
-    return this.arrayValue(detail.result_payload?.['lab_timeline'])
-      .map((item) => this.recordValue(item))
-      .filter((item): item is Record<string, unknown> => item !== null)
-      .map((item) => {
-        const value = this.stringValue(item['value']) || this.stringValue(item['value_text']) || 'N/A';
-        const unit = this.stringValue(item['unit']) || '';
-        const upperLimit = this.stringValue(item['upper_limit_normal']) || this.stringValue(item['upper_limit_text']) || 'N/A';
-        const timing = this.stringValue(item['sample_date']) || this.stringValue(item['relative_time']) || 'Unknown';
-        return {
-          marker: this.stringValue(item['marker_name']) || 'Lab',
-          value,
-          unit,
-          upperLimit,
-          timing,
-          source: this.stringValue(item['source']) || 'N/A',
-          evidence: this.stringValue(item['evidence']) || '',
-        };
-      });
-  }
-
-  private previewLaboratorySummary(detail: ClinicalSessionDetail): Array<{ label: string; value: string }> {
-    const payload = detail.result_payload || {};
-    const flatPayload = this.flattenPayload(payload);
-    const fromPayload = this.collectLabValues(flatPayload);
-    if (fromPayload.length) return fromPayload;
-
-    const report = this.previewReport(detail).replace(/[*_`]/g, '');
-    const regexMap: Array<{ label: string; regex: RegExp }> = [
-      { label: 'ALT', regex: /\bALT\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?\s*[A-Za-z/%µμ\.]*\/?[A-Za-z]*)/i },
-      { label: 'AST', regex: /\bAST\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?\s*[A-Za-z/%µμ\.]*\/?[A-Za-z]*)/i },
-      { label: 'ALP', regex: /\bALP\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?\s*[A-Za-z/%µμ\.]*\/?[A-Za-z]*)/i },
-      { label: 'Bilirubin', regex: /\b(?:total\s+)?bilirubin\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?\s*[A-Za-z/%µμ\.]*\/?[A-Za-z]*)/i },
-      { label: 'INR', regex: /\bINR\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/i },
-      { label: 'R-score', regex: /\bR-?score\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/i },
-    ];
-    return regexMap
-      .map(({ label, regex }) => {
-        const match = report.match(regex);
-        return match?.[1] ? { label, value: match[1].trim() } : null;
-      })
-      .filter((item): item is { label: string; value: string } => item !== null);
-  }
-
-  private previewHepatotoxicityPattern(detail: ClinicalSessionDetail): string {
-    const payload = detail.result_payload || {};
-    const flatPayload = this.flattenPayload(payload);
-    const fromPayload = [
-      flatPayload['hepatotoxicity_pattern'],
-      flatPayload['pattern_classification'],
-      flatPayload['classification'],
-      flatPayload['hepatotoxicity.classification'],
-    ].find((value) => typeof value === 'string' && value.trim().length > 0);
-    if (typeof fromPayload === 'string') return fromPayload.trim();
-
-    const report = this.previewReport(detail).replace(/[*_`]/g, '');
-    const patternMatch = report.match(/\b(?:hepatotoxicity pattern|classification)\b\s*[:=]\s*([A-Za-z -]+)/i);
-    return patternMatch?.[1]?.trim() || 'N/A';
-  }
-
-  private flattenPayload(
-    value: unknown,
-    prefix = '',
-    acc: Record<string, unknown> = {},
-  ): Record<string, unknown> {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return acc;
-    const record = value as Record<string, unknown>;
-    for (const [key, nested] of Object.entries(record)) {
-      const fullKey = prefix ? `${prefix}.${key}` : key;
-      acc[fullKey.toLowerCase()] = nested;
-      if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-        this.flattenPayload(nested, fullKey, acc);
-      }
-    }
-    return acc;
-  }
-
-  private collectLabValues(flatPayload: Record<string, unknown>): Array<{ label: string; value: string }> {
-    const keys: Array<{ label: string; includes: string[] }> = [
-      { label: 'ALT', includes: ['alt'] },
-      { label: 'AST', includes: ['ast'] },
-      { label: 'ALP', includes: ['alp', 'alkaline_phosphatase'] },
-      { label: 'Bilirubin', includes: ['bilirubin', 'tbil'] },
-      { label: 'INR', includes: ['inr'] },
-      { label: 'R-score', includes: ['r_score', 'rscore', 'r-score'] },
-    ];
-
-    return keys
-      .map(({ label, includes }) => {
-        const payloadEntry = Object.entries(flatPayload).find(([key, val]) =>
-          includes.some((needle) => key.includes(needle)) &&
-          val !== null &&
-          val !== undefined &&
-          String(val).trim().length > 0,
-        );
-        if (!payloadEntry) return null;
-        return { label, value: String(payloadEntry[1]).trim() };
-      })
-      .filter((item): item is { label: string; value: string } => item !== null);
-  }
-
-  private drugNameFromUnknown(value: unknown): string | null {
-    if (typeof value === 'string') return value.trim() || null;
-    const record = this.recordValue(value);
-    if (!record) return null;
-    return this.stringValue(record['name'])
-      || this.stringValue(record['drug_name'])
-      || this.stringValue(record['raw_drug_name'])
-      || this.stringValue(record['matched_drug_name']);
-  }
-
-  private stringValue(value: unknown): string | null {
-    if (typeof value === 'string') return value.trim() || null;
-    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-    return null;
-  }
-
-  private recordValue(value: unknown): Record<string, unknown> | null {
-    return value && typeof value === 'object' && !Array.isArray(value)
-      ? value as Record<string, unknown>
-      : null;
-  }
-
-  private arrayValue(value: unknown): unknown[] {
-    return Array.isArray(value) ? value : [];
-  }
 
   private dateKey(value: string | null): string {
     if (!value) return '';

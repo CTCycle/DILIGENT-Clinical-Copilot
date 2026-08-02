@@ -4,6 +4,7 @@ import { DEFAULT_FORM_STATE, DEFAULT_SETTINGS } from '../constants';
 import { buildRuntimeSettingsFromConfig } from '../model-config';
 import { fetchModelConfigState } from '../services/model-config-api';
 import { ClinicalFormState, JobStatus, RuntimeSettings } from '../models/types';
+import { isRecord } from '../utils';
 
 export type PageId = 'dili-agent' | 'clinical-sessions' | 'data-inspection' | 'model-config';
 export type ThemeMode = 'light' | 'dark';
@@ -98,10 +99,6 @@ const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
   jobLastProgressAtMs: null,
   pollIntervalMs: null,
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 function isJobStatus(value: unknown): value is JobStatus | null {
   return value === null

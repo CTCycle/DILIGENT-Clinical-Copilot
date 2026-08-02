@@ -117,6 +117,27 @@ describe('PatientTimetablePageComponent', () => {
     expect(component.lanes().find((lane) => lane.id === 'therapy')?.collapsed).toBe(true);
   });
 
+  it('guards typed filter values and range input events', () => {
+    component.setEvidenceFilter('with_evidence');
+    component.setDensity('dense');
+    component.setEvidenceFilter('not-a-filter');
+    component.setDensity('not-a-density');
+
+    expect(component.evidenceFilter()).toBe('with_evidence');
+    expect(component.density()).toBe('dense');
+
+    component.scrollMax.set(100);
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.value = '42';
+    const event = new Event('input');
+    Object.defineProperty(event, 'target', { value: input });
+
+    component.handleScrollInput(event);
+
+    expect(component.scrollOffset()).toBe(42);
+  });
+
   it('keeps January 5 on the same UTC scale as the month boundaries', () => {
     const start = normalizeTimelineDate('2024-12-01');
     const event = normalizeTimelineDate('2025-01-05');

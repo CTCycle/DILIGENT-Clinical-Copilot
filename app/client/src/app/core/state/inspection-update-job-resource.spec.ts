@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
 
 import {
   InspectionUpdateJobResource,
@@ -67,5 +69,36 @@ describe('InspectionUpdateJobResource', () => {
     expect(actions.rxnav.refresh).toHaveBeenCalled();
     expect(resource.updateRunning()).toBe(false);
     expect(resource.updateProgress()).toBe(100);
+  });
+
+  it('passes a discriminated start request to the shared tracker', async () => {
+    const actions = {
+      rxnav: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
+      livertox: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
+      rag: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
+    } as unknown as InspectionUpdateTargetActionsMap;
+    const tracker = {
+      configureRefreshers: vi.fn(),
+      targetState: signal({
+        rxnav: { jobId: null, running: false, progress: 0, message: '', error: null },
+        livertox: { jobId: null, running: false, progress: 0, message: '', error: null },
+        rag: { jobId: null, running: false, progress: 0, message: '', error: null },
+      }),
+      start: vi.fn().mockResolvedValue(undefined),
+    };
+    const resource = TestBed.runInInjectionContext(() => new InspectionUpdateJobResource(
+      {} as JobPollingService,
+      actions,
+      () => 'C:\\clinical-documents',
+      tracker as never,
+    ));
+    resource.activeTarget.set('rag');
+
+    await resource.start();
+
+    expect(tracker.start).toHaveBeenCalledWith({
+      target: 'rag',
+      payload: { documents_path: 'C:\\clinical-documents' },
+    });
   });
 });

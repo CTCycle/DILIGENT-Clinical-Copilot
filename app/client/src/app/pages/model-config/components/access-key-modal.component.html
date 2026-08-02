@@ -14,10 +14,11 @@
         class="access-key-input"
         type="password"
         placeholder="Paste access key"
-        [(ngModel)]="newKeyValue"
-        [disabled]="isSaving"
+        [ngModel]="newKeyValue()"
+        (ngModelChange)="newKeyValue.set($event)"
+        [disabled]="isSaving()"
       />
-      <button class="btn btn-primary access-key-add-btn" type="button" (click)="addKey()" [disabled]="isSaving">
+      <button class="btn btn-primary access-key-add-btn" type="button" (click)="addKey()" [disabled]="isSaving()">
         Add
       </button>
     </div>
@@ -25,15 +26,15 @@
 
   <section class="modal-section">
     <h3 class="modal-section-title">Stored Keys</h3>
-    @if (isLoading) {
+    @if (isLoading()) {
       <p class="access-key-empty">Loading keys...</p>
     }
-    @if (!isLoading && !hasKeys) {
+    @if (!isLoading() && !hasKeys()) {
       <p class="access-key-empty">No keys stored for this provider.</p>
     }
-    @if (!isLoading && hasKeys) {
+    @if (!isLoading() && hasKeys()) {
       <ul class="access-key-list">
-        @for (item of sortedKeys; track item.id) {
+        @for (item of sortedKeys(); track item.id) {
           <li class="access-key-row" [class.is-active]="item.is_active">
             <div class="access-key-meta">
               <div class="access-key-meta-top">
@@ -50,7 +51,7 @@
                 [class.is-active]="item.is_active"
                 type="button"
                 (click)="activateKey(item.id)"
-                [disabled]="isSaving || item.is_active"
+                [disabled]="isSaving() || item.is_active"
                 [attr.aria-label]="activateActionLabel(item)"
                 [title]="activateActionLabel(item)"
               >
@@ -62,11 +63,11 @@
                 class="access-key-action"
                 type="button"
                 (click)="toggleVisibility(item.id)"
-                [disabled]="isSaving"
+                [disabled]="isSaving()"
                 [attr.aria-label]="visibilityActionLabel(item)"
                 [title]="visibilityActionLabel(item)"
               >
-                @if (visibleRows[item.id]) {
+                @if (visibleRows()[item.id]) {
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="m3 3 18 18" />
                     <path d="M10.58 10.58a2 2 0 0 0 2.84 2.84" />
@@ -84,7 +85,7 @@
                 class="access-key-action is-danger"
                 type="button"
                 (click)="deleteKey(item.id)"
-                [disabled]="isSaving"
+                [disabled]="isSaving()"
                 aria-label="Delete key"
                 title="Delete key"
               >
@@ -102,6 +103,6 @@
     }
   </section>
 
-  <app-status-message [message]="errorMessage ? '[ERROR] ' + errorMessage : ''" tone="is-error"></app-status-message>
+  <app-status-message [message]="errorMessage() ? '[ERROR] ' + errorMessage() : ''" tone="is-error"></app-status-message>
 </app-modal-shell>
 

@@ -22,6 +22,10 @@ import {
   TimelineDatePrecision,
 } from './timeline-date';
 import { packTimelineItems, TimelineCluster } from './timeline-layout';
+import {
+  TimetableFilterOption,
+  TimetableFilterSelectComponent,
+} from './components/timetable-filter-select.component';
 
 type TimetableLane = 'clinical' | 'therapy' | 'labs' | 'uncertainty' | 'unanchored';
 type TimelineCardAlign = 'start' | 'center' | 'end';
@@ -83,11 +87,29 @@ const TIMETABLE_LANE_LABELS: Record<TimetableLane, string> = {
 const TIMETABLE_LANES: TimetableLane[] = ['clinical', 'therapy', 'labs', 'uncertainty', 'unanchored'];
 const TIMELINE_MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 const TIMELINE_MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' });
+const EVIDENCE_FILTER_OPTIONS: readonly TimetableFilterOption[] = [
+  { value: 'all', label: 'All events' },
+  { value: 'with_evidence', label: 'Has source evidence' },
+  { value: 'missing_evidence', label: 'Missing source evidence' },
+];
+const DENSITY_OPTIONS: readonly TimetableFilterOption[] = [
+  { value: 'dense', label: 'Dense' },
+  { value: 'compact', label: 'Compact' },
+  { value: 'comfortable', label: 'Comfortable' },
+];
+
+function isTimelineEvidenceFilter(value: string): value is TimelineEvidenceFilter {
+  return value === 'all' || value === 'with_evidence' || value === 'missing_evidence';
+}
+
+function isTimelineDensity(value: string): value is TimelineDensity {
+  return value === 'dense' || value === 'compact' || value === 'comfortable';
+}
 
 @Component({
   selector: 'app-patient-timetable-page',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, TimetableFilterSelectComponent],
   templateUrl: './patient-timetable-page.component.html',
   styleUrl: './patient-timetable-page.component.scss',
 })
@@ -114,6 +136,8 @@ export class PatientTimetablePageComponent implements OnInit, AfterViewInit {
   readonly scrollOffset = signal(0);
   readonly scrollMax = signal(0);
   readonly selectionAnnouncement = signal('');
+  readonly evidenceFilterOptions = EVIDENCE_FILTER_OPTIONS;
+  readonly densityOptions = DENSITY_OPTIONS;
   readonly isNarrowScreen = signal(globalThis.matchMedia?.('(max-width: 640px)').matches ?? false);
   private lastFocusedElement: HTMLElement | null = null;
   @ViewChild('timelineArea') private timelineArea?: ElementRef<HTMLElement>;
@@ -392,10 +416,18 @@ export class PatientTimetablePageComponent implements OnInit, AfterViewInit {
 
   toggleLaneVisibility(lane: TimetableLane): void { this.visibleLanes.update((value) => ({ ...value, [lane]: !value[lane] })); }
   toggleLaneCollapsed(lane: TimetableLane): void { this.collapsedLanes.update((value) => ({ ...value, [lane]: !value[lane] })); }
-  setEvidenceFilter(value: TimelineEvidenceFilter): void { this.evidenceFilter.set(value); }
+  setEvidenceFilter(value: string): void {
+    if (isTimelineEvidenceFilter(value)) {
+      this.evidenceFilter.set(value);
+    }
+  }
   toggleUncertainEvents(): void { this.showUncertainEvents.update((value) => !value); }
   toggleHideEmptyLanes(): void { this.hideEmptyLanes.update((value) => !value); }
-  setDensity(value: TimelineDensity): void { this.density.set(value); }
+  setDensity(value: string): void {
+    if (isTimelineDensity(value)) {
+      this.density.set(value);
+    }
+  }
   setZoom(value: number): void { this.zoom.set(Math.min(2.5, Math.max(0.75, value))); queueMicrotask(() => this.updateScrollMetrics()); }
   zoomIn(): void { this.setZoom(this.zoom() + 0.25); }
   zoomOut(): void { this.setZoom(this.zoom() - 0.25); }
@@ -404,6 +436,12 @@ export class PatientTimetablePageComponent implements OnInit, AfterViewInit {
     const next = Math.min(this.scrollMax(), Math.max(0, value));
     this.scrollOffset.set(next);
     this.timelineArea?.nativeElement.scrollTo({ left: next, behavior: 'auto' });
+  }
+  handleScrollInput(event: Event): void {
+    const target = event.target;
+    if (target instanceof HTMLInputElement) {
+      this.setScrollOffset(target.valueAsNumber);
+    }
   }
   handleEventKeydown(event: KeyboardEvent, item: InspectionTimelineEvent): void {
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.selectEvent(item); return; }

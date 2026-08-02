@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 
 import {
   InspectionUpdateJobStatusResponse,
+  InspectionUpdateStartRequest,
   InspectionUpdateTarget,
   JobStartResponse,
   JobStatus,
@@ -90,14 +91,14 @@ export class InspectionUpdateJobTrackerService {
     }
   }
 
-  async start(target: InspectionUpdateTarget, payload: Record<string, unknown>): Promise<void> {
+  async start(request: InspectionUpdateStartRequest): Promise<void> {
     try {
-      const started = await this.startRequest(target, payload);
-      this.applyStarted(target, started);
-      this.startPolling(target, started.job_id, resolvePollIntervalMs(started.poll_interval));
+      const started = await this.startRequest(request);
+      this.applyStarted(request.target, started);
+      this.startPolling(request.target, started.job_id, resolvePollIntervalMs(started.poll_interval));
     } catch (error) {
       await this.discover();
-      if (this.targetState()[target].running) return;
+      if (this.targetState()[request.target].running) return;
       throw error;
     }
   }
@@ -108,10 +109,10 @@ export class InspectionUpdateJobTrackerService {
     await this.cancelRequest(target, jobId);
   }
 
-  private async startRequest(target: InspectionUpdateTarget, payload: Record<string, unknown>): Promise<JobStartResponse> {
-    if (target === 'rxnav') return startInspectionRxNavUpdateJob(payload);
-    if (target === 'livertox') return startInspectionLiverToxUpdateJob(payload);
-    return startInspectionRagUpdateJob(payload);
+  private async startRequest(request: InspectionUpdateStartRequest): Promise<JobStartResponse> {
+    if (request.target === 'rxnav') return startInspectionRxNavUpdateJob(request.payload);
+    if (request.target === 'livertox') return startInspectionLiverToxUpdateJob(request.payload);
+    return startInspectionRagUpdateJob(request.payload);
   }
 
   private async cancelRequest(target: InspectionUpdateTarget, jobId: string): Promise<void> {
