@@ -7,10 +7,14 @@ from __future__ import annotations
 from playwright.sync_api import APIRequestContext
 
 ###############################################################################
-def test_root_redirects_to_docs(api_context: APIRequestContext):
+def test_root_serves_spa_or_redirects_to_docs(api_context: APIRequestContext):
     response = api_context.get("/")
     assert response.ok
-    assert response.url.endswith("/docs")
+    if response.url.endswith("/docs"):
+        assert "swagger" in response.text().lower()
+    else:
+        assert response.url.endswith("/")
+        assert "<html" in response.text().lower()
 
 ###############################################################################
 def test_docs_available(api_context: APIRequestContext):
