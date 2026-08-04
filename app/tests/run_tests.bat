@@ -163,6 +163,17 @@ echo [INFO] Backend URL : %APP_TEST_BACKEND_URL%
 echo [INFO] Frontend URL: %APP_TEST_FRONTEND_URL%
 echo.
 
+if defined MODELCONFIG_KIND (
+  set "TIMESTAMP=%DATE:/=-%_%TIME::=-%"
+  set "TIMESTAMP=!TIMESTAMP: =0!"
+
+  set "RUN_DB=%TEMP%\diligent-modelconfig-runner.!TIMESTAMP!.db"
+  set "PYTEST_CACHE=%TEMP%\diligent-modelconfig-pytest-cache.!TIMESTAMP!"
+  set "DILIGENT_SQLITE_PATH=!RUN_DB!"
+  set "PYTEST_ADDOPTS=-o cache_dir=!PYTEST_CACHE!"
+  if exist "!RUN_DB!" del /f "!RUN_DB!" >nul 2>&1
+)
+
 if "%NEED_BACKEND%"=="1" (
   curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
   if errorlevel 1 (
@@ -214,33 +225,24 @@ if "%NEED_FRONTEND%"=="1" (
 )
 
 if defined MODELCONFIG_KIND (
-  set "TIMESTAMP=%DATE:/=-%_%TIME::=-%"
-  set "TIMESTAMP=!TIMESTAMP: =0!"
-
-  set "RUN_DB=%TEMP%\diligent-modelconfig-runner.!TIMESTAMP!.db"
-  set "PYTEST_CACHE=%TEMP%\diligent-modelconfig-pytest-cache.!TIMESTAMP%"
-  set "DILIGENT_SQLITE_PATH=!RUN_DB!"
-  set "PYTEST_ADDOPTS=-o cache_dir=!PYTEST_CACHE!"
-  if exist "!RUN_DB!" del /f "!RUN_DB!" >nul 2>&1
-
   set "MC_UNIT=%TESTS_DIR%\unit\test_model_config_persistence.py"
   set "MC_API=%TESTS_DIR%\e2e\test_model_config_api.py"
   set "MC_FLOW=%TESTS_DIR%\e2e\test_app_flow.py"
 
   echo [STEP] Running model-config unit tests...
-  "%PYTHON_CMD%" -m pytest "%MC_UNIT%" -q
+  "%PYTHON_CMD%" -m pytest "!MC_UNIT!" -q
   if errorlevel 1 set "TEST_RESULT=1" & goto cleanup
 
   set "APP_TEST_BACKEND_URL=http://127.0.0.1:7690"
   set "APP_TEST_FRONTEND_URL=http://127.0.0.1:9847"
 
   if /i "%MODELCONFIG_KIND%"=="slice" (
-    set "MC_K=-k runtime_toggle_enables_save_and_submits_put or model_config or dili_run_burst_click_submits_single_job or dili_run_conflict_surfaces_clear_error_message"
+    set "MC_K=runtime_toggle_enables_save_and_submits_put or model_config or dili_run_burst_click_submits_single_job or dili_run_conflict_surfaces_clear_error_message"
     echo [STEP] Running model-config API + app-flow e2e slice...
-    "%PYTHON_CMD%" -m pytest "%MC_API%" "%MC_FLOW%" !MC_K! -q
+    "%PYTHON_CMD%" -m pytest "!MC_API!" "!MC_FLOW!" -k "!MC_K!" -q
   ) else (
     echo [STEP] Running full model-config API + app-flow e2e suite...
-    "%PYTHON_CMD%" -m pytest "%MC_API%" "%MC_FLOW%" -q
+    "%PYTHON_CMD%" -m pytest "!MC_API!" "!MC_FLOW!" -q
   )
   if errorlevel 1 set "TEST_RESULT=1"
   goto cleanup
