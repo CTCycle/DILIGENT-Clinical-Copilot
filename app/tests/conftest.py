@@ -18,6 +18,8 @@ from typing import Any
 import pytest
 
 from common import paths as common_paths
+from configurations.startup import get_server_settings
+from repositories.database.initializer import initialize_sqlite_database
 from repositories.database import sqlite as sqlite_module
 from services.catalogs.runtime import initialize_reference_catalog_provider
 
@@ -28,6 +30,14 @@ def _configure_test_embedded_database_path() -> None:
     db_path = temp_root / f"embedded-{uuid.uuid4().hex}.db"
     common_paths.DATABASE_FILE_PATH = db_path
     sqlite_module.DATABASE_FILE_PATH = db_path
+    settings = get_server_settings().database.model_copy(
+        update={
+            "backend": "sqlite",
+            "embedded_database": True,
+            "sqlite_path": str(db_path),
+        }
+    )
+    initialize_sqlite_database(settings)
 
 ###############################################################################
 def _configure_playwright_node_runtime() -> None:

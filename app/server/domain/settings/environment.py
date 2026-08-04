@@ -10,6 +10,14 @@ class DatabaseEnvironmentSnapshot(BaseModel):
     backend: str | None = None
     url: str | None = None
     sqlite_path: str | None = None
+    engine: str | None = None
+    host: str | None = None
+    port: str | None = None
+    database_name: str | None = None
+    username: str | None = None
+    password: str | None = None
+    ssl: str | None = None
+    ssl_ca: str | None = None
     connect_timeout: str | None = None
     write_batch_size: str | None = None
     read_page_size: str | None = None

@@ -7,38 +7,23 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from common.paths import DATABASE_FILE_PATH
-from common.utils.logger import logger
 from domain.settings.configuration import DatabaseSettings
-from repositories.schemas.base import Base
 from repositories.database.engine import build_sqlite_engine
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
+
+###############################################################################
+def resolve_sqlite_database_path(settings: DatabaseSettings) -> Path:
+    return Path(settings.sqlite_path) if settings.sqlite_path else DATABASE_FILE_PATH
 
 ###############################################################################
 class SQLiteRepository:
 
     # -------------------------------------------------------------------------
     def __init__(self, settings: DatabaseSettings) -> None:
-        self.db_path = (
-            Path(settings.sqlite_path)
-            if settings.sqlite_path
-            else DATABASE_FILE_PATH
-        )
-        db_file_missing = bool(self.db_path and not self.db_path.exists())
+        self.db_path = resolve_sqlite_database_path(settings)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.engine: Engine = build_sqlite_engine(str(self.db_path), timeout=30.0)
         event.listen(self.engine, "connect", self._configure_connection)
-        if db_file_missing:
-            Base.metadata.create_all(self.engine)
-        if db_file_missing:
-            logger.info(
-                "SQLite DB file was missing; created and initialized schema at %s",
-                str(self.db_path),
-            )
-        else:
-            logger.info(
-                "SQLite DB file already existed; ensured schema at %s",
-                str(self.db_path),
-            )
         self.session_factory = sessionmaker(bind=self.engine, future=True)
         self.catalogs = ReferenceCatalogSerializer(session_factory=self.session_factory)
 

@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Relational Database
 
@@ -41,8 +41,10 @@ Last updated: 2026-08-02
 
 - Canonical manifests live in `app/resources/catalogs/*.json` and are seeded into database tables.
 - RxNorm persistence uses `drug_rxnorm_codes` as the canonical RxCUI mapping table.
-- Startup performs hash-based seed checks and reseeds only missing or changed manifests.
-- Full reseed or reset is explicit through `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs`.
+- Explicit database initialization seeds the canonical manifests.
+- SQLite startup initializes and seeds only when the configured `.db` file is missing. An existing SQLite file is opened without schema cross-validation, reset, or reseeding.
+- PostgreSQL database creation, schema initialization, and seeding are available only through the explicit launcher database action; normal application startup never creates or resets PostgreSQL state.
+- Full reseed or reset remains explicit through `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs`.
 
 ## Vector Persistence
 

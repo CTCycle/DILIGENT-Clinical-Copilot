@@ -39,15 +39,12 @@ def _compile_terms_regex(category: str) -> re.Pattern[str]:
     return re.compile(r"$^")
 
 
-ALCOHOL_RE = _compile_terms_regex(
-    "rucam_alcohol_terms",
-)
-PREGNANCY_RE = _compile_terms_regex(
-    "rucam_pregnancy_terms",
-)
-EXCLUSION_RE = _compile_terms_regex(
-    "rucam_exclusion_terms",
-)
+def _alcohol_re() -> re.Pattern[str]:
+    return _compile_terms_regex("rucam_alcohol_terms")
+
+###############################################################################
+def _exclusion_re() -> re.Pattern[str]:
+    return _compile_terms_regex("rucam_exclusion_terms")
 RUCAM_SCORE_RE = re.compile(
     r"\brucam\b\s*(?:score)?\s*[:=]?\s*(-?\d{1,2})", re.IGNORECASE
 )
@@ -350,7 +347,7 @@ class RucamScoreEstimator:
         if len(lab_timeline.entries) < 1:
             reasons.append("no laboratory timeline entries")
         has_alt = bool((payload.anamnesis or "").strip()) and (
-            len(EXCLUSION_RE.findall(payload.anamnesis or "")) > 0
+            len(_exclusion_re().findall(payload.anamnesis or "")) > 0
             or len(disease_context.entries) > 0
         )
         if not has_alt:
@@ -662,7 +659,7 @@ class RucamScoreEstimator:
     ) -> RucamComponentAssessment:
         _ = injury_type
         text = (payload.anamnesis or "").strip()
-        score = 1 if ALCOHOL_RE.search(text) else 0
+        score = 1 if _alcohol_re().search(text) else 0
         return RucamComponentAssessment(
             component_key="risk_factors",
             label="Risk factors",
@@ -707,7 +704,7 @@ class RucamScoreEstimator:
                 status="scored",
                 evidence=hepatic_entries[0].evidence or hepatic_entries[0].name,
             )
-        clues = len(EXCLUSION_RE.findall(text))
+        clues = len(_exclusion_re().findall(text))
         if clues == 0:
             return RucamComponentAssessment(
                 component_key="non_drug_causes",

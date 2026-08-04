@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled automatic generation policy immediately before each LLM call.
@@ -70,7 +70,7 @@ authentication, and provider-side errors still fail promptly.
 ## Feature Toggles
 - Cloud-versus-local model usage is runtime-configured through model configuration APIs.
 - Database mode, embedded SQLite versus PostgreSQL, is controlled by `settings/.env`.
-- Catalog seeding is hash-checked and incremental on normal startup.
+- Catalog seeding occurs during explicit database initialization, or during the first SQLite startup when its configured `.db` file is missing. Existing databases are not reseeded during normal startup.
 
 ## RAG Defaults
 - RAG uses `ibm-granite/granite-embedding-97m-multilingual-r2` at the pinned revision and AVX2 quantized ONNX artifact declared in `app/server/common/embedding/config.py`.

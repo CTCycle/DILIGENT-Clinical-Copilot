@@ -5,6 +5,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
+import pytest
 from domain.settings.configuration import DatabaseSettings
 from repositories.database import initializer
 from repositories.database.sqlite import SQLiteRepository
@@ -12,6 +13,7 @@ from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
 from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 ###############################################################################
@@ -49,7 +51,9 @@ def test_sqlite_fresh_creation_uses_external_material(monkeypatch) -> None:  # t
         material_path = temp_root / "access-key-material.json"
         monkeypatch.setenv("DILIGENT_ACCESS_KEY_MATERIAL_FILE", str(material_path))
 
-        repository = SQLiteRepository(make_sqlite_settings())
+        settings = make_sqlite_settings()
+        initializer.initialize_sqlite_database(settings, seed_catalogs=False)
+        repository = SQLiteRepository(settings)
         assert repository.db_path is not None
         assert Path(repository.db_path).exists()
 
@@ -74,8 +78,10 @@ def test_sqlite_reopen_with_existing_db_reuses_external_material(monkeypatch) ->
         material_path = temp_root / "access-key-material.json"
         monkeypatch.setenv("DILIGENT_ACCESS_KEY_MATERIAL_FILE", str(material_path))
 
-        first = SQLiteRepository(make_sqlite_settings())
-        second = SQLiteRepository(make_sqlite_settings())
+        settings = make_sqlite_settings()
+        initializer.initialize_sqlite_database(settings, seed_catalogs=False)
+        first = SQLiteRepository(settings)
+        second = SQLiteRepository(settings)
         first_material = AccessKeyEncryptionMaterialSerializer(
             engine=first.engine,
             session_factory=first.session_factory,
@@ -199,12 +205,14 @@ def test_external_material_does_not_duplicate_on_reopen(monkeypatch) -> None:  #
         material_path = temp_root / "access-key-material.json"
         monkeypatch.setenv("DILIGENT_ACCESS_KEY_MATERIAL_FILE", str(material_path))
 
-        repository = SQLiteRepository(make_sqlite_settings())
+        settings = make_sqlite_settings()
+        initializer.initialize_sqlite_database(settings, seed_catalogs=False)
+        repository = SQLiteRepository(settings)
         material = AccessKeyEncryptionMaterialSerializer(
             engine=repository.engine,
             session_factory=repository.session_factory,
         ).ensure_seeded()
-        repository_again = SQLiteRepository(make_sqlite_settings())
+        repository_again = SQLiteRepository(settings)
         material_again = AccessKeyEncryptionMaterialSerializer(
             engine=repository_again.engine,
             session_factory=repository_again.session_factory,
@@ -212,6 +220,57 @@ def test_external_material_does_not_duplicate_on_reopen(monkeypatch) -> None:  #
         assert material.key_material == material_again.key_material
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
+
+###############################################################################
+def test_sqlite_startup_initializes_only_when_database_file_is_missing(
+    monkeypatch, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    database_path = tmp_path / "missing.db"
+    settings = make_sqlite_settings()
+    monkeypatch.setattr(
+        "repositories.database.sqlite.DATABASE_FILE_PATH", database_path
+    )
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        initializer,
+        "initialize_sqlite_database",
+        lambda _settings, **kwargs: calls.append(kwargs),
+    )
+
+    assert initializer.initialize_sqlite_database_if_missing(settings) is True
+    assert calls == [{}]
+
+###############################################################################
+def test_sqlite_startup_does_not_reinitialize_existing_database(
+    monkeypatch, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    database_path = tmp_path / "existing.db"
+    database_path.touch()
+    settings = make_sqlite_settings()
+    monkeypatch.setattr(
+        "repositories.database.sqlite.DATABASE_FILE_PATH", database_path
+    )
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("existing SQLite databases must not be initialized")
+
+    monkeypatch.setattr(initializer, "initialize_sqlite_database", fail_if_called)
+
+    assert initializer.initialize_sqlite_database_if_missing(settings) is False
+
+###############################################################################
+def test_database_initialization_converts_unavailable_connection_to_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_initialization(**_kwargs):
+        raise SQLAlchemyError("connection refused")
+
+    monkeypatch.setattr(initializer, "run_database_initialization", fail_initialization)
+
+    with pytest.raises(SystemExit) as exc_info:
+        initializer.initialize_database()
+
+    assert exc_info.value.code == 1
 
 ###############################################################################
 def _sqlite_settings() -> DatabaseSettings:
@@ -266,12 +325,12 @@ def test_run_database_initialization_uses_sqlite_path_when_embedded(
     monkeypatch.setattr(
         initializer,
         "initialize_sqlite_database",
-        lambda _settings: calls.append("sqlite"),
+        lambda _settings, **_kwargs: calls.append("sqlite"),
     )
     monkeypatch.setattr(
         initializer,
         "ensure_postgres_database",
-        lambda _settings: calls.append("postgres"),
+        lambda _settings, **_kwargs: calls.append("postgres"),
     )
 
     initializer.run_database_initialization()
@@ -293,12 +352,12 @@ def test_run_database_initialization_uses_postgres_path_when_external(
     monkeypatch.setattr(
         initializer,
         "initialize_sqlite_database",
-        lambda _settings: calls.append("sqlite"),
+        lambda _settings, **_kwargs: calls.append("sqlite"),
     )
     monkeypatch.setattr(
         initializer,
         "ensure_postgres_database",
-        lambda _settings: calls.append("postgres"),
+        lambda _settings, **_kwargs: calls.append("postgres"),
     )
 
     initializer.run_database_initialization()

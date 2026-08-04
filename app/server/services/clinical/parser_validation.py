@@ -7,7 +7,7 @@ from services.catalogs.runtime import get_reference_catalog_snapshot
 
 ###############################################################################
 @lru_cache(maxsize=1)
-def _get_parser_validation_data() -> dict[str, Any]:
+def get_parser_validation_data() -> dict[str, Any]:
     snapshot = get_reference_catalog_snapshot()
     non_drug_exact_names = set(
         snapshot.values("clinical_extraction", "drug_non_name_exact", key="default")
@@ -37,11 +37,3 @@ def _get_parser_validation_data() -> dict[str, Any]:
             snapshot.values("clinical_extraction", "drug_line_prefixes")
         ),
     }
-
-###############################################################################
-def __getattr__(name: str) -> Any:
-    data = _get_parser_validation_data()
-    if name in data:
-        return data[name]
-    msg = f"module 'parser_validation' has no attribute '{name}'"
-    raise AttributeError(msg)

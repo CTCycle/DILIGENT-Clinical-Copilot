@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Recommended Local Startup
 On Windows, use:
@@ -18,6 +18,12 @@ The launcher:
 - starts the frontend preview server
 - recreates a stale backend virtual environment when the repository has moved
 - provides database, test, log, cache, and uninstall maintenance options
+
+Database startup behavior is mode-specific:
+
+- In SQLite mode, application startup checks only whether the configured `.db` file exists. A missing file is initialized and seeded once; an existing file is used as-is without schema validation or reseeding.
+- In PostgreSQL mode, application startup only connects to the configured database. Run `.\start_on_windows.ps1 -Action InitializeDatabase` after selecting PostgreSQL to create the database, schema, and seed data.
+- The explicit `InitializeDatabase` action is the manual initialization path for either backend. It never runs implicitly as part of `Launch`.
 
 Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
 

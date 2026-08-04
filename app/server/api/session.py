@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from fastapi import APIRouter, Body, Response, status
 
 from domain.clinical.entities import (
@@ -25,9 +27,30 @@ router = APIRouter(tags=["session"])
 class ClinicalSessionEndpoint:
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, router: APIRouter, service: ClinicalSessionService) -> None:
+    def __init__(
+        self,
+        *,
+        router: APIRouter,
+        service: ClinicalSessionService | None = None,
+        service_factory: Callable[[], ClinicalSessionService] | None = None,
+    ) -> None:
         self.router = router
-        self.service = service
+        self._service = service
+        self._service_factory = service_factory
+
+    # -------------------------------------------------------------------------
+    @property
+    def service(self) -> ClinicalSessionService:
+        if self._service is None:
+            if self._service_factory is None:
+                raise RuntimeError("Clinical session service is not configured.")
+            self._service = self._service_factory()
+        return self._service
+
+    # -------------------------------------------------------------------------
+    @service.setter
+    def service(self, value: ClinicalSessionService) -> None:
+        self._service = value
 
     # -------------------------------------------------------------------------
     def start_clinical_job(
@@ -107,5 +130,5 @@ class ClinicalSessionEndpoint:
 
 ClinicalSessionEndpoint(
     router=router,
-    service=build_clinical_session_service(get_job_manager()),
+    service_factory=lambda: build_clinical_session_service(get_job_manager()),
 ).add_routes()

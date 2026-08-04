@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 
 from domain.settings.configuration import DatabaseSettings
+from repositories.database.initializer import initialize_sqlite_database
 from repositories.database.sqlite import SQLiteRepository
 from repositories.schemas.base import Base
 from repositories.schemas.configuration import (
@@ -40,7 +41,7 @@ def _make_temp_db_root(prefix: str) -> Path:
     return temp_root
 
 ###############################################################################
-def test_sqlite_repository_initializes_schema_when_db_file_missing(
+def test_sqlite_initializer_creates_schema_when_db_file_missing(
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
     temp_root = _make_temp_db_root("sqlite-init-missing")
@@ -50,7 +51,9 @@ def test_sqlite_repository_initializes_schema_when_db_file_missing(
             temp_root / "missing.db",
         )
 
-        repository = SQLiteRepository(_build_settings())
+        settings = _build_settings()
+        initialize_sqlite_database(settings, seed_catalogs=False)
+        repository = SQLiteRepository(settings)
         inspector = inspect(repository.engine)
 
         assert repository.db_path is not None
@@ -99,7 +102,9 @@ def test_sqlite_repository_exposes_orm_session_factory(
         "repositories.database.sqlite.DATABASE_FILE_PATH",
         tmp_path / "orm_reads.db",
     )
-    repository = SQLiteRepository(_build_settings())
+    settings = _build_settings()
+    initialize_sqlite_database(settings, seed_catalogs=False)
+    repository = SQLiteRepository(settings)
 
     with repository.session_factory() as db_session:
         db_session.add(

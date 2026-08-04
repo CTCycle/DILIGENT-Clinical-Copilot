@@ -420,7 +420,6 @@ function Start-Application {
     else {
         Write-Ok 'Application environments are ready; skipped dependency installation'
     }
-    Initialize-Database
     Set-LauncherEnvironment
 
     $fastApiHost = if ($env:FASTAPI_HOST) { $env:FASTAPI_HOST } else { '127.0.0.1' }
@@ -501,6 +500,7 @@ function Install-OrUpdateApplication {
 
 function Initialize-Database {
     Initialize-PortableRuntimes
+    Import-DotEnv -CreateIfMissing
     Set-LauncherEnvironment
     $databaseScript = Join-Path $RepoRoot 'app/scripts/initialize_database.py'
     if (-not (Test-Path -LiteralPath $databaseScript)) {
