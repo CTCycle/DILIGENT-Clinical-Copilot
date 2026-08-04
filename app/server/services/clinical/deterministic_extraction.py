@@ -172,12 +172,13 @@ CARCINOMA_PHRASE_RE = re.compile(
     r"\b(?P<name>(?:high\s+grade\s+)?[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ\s/-]{0,80}carcinoma)\b",
     re.IGNORECASE,
 )
-NON_DRUG_TOKENS = frozenset(
-    get_reference_catalog_snapshot().values(
-        "clinical_extraction",
-        "deterministic_non_drug_tokens",
+def _non_drug_tokens() -> frozenset[str]:
+    return frozenset(
+        get_reference_catalog_snapshot().values(
+            "clinical_extraction",
+            "deterministic_non_drug_tokens",
+        )
     )
-)
 
 ###############################################################################
 def line_has_regimen_signal(line: str) -> bool:
@@ -219,10 +220,11 @@ def extract_regimen_drug_candidates(
 
     seen: set[str] = set()
     entries: list[DrugEntry] = []
+    non_drug_tokens = _non_drug_tokens()
     for match in CAPITALIZED_DRUG_TOKEN_RE.finditer(stripped):
         candidate_name = match.group(1).strip()
         lowered = candidate_name.casefold()
-        if lowered in seen or lowered in NON_DRUG_TOKENS:
+        if lowered in seen or lowered in non_drug_tokens:
             continue
         if len(candidate_name) <= 2:
             continue

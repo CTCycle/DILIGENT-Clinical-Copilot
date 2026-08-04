@@ -23,13 +23,7 @@ from services.clinical.parser_extraction import (
     build_suspension_event_re,
     build_trailing_route_token_re,
 )
-from services.clinical.parser_validation import (
-    NON_DRUG_CONTAINS,
-    NON_DRUG_EXACT_NAMES,
-    NON_DRUG_PREFIXES,
-    NON_THERAPY_LINE_PREFIXES,
-    WEEKDAY_TOKENS,
-)
+from services.clinical.parser_validation import get_parser_validation_data
 from services.clinical.parser_llm import DrugLlmExtractionMixin
 from services.clinical.parser_rules import DrugRulesMixin
 
@@ -109,6 +103,7 @@ class DrugsParser(DrugLlmExtractionMixin, DrugRulesMixin):
         self.client_loop_id: int | None = None
         self.forced_provider: str | None = None
         self.forced_model: str | None = None
+        self._parser_validation_data = get_parser_validation_data()
         if client is None:
             self.client_provider: str | None = None
             self.runtime_revision = -1
@@ -163,7 +158,7 @@ class DrugsParser(DrugLlmExtractionMixin, DrugRulesMixin):
         values = set(
             snapshot.values("clinical_extraction", "drug_non_name_exact", key="default")
         )
-        values.update(NON_DRUG_EXACT_NAMES)
+        values.update(self._parser_validation_data["NON_DRUG_EXACT_NAMES"])
         return values
 
     # -------------------------------------------------------------------------
@@ -177,7 +172,7 @@ class DrugsParser(DrugLlmExtractionMixin, DrugRulesMixin):
                         "drug_non_name_prefixes",
                         key="default",
                     ),
-                    *NON_DRUG_PREFIXES,
+                    *self._parser_validation_data["NON_DRUG_PREFIXES"],
                 ]
             )
         )
@@ -193,7 +188,7 @@ class DrugsParser(DrugLlmExtractionMixin, DrugRulesMixin):
                         "drug_non_name_contains",
                         key="default",
                     ),
-                    *NON_DRUG_CONTAINS,
+                    *self._parser_validation_data["NON_DRUG_CONTAINS"],
                 ]
             )
         )
@@ -204,7 +199,7 @@ class DrugsParser(DrugLlmExtractionMixin, DrugRulesMixin):
         values = set(
             snapshot.values("clinical_extraction", "weekday_terms", key="default")
         )
-        values.update(WEEKDAY_TOKENS)
+        values.update(self._parser_validation_data["WEEKDAY_TOKENS"])
         return values
 
     # -------------------------------------------------------------------------
@@ -214,7 +209,7 @@ class DrugsParser(DrugLlmExtractionMixin, DrugRulesMixin):
             dict.fromkeys(
                 [
                     *snapshot.values("clinical_extraction", "drug_line_prefixes"),
-                    *NON_THERAPY_LINE_PREFIXES,
+                    *self._parser_validation_data["NON_THERAPY_LINE_PREFIXES"],
                 ]
             )
         )

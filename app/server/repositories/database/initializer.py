@@ -4,7 +4,6 @@ import urllib.parse
 import sqlalchemy
 from sqlalchemy import column, literal, select, table
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.elements import TextClause
 
 from common.catalogs.manifest_loader import (
@@ -18,7 +17,10 @@ from configurations.startup import get_server_settings
 from domain.catalogs import CatalogSeedResult
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.postgres import PostgresRepository
-from repositories.database.sqlite import SQLiteRepository
+from repositories.database.sqlite import (
+    SQLiteRepository,
+    resolve_sqlite_database_path,
+)
 from repositories.database.utils import (
     normalize_postgres_engine,
     validate_postgres_database_name,
@@ -97,18 +99,14 @@ def _seed_catalogs(
             manifest.manifest, manifest_hash
         ):
             continue
-        try:
-            written = serializer.replace_manifest_entries(
-                manifest=manifest,
-                manifest_hash=manifest_hash,
-                source_path=str(path),
-            )
-            if written > 0:
-                manifests_seeded += 1
-                entries_written += written
-        except Exception as exc:
-            _ = exc
-            raise
+        written = serializer.replace_manifest_entries(
+            manifest=manifest,
+            manifest_hash=manifest_hash,
+            source_path=str(path),
+        )
+        if written > 0:
+            manifests_seeded += 1
+            entries_written += written
     return CatalogSeedResult(
         manifests_seen=len(paths),
         manifests_seeded=manifests_seeded,
@@ -128,12 +126,9 @@ def initialize_sqlite_database(
         Base.metadata.drop_all(repository.engine)
     Base.metadata.create_all(repository.engine)
     if seed_catalogs:
-        session_factory = getattr(
-            repository,
-            "session_factory",
-            sessionmaker(bind=repository.engine, future=True),
+        serializer = ReferenceCatalogSerializer(
+            session_factory=repository.session_factory
         )
-        serializer = ReferenceCatalogSerializer(session_factory=session_factory)
         result = _seed_catalogs(serializer, force=force_reseed_catalogs)
         logger.info(
             "Catalog seeding completed for SQLite: seen=%s seeded=%s entries=%s",
@@ -143,6 +138,19 @@ def initialize_sqlite_database(
         )
         get_catalog_provider().invalidate()
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
+
+###############################################################################
+def initialize_sqlite_database_if_missing(settings: DatabaseSettings) -> bool:
+    database_path = resolve_sqlite_database_path(settings)
+    if database_path.is_file():
+        logger.info(
+            "Skipping SQLite initialization because the database already exists at %s",
+            database_path,
+        )
+        return False
+
+    initialize_sqlite_database(settings)
+    return True
 
 ###############################################################################
 def ensure_postgres_database(
@@ -193,20 +201,17 @@ def ensure_postgres_database(
         Base.metadata.drop_all(repository.engine)
     Base.metadata.create_all(repository.engine)
     if seed_catalogs:
-        session_factory = getattr(repository, "session_factory", None)
-        if session_factory is not None:
-            serializer = ReferenceCatalogSerializer(session_factory=session_factory)
-            result = _seed_catalogs(serializer, force=force_reseed_catalogs)
-        else:
-            result = None
-        if result is not None:
-            logger.info(
-                "Catalog seeding completed for PostgreSQL: seen=%s seeded=%s entries=%s",
-                result.manifests_seen,
-                result.manifests_seeded,
-                result.entries_written,
-            )
-            get_catalog_provider().invalidate()
+        serializer = ReferenceCatalogSerializer(
+            session_factory=repository.session_factory
+        )
+        result = _seed_catalogs(serializer, force=force_reseed_catalogs)
+        logger.info(
+            "Catalog seeding completed for PostgreSQL: seen=%s seeded=%s entries=%s",
+            result.manifests_seen,
+            result.manifests_seeded,
+            result.entries_written,
+        )
+        get_catalog_provider().invalidate()
     logger.info("Ensured PostgreSQL tables exist in %s", target_database)
 
     return target_database
@@ -224,15 +229,9 @@ def run_database_initialization(
         "seed_catalogs": seed_catalogs,
         "force_reseed_catalogs": force_reseed_catalogs,
     }
-    use_default_init_kwargs = (
-        not drop_existing and seed_catalogs and not force_reseed_catalogs
-    )
     if settings.backend == "sqlite":
         logger.info("Running SQLite initialization path.")
-        if use_default_init_kwargs:
-            initialize_sqlite_database(settings)
-        else:
-            initialize_sqlite_database(settings, **init_kwargs)
+        initialize_sqlite_database(settings, **init_kwargs)
         return
 
     logger.info("Running PostgreSQL initialization path (manual trigger expected).")
@@ -244,10 +243,7 @@ def run_database_initialization(
     }:
         raise ValueError(f"Unsupported database engine: {settings.engine}")
 
-    if use_default_init_kwargs:
-        ensure_postgres_database(settings)
-    else:
-        ensure_postgres_database(settings, **init_kwargs)
+    ensure_postgres_database(settings, **init_kwargs)
 
 ###############################################################################
 def initialize_database(
