@@ -49,6 +49,24 @@ def test_initialize_environment_creates_env_from_example_when_missing(
     assert os.environ.get("TEST_DOTENV_VAR") == "enabled"
 
 ###############################################################################
+def test_initialize_environment_does_not_overwrite_existing_env(
+    tmp_path, monkeypatch
+) -> None:
+    dotenv_path = tmp_path / ".env"
+    example_path = tmp_path / ".env.example"
+    dotenv_path.write_text("TEST_DOTENV_VAR=existing\n", encoding="utf-8")
+    example_path.write_text("TEST_DOTENV_VAR=template\n", encoding="utf-8")
+    monkeypatch.setattr(paths, "ENV_FILE_PATH", dotenv_path)
+    monkeypatch.setattr(paths, "ENV_EXAMPLE_PATH", example_path)
+    monkeypatch.delenv("TEST_DOTENV_VAR", raising=False)
+    environment.reset_environment_bootstrap_for_tests()
+
+    initialize_environment()
+
+    assert dotenv_path.read_text(encoding="utf-8") == "TEST_DOTENV_VAR=existing\n"
+    assert os.environ.get("TEST_DOTENV_VAR") == "existing"
+
+###############################################################################
 def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(
     monkeypatch, tmp_path
 ) -> None:

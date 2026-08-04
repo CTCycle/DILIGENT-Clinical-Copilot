@@ -37,7 +37,7 @@ class DrugsLookup:
     MATCH_CACHE_LIMIT = get_server_settings().drugs_matcher.match_cache_limit
     ALIAS_CACHE_LIMIT = get_server_settings().drugs_matcher.alias_cache_limit
     TOKEN_MIN_LENGTH = get_server_settings().drugs_matcher.token_min_length
-    CATALOG_EXCLUDED_TERM_SUFFIXES = _catalog_excluded_term_suffixes()
+    CATALOG_EXCLUDED_TERM_SUFFIXES: tuple[str, ...] = ()
     CATALOG_INDEX_LIMIT = get_server_settings().drugs_matcher.catalog_index_limit
     SPELLING_CONFIDENCE = get_server_settings().drugs_matcher.spelling_confidence
     SPELLING_MIN_QUERY_LENGTH = (
@@ -57,6 +57,7 @@ class DrugsLookup:
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
+        self.CATALOG_EXCLUDED_TERM_SUFFIXES = _catalog_excluded_term_suffixes()
         self.data: LiverToxData | None = None
         self.match_cache: BoundedCache[str, LiverToxMatch] = BoundedCache(
             self.MATCH_CACHE_LIMIT

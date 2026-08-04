@@ -198,6 +198,14 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
             backend=coerce_str_or_none(os.getenv("DATABASE_BACKEND")),
             url=coerce_str_or_none(os.getenv("DATABASE_URL")),
             sqlite_path=coerce_str_or_none(os.getenv("DATABASE_SQLITE_PATH")),
+            engine=coerce_str_or_none(os.getenv("DATABASE_ENGINE")),
+            host=coerce_str_or_none(os.getenv("DATABASE_HOST")),
+            port=coerce_str_or_none(os.getenv("DATABASE_PORT")),
+            database_name=coerce_str_or_none(os.getenv("DATABASE_NAME")),
+            username=coerce_str_or_none(os.getenv("DATABASE_USERNAME")),
+            password=coerce_str_or_none(os.getenv("DATABASE_PASSWORD")),
+            ssl=coerce_str_or_none(os.getenv("DATABASE_SSL")),
+            ssl_ca=coerce_str_or_none(os.getenv("DATABASE_SSL_CA")),
             connect_timeout=coerce_str_or_none(os.getenv("DATABASE_CONNECT_TIMEOUT")),
             write_batch_size=coerce_str_or_none(os.getenv("DATABASE_WRITE_BATCH_SIZE")),
             read_page_size=coerce_str_or_none(os.getenv("DATABASE_READ_PAGE_SIZE")),
@@ -305,17 +313,28 @@ def _build_database_settings(
             insert_commit_interval=commit_interval,
             select_page_size=read_page_size,
         )
-    engine_value = coerce_str_or_none(url_payload.get("engine"))
-    host_value = coerce_str_or_none(url_payload.get("host"))
+    engine_value = coerce_str_or_none(environment.engine) or coerce_str_or_none(
+        url_payload.get("engine")
+    )
+    host_value = coerce_str_or_none(environment.host) or coerce_str_or_none(
+        url_payload.get("host")
+    )
     port_value = coerce_int(
-        url_payload.get("port"),
+        environment.port or url_payload.get("port"),
         5432,
         minimum=1,
         maximum=65535,
     )
-    database_name = coerce_str_or_none(url_payload.get("database_name"))
-    username = coerce_str_or_none(url_payload.get("username"))
-    password = coerce_str_or_none(url_payload.get("password"))
+    database_name = coerce_str_or_none(
+        environment.database_name
+    ) or coerce_str_or_none(url_payload.get("database_name"))
+    username = coerce_str_or_none(environment.username) or coerce_str_or_none(
+        url_payload.get("username")
+    )
+    password = coerce_str_or_none(environment.password)
+    if password is None:
+        password = coerce_str_or_none(url_payload.get("password"))
+    ssl_ca = coerce_str_or_none(environment.ssl_ca)
     return DatabaseSettings(
         backend="postgresql",
         url=environment.url,
@@ -329,8 +348,8 @@ def _build_database_settings(
         database_name=database_name,
         username=username,
         password=password,
-        ssl=False,
-        ssl_ca=None,
+        ssl=coerce_bool(environment.ssl, False),
+        ssl_ca=ssl_ca,
         connect_timeout=coerce_int(environment.connect_timeout, 10, minimum=1),
         insert_batch_size=write_batch_size,
         insert_commit_interval=commit_interval,

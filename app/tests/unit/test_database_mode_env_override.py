@@ -106,6 +106,14 @@ def test_environment_snapshot_from_os_env_uses_domain_models(monkeypatch) -> Non
         "OLLAMA_PORT",
         "DATABASE_BACKEND",
         "DATABASE_URL",
+        "DATABASE_ENGINE",
+        "DATABASE_HOST",
+        "DATABASE_PORT",
+        "DATABASE_NAME",
+        "DATABASE_USERNAME",
+        "DATABASE_PASSWORD",
+        "DATABASE_SSL",
+        "DATABASE_SSL_CA",
         "DATABASE_CONNECT_TIMEOUT",
         "DATABASE_SQLITE_PATH",
         "DATABASE_WRITE_BATCH_SIZE",
@@ -132,3 +140,47 @@ def test_environment_snapshot_from_os_env_uses_domain_models(monkeypatch) -> Non
     assert snapshot.database.connect_timeout is None
     assert snapshot.database.write_batch_size is None
     assert snapshot.database.read_page_size is None
+
+###############################################################################
+def test_explicit_postgres_environment_fields_override_database_url(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("EMBEDDED_DATABASE", "false")
+    monkeypatch.setenv(
+        "DATABASE_URL", "postgresql://url_user:url_secret@url-host:5432/url_db"
+    )
+    monkeypatch.setenv("DATABASE_ENGINE", "postgresql+psycopg")
+    monkeypatch.setenv("DATABASE_HOST", "explicit-host")
+    monkeypatch.setenv("DATABASE_PORT", "5544")
+    monkeypatch.setenv("DATABASE_NAME", "explicit_db")
+    monkeypatch.setenv("DATABASE_USERNAME", "explicit_user")
+    monkeypatch.setenv("DATABASE_PASSWORD", "explicit_secret")
+    monkeypatch.setenv("DATABASE_SSL", "true")
+    monkeypatch.setenv("DATABASE_SSL_CA", "C:/certs/ca.crt")
+    monkeypatch.setenv("DATABASE_CONNECT_TIMEOUT", "10")
+
+    payload = build_settings_payload_from_json(
+        {},
+        environment_snapshot_from_os_env(),
+    )
+
+    assert payload["database"] == {
+        "backend": "postgresql",
+        "url": "postgresql://url_user:url_secret@url-host:5432/url_db",
+        "sqlite_path": None,
+        "write_batch_size": 1000,
+        "read_page_size": 1000,
+        "embedded_database": False,
+        "engine": "postgresql+psycopg",
+        "host": "explicit-host",
+        "port": 5544,
+        "database_name": "explicit_db",
+        "username": "explicit_user",
+        "password": "explicit_secret",
+        "ssl": True,
+        "ssl_ca": "C:/certs/ca.crt",
+        "connect_timeout": 10,
+        "insert_batch_size": 1000,
+        "insert_commit_interval": 5,
+        "select_page_size": 1000,
+    }
