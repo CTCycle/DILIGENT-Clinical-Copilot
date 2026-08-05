@@ -22,6 +22,7 @@ from repository_fixtures import build_repository_graph
 from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.inspection import DataInspectionService
+from services.llm.cloud import LLMError
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
@@ -453,7 +454,7 @@ class FailingTimelineExtractor:
         runtime_settings: dict[str, Any] | None = None,
     ) -> PatientTimeline:
         _ = session_id, source_payload, runtime_settings
-        raise RuntimeError("structured extraction failed")
+        raise LLMError("structured extraction failed", error_code="invalid_response")
 
 ###############################################################################
 def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced() -> (
@@ -551,6 +552,8 @@ def test_timeline_generation_marks_fallback_payload() -> None:
     assert generated.timeline_id is not None
     assert generated.generation_status == "fallback"
     assert generated.generation_note is not None
+    assert generated.generation_error_code == "invalid_response"
+    assert "invalid structured data" in generated.generation_note
     assert generated.events
     assert {event.source for event in generated.events} == {"fallback_parser"}
 
@@ -563,6 +566,7 @@ def test_timeline_generation_marks_fallback_payload() -> None:
     assert len(history) == 1
     assert history[0]["timeline_id"] == generated.timeline_id
     assert history[0]["generation_status"] == "fallback"
+    assert history[0]["generation_error_code"] == "invalid_response"
     assert all(event.event_date is None for event in generated.events)
     assert all(event.extracted_timing_text is None for event in generated.events)
     assert all(event.timing_type == "uncertain" for event in generated.events)

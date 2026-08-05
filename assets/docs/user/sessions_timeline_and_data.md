@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-08-02
+Last updated: 2026-08-05
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -53,16 +53,16 @@ model, date range, event count, and evidence-quality warnings. Use **Open** to r
 **Use settings** to copy its available settings into the form, or **Delete** to remove
 only that saved timeline after confirmation.
 
-The timetable separates Clinical events, Medication exposure, Laboratory findings,
-and Uncertain or unanchored events. Positionable uncertain events remain in their clinical lane;
-events without a canonical date appear in Unanchored. Use its evidence filter, lane controls, dense/compact/comfortable
-density, fit/zoom controls, horizontal scrollbar, and previous/next navigation to review the chronology. Close date-proximity
-events are represented by bounded clusters; selecting an event opens the modeless Event inspector on desktop and a bottom-sheet
-inspector on narrow screens. A **Fallback
-chronology** or **Missing source evidence** label is a warning, not clinical
-confirmation.
+The timetable presents a vertical chronology grouped by canonical date so events on
+the same day remain readable without overlapping cards. Clinical, Medication,
+Laboratory, Uncertain, and Date not reported categories remain explicit through
+labels and category controls. Use its evidence filter, category collapse controls,
+dense/compact/comfortable density, and previous/next navigation to focus review.
+Selecting an event opens the Event inspector on desktop and a bottom-sheet inspector
+on narrow screens. Approximate placement, a **Fallback chronology**, and **Missing
+source evidence** are visible warnings, not clinical confirmation.
 
-Timeline generation may show a fallback notice when local model extraction is unavailable. In that case, the timetable is built deterministically from persisted session fields with uncertain timing and no invented exact dates. Treat fallback events as navigation aids rather than model-extracted chronology.
+Timeline generation may show a fallback notice when model extraction does not complete. The notice now identifies the failure class, such as provider network unavailable, provider timeout, authentication rejected, rate limited, upstream error, invalid structured response, or incomplete configuration. Transient network, timeout, rate-limit, and upstream failures are retried with bounded backoff before fallback. In that case, the timetable is built deterministically from persisted session fields with uncertain timing and no invented exact dates. Treat fallback events as navigation aids rather than model-extracted chronology, then retry after correcting the reported condition.
 
 For LLM-generated timelines, events without preserved source evidence are not part of the persisted clinical chronology contract. In the UI, missing source evidence should be treated as a warning rather than as clinically grounded support.
 

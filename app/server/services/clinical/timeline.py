@@ -46,7 +46,7 @@ class PatientTimelineExtractor:
         self.timeout_s = float(timeout_s)
         self.client: Any | None = client
         self.model: str = ""
-        self.extraction_retry_attempts = 2
+        self.extraction_retry_attempts = 3
         self.client_lock = asyncio.Lock()
         self.client_loop_id: int | None = None
         if client is None:
@@ -261,15 +261,29 @@ class PatientTimelineExtractor:
                 )
                 break
             except Exception as exc:
-                if attempt >= self.extraction_retry_attempts:
-                    raise RuntimeError("Failed to extract patient timeline") from exc
+                error_code = str(getattr(exc, "error_code", "unknown"))
+                retryable = bool(getattr(exc, "retryable", False))
+                if attempt >= self.extraction_retry_attempts or not retryable:
+                    logger.warning(
+                        "Timeline extraction stopped session_id=%s attempt=%d/%d "
+                        "error_code=%s error_type=%s",
+                        session_id,
+                        attempt,
+                        self.extraction_retry_attempts,
+                        error_code,
+                        type(exc).__name__,
+                        exc_info=True,
+                    )
+                    raise
                 delay = min(6.0, 0.75 * (2 ** (attempt - 1)))
                 logger.warning(
-                    "Retrying timeline extraction attempt %d/%d (delay %.2fs): %s",
+                    "Retrying timeline extraction attempt %d/%d (delay %.2fs) "
+                    "error_code=%s error_type=%s",
                     attempt,
                     self.extraction_retry_attempts,
                     delay,
-                    exc,
+                    error_code,
+                    type(exc).__name__,
                 )
                 await asyncio.sleep(delay)
 
