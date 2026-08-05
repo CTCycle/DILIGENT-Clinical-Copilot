@@ -47,6 +47,24 @@ describe('PatientTimetablePageComponent', () => {
     );
   });
 
+  it('surfaces the classified reason for a fallback timeline', () => {
+    component.timeline.set({
+      timeline_id: 11,
+      session_id: 12,
+      generated_at: '2026-07-09T08:00:00Z',
+      generation_status: 'fallback',
+      generation_note: 'The provider could not be reached. Retry after restoring network access.',
+      generation_error_code: 'network_unavailable',
+      source_model: 'deepseek-v4-flash',
+      source_kind: 'cloud',
+      model_provider: 'opencode_go',
+      events: [],
+    });
+
+    expect(component.generationErrorLabel()).toBe('Provider network unavailable');
+    expect(component.generationNote()).toContain('provider could not be reached');
+  });
+
   it('renders a warning when source evidence is missing', () => {
     const timeline: InspectionSessionTimeline = {
       timeline_id: 8,
@@ -102,7 +120,7 @@ describe('PatientTimetablePageComponent', () => {
     expect(label('2025-02')).toBe('Month precision');
   });
 
-  it('filters evidence, keeps uncertain events exclusive, and supports lane collapse', () => {
+  it('filters evidence, keeps uncertain events exclusive, and supports category collapse', () => {
     component.timeline.set({
       timeline_id: 9, session_id: 12, generated_at: '2026-07-09T08:00:00Z', events: [
         { event_id: 'therapy', title: 'Therapy', description: null, event_type: 'therapy', timing_type: 'explicit_date', event_date: '2025-01-01', relative_time: null, extracted_timing_text: null, source_evidence: 'source', linked_patient_event_ids: [], source: null, confidence: null, confidence_rationale: null, sort_order: 0 },
@@ -110,14 +128,15 @@ describe('PatientTimetablePageComponent', () => {
       ],
     });
 
-    expect(component.lanes().find((lane) => lane.id === 'unanchored')?.items.map((item) => item.event.event_id)).toEqual(['uncertain']);
+    expect(component.timelineGroups().find((group) => group.isUnanchored)?.events.map((event) => event.event_id)).toEqual(['uncertain']);
     component.setEvidenceFilter('with_evidence');
     expect(component.filteredEvents().map((event) => event.event_id)).toEqual(['therapy']);
     component.toggleLaneCollapsed('therapy');
-    expect(component.lanes().find((lane) => lane.id === 'therapy')?.collapsed).toBe(true);
+    expect(component.laneSummaries().find((lane) => lane.id === 'therapy')?.collapsed).toBe(true);
+    expect(component.timelineGroups()).toEqual([]);
   });
 
-  it('guards typed filter values and range input events', () => {
+  it('guards typed filter and density values', () => {
     component.setEvidenceFilter('with_evidence');
     component.setDensity('dense');
     component.setEvidenceFilter('not-a-filter');
@@ -125,17 +144,25 @@ describe('PatientTimetablePageComponent', () => {
 
     expect(component.evidenceFilter()).toBe('with_evidence');
     expect(component.density()).toBe('dense');
+  });
 
-    component.scrollMax.set(100);
-    const input = document.createElement('input');
-    input.type = 'range';
-    input.value = '42';
-    const event = new Event('input');
-    Object.defineProperty(event, 'target', { value: input });
+  it('groups same-day events and keeps undated events in a review group', () => {
+    component.timeline.set({
+      timeline_id: 10,
+      session_id: 12,
+      generated_at: '2026-07-09T08:00:00Z',
+      events: [
+        { event_id: 'first', title: 'First', description: 'One', event_type: 'disease', timing_type: 'explicit_date', event_date: '2025-02-03', relative_time: null, extracted_timing_text: null, source_evidence: 'source', linked_patient_event_ids: [], source: 'anamnesis', confidence: 0.9, confidence_rationale: null, sort_order: 0 },
+        { event_id: 'second', title: 'Second', description: 'Two', event_type: 'lab', timing_type: 'explicit_date', event_date: '2025-02-03', relative_time: null, extracted_timing_text: null, source_evidence: 'source', linked_patient_event_ids: [], source: 'laboratory history', confidence: 0.8, confidence_rationale: null, sort_order: 1 },
+        { event_id: 'undated', title: 'Undated', description: 'Three', event_type: 'other', timing_type: 'uncertain', event_date: null, relative_time: 'After treatment', extracted_timing_text: null, source_evidence: 'source', linked_patient_event_ids: [], source: 'anamnesis', confidence: null, confidence_rationale: null, sort_order: 2 },
+      ],
+    });
 
-    component.handleScrollInput(event);
-
-    expect(component.scrollOffset()).toBe(42);
+    expect(component.timelineGroups().map((group) => [group.label, group.events.length])).toEqual([
+      ['Feb 3, 2025', 2],
+      ['Date not reported', 1],
+    ]);
+    expect(component.eventDateSummary(component.timeline()!.events[2])).toBe('No canonical date · After treatment');
   });
 
   it('keeps January 5 on the same UTC scale as the month boundaries', () => {

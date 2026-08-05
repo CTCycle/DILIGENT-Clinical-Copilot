@@ -5246,6 +5246,28 @@
             ],
             "title": "Generation Note"
           },
+          "generation_error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "network_unavailable",
+                  "timeout",
+                  "authentication",
+                  "rate_limited",
+                  "upstream_error",
+                  "invalid_response",
+                  "configuration",
+                  "provider_error",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generation Error Code"
+          },
           "source_model": {
             "anyOf": [
               {
@@ -7571,6 +7593,28 @@
               }
             ],
             "title": "Generation Note"
+          },
+          "generation_error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "network_unavailable",
+                  "timeout",
+                  "authentication",
+                  "rate_limited",
+                  "upstream_error",
+                  "invalid_response",
+                  "configuration",
+                  "provider_error",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generation Error Code"
           },
           "source_model": {
             "anyOf": [

@@ -9,7 +9,13 @@ import httpx
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
-from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, OpenAIError
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncOpenAI,
+    OpenAIError,
+)
 
 from common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from common.utils.logger import logger
@@ -38,11 +44,29 @@ def _list_gemini_models_sync(client: genai.Client) -> list[Any]:
 
 ###############################################################################
 class LLMError(RuntimeError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = "provider_error",
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.error_code = error_code
+        self.retryable = bool(retryable)
 
 ###############################################################################
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
+
+    def __init__(
+        self,
+        message: str = "Timed out waiting for cloud chat response",
+        *,
+        error_code: str = "timeout",
+        retryable: bool = True,
+    ) -> None:
+        super().__init__(message, error_code=error_code, retryable=retryable)
 
 ###############################################################################
 def short_output_hash(output_text: str) -> str:
@@ -261,8 +285,14 @@ class CloudLLMClient:
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as e:
-            detail = resp.text
-            raise LLMError(f"HTTP {resp.status_code}: {detail}") from e
+            error_code, retryable = CloudLLMClient._http_status_error_code(
+                resp.status_code
+            )
+            raise LLMError(
+                f"Cloud provider returned HTTP {resp.status_code}",
+                error_code=error_code,
+                retryable=retryable,
+            ) from e
 
     # -------------------------------------------------------------------------
     async def chat(
@@ -494,13 +524,54 @@ class CloudLLMClient:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _http_status_error_code(status_code: int) -> tuple[str, bool]:
+        if status_code in {401, 403}:
+            return "authentication", False
+        if status_code == 404:
+            return "configuration", False
+        if status_code == 408:
+            return "timeout", True
+        if status_code == 429:
+            return "rate_limited", True
+        if 500 <= status_code <= 599:
+            return "upstream_error", True
+        return "provider_error", False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _map_provider_exception(exc: Exception) -> LLMError:
         if isinstance(exc, LLMError):
             return exc
         if isinstance(exc, (TimeoutError, APITimeoutError)):
             return LLMTimeout("Timed out waiting for cloud chat response")
-        if isinstance(exc, (httpx.TimeoutException, APIConnectionError)):
+        if isinstance(exc, httpx.TimeoutException):
             return LLMTimeout("Timed out waiting for cloud chat response")
+        if isinstance(exc, (httpx.NetworkError, APIConnectionError)):
+            return LLMError(
+                "Cloud provider connection failed",
+                error_code="network_unavailable",
+                retryable=True,
+            )
+        if isinstance(exc, httpx.HTTPStatusError):
+            status_code = exc.response.status_code
+            error_code, retryable = CloudLLMClient._http_status_error_code(status_code)
+            return LLMError(
+                f"Cloud provider returned HTTP {status_code}",
+                error_code=error_code,
+                retryable=retryable,
+            )
+        if isinstance(exc, APIStatusError):
+            status_code = getattr(exc, "status_code", None)
+            if not isinstance(status_code, int):
+                response = getattr(exc, "response", None)
+                status_code = getattr(response, "status_code", None)
+            if isinstance(status_code, int):
+                error_code, retryable = CloudLLMClient._http_status_error_code(status_code)
+                return LLMError(
+                    f"Cloud provider returned HTTP {status_code}",
+                    error_code=error_code,
+                    retryable=retryable,
+                )
         timeout_error = getattr(genai_errors, "TimeoutError", None)
         if timeout_error is not None and isinstance(exc, timeout_error):
             return LLMTimeout("Timed out waiting for cloud chat response")

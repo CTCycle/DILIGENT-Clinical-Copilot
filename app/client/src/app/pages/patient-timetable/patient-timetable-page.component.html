@@ -2,184 +2,283 @@
   <p class="sr-only" aria-live="polite">{{ selectionAnnouncement() }}</p>
   <section class="timetable-shell">
     <header class="timetable-header">
-      <div>
+      <div class="timetable-heading">
+        <a class="back-link" routerLink="/clinical-sessions">← Clinical sessions</a>
         <p class="eyebrow">Session {{ sessionId() ?? '' }}</p>
-        <h1>Patient Timetable</h1>
+        <h1>Patient timeline</h1>
+        <p class="page-intro">A chronological review of clinically relevant events, supporting evidence, and timing certainty.</p>
       </div>
       <div class="timetable-actions">
         <button type="button" class="btn-secondary" routerLink="/clinical-sessions">Back</button>
-        <button type="button" class="btn-primary" (click)="regenerate()" [disabled]="loading()">Regenerate</button>
+        <button type="button" class="btn-primary" (click)="regenerate()" [disabled]="loading()">
+          {{ loading() ? 'Generating…' : 'Regenerate' }}
+        </button>
       </div>
     </header>
 
-    <section class="timetable-toolbar" aria-label="Timetable controls">
-      <span class="toolbar-group">Range <strong>{{ rangeLabel() }}</strong></span>
-      <span class="toolbar-group">Events <strong>{{ filteredEvents().length }}</strong></span>
-      <app-timetable-filter-select label="Evidence" [value]="evidenceFilter()" [options]="evidenceFilterOptions" (valueChange)="setEvidenceFilter($event)"></app-timetable-filter-select>
-      <label class="toolbar-group"><input type="checkbox" [checked]="showUncertainEvents()" (change)="toggleUncertainEvents()"> Show uncertain</label>
-      <label class="toolbar-group"><input type="checkbox" [checked]="hideEmptyLanes()" (change)="toggleHideEmptyLanes()"> Hide empty lanes</label>
-      <app-timetable-filter-select label="Density" [value]="density()" [options]="densityOptions" (valueChange)="setDensity($event)"></app-timetable-filter-select>
-      <button type="button" class="btn-secondary" (click)="fitRange()">Fit range</button><button type="button" class="btn-secondary" (click)="selectPreviousEvent()" [disabled]="!hasPreviousEvent()">Previous event</button><button type="button" class="btn-secondary" (click)="selectNextEvent()" [disabled]="!hasNextEvent()">Next event</button>
-      <span class="toolbar-group">Source <strong>{{ generationStatusLabel() }}</strong></span>
-      <span class="toolbar-group">Model <strong>{{ sourceModelLabel() }}</strong></span>
-      <span class="toolbar-group">Generated <strong>{{ timeline()?.generated_at | date: 'mediumDate' }}</strong></span>
-    </section>
-
     @if (loading()) {
-      <p class="status-note">Loading timetable...</p>
-    }
-    @if (generationNote()) {
-      <p class="status-note" [class.is-warning]="isFallbackTimeline()">{{ generationNote() }}</p>
+      <div class="status-note is-loading" role="status">
+        <span class="status-spinner" aria-hidden="true"></span>
+        <span>Loading the saved chronology…</span>
+      </div>
     }
     @if (error()) {
-      <p class="error-note">{{ error() }}</p>
+      <p class="error-note" role="alert">{{ error() }}</p>
     }
 
-    <section class="timetable-content">
-      <div class="timeline-area" #timelineArea (scroll)="setScrollOffset(timelineArea.scrollLeft)">
-        <div class="timeline-card" #timelineCanvas [class.is-compact]="density() === 'compact'" [class.is-dense]="density() === 'dense'">
-          <div class="timeline-card-header">
+    @if (timeline(); as currentTimeline) {
+      <section class="generation-summary" [class.is-warning]="isFallbackTimeline()" aria-labelledby="timeline-summary-title">
+        <div class="generation-summary-main">
+          <div class="generation-summary-heading">
+            <span class="status-indicator" aria-hidden="true"></span>
             <div>
-              <span class="timeline-card-kicker">Timeline overview</span>
-              <h2>Clinical chronology</h2>
+              <span class="section-kicker">Timeline source</span>
+              <h2 id="timeline-summary-title">{{ generationStatusLabel() }}</h2>
             </div>
-            <p>Anchored events preserve exact sequence across clinical, therapy, laboratory, and uncertain findings.</p>
           </div>
+          <p>{{ generationNote() }}</p>
+          @if (generationErrorLabel(); as errorLabel) {
+            <p class="generation-diagnostic"><strong>Failure class:</strong> {{ errorLabel }}</p>
+          }
+        </div>
+        <dl class="summary-metadata">
+          <div>
+            <dt>Events</dt>
+            <dd>{{ currentTimeline.events.length }}</dd>
+          </div>
+          <div>
+            <dt>Date range</dt>
+            <dd>{{ rangeLabel() }}</dd>
+          </div>
+          <div>
+            <dt>Model</dt>
+            <dd>{{ currentTimeline.source_model || 'Not reported' }}</dd>
+          </div>
+          <div>
+            <dt>Generated</dt>
+            <dd>{{ currentTimeline.generated_at | date: 'mediumDate' }}</dd>
+          </div>
+        </dl>
+      </section>
 
-          <div class="timeline-zoom-controls" aria-label="Timeline zoom controls">
-            <button type="button" class="btn-secondary" (click)="zoomOut()" [disabled]="zoom() <= 0.75">Zoom out</button>
-            <span>{{ (zoom() * 100) | number: '1.0-0' }}%</span>
-            <button type="button" class="btn-secondary" (click)="zoomIn()" [disabled]="zoom() >= 2.5">Zoom in</button>
-            <button type="button" class="btn-secondary" (click)="fitZoom()">Fit</button>
+      <section class="review-toolbar" aria-labelledby="review-toolbar-title">
+        <div class="toolbar-heading">
+          <div>
+            <span class="section-kicker">Review controls</span>
+            <h2 id="review-toolbar-title">Focus the chronology</h2>
           </div>
-          <input class="timeline-scrollbar" type="range" min="0" [max]="scrollMax()" [value]="scrollOffset()" aria-label="Timeline horizontal position" (input)="handleScrollInput($event)">
-          <div class="timeline-time-canvas" [style.width.%]="100 * zoom()">
-          <div class="timeline-axis" aria-label="Timeline range">
-            <div class="timeline-axis-line"></div>
-            @for (point of scalePoints(); track point.label + '-' + point.positionPercent) {
-              <div class="timeline-axis-tick" [style.left.%]="point.positionPercent" [class.is-year]="point.isYearBoundary">
-                <span class="timeline-axis-dot"></span>
-                <strong>{{ point.shortLabel }}</strong>
-                <small>{{ point.label }}</small>
+          <p>Filter evidence and timing signals without losing the original event order.</p>
+        </div>
+        <div class="toolbar-controls">
+          <app-timetable-filter-select label="Evidence" [value]="evidenceFilter()" [options]="evidenceFilterOptions" (valueChange)="setEvidenceFilter($event)"></app-timetable-filter-select>
+          <app-timetable-filter-select label="Density" [value]="density()" [options]="densityOptions" (valueChange)="setDensity($event)"></app-timetable-filter-select>
+          <label class="check-control">
+            <input type="checkbox" [checked]="showUncertainEvents()" (change)="toggleUncertainEvents()">
+            <span>Show uncertain timing</span>
+          </label>
+          <label class="check-control">
+            <input type="checkbox" [checked]="hideEmptyLanes()" (change)="toggleHideEmptyLanes()">
+            <span>Hide empty categories</span>
+          </label>
+        </div>
+        <div class="toolbar-footer">
+          <span class="result-count">Showing <strong>{{ visibleEventsCount() }}</strong> of {{ currentTimeline.events.length }} events</span>
+          <div class="event-navigation" aria-label="Event navigation">
+            <button type="button" class="btn-secondary" (click)="selectPreviousEvent()" [disabled]="!hasPreviousEvent()">Previous event</button>
+            <button type="button" class="btn-secondary" (click)="selectNextEvent()" [disabled]="!hasNextEvent()">Next event</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="timetable-content">
+        <div class="timeline-area">
+          <section class="chronology-card" [class.is-compact]="density() === 'compact'" [class.is-dense]="density() === 'dense'" aria-labelledby="chronology-title">
+            <header class="chronology-header">
+              <div>
+                <span class="section-kicker">{{ rangeLabel() }}</span>
+                <h2 id="chronology-title">Clinical chronology</h2>
+                <p>Events are grouped by date so same-day findings can be compared without overlapping cards or hidden labels.</p>
+              </div>
+              <div class="chronology-legend" aria-label="Event category legend">
+                <span><i class="legend-swatch is-clinical" aria-hidden="true"></i>Clinical</span>
+                <span><i class="legend-swatch is-therapy" aria-hidden="true"></i>Medication</span>
+                <span><i class="legend-swatch is-lab" aria-hidden="true"></i>Laboratory</span>
+                <span><i class="legend-swatch is-uncertain" aria-hidden="true"></i>Uncertain</span>
+              </div>
+            </header>
+
+            <div class="lane-controls" aria-label="Event category visibility">
+              <span class="lane-controls-label">Categories</span>
+              @for (lane of laneSummaries(); track lane.id) {
+                <button type="button" class="lane-toggle" [class.is-collapsed]="lane.collapsed" [attr.aria-pressed]="!lane.collapsed" (click)="toggleLaneCollapsed(lane.id)">
+                  <span class="lane-toggle-dot" [class]="'is-' + lane.id" aria-hidden="true"></span>
+                  <span>{{ lane.label }}</span>
+                  <strong>{{ lane.count }}</strong>
+                  <span class="lane-toggle-state">{{ lane.collapsed ? 'Show' : 'Hide' }}</span>
+                </button>
+              }
+            </div>
+
+            @if (timelineGroups().length === 0) {
+              <div class="empty-state">
+                <span class="empty-state-icon" aria-hidden="true">⌁</span>
+                <h3>No events match these filters</h3>
+                <p>Try showing uncertain timing or choosing a different evidence filter.</p>
+              </div>
+            } @else {
+              <div class="event-group-list">
+                @for (group of timelineGroups(); track group.key) {
+                  <section class="event-group" [class.is-unanchored]="group.isUnanchored" [attr.aria-labelledby]="'group-' + group.key">
+                    <header class="event-group-header">
+                      <div class="event-group-marker" [class.is-unanchored]="group.isUnanchored" aria-hidden="true">
+                        <span>{{ group.isUnanchored ? '?' : '•' }}</span>
+                      </div>
+                      <div class="event-group-copy">
+                        <span class="section-kicker">{{ group.eyebrow }}</span>
+                        <h3 [id]="'group-' + group.key">{{ group.label }}</h3>
+                        <p>{{ group.events.length }} {{ group.events.length === 1 ? 'event' : 'events' }} <span aria-hidden="true">·</span> {{ group.dateHint }}</p>
+                      </div>
+                    </header>
+
+                    <div class="event-list">
+                      @for (event of group.events; track event.event_id) {
+                        <article class="event-card" [class.is-selected]="selectedEventId() === event.event_id" [class.is-linked]="isLinkedToSelectedEvent(event)" [class.is-missing-evidence]="!hasEventEvidence(event)" [style.--event-color]="eventColor(event)">
+                          <span class="event-card-accent" aria-hidden="true"></span>
+                          <div class="event-card-main">
+                            <div class="event-card-heading">
+                              <div class="event-card-title">
+                                <div class="event-labels">
+                                  <span class="event-category">{{ eventLaneLabel(event) }}</span>
+                                  <span class="event-type">{{ eventTypeLabel(event) }}</span>
+                                </div>
+                                <h4>{{ event.title }}</h4>
+                              </div>
+                              <button type="button" class="event-inspect-button" [attr.aria-label]="'Inspect ' + event.title + ' details'" [attr.aria-pressed]="selectedEventId() === event.event_id" [attr.data-event-id]="event.event_id" [attr.tabindex]="0" (click)="selectEvent(event)" (keydown)="handleEventKeydown($event, event)">
+                                <span>Inspect details</span>
+                                <span aria-hidden="true">↗</span>
+                              </button>
+                            </div>
+                            <div class="event-meta-row">
+                              <span class="event-meta-item"><span class="meta-label">Timing</span>{{ timingLabel(event.timing_type) }}</span>
+                              <span class="event-meta-item"><span class="meta-label">Placement</span>{{ eventDateSummary(event) }}</span>
+                              @if (isEventUncertain(event)) {
+                                <span class="event-flag is-uncertain">Approximate placement</span>
+                              }
+                              @if (!hasEventEvidence(event)) {
+                                <span class="event-flag is-warning">Missing source evidence</span>
+                              }
+                            </div>
+                            @if (event.description) {
+                              <p class="event-description">{{ event.description }}</p>
+                            }
+                            <div class="event-footer">
+                              @if (event.source) {
+                                <span><span class="footer-label">Source</span>{{ event.source }}</span>
+                              }
+                              <span><span class="footer-label">Confidence</span>{{ confidenceLabel(event.confidence) }}</span>
+                              @if (event.linked_patient_event_ids.length > 0) {
+                                <span><span class="footer-label">Linked events</span>{{ event.linked_patient_event_ids.length }}</span>
+                              }
+                              @if (event.uncertainty_reason) {
+                                <span><span class="footer-label">Review note</span>{{ event.uncertainty_reason }}</span>
+                              }
+                            </div>
+                          </div>
+                        </article>
+                      }
+                    </div>
+                  </section>
+                }
               </div>
             }
-          </div>
+          </section>
+        </div>
 
-          <div class="lane-grid">
-            @for (lane of visibleLaneRows(); track lane.id) {
-              <section class="lane-row" [class.is-empty]="lane.items.length === 0" [class.is-collapsed]="lane.collapsed" [style.--lane-levels]="lane.levelCount">
-                <div class="lane-label">
-                  <strong>{{ lane.label }}</strong>
-                  <span>{{ lane.eventCount }} events</span>
-                  <button type="button" class="btn-secondary" [attr.aria-expanded]="!lane.collapsed" (click)="toggleLaneCollapsed(lane.id)">{{ lane.collapsed ? 'Expand' : 'Collapse' }}</button>
+        @if (selectedEvent() && isNarrowScreen()) {
+          <button type="button" class="inspector-backdrop" aria-label="Dismiss event inspector" (click)="closeInspector()"></button>
+        }
+        <aside class="evidence-panel" [class.is-open]="selectedEvent()" [attr.role]="isNarrowScreen() ? 'dialog' : 'complementary'" [attr.aria-modal]="isNarrowScreen() ? 'true' : null" aria-label="Event inspector" aria-live="polite">
+          <div class="evidence-panel-header">
+            <div>
+              <span class="section-kicker">Supporting detail</span>
+              <h2>Event inspector</h2>
+            </div>
+            <button type="button" class="icon-button" aria-label="Close event inspector" (click)="closeInspector()">×</button>
+          </div>
+          @if (selectedEvent(); as event) {
+            <section class="inspector-hero">
+              <div class="event-labels">
+                <span class="event-category">{{ eventLaneLabel(event) }}</span>
+                <span class="event-type">{{ eventTypeLabel(event) }}</span>
+              </div>
+              <h3>{{ event.title }}</h3>
+              <p>{{ eventDateSummary(event) }}</p>
+            </section>
+            <section class="inspector-section">
+              <h3>Description</h3>
+              <p>{{ event.description || 'No description supplied.' }}</p>
+            </section>
+            <dl class="inspector-details">
+              <div>
+                <dt>Timing</dt>
+                <dd>{{ timingLabel(event.timing_type) }}</dd>
+              </div>
+              <div>
+                <dt>Date precision</dt>
+                <dd>{{ precisionLabel(event.event_date) }}{{ event.date_certainty && event.date_certainty !== 'uncertain' ? ' · ' + event.date_certainty : '' }}</dd>
+              </div>
+              <div>
+                <dt>Normalized date</dt>
+                <dd>{{ event.event_date || 'Unanchored' }}{{ event.event_date_end ? ' – ' + event.event_date_end : '' }}</dd>
+              </div>
+              <div>
+                <dt>Extracted timing text</dt>
+                <dd>{{ event.extracted_timing_text || event.relative_time || event.event_date || 'Not reported' }}</dd>
+              </div>
+              <div>
+                <dt>Source</dt>
+                <dd>{{ event.source || 'Not reported' }}</dd>
+              </div>
+              <div>
+                <dt>Confidence</dt>
+                <dd>{{ confidenceLabel(event.confidence) }}</dd>
+              </div>
+              <div>
+                <dt>Confidence rationale</dt>
+                <dd>{{ event.confidence_rationale || 'Not reported' }}</dd>
+              </div>
+              @if (event.uncertainty_reason) {
+                <div>
+                  <dt>Uncertainty</dt>
+                  <dd>{{ event.uncertainty_reason }}</dd>
                 </div>
-                @if (!lane.collapsed) { <div class="lane-track">
-                  <div class="lane-track-line"></div>
-                  @for (cluster of lane.clusters; track cluster.id) {
-                    <button type="button" class="timeline-cluster" [style.left.%]="cluster.positionPercent" [attr.aria-label]="cluster.memberIds.length + ' clustered events'" (click)="selectCluster(cluster)">
-                      <span aria-hidden="true">＋</span>{{ cluster.memberIds.length }} events
-                    </button>
+              }
+              <div>
+                <dt>Source evidence</dt>
+                <dd class="source-evidence" [class.is-warning]="!selectedEventHasSourceEvidence()">
+                  {{ event.source_evidence || 'Missing source evidence. Do not treat this event as clinically grounded chronology.' }}
+                </dd>
+              </div>
+            </dl>
+            @if (event.linked_patient_event_ids.length > 0) {
+              <section class="linked-events">
+                <h3>Linked patient events</h3>
+                <div>
+                  @for (id of event.linked_patient_event_ids; track id) {
+                    <span>{{ id }}</span>
                   }
-                  @if (lane.items.length > 0) {
-                    @for (item of lane.items; track item.event.event_id) {
-                      <button
-                        type="button"
-                        class="timeline-node"
-                        [attr.aria-pressed]="selectedEventId() === item.event.event_id"
-                        [class.is-selected]="selectedEventId() === item.event.event_id"
-                        [class.is-linked]="isLinkedToSelectedEvent(item.event)"
-                        [class.is-missing-evidence]="!item.event.source_evidence"
-                        [class.is-unanchored]="item.positionPercent === null"
-                        [class.is-align-start]="item.align === 'start'"
-                        [class.is-align-center]="item.align === 'center'"
-                        [class.is-align-end]="item.align === 'end'"
-                        [style.left.%]="item.positionPercent ?? undefined"
-                        [style.--stack-level]="item.stackLevel"
-                        [style.--event-color]="item.color"
-                        [style.--range-start]="item.rangeStartPercent !== null ? item.rangeStartPercent + '%' : null"
-                        [style.--range-width]="item.rangeStartPercent !== null && item.rangeEndPercent !== null ? (item.rangeEndPercent - item.rangeStartPercent) + '%' : null"
-                        [attr.data-event-id]="item.event.event_id"
-                        [attr.tabindex]="selectedEventId() === item.event.event_id ? 0 : -1"
-                        [attr.aria-label]="item.event.title + ', ' + timingLabel(item.event.timing_type)"
-                        (click)="selectEvent(item.event)"
-                        (keydown)="handleEventKeydown($event, item.event)"
-                      >
-                        <span class="timeline-node-dot"></span>
-                        <span class="timeline-node-stem"></span>
-                        <span class="timeline-node-card">
-                          <span class="timeline-node-type">{{ timingLabel(item.event.timing_type) }}</span>
-                          <strong>{{ item.event.title }}</strong>
-                          <small>{{ eventTimingText(item.event) }}</small>
-                          @if (item.event.date_certainty === 'uncertain' || item.event.timing_type === 'uncertain' || item.event.timing_type === 'ordering') {
-                            <small class="timeline-node-uncertainty">Uncertain timing</small>
-                          }
-                        </span>
-                      </button>
-                    }
-                  } @else {
-                    <p class="lane-empty-note">No events in this lane.</p>
-                  }
-                </div> }
+                </div>
               </section>
             }
-          </div>
-          </div>
-        </div>
-      </div>
-
-      <aside class="evidence-panel" [class.is-open]="selectedEvent()" [attr.role]="isNarrowScreen() ? 'dialog' : 'complementary'" [attr.aria-modal]="isNarrowScreen() ? 'true' : null" aria-label="Event inspector" aria-live="polite">
-        <div class="evidence-panel-header">
-          <h2>Event inspector</h2>
-          <button type="button" class="icon-button" aria-label="Close event inspector" (click)="closeInspector()">×</button>
-        </div>
-        @if (selectedEvent(); as event) {
-          @if (selectedCluster(); as cluster) {
-            <section class="cluster-member-list" aria-label="Cluster members">
-              <h3>{{ cluster.memberIds.length }} events at this position</h3>
-              @for (member of clusterMembers(); track member.event_id) {
-                <button type="button" class="cluster-member-button" [class.is-current]="member.event_id === event.event_id" (click)="selectEvent(member)">{{ member.title }}</button>
-              }
-            </section>
-          }
-          <section>
-            <h3>{{ event.title }}</h3>
-            <p>{{ event.description || 'No description supplied.' }}</p>
-          </section>
-          <dl>
-            <dt>Timing</dt>
-            <dd>{{ timingLabel(event.timing_type) }}</dd>
-            <dt>Date precision</dt>
-            <dd>{{ precisionLabel(event.event_date) }}{{ event.date_certainty && event.date_certainty !== 'uncertain' ? ' · ' + event.date_certainty : '' }}</dd>
-            <dt>Normalized date</dt>
-            <dd>{{ event.event_date || 'Unanchored' }}{{ event.event_date_end ? ' – ' + event.event_date_end : '' }}</dd>
-            <dt>Extracted text</dt>
-            <dd>{{ event.extracted_timing_text || event.relative_time || event.event_date || 'Not reported' }}</dd>
-            <dt>Source</dt>
-            <dd>{{ event.source || 'Not reported' }}</dd>
-            <dt>Confidence</dt>
-            <dd>{{ confidenceLabel(event.confidence) }}</dd>
-            <dt>Rationale</dt>
-            <dd>{{ event.confidence_rationale || 'Not reported' }}</dd>
-            @if (event.uncertainty_reason) {
-              <dt>Uncertainty</dt>
-              <dd>{{ event.uncertainty_reason }}</dd>
-            }
-            <dt>Source evidence</dt>
-            <dd class="source-evidence" [class.is-warning]="!selectedEventHasSourceEvidence()">
-              {{ event.source_evidence || 'Missing source evidence. Do not treat this event as clinically grounded chronology.' }}
-            </dd>
-          </dl>
-          @if (event.linked_patient_event_ids.length > 0) {
-            <div class="linked-events">
-              @for (id of event.linked_patient_event_ids; track id) {
-                <span>{{ id }}</span>
-              }
+          } @else {
+            <div class="inspector-placeholder">
+              <span aria-hidden="true">⌁</span>
+              <h3>Select an event</h3>
+              <p>Choose Inspect details on any event to review its description, timing, confidence, and source evidence.</p>
             </div>
           }
-        } @else {
-          <p>Select an item on the timetable to inspect supporting evidence.</p>
-        }
-      </aside>
-    </section>
+        </aside>
+      </section>
+    }
   </section>
 </main>

@@ -30,7 +30,13 @@ def _set_runtime_signature(
 ###############################################################################
 def _set_retry_attempts(owner: LLMClientRuntimeOwner, provider: str) -> None:
     if hasattr(owner, "extraction_retry_attempts"):
-        default_attempts = 4 if provider in {"openai", "gemini"} else 2
+        default_attempts = (
+            4
+            if provider in {"openai", "gemini"}
+            else 3
+            if provider == "opencode_go"
+            else 2
+        )
         current = getattr(owner, "extraction_retry_attempts", None)
         if isinstance(current, int | float | str):
             try:

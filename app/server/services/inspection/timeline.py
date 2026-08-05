@@ -28,6 +28,103 @@ def _report_progress(
     if callback is not None:
         callback(progress, message)
 
+_TIMELINE_ERROR_CODES = frozenset(
+    {
+        "network_unavailable",
+        "timeout",
+        "authentication",
+        "rate_limited",
+        "upstream_error",
+        "invalid_response",
+        "configuration",
+        "provider_error",
+        "unknown",
+    }
+)
+
+###############################################################################
+def _timeline_error_code(exc: BaseException) -> str:
+    current: BaseException | None = exc
+    visited: set[int] = set()
+    provider_error_seen = False
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+        candidate = str(getattr(current, "error_code", "") or "").strip()
+        if candidate in _TIMELINE_ERROR_CODES and candidate != "provider_error":
+            return candidate
+        provider_error_seen = provider_error_seen or candidate == "provider_error"
+        text = " ".join(str(current).split()).casefold()
+        if any(token in text for token in ("401", "403", "authentication", "api key", "credential")):
+            return "authentication"
+        if "429" in text or "rate limit" in text or "rate-limit" in text:
+            return "rate_limited"
+        if any(token in text for token in ("timed out", "timeout", "time out")):
+            return "timeout"
+        if any(token in text for token in ("connect", "network", "socket", "winerror 10013")):
+            return "network_unavailable"
+        if any(token in text for token in ("invalid json", "validation", "structured output")):
+            return "invalid_response"
+        if "http 5" in text or "service unavailable" in text:
+            return "upstream_error"
+        if any(
+            token in text
+            for token in (
+                "no active",
+                "model is required",
+                "unknown provider",
+                "not configured",
+                "not found for provider",
+                "unsupported provider",
+                "does not include the requested model",
+                "does not declare a transport endpoint",
+                "api key is required",
+            )
+        ):
+            return "configuration"
+        current = current.__cause__ or current.__context__
+    return "provider_error" if provider_error_seen else "unknown"
+
+###############################################################################
+def _timeline_fallback_note(
+    *,
+    use_cloud_services: bool,
+    provider: object,
+    model: object,
+    error_code: str,
+) -> str:
+    provider_label = coerce_optional_str(provider) or "configured provider"
+    model_label = coerce_optional_str(model) or "configured model"
+    if use_cloud_services:
+        provider_key = provider_label.casefold().replace("-", "_")
+        credential_hint = (
+            "the active OpenCode access key"
+            if provider_key == "opencode_go"
+            else f"the active {provider_label} credentials"
+        )
+        messages = {
+            "network_unavailable": "The provider could not be reached. Check outbound HTTPS access and retry.",
+            "timeout": "The provider did not respond before the configured timeout. Retry when it is responsive.",
+            "authentication": f"The provider rejected authentication. Check {credential_hint} and retry.",
+            "rate_limited": "The provider rate-limited the request. Wait briefly and retry.",
+            "upstream_error": "The provider returned a temporary upstream error. Retry shortly.",
+            "invalid_response": "The provider returned invalid structured data. Retry the extraction.",
+            "configuration": "The provider or model configuration is incomplete. Check model settings and retry.",
+            "provider_error": "The provider request failed. Check backend logs and retry.",
+        }
+        message = messages.get(error_code, "The provider request failed unexpectedly. Check backend logs and retry.")
+        return f"Cloud timeline extraction using {provider_label} / {model_label} did not complete. {message}"
+    local_messages = {
+        "timeout": "The local model runtime did not respond before the configured timeout.",
+        "invalid_response": "The local model returned invalid structured data.",
+        "configuration": "The local model configuration is incomplete.",
+        "network_unavailable": "The local model runtime could not be reached.",
+    }
+    message = local_messages.get(
+        error_code,
+        "Check the configured local model runtime and backend logs for details.",
+    )
+    return f"Local timeline extraction did not complete. {message} Retry when ready."
+
 ###############################################################################
 class InspectionTimelineMixin:
     session_timeline_repository: Any
@@ -117,6 +214,7 @@ class InspectionTimelineMixin:
         session_id: int,
         source: dict[str, Any],
         generation_note: str | None = None,
+        generation_error_code: str | None = None,
     ) -> PatientTimeline:
         events: list[PatientTimelineEvent] = []
 
@@ -192,6 +290,7 @@ class InspectionTimelineMixin:
             generation_status="fallback",
             generation_note=generation_note
             or "Timeline extraction was unavailable; deterministic fallback events were built from persisted session fields.",
+            generation_error_code=generation_error_code,
             events=events,
         )
 
@@ -275,20 +374,25 @@ class InspectionTimelineMixin:
                     }
                 )
             except Exception as exc:  # noqa: BLE001
+                error_code = _timeline_error_code(exc)
                 logger.warning(
-                    "Timeline extraction unavailable for session_id=%s, using deterministic fallback: %s",
+                    "Timeline extraction unavailable for session_id=%s, using deterministic fallback "
+                    "error_code=%s error_type=%s",
                     session_id,
-                    exc,
+                    error_code,
+                    type(exc).__name__,
+                    exc_info=True,
                 )
                 timeline = self.build_fallback_timeline(
                     session_id=safe_session_id,
                     source=source,
-                    generation_note=(
-                        f"Cloud timeline extraction using {requested_runtime_settings['llm_provider']} "
-                        f"/{source_model} was unavailable; deterministic fallback events were built from persisted session fields."
-                        if requested_runtime_settings["use_cloud_services"]
-                        else "Local timeline extraction was unavailable; deterministic fallback events were built from persisted session fields."
+                    generation_note=_timeline_fallback_note(
+                        use_cloud_services=bool(requested_runtime_settings["use_cloud_services"]),
+                        provider=requested_runtime_settings.get("llm_provider"),
+                        model=source_model,
+                        error_code=error_code,
                     ),
+                    generation_error_code=error_code,
                 )
                 timeline = PatientTimeline(
                     **{
