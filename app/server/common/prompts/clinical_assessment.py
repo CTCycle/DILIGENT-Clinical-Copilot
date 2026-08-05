@@ -6,7 +6,7 @@ footnotes, endnotes, source lists, References sections, Sources sections, or
 Bibliography sections. The application appends verified document locations
 after generation. You may describe evidence reported by supplied studies, but
 do not produce citation markers or document-location references.
-""".strip()
+"""
 
 LIVERTOX_CLINICAL_SYSTEM_PROMPT = f"""
 You are a clinical hepatologist assessing drug-induced liver injury (DILI).
