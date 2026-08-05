@@ -770,7 +770,7 @@ class RevisionAgentToolCall(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tool_name: str
     arguments: dict[str, Any] = Field(default_factory=dict)
-    rationale: str = Field(min_length=1, max_length=1000)
+    rationale: str = Field(min_length=1, max_length=4000)
     task_complete: bool = False
 
 ###############################################################################

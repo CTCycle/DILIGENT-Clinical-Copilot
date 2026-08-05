@@ -935,3 +935,14 @@ def test_deterministic_anamnesis_regimen_extraction_captures_oncology_history() 
     assert "Olaparib" in names
     assert "Gemcitabina" in names
     assert result.regimen_lines
+
+###############################################################################
+def test_deterministic_anamnesis_ignores_iso_date_in_symptom_sentence() -> None:
+    parser = DrugsParser(client=object())
+
+    result = parser.extract_drugs_from_anamnesis_deterministic(
+        "Adult with fatigue and mild nausea beginning 2026-07-24. "
+        "No known chronic liver disease."
+    )
+
+    assert result.entries == []
