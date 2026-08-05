@@ -49,7 +49,22 @@ def tool_prompt(task: object, observations: object, manifest: object) -> str:
 
 ###############################################################################
 def editor_prompt(context: object, observations: object) -> str:
-    return f"{SAFETY_RULES}\nReturn a revised report and exact evidence-backed patches: {context}\nObservations: {observations}"
+    return (
+        f"{SAFETY_RULES}\n"
+        "Return a revised report and exact evidence-backed patches. The canonical "
+        "patch source is review_target.official_report.text in the context. For every "
+        "patch, start and end are zero-based Python slice offsets into that exact "
+        "string, and expected_text must equal the exact source substring "
+        "character-for-character "
+        "including whitespace and punctuation. Do not derive offsets from a shortened, "
+        "reformatted, escaped, or paraphrased copy. Before returning, verify every "
+        "patch against the canonical source. If any proposed edit cannot be verified "
+        "exactly, return patches as an empty list and set revised_report_text exactly "
+        "to review_target.official_report.text; record the unresolved issue and human "
+        "review requirement instead of guessing. Every non-empty patch must include "
+        "evidence_references.\n"
+        f"Context: {context}\nObservations: {observations}"
+    )
 
 ###############################################################################
 def qa_prompt(context: object, draft: object) -> str:
