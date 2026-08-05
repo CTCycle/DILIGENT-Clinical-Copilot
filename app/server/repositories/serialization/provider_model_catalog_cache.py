@@ -26,6 +26,7 @@ class ProviderModelCatalogCacheRecord:
 class ProviderModelCatalogCacheSerializer:
     """Persist provider model catalogs independently from runtime settings."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -39,6 +40,7 @@ class ProviderModelCatalogCacheSerializer:
             expire_on_commit=False,
         )
 
+    # -------------------------------------------------------------------------
     def get(
         self, provider_id: str, configuration_fingerprint: str
     ) -> ProviderModelCatalogCacheRecord | None:
@@ -52,6 +54,7 @@ class ProviderModelCatalogCacheSerializer:
                 return None
             return self._to_record(row)
 
+    # -------------------------------------------------------------------------
     def save_success(
         self,
         *,
@@ -76,6 +79,7 @@ class ProviderModelCatalogCacheSerializer:
             db_session.refresh(row)
             return self._to_record(row)
 
+    # -------------------------------------------------------------------------
     def save_failure(
         self,
         *,
@@ -110,6 +114,7 @@ class ProviderModelCatalogCacheSerializer:
             db_session.refresh(row)
             return self._to_record(row)
 
+    # -------------------------------------------------------------------------
     def merge_model(
         self,
         *,
@@ -128,6 +133,7 @@ class ProviderModelCatalogCacheSerializer:
             models=models,
         )
 
+    # -------------------------------------------------------------------------
     def clear_provider(self, provider_id: str) -> None:
         with self.session_factory() as db_session:
             db_session.execute(
@@ -137,6 +143,7 @@ class ProviderModelCatalogCacheSerializer:
             )
             db_session.commit()
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _to_record(row: ProviderModelCatalogCache) -> ProviderModelCatalogCacheRecord:
         return ProviderModelCatalogCacheRecord(

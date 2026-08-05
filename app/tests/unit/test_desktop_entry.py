@@ -8,7 +8,6 @@ import pytest
 
 import desktop_entry
 
-
 ###############################################################################
 def test_host_is_restricted_to_localhost(monkeypatch, tmp_path) -> None:
     with pytest.raises(ValueError, match="127.0.0.1"):
@@ -16,7 +15,6 @@ def test_host_is_restricted_to_localhost(monkeypatch, tmp_path) -> None:
             ready_file=tmp_path / "ready.json",
             host="0.0.0.0",
         )
-
 
 ###############################################################################
 def test_desktop_entry_writes_dynamic_ready_file_and_cleans_up(
@@ -57,7 +55,6 @@ def test_desktop_entry_writes_dynamic_ready_file_and_cleans_up(
     assert '"release_version": "3.1.0"' in str(payload)
     assert json.loads(str(payload))["port"] > 0
     assert not ready_file.exists()
-
 
 ###############################################################################
 def test_invalid_packaged_environment_fails_before_importing_app(

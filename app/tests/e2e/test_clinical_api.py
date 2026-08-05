@@ -63,6 +63,7 @@ def test_clinical_validate_input_returns_deterministic_diagnostics(
         }
         assert {"livertox_catalog_empty", "rxnav_catalog_empty"} & blocking_codes
 
+###############################################################################
 def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):
     payload = build_minimal_payload()
     payload["visit_date"] = {"day": 15, "month": 1, "year": 2024}

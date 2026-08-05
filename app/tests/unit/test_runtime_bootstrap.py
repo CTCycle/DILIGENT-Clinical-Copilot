@@ -5,7 +5,6 @@ from pathlib import Path
 from common.runtime_layout import RuntimeLayout
 from configurations import runtime_bootstrap
 
-
 ###############################################################################
 def _packaged_layout(runtime_root: Path, data_root: Path) -> RuntimeLayout:
     return RuntimeLayout(
@@ -18,7 +17,6 @@ def _packaged_layout(runtime_root: Path, data_root: Path) -> RuntimeLayout:
         mutable_resources_root=data_root / "resources",
         client_dist_root=runtime_root / "app" / "client" / "dist" / "browser",
     )
-
 
 ###############################################################################
 def test_first_launch_seeds_only_settings_and_mutable_directories(
@@ -56,7 +54,6 @@ def test_first_launch_seeds_only_settings_and_mutable_directories(
     ):
         assert (data_root / "resources" / relative_path).is_dir()
 
-
 ###############################################################################
 def test_existing_settings_are_preserved(monkeypatch, tmp_path: Path) -> None:
     runtime_root = tmp_path / "runtime"
@@ -74,7 +71,6 @@ def test_existing_settings_are_preserved(monkeypatch, tmp_path: Path) -> None:
 
     assert (layout.settings_root / ".env").read_text(encoding="utf-8") == "user"
     assert (layout.settings_root / "configurations.json").read_text(encoding="utf-8") == "user"
-
 
 ###############################################################################
 def test_source_mode_is_a_no_op(monkeypatch, tmp_path: Path) -> None:

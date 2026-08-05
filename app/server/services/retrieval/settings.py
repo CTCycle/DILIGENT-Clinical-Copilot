@@ -14,7 +14,6 @@ from domain.model_configs import RagSettingsResponse
 from domain.settings.configuration import RagSettings
 from repositories.serialization.model_configs import ModelConfigSerializer
 
-
 ###############################################################################
 def _runtime_rag_settings() -> dict[str, object]:
     try:

@@ -4,11 +4,9 @@ import pytest
 
 from common import runtime_layout
 
-
 ###############################################################################
 def _clear_layout_cache() -> None:
     runtime_layout.resolve_runtime_layout.cache_clear()
-
 
 ###############################################################################
 def test_source_layout_preserves_repository_paths(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -24,7 +22,6 @@ def test_source_layout_preserves_repository_paths(monkeypatch: pytest.MonkeyPatc
     assert layout.settings_root == layout.settings_template_root
     assert layout.mutable_resources_root == layout.immutable_resources_root
     assert layout.client_dist_root.parts[-3:] == ("client", "dist", "browser")
-
 
 ###############################################################################
 def test_packaged_layout_separates_immutable_and_mutable_roots(
@@ -47,7 +44,6 @@ def test_packaged_layout_separates_immutable_and_mutable_roots(
     assert layout.mutable_resources_root == data_root.resolve() / "resources"
     assert layout.client_dist_root == runtime_root.resolve() / "app" / "client" / "dist" / "browser"
 
-
 ###############################################################################
 def test_only_one_packaged_root_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DILIGENT_RUNTIME_ROOT", "C:/runtime")
@@ -56,7 +52,6 @@ def test_only_one_packaged_root_fails(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(RuntimeError, match="must be supplied together"):
         runtime_layout.resolve_runtime_layout()
-
 
 ###############################################################################
 @pytest.mark.parametrize("name", ["DILIGENT_RUNTIME_ROOT", "DILIGENT_DATA_ROOT"])
