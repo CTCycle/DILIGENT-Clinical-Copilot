@@ -172,6 +172,8 @@ CARCINOMA_PHRASE_RE = re.compile(
     r"\b(?P<name>(?:high\s+grade\s+)?[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ\s/-]{0,80}carcinoma)\b",
     re.IGNORECASE,
 )
+
+###############################################################################
 def _non_drug_tokens() -> frozenset[str]:
     return frozenset(
         get_reference_catalog_snapshot().values(

@@ -85,6 +85,7 @@ def test_model_catalog_routes_are_explicit_and_provider_scoped() -> None:
     get_parameters = paths["/api/model-config"]["get"].get("parameters", [])
     assert not any(item.get("name") == "include_local_availability" for item in get_parameters)
 
+###############################################################################
 def test_provider_descriptions_match_supported_providers() -> None:
     assert set(get_args(ProviderName)) == {
         "openai",

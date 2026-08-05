@@ -51,7 +51,6 @@ from services.retrieval.settings import (
     rag_settings_payload,
 )
 
-
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
 
@@ -76,6 +75,7 @@ class ModelConfigSnapshotStore(Protocol):
 ###############################################################################
 class ModelConfigService:
     _FAST_LOCAL_EXTRACTION_MODELS = ("qwen3.5:2b", "qwen3.5:9b")
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -429,6 +429,7 @@ class ModelConfigService:
         except ValueError as exc:
             raise ServiceValidationError(str(exc)) from exc
 
+    # -------------------------------------------------------------------------
     def resolve_cloud_model(self, provider: str, model_name: str | None) -> str | None:
         normalized = (model_name or "").strip()
         if not normalized:
@@ -440,6 +441,7 @@ class ModelConfigService:
             )
         return normalized
 
+    # -------------------------------------------------------------------------
     def known_provider_model_names(self, provider: str) -> set[str]:
         definition = provider_registry.get(provider)
         if definition.models:
@@ -454,6 +456,7 @@ class ModelConfigService:
             if str(item.get("id") or "").strip()
         }
 
+    # -------------------------------------------------------------------------
     def ensure_defaults(self) -> ModelConfigSnapshot:
         snapshot = self.serializer.load_snapshot()
         defaults = get_server_settings().llm_defaults
@@ -480,6 +483,7 @@ class ModelConfigService:
         self.validate_current_snapshot(snapshot)
         return snapshot
 
+    # -------------------------------------------------------------------------
     def validate_current_snapshot(self, snapshot: ModelConfigSnapshot) -> None:
         provider = snapshot.cloud_provider
         cloud_model = self.normalize_optional_text(snapshot.cloud_model)
@@ -514,6 +518,7 @@ class ModelConfigService:
                     "Cloud mode requires both a provider and a model."
                 )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def normalize_optional_text(value: str | None) -> str | None:
         if value is None:
@@ -521,11 +526,13 @@ class ModelConfigService:
         normalized = value.strip()
         return normalized or None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def describe_local_model(model_name: str) -> str:
         family = model_name.split(":", maxsplit=1)[0].strip() or model_name
         return f"Installed local Ollama model from the {family} family."
 
+    # -------------------------------------------------------------------------
     @classmethod
     def local_recommendation_rank(cls, model_name: str) -> int | None:
         try:
@@ -533,6 +540,7 @@ class ModelConfigService:
         except ValueError:
             return None
 
+    # -------------------------------------------------------------------------
     @classmethod
     def build_local_model_card(
         cls,
@@ -799,6 +807,7 @@ class ModelConfigService:
             )
         return descriptors
 
+    # -------------------------------------------------------------------------
     async def load_catalog(
         self, provider: CatalogProviderId, *, force_refresh: bool = False
     ) -> ModelCatalogOperationResponse:
@@ -824,6 +833,7 @@ class ModelConfigService:
             if task.done() and self._catalog_tasks.get(provider) is task:
                 self._catalog_tasks.pop(provider, None)
 
+    # -------------------------------------------------------------------------
     async def _fetch_catalog(
         self, provider: CatalogProviderId
     ) -> ModelCatalogOperationResponse:

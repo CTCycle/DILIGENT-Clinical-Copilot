@@ -28,7 +28,6 @@ from services.llm.runtime_config import LLMRuntimeConfig
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 
-
 ###############################################################################
 class InMemorySerializer:
 
@@ -803,13 +802,18 @@ def test_empty_ollama_catalog_is_saved_as_a_valid_empty_result(monkeypatch, tmp_
         ),
     )
 
+    ###############################################################################
     class EmptyOllamaClient:
+
+        # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
 
+        # -------------------------------------------------------------------------
         async def __aexit__(self, exc_type, exc, tb):
             return False
 
+        # -------------------------------------------------------------------------
         async def list_models(self):
             return []
 
@@ -853,16 +857,22 @@ def test_catalog_provider_switching_keeps_provider_specific_lists(
         ),
     )
 
+    ###############################################################################
     class FakeCloudClient:
+
+        # -------------------------------------------------------------------------
         def __init__(self, *, provider: str, **_: Any) -> None:
             self.provider = provider
 
+        # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
 
+        # -------------------------------------------------------------------------
         async def __aexit__(self, *_: Any) -> None:
             return None
 
+        # -------------------------------------------------------------------------
         async def list_model_descriptors(self, **_: Any) -> list[CloudModelDescriptor]:
             return [
                 CloudModelDescriptor(
@@ -901,16 +911,22 @@ def test_concurrent_catalog_loads_share_one_provider_fetch(monkeypatch, tmp_path
     )
     calls = 0
 
+    ###############################################################################
     class FakeCloudClient:
+
+        # -------------------------------------------------------------------------
         def __init__(self, **_: Any) -> None:
             pass
 
+        # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
 
+        # -------------------------------------------------------------------------
         async def __aexit__(self, *_: Any) -> None:
             return None
 
+        # -------------------------------------------------------------------------
         async def list_model_descriptors(self, **_: Any) -> list[CloudModelDescriptor]:
             nonlocal calls
             calls += 1

@@ -18,6 +18,7 @@ from repositories.serialization.provider_model_catalog_cache import (
 from services.llm.provider_registry import provider_registry
 
 
+###############################################################################
 def catalog_configuration_fingerprint(provider: CatalogProviderId) -> str:
     if provider == "ollama":
         endpoint = str(
@@ -53,12 +54,14 @@ def catalog_configuration_fingerprint(provider: CatalogProviderId) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+###############################################################################
 def load_catalog_record(
     catalog_cache: ProviderModelCatalogCacheSerializer, provider: CatalogProviderId
 ) -> ProviderModelCatalogCacheRecord | None:
     return catalog_cache.get(provider, catalog_configuration_fingerprint(provider))
 
 
+###############################################################################
 def local_catalog_metadata(
     catalog_cache: ProviderModelCatalogCacheSerializer,
 ) -> LocalCatalogMetadata:
@@ -89,6 +92,7 @@ def local_catalog_metadata(
     )
 
 
+###############################################################################
 def cloud_models_from_record(
     record: ProviderModelCatalogCacheRecord | None,
 ) -> list[CloudModelDescriptor]:
@@ -104,6 +108,7 @@ def cloud_models_from_record(
     return models
 
 
+###############################################################################
 def sanitize_catalog_error(message: str) -> str:
     normalized = " ".join(message.split())
     normalized = re.sub(

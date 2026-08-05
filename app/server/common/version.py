@@ -9,14 +9,12 @@ from common.runtime_layout import resolve_runtime_layout
 
 _VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
 
-
 ###############################################################################
 def _validate_version(value: str, source: str) -> str:
     version = value.strip()
     if not _VERSION_PATTERN.fullmatch(version):
         raise RuntimeError(f"Invalid application version from {source}: {value!r}")
     return version
-
 
 ###############################################################################
 @lru_cache(maxsize=1)

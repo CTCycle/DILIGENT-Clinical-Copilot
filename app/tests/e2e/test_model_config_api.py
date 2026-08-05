@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from playwright.sync_api import APIRequestContext
 
-
 ###############################################################################
 def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext):
     response = api_context.get("/api/model-config")

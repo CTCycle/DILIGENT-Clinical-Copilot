@@ -13,7 +13,6 @@ import uvicorn
 
 _VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
 
-
 ###############################################################################
 def _absolute_environment_path(name: str) -> Path:
     value = os.getenv(name, "").strip()
@@ -24,7 +23,6 @@ def _absolute_environment_path(name: str) -> Path:
         raise RuntimeError(f"{name} must be an absolute path")
     return path.resolve()
 
-
 ###############################################################################
 def _validate_desktop_environment() -> str:
     _absolute_environment_path("DILIGENT_RUNTIME_ROOT")
@@ -33,7 +31,6 @@ def _validate_desktop_environment() -> str:
     if not _VERSION_PATTERN.fullmatch(version):
         raise RuntimeError("DILIGENT_RELEASE_VERSION must be major.minor.patch")
     return version
-
 
 ###############################################################################
 def _write_ready_file(path: Path, payload: dict[str, Any]) -> None:
@@ -45,14 +42,12 @@ def _write_ready_file(path: Path, payload: dict[str, Any]) -> None:
     finally:
         temporary.unlink(missing_ok=True)
 
-
 ###############################################################################
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="DILIGENT packaged backend")
     parser.add_argument("--ready-file", type=Path, required=True)
     parser.add_argument("--host", default="127.0.0.1")
     return parser
-
 
 ###############################################################################
 def run_desktop_backend(*, ready_file: Path, host: str = "127.0.0.1") -> None:
@@ -89,7 +84,6 @@ def run_desktop_backend(*, ready_file: Path, host: str = "127.0.0.1") -> None:
     finally:
         ready_file.unlink(missing_ok=True)
         server_socket.close()
-
 
 ###############################################################################
 def main() -> None:

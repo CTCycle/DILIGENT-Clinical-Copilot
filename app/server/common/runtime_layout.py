@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-
 ###############################################################################
 @dataclass(frozen=True, slots=True)
 class RuntimeLayout:
@@ -20,7 +19,6 @@ class RuntimeLayout:
     mutable_resources_root: Path
     client_dist_root: Path
 
-
 ###############################################################################
 def _resolve_required_absolute_environment_path(name: str) -> Path:
     value = os.getenv(name, "").strip()
@@ -30,7 +28,6 @@ def _resolve_required_absolute_environment_path(name: str) -> Path:
     if not path.is_absolute():
         raise RuntimeError(f"{name} must be an absolute path")
     return path.resolve()
-
 
 ###############################################################################
 def _resolve_source_layout() -> RuntimeLayout:
@@ -47,7 +44,6 @@ def _resolve_source_layout() -> RuntimeLayout:
         mutable_resources_root=resources_root,
         client_dist_root=application_root / "client" / "dist" / "browser",
     )
-
 
 ###############################################################################
 def _resolve_packaged_layout() -> RuntimeLayout:
@@ -66,7 +62,6 @@ def _resolve_packaged_layout() -> RuntimeLayout:
         mutable_resources_root=data_root / "resources",
         client_dist_root=application_root / "client" / "dist" / "browser",
     )
-
 
 ###############################################################################
 @lru_cache(maxsize=1)
