@@ -435,6 +435,7 @@ export type InspectionSessionTimeline = {
   generated_at: string;
   generation_status?: "llm_generated" | "fallback";
   generation_note?: string | null;
+  generation_error_code?: "network_unavailable" | "timeout" | "authentication" | "rate_limited" | "upstream_error" | "invalid_response" | "configuration" | "provider_error" | "unknown" | null;
   source_model?: string | null;
   source_kind?: "local" | "cloud" | null;
   model_provider?: string | null;
@@ -459,6 +460,7 @@ export type InspectionSessionTimelinePreview = {
   generated_at: string;
   generation_status?: "llm_generated" | "fallback";
   generation_note?: string | null;
+  generation_error_code?: "network_unavailable" | "timeout" | "authentication" | "rate_limited" | "upstream_error" | "invalid_response" | "configuration" | "provider_error" | "unknown" | null;
   source_model?: string | null;
   source_kind?: "local" | "cloud" | null;
   model_provider?: string | null;

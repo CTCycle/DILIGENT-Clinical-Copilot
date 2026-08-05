@@ -53,6 +53,7 @@ def build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
         generated_at=payload.generated_at,
         generation_status=payload.generation_status,
         generation_note=payload.generation_note,
+        generation_error_code=payload.generation_error_code,
         source_model=payload.source_model,
         source_kind=payload.source_kind,
         model_provider=payload.model_provider,

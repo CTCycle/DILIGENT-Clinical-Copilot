@@ -7,6 +7,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 PatientTimelineEventType = Literal["therapy", "disease", "lab", "other"]
 PatientTimelineGenerationStatus = Literal["llm_generated", "fallback"]
+PatientTimelineGenerationErrorCode = Literal[
+    "network_unavailable",
+    "timeout",
+    "authentication",
+    "rate_limited",
+    "upstream_error",
+    "invalid_response",
+    "configuration",
+    "provider_error",
+    "unknown",
+]
 PatientTimelineSourceKind = Literal["local", "cloud"]
 PatientTimelineTimingType = Literal[
     "explicit_date",
@@ -96,6 +107,7 @@ class PatientTimeline(BaseModel):
     generated_at: datetime
     generation_status: PatientTimelineGenerationStatus = "llm_generated"
     generation_note: str | None = Field(default=None, max_length=500)
+    generation_error_code: PatientTimelineGenerationErrorCode | None = None
     source_model: str | None = Field(default=None, max_length=200)
     source_kind: PatientTimelineSourceKind | None = None
     model_provider: str | None = Field(default=None, max_length=40)
@@ -124,6 +136,7 @@ class SessionTimelinePreview(BaseModel):
     generated_at: datetime
     generation_status: PatientTimelineGenerationStatus = "llm_generated"
     generation_note: str | None = Field(default=None, max_length=500)
+    generation_error_code: PatientTimelineGenerationErrorCode | None = None
     source_model: str | None = Field(default=None, max_length=200)
     source_kind: PatientTimelineSourceKind | None = None
     model_provider: str | None = Field(default=None, max_length=40)
