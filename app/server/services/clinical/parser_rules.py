@@ -78,7 +78,10 @@ class DrugRulesMixin(ParserHost):
     # -------------------------------------------------------------------------
     def is_likely_medication_line(self, line: str) -> bool:
         lowered = line.lower()
-        if self.SCHEDULE_RE.search(line):
+        schedule_match = self.SCHEDULE_RE.search(line)
+        if schedule_match and not self.is_date_like_schedule(
+            schedule_match.group("schedule")
+        ):
             return True
         if self.DOSE_CUE_RE.search(line):
             return True

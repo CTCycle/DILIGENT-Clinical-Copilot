@@ -355,10 +355,11 @@ button,
   box-shadow:
     0 20px 42px -30px rgba(21, 42, 36, 0.7),
     inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  color: #2d3433;
 }
 
 .timeline-node-card strong {
-  color: var(--color-text-primary);
+  color: #2d3433;
   display: -webkit-box;
   line-height: 1.25;
   overflow: hidden;
@@ -367,7 +368,7 @@ button,
 }
 
 .timeline-node-card small {
-  color: var(--color-text-secondary);
+  color: #596060;
   display: -webkit-box;
   font-size: var(--font-xs);
   line-height: 1.4;

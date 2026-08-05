@@ -9,13 +9,18 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import create_engine
 
-from domain.inspection import RevisionIssueScanResult, SessionRevisionRequest
+from domain.inspection import (
+    RevisionAgentToolCall,
+    RevisionIssueScanResult,
+    SessionRevisionRequest,
+)
 from repositories.schemas.base import Base
 from repository_fixtures import build_repository_graph
 from services.inspection.revision_agent import (
     RevisionAgentRunner,
     build_revision_agent_user_prompt,
 )
+from common.prompts.revision_agent import editor_prompt
 from services.inspection.revision_scaffold import SessionRevisionConflictError
 from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
@@ -143,6 +148,19 @@ def test_revision_issue_scan_schema_rejects_unknown_category() -> None:
         )
 
 ###############################################################################
+def test_revision_agent_tool_call_accepts_provider_rationale_within_budget() -> None:
+    decision = RevisionAgentToolCall.model_validate(
+        {
+            "tool_name": "read_session_context",
+            "arguments": {},
+            "rationale": "evidence " * 250,
+            "task_complete": True,
+        }
+    )
+
+    assert len(decision.rationale) > 1000
+
+###############################################################################
 def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
     prompt = build_revision_agent_user_prompt(
         session={
@@ -166,6 +184,17 @@ def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
     assert "Check hallucinations around dechallenge." in prompt
     assert "may steer focus but is not clinical evidence" in prompt
     assert "No tools are available" in prompt
+
+###############################################################################
+def test_revision_editor_prompt_requires_exact_source_patches() -> None:
+    prompt = editor_prompt(
+        {"review_target": {"official_report": {"text": "Canonical report"}}},
+        [],
+    )
+
+    assert "zero-based Python slice offsets" in prompt
+    assert "expected_text must equal the exact source substring" in prompt
+    assert "return patches as an empty list" in prompt
 
 ###############################################################################
 def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> None:
