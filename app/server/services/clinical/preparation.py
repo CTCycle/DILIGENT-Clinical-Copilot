@@ -34,7 +34,7 @@ For combination products, list each active ingredient separately.
 If the identity is uncertain, keep confidence low and do not invent an ingredient.
 The application will independently validate every proposed name against local
 RxNav and LiverTox evidence before accepting it.
-""".strip()
+"""
 
     # -------------------------------------------------------------------------
     def __init__(

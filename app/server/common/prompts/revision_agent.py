@@ -37,7 +37,7 @@ Output requirements:
 - Every issue must include an evidence status: supported_by_source, missing_from_source, conflicts_with_source, report_only, or unclear.
 - Every issue must include a concise rationale and a recommended next action.
 - If no issue is found, return an empty issues array and explain the limits of the review in the summary.
-""".strip()
+"""
 
 ###############################################################################
 def planner_prompt(context: object, manifest: object) -> str:
