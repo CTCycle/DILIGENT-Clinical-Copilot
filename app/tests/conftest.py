@@ -206,8 +206,12 @@ def api_context(playwright):
     """
     Creates an API request context for making direct HTTP calls.
     Useful for testing backend endpoints independently of the UI.
+
+    The first local-model request may start Ollama before serving the response;
+    allow that documented cold-start path to complete before Playwright times
+    out the request.
     """
-    context = playwright.request.new_context(base_url=API_BASE_URL)
+    context = playwright.request.new_context(base_url=API_BASE_URL, timeout=60000)
     yield context
     context.dispose()
 
