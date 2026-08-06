@@ -1,5 +1,5 @@
 # DILIGENT Clinical Copilot
-Last updated: 2026-07-30
+Last updated: 2026-08-06
 
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-GNU%20GPL%20v3-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
@@ -50,19 +50,18 @@ The v3.0.0 release also publishes these Windows x64 desktop artifacts:
 ```text
 release/DILIGENT-v3.0.0-windows-x64-portable.exe
 release/DILIGENT-v3.0.0-windows-x64.msi
-release/DILIGENT-v3.0.0-windows-x64.sha256
 ```
 
 The portable executable is a single-file Tauri application. It does not require a separate Python, Node.js, Rust, npm, uv, or source checkout on the target machine. On first launch it verifies and extracts the embedded PyInstaller backend and Angular assets under `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>`, starts the backend on a random localhost port, and opens the desktop window. User settings, database, logs, models, source documents, vectors, exports, state, and access-key material remain under `%LOCALAPPDATA%\DILIGENT\data`.
 
-The MSI installs the same Tauri shell and packaged runtime. It may use the configured WebView2 bootstrapper; an offline WebView2 installer is available only when the maintainer builds with `-OfflineWebView2`.
+The MSI installs the same Tauri shell and packaged runtime. It may use the configured WebView2 bootstrapper; an offline WebView2 installer is available only when the maintainer builds with `-OfflineWebView2`. The build also generates `release/DILIGENT-v3.0.0-windows-x64.sha256` for maintainer-side verification; the standard GitHub release attaches the portable EXE and MSI only.
 
-To use the published desktop build, download the portable EXE for no-install use or the MSI for an installed shortcut. Verify the matching `.sha256` file before distribution. Desktop startup does not use the development ports `7690` and `9847`.
+To use the published desktop build, download the portable EXE for no-install use or the MSI for an installed shortcut. Desktop startup does not use the development ports `7690` and `9847`.
 
 For maintainers building a release on Windows x64:
 
 ```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.0.0 -DesktopTarget All
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.0.0 -DesktopTarget All -Force
 ```
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a Windows x64 host and a clean worktree unless `-AllowDirtyTree` is supplied explicitly. Add `-OfflineWebView2` only when building an MSI that must install WebView2 without network access. See [desktop release documentation](assets/docs/runtime/desktop_release.md) for the build pipeline, artifact validation, runtime layout, and cleanup.
