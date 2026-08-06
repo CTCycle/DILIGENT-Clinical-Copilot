@@ -38,7 +38,6 @@ def _compile_terms_regex(category: str) -> re.Pattern[str]:
         return re.compile(r"\b(" + "|".join(terms) + r")\b", re.IGNORECASE)
     return re.compile(r"$^")
 
-
 ###############################################################################
 def _alcohol_re() -> re.Pattern[str]:
     return _compile_terms_regex("rucam_alcohol_terms")

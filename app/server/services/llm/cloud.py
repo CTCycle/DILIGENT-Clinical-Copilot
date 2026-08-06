@@ -44,6 +44,8 @@ def _list_gemini_models_sync(client: genai.Client) -> list[Any]:
 
 ###############################################################################
 class LLMError(RuntimeError):
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         message: str,
@@ -59,6 +61,7 @@ class LLMError(RuntimeError):
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         message: str = "Timed out waiting for cloud chat response",
