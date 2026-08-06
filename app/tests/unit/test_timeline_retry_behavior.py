@@ -12,9 +12,11 @@ from services.llm.cloud import LLMError
 ###############################################################################
 class RetryThenSuccessClient:
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.call_count = 0
 
+    # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientTimelineExtraction:
         del kwargs
         self.call_count += 1
@@ -38,9 +40,11 @@ class RetryThenSuccessClient:
 ###############################################################################
 class NonRetryableClient:
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.call_count = 0
 
+    # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientTimelineExtraction:
         del kwargs
         self.call_count += 1
