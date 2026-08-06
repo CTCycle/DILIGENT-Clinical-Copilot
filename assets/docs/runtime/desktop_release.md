@@ -1,5 +1,5 @@
 # DILIGENT Desktop Release
-Last updated: 2026-08-02
+Last updated: 2026-08-06
 
 ## Packaging architecture
 
@@ -18,10 +18,10 @@ The runtime allowlist excludes source code, tests, documentation, credentials, `
 
 ## Current source and artifact status
 
-The current source manifests report version `3.0.0`, but the latest local tag is
-`v2.4.0` and the checked-in `release/` directory contains the previous `v2.4.0`
-portable EXE, MSI, and checksum manifest. A `v3.0.0` build is an available build
-target, not evidence of publication.
+The current source manifests report version `3.0.0`. The `v3.0.0` desktop release
+is created from the synchronized `main` branch. Publication is confirmed only
+after the portable EXE and MSI, annotated tag, remote-release metadata, and
+downloaded hash evidence have all been verified.
 
 The expected output names for a verified `3.0.0` build are:
 
@@ -32,6 +32,8 @@ release/DILIGENT-v3.0.0-windows-x64.sha256
 ```
 
 The portable executable is a single distribution file for no-install use. The MSI installs the same Tauri shell and packaged runtime. The `.sha256` file contains one SHA-256 entry per built artifact and must be checked before distribution. Publication requires separate tag, remote-release, and download/hash evidence.
+
+The standard GitHub release attaches the portable EXE and MSI only. The `.sha256` file remains local maintainer-side verification output.
 
 ## Runtime and data layout
 
@@ -61,7 +63,7 @@ Artifact cleanup and MSI uninstall do not remove this user data. The extracted r
 Run on a Windows x64 host with Rust/Cargo, the Windows build toolchain, the pinned portable runtimes, and network access for dependencies and the default WebView2 bootstrapper:
 
 ```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.0.0 -DesktopTarget All
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.0.0 -DesktopTarget All -Force
 ```
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a clean worktree by default; use `-AllowDirtyTree` only when the dirty state is intentional and recorded. `-OfflineWebView2` is valid only with `-DesktopTarget Msi` or `All` and changes the MSI WebView2 installation mode.
