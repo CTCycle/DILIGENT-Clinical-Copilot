@@ -75,6 +75,9 @@ def test_clean_break_routes_are_canonical() -> None:
     assert "/api/model-config/openai-connectivity-check" not in paths
     assert "/api/inspection/sessions/{session_id}/timelines" in paths
     assert "/api/inspection/sessions/{session_id}/timelines/{timeline_id}" in paths
+    assert "/api/inspection/sessions/{session_id}/timeline-jobs" in paths
+    assert "/api/inspection/sessions/{session_id}/timeline-jobs/{job_id}" in paths
+    assert "post" not in paths["/api/inspection/sessions/{session_id}/timelines"]
     assert "/api/inspection/sessions/{session_id}/timeline" not in paths
 
 ###############################################################################

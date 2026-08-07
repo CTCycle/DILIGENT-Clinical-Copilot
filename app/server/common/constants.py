@@ -35,19 +35,8 @@ OPENAI_API_BASE = "https://api.openai.com/v1"
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1"
 
 
-# [DATA SERIALIZATION]
+# [DRUG MATCHING]
 ###############################################################################
-TABLE_CLINICAL_SESSIONS = "clinical_sessions"
-TABLE_CLINICAL_SESSION_SECTIONS = "clinical_session_sections"
-TABLE_CLINICAL_SESSION_RESULTS = "clinical_session_results"
-TABLE_DRUGS = "drugs"
-TABLE_DRUG_RXNORM_CODES = "drug_rxnorm_codes"
-TABLE_DRUG_ALIASES = "drug_aliases"
-TABLE_LIVERTOX_MONOGRAPHS = "livertox_monographs"
-TABLE_ACCESS_KEYS = "access_keys"
-TABLE_REFERENCE_CATALOG_ENTRIES = "reference_catalog_entries"
-TABLE_REFERENCE_CATALOG_SEED_RUNS = "reference_catalog_seed_runs"
-
 DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH = 4
 DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT = 75000
 DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE = 0.94

@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-08-02
+Last updated: 2026-08-07
 
 Sampling behavior is owned by `services/llm/generation_policy.py`.
 
@@ -40,7 +40,7 @@ Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and
   - `ProviderModelCatalogCacheSerializer` persists successful and failed provider catalog attempts, including model entries, timestamps, status, and safe error text, through the SQLAlchemy configuration schema.
   - ORM ownership is split across `repositories/schemas/clinical.py`, `knowledge.py`, `security.py`, and `configuration.py`; all mappings register on the shared `Base.metadata`.
   - Access key persistence mapping and active key retrieval stay in `app/server/repositories/serialization/access_keys.py`.
-  - Reference catalog persistence and seeding are implemented through `reference_catalog_entries` and `reference_catalog_seed_runs` in `app/server/repositories/serialization/catalogs.py`.
+  - Reference catalog persistence and seeding are implemented through `reference_catalog_entries` and `reference_catalog_manifests` in `app/server/repositories/serialization/catalogs.py`.
   - Database initialization (`repositories/database/initializer.py`) handles catalog seeding inline using `common/catalogs/manifest_loader.py` rather than the services layer, preserving strict layering during bootstrapping.
 - Config and common layers: `app/server/configurations/*`, `app/server/common/*`
   - Own runtime settings, constants, environment bootstrap, logging, and shared security helpers.
