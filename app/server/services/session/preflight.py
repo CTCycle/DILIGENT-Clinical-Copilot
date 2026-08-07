@@ -545,8 +545,6 @@ def _validate_persistence(
     service: Any,
     blocking: list[ClinicalInputPreflightIssue],
 ) -> None:
-    if not hasattr(service.session_repository, "session_factory"):
-        return
     try:
         with service.session_repository.session_factory() as db_session:
             db_session.connection()

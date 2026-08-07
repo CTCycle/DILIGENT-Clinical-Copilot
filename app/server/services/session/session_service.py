@@ -127,6 +127,7 @@ class ClinicalSessionService(
         self.stage_elapsed_ms: dict[str, int] = {}
         self.fallback_reasons: dict[str, dict[str, str | None]] = {}
         self.structured_failure_kind: dict[str, str] = {}
+        self.latest_lab_extraction_audit: Any = None
 
     # -------------------------------------------------------------------------
     def note_stage_runtime(
@@ -191,10 +192,7 @@ class ClinicalSessionService(
     ) -> None:
         if progress_callback is None:
             return
-        try:
-            progress_callback(stage, value, detail)
-        except TypeError:
-            progress_callback(stage, value)
+        progress_callback(stage, value, detail)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -613,7 +611,7 @@ class ClinicalSessionService(
         normalized_document: Any | None = None,
         report_mode: str = "faithful_only",
         session_version: int = 1,
-        progress_callback: Callable[[str, float], None] | None = None,
+        progress_callback: Callable[[str, float, str | None], None] | None = None,
         stop_check: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
         return await process_single_patient_workflow(

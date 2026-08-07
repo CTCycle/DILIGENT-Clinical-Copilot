@@ -65,11 +65,8 @@ from services.text.vocabulary import invalidate_text_normalization_snapshot
 from services.session.workflow_shared import (
     ClinicalPersistenceError,
     PROGRESS_SEQUENCE as _PROGRESS_SEQUENCE,
-    append_warning_issue as _append_warning_issue,
     build_matched_drugs_payload as build_matched_drugs_payload_workflow,
     emit_progress as _emit_progress,
-    extract_deterministic_drugs as _extract_deterministic_drugs,
-    has_temporal_information as _has_temporal_information,
     resolve_rucam_source as _resolve_rucam_source,
 )
 
@@ -248,11 +245,15 @@ async def process_single_patient_workflow(
     cleaned_therapy_text = service.drugs_parser.clean_text(payload.drugs or "")
     cleaned_anamnesis_text = service.drugs_parser.clean_text(payload.anamnesis or "")
 
-    therapy_deterministic = _extract_deterministic_drugs(
-        service, text=cleaned_therapy_text, source="therapy"
+    therapy_deterministic = (
+        service.drugs_parser.extract_drugs_from_therapy_deterministic(
+            cleaned_therapy_text
+        )
     )
-    anamnesis_deterministic = _extract_deterministic_drugs(
-        service, text=cleaned_anamnesis_text, source="anamnesis"
+    anamnesis_deterministic = (
+        service.drugs_parser.extract_drugs_from_anamnesis_deterministic(
+            cleaned_anamnesis_text
+        )
     )
     disease_deterministic = extract_deterministic_diseases(cleaned_anamnesis_text)
 
@@ -286,8 +287,7 @@ async def process_single_patient_workflow(
             preflight.model,
             preflight.reason,
         )
-        _append_warning_issue(
-            service,
+        service.append_warning_issue(
             issues,
             code="parser_batch_preflight_sequential_fallback",
             message="Parser batch preflight denied concurrent extraction; using sequential extraction for local runtime safety.",
@@ -356,14 +356,9 @@ async def process_single_patient_workflow(
     calculated_pattern_score = pattern_assessment.score
     pattern_score = calculated_pattern_score
     explicit_hepatic_pattern = None
-    lab_extractor = getattr(service, "lab_extractor", None)
-    if (
-        lab_extractor is not None
-        and hasattr(lab_extractor, "extract_explicit_hepatic_pattern")
-        and payload.laboratory_analysis
-    ):
+    if payload.laboratory_analysis:
         try:
-            explicit_hepatic_pattern = lab_extractor.extract_explicit_hepatic_pattern(
+            explicit_hepatic_pattern = service.lab_extractor.extract_explicit_hepatic_pattern(
                 payload.laboratory_analysis
             )
         except Exception:
@@ -383,12 +378,11 @@ async def process_single_patient_workflow(
     temporal_uncertain_count = sum(
         1
         for entry in [*anamnesis_drugs.entries, *therapy_drugs.entries]
-        if not _has_temporal_information(service, entry)
+        if not service.drugs_parser.drug_entry_has_temporal_information(entry)
     )
     filtered_out_count = 0
     if temporal_uncertain_count > 0:
-        _append_warning_issue(
-            service,
+        service.append_warning_issue(
             issues,
             code="drugs_missing_temporal_information_present",
             message=f"{temporal_uncertain_count} extracted drug entries have uncertain temporal information and are reported with reduced causal confidence.",
@@ -473,8 +467,8 @@ async def process_single_patient_workflow(
         use_rag=payload.use_rag,
     )
     match_audit_issues: list[PipelineIssue] = []
-    if prepared_inputs is not None and hasattr(service, "build_match_audit_issues"):
-        match_audit_issues = service.build_match_audit_issues(
+    if prepared_inputs is not None:
+        match_audit_issues = service.input_preparator.build_match_audit_issues(
             prepared_inputs.resolved_drugs
         )
         issues.extend(match_audit_issues)
@@ -726,12 +720,10 @@ async def process_single_patient_workflow(
         "section_extraction": section_extraction.model_dump()
         if section_extraction is not None
         else None,
-        "resolved_runtime": dict(getattr(service, "resolved_runtime", {})),
-        "stage_elapsed_ms": dict(getattr(service, "stage_elapsed_ms", {})),
-        "fallback_reasons": dict(getattr(service, "fallback_reasons", {})),
-        "structured_failure_kind": dict(
-            getattr(service, "structured_failure_kind", {})
-        ),
+        "resolved_runtime": dict(service.resolved_runtime),
+        "stage_elapsed_ms": dict(service.stage_elapsed_ms),
+        "fallback_reasons": dict(service.fallback_reasons),
+        "structured_failure_kind": dict(service.structured_failure_kind),
         "runtime_settings": {
             "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
             "llm_provider": LLMRuntimeConfig.get_llm_provider(),
@@ -741,12 +733,10 @@ async def process_single_patient_workflow(
             "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
             "ollama_seed": LLMRuntimeConfig.get_ollama_seed(),
             "use_rag": bool(payload.use_rag),
-            "resolved_runtime": dict(getattr(service, "resolved_runtime", {})),
-            "stage_elapsed_ms": dict(getattr(service, "stage_elapsed_ms", {})),
-            "fallback_reasons": dict(getattr(service, "fallback_reasons", {})),
-            "structured_failure_kind": dict(
-                getattr(service, "structured_failure_kind", {})
-            ),
+            "resolved_runtime": dict(service.resolved_runtime),
+            "stage_elapsed_ms": dict(service.stage_elapsed_ms),
+            "fallback_reasons": dict(service.fallback_reasons),
+            "structured_failure_kind": dict(service.structured_failure_kind),
         },
         "manual_review_required": manual_review_required,
         "blocking_issues": faithfulness_audit.blocking_issues,
@@ -761,11 +751,7 @@ async def process_single_patient_workflow(
                 section_extraction.metadata if section_extraction is not None else None
             ),
             "extraction_strategy_decisions": {
-                "laboratory_history": getattr(
-                    service,
-                    "latest_lab_extraction_audit",
-                    None,
-                ),
+                "laboratory_history": service.latest_lab_extraction_audit,
             },
             "hepatic_pattern_resolution": hepatic_pattern_resolution.model_dump(),
             "match_audit": {
@@ -841,7 +827,7 @@ async def process_single_patient_workflow(
                 "section_extraction": section_extraction.model_dump()
                 if section_extraction is not None
                 else None,
-                "text_extraction_model": getattr(service.drugs_parser, "model", None),
+                "text_extraction_model": service.drugs_parser.model,
                 "clinical_model": getattr(clinical_session, "llm_model", None),
                 "total_duration": global_elapsed,
                 "final_report": final_report,

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, HTTPException, Query, status
+from fastapi import APIRouter, Body, HTTPException, status
 
 from api.inspection.common import InspectionJobEndpointMixin
-from common.utils.logger import logger
 from domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from domain.patient_timeline import (
     PatientTimeline,
@@ -46,56 +45,6 @@ class InspectionTimelineEndpoint(InspectionJobEndpointMixin):
         return SessionTimelineListResponse(
             items=[SessionTimelinePreview(**item) for item in items]
         )
-
-    # -------------------------------------------------------------------------
-    def generate_session_timeline(
-        self,
-        session_id: int,
-        request: SessionTimelineRegenerateRequest | None = Body(default=None),
-        force_regenerate_query: bool = Query(default=False, alias="force_regenerate"),
-    ) -> PatientTimeline:
-        request = request or SessionTimelineRegenerateRequest()
-        force_regenerate = bool(force_regenerate_query or request.force_regenerate)
-        try:
-            timeline = self.service.generate_session_timeline(
-                session_id,
-                force_regenerate=force_regenerate,
-                model_overrides=request.model_overrides,
-            )
-        except RuntimeError as exc:
-            detail_message = str(exc)
-            lowered_detail = detail_message.casefold()
-            if (
-                "cooling down" in lowered_detail
-                or "already in progress" in lowered_detail
-            ):
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=detail_message,
-                ) from exc
-            if "failed to list ollama models" in lowered_detail:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=(
-                        "Timeline generation requires a reachable local model runtime. "
-                        "Start Ollama and retry."
-                    ),
-                ) from exc
-            logger.warning(
-                "Session timeline generation failed session_id=%s error=%s",
-                session_id,
-                exc,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Timeline generation is currently unavailable. Please retry.",
-            ) from exc
-        if timeline is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session not found.",
-            )
-        return timeline
 
     # -------------------------------------------------------------------------
     def start_session_timeline_job(
@@ -148,13 +97,6 @@ class InspectionTimelineEndpoint(InspectionJobEndpointMixin):
             self.list_session_timelines,
             methods=["GET"],
             response_model=SessionTimelineListResponse,
-            status_code=status.HTTP_200_OK,
-        )
-        self.router.add_api_route(
-            "/sessions/{session_id}/timelines",
-            self.generate_session_timeline,
-            methods=["POST"],
-            response_model=PatientTimeline,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

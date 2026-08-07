@@ -9,12 +9,14 @@ import pytest
 
 from domain.clinical.entities import (
     ClinicalLabEntry,
+    DeterministicDrugExtractionResult,
     DrugEntry,
     HepatotoxicityPatternScore,
     PatientData,
     PatientDrugs,
     PatientLabTimeline,
     PatientRucamAssessmentBundle,
+    PipelineIssue,
 )
 import services.session.session_workflow as session_workflow_module
 from services.session.document_normalizer import DocumentNormalizer
@@ -44,6 +46,29 @@ class FakeDrugsParser:
     # -------------------------------------------------------------------------
     def clean_text(self, text: str) -> str:
         return text
+
+    # -------------------------------------------------------------------------
+    def extract_drugs_from_therapy_deterministic(
+        self, text: str
+    ) -> DeterministicDrugExtractionResult:
+        _ = text
+        return DeterministicDrugExtractionResult(
+            entries=[], unresolved_lines=[], regimen_lines=[]
+        )
+
+    # -------------------------------------------------------------------------
+    def extract_drugs_from_anamnesis_deterministic(
+        self, text: str
+    ) -> DeterministicDrugExtractionResult:
+        _ = text
+        return DeterministicDrugExtractionResult(
+            entries=[], unresolved_lines=[], regimen_lines=[]
+        )
+
+    # -------------------------------------------------------------------------
+    def drug_entry_has_temporal_information(self, entry: DrugEntry) -> bool:
+        _ = entry
+        return True
 
 ###############################################################################
 class FakeSessionRepository:
@@ -76,6 +101,11 @@ class FakeClinicalService:
                 else None
             )
         )
+        self.resolved_runtime = {}
+        self.stage_elapsed_ms = {}
+        self.fallback_reasons = {}
+        self.structured_failure_kind = {}
+        self.latest_lab_extraction_audit = None
 
     # -------------------------------------------------------------------------
     def run_stop_check(self, stop_check: Any) -> None:
@@ -85,6 +115,24 @@ class FakeClinicalService:
     # -------------------------------------------------------------------------
     def emit_progress(self, *args: Any, **kwargs: Any) -> None:
         _ = args, kwargs
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def append_warning_issue(
+        issues: list[PipelineIssue],
+        *,
+        code: str,
+        message: str,
+        field: str | None = None,
+    ) -> None:
+        issues.append(
+            PipelineIssue(
+                severity="warning",
+                code=code,
+                message=message,
+                field=field,
+            )
+        )
 
     # -------------------------------------------------------------------------
     def build_validation_bundle_for_payload(self, payload: PatientData) -> object:

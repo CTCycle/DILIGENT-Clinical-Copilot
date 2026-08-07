@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-08-02
+Last updated: 2026-08-07
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -79,9 +79,11 @@ latest saved configuration and provider-catalog state.
 - `GET /api/inspection/sessions/{session_id}/versions/{version_id}/reviews`
 - `GET /api/inspection/sessions/{session_id}/versions/{version_id}/artifacts`
 - `GET /api/inspection/sessions/{session_id}/timelines`
-- `POST /api/inspection/sessions/{session_id}/timelines`
 - `GET /api/inspection/sessions/{session_id}/timelines/{timeline_id}`
 - `DELETE /api/inspection/sessions/{session_id}/timelines/{timeline_id}`
+- `POST /api/inspection/sessions/{session_id}/timeline-jobs`
+- `GET /api/inspection/sessions/{session_id}/timeline-jobs/{job_id}`
+- `DELETE /api/inspection/sessions/{session_id}/timeline-jobs/{job_id}`
 - `DELETE /api/inspection/sessions/{session_id}`
 - `GET /api/inspection/rxnav`
 - `GET /api/inspection/rxnav/{drug_id}/aliases`
@@ -109,8 +111,8 @@ latest saved configuration and provider-catalog state.
 - `DELETE /api/inspection/rag/jobs/{job_id}`
 
 ## Notes
-- `POST /api/inspection/sessions/{session_id}/timelines` accepts optional run-scoped
-  `model_overrides`. Local runs require `text_extraction_model`; cloud runs require
+- `POST /api/inspection/sessions/{session_id}/timeline-jobs` accepts optional run-scoped
+  `model_overrides` and returns a job for polling. Local runs require `text_extraction_model`; cloud runs require
   `llm_provider` and `cloud_model`. These settings are applied only for that run and
   do not change persisted session settings or global model configuration. Timeline
   previews include source-evidence, missing-evidence, uncertain, and undated counts.

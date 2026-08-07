@@ -5,11 +5,13 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import {
   fetchInspectionSessionTimelineById,
+  fetchInspectionSessionTimelineJobStatus,
   fetchInspectionSessionTimelineList,
-  generateInspectionSessionTimeline,
+  startInspectionSessionTimelineJob,
 } from '../../core/services/inspection-api';
 import {
   InspectionSessionTimeline,
+  InspectionTimelineJobStatusResponse,
   InspectionTimelineEvent,
   InspectionTimelineEventType,
   InspectionTimelineTimingType,
@@ -313,7 +315,15 @@ export class PatientTimetablePageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const payload = await generateInspectionSessionTimeline(id, { force_regenerate: true });
+      const started = await startInspectionSessionTimelineJob(id, { force_regenerate: true });
+      const job = await this.waitForTimelineJob(id, started.job_id, started.poll_interval);
+      if (job.status !== 'completed') {
+        throw new Error(job.error || 'Timeline generation did not complete.');
+      }
+      const generatedTimelineId = job.result?.timeline_id;
+      const payload = typeof generatedTimelineId === 'number'
+        ? await fetchInspectionSessionTimelineById(id, generatedTimelineId)
+        : await this.fetchLatestTimeline(id);
       this.timeline.set(payload);
       this.timelineId.set(payload.timeline_id ?? null);
       this.selectedEventId.set(null);
@@ -490,6 +500,30 @@ export class PatientTimetablePageComponent implements OnInit {
     const latest = timelines.items[0];
     if (!latest?.timeline_id) throw new Error('Not found');
     return fetchInspectionSessionTimelineById(sessionId, latest.timeline_id);
+  }
+
+  private async waitForTimelineJob(
+    sessionId: number,
+    jobId: string,
+    pollIntervalSeconds: number,
+  ): Promise<InspectionTimelineJobStatusResponse> {
+    const deadline = Date.now() + 360_000;
+    const delayMs = Math.max(
+      250,
+      Math.round(
+        (Number.isFinite(pollIntervalSeconds) && pollIntervalSeconds > 0
+          ? pollIntervalSeconds
+          : 1) * 1000,
+      ),
+    );
+    while (Date.now() < deadline) {
+      const job = await fetchInspectionSessionTimelineJobStatus(sessionId, jobId);
+      if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+        return job;
+      }
+      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, delayMs));
+    }
+    throw new Error('Timeline generation timed out. Check the saved timeline history and retry if needed.');
   }
 
   private resolveEventDate(value: string | null): { date: Date; precision: TimelineDatePrecision } | null {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import date
 from types import SimpleNamespace
 
@@ -52,6 +53,7 @@ def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
     service = SimpleNamespace(
         apply_persisted_runtime_configuration=lambda: None,
         session_repository=SimpleNamespace(
+            session_factory=lambda: nullcontext(SimpleNamespace(connection=lambda: None)),
             knowledge_repository=SimpleNamespace(
                 list_livertox_catalog=lambda **kwargs: ([{"id": 1}], 1),
             ),

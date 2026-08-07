@@ -108,23 +108,6 @@ export async function fetchInspectionSessionTimelineById(
   );
 }
 
-export async function generateInspectionSessionTimeline(
-  sessionId: number,
-  payload: InspectionSessionTimelineRequest = {},
-): Promise<InspectionSessionTimeline> {
-  return requestJson<InspectionSessionTimeline>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timelines`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-    TIMELINE_REQUEST_TIMEOUT_SECONDS,
-  );
-}
-
 export async function deleteInspectionSession(
   sessionId: number,
 ): Promise<InspectionDeleteResponse> {
