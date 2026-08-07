@@ -39,7 +39,7 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _normalize_provider(value: str | None, fallback: str) -> CloudProviderId:
+    def _normalize_provider(value: str | None) -> CloudProviderId:
         normalized = (value or "").strip().lower()
         try:
             return provider_registry.get(normalized).provider_id
@@ -48,7 +48,7 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _normalize_cloud_model(provider: str, value: str | None, fallback: str) -> str:
+    def _normalize_cloud_model(provider: str, value: str | None) -> str:
         normalized = (value or "").strip()
         if not normalized:
             raise ValueError("Cloud model is required")
@@ -106,8 +106,7 @@ class LLMRuntimeConfig:
         provider = cls._normalize_provider(
             cls._coerce_optional_text(overrides.get("cloud_provider"))
             if "cloud_provider" in overrides
-            else base_provider,
-            defaults.llm_provider,
+            else base_provider
         )
         requested_cloud_model = (
             cls._coerce_optional_text(overrides.get("cloud_model"))
@@ -115,7 +114,7 @@ class LLMRuntimeConfig:
             else base_cloud_model
         )
         cloud_model = (
-            cls._normalize_cloud_model(provider, requested_cloud_model, defaults.cloud_model)
+            cls._normalize_cloud_model(provider, requested_cloud_model)
             if requested_cloud_model or cls._coerce_bool(
                 overrides.get("use_cloud_models", snapshot.use_cloud_models)
             )

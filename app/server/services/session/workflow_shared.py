@@ -6,7 +6,6 @@ from common.exceptions import ServiceDependencyError
 from domain.clinical.entities import (
     DrugRucamAssessment,
     PatientRucamAssessmentBundle,
-    PipelineIssue,
 )
 from services.clinical.match_quality import classify_match_evidence
 from services.text.normalization import normalize_drug_query_name
@@ -43,65 +42,7 @@ def emit_progress(
 ) -> None:
     if progress_callback is None:
         return
-    try:
-        progress_callback(stage, progress, detail)
-    except TypeError:
-        progress_callback(stage, progress)
-
-###############################################################################
-def extract_deterministic_drugs(
-    service: Any,
-    *,
-    text: str,
-    source: str,
-) -> Any:
-    parser = getattr(service, "drugs_parser", None)
-    if parser is None:
-        return type(
-            "_Fallback",
-            (),
-            {"entries": [], "unresolved_lines": [], "regimen_lines": []},
-        )()
-    method = getattr(parser, f"extract_drugs_from_{source}_deterministic", None)
-    if callable(method):
-        return method(text)
-    return type(
-        "_Fallback", (), {"entries": [], "unresolved_lines": [], "regimen_lines": []}
-    )()
-
-###############################################################################
-def append_warning_issue(
-    service: Any,
-    issues: list[PipelineIssue],
-    *,
-    code: str,
-    message: str,
-    field: str | None = None,
-) -> None:
-    if hasattr(service, "append_warning_issue"):
-        service.append_warning_issue(
-            issues,
-            code=code,
-            message=message,
-            field=field,
-        )
-        return
-    issues.append(
-        PipelineIssue(
-            severity="warning",
-            code=code,
-            message=message,
-            field=field,
-        )
-    )
-
-###############################################################################
-def has_temporal_information(service: Any, entry: Any) -> bool:
-    parser = getattr(service, "drugs_parser", None)
-    checker = getattr(parser, "drug_entry_has_temporal_information", None)
-    if callable(checker):
-        return bool(checker(entry))
-    return True
+    progress_callback(stage, progress, detail)
 
 ###############################################################################
 def resolve_rucam_source(entries: list[DrugRucamAssessment]) -> str:

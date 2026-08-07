@@ -17,6 +17,7 @@ from domain.clinical import (
     PatientLabTimeline,
     PatientRucamAssessmentBundle,
 )
+from domain.clinical.entities import DeterministicDrugExtractionResult
 from services.clinical.preparation import HepatoxPreparedInputs
 
 ###############################################################################
@@ -56,6 +57,11 @@ class FakeInputPreparator:
             clinical_context="Clinical context.",
         )
 
+    # -------------------------------------------------------------------------
+    def build_match_audit_issues(self, resolved_drugs: dict[str, Any]) -> list[Any]:
+        _ = resolved_drugs
+        return []
+
 ###############################################################################
 class FakeHepatoxConsultation:
 
@@ -77,6 +83,29 @@ class FakeDrugsParser:
     # -------------------------------------------------------------------------
     def clean_text(self, text: str) -> str:
         return text
+
+    # -------------------------------------------------------------------------
+    def extract_drugs_from_therapy_deterministic(
+        self, text: str
+    ) -> DeterministicDrugExtractionResult:
+        _ = text
+        return DeterministicDrugExtractionResult(
+            entries=[], unresolved_lines=[], regimen_lines=[]
+        )
+
+    # -------------------------------------------------------------------------
+    def extract_drugs_from_anamnesis_deterministic(
+        self, text: str
+    ) -> DeterministicDrugExtractionResult:
+        _ = text
+        return DeterministicDrugExtractionResult(
+            entries=[], unresolved_lines=[], regimen_lines=[]
+        )
+
+    # -------------------------------------------------------------------------
+    def drug_entry_has_temporal_information(self, entry: DrugEntry) -> bool:
+        _ = entry
+        return True
 
     # -------------------------------------------------------------------------
     def parse_line(self, line: str) -> DrugEntry | None:
@@ -127,6 +156,11 @@ class FakeDiseaseExtractor:
 
 ###############################################################################
 class FakeLabExtractor:
+
+    # -------------------------------------------------------------------------
+    def extract_explicit_hepatic_pattern(self, text: str) -> str | None:
+        _ = text
+        return None
 
     # -------------------------------------------------------------------------
     async def extract_from_payload(

@@ -41,7 +41,6 @@ class ApplicationConfigurationSerializer:
         self,
         payload: dict[str, Any],
         *,
-        schema_version: int = 1,
         return_metadata: Literal[False] = False,
     ) -> dict[str, Any]: ...
 
@@ -51,7 +50,6 @@ class ApplicationConfigurationSerializer:
         self,
         payload: dict[str, Any],
         *,
-        schema_version: int = 1,
         return_metadata: Literal[True],
     ) -> tuple[dict[str, Any], Any]: ...
 
@@ -60,7 +58,6 @@ class ApplicationConfigurationSerializer:
         self,
         payload: dict[str, Any],
         *,
-        schema_version: int = 1,
         return_metadata: bool = False,
     ) -> dict[str, Any] | tuple[dict[str, Any], Any]:
         json_safe_payload = json.loads(json.dumps(payload, default=str))
@@ -68,7 +65,6 @@ class ApplicationConfigurationSerializer:
             row = upsert_application_configuration(
                 db_session,
                 payload=json_safe_payload,
-                schema_version=schema_version,
             )
             saved_payload = dict(row.payload)
             if return_metadata:

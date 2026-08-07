@@ -19,19 +19,16 @@ def upsert_application_configuration(
     db_session: Session,
     *,
     payload: dict[str, Any],
-    schema_version: int = 1,
 ) -> ApplicationConfiguration:
     """Atomically replace the fixed-id application configuration row."""
     values = {
         "id": 1,
-        "schema_version": int(schema_version),
         "payload": payload,
     }
     statement = dialect_insert(db_session, ApplicationConfiguration).values(**values)
     statement = statement.on_conflict_do_update(
         index_elements=[ApplicationConfiguration.id],
         set_={
-            "schema_version": statement.excluded.schema_version,
             "payload": statement.excluded.payload,
             "revision": ApplicationConfiguration.revision + 1,
             "updated_at": func.now(),
