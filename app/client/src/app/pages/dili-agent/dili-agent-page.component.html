@@ -157,7 +157,7 @@
   closeLabel="Return to clinical input"
   [footer]="true"
   [showCloseButton]="!preflightHasBlockingIssues()"
-  [closeOnEscape]="true"
+  [closeOnEscape]="!preflightHasBlockingIssues()"
   [restoreFocus]="false"
   (close)="returnToInputFromPreflight()"
   (closed)="focusPreflightTarget()"

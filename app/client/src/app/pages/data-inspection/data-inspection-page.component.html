@@ -87,10 +87,14 @@
                   }
                 </tbody>
               </table>
-              @if (rxnavLoading()) { <p class="inspection-loading-note">Loading RxNav data...</p> }
-              @if (rxnavLoadingMore()) { <p class="inspection-loading-note">Loading more RxNav rows...</p> }
-              @if (!rxnavLoading() && rxnavHasMore()) { <p class="inspection-loading-note">Scroll to load more...</p> }
-              @if (rxnavError()) { <p class="inspection-error-text">{{ rxnavError() }}</p> }
+              <app-inspection-catalog-status
+                [loading]="rxnavLoading()"
+                loadingMessage="Loading RxNav data..."
+                [loadingMore]="rxnavLoadingMore()"
+                loadingMoreMessage="Loading more RxNav rows..."
+                [hasMore]="rxnavHasMore()"
+                [error]="rxnavError()"
+              />
             </div>
           </div>
         </section>
@@ -148,10 +152,14 @@
                   }
                 </tbody>
               </table>
-              @if (livertoxLoading()) { <p class="inspection-loading-note">Loading LiverTox data...</p> }
-              @if (livertoxLoadingMore()) { <p class="inspection-loading-note">Loading more LiverTox rows...</p> }
-              @if (!livertoxLoading() && livertoxHasMore()) { <p class="inspection-loading-note">Scroll to load more...</p> }
-              @if (livertoxError()) { <p class="inspection-error-text">{{ livertoxError() }}</p> }
+              <app-inspection-catalog-status
+                [loading]="livertoxLoading()"
+                loadingMessage="Loading LiverTox data..."
+                [loadingMore]="livertoxLoadingMore()"
+                loadingMoreMessage="Loading more LiverTox rows..."
+                [hasMore]="livertoxHasMore()"
+                [error]="livertoxError()"
+              />
             </div>
           </div>
         </section>
@@ -232,10 +240,14 @@
                   }
                 </tbody>
               </table>
-              @if (ragLoading()) { <p class="inspection-loading-note">Loading RAG data...</p> }
-              @if (ragLoadingMore()) { <p class="inspection-loading-note">Loading more RAG documents...</p> }
-              @if (!ragLoading() && ragHasMore()) { <p class="inspection-loading-note">Scroll to load more...</p> }
-              @if (ragError()) { <p class="inspection-error-text">{{ ragError() }}</p> }
+              <app-inspection-catalog-status
+                [loading]="ragLoading()"
+                loadingMessage="Loading RAG data..."
+                [loadingMore]="ragLoadingMore()"
+                loadingMoreMessage="Loading more RAG documents..."
+                [hasMore]="ragHasMore()"
+                [error]="ragError()"
+              />
             </div>
           </div>
         </section>

@@ -58,17 +58,27 @@ def test_model_config_put_rejects_unknown_nested_rag_field(
 def test_model_config_put_returns_persisted_values_without_catalog_refresh(
     api_context: APIRequestContext,
 ):
-    response = api_context.put(
-        "/api/model-config",
-        data={"ollama_reasoning": True},
-    )
-    assert response.status == 200
-    payload = response.json()
-    assert payload["ollama_reasoning"] is True
-    assert "updated_at" in payload
-    assert "local_models" not in payload
-    assert "cloud_providers" not in payload
-    assert "embedding_runtime" not in payload
-    assert "embedding_index" not in payload
+    original = api_context.get("/api/model-config")
+    assert original.status == 200
+    original_reasoning = bool(original.json().get("ollama_reasoning"))
+    try:
+        response = api_context.put(
+            "/api/model-config",
+            data={"ollama_reasoning": not original_reasoning},
+        )
+        assert response.status == 200
+        payload = response.json()
+        assert payload["ollama_reasoning"] is not original_reasoning
+        assert "updated_at" in payload
+        assert "local_models" not in payload
+        assert "cloud_providers" not in payload
+        assert "embedding_runtime" not in payload
+        assert "embedding_index" not in payload
+    finally:
+        restored = api_context.put(
+            "/api/model-config",
+            data={"ollama_reasoning": original_reasoning},
+        )
+        assert restored.status == 200
 
 ###############################################################################

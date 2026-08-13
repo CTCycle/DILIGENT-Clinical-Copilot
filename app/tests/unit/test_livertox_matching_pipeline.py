@@ -1087,3 +1087,36 @@ def test_livertox_match_audit_flags_missing_ambiguous_and_low_confidence() -> No
     assert "livertox_match_ambiguous" in codes
     assert "livertox_match_low_confidence" in codes
     assert "rxnav_alias_not_validated" in codes
+
+###############################################################################
+def test_livertox_match_audit_ignores_identity_candidates_not_in_analysis_set() -> None:
+    graph = build_repository_graph()
+    preparation = ClinicalKnowledgePreparation(
+        knowledge_repository=graph.knowledge_repository,
+        drug_catalog_repository=graph.drug_catalog_repository,
+    )
+    issues = preparation.build_match_audit_issues(
+        {
+            "amoxicillin clavulanate": {
+                "raw_mentions": ["Amoxicillin-clavulanate"],
+                "match_status": "accepted_exact_livertox",
+                "match_confidence": 1.0,
+                "missing_livertox": False,
+                "ambiguous_match": False,
+                "rxnav_validated": False,
+                "rxnav_rxcui": None,
+            },
+            "amoxicillin extended release": {
+                "raw_mentions": ["Amoxicillin-clavulanate"],
+                "match_status": "missing_match",
+                "missing_livertox": True,
+                "ambiguous_match": True,
+                "rxnav_validated": False,
+                "rxnav_rxcui": None,
+            },
+        },
+        detected_drug_names=["Amoxicillin-clavulanate"],
+    )
+
+    codes = [issue.code for issue in issues]
+    assert codes == ["rxnav_alias_not_validated"]

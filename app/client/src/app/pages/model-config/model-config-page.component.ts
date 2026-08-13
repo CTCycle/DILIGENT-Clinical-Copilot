@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -129,7 +129,7 @@ function resolveProviderLabel(provider: string): string {
   templateUrl: './model-config-page.component.html',
   styleUrl: './model-config-page.component.scss',
 })
-export class ModelConfigPageComponent implements OnInit {
+export class ModelConfigPageComponent implements OnInit, OnDestroy {
   readonly appState = inject(AppStateService);
   private readonly modelPullJobs = inject(ModelPullJobService);
 
@@ -387,6 +387,13 @@ export class ModelConfigPageComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     await this.loadModelConfig(true, true);
     this.applyPreviewDefaultState();
+  }
+
+  ngOnDestroy(): void {
+    if (this.reasoningSaveTimer !== null) {
+      clearTimeout(this.reasoningSaveTimer);
+      this.reasoningSaveTimer = null;
+    }
   }
 
   async loadModelConfig(

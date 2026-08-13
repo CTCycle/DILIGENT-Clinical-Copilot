@@ -647,6 +647,17 @@ def test_dili_run_conflict_surfaces_clear_error_message(
     finally:
         page.unroute("**/api/clinical/validate-input")
         page.unroute("**/api/clinical/jobs", mock_conflict)
+        restored = page.request.put(
+            f"{api_base_url}/api/model-config",
+            data={
+                "use_cloud_services": model_config.get("use_cloud_services", False),
+                "llm_provider": model_config.get("llm_provider"),
+                "cloud_model": model_config.get("cloud_model"),
+                "clinical_model": model_config.get("clinical_model"),
+                "text_extraction_model": model_config.get("text_extraction_model"),
+            },
+        )
+        assert restored.status == 200
 
 ###############################################################################
 def test_timetable_route_load_does_not_autogenerate_timeline(

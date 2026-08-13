@@ -428,6 +428,26 @@ def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
     assert serializer.session_revision_repository.get_revision_run(pipeline_run_id) is None
 
 ###############################################################################
+def test_incomplete_revision_shell_cannot_be_clinically_reviewed(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    shell = serializer.session_revision_repository.create_revision_version_shell(
+        session_id,
+        reviewer_note=None,
+        configuration={},
+        pipeline_run_id="incomplete-review-run",
+    )
+    assert shell is not None
+
+    with pytest.raises(ValueError, match="Only completed revision versions"):
+        serializer.session_revision_repository.record_revision_review_action(
+            revision_version_id=int(shell["revision_version_id"]),
+            clinical_review_status="approved_by_human",
+            reviewer_note=None,
+            reviewed_by="QA",
+        )
+
+###############################################################################
 def test_revision_job_rejects_same_root_concurrent_start(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)

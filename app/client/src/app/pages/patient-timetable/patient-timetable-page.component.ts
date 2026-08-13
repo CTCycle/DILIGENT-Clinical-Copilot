@@ -9,6 +9,7 @@ import {
   fetchInspectionSessionTimelineList,
   startInspectionSessionTimelineJob,
 } from '../../core/services/inspection-api';
+import { JobPollingService } from '../../core/services/job-polling.service';
 import {
   InspectionSessionTimeline,
   InspectionTimelineJobStatusResponse,
@@ -124,6 +125,7 @@ export class PatientTimetablePageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly jobPolling = inject(JobPollingService);
 
   readonly sessionId = signal<number | null>(null);
   readonly timelineId = signal<number | null>(null);
@@ -317,6 +319,7 @@ export class PatientTimetablePageComponent implements OnInit {
     try {
       const started = await startInspectionSessionTimelineJob(id, { force_regenerate: true });
       const job = await this.waitForTimelineJob(id, started.job_id, started.poll_interval);
+      if (!job) return;
       if (job.status !== 'completed') {
         throw new Error(job.error || 'Timeline generation did not complete.');
       }
@@ -331,9 +334,11 @@ export class PatientTimetablePageComponent implements OnInit {
         await this.router.navigate(['/sessions', id, 'timetable', payload.timeline_id], { replaceUrl: true });
       }
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Failed to regenerate timetable.');
+      if (!this.destroyRef.destroyed) {
+        this.error.set(error instanceof Error ? error.message : 'Failed to regenerate timetable.');
+      }
     } finally {
-      this.loading.set(false);
+      if (!this.destroyRef.destroyed) this.loading.set(false);
     }
   }
 
@@ -506,7 +511,7 @@ export class PatientTimetablePageComponent implements OnInit {
     sessionId: number,
     jobId: string,
     pollIntervalSeconds: number,
-  ): Promise<InspectionTimelineJobStatusResponse> {
+  ): Promise<InspectionTimelineJobStatusResponse | null> {
     const deadline = Date.now() + 360_000;
     const delayMs = Math.max(
       250,
@@ -516,13 +521,21 @@ export class PatientTimetablePageComponent implements OnInit {
           : 1) * 1000,
       ),
     );
-    while (Date.now() < deadline) {
-      const job = await fetchInspectionSessionTimelineJobStatus(sessionId, jobId);
-      if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
-        return job;
-      }
-      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, delayMs));
-    }
+    let terminalStatus: InspectionTimelineJobStatusResponse | null = null;
+    await this.jobPolling.run({
+      intervalMs: delayMs,
+      isCancelled: () => this.destroyRef.destroyed || Date.now() >= deadline,
+      pollStep: async () => {
+        const job = await fetchInspectionSessionTimelineJobStatus(sessionId, jobId);
+        if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+          terminalStatus = job;
+          return false;
+        }
+        return true;
+      },
+    });
+    if (terminalStatus) return terminalStatus;
+    if (this.destroyRef.destroyed) return null;
     throw new Error('Timeline generation timed out. Check the saved timeline history and retry if needed.');
   }
 
