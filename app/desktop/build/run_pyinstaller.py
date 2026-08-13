@@ -20,6 +20,10 @@ if hasattr(os, "add_dll_directory"):
     if _venv_bin.is_dir():
         _dll_directory_handles.append(os.add_dll_directory(str(_venv_bin)))
 
+# Load the supported native compatibility backend before PyInstaller's
+# dependency scanner reaches ctypes.util on affected hosted runners.
+import cffi  # noqa: E402, F401
+
 
 def _import_with_cffi_backend(name, globals=None, locals=None, fromlist=(), level=0):
     """Let win32ctypes select its cffi backend during PyInstaller startup.
