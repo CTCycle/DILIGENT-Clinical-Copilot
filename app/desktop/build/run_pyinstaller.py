@@ -3,10 +3,22 @@
 from __future__ import annotations
 
 import builtins
+import os
+from pathlib import Path
 import sys
 
 
 _original_import = builtins.__import__
+
+
+# The embedded Python venv keeps its matching _ctypes/libffi pair beside the
+# interpreter. Hosted Windows runners can otherwise resolve a different
+# libffi-8.dll before PyInstaller imports ctypes.
+_dll_directory_handles = []
+if hasattr(os, "add_dll_directory"):
+    _venv_bin = Path(sys.executable).resolve().parent
+    if _venv_bin.is_dir():
+        _dll_directory_handles.append(os.add_dll_directory(str(_venv_bin)))
 
 
 def _import_with_cffi_backend(name, globals=None, locals=None, fromlist=(), level=0):
