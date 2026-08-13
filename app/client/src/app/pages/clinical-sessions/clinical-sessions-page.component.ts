@@ -38,6 +38,7 @@ import {
   RevisionPipelineStep,
 } from '../../core/models/types';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
+import { JobPollingService } from '../../core/services/job-polling.service';
 import { formatErrorMessage, formatUnknownError, isRecord } from '../../core/utils';
 import {
   DEFAULT_CLINICAL_SESSION_METADATA_TEXT,
@@ -91,7 +92,7 @@ import {
 })
 export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   private readonly markdownRenderer = inject(MarkdownRendererService);
-  private pollCancelled = false;
+  private readonly jobPolling = inject(JobPollingService);
 
   readonly sessions = signal<InspectionSessionItem[]>([]);
   readonly statusFilter = signal<'all' | InspectionSessionStatus>('all');
@@ -152,7 +153,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionReviewAvailable = computed(() => (
     this.revisionVersionId() !== null
     && !this.revisionRunning()
-    && !['cancelled', 'failed'].includes(this.revisionStatus().trim().toLowerCase())
+    && this.revisionStatus().trim().toLowerCase() === 'completed'
   ));
   readonly revisionModelLoading = signal(false);
   readonly revisionModelError = signal<string | null>(null);
@@ -519,21 +520,25 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     }
   }
   private async pollRevision(sessionId: number, jobId: string): Promise<void> {
-    while (!this.revisionPollCancelled) {
-      const status = await fetchSessionRevisionJobStatus(jobId);
-      const result = status.result;
-      this.revisionStatus.set(status.status === 'running' ? 'Revision agent is working...' : status.status);
-      if (typeof result?.revision_version_id === 'number') this.revisionVersionId.set(result.revision_version_id);
-      if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
-        this.revisionRunning.set(false);
-        const pipelineRunId = typeof result?.pipeline_run_id === 'string' ? result.pipeline_run_id : null;
-        const versionId = this.revisionVersionId();
-        if (pipelineRunId) this.revisionSteps.set((await fetchRevisionPipelineSteps(pipelineRunId)).items);
-        if (versionId) this.revisionArtifacts.set((await fetchRevisionArtifacts(sessionId, versionId)).items);
-        return;
-      }
-      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 1000));
-    }
+    await this.jobPolling.run({
+      intervalMs: 1000,
+      isCancelled: () => this.revisionPollCancelled,
+      pollStep: async () => {
+        const status = await fetchSessionRevisionJobStatus(jobId);
+        const result = status.result;
+        this.revisionStatus.set(status.status === 'running' ? 'Revision agent is working...' : status.status);
+        if (typeof result?.revision_version_id === 'number') this.revisionVersionId.set(result.revision_version_id);
+        if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
+          this.revisionRunning.set(false);
+          const pipelineRunId = typeof result?.pipeline_run_id === 'string' ? result.pipeline_run_id : null;
+          const versionId = this.revisionVersionId();
+          if (pipelineRunId) this.revisionSteps.set((await fetchRevisionPipelineSteps(pipelineRunId)).items);
+          if (versionId) this.revisionArtifacts.set((await fetchRevisionArtifacts(sessionId, versionId)).items);
+          return false;
+        }
+        return true;
+      },
+    });
   }
   updateManualEditReviewerNote(value: string): void {
     this.manualEditReviewerNote.set(value);
@@ -574,7 +579,12 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (!detail) return;
     let metadata: Record<string, unknown>;
     try {
-      metadata = JSON.parse(this.metadataText()) as Record<string, unknown>;
+      const parsed: unknown = JSON.parse(this.metadataText());
+      if (!isRecord(parsed)) {
+        this.metadataSaveStatus.set('[ERROR] Metadata must be a JSON object.');
+        return;
+      }
+      metadata = parsed;
     } catch {
       this.metadataSaveStatus.set('[ERROR] Metadata must be valid JSON.');
       return;
@@ -704,16 +714,15 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   private readMetadataDraft(): Record<string, unknown> {
     try {
-      return normalizeClinicalSessionMetadata(
-        JSON.parse(this.metadataText()) as Record<string, unknown>,
-      );
+      const parsed: unknown = JSON.parse(this.metadataText());
+      return normalizeClinicalSessionMetadata(isRecord(parsed) ? parsed : {});
     } catch {
       return normalizeClinicalSessionMetadata({});
     }
   }
 
   private stopPoller(): void {
-    this.pollCancelled = true;
+    this.revisionPollCancelled = true;
   }
 }
 

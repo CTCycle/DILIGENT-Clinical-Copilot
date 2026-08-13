@@ -6,6 +6,7 @@ import { Router } from '@angular/router';
 import { ModalShellComponent } from '../../../components/modal-shell/modal-shell.component';
 import { ClinicalSessionDetail, CloudProvider, InspectionSessionTimelinePreview, ModelConfigStateResponse } from '../../../core/models/types';
 import { deleteInspectionSessionTimeline, fetchInspectionSessionTimelineJobStatus, fetchInspectionSessionTimelineList, startInspectionSessionTimelineJob } from '../../../core/services/inspection-api';
+import { JobPollingService } from '../../../core/services/job-polling.service';
 import { fetchModelConfigState } from '../../../core/services/model-config-api';
 import { formatUnknownError } from '../../../core/utils';
 
@@ -18,6 +19,7 @@ import { formatUnknownError } from '../../../core/utils';
 })
 export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
   private readonly router = inject(Router);
+  private readonly jobPolling = inject(JobPollingService);
   @Input({ required: true }) session!: ClinicalSessionDetail;
 
   readonly timelinePreviews = signal<InspectionSessionTimelinePreview[]>([]);
@@ -38,7 +40,6 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
   readonly deletingTimelineId = signal<number | null>(null);
   readonly deleteError = signal<string | null>(null);
   readonly settingsRestoreNotice = signal<string | null>(null);
-  private generationPollTimer: ReturnType<typeof setTimeout> | null = null;
   private generationPollToken = 0;
   private readonly timelineJobStoragePrefix = 'clinical-session-timeline-job:';
 
@@ -114,34 +115,36 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
   }
   private attachToTimelineJob(jobId: string, pollIntervalSeconds: number, restoring = false): void {
     this.stopTimelinePolling(); this.persistTimelineJob(jobId); this.generationJobId.set(jobId); this.generationRunning.set(true);
-    this.generationStatus.set(restoring ? 'Restoring timeline generation…' : 'Generating timeline…'); this.pollTimelineJob(jobId, pollIntervalSeconds);
+    this.generationStatus.set(restoring ? 'Restoring timeline generation…' : 'Generating timeline…'); void this.pollTimelineJob(jobId, pollIntervalSeconds);
   }
-  private stopTimelinePolling(): void { this.generationPollToken += 1; if (this.generationPollTimer !== null) { clearTimeout(this.generationPollTimer); this.generationPollTimer = null; } }
-  private pollTimelineJob(jobId: string, pollIntervalSeconds: number): void {
+  private stopTimelinePolling(): void { this.generationPollToken += 1; }
+  private async pollTimelineJob(jobId: string, pollIntervalSeconds: number): Promise<void> {
     const token = ++this.generationPollToken;
     const delayMs = Math.max(500, Math.round((Number.isFinite(pollIntervalSeconds) ? pollIntervalSeconds : 1) * 1000));
     let consecutiveErrors = 0;
-    const poll = async (): Promise<void> => {
-      if (token !== this.generationPollToken || this.generationJobId() !== jobId) return;
-      try {
-        const job = await fetchInspectionSessionTimelineJobStatus(this.session.session_id, jobId);
-        if (token !== this.generationPollToken || this.generationJobId() !== jobId) return;
-        consecutiveErrors = 0; this.generationProgress.set(Math.max(0, Math.min(100, Number(job.progress) || 0)));
-        const message = job.result?.progress_message;
-        if (typeof message === 'string' && message) this.generationProgressMessage.set(message);
-        if (job.status === 'completed') {
-          this.generationProgress.set(100); this.generationRunning.set(false); this.generationStatus.set('Timeline generated and saved.'); this.clearPersistedTimelineJob(); this.generationJobId.set(null); await this.loadTimelineHistory(); return;
+    await this.jobPolling.run({
+      intervalMs: delayMs,
+      isCancelled: () => token !== this.generationPollToken || this.generationJobId() !== jobId,
+      pollStep: async () => {
+        try {
+          const job = await fetchInspectionSessionTimelineJobStatus(this.session.session_id, jobId);
+          if (token !== this.generationPollToken || this.generationJobId() !== jobId) return false;
+          consecutiveErrors = 0; this.generationProgress.set(Math.max(0, Math.min(100, Number(job.progress) || 0)));
+          const message = job.result?.progress_message;
+          if (typeof message === 'string' && message) this.generationProgressMessage.set(message);
+          if (job.status === 'completed') {
+            this.generationProgress.set(100); this.generationRunning.set(false); this.generationStatus.set('Timeline generated and saved.'); this.clearPersistedTimelineJob(); this.generationJobId.set(null); await this.loadTimelineHistory(); return false;
+          }
+          if (job.status === 'failed' || job.status === 'cancelled') {
+            this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(job.error || 'Timeline generation did not complete.'); this.clearPersistedTimelineJob(); this.generationJobId.set(null); return false;
+          }
+        } catch (error) {
+          consecutiveErrors += 1;
+          if (consecutiveErrors >= 5) { this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(formatUnknownError(error, 'Unable to restore timeline generation status.')); this.clearPersistedTimelineJob(); this.generationJobId.set(null); return false; }
         }
-        if (job.status === 'failed' || job.status === 'cancelled') {
-          this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(job.error || 'Timeline generation did not complete.'); this.clearPersistedTimelineJob(); this.generationJobId.set(null); return;
-        }
-      } catch (error) {
-        consecutiveErrors += 1;
-        if (consecutiveErrors >= 5) { this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(formatUnknownError(error, 'Unable to restore timeline generation status.')); this.clearPersistedTimelineJob(); this.generationJobId.set(null); return; }
-      }
-      this.generationPollTimer = setTimeout(() => void poll(), delayMs);
-    };
-    void poll();
+        return true;
+      },
+    });
   }
 
   openTimeline(preview: InspectionSessionTimelinePreview): void { if (preview.timeline_id) void this.router.navigate(['/sessions', this.session.session_id, 'timetable', preview.timeline_id]); }

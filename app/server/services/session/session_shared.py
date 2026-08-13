@@ -356,29 +356,22 @@ class NarrativeBuilder:
                 )
             sections.append("\n".join(rucam_section))
 
-        if issues:
-            warnings_section = [bundle["warnings_title"], ""]
-            for issue in issues:
-                warnings_section.append(f"- {issue.message}")
-            sections.append("\n".join(warnings_section))
-
         excluded_active_drugs = [
             assessment.drug_name
             for assessment in (rucam_assessments or [])
             if assessment.causality_category == "excluded"
             and assessment.drug_name in detected_drugs
         ]
+        warning_messages = [f"- {issue.message}" for issue in issues]
         if excluded_active_drugs:
-            sections.append(
-                "\n".join(
-                    [
-                        bundle["warnings_title"],
-                        "",
-                        bundle["consistency_warning"].format(
-                            drugs=", ".join(excluded_active_drugs)
-                        ),
-                    ]
+            warning_messages.append(
+                bundle["consistency_warning"].format(
+                    drugs=", ".join(excluded_active_drugs)
                 )
+            )
+        if warning_messages:
+            sections.append(
+                "\n".join([bundle["warnings_title"], "", *warning_messages])
             )
 
         clinical_report_section = [bundle["report_title"], ""]

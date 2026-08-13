@@ -248,7 +248,7 @@ def test_focus_is_trapped_inside_warning_modal(
         page.unroute("**/api/clinical/validate-input")
 
 ###############################################################################
-def test_escape_closes_modal_and_focuses_first_affected_input(
+def test_escape_does_not_close_blocking_modal(
     page: Page,
     base_url: str,
 ) -> None:
@@ -270,6 +270,8 @@ def test_escape_closes_modal_and_focuses_first_affected_input(
 
         page.keyboard.press("Escape")
 
+        expect(page.get_by_role("dialog")).to_be_visible()
+        page.get_by_role("button", name="Return to input").click()
         expect(page.get_by_role("dialog")).to_have_count(0)
         expect(page.get_by_label("Visit Date")).to_be_focused()
     finally:

@@ -58,8 +58,14 @@ class FakeInputPreparator:
         )
 
     # -------------------------------------------------------------------------
-    def build_match_audit_issues(self, resolved_drugs: dict[str, Any]) -> list[Any]:
+    def build_match_audit_issues(
+        self,
+        resolved_drugs: dict[str, Any],
+        *,
+        detected_drug_names: list[str] | None = None,
+    ) -> list[Any]:
         _ = resolved_drugs
+        _ = detected_drug_names
         return []
 
 ###############################################################################

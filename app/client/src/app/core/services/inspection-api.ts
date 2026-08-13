@@ -31,6 +31,7 @@ import {
   RevisionJobStatusResponse,
   RevisionPipelineStepListResponse,
   SessionRevisionRequest,
+  RevisionClinicalReviewUpdateResponse,
   RevisionClinicalReviewUpdateRequest,
 } from "../models/types";
 import { buildQueryString, requestJson } from "./http-api";
@@ -402,8 +403,8 @@ export async function fetchRevisionPipelineSteps(pipelineRunId: string): Promise
 export async function fetchRevisionArtifacts(sessionId: number, versionId: number): Promise<RevisionArtifactListResponse> {
   return requestJson<RevisionArtifactListResponse>(`${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/artifacts`, { method: "GET" });
 }
-export async function updateRevisionClinicalReview(sessionId: number, versionId: number, payload: RevisionClinicalReviewUpdateRequest): Promise<unknown> {
-  return requestJson<unknown>(`${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/clinical-review`, {
+export async function updateRevisionClinicalReview(sessionId: number, versionId: number, payload: RevisionClinicalReviewUpdateRequest): Promise<RevisionClinicalReviewUpdateResponse> {
+  return requestJson<RevisionClinicalReviewUpdateResponse>(`${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/clinical-review`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
   });
 }

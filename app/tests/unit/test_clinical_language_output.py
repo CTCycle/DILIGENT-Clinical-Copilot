@@ -4,6 +4,8 @@ from domain.clinical import (
     DrugClinicalAssessment,
     HepatotoxicityPatternScore,
     PatientData,
+    PipelineIssue,
+    DrugRucamAssessment,
 )
 from services.clinical.report_finalizer import ReportFinalizer
 from services.clinical.language import detect_clinical_language
@@ -61,6 +63,41 @@ def test_narrative_builder_does_not_force_english_for_italian() -> None:
     )
     assert "# Sintesi Visita Clinica" in report
     assert "## Report Clinico" in report
+
+###############################################################################
+def test_narrative_builder_combines_pipeline_and_rucam_warnings() -> None:
+    report = NarrativeBuilder.build_patient_narrative(
+        patient_label="Patient",
+        visit_label="2026-08-12",
+        anamnesis="Clinical context.",
+        drugs_text="Levothyroxine daily.",
+        pattern_score=None,
+        pattern_strings={},
+        detected_drugs=["levothyroxine"],
+        anamnesis_detected_drugs=[],
+        report_language="en",
+        issues=[
+            PipelineIssue(
+                severity="warning",
+                code="rxnav_alias_not_validated",
+                field="matched_drugs",
+                message="RxNav alias was not validated for levothyroxine.",
+            )
+        ],
+        rucam_assessments=[
+            DrugRucamAssessment(
+                drug_name="levothyroxine",
+                total_score=-3,
+                causality_category="excluded",
+                confidence="low",
+            )
+        ],
+        final_report="Clinical report.",
+    )
+
+    assert report.count("## Warnings") == 1
+    assert "RxNav alias was not validated" in report
+    assert "Structured RUCAM classifies levothyroxine as excluded" in report
 
 ###############################################################################
 def test_italian_clinician_report_wrappers_do_not_use_english_labels() -> None:

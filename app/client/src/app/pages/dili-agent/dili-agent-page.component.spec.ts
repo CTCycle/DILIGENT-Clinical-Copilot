@@ -117,6 +117,31 @@ describe('DiliAgentPageComponent', () => {
     expect(root.textContent).not.toContain('Continue with limitations');
   });
 
+  it('does not dismiss a blocking pre-flight with Escape', () => {
+    component.preflightDialog.set(
+      result([issue('blocking', 'visit_date_missing', 'visit_date')]),
+    );
+    fixture.detectChanges();
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+
+    expect(component.preflightDialog()).not.toBeNull();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Cannot start analysis');
+  });
+
+  it('allows Escape to dismiss a non-blocking pre-flight', () => {
+    component.preflightDialog.set(
+      result([], [issue('non_blocking', 'missing_timing', 'drugs')]),
+    );
+    fixture.detectChanges();
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+
+    expect(component.preflightDialog()).toBeNull();
+  });
+
   it('renders a single non-blocking warning with both explicit actions', () => {
     component.preflightDialog.set(
       result([], [issue('non_blocking', 'missing_timing', 'drugs')]),

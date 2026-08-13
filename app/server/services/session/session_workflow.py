@@ -469,7 +469,10 @@ async def process_single_patient_workflow(
     match_audit_issues: list[PipelineIssue] = []
     if prepared_inputs is not None:
         match_audit_issues = service.input_preparator.build_match_audit_issues(
-            prepared_inputs.resolved_drugs
+            prepared_inputs.resolved_drugs,
+            detected_drug_names=[
+                entry.name for entry in analysis_drugs.entries if entry.name
+            ],
         )
         issues.extend(match_audit_issues)
     _emit_progress(
