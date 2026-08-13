@@ -596,35 +596,8 @@ def test_dili_submit_accepts_variant_section_headings(
 
 ###############################################################################
 def test_dili_run_conflict_surfaces_clear_error_message(
-    page: Page, base_url: str, api_base_url: str
+    page: Page, base_url: str
 ):
-    model_config_response = page.request.get(f"{api_base_url}/api/model-config")
-    assert model_config_response.status == 200
-    model_config = model_config_response.json()
-    configured_provider = str(model_config.get("llm_provider") or "openai")
-    cloud_provider = next(
-        (
-            provider
-            for provider in model_config.get("cloud_providers", [])
-            if provider.get("id") == configured_provider
-        ),
-        None,
-    )
-    cloud_model = model_config.get("cloud_model") or "gpt-4.1-mini"
-    if cloud_provider and cloud_provider.get("models"):
-        cloud_model = cloud_provider["models"][0]["id"]
-    runtime_reset = page.request.put(
-        f"{api_base_url}/api/model-config",
-        data={
-            "use_cloud_services": True,
-            "llm_provider": configured_provider,
-            "cloud_model": cloud_model,
-            "clinical_model": cloud_model,
-            "text_extraction_model": cloud_model,
-        },
-    )
-    assert runtime_reset.status == 200
-
     def mock_conflict(route: Route) -> None:
         route.fulfill(
             status=409,
@@ -647,17 +620,6 @@ def test_dili_run_conflict_surfaces_clear_error_message(
     finally:
         page.unroute("**/api/clinical/validate-input")
         page.unroute("**/api/clinical/jobs", mock_conflict)
-        restored = page.request.put(
-            f"{api_base_url}/api/model-config",
-            data={
-                "use_cloud_services": model_config.get("use_cloud_services", False),
-                "llm_provider": model_config.get("llm_provider"),
-                "cloud_model": model_config.get("cloud_model"),
-                "clinical_model": model_config.get("clinical_model"),
-                "text_extraction_model": model_config.get("text_extraction_model"),
-            },
-        )
-        assert restored.status == 200
 
 ###############################################################################
 def test_timetable_route_load_does_not_autogenerate_timeline(

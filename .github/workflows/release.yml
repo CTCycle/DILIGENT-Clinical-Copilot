@@ -1,0 +1,104 @@
+name: Windows Desktop Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package-and-publish:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout tagged release
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: app/server/pyproject.toml
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            app/client/package-lock.json
+            app/desktop/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Windows desktop artifacts
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ($env:RELEASE_TAG -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+            throw "Unsupported release tag: $env:RELEASE_TAG"
+          }
+          $version = $Matches.version
+          & .\start_on_windows.ps1 -Action BuildDesktopRelease -Version $version -DesktopTarget All -Force
+          if ($LASTEXITCODE -ne 0) {
+            throw "Desktop release build failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Verify release artifacts
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = $env:RELEASE_TAG.Substring(1)
+          $artifacts = @(
+            (Join-Path "release" "DILIGENT-v$version-windows-x64-portable.exe"),
+            (Join-Path "release" "DILIGENT-v$version-windows-x64.msi"),
+            (Join-Path "release" "DILIGENT-v$version-windows-x64.sha256")
+          )
+          foreach ($artifact in $artifacts) {
+            if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
+              throw "Missing release artifact: $artifact"
+            }
+            $item = Get-Item -LiteralPath $artifact
+            if ($item.Length -le 0) {
+              throw "Empty release artifact: $artifact"
+            }
+            Write-Output "$($item.Name): $($item.Length) bytes"
+          }
+
+      - name: Create or update GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $repo = $env:GITHUB_REPOSITORY
+          $tag = $env:RELEASE_TAG
+          $version = $tag.Substring(1)
+          gh release view $tag --repo $repo *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --repo $repo --verify-tag --generate-notes --title "DILIGENT Clinical Copilot $tag"
+            if ($LASTEXITCODE -ne 0) {
+              throw "GitHub Release creation failed with exit code $LASTEXITCODE"
+            }
+          }
+          $portable = Join-Path "release" "DILIGENT-v$version-windows-x64-portable.exe"
+          $msi = Join-Path "release" "DILIGENT-v$version-windows-x64.msi"
+          gh release upload $tag --repo $repo $portable $msi --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub Release asset upload failed with exit code $LASTEXITCODE"
+          }

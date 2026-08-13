@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-08-05
+Last updated: 2026-08-13
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.

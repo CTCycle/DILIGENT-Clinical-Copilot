@@ -1,5 +1,5 @@
 # DILIGENT Desktop Release
-Last updated: 2026-08-06
+Last updated: 2026-08-13
 
 ## Packaging architecture
 
@@ -18,17 +18,17 @@ The runtime allowlist excludes source code, tests, documentation, credentials, `
 
 ## Current source and artifact status
 
-The current source manifests report version `3.0.0`. The `v3.0.0` desktop release
+The current source manifests report version `3.1.0`. The `v3.1.0` desktop release
 is created from the synchronized `main` branch. Publication is confirmed only
 after the portable EXE and MSI, annotated tag, remote-release metadata, and
 downloaded hash evidence have all been verified.
 
-The expected output names for a verified `3.0.0` build are:
+The expected output names for a verified `3.1.0` build are:
 
 ```text
-release/DILIGENT-v3.0.0-windows-x64-portable.exe
-release/DILIGENT-v3.0.0-windows-x64.msi
-release/DILIGENT-v3.0.0-windows-x64.sha256
+release/DILIGENT-v3.1.0-windows-x64-portable.exe
+release/DILIGENT-v3.1.0-windows-x64.msi
+release/DILIGENT-v3.1.0-windows-x64.sha256
 ```
 
 The portable executable is a single distribution file for no-install use. The MSI installs the same Tauri shell and packaged runtime. The `.sha256` file contains one SHA-256 entry per built artifact and must be checked before distribution. Publication requires separate tag, remote-release, and download/hash evidence.
@@ -63,7 +63,7 @@ Artifact cleanup and MSI uninstall do not remove this user data. The extracted r
 Run on a Windows x64 host with Rust/Cargo, the Windows build toolchain, the pinned portable runtimes, and network access for dependencies and the default WebView2 bootstrapper:
 
 ```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.0.0 -DesktopTarget All -Force
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.1.0 -DesktopTarget All -Force
 ```
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a clean worktree by default; use `-AllowDirtyTree` only when the dirty state is intentional and recorded. `-OfflineWebView2` is valid only with `-DesktopTarget Msi` or `All` and changes the MSI WebView2 installation mode.
@@ -71,6 +71,10 @@ Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release 
 Final desktop artifacts are written directly to `release/`. Intermediate desktop staging remains under `release/.staging/`; Tauri's native Cargo output remains under `app/desktop/src-tauri/target/release/`.
 
 The build refuses to complete if the frozen backend, runtime manifest, artifact size, or MSI metadata checks fail. The portable artifact is the raw Tauri release executable copied to `release/` after those checks; remote publication is a separate maintainer action.
+
+## GitHub Actions publication
+
+`.github/workflows/release.yml` runs on a `vX.Y.Z` tag. It builds both Windows desktop targets from that tagged commit, creates or updates the matching GitHub Release, and attaches the portable EXE and MSI. The generated `.sha256` manifest remains a local maintainer-side verification file. Create the tag only after `develop` and `main` have been synchronized and local release validation has passed.
 
 ## Validation
 
@@ -88,7 +92,7 @@ After publishing, perform a Windows host smoke test by opening the portable EXE,
 ## Cleanup
 
 ```powershell
-.\start_on_windows.ps1 -Action RemoveDesktopRelease -Version 3.0.0
+.\start_on_windows.ps1 -Action RemoveDesktopRelease -Version 3.1.0
 .\start_on_windows.ps1 -Action RemoveDesktopRelease -AllDesktopReleases
 ```
 
