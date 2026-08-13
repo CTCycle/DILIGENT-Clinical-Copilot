@@ -1,5 +1,5 @@
 # System Overview
-Last updated: 2026-08-02
+Last updated: 2026-08-13
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
@@ -90,5 +90,7 @@ Maintained source-level structure, with build and cache artifacts omitted:
 - Packaged desktop: the Tauri shell in `app/desktop/src-tauri` extracts a verified runtime, starts `DILIGENTBackend.exe` on a random localhost port, and loads the Angular build served by FastAPI. Node.js is not part of the packaged runtime.
 
 The release pipeline produces a no-install portable EXE, an MSI, and a SHA-256 manifest. The EXE and MSI share the same embedded deterministic runtime archive; the shell keeps mutable user data outside that archive under `%LOCALAPPDATA%\DILIGENT\data`.
+
+The tag-triggered `.github/workflows/release.yml` rebuilds both Windows artifacts from the release tag and attaches the portable EXE and MSI to the matching GitHub Release.
 
 Backend ownership is explicit: API endpoints call services, services orchestrate domain contracts, and focused repositories own persistence. Repository helpers are pure serializers and value converters, while the deterministic `ExposureTimelineService` and explicitly injected Hepatox subservices remain independent of the HTTP layer. The local database is recreated with `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs` when a clean schema cutover is required.

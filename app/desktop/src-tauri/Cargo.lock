@@ -596,7 +596,7 @@ dependencies = [
 
 [[package]]
 name = "diligent-desktop"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "open",
  "reqwest 0.12.28",
