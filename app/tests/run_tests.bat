@@ -169,9 +169,11 @@ if defined MODELCONFIG_KIND (
 
   set "RUN_DB=%TEMP%\diligent-modelconfig-runner.!TIMESTAMP!.db"
   set "PYTEST_CACHE=%TEMP%\diligent-modelconfig-pytest-cache.!TIMESTAMP!"
+  set "PYTEST_BASETEMP=%TESTS_DIR%\.basetemp-modelconfig"
   set "DILIGENT_SQLITE_PATH=!RUN_DB!"
-  set "PYTEST_ADDOPTS=-o cache_dir=!PYTEST_CACHE!"
+  set "PYTEST_TEMP_ARGS=--basetemp "!PYTEST_BASETEMP!" -o cache_dir="!PYTEST_CACHE!""
   if exist "!RUN_DB!" del /f "!RUN_DB!" >nul 2>&1
+  if exist "!PYTEST_BASETEMP!" rmdir /s /q "!PYTEST_BASETEMP!" >nul 2>&1
 )
 
 if "%NEED_BACKEND%"=="1" (
@@ -230,7 +232,7 @@ if defined MODELCONFIG_KIND (
   set "MC_FLOW=%TESTS_DIR%\e2e\test_app_flow.py"
 
   echo [STEP] Running model-config unit tests...
-  "%PYTHON_CMD%" -m pytest "!MC_UNIT!" -q
+  "%PYTHON_CMD%" -m pytest "!MC_UNIT!" -q !PYTEST_TEMP_ARGS!
   if errorlevel 1 set "TEST_RESULT=1" & goto cleanup
 
   set "APP_TEST_BACKEND_URL=http://127.0.0.1:7690"
@@ -239,10 +241,10 @@ if defined MODELCONFIG_KIND (
   if /i "%MODELCONFIG_KIND%"=="slice" (
     set "MC_K=runtime_toggle_enables_save_and_submits_put or model_config or dili_run_burst_click_submits_single_job or dili_run_conflict_surfaces_clear_error_message"
     echo [STEP] Running model-config API + app-flow e2e slice...
-    "%PYTHON_CMD%" -m pytest "!MC_API!" "!MC_FLOW!" -k "!MC_K!" -q
+    "%PYTHON_CMD%" -m pytest "!MC_API!" "!MC_FLOW!" -k "!MC_K!" -q !PYTEST_TEMP_ARGS!
   ) else (
     echo [STEP] Running full model-config API + app-flow e2e suite...
-    "%PYTHON_CMD%" -m pytest "!MC_API!" "!MC_FLOW!" -q
+    "%PYTHON_CMD%" -m pytest "!MC_API!" "!MC_FLOW!" -q !PYTEST_TEMP_ARGS!
   )
   if errorlevel 1 set "TEST_RESULT=1"
   goto cleanup
@@ -259,5 +261,8 @@ if "%STARTED_BACKEND%"=="1" (
 if "%STARTED_FRONTEND%"=="1" (
   for /f "tokens=5" %%P in ('netstat -ano ^| findstr LISTENING ^| findstr ":%UI_PORT%"') do taskkill /PID %%P /F >nul 2>&1
 )
+if defined PYTEST_BASETEMP if exist "!PYTEST_BASETEMP!" rmdir /s /q "!PYTEST_BASETEMP!" >nul 2>&1
+if defined PYTEST_CACHE if exist "!PYTEST_CACHE!" rmdir /s /q "!PYTEST_CACHE!" >nul 2>&1
+if defined RUN_DB if exist "!RUN_DB!" del /f "!RUN_DB!" >nul 2>&1
 
 exit /b %TEST_RESULT%
