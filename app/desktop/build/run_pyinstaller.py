@@ -20,6 +20,11 @@ if hasattr(os, "add_dll_directory"):
     if _venv_bin.is_dir():
         _dll_directory_handles.append(os.add_dll_directory(str(_venv_bin)))
 
+# Load ctypes while the matching embedded Python DLL directory is explicitly
+# active. This prevents a hosted runner's other Python installation from
+# winning the dependency lookup when PyInstaller later imports ctypes.util.
+import ctypes  # noqa: E402, F401
+
 # Load the supported native compatibility backend before PyInstaller's
 # dependency scanner reaches ctypes.util on affected hosted runners.
 import cffi  # noqa: E402, F401
