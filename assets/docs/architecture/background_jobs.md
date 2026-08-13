@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-08-02
+Last updated: 2026-08-13
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -49,6 +49,9 @@ Each job tracks:
 - `rag_update`
   - Start: `POST /api/inspection/rag/jobs`
   - Poll or cancel: `GET|DELETE /api/inspection/rag/jobs/{job_id}`
+- `session_timeline`
+  - Start: `POST /api/inspection/sessions/{session_id}/timeline-jobs`
+  - Poll or cancel: `GET|DELETE /api/inspection/sessions/{session_id}/timeline-jobs/{job_id}`
 
 ## Polling Contract
 1. Start endpoints return `JobStartResponse` with `job_id`, `status`, and `poll_interval`.

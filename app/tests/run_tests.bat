@@ -175,7 +175,7 @@ if defined MODELCONFIG_KIND (
 )
 
 if "%NEED_BACKEND%"=="1" (
-  curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
+  curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/api/health" >nul 2>&1
   if errorlevel 1 (
     echo [INFO] Starting backend server...
     start "" /B /D "%BACKEND_WORKDIR%" "%PYTHON_CMD%" -m uvicorn %UVICORN_APP% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning
@@ -187,7 +187,7 @@ if "%NEED_BACKEND%"=="1" (
   set "BACKEND_READY=0"
   for /l %%I in (1,1,90) do (
     if "!BACKEND_READY!"=="0" (
-      curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
+      curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/api/health" >nul 2>&1
       if not errorlevel 1 (
         set "BACKEND_READY=1"
       ) else (

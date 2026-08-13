@@ -1,5 +1,5 @@
 # QA Regression
-Last updated: 2026-08-02
+Last updated: 2026-08-13
 
 ## Scope
 This file captures the repeatable regression slice for model configuration and app-flow validation.
