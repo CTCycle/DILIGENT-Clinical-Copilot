@@ -76,7 +76,7 @@ The build refuses to complete if the frozen backend, runtime manifest, artifact 
 
 `.github/workflows/release.yml` runs on a `vX.Y.Z` tag. It builds both Windows desktop targets from that tagged commit, creates or updates the matching GitHub Release, and attaches the portable EXE and MSI. The generated `.sha256` manifest remains a local maintainer-side verification file. Create the tag only after `develop` and `main` have been synchronized and local release validation has passed.
 
-The workflow uses the launcher's pinned portable Python runtime rather than installing a second host Python. This keeps the PyInstaller build on the same embedded-Python and DLL set used by the release launcher on hosted Windows runners.
+The workflow uses the launcher's pinned portable Python runtime rather than installing a second host Python. It also removes alternate Python and AWS CLI directories from the hosted build PATH so PyInstaller resolves the same embedded-Python and DLL set used by the release launcher.
 
 ## Validation
 
