@@ -683,7 +683,8 @@ function Build-DesktopBackend {
     $workPath = Join-Path $DesktopBuildDir 'pyinstaller-work'
     New-Item -ItemType Directory -Path $distPath, $workPath -Force | Out-Null
     Invoke-Checked -FilePath $VenvPython -WorkingDirectory $RepoRoot -ArgumentList @(
-        '-m', 'PyInstaller', '--noconfirm', '--clean', '--distpath', $distPath, '--workpath', $workPath,
+        (Join-Path $DesktopDir 'build/run_pyinstaller.py'), '--noconfirm', '--clean', '--distpath', $distPath,
+        '--workpath', $workPath,
         (Join-Path $DesktopDir 'build/diligent_backend.spec')
     )
     $backendRoot = Join-Path $distPath 'DILIGENTBackend'
