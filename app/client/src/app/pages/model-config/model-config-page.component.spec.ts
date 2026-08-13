@@ -152,4 +152,18 @@ describe('ModelConfigPageComponent', () => {
     expect(component.catalogProviderInFlight()).toBeNull();
     expect(component.statusMessage()).toContain('Provider unavailable');
   });
+
+  it('cancels pending reasoning persistence when the page is destroyed', () => {
+    vi.useFakeTimers();
+    const persistSpy = vi
+      .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<void> }, 'persistConfigPatch')
+      .mockResolvedValue();
+
+    component.handleReasoningLevelChange(2);
+    fixture.destroy();
+    vi.advanceTimersByTime(300);
+
+    expect(persistSpy).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
 });

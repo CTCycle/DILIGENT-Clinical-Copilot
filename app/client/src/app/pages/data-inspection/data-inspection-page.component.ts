@@ -3,6 +3,7 @@ import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, 
 import { FormsModule } from '@angular/forms';
 
 import { InspectionActionIconButtonComponent } from '../../components/inspection-action-icon-button/inspection-action-icon-button.component';
+import { InspectionCatalogStatusComponent } from '../../components/inspection-catalog-status/inspection-catalog-status.component';
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import { InspectionCatalogToolbarComponent } from '../../components/inspection-catalog-toolbar/inspection-catalog-toolbar.component';
 import {
@@ -100,6 +101,7 @@ function folderBasename(value: string): string {
     FormsModule,
     ModalShellComponent,
     InspectionActionIconButtonComponent,
+    InspectionCatalogStatusComponent,
     InspectionCatalogToolbarComponent,
   ],
   templateUrl: './data-inspection-page.component.html',

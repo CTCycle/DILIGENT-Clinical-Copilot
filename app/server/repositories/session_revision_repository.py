@@ -649,6 +649,8 @@ class SessionRevisionRepository:
                 return None
             if version.revision_kind != "llm_assisted_revision":
                 raise ValueError("Only LLM-assisted revision versions can be reviewed")
+            if version.session_id is None or version.completed_at is None:
+                raise ValueError("Only completed revision versions can be reviewed")
             reviewer = repository_values.normalize_string(reviewed_by)
             row = ClinicalSessionRevisionReview(revision_version_id=int(version.id), session_id=int(version.session_id) if version.session_id else None, clinical_review_status=clinical_review_status, reviewer_note=repository_values.normalize_string(reviewer_note), reviewed_by=reviewer, actor_id=None, actor_display_name=reviewer, actor_source="manual_entry" if reviewer else "unknown", actor_confidence="unverified", metadata_json=serialize_json_payload(metadata or {}), reviewed_at=datetime.now(UTC))
             db_session.add(row)

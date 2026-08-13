@@ -397,11 +397,27 @@ RxNav and LiverTox evidence before accepting it.
     def build_match_audit_issues(
         self,
         resolved_drugs: dict[str, dict[str, Any]] | None,
+        *,
+        detected_drug_names: list[str] | None = None,
     ) -> list[PipelineIssue]:
         issues: list[PipelineIssue] = []
         if not resolved_drugs:
             return issues
-        for payload in resolved_drugs.values():
+        detected_keys = (
+            {
+                normalize_drug_query_name(name)
+                for name in detected_drug_names
+                if normalize_drug_query_name(name)
+            }
+            if detected_drug_names is not None
+            else None
+        )
+        for key, payload in resolved_drugs.items():
+            if (
+                detected_keys is not None
+                and normalize_drug_query_name(key) not in detected_keys
+            ):
+                continue
             raw_mentions = payload.get("raw_mentions") or []
             raw_label = ", ".join(str(item) for item in raw_mentions if item) or str(
                 payload.get("drug_name") or payload.get("canonical_name") or "unknown"

@@ -422,7 +422,7 @@
                 <p class="clinical-session-panel-note">Create a new draft with a selected revision model. Human review is required before clinical reliance.</p>
               </div>
             </div>
-            <label class="clinical-session-revision-instruction"><span>Revision instruction</span><textarea [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe the report issue."></textarea></label>
+            <label class="clinical-session-revision-instruction"><span>Revision instruction (optional)</span><textarea [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe a report issue or leave blank for a full review."></textarea></label>
             <section class="clinical-session-revision-model-panel" aria-label="Revision model selection">
               <div class="clinical-session-revision-model-header">
                 <div>
