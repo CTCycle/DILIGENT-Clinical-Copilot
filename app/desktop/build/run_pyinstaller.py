@@ -41,8 +41,41 @@ def _import_with_cffi_backend(name, globals=None, locals=None, fromlist=(), leve
 
 builtins.__import__ = _import_with_cffi_backend
 
-from PyInstaller.__main__ import run  # noqa: E402
+from PyInstaller import __main__ as _pyinstaller_main  # noqa: E402
+
+
+def _check_release_builder_context():
+    """Keep PyInstaller's safe working-directory guard without ctypes probing.
+
+    Some hosted Windows images fail loading the builder interpreter's
+    ``_ctypes`` extension while PyInstaller checks administrator elevation.
+    That check is advisory; the working-directory guard remains relevant to
+    release builds.
+    """
+
+    if not _pyinstaller_main.compat.is_win:
+        return
+
+    cwd = Path.cwd().resolve()
+    try:
+        windows_dir = _pyinstaller_main.compat.win32api.GetWindowsDirectory()
+    except Exception:
+        windows_dir = None
+    windows_dir = None if windows_dir is None else Path(windows_dir).resolve()
+    inside_windows_dir = windows_dir is not None and (cwd == windows_dir or windows_dir in cwd.parents)
+    if inside_windows_dir:
+        home_dir = Path.home().resolve()
+        if cwd == home_dir or home_dir in cwd.parents:
+            inside_windows_dir = False
+    if inside_windows_dir:
+        raise SystemExit(
+            f"ERROR: Do not run pyinstaller from {cwd}. cd to where your code is and run pyinstaller from there. "
+            "Hint: open a terminal at the repository before running the release builder."
+        )
+
+
+_pyinstaller_main.check_unsafe_privileges = _check_release_builder_context
 
 
 if __name__ == "__main__":
-    run()
+    _pyinstaller_main.run()
