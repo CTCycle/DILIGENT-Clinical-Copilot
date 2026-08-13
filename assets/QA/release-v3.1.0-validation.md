@@ -6,7 +6,7 @@ Previous release: `v3.0.0` at `d60ddf2d`
 
 ## Release delta reviewed
 
-The review covered the full `v3.0.0..HEAD` delta, with emphasis on the latest feature commits `f7c4b12a` and `45b0ca32`, plus the release-hardening fixes `d5b74767` and `f003958e`:
+The review covered the full `v3.0.0..HEAD` delta, with emphasis on the latest feature commits `f7c4b12a` and `45b0ca32`, plus the release-hardening fixes `d5b74767`, `f003958e`, `7fc8c4c0`, and `9a298e14`:
 
 - Clinical-session metadata, review, preflight, timeline, and report-generation paths.
 - Removal of the obsolete synchronous timeline-generation API and the associated backend/frontend contract cleanup.
@@ -24,15 +24,15 @@ The review covered the full `v3.0.0..HEAD` delta, with emphasis on the latest fe
 | Direct model-config and app-flow E2E | PASS | 23 passed, 3 skipped, 1 warning in 20.36s. The skips require persisted inspection sessions and are not applicable to the disposable SQLite database. |
 | Browser UI smoke | PASS | In-app Browser loaded the app and exercised Clinical Sessions, Data Inspection, and Configurations. No browser console errors or warnings were reported. |
 | Development runtime | PASS | Backend/frontend startup succeeded; health, navigation, API loading, persistence initialization, and affected UI surfaces were exercised. |
-| Release build | PASS | `.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.1.0 -DesktopTarget All -Force` produced both Windows artifacts from the release configuration after the launcher was corrected to register the release venv DLL directory and invoke the PyInstaller bootstrap. |
+| Release build | PASS | `.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.1.0 -DesktopTarget All -Force` produced both Windows artifacts from the final release configuration after the launcher was corrected to register the release venv DLL directory and invoke the PyInstaller bootstrap. |
 | Portable package smoke | PASS | `DILIGENT-v3.1.0-windows-x64-portable.exe` passed two launches from the final local rebuild, including a first launch with a stale readiness marker and a consecutive restart; each fresh bundled backend reported `release_version: 3.1.0`, `/api/health` returned HTTP 200 with `{"status":"ok"}`, `/` returned HTTP 200, WebView2 loaded the frontend/assets, and SQLite initialization completed. |
 | MSI artifact | PASS | `DILIGENT-v3.1.0-windows-x64.msi` was generated and its SHA-256 matched the release manifest. |
-| Artifact checksums | PASS | Final local rebuild portable: `acd10eeab4056f19f1148b7caf116af38b9eb1a1c2b50711084006d6df8e7d28`; MSI: `7b757b32dda6c71f3f12f7e2317dc914d594f14b539a81634a3348cb46eef51c`. |
+| Artifact checksums | PASS | Final local rebuild portable: `58a8b3c408e13e560a1b623c6302efb8b613eb9c161f4d276997afd42a6145af`; MSI: `c3ac1a0e701a18e2df0a3c2b957acfc392989af585ee861dbbf384bc2377d185`. |
 | Release workflow | PASS | `.github/workflows/release.yml` validates `vX.Y.Z` tags, builds both desktop targets, verifies artifacts, and creates/updates the matching GitHub Release with the EXE and MSI attached. |
 
 The repository runner's assertions passed for the model-config slice (33 unit tests and 8 selected E2E tests), but the Windows wrapper did not terminate cleanly in the managed console after its child processes exited. This is recorded as an environment-limited runner cleanup issue; the same affected tests passed directly in fresh processes, and the exact task-owned listeners were stopped afterward.
 
-The first five GitHub Actions release attempts reached the build step but failed on hosted-Windows Python isolation: the `pyinstaller.exe` entrypoint and then `python -m PyInstaller` could not import `pywin32-ctypes`, while the corrected wrapper then exposed a `_ctypes` DLL collision during PyInstaller's advisory administrator probe. The wrapper now registers the release venv's DLL directory, selects the compatible cffi backend, and retains PyInstaller's working-directory safety guard without that nonessential ctypes probe. The release workflow relies only on the launcher's pinned portable Python runtime. The final local release rebuild passed, including the frozen-backend smoke test and Tauri MSI packaging; the synchronized `v3.1.0` tag must be retried from this final builder correction.
+The first five GitHub Actions release attempts reached the build step but failed on hosted-Windows Python isolation: the `pyinstaller.exe` entrypoint and then `python -m PyInstaller` could not import `pywin32-ctypes`, while the corrected wrapper then exposed a `_ctypes` DLL collision during PyInstaller's advisory administrator probe. The wrapper now registers the release venv's DLL directory, selects the compatible cffi backend, and retains PyInstaller's working-directory safety guard without that nonessential ctypes probe. The release workflow relies only on the launcher's pinned portable Python runtime. The final local release rebuild passed, including the frozen-backend smoke test and Tauri MSI packaging; the synchronized `v3.1.0` tag is the hosted publication gate for this final builder correction.
 
 During the final packaged smoke test, a stale `desktop-backend-ready.json` from a prior run reproduced a real restart failure: Tauri accepted the old PID before the new backend had published its contract. Commit `f003958e` removes the stale marker before spawning the backend. The rebuilt portable package then passed both the stale-marker first launch and the immediate restart check with fresh backend PIDs and HTTP 200 health/root responses.
 
