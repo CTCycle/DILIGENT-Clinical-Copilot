@@ -43,6 +43,9 @@ impl BackendProcess {
         fs::create_dir_all(&state_root).map_err(|error| error.to_string())?;
         fs::create_dir_all(&log_root).map_err(|error| error.to_string())?;
         let ready_file = state_root.join("desktop-backend-ready.json");
+        if ready_file.is_file() {
+            fs::remove_file(&ready_file).map_err(|error| error.to_string())?;
+        }
         let log_path = log_root.join("desktop-backend.log");
         rotate_log(&log_path)?;
         let log = OpenOptions::new()
