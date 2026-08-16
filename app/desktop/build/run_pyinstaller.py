@@ -16,8 +16,18 @@ _original_import = builtins.__import__
 # libffi-8.dll before PyInstaller imports ctypes.
 _dll_directory_handles = []
 _venv_bin = Path(sys.executable).resolve().parent
+_repo_root = Path(__file__).resolve().parents[3]
+_embedded_runtime = _repo_root / "runtimes" / "python"
+
+
+def _is_hosted_python_path(entry):
+    normalized = str(Path(entry).resolve()).replace("\\", "/").lower()
+    return "/hostedtoolcache/windows/python/" in normalized
+
+
+sys.path[:] = [entry for entry in sys.path if not entry or not _is_hosted_python_path(entry)]
 _native_dll_dirs = []
-for _candidate in [_venv_bin, *(Path(_entry) for _entry in sys.path if _entry)]:
+for _candidate in (_venv_bin, _embedded_runtime):
     if not _candidate.is_dir() or _candidate in _native_dll_dirs:
         continue
     if any((_candidate / _name).is_file() for _name in ("libffi-8.dll", "python314.dll", "python3.dll", "_ctypes.pyd")):
