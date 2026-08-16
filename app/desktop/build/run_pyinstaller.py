@@ -31,6 +31,18 @@ if hasattr(os, "add_dll_directory"):
 import cffi  # noqa: E402, F401
 import _cffi_backend  # noqa: E402, F401
 
+# Resolve the matching libffi pair explicitly before Python loads _ctypes. The
+# hosted runner can still have a same-named DLL available through Windows'
+# default search locations even after PATH and add_dll_directory isolation.
+_ffi = cffi.FFI()
+_ffi.cdef("void *LoadLibraryW(const wchar_t *lpFileName);")
+_kernel32 = _ffi.dlopen("kernel32.dll")
+_libffi_path = _venv_bin / "libffi-8.dll"
+if _libffi_path.is_file():
+    _libffi_handle = _kernel32.LoadLibraryW(_ffi.new("wchar_t[]", str(_libffi_path)))
+    if _libffi_handle == _ffi.NULL:
+        raise OSError(f"unable to load release libffi: {_libffi_path}")
+
 # Load ctypes while the matching embedded Python DLL directory is explicitly
 # active. This prevents a hosted runner's other Python installation from
 # winning the dependency lookup when PyInstaller later imports ctypes.util.
