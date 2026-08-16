@@ -285,11 +285,18 @@ function Set-LauncherEnvironment {
         if (-not $entry) {
             continue
         }
-        $hasConflictingNativeRuntime = $false
-        foreach ($nativeName in $nativeNames) {
-            if (Test-Path -LiteralPath (Join-Path $entry $nativeName)) {
-                $hasConflictingNativeRuntime = $true
-                break
+        $hasConflictingNativeRuntime = (
+            $entry -match '(?i)[\\/]Git[\\/]usr[\\/]bin(?:[\\/]|$)' -or
+            $entry -match '(?i)(?:^|[\\/])mingw(?:64)?[\\/]bin(?:[\\/]|$)' -or
+            $entry -match '(?i)[\\/]Amazon[\\/]AWSCLIV2(?:[\\/]|$)' -or
+            $entry -match '(?i)[\\/]Python(?:[0-9.]*)?(?:[\\/]|$)'
+        )
+        if (-not $hasConflictingNativeRuntime) {
+            foreach ($nativeName in $nativeNames) {
+                if (Test-Path -LiteralPath (Join-Path $entry $nativeName)) {
+                    $hasConflictingNativeRuntime = $true
+                    break
+                }
             }
         }
         if (-not $hasConflictingNativeRuntime) {

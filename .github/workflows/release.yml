@@ -43,11 +43,18 @@ jobs:
             if (-not $entry) {
               continue
             }
-            $hasConflictingNativeRuntime = $false
-            foreach ($nativeName in $nativeNames) {
-              if (Test-Path -LiteralPath (Join-Path $entry $nativeName)) {
-                $hasConflictingNativeRuntime = $true
-                break
+            $hasConflictingNativeRuntime = (
+              $entry -match '(?i)[\\/]Git[\\/]usr[\\/]bin(?:[\\/]|$)' -or
+              $entry -match '(?i)(?:^|[\\/])mingw(?:64)?[\\/]bin(?:[\\/]|$)' -or
+              $entry -match '(?i)[\\/]Amazon[\\/]AWSCLIV2(?:[\\/]|$)' -or
+              $entry -match '(?i)[\\/]Python(?:[0-9.]*)?(?:[\\/]|$)'
+            )
+            if (-not $hasConflictingNativeRuntime) {
+              foreach ($nativeName in $nativeNames) {
+                if (Test-Path -LiteralPath (Join-Path $entry $nativeName)) {
+                  $hasConflictingNativeRuntime = $true
+                  break
+                }
               }
             }
             if (-not $hasConflictingNativeRuntime) {
@@ -69,6 +76,32 @@ jobs:
             throw "Unsupported release tag: $env:RELEASE_TAG"
           }
           $version = $Matches.version
+          $nativeNames = @('libffi-8.dll', 'python314.dll', 'python3.dll', '_ctypes.pyd')
+          $cleanPath = foreach ($entry in ($env:PATH -split ';')) {
+            if (-not $entry) {
+              continue
+            }
+            $hasConflictingNativeRuntime = (
+              $entry -match '(?i)[\\/]Git[\\/]usr[\\/]bin(?:[\\/]|$)' -or
+              $entry -match '(?i)(?:^|[\\/])mingw(?:64)?[\\/]bin(?:[\\/]|$)' -or
+              $entry -match '(?i)[\\/]Amazon[\\/]AWSCLIV2(?:[\\/]|$)' -or
+              $entry -match '(?i)[\\/]Python(?:[0-9.]*)?(?:[\\/]|$)'
+            )
+            if (-not $hasConflictingNativeRuntime) {
+              foreach ($nativeName in $nativeNames) {
+                if (Test-Path -LiteralPath (Join-Path $entry $nativeName)) {
+                  $hasConflictingNativeRuntime = $true
+                  break
+                }
+              }
+            }
+            if (-not $hasConflictingNativeRuntime) {
+              $entry
+            } else {
+              Write-Host "Build-step removed conflicting native-runtime PATH entry: $entry"
+            }
+          }
+          $env:PATH = $cleanPath -join ';'
           & .\start_on_windows.ps1 -Action BuildDesktopRelease -Version $version -DesktopTarget All -Force
           if ($LASTEXITCODE -ne 0) {
             throw "Desktop release build failed with exit code $LASTEXITCODE"
