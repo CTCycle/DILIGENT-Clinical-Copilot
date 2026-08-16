@@ -18,6 +18,11 @@ _dll_directory_handles = []
 if hasattr(os, "add_dll_directory"):
     _venv_bin = Path(sys.executable).resolve().parent
     if _venv_bin.is_dir():
+        # Put the matching venv DLLs first for Python extension imports too.
+        # ``add_dll_directory`` participates in dependency resolution, but a
+        # hosted runner can still expose a conflicting libffi/Python DLL via
+        # its inherited PATH before the extension is initialized.
+        os.environ["PATH"] = f"{_venv_bin}{os.pathsep}{os.environ.get('PATH', '')}"
         _dll_directory_handles.append(os.add_dll_directory(str(_venv_bin)))
 
 # Load ctypes while the matching embedded Python DLL directory is explicitly

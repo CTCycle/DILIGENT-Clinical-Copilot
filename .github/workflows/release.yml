@@ -38,10 +38,23 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $cleanPath = $env:PATH -split ';' | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)[\\/]Amazon[\\/]AWSCLIV2(?:[\\/]|$)' -and
-            $_ -notmatch '(?i)[\\/]Python(?:[0-9.]*)?(?:[\\/]|$)'
+          $nativeNames = @('libffi-8.dll', 'python314.dll', 'python3.dll', '_ctypes.pyd')
+          $cleanPath = foreach ($entry in ($env:PATH -split ';')) {
+            if (-not $entry) {
+              continue
+            }
+            $hasConflictingNativeRuntime = $false
+            foreach ($nativeName in $nativeNames) {
+              if (Test-Path -LiteralPath (Join-Path $entry $nativeName)) {
+                $hasConflictingNativeRuntime = $true
+                break
+              }
+            }
+            if (-not $hasConflictingNativeRuntime) {
+              $entry
+            } else {
+              Write-Host "Removed conflicting native-runtime PATH entry: $entry"
+            }
           }
           $env:PATH = $cleanPath -join ';'
           "PATH=$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
