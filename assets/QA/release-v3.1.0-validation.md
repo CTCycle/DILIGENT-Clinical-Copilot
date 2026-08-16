@@ -1,7 +1,7 @@
 # DILIGENT Clinical Copilot v3.1.0 release validation
 
 Date: 2026-08-16
-Release candidate: final mainline release preparation after the hosted packaging bootstrap fix
+Release candidate: final mainline release preparation after the hosted launcher PATH fix
 Previous release: `v3.0.0` at `d60ddf2d`
 
 ## Release delta reviewed
@@ -32,7 +32,7 @@ The review covered the full `v3.0.0..HEAD` delta, with emphasis on the latest fe
 
 The repository runner's assertions passed for the model-config slice (33 unit tests and 8 selected E2E tests), but the Windows wrapper did not terminate cleanly in the managed console after its child processes exited. This is recorded as an environment-limited runner cleanup issue; the same affected tests passed directly in fresh processes, and the exact task-owned listeners were stopped afterward.
 
-The first nine GitHub Actions release attempts reached the build step but failed on hosted-Windows Python isolation: the `pyinstaller.exe` entrypoint and then `python -m PyInstaller` could not import `pywin32-ctypes`, while the corrected wrapper then exposed a `_ctypes` DLL collision during PyInstaller's advisory administrator probe, dependency scanner, and bootstrap import. The wrapper now registers and prepends the release venv's DLL directory, eagerly loads `ctypes` before the supported CFFI backend, selects that compatibility path, and retains PyInstaller's working-directory safety guard without the nonessential ctypes privilege probe. The release workflow now removes any inherited PATH entry containing a competing Python, `libffi`, or `_ctypes` native file before invoking the pinned runtime. The final local release rebuild passed, including the frozen-backend smoke test and Tauri MSI packaging; the synchronized `v3.1.0` tag run is the hosted publication gate for this final builder correction.
+The first ten GitHub Actions release attempts reached the build step but failed on hosted-Windows Python isolation: the `pyinstaller.exe` entrypoint and then `python -m PyInstaller` could not import `pywin32-ctypes`, while the corrected wrapper then exposed a `_ctypes` DLL collision during PyInstaller's advisory administrator probe, dependency scanner, and bootstrap import. The wrapper now registers and prepends the release venv's DLL directory, eagerly loads `ctypes` before the supported CFFI backend, selects that compatibility path, and retains PyInstaller's working-directory safety guard without the nonessential ctypes privilege probe. The launcher now removes any inherited PATH entry containing a competing Python, `libffi`, or `_ctypes` native file immediately before starting the venv, covering hosted runners that reconstruct PATH between workflow steps. The final local release rebuild passed, including the frozen-backend smoke test and Tauri MSI packaging; the next synchronized `v3.1.0` tag run is the hosted publication gate for this final builder correction.
 
 During the final packaged smoke test, a stale `desktop-backend-ready.json` from a prior run reproduced a real restart failure: Tauri accepted the old PID before the new backend had published its contract. Commit `f003958e` removes the stale marker before spawning the backend. The rebuilt portable package then passed both the stale-marker first launch and the immediate restart check with fresh backend PIDs and HTTP 200 health/root responses.
 
