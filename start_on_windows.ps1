@@ -275,6 +275,32 @@ function Set-LauncherEnvironment {
     Remove-Item Env:PYTHONHOME -ErrorAction SilentlyContinue
     Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
     Remove-Item Env:PYTHONNOUSERSITE -ErrorAction SilentlyContinue
+
+    # Hosted Windows runners can reinsert Git/AWS/Python directories into
+    # PATH between workflow steps. Keep the release venv's native Python DLLs
+    # ahead of, and isolated from, any competing libffi/_ctypes pair before
+    # starting the venv interpreter.
+    $nativeNames = @('libffi-8.dll', 'python314.dll', 'python3.dll', '_ctypes.pyd')
+    $cleanPath = foreach ($entry in ($env:PATH -split ';')) {
+        if (-not $entry) {
+            continue
+        }
+        $hasConflictingNativeRuntime = $false
+        foreach ($nativeName in $nativeNames) {
+            if (Test-Path -LiteralPath (Join-Path $entry $nativeName)) {
+                $hasConflictingNativeRuntime = $true
+                break
+            }
+        }
+        if (-not $hasConflictingNativeRuntime) {
+            $entry
+        }
+        else {
+            Write-Info "Ignoring conflicting native-runtime PATH entry: $entry"
+        }
+    }
+    $venvBin = Split-Path -Parent $VenvPython
+    $env:PATH = "$venvBin;$($cleanPath -join ';')"
 }
 
 function Install-ApplicationDependencies {
