@@ -4,13 +4,14 @@ import asyncio
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from domain.patient_timeline import (
     PatientTimeline,
     PatientTimelineEvent,
+    PatientTimelineGenerationErrorCode,
     SessionTimelineModelOverrides,
 )
 from services.inspection.normalization import (
@@ -28,7 +29,7 @@ def _report_progress(
     if callback is not None:
         callback(progress, message)
 
-_TIMELINE_ERROR_CODES = frozenset(
+_TIMELINE_ERROR_CODES: frozenset[PatientTimelineGenerationErrorCode] = frozenset(
     {
         "network_unavailable",
         "timeout",
@@ -43,7 +44,7 @@ _TIMELINE_ERROR_CODES = frozenset(
 )
 
 ###############################################################################
-def _timeline_error_code(exc: BaseException) -> str:
+def _timeline_error_code(exc: BaseException) -> PatientTimelineGenerationErrorCode:
     current: BaseException | None = exc
     visited: set[int] = set()
     provider_error_seen = False
@@ -51,7 +52,7 @@ def _timeline_error_code(exc: BaseException) -> str:
         visited.add(id(current))
         candidate = str(getattr(current, "error_code", "") or "").strip()
         if candidate in _TIMELINE_ERROR_CODES and candidate != "provider_error":
-            return candidate
+            return cast(PatientTimelineGenerationErrorCode, candidate)
         provider_error_seen = provider_error_seen or candidate == "provider_error"
         text = " ".join(str(current).split()).casefold()
         if any(token in text for token in ("401", "403", "authentication", "api key", "credential")):
@@ -90,7 +91,7 @@ def _timeline_fallback_note(
     use_cloud_services: bool,
     provider: object,
     model: object,
-    error_code: str,
+    error_code: PatientTimelineGenerationErrorCode,
 ) -> str:
     provider_label = coerce_optional_str(provider) or "configured provider"
     model_label = coerce_optional_str(model) or "configured model"
@@ -214,7 +215,7 @@ class InspectionTimelineMixin:
         session_id: int,
         source: dict[str, Any],
         generation_note: str | None = None,
-        generation_error_code: str | None = None,
+        generation_error_code: PatientTimelineGenerationErrorCode | None = None,
     ) -> PatientTimeline:
         events: list[PatientTimelineEvent] = []
 
