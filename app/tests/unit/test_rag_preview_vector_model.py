@@ -5,7 +5,7 @@ from services.runtime.jobs import JobManager
 from repository_fixtures import build_repository_graph
 
 ###############################################################################
-def test_rag_preview_includes_vector_model(monkeypatch) -> None:
+def test_rag_preview_includes_vector_model(monkeypatch, tmp_path) -> None:
     graph = build_repository_graph()
     service = DataInspectionService(
         clinical_session_repository=graph.clinical_session_repository,
@@ -16,14 +16,16 @@ def test_rag_preview_includes_vector_model(monkeypatch) -> None:
         jobs=JobManager(),
     )
 
+    documents_path = tmp_path / "docs"
+    document_path = documents_path / "doc1.txt"
     monkeypatch.setattr(
         "services.inspection.service.DocumentSerializer.collect_document_paths",
-        lambda self: [r"C:\docs\doc1.txt"],
+        lambda self: [str(document_path)],
     )
     monkeypatch.setattr(
         service,
         "get_effective_rag_documents_path",
-        lambda: r"C:\docs",
+        lambda: str(documents_path),
     )
 
     ###############################################################################
