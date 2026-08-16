@@ -15,15 +15,23 @@ _original_import = builtins.__import__
 # interpreter. Hosted Windows runners can otherwise resolve a different
 # libffi-8.dll before PyInstaller imports ctypes.
 _dll_directory_handles = []
-if hasattr(os, "add_dll_directory"):
-    _venv_bin = Path(sys.executable).resolve().parent
-    if _venv_bin.is_dir():
-        # Put the matching venv DLLs first for Python extension imports too.
-        # ``add_dll_directory`` participates in dependency resolution, but a
-        # hosted runner can still expose a conflicting libffi/Python DLL via
-        # its inherited PATH before the extension is initialized.
-        os.environ["PATH"] = f"{_venv_bin}{os.pathsep}{os.environ.get('PATH', '')}"
-        _dll_directory_handles.append(os.add_dll_directory(str(_venv_bin)))
+_venv_bin = Path(sys.executable).resolve().parent
+_native_dll_dirs = []
+for _candidate in [_venv_bin, *(Path(_entry) for _entry in sys.path if _entry)]:
+    if not _candidate.is_dir() or _candidate in _native_dll_dirs:
+        continue
+    if any((_candidate / _name).is_file() for _name in ("libffi-8.dll", "python314.dll", "python3.dll", "_ctypes.pyd")):
+        _native_dll_dirs.append(_candidate)
+
+if _native_dll_dirs:
+    # Put every matching embedded-Python directory first. The _ctypes module
+    # can be imported from either the venv or the pinned runtime root.
+    _native_path = os.pathsep.join(str(_directory) for _directory in _native_dll_dirs)
+    os.environ["PATH"] = f"{_native_path}{os.pathsep}{os.environ.get('PATH', '')}"
+    if hasattr(os, "add_dll_directory"):
+        _dll_directory_handles.extend(
+            os.add_dll_directory(str(_directory)) for _directory in _native_dll_dirs
+        )
 
 # Load the supported native compatibility backend before ctypes. Its native
 # extension binds the matching release-vendor libffi first, avoiding a hosted
@@ -37,11 +45,15 @@ import _cffi_backend  # noqa: E402, F401
 _ffi = cffi.FFI()
 _ffi.cdef("void *LoadLibraryW(const wchar_t *lpFileName);")
 _kernel32 = _ffi.dlopen("kernel32.dll")
-_libffi_path = _venv_bin / "libffi-8.dll"
-if _libffi_path.is_file():
-    _libffi_handle = _kernel32.LoadLibraryW(_ffi.new("wchar_t[]", str(_libffi_path)))
-    if _libffi_handle == _ffi.NULL:
-        raise OSError(f"unable to load release libffi: {_libffi_path}")
+_libffi_path = next(
+    (_directory / "libffi-8.dll" for _directory in _native_dll_dirs if (_directory / "libffi-8.dll").is_file()),
+    None,
+)
+if _libffi_path is None:
+    raise OSError("unable to locate the embedded release libffi-8.dll")
+_libffi_handle = _kernel32.LoadLibraryW(_ffi.new("wchar_t[]", str(_libffi_path)))
+if _libffi_handle == _ffi.NULL:
+    raise OSError(f"unable to load release libffi: {_libffi_path}")
 
 # Load ctypes while the matching embedded Python DLL directory is explicitly
 # active. This prevents a hosted runner's other Python installation from
