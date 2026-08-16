@@ -43,17 +43,38 @@ import _cffi_backend  # noqa: E402, F401
 # hosted runner can still have a same-named DLL available through Windows'
 # default search locations even after PATH and add_dll_directory isolation.
 _ffi = cffi.FFI()
-_ffi.cdef("void *LoadLibraryW(const wchar_t *lpFileName);")
+_ffi.cdef(
+    """
+    void *GetModuleHandleW(const wchar_t *lpModuleName);
+    unsigned long GetModuleFileNameW(void *hModule, wchar_t *lpFilename, unsigned long nSize);
+    void *LoadLibraryW(const wchar_t *lpFileName);
+    """
+)
 _kernel32 = _ffi.dlopen("kernel32.dll")
+
+
+def _loaded_module_path(name):
+    handle = _kernel32.GetModuleHandleW(_ffi.new("wchar_t[]", name))
+    if handle == _ffi.NULL:
+        return None
+    buffer = _ffi.new("wchar_t[]", 512)
+    length = _kernel32.GetModuleFileNameW(handle, buffer, 512)
+    return str(_ffi.string(buffer)) if length else None
+
+
 _libffi_path = next(
     (_directory / "libffi-8.dll" for _directory in _native_dll_dirs if (_directory / "libffi-8.dll").is_file()),
     None,
 )
 if _libffi_path is None:
     raise OSError("unable to locate the embedded release libffi-8.dll")
+print(f"[INFO] PyInstaller native DLL directories: {_native_dll_dirs}", flush=True)
+print(f"[INFO] PyInstaller embedded libffi candidate: {_libffi_path}", flush=True)
+print(f"[INFO] PyInstaller preloaded libffi: {_loaded_module_path('libffi-8.dll')}", flush=True)
 _libffi_handle = _kernel32.LoadLibraryW(_ffi.new("wchar_t[]", str(_libffi_path)))
 if _libffi_handle == _ffi.NULL:
     raise OSError(f"unable to load release libffi: {_libffi_path}")
+print(f"[INFO] PyInstaller loaded libffi: {_loaded_module_path('libffi-8.dll')}", flush=True)
 
 # Load ctypes while the matching embedded Python DLL directory is explicitly
 # active. This prevents a hosted runner's other Python installation from
