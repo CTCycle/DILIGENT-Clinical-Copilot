@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from common import runtime_layout
@@ -17,7 +19,7 @@ def test_source_layout_preserves_repository_paths(monkeypatch: pytest.MonkeyPatc
     layout = runtime_layout.resolve_runtime_layout()
 
     assert layout.packaged is False
-    assert layout.runtime_root.name == "DILIGENT Clinical Copilot"
+    assert layout.runtime_root == Path(runtime_layout.__file__).resolve().parents[3]
     assert layout.application_root.name == "app"
     assert layout.settings_root == layout.settings_template_root
     assert layout.mutable_resources_root == layout.immutable_resources_root
