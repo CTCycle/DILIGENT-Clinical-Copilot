@@ -846,7 +846,10 @@ function Publish-DesktopArtifacts {
         Test-PortableDesktopArtifact -Path $portable
     }
     if ($DesktopTarget -in @('Msi', 'All')) {
-        $builtMsi = Get-ChildItem -LiteralPath (Join-Path $DesktopTauriDir 'target/release/bundle/msi') -Filter '*.msi' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+        $builtMsi = Get-ChildItem -LiteralPath (Join-Path $DesktopTauriDir 'target/release/bundle/msi') -Filter '*.msi' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like ("*_{0}_*.msi" -f $Version) } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
         if ($null -eq $builtMsi) { throw 'Tauri MSI artifact was not found' }
         if ((Test-Path -LiteralPath $msi) -and -not $Force) { throw "Release already exists: $msi (use -Force to replace it)" }
         Copy-Item -LiteralPath $builtMsi.FullName -Destination $msi -Force
