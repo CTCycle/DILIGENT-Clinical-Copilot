@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import httpx
 import hashlib
 from datetime import UTC, datetime, timedelta
 
+import httpx
+
+from common.utils.logger import logger
 from domain.llm.providers import CloudModelDescriptor
 from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
 from services.llm.transports.anthropic_messages import AnthropicMessagesTransport
@@ -13,6 +15,7 @@ from services.llm.transports.openai_responses import OpenAIResponsesTransport
 
 ###############################################################################
 class RoutedGatewayTransport(StructuredTransportMixin):
+    _opencode_go_models_path = "/zen/go/v1/models"
     _cache: dict[str, tuple[datetime, list[CloudModelDescriptor]]] = {}
     _cache_ttl = timedelta(minutes=15)
     _opencode_go_anthropic_models = frozenset(
@@ -76,9 +79,21 @@ class RoutedGatewayTransport(StructuredTransportMixin):
 
     # -------------------------------------------------------------------------
     async def chat(self, request: ChatRequest) -> ChatResult:
-        if request.model not in self._models:
-            await self.list_models()
         descriptor = self._models.get(request.model)
+        route_source = "catalog"
+        if descriptor is None and self.models_path == self._opencode_go_models_path:
+            # OpenCode Go has a documented route family even when its catalog is
+            # temporarily unavailable or does not contain the selected model.
+            # Keep the explicit model selection and route it directly instead of
+            # turning a catalog outage into a timeline fallback.
+            descriptor = CloudModelDescriptor(
+                id=request.model,
+                display_name=request.model,
+            )
+            route_source = "known_opencode_go_route"
+        elif descriptor is None:
+            await self.list_models()
+            descriptor = self._models.get(request.model)
         if descriptor is None:
             raise ValueError(
                 "Provider model metadata does not include the requested model"
@@ -111,6 +126,19 @@ class RoutedGatewayTransport(StructuredTransportMixin):
             raise ValueError(
                 f"Unsupported provider model transport: {descriptor.endpoint_family}"
             )
+        message_chars = sum(
+            len(str(message.get("content") or "")) for message in request.messages
+        )
+        logger.info(
+            "Cloud chat request attempted: gateway_path=%s model=%s endpoint=%s "
+            "route_source=%s message_count=%d message_chars=%d",
+            self.models_path,
+            request.model,
+            endpoint,
+            route_source,
+            len(request.messages),
+            message_chars,
+        )
         self._transports.append(transport)
         return await transport.chat(request)
 
@@ -118,7 +146,7 @@ class RoutedGatewayTransport(StructuredTransportMixin):
     def _resolve_transport_endpoint(self, descriptor: CloudModelDescriptor) -> str:
         if descriptor.endpoint_family:
             return descriptor.endpoint_family.lower()
-        if self.models_path != "/zen/go/v1/models":
+        if self.models_path != self._opencode_go_models_path:
             return ""
         if descriptor.id in self._opencode_go_anthropic_models:
             return "messages"
