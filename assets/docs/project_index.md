@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-08-13
+Last updated: 2026-08-17
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -7,11 +7,11 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 ## Current Codebase Snapshot
 
 This documentation describes the checked-out source tree, not a release claim.
-As of 2026-08-13:
+As of 2026-08-17:
 
-- The latest feature commit on `develop` is `45b0ca32`; the release-preparation commit also updates the focused runner and release metadata.
-- Backend, frontend, and desktop source manifests report version `3.1.0`.
-- The `v3.1.0` desktop release target is created from the synchronized `main` branch. Its portable EXE and MSI require independent artifact, tag, remote-release, and download/hash verification; the generated checksum manifest is maintainer-side verification output.
+- The latest application commit on `develop` is `c06edaef`; the release metadata targets the synchronized `main` branch.
+- Backend, frontend, and desktop source manifests report version `3.2.0`.
+- The `v3.2.0` desktop release target is created from the synchronized `main` branch. Its portable EXE and MSI require independent artifact, tag, remote-release, and download/hash verification; the generated checksum manifest is maintainer-side verification output.
 - Model configuration reads are cache-only and non-cacheable. Provider contact is limited to explicit catalog load/refresh operations, and catalog attempts persist in `provider_model_catalog_cache`.
 - The revision workflow remains an issue-scan skeleton. It does not currently plan tools, rewrite reports, rerun DILI adjudication, or persist revised clinical entities.
 - Angular page and component state uses signals/computed state in current model-configuration, access-key, and clinical-session preview surfaces.

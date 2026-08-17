@@ -1,5 +1,5 @@
 # DILIGENT Clinical Copilot
-Last updated: 2026-08-13
+Last updated: 2026-08-17
 
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-GNU%20GPL%20v3-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
@@ -26,9 +26,9 @@ _The main workspace brings clinical intake, run status, and assessment review in
 
 The application deliberately distinguishes model-generated suggestions from persisted, backend-confirmed evidence. Treat all generated clinical text as a draft requiring clinical review.
 
-## v3.1.0 release highlights
+## v3.2.0 release highlights
 
-The v3.1.0 release strengthens clinical-session metadata and human-review handling, adds the asynchronous Patient Timeline job flow with clearer evidence-quality warnings, and tightens model-configuration and drug-matching contract behavior. The release also includes the focused startup/readiness checks used by the Windows regression runner.
+The v3.2.0 release improves Patient Timeline generation for explicitly selected OpenCode Go models by preserving persisted model settings and routing requests even when the model catalog is temporarily unavailable. It also hardens Tauri MSI artifact selection to match the requested release version.
 
 ## Before you use it
 
@@ -43,29 +43,29 @@ The supported deployment profile is local, single-user operation. Network deploy
 
 ## Get the source release
 
-Download `DILIGENT-Clinical-Copilot-3.1.0.zip` from the [v3.1.0 GitHub release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.1.0), extract it, and follow the source-startup instructions below.
+Download `DILIGENT-Clinical-Copilot-3.2.0.zip` from the [v3.2.0 GitHub release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.2.0), extract it, and follow the source-startup instructions below.
 
 The source archive contains the verified repository at the release commit. It is intended for development and local launcher-based operation; it is separate from the Windows desktop packages.
 
 ## Windows desktop release
 
-The v3.1.0 release also publishes these Windows x64 desktop artifacts:
+The v3.2.0 release also publishes these Windows x64 desktop artifacts:
 
 ```text
-release/DILIGENT-v3.1.0-windows-x64-portable.exe
-release/DILIGENT-v3.1.0-windows-x64.msi
+release/DILIGENT-v3.2.0-windows-x64-portable.exe
+release/DILIGENT-v3.2.0-windows-x64.msi
 ```
 
 The portable executable is a single-file Tauri application. It does not require a separate Python, Node.js, Rust, npm, uv, or source checkout on the target machine. On first launch it verifies and extracts the embedded PyInstaller backend and Angular assets under `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>`, starts the backend on a random localhost port, and opens the desktop window. User settings, database, logs, models, source documents, vectors, exports, state, and access-key material remain under `%LOCALAPPDATA%\DILIGENT\data`.
 
-The MSI installs the same Tauri shell and packaged runtime. It may use the configured WebView2 bootstrapper; an offline WebView2 installer is available only when the maintainer builds with `-OfflineWebView2`. The build also generates `release/DILIGENT-v3.1.0-windows-x64.sha256` for maintainer-side verification; the standard GitHub release attaches the portable EXE and MSI only.
+The MSI installs the same Tauri shell and packaged runtime. It may use the configured WebView2 bootstrapper; an offline WebView2 installer is available only when the maintainer builds with `-OfflineWebView2`. The build also generates `release/DILIGENT-v3.2.0-windows-x64.sha256` for maintainer-side verification; the standard GitHub release attaches the portable EXE and MSI only.
 
 To use the published desktop build, download the portable EXE for no-install use or the MSI for an installed shortcut. Desktop startup does not use the development ports `7690` and `9847`.
 
 For maintainers building a release on Windows x64:
 
 ```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.1.0 -DesktopTarget All -Force
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.2.0 -DesktopTarget All -Force
 ```
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a Windows x64 host and a clean worktree unless `-AllowDirtyTree` is supplied explicitly. Add `-OfflineWebView2` only when building an MSI that must install WebView2 without network access. Pushing a `vX.Y.Z` tag runs the Windows packaging workflow in `.github/workflows/release.yml`, which attaches the portable EXE and MSI to the matching GitHub Release. See [desktop release documentation](assets/docs/runtime/desktop_release.md) for the build pipeline, artifact validation, runtime layout, and cleanup.
