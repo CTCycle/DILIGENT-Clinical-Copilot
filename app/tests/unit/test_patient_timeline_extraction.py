@@ -4,15 +4,18 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
+import pytest
 from domain.patient_timeline import (
+    PatientTimeline,
     PatientTimelineEvent,
     PatientTimelineExtraction,
     SessionTimelineModelOverrides,
 )
-from repositories.serialization.session_timelines import build_timeline_preview_payload
-from domain.patient_timeline import PatientTimeline
 from domain.timeline_dates import normalize_timeline_interval
+from repositories.serialization.session_timelines import build_timeline_preview_payload
+from services.clinical import timeline as timeline_service
 from services.clinical.timeline import PatientTimelineExtractor
+
 
 ###############################################################################
 class FakeTimelineClient:
@@ -222,12 +225,53 @@ def test_timeline_model_override_validation_requires_an_unambiguous_runtime_mode
         use_cloud_services=True, llm_provider="openai", cloud_model="gpt-4.1-mini"
     ).cloud_model == "gpt-4.1-mini"
 
-    import pytest
-
     with pytest.raises(ValueError):
         SessionTimelineModelOverrides(use_cloud_services=False)
     with pytest.raises(ValueError):
         SessionTimelineModelOverrides(use_cloud_services=True, llm_provider="openai")
+
+###############################################################################
+def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_select_llm_provider(**kwargs: object) -> dict[str, object]:
+        captured["factory_kwargs"] = kwargs
+        return kwargs
+
+    async def fake_ensure_runtime_client(owner: object, **kwargs: object) -> None:
+        captured["runtime_kwargs"] = kwargs
+        factory = kwargs["client_factory"]
+        assert callable(factory)
+        owner.client = factory("opencode_go", "deepseek-v4-flash")
+        owner.client_provider = "opencode_go"
+        owner.model = "deepseek-v4-flash"
+
+    monkeypatch.setattr(timeline_service, "select_llm_provider", fake_select_llm_provider)
+    monkeypatch.setattr(timeline_service, "ensure_runtime_client", fake_ensure_runtime_client)
+
+    extractor = PatientTimelineExtractor()
+    asyncio.run(
+        extractor.ensure_client(
+            runtime_settings={
+                "use_cloud_services": True,
+                "llm_provider": " OpenCode_Go ",
+                "cloud_model": " deepseek-v4-flash ",
+            }
+        )
+    )
+
+    runtime_kwargs = captured["runtime_kwargs"]
+    assert isinstance(runtime_kwargs, dict)
+    assert runtime_kwargs["provider"] == "opencode_go"
+    assert runtime_kwargs["model"] == "deepseek-v4-flash"
+    factory_kwargs = captured["factory_kwargs"]
+    assert isinstance(factory_kwargs, dict)
+    assert factory_kwargs["provider"] == "opencode_go"
+    assert factory_kwargs["default_model"] == "deepseek-v4-flash"
+    assert extractor.client_provider == "opencode_go"
+    assert extractor.model == "deepseek-v4-flash"
 
 ###############################################################################
 def test_timeline_preview_includes_evidence_and_timing_quality_counts() -> None:

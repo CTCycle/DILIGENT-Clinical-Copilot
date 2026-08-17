@@ -616,6 +616,51 @@ def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> Non
     )
 
 ###############################################################################
+def test_timeline_generation_passes_persisted_opencode_go_settings_to_extractor() -> None:
+    repository_graph, _ = build_repository_graph_for_test()
+    persisted_runtime_settings = {
+        "use_cloud_services": True,
+        "llm_provider": "opencode_go",
+        "cloud_model": "deepseek-v4-flash",
+        "text_extraction_model": "deepseek-v4-flash",
+        "clinical_model": "deepseek-v4-flash",
+    }
+    save_session(
+        repository_graph,
+        patient_name="OpenCode Go Timeline Patient",
+        timestamp=datetime(2025, 1, 1, 8, 30),
+        status="successful",
+        report="OpenCode Go timeline report",
+        anamnesis="OpenCode Go timeline context.",
+        payload={
+            "report": "OpenCode Go timeline report",
+            "issues": [],
+            "runtime_settings": persisted_runtime_settings,
+        },
+    )
+    session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
+        search="OpenCode Go Timeline Patient",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(session_rows[0]["session_id"])
+    extractor = FakeTimelineExtractor()
+    service = build_service(
+        repository_graph, timeline_extractor=extractor, jobs=JobManager()
+    )
+
+    generated = service.generate_session_timeline(session_id, force_regenerate=True)
+
+    assert generated is not None
+    assert extractor.last_runtime_settings is not None
+    assert extractor.last_runtime_settings["use_cloud_services"] is True
+    assert extractor.last_runtime_settings["llm_provider"] == "opencode_go"
+    assert extractor.last_runtime_settings["cloud_model"] == "deepseek-v4-flash"
+
+###############################################################################
 def test_session_payload_timeline_is_not_read_as_history_record() -> None:
     repository_graph, _ = build_repository_graph_for_test()
     payload_timeline = PatientTimeline(

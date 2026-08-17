@@ -20,10 +20,7 @@ from domain.patient_timeline import (
 )
 from domain.timeline_dates import normalize_timeline_interval, timeline_date_sort_key
 from services.llm.client_runtime import ensure_runtime_client
-from services.llm.provider_factory import (
-    initialize_llm_client,
-    select_llm_provider,
-)
+from services.llm.provider_factory import select_llm_provider
 
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATE_SHORT_RE = re.compile(r"^\d{4}-\d{2}$")
@@ -115,21 +112,11 @@ class PatientTimelineExtractor:
             signature=signature,
             track_revision=runtime_settings is None,
             track_signature=runtime_settings is not None,
-            client_factory=(
-                lambda _selected_provider, _selected_model: (
-                    initialize_llm_client(
-                        purpose="parser",
-                        timeout_s=self.timeout_s,
-                        max_retries=0,
-                    )
-                    if runtime_settings is None
-                    else select_llm_provider(
-                        provider=provider,
-                        timeout_s=self.timeout_s,
-                        default_model=model,
-                        max_retries=0,
-                    )
-                )
+            client_factory=lambda selected_provider, selected_model: select_llm_provider(
+                provider=selected_provider,
+                timeout_s=self.timeout_s,
+                default_model=selected_model,
+                max_retries=0,
             ),
         )
 
