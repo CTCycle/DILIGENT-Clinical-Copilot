@@ -8,11 +8,11 @@ DILIGENT Clinical Copilot is a local, single-user decision-support application f
 
 It is a clinical-support tool, not a diagnostic device. A qualified clinician remains responsible for checking every input, output, conclusion, and use of any generated text.
 
-![DILIGENT flow schema](assets/figures/diligent-flow.png)
-_Case intake is validated, analysed through the configured services, saved as a clinical session, and made available for review._
+![DILIGENT assessment flow (v3.2.0)](https://raw.githubusercontent.com/CTCycle/DILIGENT-Clinical-Copilot/main/assets/figures/diligent-flow-v3.2.0.png)
+_The 3.2.0 flow runs deterministic preflight and a polled background job, persists an evidence-bounded session, and ends with human review._
 
-![DILIGENT Clinical Copilot overview](assets/figures/clinical-copilot-overview.png)
-_The main workspace brings clinical intake, run status, and assessment review into one local interface._
+![DILIGENT Clinical Copilot system overview (v3.2.0)](https://raw.githubusercontent.com/CTCycle/DILIGENT-Clinical-Copilot/main/assets/figures/clinical-copilot-overview-v3.2.0.png)
+_The current system keeps the Angular workspace, FastAPI contracts, local persistence, configured model runtime, and human-review boundary explicit._
 
 ## What DILIGENT helps with
 
@@ -126,7 +126,7 @@ For local use, DILIGENT works with chat-capable Ollama models. Ollama must expos
 
 Changing between local and cloud modes requires compatible model roles. The application rejects a configuration that persists cloud-only models under local mode, preventing the model-role mismatch that would otherwise fail later during report generation.
 
-![Configurations](assets/figures/models-configuration.png)
+![Configurations](https://raw.githubusercontent.com/CTCycle/DILIGENT-Clinical-Copilot/main/assets/figures/models-configuration.png)
 _Configurations brings runtime selection, RAG settings, model catalogs, and provider keys into one workspace._
 
 ## Run a DILI assessment
@@ -175,8 +175,8 @@ The structured assessment retains details such as longitudinal events, Hy's Law 
 
 Use the copy or export actions only after a human reviewer has verified the result and added any required local attribution.
 
-![Dashboard view](assets/figures/dashboard.png)
-![Dashboard view](assets/figures/dashboard-dark-theme.png)
+![Dashboard view](https://raw.githubusercontent.com/CTCycle/DILIGENT-Clinical-Copilot/main/assets/figures/dashboard.png)
+![Dashboard view](https://raw.githubusercontent.com/CTCycle/DILIGENT-Clinical-Copilot/main/assets/figures/dashboard-dark-theme.png)
 _The DILI Agent workspace combines structured case input with assessment actions and report output._
 
 
@@ -193,7 +193,7 @@ Open **Clinical Sessions** to find persisted work by identifier, date, or availa
 
 Manual report edits do not create a new official version. Review provenance and persisted evidence before approving an LLM-assisted revision.
 
-![Session dashboard](assets/figures/session-inspection.png)
+![Session dashboard](https://raw.githubusercontent.com/CTCycle/DILIGENT-Clinical-Copilot/main/assets/figures/session-inspection.png)
 _Clinical Sessions shows a persisted review workspace._
 
 ## Use the timeline and data inspection views
@@ -202,7 +202,7 @@ _Clinical Sessions shows a persisted review workspace._
 
 **Data Inspection** provides a local view of available resources, records, metadata, and update state. Use it to confirm that expected data is present and to inspect records through the available filtering or pagination controls. Do not edit database files directly while the application is running.
 
-![Data inspection](assets/figures/data-inspection.png)
+![Data inspection](https://raw.githubusercontent.com/CTCycle/DILIGENT-Clinical-Copilot/main/assets/figures/data-inspection.png)
 _Data Inspection presents curated resource records, status, and maintenance information for local review._
 
 ## Troubleshooting
