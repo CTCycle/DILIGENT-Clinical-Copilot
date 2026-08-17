@@ -26,6 +26,39 @@ def test_source_layout_preserves_repository_paths(monkeypatch: pytest.MonkeyPatc
     assert layout.client_dist_root.parts[-3:] == ("client", "dist", "browser")
 
 ###############################################################################
+def test_source_layout_reads_resource_path_from_env_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    settings_root = tmp_path / "settings"
+    settings_root.mkdir()
+    (settings_root / ".env").write_text(
+        "DILIGENT_RESOURCES_PATH=custom/resources\n", encoding="utf-8"
+    )
+    monkeypatch.delenv("DILIGENT_RESOURCES_PATH", raising=False)
+
+    resolved = runtime_layout._resolve_source_resources_root(
+        tmp_path, tmp_path / "app" / "resources"
+    )
+
+    assert resolved == (tmp_path / "custom" / "resources").resolve()
+
+###############################################################################
+def test_source_layout_uses_process_resource_path_override(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("DILIGENT_RUNTIME_ROOT", raising=False)
+    monkeypatch.delenv("DILIGENT_DATA_ROOT", raising=False)
+    monkeypatch.setenv("DILIGENT_RESOURCES_PATH", str(tmp_path / "resources"))
+    _clear_layout_cache()
+
+    layout = runtime_layout.resolve_runtime_layout()
+
+    assert layout.mutable_resources_root == (tmp_path / "resources").resolve()
+    assert layout.immutable_resources_root == layout.mutable_resources_root
+
+###############################################################################
 def test_packaged_layout_separates_immutable_and_mutable_roots(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,

@@ -1,11 +1,11 @@
 # Persistence
-Last updated: 2026-08-03
+Last updated: 2026-08-18
 
 ## Relational Database
 
 - SQLAlchemy-backed storage.
 - Database mode and connection settings are sourced from `settings/.env`.
-- SQLite uses `app/resources/database.db` when `database.embedded_database=true`; PostgreSQL is used in external database mode.
+- SQLite uses `<resource-root>/database.db` when `database.embedded_database=true`; the source-mode resource root defaults to `app/resources` and can be overridden with `DILIGENT_RESOURCES_PATH`. PostgreSQL is used in external database mode.
 
 ## Persisted Clinical Session Contract
 
