@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from dotenv import dotenv_values
+
+RESOURCE_PATH_ENV = "DILIGENT_RESOURCES_PATH"
+
 ###############################################################################
 @dataclass(frozen=True, slots=True)
 class RuntimeLayout:
@@ -30,10 +34,29 @@ def _resolve_required_absolute_environment_path(name: str) -> Path:
     return path.resolve()
 
 ###############################################################################
+def _resolve_source_resources_root(
+    repository_root: Path, default_root: Path
+) -> Path:
+    configured = os.getenv(RESOURCE_PATH_ENV, "").strip()
+    if not configured:
+        env_path = repository_root / "settings" / ".env"
+        if env_path.is_file():
+            configured = str(dotenv_values(env_path).get(RESOURCE_PATH_ENV) or "").strip()
+    if not configured:
+        return default_root
+
+    path = Path(configured).expanduser()
+    if not path.is_absolute():
+        path = repository_root / path
+    return path.resolve()
+
+###############################################################################
 def _resolve_source_layout() -> RuntimeLayout:
     repository_root = Path(__file__).resolve().parents[3]
     application_root = repository_root / "app"
-    resources_root = application_root / "resources"
+    resources_root = _resolve_source_resources_root(
+        repository_root, application_root / "resources"
+    )
     return RuntimeLayout(
         packaged=False,
         runtime_root=repository_root,

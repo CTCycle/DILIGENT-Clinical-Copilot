@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-08-03
+Last updated: 2026-08-18
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled automatic generation policy immediately before each LLM call.
@@ -36,6 +36,16 @@ The Tauri shell sets these desktop-only variables when it starts the frozen back
 - `RELOAD=false`
 - `ALWAYS_REBUILD=false` in `settings/.env.example` (rebuilds the frontend at application startup when `true`; skips that build when `false`; the launcher treats an absent value as `true`)
 - `BACKEND_LOGS_VISIBLE=true` (defaults to `true` when absent)
+
+## Source-mode Resource Location
+
+- `DILIGENT_RESOURCES_PATH=app/resources`
+
+This optional path relocates the source-mode resource tree. Relative paths are
+resolved from the repository root. The embedded SQLite database defaults to
+`<resource-root>/database.db`; an explicit `DILIGENT_SQLITE_PATH` still takes
+precedence. Packaged desktop mode uses `DILIGENT_RUNTIME_ROOT` and
+`DILIGENT_DATA_ROOT` instead.
 
 ## Operational Settings By Source
 - `settings/.env`
