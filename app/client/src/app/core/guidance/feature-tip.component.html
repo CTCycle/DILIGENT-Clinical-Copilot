@@ -1,0 +1,18 @@
+@if (visible()) {
+  <aside class="guidance-feature-tip" role="note" [attr.aria-label]="title">
+    <div class="guidance-feature-tip-icon" aria-hidden="true">✦</div>
+    <div class="guidance-feature-tip-copy">
+      <div class="guidance-feature-tip-heading">
+        <strong>{{ title }}</strong>
+        <button type="button" class="guidance-feature-tip-dismiss" aria-label="Dismiss this tip" (click)="dismiss()">×</button>
+      </div>
+      <p>{{ body }}</p>
+      <div class="guidance-feature-tip-actions">
+        <button type="button" class="guidance-feature-tip-action" (click)="showMore()">{{ actionLabel }}</button>
+        @if (secondaryLabel) {
+          <button type="button" class="guidance-feature-tip-secondary" (click)="openSecondaryAction()">{{ secondaryLabel }}</button>
+        }
+      </div>
+    </div>
+  </aside>
+}

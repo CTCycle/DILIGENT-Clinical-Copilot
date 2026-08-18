@@ -1,6 +1,8 @@
 <div class="app-shell">
-  <app-nav-sidebar (navigate)="navigateToPage($event)"></app-nav-sidebar>
+  <app-nav-sidebar (navigate)="navigateToPage($event)" (helpRequested)="openTips()"></app-nav-sidebar>
   <div class="app-main">
     <router-outlet></router-outlet>
   </div>
 </div>
+<app-tips-and-tricks [isOpen]="tipsOpen()" (closed)="tipsOpen.set(false)"></app-tips-and-tricks>
+<app-guided-tour></app-guided-tour>

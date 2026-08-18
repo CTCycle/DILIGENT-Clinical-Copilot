@@ -1,5 +1,5 @@
 # Components And Patterns
-Last updated: 2026-08-02
+Last updated: 2026-08-18
 
 ## Page Layout Patterns
 - DILI page uses a responsive grid through `.stitch-dili-grid` and a sticky sidebar on desktop.
@@ -30,6 +30,14 @@ Last updated: 2026-08-02
 
 ### Navigation
 - Sidebar and tab patterns must support keyboard navigation.
+
+### Contextual Guidance
+- Use `HelpPopoverComponent` for a small explanation tied to a non-obvious control.
+- Use `FeatureTipComponent` for a one-time, dismissible first-use callout with a short action.
+- Use `GuidedTourComponent` only for a genuinely multi-step workflow. Definitions belong in `core/guidance/guidance-content.ts` and should remain short, target stable `data-guidance-target` attributes, and provide a useful fallback when a target is unavailable.
+- Use `TipsAndTricksComponent` for manually reopened, concise workflow reminders. It is hosted by the existing `ModalShellComponent` and must remain optional.
+- Persist guidance with `GuidanceStateService`; do not add backend tables or couple tutorial state to clinical session state.
+- Do not add automatic guidance to routine navigation, common controls, or Data Inspection, which already explains its page-level actions.
 
 ### Tables And Scroll Areas
 - Keep fixed action-column sizing where needed.

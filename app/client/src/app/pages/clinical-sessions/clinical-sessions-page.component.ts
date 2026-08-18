@@ -11,6 +11,7 @@ import {
 } from '@lucide/angular';
 
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
+import { HelpPopoverComponent } from '../../core/guidance/help-popover.component';
 
 import {
   cancelSessionRevisionJob,
@@ -78,6 +79,7 @@ import {
     CommonModule,
     FormsModule,
     ModalShellComponent,
+    HelpPopoverComponent,
     ClinicalSessionEditorToolbarComponent,
     ClinicalSessionTimelineWorkspaceComponent,
     LucideFileText,

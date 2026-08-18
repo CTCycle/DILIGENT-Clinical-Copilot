@@ -61,12 +61,18 @@
         </dl>
       </section>
 
-      <section class="review-toolbar" aria-labelledby="review-toolbar-title">
+      <section class="review-toolbar" data-guidance-target="timeline-review-controls" aria-labelledby="review-toolbar-title">
         <div class="toolbar-heading">
           <div>
             <span class="section-kicker">Review controls</span>
             <h2 id="review-toolbar-title">Focus the chronology</h2>
           </div>
+          <app-help-popover
+            ariaLabel="Explain timeline review controls"
+            placement="right"
+            title="Review the chronology deliberately"
+            body="Evidence filters reveal which events have source support. Density changes reading comfort, while uncertain timing and categories keep review signals visible. Inspect an event for its source and confidence rationale."
+          ></app-help-popover>
           <p>Filter evidence and timing signals without losing the original event order.</p>
         </div>
         <div class="toolbar-controls">

@@ -127,13 +127,20 @@
           </div>
         </div>
 
-        <nav class="clinical-session-tabs" aria-label="Session sections">
-          <button type="button" [class.is-active]="activeSection() === 'preview'" (click)="setSection('preview')">Preview</button>
-          <button type="button" [class.is-active]="activeSection() === 'editor'" (click)="setSection('editor')">Text Editor</button>
-          <button type="button" [class.is-active]="activeSection() === 'metadata'" (click)="setSection('metadata')">Metadata</button>
-          <button type="button" [class.is-active]="activeSection() === 'revision'" (click)="setSection('revision')">Revision</button>
-          <button type="button" [class.is-active]="activeSection() === 'timeline'" (click)="setSection('timeline')">Timeline</button>
-        </nav>
+        <div class="clinical-session-tabs-row" data-guidance-target="clinical-session-tabs">
+          <nav class="clinical-session-tabs" aria-label="Session sections">
+            <button type="button" [class.is-active]="activeSection() === 'preview'" (click)="setSection('preview')">Preview</button>
+            <button type="button" [class.is-active]="activeSection() === 'editor'" (click)="setSection('editor')">Text Editor</button>
+            <button type="button" [class.is-active]="activeSection() === 'metadata'" (click)="setSection('metadata')">Metadata</button>
+            <button type="button" [class.is-active]="activeSection() === 'revision'" (click)="setSection('revision')">Revision</button>
+            <button type="button" [class.is-active]="activeSection() === 'timeline'" (click)="setSection('timeline')">Timeline</button>
+          </nav>
+          <app-help-popover
+            ariaLabel="Explain session sections"
+            title="How to use these sections"
+            body="Preview is read-only. Text Editor saves manual edits. Revision creates a new draft. Timeline generates and reopens a separate patient chronology."
+          ></app-help-popover>
+        </div>
 
         @if (activeSection() === 'preview') {
           <section class="clinical-session-preview">

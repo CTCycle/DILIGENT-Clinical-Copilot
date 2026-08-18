@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
@@ -12,15 +12,18 @@ import {
 import { DiliJobTrackerService } from './core/services/dili-job-tracker.service';
 import { InspectionUpdateJobTrackerService } from './core/state/inspection-update-job-tracker.service';
 import { NavSidebarComponent } from './components/nav-sidebar/nav-sidebar.component';
+import { GuidedTourComponent } from './core/guidance/guided-tour.component';
+import { TipsAndTricksComponent } from './core/guidance/tips-and-tricks.component';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, NavSidebarComponent],
+  imports: [RouterOutlet, NavSidebarComponent, GuidedTourComponent, TipsAndTricksComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
   readonly stateService = inject(AppStateService);
+  readonly tipsOpen = signal(false);
   private readonly diliJobTracker = inject(DiliJobTrackerService);
   private readonly inspectionUpdateTracker = inject(InspectionUpdateJobTrackerService);
   private readonly router = inject(Router);
@@ -45,6 +48,10 @@ export class App {
       void this.router.navigateByUrl(nextPath);
     }
     this.stateService.setActivePage(pageId);
+  }
+
+  openTips(): void {
+    this.tipsOpen.set(true);
   }
 
 }

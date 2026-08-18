@@ -1,9 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnDestroy, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import { DEFAULT_FORM_STATE, REPORT_EXPORT_FILENAME } from '../../core/constants';
+import { DILI_ASSESSMENT_TOUR, GUIDANCE_DEFINITIONS } from '../../core/guidance/guidance-content';
+import { FeatureTipComponent } from '../../core/guidance/feature-tip.component';
+import { GuidanceTourService } from '../../core/guidance/guidance-tour.service';
 import {
   ClinicalInputPreflightIssue,
   ClinicalInputPreflightResponse,
@@ -47,7 +51,7 @@ function isTerminalJobStatus(status: JobStatus | null): boolean {
 
 @Component({
   selector: 'app-dili-agent-page',
-  imports: [CommonModule, FormsModule, ModalShellComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, FeatureTipComponent],
   templateUrl: './dili-agent-page.component.html',
   styleUrl: './dili-agent-page.component.scss',
 })
@@ -56,6 +60,9 @@ export class DiliAgentPageComponent implements OnDestroy {
   @ViewChild('runAnalysisButton') private runAnalysisButton?: ElementRef<HTMLButtonElement>;
 
   readonly stateService = inject(AppStateService);
+  readonly guidanceDefinitions = GUIDANCE_DEFINITIONS;
+  private readonly router = inject(Router);
+  private readonly guidanceTour = inject(GuidanceTourService);
   private readonly markdownRenderer = inject(MarkdownRendererService);
   private readonly diliJobTracker = inject(DiliJobTrackerService);
 
@@ -110,6 +117,14 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   get vm() {
     return this.stateService.state().diliAgent;
+  }
+
+  startAssessmentTour(): void {
+    this.guidanceTour.start(DILI_ASSESSMENT_TOUR);
+  }
+
+  openConfigurations(): void {
+    void this.router.navigateByUrl('/model-config');
   }
 
   ngOnDestroy(): void {

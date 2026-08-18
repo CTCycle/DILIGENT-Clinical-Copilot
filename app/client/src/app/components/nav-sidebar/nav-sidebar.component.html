@@ -30,6 +30,15 @@
       <div class="app-header-actions">
         <button
           type="button"
+          class="app-header-icon-btn app-header-help-btn"
+          (click)="openHelp()"
+          aria-label="Open Help and Tips"
+          title="Open Help and Tips"
+        >
+          Help
+        </button>
+        <button
+          type="button"
           class="app-header-icon-btn"
           (click)="toggleTheme()"
           [attr.aria-label]="themeAriaLabel"
