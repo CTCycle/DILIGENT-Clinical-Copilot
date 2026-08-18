@@ -312,7 +312,7 @@ function Set-LauncherEnvironment {
 
 function Install-ApplicationDependencies {
     param(
-        [bool]$BuildFrontend = $true,
+        [bool]$BuildFrontend = $false,
         [ValidateSet('Standard', 'Development')]
         [string]$InstallationType = 'Standard',
         [switch]$PortableRuntimesReady
@@ -360,7 +360,7 @@ function Install-ApplicationDependencies {
         Write-Ok 'Dependencies and frontend build are ready'
     }
     else {
-        Write-Info 'Skipping frontend build because ALWAYS_REBUILD=false'
+        Write-Info 'Skipping frontend build; use option 2 to rebuild the frontend'
         Write-Ok 'Dependencies are ready'
     }
 }
@@ -448,14 +448,17 @@ function Get-BooleanEnvironmentValue {
 
 function Start-Application {
     Import-DotEnv -CreateIfMissing
-    $alwaysRebuild = Get-BooleanEnvironmentValue -Name 'ALWAYS_REBUILD' -Default $true
     Set-LauncherEnvironment
     if (-not (Test-DependenciesReady)) {
         Write-Step 'Required application environments are missing or unusable; installing dependencies'
-        Install-ApplicationDependencies -BuildFrontend $alwaysRebuild -InstallationType 'Standard'
+        Install-ApplicationDependencies -BuildFrontend $false -InstallationType 'Standard'
     }
     else {
         Write-Ok 'Application environments are ready; skipped dependency installation'
+    }
+    $frontendIndex = Join-Path $ClientDir 'dist/browser/index.html'
+    if (-not (Test-Path -LiteralPath $frontendIndex)) {
+        throw 'Frontend build output is missing. Select option 2 to install or update dependencies and rebuild the frontend.'
     }
     Set-LauncherEnvironment
 
@@ -531,6 +534,7 @@ function Install-OrUpdateApplication {
         $selectedInstallationType = Read-InstallationType
     }
     Install-ApplicationDependencies `
+        -BuildFrontend $true `
         -InstallationType $selectedInstallationType `
         -PortableRuntimesReady:$portableRuntimesReady
     if (Test-Path -LiteralPath $UvCacheDir) {

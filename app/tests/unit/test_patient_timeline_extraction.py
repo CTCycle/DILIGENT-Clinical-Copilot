@@ -16,7 +16,6 @@ from repositories.serialization.session_timelines import build_timeline_preview_
 from services.clinical import timeline as timeline_service
 from services.clinical.timeline import PatientTimelineExtractor
 
-
 ###############################################################################
 class FakeTimelineClient:
 
