@@ -449,16 +449,18 @@ function Get-BooleanEnvironmentValue {
 function Start-Application {
     Import-DotEnv -CreateIfMissing
     Set-LauncherEnvironment
-    if (-not (Test-DependenciesReady)) {
-        Write-Step 'Required application environments are missing or unusable; installing dependencies'
-        Install-ApplicationDependencies -BuildFrontend $false -InstallationType 'Standard'
+    $frontendIndex = Join-Path $ClientDir 'dist/browser/index.html'
+    $dependenciesReady = Test-DependenciesReady
+    $frontendBuildReady = Test-Path -LiteralPath $frontendIndex -PathType Leaf
+    if (-not $dependenciesReady -or -not $frontendBuildReady) {
+        Write-Step 'Required application environments or frontend build are missing or unusable; recovering dependencies and frontend build'
+        Install-ApplicationDependencies -BuildFrontend $true -InstallationType 'Standard'
     }
     else {
         Write-Ok 'Application environments are ready; skipped dependency installation'
     }
-    $frontendIndex = Join-Path $ClientDir 'dist/browser/index.html'
     if (-not (Test-Path -LiteralPath $frontendIndex)) {
-        throw 'Frontend build output is missing. Select option 2 to install or update dependencies and rebuild the frontend.'
+        throw 'Frontend build output is still missing after recovery. Select option 2 to retry dependency installation and the frontend build.'
     }
     Set-LauncherEnvironment
 
