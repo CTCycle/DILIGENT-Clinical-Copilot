@@ -1,0 +1,32 @@
+<span class="guidance-help-popover-host">
+  <button
+    #trigger
+    type="button"
+    class="guidance-help-trigger"
+    [attr.aria-label]="ariaLabel"
+    [attr.aria-expanded]="open()"
+    [attr.aria-controls]="open() ? panelId : null"
+    (click)="toggle()"
+  >
+    <span aria-hidden="true">?</span>
+  </button>
+
+  @if (open()) {
+    <section
+      #panel
+      class="guidance-help-panel"
+      role="dialog"
+      tabindex="-1"
+      [id]="panelId"
+      [attr.aria-label]="title"
+      [style.top.px]="panelPosition().top"
+      [style.left.px]="panelPosition().left"
+    >
+      <div class="guidance-help-panel-heading">
+        <h3>{{ title }}</h3>
+        <button type="button" class="guidance-help-panel-close" aria-label="Close help" (click)="close()">×</button>
+      </div>
+      <p>{{ body }}</p>
+    </section>
+  }
+</span>

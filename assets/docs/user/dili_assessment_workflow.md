@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-08-02
+Last updated: 2026-08-18
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -18,6 +18,8 @@ Typical input areas include:
 - optional file upload where enabled
 - run or submit action
 - generated assessment output
+
+On a first empty assessment, the page may show a small optional **Get started with DILI Agent** callout. Use **Show me** for the three-step tour of clinical input, RAG evidence, and Run, or use **Open Configurations** to choose a runtime and model. The tour can be skipped and reopened from header **Help**.
 
 ## Enter Clinical Context
 Use clear, specific, structured text. Prefer input like:
@@ -59,6 +61,8 @@ Expected result:
 - the UI shows a generated DILI assessment or a clear error message
 
 Choosing **Run without RAG** affects only the pending assessment. It does not disable the saved RAG configuration for future sessions.
+
+The **Use RAG evidence** checkbox is deliberately per-assessment. Model Configurations controls the retrieval and reranking setup; the checkbox decides whether this run requests indexed evidence. If the pre-flight check reports that RAG is unavailable, continuing applies the fallback only to that pending assessment.
 
 During Step 12, the progress message identifies whether vector retrieval is
 enabled. If evidence preparation exceeds its bounded runtime, the assessment

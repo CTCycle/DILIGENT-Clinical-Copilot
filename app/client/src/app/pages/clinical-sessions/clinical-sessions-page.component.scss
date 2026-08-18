@@ -302,6 +302,18 @@
   color: var(--color-text-secondary);
 }
 
+.clinical-session-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.clinical-session-tabs-row .clinical-session-tabs {
+  flex: 1 1 auto;
+  margin-bottom: 0;
+}
+
 .clinical-session-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1859,6 +1871,10 @@
   .clinical-session-tabs {
     margin-inline: calc(var(--space-sm) * -1);
     padding-inline: var(--space-sm);
+  }
+
+  .clinical-session-tabs-row {
+    align-items: flex-start;
   }
 
   .clinical-session-timeline-history-meta {

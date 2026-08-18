@@ -1,0 +1,75 @@
+:host {
+  display: contents;
+}
+
+.guidance-tips-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+}
+
+.guidance-tips-intro p {
+  margin: 0;
+}
+
+.guidance-tips-intro-mark {
+  color: var(--color-brand);
+  font-size: var(--font-lg);
+  line-height: 1;
+}
+
+.guidance-tips-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.guidance-tip-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 150px;
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.guidance-tip-card h3 {
+  margin: 0;
+  font-size: var(--font-base);
+}
+
+.guidance-tip-card p {
+  margin: var(--space-sm) 0 var(--space-lg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+  line-height: 1.5;
+}
+
+.guidance-tip-action {
+  align-self: flex-start;
+  margin-top: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-brand);
+  font-size: var(--font-sm);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.guidance-tip-action:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .guidance-tips-grid {
+    grid-template-columns: 1fr;
+  }
+}

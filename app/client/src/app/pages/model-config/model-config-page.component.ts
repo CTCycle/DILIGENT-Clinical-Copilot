@@ -6,6 +6,7 @@ import {
   StatusMessageComponent,
   resolveStatusTone,
 } from '../../components/status-message/status-message.component';
+import { HelpPopoverComponent } from '../../core/guidance/help-popover.component';
 import { AppStateService } from '../../core/state/app-state.service';
 import { formatUnknownError } from '../../core/utils';
 import {
@@ -125,6 +126,7 @@ function resolveProviderLabel(provider: string): string {
     AccessKeyModalComponent,
     ModelConfigToggleCardComponent,
     ModelRoleActionButtonComponent,
+    HelpPopoverComponent,
   ],
   templateUrl: './model-config-page.component.html',
   styleUrl: './model-config-page.component.scss',

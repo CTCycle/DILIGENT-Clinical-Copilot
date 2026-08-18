@@ -1,0 +1,47 @@
+@if (active(); as tour) {
+  <div class="guidance-tour-layer">
+    <button type="button" class="guidance-tour-scrim" aria-label="Close walkthrough" (click)="skip()"></button>
+    @if (targetRect(); as target) {
+      <div
+        class="guidance-tour-spotlight"
+        aria-hidden="true"
+        [style.top.px]="target.top - 8"
+        [style.left.px]="target.left - 8"
+        [style.width.px]="target.width + 16"
+        [style.height.px]="target.height + 16"
+      ></div>
+    }
+    <section
+      class="guidance-tour-dialog"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+      [attr.aria-label]="tour.definition.title"
+      aria-describedby="guidance-tour-description"
+      [style.top.px]="cardPosition().top"
+      [style.left.px]="cardPosition().left"
+    >
+      <div class="guidance-tour-header">
+        <div>
+          <p class="guidance-tour-progress">{{ tour.stepIndex + 1 }} of {{ tour.definition.steps.length }}</p>
+          <h2 id="guidance-tour-title">{{ currentStep()?.title }}</h2>
+        </div>
+        <button type="button" class="guidance-tour-close" aria-label="Close walkthrough" (click)="skip()">×</button>
+      </div>
+      <p id="guidance-tour-description">{{ currentStep()?.body }}</p>
+      @if (!targetRect()) {
+        <p class="guidance-tour-unavailable" role="status">This control is not available on the current screen. You can continue or skip the walkthrough.</p>
+      }
+      <div class="guidance-tour-actions">
+        <button type="button" class="guidance-tour-skip" (click)="skip()">Skip walkthrough</button>
+        <div class="guidance-tour-nav">
+          <button type="button" class="btn btn-secondary" (click)="back()" [disabled]="tour.stepIndex === 0">Back</button>
+          <button type="button" class="btn btn-primary" data-tour-initial-focus (click)="next()">
+            {{ tour.stepIndex === tour.definition.steps.length - 1 ? 'Finish' : 'Next' }}
+          </button>
+        </div>
+      </div>
+      <p class="guidance-tour-live-copy" aria-live="polite">Step {{ tour.stepIndex + 1 }} of {{ tour.definition.steps.length }}</p>
+    </section>
+  </div>
+}

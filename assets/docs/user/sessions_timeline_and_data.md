@@ -1,8 +1,10 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-08-13
+Last updated: 2026-08-18
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
+
+The section tabs have a contextual help popover because their responsibilities are easy to confuse: **Preview** is read-only, **Text Editor** saves manual edits, **Revision** creates a new draft, and **Timeline** manages generated chronologies.
 
 Expected capabilities:
 - view a list of sessions
@@ -61,6 +63,8 @@ dense/compact/comfortable density, and previous/next navigation to focus review.
 Selecting an event opens the Event inspector on desktop and a bottom-sheet inspector
 on narrow screens. Approximate placement, a **Fallback chronology**, and **Missing
 source evidence** are visible warnings, not clinical confirmation.
+
+Use the help popover beside **Review controls** when the filter names need context. Evidence filters describe source support, density changes reading comfort, uncertain timing keeps approximate events visible, and **Inspect details** opens the event's source and confidence rationale. These controls do not alter the saved timeline.
 
 Timeline generation may show a fallback notice when model extraction does not complete. For an explicitly selected OpenCode Go model, a temporary model-catalog outage does not prevent the known routed request from being attempted. The notice now identifies the failure class, such as provider network unavailable, provider timeout, authentication rejected, rate limited, upstream error, invalid structured response, or incomplete configuration. Transient network, timeout, rate-limit, and upstream failures are retried with bounded backoff before fallback. In that case, the timetable is built deterministically from persisted session fields with uncertain timing and no invented exact dates. Treat fallback events as navigation aids rather than model-extracted chronology, then retry after correcting the reported condition.
 

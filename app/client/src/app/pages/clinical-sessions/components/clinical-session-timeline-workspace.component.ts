@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { ModalShellComponent } from '../../../components/modal-shell/modal-shell.component';
+import { HelpPopoverComponent } from '../../../core/guidance/help-popover.component';
 import { ClinicalSessionDetail, CloudProvider, InspectionSessionTimelinePreview, ModelConfigStateResponse } from '../../../core/models/types';
 import { deleteInspectionSessionTimeline, fetchInspectionSessionTimelineJobStatus, fetchInspectionSessionTimelineList, startInspectionSessionTimelineJob } from '../../../core/services/inspection-api';
 import { JobPollingService } from '../../../core/services/job-polling.service';
@@ -13,7 +14,7 @@ import { formatUnknownError } from '../../../core/utils';
 @Component({
   selector: 'app-clinical-session-timeline-workspace',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, HelpPopoverComponent],
   templateUrl: './clinical-session-timeline-workspace.component.html',
   styleUrl: './clinical-session-timeline-workspace.component.scss',
 })

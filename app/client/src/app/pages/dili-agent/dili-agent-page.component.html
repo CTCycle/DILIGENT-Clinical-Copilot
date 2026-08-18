@@ -14,6 +14,7 @@
           </h3>
           <textarea
             id="clinical-input"
+            data-guidance-target="dili-clinical-input"
             aria-label="Clinical Input"
             class="stitch-dili-input-unified"
             [placeholder]="clinicalInputTemplate()"
@@ -78,7 +79,7 @@
           </div>
         </div>
 
-        <label class="stitch-dili-rag-toggle" for="rag-enabled">
+        <label class="stitch-dili-rag-toggle" for="rag-enabled" data-guidance-target="dili-rag-toggle">
           <input
             id="rag-enabled"
             type="checkbox"
@@ -96,6 +97,7 @@
           <button
             #runAnalysisButton
             id="run-analysis-button"
+            data-guidance-target="dili-run-action"
             class="btn btn-primary"
             type="button"
             [disabled]="runActionDisabled"
@@ -141,6 +143,18 @@
           </div>
         } @else {
           <article id="rendered-report-content" class="report-markdown inspection-excerpt-text" [innerHTML]="renderedReport().html"></article>
+          @if (!vm.message && !vm.isRunning && !vm.isStarting) {
+            <app-feature-tip
+              [guidanceId]="'dili-first-assessment'"
+              [version]="guidanceDefinitions.diliFirstAssessment.version"
+              [title]="guidanceDefinitions.diliFirstAssessment.title"
+              [body]="guidanceDefinitions.diliFirstAssessment.description"
+              actionLabel="Show me"
+              secondaryLabel="Open Configurations"
+              (primaryAction)="startAssessmentTour()"
+              (secondaryAction)="openConfigurations()"
+            ></app-feature-tip>
+          }
         }
       </div>
     </div>

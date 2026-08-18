@@ -1,0 +1,26 @@
+<app-modal-shell
+  [isOpen]="isOpen"
+  title="Tips & Tricks"
+  subtitle="Short reminders for the workflows that benefit from a little context."
+  titleId="tips-and-tricks-title"
+  ariaLabelledBy="tips-and-tricks-title"
+  dialogClassName="modal-container guidance-tips-modal"
+  closeLabel="Close Tips & Tricks"
+  (close)="close()"
+>
+  <div class="guidance-tips-intro">
+    <span class="guidance-tips-intro-mark" aria-hidden="true">✦</span>
+    <p>You can reopen this help from the header whenever you need it. Nothing here changes your saved clinical work.</p>
+  </div>
+  <div class="guidance-tips-grid">
+    @for (tip of tips; track tip.id) {
+      <article class="guidance-tip-card">
+        <h3>{{ tip.title }}</h3>
+        <p>{{ tip.body }}</p>
+        @if (tip.action) {
+          <button type="button" class="guidance-tip-action" (click)="handleAction(tip.action)">{{ tip.actionLabel }}</button>
+        }
+      </article>
+    }
+  </div>
+</app-modal-shell>
