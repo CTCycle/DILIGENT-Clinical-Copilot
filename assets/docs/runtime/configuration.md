@@ -34,7 +34,6 @@ The Tauri shell sets these desktop-only variables when it starts the frozen back
 - `UI_PORT=9847`
 - `VITE_API_BASE_URL=/api`
 - `RELOAD=false`
-- `ALWAYS_REBUILD=false` in `settings/.env.example` (rebuilds the frontend at application startup when `true`; skips that build when `false`; the launcher treats an absent value as `true`)
 - `BACKEND_LOGS_VISIBLE=true` (defaults to `true` when absent)
 
 ## Source-mode Resource Location

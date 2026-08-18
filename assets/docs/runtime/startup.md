@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-08-03
+Last updated: 2026-08-18
 
 ## Recommended Local Startup
 On Windows, use:
@@ -13,7 +13,8 @@ The launcher:
 - ensures portable Python, `uv`, and Node runtimes under `runtimes/`
 - runs `uv sync`
 - installs frontend dependencies
-- builds frontend dist at application startup when `ALWAYS_REBUILD` is `true`; skips that build when `false`
+- rebuilds the frontend only when the main-menu install/update option 2 is executed
+- validates that an existing frontend build is available before starting the preview server
 - starts the backend with the synchronized virtual-environment Python and `uvicorn`
 - starts the frontend preview server
 - recreates a stale backend virtual environment when the repository has moved
@@ -25,7 +26,7 @@ Database startup behavior is mode-specific:
 - In PostgreSQL mode, application startup only connects to the configured database. Run `.\start_on_windows.ps1 -Action InitializeDatabase` after selecting PostgreSQL to create the database, schema, and seed data.
 - The explicit `InitializeDatabase` action is the manual initialization path for either backend. It never runs implicitly as part of `Launch`.
 
-Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
+Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. On a fresh checkout, execute option 2 first to install/update dependencies and build the frontend, then execute option 1 to launch the application. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
 
 ## Packaged desktop startup
 

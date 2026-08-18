@@ -84,6 +84,8 @@ For source/development operation, open PowerShell in the extracted repository fo
 
 The launcher prepares the project runtimes and dependencies, starts the backend and frontend, and offers maintenance actions for the local database, dependencies, tests, logs, caches, and cleanup. On the first launch it creates `settings/.env` from `settings/.env.example` when necessary.
 
+On a fresh checkout, select option 2 first to install or update dependencies and build the frontend, then select option 1 to launch the application.
+
 When startup finishes, open the local UI at `http://127.0.0.1:9847`. If the page reports that the backend is unavailable, check `http://127.0.0.1:7690/api/health` first.
 
 ### macOS and Linux

@@ -8,7 +8,6 @@ from domain.llm.transports import ChatRequest, ChatResult
 from services.llm.transports import routed_gateway
 from services.llm.transports.routed_gateway import RoutedGatewayTransport
 
-
 ###############################################################################
 def _transport(models_path: str = "/zen/go/v1/models") -> RoutedGatewayTransport:
     return RoutedGatewayTransport(
@@ -53,7 +52,10 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
     transport = _transport()
     captured: dict[str, object] = {}
 
+    ###############################################################################
     class FakeChatTransport:
+
+        # -------------------------------------------------------------------------
         def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
             captured.update(
                 api_key=api_key,
@@ -61,10 +63,12 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
                 timeout=timeout,
             )
 
+        # -------------------------------------------------------------------------
         async def chat(self, request: ChatRequest) -> ChatResult:
             captured["request"] = request
             return ChatResult(content='{"events":[]}')
 
+        # -------------------------------------------------------------------------
         async def close(self) -> None:
             return None
 
@@ -105,14 +109,19 @@ def test_opencode_go_missing_catalog_model_uses_direct_route(
     )
     captured: dict[str, object] = {}
 
+    ###############################################################################
     class FakeChatTransport:
+
+        # -------------------------------------------------------------------------
         def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
             captured["base_url"] = base_url
 
+        # -------------------------------------------------------------------------
         async def chat(self, request: ChatRequest) -> ChatResult:
             captured["request"] = request
             return ChatResult(content="ok")
 
+        # -------------------------------------------------------------------------
         async def close(self) -> None:
             return None
 
@@ -141,14 +150,19 @@ def test_opencode_go_connectivity_check_uses_direct_route(
     transport = _transport()
     captured: dict[str, object] = {}
 
+    ###############################################################################
     class FakeChatTransport:
+
+        # -------------------------------------------------------------------------
         def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
             captured["base_url"] = base_url
 
+        # -------------------------------------------------------------------------
         async def chat(self, request: ChatRequest) -> ChatResult:
             captured["request"] = request
             return ChatResult(content="OK")
 
+        # -------------------------------------------------------------------------
         async def close(self) -> None:
             return None
 
