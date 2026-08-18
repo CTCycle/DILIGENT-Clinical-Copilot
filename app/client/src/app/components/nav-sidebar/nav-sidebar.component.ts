@@ -7,9 +7,11 @@ import { AppStateService, PageId } from '../../core/state/app-state.service';
   selector: 'app-nav-sidebar',
   imports: [CommonModule],
   templateUrl: './nav-sidebar.component.html',
+  styleUrl: './nav-sidebar.component.scss',
 })
 export class NavSidebarComponent {
   @Output() navigate = new EventEmitter<PageId>();
+  @Output() helpRequested = new EventEmitter<void>();
 
   readonly stateService = inject(AppStateService);
 
@@ -22,6 +24,10 @@ export class NavSidebarComponent {
 
   onNavigate(pageId: PageId): void {
     this.navigate.emit(pageId);
+  }
+
+  openHelp(): void {
+    this.helpRequested.emit();
   }
 
   onNavTabKeydown(event: KeyboardEvent, pageId: PageId): void {

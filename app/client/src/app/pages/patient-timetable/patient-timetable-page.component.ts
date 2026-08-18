@@ -3,6 +3,7 @@ import { Component, DestroyRef, HostListener, OnInit, computed, inject, signal }
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
+import { HelpPopoverComponent } from '../../core/guidance/help-popover.component';
 import {
   fetchInspectionSessionTimelineById,
   fetchInspectionSessionTimelineJobStatus,
@@ -117,7 +118,7 @@ function isTimelineDensity(value: string): value is TimelineDensity {
 @Component({
   selector: 'app-patient-timetable-page',
   standalone: true,
-  imports: [CommonModule, RouterLink, TimetableFilterSelectComponent],
+  imports: [CommonModule, RouterLink, TimetableFilterSelectComponent, HelpPopoverComponent],
   templateUrl: './patient-timetable-page.component.html',
   styleUrl: './patient-timetable-page.component.scss',
 })

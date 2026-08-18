@@ -1,10 +1,15 @@
 <div class="timeline-workspace">
   <section class="timeline-models" aria-label="Timeline model selection">
-    <div class="timeline-model-header">
+    <div class="timeline-model-header" data-guidance-target="timeline-generation-controls">
       <div>
         <h4>Timeline model</h4>
         <p>This selection applies only to the new timeline and does not modify global model configuration.</p>
       </div>
+      <app-help-popover
+        ariaLabel="Explain timeline generation"
+        title="Generate a separate chronology"
+        body="Choose a provider and model for this timeline run. Existing saved timelines remain available, and this selection does not change the global model configuration."
+      ></app-help-popover>
     </div>
 
     <p class="timeline-loading" aria-live="polite" [class.is-hidden]="!modelConfigLoading()">Loading model options…</p>
@@ -81,7 +86,12 @@
         }
       </div>
       }
-      @else if (!generationJobId()) { <p>No generated timelines yet.<br>Generate a timeline to create a saved clinical chronology for this session.</p> }
+      @else if (!generationJobId()) {
+        <div class="timeline-empty-guidance" role="note">
+          <strong>No generated timelines yet.</strong>
+          <p>Choose a provider and model above, then select <strong>Generate Timeline</strong> to create a saved chronology. You can reopen it here later.</p>
+        </div>
+      }
     }
   </section>
 </div>

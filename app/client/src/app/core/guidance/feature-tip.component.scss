@@ -1,0 +1,104 @@
+:host {
+  display: block;
+}
+
+.guidance-feature-tip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-md);
+  align-items: start;
+  margin: var(--space-lg) 0;
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid color-mix(in srgb, var(--color-brand) 32%, var(--color-border-subtle));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-brand-bg) 72%, var(--color-surface));
+  box-shadow: var(--shadow-sm);
+}
+
+.guidance-feature-tip-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--color-brand);
+  color: #fff;
+  font-size: var(--font-md);
+}
+
+.guidance-feature-tip-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  color: var(--color-text-primary);
+}
+
+.guidance-feature-tip-copy p {
+  max-width: 680px;
+  margin: var(--space-xs) 0 var(--space-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+}
+
+.guidance-feature-tip-dismiss {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.guidance-feature-tip-dismiss:hover {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.guidance-feature-tip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.guidance-feature-tip-action,
+.guidance-feature-tip-secondary {
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.guidance-feature-tip-action {
+  border: 1px solid var(--color-brand);
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.guidance-feature-tip-action:hover {
+  filter: brightness(0.96);
+}
+
+.guidance-feature-tip-secondary {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.guidance-feature-tip-secondary:hover {
+  background: var(--color-brand-bg);
+  color: var(--color-brand);
+}
+
+@media (max-width: 720px) {
+  .guidance-feature-tip {
+    margin: var(--space-md) 0;
+    padding: var(--space-md);
+  }
+}
