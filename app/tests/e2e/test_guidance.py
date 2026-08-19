@@ -9,12 +9,10 @@ from playwright.sync_api import Page, expect
 
 GUIDANCE_STORAGE_KEY = "diligent-guidance-state-v1"
 
-
 ###############################################################################
 def _reset_guidance(page: Page) -> None:
     page.evaluate(f"localStorage.removeItem('{GUIDANCE_STORAGE_KEY}')")
     page.reload()
-
 
 ###############################################################################
 def test_dili_first_use_callout_is_dismissible_and_persists(
@@ -35,7 +33,6 @@ def test_dili_first_use_callout_is_dismissible_and_persists(
     page.reload()
     expect(page.get_by_role("note", name="Get started with DILI Agent")).to_have_count(0)
 
-
 ###############################################################################
 def test_help_reopens_tips_and_restores_focus(
     page: Page,
@@ -51,7 +48,6 @@ def test_help_reopens_tips_and_restores_focus(
     dialog.get_by_role("button", name="Close Tips & Tricks").click()
     expect(dialog).to_have_count(0)
     expect(help_button).to_be_focused()
-
 
 ###############################################################################
 def test_dili_walkthrough_supports_back_skip_and_finish(
@@ -85,7 +81,6 @@ def test_dili_walkthrough_supports_back_skip_and_finish(
     tour.get_by_role("button", name="Finish").click()
     expect(page.locator('[role="dialog"][aria-label="Run a DILI assessment"]')).to_have_count(0)
 
-
 ###############################################################################
 def test_model_configuration_help_popovers_are_keyboard_dismissible(
     page: Page,
@@ -103,7 +98,6 @@ def test_model_configuration_help_popovers_are_keyboard_dismissible(
     rag_help = page.get_by_role("button", name="Explain RAG settings")
     rag_help.click()
     expect(page.get_by_role("dialog", name="What RAG settings control")).to_be_visible()
-
 
 ###############################################################################
 def test_capture_guidance_screenshots_when_requested(
