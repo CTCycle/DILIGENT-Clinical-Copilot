@@ -13,7 +13,7 @@ The launcher:
 - ensures portable Python, `uv`, and Node runtimes under `runtimes/`
 - runs `uv sync`
 - installs frontend dependencies
-- rebuilds the frontend when the main-menu install/update option 2 is executed, or when option 1 detects missing or unusable dependencies or frontend output during recovery
+- rebuilds the frontend when the main-menu install/update option 2 or frontend rebuild option 3 is executed, or when option 1 detects missing or unusable dependencies or frontend output during recovery
 - validates that the frontend build is available before starting the preview server
 - starts the backend with the synchronized virtual-environment Python and `uvicorn`
 - starts the frontend preview server
@@ -26,7 +26,7 @@ Database startup behavior is mode-specific:
 - In PostgreSQL mode, application startup only connects to the configured database. Run `.\start_on_windows.ps1 -Action InitializeDatabase` after selecting PostgreSQL to create the database, schema, and seed data.
 - The explicit `InitializeDatabase` action is the manual initialization path for either backend. It never runs implicitly as part of `Launch`.
 
-Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. On a fresh checkout, execute option 2 first to install/update dependencies and build the frontend, then execute option 1 to launch the application; option 1 also recovers missing or unusable environments and frontend output. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
+Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. On a fresh checkout, execute option 2 first to install/update dependencies and build the frontend, then execute option 1 to launch the application. Use option 3, or `.\start_on_windows.ps1 -Action RebuildFrontend`, to rebuild only the frontend after frontend changes or when its production output needs refreshing; this does not synchronize Python dependencies. Option 1 also recovers missing or unusable environments and frontend output. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
 
 ## Packaged desktop startup
 
