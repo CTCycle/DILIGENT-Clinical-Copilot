@@ -3,7 +3,7 @@ Last updated: 2026-08-19
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
-- On Windows, `start_on_windows.ps1` prepares portable runtimes and dependencies before launching the local services; the frontend build is normally produced by install/update option 2 and is rebuilt by option 1 when recovery detects missing or unusable environments or frontend output.
+- On Windows, `start_on_windows.ps1` prepares portable runtimes and dependencies before launching the local services; the frontend build is normally produced by install/update option 2, can be rebuilt independently with option 3 or `-Action RebuildFrontend`, and is rebuilt by option 1 when recovery detects missing or unusable environments or frontend output.
 - The frontend runtime baseline is Node.js 22.13.0 or newer within the Node.js 22 line; this is required by the locked `jsdom` version.
 - RAG requires `numpy`, `onnxruntime`, and `tokenizers`; the canonical artifact is a pinned AVX2 `uint8` ONNX model. PyTorch and Sentence Transformers are not required.
 - Manual macOS and Linux startup requires compatible Python, Node.js, and npm installations.

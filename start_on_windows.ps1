@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Launch', 'Install', 'InitializeDatabase', 'Test', 'Uninstall', 'BuildDesktopRelease', 'RemoveDesktopRelease')]
+    [ValidateSet('Launch', 'Install', 'RebuildFrontend', 'InitializeDatabase', 'Test', 'Uninstall', 'BuildDesktopRelease', 'RemoveDesktopRelease')]
     [string]$Action,
     [ValidateSet('Standard', 'Development')]
     [string]$InstallationType,
@@ -154,43 +154,8 @@ function Invoke-HealthCheck {
     }
 }
 
-function Initialize-PortableRuntimes {
-    Write-Step 'Ensuring portable Python, uv, and Node.js runtimes'
-    New-Item -ItemType Directory -Path $PythonDir, $UvDir, $NodeDir -Force | Out-Null
-
-    if (-not (Test-Path -LiteralPath $PythonExe)) {
-        $pythonZipName = "python-$PythonVersion-embed-amd64.zip"
-        $pythonUrl = "https://www.python.org/ftp/python/$PythonVersion/$pythonZipName"
-        Write-Info "Downloading $pythonUrl"
-        Invoke-DownloadAndExtract `
-            -Uri $pythonUrl `
-            -ArchivePath (Join-Path $PythonDir $pythonZipName) `
-            -DestinationPath $PythonDir
-    }
-
-    Patch-PythonPth -Path $PythonPth
-    $pythonVersionFound = Invoke-PythonVersionCheck -PythonExecutable $PythonExe
-    Write-Ok "Python ready: $pythonVersionFound"
-
-    if (-not (Test-Path -LiteralPath $UvExe)) {
-        $uvTarget = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
-            'uv-aarch64-pc-windows-msvc.zip'
-        }
-        else {
-            'uv-x86_64-pc-windows-msvc.zip'
-        }
-        $uvUrl = "https://github.com/astral-sh/uv/releases/latest/download/$uvTarget"
-        Write-Info "Downloading $uvUrl"
-        Invoke-DownloadAndExtract `
-            -Uri $uvUrl `
-            -ArchivePath (Join-Path $UvDir 'uv.zip') `
-            -DestinationPath $UvDir
-        $foundUv = Find-UvExecutable -SearchRoot $UvDir
-        if ($foundUv -ne $UvExe) {
-            Copy-Item -LiteralPath $foundUv -Destination $UvExe -Force
-        }
-    }
-    Write-Ok (& $UvExe --version)
+function Initialize-PortableNodeRuntime {
+    New-Item -ItemType Directory -Path $NodeDir -Force | Out-Null
 
     $nodeNeedsInstall = -not (Test-Path -LiteralPath $NodeExe)
     if (-not $nodeNeedsInstall) {
@@ -232,6 +197,47 @@ function Initialize-PortableRuntimes {
     }
     $env:PATH = "$NodeDir;$env:PATH"
     Write-Ok "Node.js ready: $(& $NodeExe --version)"
+}
+
+function Initialize-PortableRuntimes {
+    Write-Step 'Ensuring portable Python, uv, and Node.js runtimes'
+    New-Item -ItemType Directory -Path $PythonDir, $UvDir -Force | Out-Null
+
+    if (-not (Test-Path -LiteralPath $PythonExe)) {
+        $pythonZipName = "python-$PythonVersion-embed-amd64.zip"
+        $pythonUrl = "https://www.python.org/ftp/python/$PythonVersion/$pythonZipName"
+        Write-Info "Downloading $pythonUrl"
+        Invoke-DownloadAndExtract `
+            -Uri $pythonUrl `
+            -ArchivePath (Join-Path $PythonDir $pythonZipName) `
+            -DestinationPath $PythonDir
+    }
+
+    Patch-PythonPth -Path $PythonPth
+    $pythonVersionFound = Invoke-PythonVersionCheck -PythonExecutable $PythonExe
+    Write-Ok "Python ready: $pythonVersionFound"
+
+    if (-not (Test-Path -LiteralPath $UvExe)) {
+        $uvTarget = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
+            'uv-aarch64-pc-windows-msvc.zip'
+        }
+        else {
+            'uv-x86_64-pc-windows-msvc.zip'
+        }
+        $uvUrl = "https://github.com/astral-sh/uv/releases/latest/download/$uvTarget"
+        Write-Info "Downloading $uvUrl"
+        Invoke-DownloadAndExtract `
+            -Uri $uvUrl `
+            -ArchivePath (Join-Path $UvDir 'uv.zip') `
+            -DestinationPath $UvDir
+        $foundUv = Find-UvExecutable -SearchRoot $UvDir
+        if ($foundUv -ne $UvExe) {
+            Copy-Item -LiteralPath $foundUv -Destination $UvExe -Force
+        }
+    }
+    Write-Ok (& $UvExe --version)
+
+    Initialize-PortableNodeRuntime
     Write-Ok 'Portable runtimes ready.'
 }
 
@@ -340,6 +346,19 @@ function Install-ApplicationDependencies {
         Invoke-Checked -FilePath $UvExe -ArgumentList $syncArguments -WorkingDirectory $ServerDir
     }
 
+    Install-FrontendDependencies
+
+    if ($BuildFrontend) {
+        Build-Frontend
+        Write-Ok 'Dependencies and frontend build are ready'
+    }
+    else {
+        Write-Info 'Skipping frontend build; use the frontend rebuild option to rebuild the frontend'
+        Write-Ok 'Dependencies are ready'
+    }
+}
+
+function Install-FrontendDependencies {
     Write-Step 'Installing frontend dependencies'
     $nodeModules = Join-Path $ClientDir 'node_modules'
     $angularCli = Join-Path $nodeModules '@angular/cli/bin/ng.js'
@@ -353,16 +372,22 @@ function Install-ApplicationDependencies {
     else {
         Invoke-Checked -FilePath $NpmCmd -ArgumentList @('install', '--ignore-scripts', '--no-audit', '--no-fund') -WorkingDirectory $ClientDir
     }
+}
 
-    if ($BuildFrontend) {
-        Write-Step 'Building frontend'
-        Invoke-Checked -FilePath $NpmCmd -ArgumentList @('run', 'build') -WorkingDirectory $ClientDir
-        Write-Ok 'Dependencies and frontend build are ready'
+function Build-Frontend {
+    Write-Step 'Building frontend'
+    Invoke-Checked -FilePath $NpmCmd -ArgumentList @('run', 'build') -WorkingDirectory $ClientDir
+    if (-not (Test-Path -LiteralPath (Join-Path $ClientDir 'dist/browser/index.html') -PathType Leaf)) {
+        throw 'Angular production output was not generated'
     }
-    else {
-        Write-Info 'Skipping frontend build; use option 2 to rebuild the frontend'
-        Write-Ok 'Dependencies are ready'
-    }
+}
+
+function Rebuild-Frontend {
+    Initialize-PortableNodeRuntime
+    Import-DotEnv
+    Install-FrontendDependencies
+    Build-Frontend
+    Write-Ok 'Frontend rebuild completed'
 }
 
 function Test-DependenciesReady {
@@ -460,7 +485,7 @@ function Start-Application {
         Write-Ok 'Application environments are ready; skipped dependency installation'
     }
     if (-not (Test-Path -LiteralPath $frontendIndex)) {
-        throw 'Frontend build output is still missing after recovery. Select option 2 to retry dependency installation and the frontend build.'
+        throw 'Frontend build output is still missing after recovery. Select option 2 to retry dependency installation and the frontend build, or use the frontend rebuild option when dependencies are ready.'
     }
     Set-LauncherEnvironment
 
@@ -967,17 +992,18 @@ function Show-MainMenu {
     Write-MenuLine -Text '' -Color DarkCyan
     Write-MenuLine -Text 'MAINTENANCE' -Color Yellow
     Write-MenuOption -Number '2.' -Label 'Install / update dependencies' -Description 'Sync runtimes + packages'
-    Write-MenuOption -Number '3.' -Label 'Initialize database' -Description 'Prepare local data store'
-    Write-MenuOption -Number '4.' -Label 'Run test suite' -Description 'Execute project checks'
-    Write-MenuOption -Number '5.' -Label 'Remove logs' -Description 'Delete application logs'
-    Write-MenuOption -Number '6.' -Label 'Clear cache' -Description 'Remove temporary caches'
-    Write-MenuOption -Number '7.' -Label 'Uninstall application' -Description 'Remove generated files'
+    Write-MenuOption -Number '3.' -Label 'Rebuild frontend' -Description 'Recreate Angular production output'
+    Write-MenuOption -Number '4.' -Label 'Initialize database' -Description 'Prepare local data store'
+    Write-MenuOption -Number '5.' -Label 'Run test suite' -Description 'Execute project checks'
+    Write-MenuOption -Number '6.' -Label 'Remove logs' -Description 'Delete application logs'
+    Write-MenuOption -Number '7.' -Label 'Clear cache' -Description 'Remove temporary caches'
+    Write-MenuOption -Number '8.' -Label 'Uninstall application' -Description 'Remove generated files'
     Write-MenuLine -Text '' -Color DarkCyan
     Write-MenuLine -Text 'DESKTOP RELEASE' -Color Yellow
-    Write-MenuOption -Number '8.' -Label 'Build desktop release' -Description 'Create portable / MSI packages'
-    Write-MenuOption -Number '9.' -Label 'Remove desktop release artifacts' -Description 'Delete generated release state'
+    Write-MenuOption -Number '9.' -Label 'Build desktop release' -Description 'Create portable / MSI packages'
+    Write-MenuOption -Number '10.' -Label 'Remove desktop release artifacts' -Description 'Delete generated release state'
     Write-MenuLine -Text '' -Color DarkCyan
-    Write-MenuLine -Text '10. Exit'
+    Write-MenuLine -Text '11. Exit'
     Write-MenuRule
 }
 
@@ -991,6 +1017,7 @@ if ($Action) {
     switch ($Action) {
         'Launch' { Start-Application }
         'Install' { Install-OrUpdateApplication }
+        'RebuildFrontend' { Rebuild-Frontend }
         'InitializeDatabase' { Initialize-Database }
         'Test' { Invoke-TestSuite }
         'Uninstall' { Uninstall-Application }
@@ -1005,7 +1032,7 @@ while ($true) {
         Clear-Host
     }
     Show-MainMenu
-    $rawSelection = Read-Host 'Select an option (1-10)'
+    $rawSelection = Read-Host 'Select an option (1-11)'
     if ($null -eq $rawSelection) {
         exit 0
     }
@@ -1018,16 +1045,17 @@ while ($true) {
                 exit 0
             }
             '^2$' { Install-OrUpdateApplication }
-            '^3$' { Initialize-Database }
-            '^4$' { Invoke-TestSuite }
-            '^5$' { Remove-ApplicationLogs }
-            '^6$' { Clear-ApplicationCache }
-            '^7$' { Uninstall-Application }
-            '^8$' { Build-DesktopRelease; exit 0 }
-            '^9$' { Remove-DesktopRelease }
-            '^10$' { exit 0 }
+            '^3$' { Rebuild-Frontend }
+            '^4$' { Initialize-Database }
+            '^5$' { Invoke-TestSuite }
+            '^6$' { Remove-ApplicationLogs }
+            '^7$' { Clear-ApplicationCache }
+            '^8$' { Uninstall-Application }
+            '^9$' { Build-DesktopRelease; exit 0 }
+            '^10$' { Remove-DesktopRelease }
+            '^11$' { exit 0 }
             default {
-                Write-Host '[ERROR] Select a number from 1 through 10.' -ForegroundColor Red
+                Write-Host '[ERROR] Select a number from 1 through 11.' -ForegroundColor Red
                 Wait-ForMenu
                 continue
             }
