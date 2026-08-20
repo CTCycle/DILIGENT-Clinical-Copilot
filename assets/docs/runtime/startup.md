@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-08-19
+Last updated: 2026-08-20
 
 ## Recommended Local Startup
 On Windows, use:
@@ -20,13 +20,24 @@ The launcher:
 - recreates a stale backend virtual environment when the repository has moved
 - provides database, test, log, cache, and uninstall maintenance options
 
-Database startup behavior is mode-specific:
+Database startup behavior is migration-driven:
 
-- In SQLite mode, application startup checks only whether the configured `.db` file exists. A missing file is initialized and seeded once; an existing file is used as-is without schema validation or reseeding.
-- In PostgreSQL mode, application startup only connects to the configured database. Run `.\start_on_windows.ps1 -Action InitializeDatabase` after selecting PostgreSQL to create the database, schema, and seed data.
-- The explicit `InitializeDatabase` action is the manual initialization path for either backend. It never runs implicitly as part of `Launch`.
+- In SQLite mode, application startup creates the configured `.db` when
+  missing, applies Alembic migrations to head, and seeds catalogs once. An
+  existing file is checked and upgraded without reseeding.
+- In PostgreSQL mode, application startup connects to the configured database,
+  creates it when permitted, applies Alembic migrations to head, and seeds only
+  a newly created database. Existing databases do not require `CREATEDB`.
+  When the target is absent, provision it in advance or grant the configured
+  role `CREATEDB`; authentication, network, and permission failures abort startup.
+- The explicit `InitializeDatabase` action remains the repeatable operator path
+  for either backend. It applies pending migrations and seeds idempotently;
+  `--drop-existing` is the explicit destructive reset path.
+- Install/update option 2 runs the same database synchronization after backend
+  and frontend dependencies are ready. Launch performs the check again so
+  startup remains safe when installation was skipped.
 
-Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. On a fresh checkout, execute option 2 first to install/update dependencies and build the frontend, then execute option 1 to launch the application. Use option 3, or `.\start_on_windows.ps1 -Action RebuildFrontend`, to rebuild only the frontend after frontend changes or when its production output needs refreshing; this does not synchronize Python dependencies. Option 1 also recovers missing or unusable environments and frontend output. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
+Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. On a fresh checkout, execute option 2 first to install/update dependencies, synchronize the database, and build the frontend, then execute option 1 to launch the application. Use option 3, or `.\start_on_windows.ps1 -Action RebuildFrontend`, to rebuild only the frontend after frontend changes or when its production output needs refreshing; this does not synchronize Python dependencies or the database. Option 1 also recovers missing or unusable environments and frontend output. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
 
 ## Packaged desktop startup
 

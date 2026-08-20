@@ -36,7 +36,7 @@ from configurations.startup import (
     get_server_settings,
     initialize_settings,
 )
-from repositories.database.initializer import initialize_sqlite_database_if_missing
+from repositories.database.initializer import ensure_database_ready
 from services.startup_validation import run_startup_validations
 from services.catalogs.runtime import initialize_reference_catalog_provider
 from services.retrieval.embedding_runtime import close_embedding_runtime
@@ -78,8 +78,7 @@ def redirect_root_to_docs() -> RedirectResponse:
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     settings = get_server_settings()
 
-    if settings.database.backend == "sqlite":
-        initialize_sqlite_database_if_missing(settings.database)
+    ensure_database_ready(settings.database)
     initialize_reference_catalog_provider()
     run_startup_validations(settings)
 

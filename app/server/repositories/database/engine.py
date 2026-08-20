@@ -15,7 +15,7 @@ def build_sqlite_engine(database_path: str, *, timeout: float = 30.0) -> Engine:
         f"sqlite:///{database_path}",
         echo=False,
         future=True,
-        connect_args={"timeout": timeout},
+        connect_args={"timeout": timeout, "autocommit": False},
     )
 
 ###############################################################################
