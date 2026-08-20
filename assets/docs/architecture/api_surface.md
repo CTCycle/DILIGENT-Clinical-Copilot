@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-08-07
+Last updated: 2026-08-20
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -119,9 +119,44 @@ latest saved configuration and provider-catalog state.
 - Timeline deletion is scoped by both session and timeline identifiers and returns 404
   when that exact persisted timeline does not exist.
 - Clinical and inspection workflows rely on job polling for long-running work.
-- Revision jobs currently expose the revision-agent skeleton: start, status, persisted run, and persisted step/artifact reads are active for issue identification only. Report rewriting, tool execution, and revised entity persistence are not implemented yet.
+  Angular feature trackers use the shared `JobPollingService`; the old
+  duplicate polling helper in `clinical-api.ts` is no longer part of the
+  client surface.
+- Revision jobs expose the implemented bounded revision workflow: start and
+  status, persisted run/context/plan/step/tool-trace/artifact reads, draft
+  report validation, QA, optional `agentic_revision` session creation, and
+  lineage/review reads. Dry runs and QA-blocked runs retain an auditable draft;
+  an accepted non-dry run finalizes the revision lineage.
 - Research has no active route inventory in the current architecture source and should not be documented as an active API surface until implemented.
 
 
 ### Session revision agent
-`POST /api/inspection/sessions/{session_id}/revision/jobs` starts an agentic revision job. Existing status, cancellation, pipeline-run, step, artifact, entity, and clinical-review routes remain stable. The job returns revision/version identifiers and task, tool, QA, and human-review summaries.
+`POST /api/inspection/sessions/{session_id}/revision/jobs` starts an agentic
+revision job. Existing status, cancellation, pipeline-run, step, artifact,
+entity, and clinical-review routes remain stable. The job returns
+revision/version identifiers and task, tool, QA, and human-review summaries.
+
+```mermaid
+sequenceDiagram
+    participant UI as Angular UI
+    participant API as Revision API
+    participant S as Inspection service
+    participant A as RevisionAgentRunner
+    participant RR as Revision persistence
+    participant CR as Clinical persistence
+
+    UI->>API: Start revision
+    API->>S: Request
+    S->>RR: Create version and run shell
+    S->>A: Run bounded agent
+    A->>RR: Context, plan, steps, traces
+    A->>A: Draft and deterministic patch validation
+    A->>RR: QA and final artifacts
+    alt accepted non-dry run
+        A->>CR: Save agentic_revision session
+        A->>RR: Finalize lineage
+    else dry run or QA blocked
+        A->>RR: Keep auditable draft
+    end
+    API-->>UI: Job status and revision identifiers
+```

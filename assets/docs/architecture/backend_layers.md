@@ -1,9 +1,43 @@
 # Backend Layers
-Last updated: 2026-08-07
+Last updated: 2026-08-20
 
 Sampling behavior is owned by `services/llm/generation_policy.py`.
 
 Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and Brave.
+
+## Dependency Direction
+
+The backend is intentionally a modular monolith. Application services compose
+focused repositories; repositories do not reach through one another to perform
+business workflows.
+
+```mermaid
+flowchart TD
+    API[API modules] --> App[Application services]
+    App --> Domain[Domain contracts]
+    App --> Repositories[Focused repositories]
+
+    Clinical[ClinicalSessionService] --> SessionRepo[ClinicalSessionRepository]
+    Clinical --> Preparation[ClinicalKnowledgePreparation]
+    Preparation --> KnowledgeRepo[KnowledgeRepository]
+    Preparation --> DrugRepo[DrugCatalogRepository]
+
+    Inspection[DataInspectionService] --> SessionRepo
+    Inspection --> RevisionRepo[SessionRevisionRepository]
+    Inspection --> TimelineRepo[SessionTimelineRepository]
+
+    SessionRepo --> Context[RepositoryContext / SQLAlchemy]
+    KnowledgeRepo --> Context
+    DrugRepo --> Context
+    RevisionRepo --> Context
+    TimelineRepo --> Context
+```
+
+The practical boundary is that a repository persists records it is given. A
+service may coordinate multiple repositories when the use case requires it,
+but a repository should not discover another repository through an internal
+attribute. Version allocation belongs to `SessionRevisionRepository`; session
+metadata and session detail belong to `ClinicalSessionRepository`.
 
 ## Responsibilities By Layer
 - Endpoint layer: `app/server/api/*`
@@ -40,6 +74,9 @@ Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and
   - `ProviderModelCatalogCacheSerializer` persists successful and failed provider catalog attempts, including model entries, timestamps, status, and safe error text, through the SQLAlchemy configuration schema.
   - ORM ownership is split across `repositories/schemas/clinical.py`, `knowledge.py`, `security.py`, and `configuration.py`; all mappings register on the shared `Base.metadata`.
   - Access key persistence mapping and active key retrieval stay in `app/server/repositories/serialization/access_keys.py`.
+  - Public access-key operations return the persistence-independent
+    `domain.keys.AccessKeyRecord`; ORM rows remain inside the persistence
+    adapter for encryption and transaction work.
   - Reference catalog persistence and seeding are implemented through `reference_catalog_entries` and `reference_catalog_manifests` in `app/server/repositories/serialization/catalogs.py`.
   - Database initialization (`repositories/database/initializer.py`) handles catalog seeding inline using `common/catalogs/manifest_loader.py` rather than the services layer, preserving strict layering during bootstrapping.
 - Config and common layers: `app/server/configurations/*`, `app/server/common/*`
@@ -50,7 +87,11 @@ Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and
   - Catalog snapshot provider (`common/catalogs/provider.py`) provides cross-layer access to reference catalog data through a cached getter. Application lifespan explicitly calls `initialize_reference_catalog_provider()` before startup validation; service imports do not register providers as a side effect.
   - `RepositoryContext` constructs the shared SQLAlchemy engine/session factory. Focused repositories own clinical-session, timeline, revision, knowledge, and drug-catalog operations; there is no aggregate `DataSerializer` boundary.
   - `ExposureTimelineService` owns deterministic exposure-date parsing and suspension evaluation without repository, FastAPI, or LLM dependencies.
-  - Focused repository helpers contain pure value normalization, serialization, and row conversion; SQLAlchemy transactions remain in the focused repositories.
+  - SQLAlchemy transactions remain at repository boundaries. Some modules under
+    `repositories/serialization` are pure converters, while access-key and
+    model-configuration adapters also own database reads, writes, and commits;
+    the package name is historical rather than a promise that every module is
+    pure serialization.
   - Hepatox subservices receive explicit typed capabilities and shared issue state; they do not reach back through a parent consultation facade.
   - Catalog manifest loading (`common/catalogs/manifest_loader.py`) handles file I/O for catalog JSON manifests, decoupled from persistence logic.
   - Constants that depend on external catalog files (e.g., `CLOUD_MODEL_CHOICES`) are exposed as lazy accessor functions (`get_cloud_model_choices()`) to avoid import-time I/O side effects.
@@ -98,8 +139,13 @@ Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and
 ### `GET|PUT /api/inspection/sessions/{session_id}`
 - `app/server/api/data_inspection.py`
 - `app/server/services/inspection/service.py`
+- `app/server/repositories/clinical_session_repository.py`
 - `app/server/repositories/session_revision_repository.py`
 - Session detail is the single session read surface for original text, parsed sections, metadata, AI preview payload, and revision audit data.
+- Metadata writes are owned by `ClinicalSessionRepository`; report edits and
+  version lineage are owned by `SessionRevisionRepository`. The application
+  service combines the resulting session detail and revision audit payload for
+  the HTTP response.
 
 ### `POST /api/inspection/sessions/{session_id}/revision/jobs`
 - `app/server/api/data_inspection.py`
@@ -108,10 +154,51 @@ Supported cloud providers are OpenAI, Gemini, DeepSeek, Anthropic, OpenCode, and
 - `app/server/services/inspection/revision_scaffold.py`
 - `app/server/services/inspection/revision_agent.py`
 - `app/server/repositories/session_revision_repository.py`
-- Revision jobs currently implement the revision-agent skeleton only. They create a draft revision version shell, persist a revision run, and execute one single-model `revision_agent_issue_scan` step.
-- The revision agent reviews the persisted session input, sections, generated report, result payload, optional selected text, and user instructions. It produces a structured issue inventory covering missing context, mismatched context, hallucination risk, ambiguity, unsupported claims, chronology gaps, and future tool needs.
-- The skeleton does not rewrite the clinical report, rerun deterministic DILI adjudication, persist revised entities, or execute tools. Future tool routing is represented only as inert `tool_intents` in the issue-scan artifact.
-- Revision result lineage is persisted through `revision_kind`, `source_session_id`, `source_version_id`, `revision_version_id`, and `pipeline_run_id`.
+- `RevisionAgentRunner` assembles persisted context, creates a bounded plan,
+  executes allow-listed tool iterations through `RevisionToolRegistry`, and
+  persists context, plans, step/tool traces, draft reports, QA, and final
+  artifacts through `SessionRevisionRepository`.
+- Deterministic patch validation runs before QA. A non-dry run that passes the
+  configured gates may persist an `agentic_revision` session through
+  `ClinicalSessionRepository`; dry runs and QA-blocked runs retain an auditable
+  draft without replacing the source session.
+- Revision result lineage is persisted through `revision_kind`,
+  `source_version_id`, `revision_version_id`, and `pipeline_run_id`.
+
+```mermaid
+sequenceDiagram
+    participant UI as Angular UI
+    participant API as Revision API
+    participant S as Inspection service
+    participant A as RevisionAgentRunner
+    participant T as RevisionToolRegistry
+    participant RR as SessionRevisionRepository
+    participant CR as ClinicalSessionRepository
+    participant LLM as Selected LLM
+
+    UI->>API: Start revision
+    API->>S: Revision request
+    S->>RR: Create version/run shell
+    S->>A: Execute bounded agent
+    A->>RR: Persist context
+    A->>LLM: Create plan
+    A->>RR: Persist plan
+    loop bounded task/tool iterations
+        A->>LLM: Select next action
+        A->>T: Execute allowed tool
+        T-->>A: Observation
+        A->>RR: Persist step and trace
+    end
+    A->>LLM: Draft revised report
+    A->>A: Deterministic patch validation
+    A->>LLM: QA
+    A->>RR: Persist QA and artifacts
+    alt accepted non-dry revision
+        A->>CR: Persist revised session
+        A->>RR: Finalize lineage and run
+    else dry run or QA blocked
+        A->>RR: Retain auditable draft
+    end
 
 ## Async And Sync Behavior
 - FastAPI handlers are mixed:

@@ -1,5 +1,5 @@
 # System Overview
-Last updated: 2026-08-13
+Last updated: 2026-08-20
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
@@ -13,6 +13,64 @@ Primary flow:
 2. The backend validates and normalizes the input, then runs clinical analysis.
 3. Long-running work executes through background jobs with poll and cancel APIs.
 4. Results, catalogs, and session data are persisted for later review.
+
+## Runtime Topology
+
+DILIGENT is a modular monolith. The desktop shell, Angular client, FastAPI
+application, and persistence adapters are packaged together for local use;
+there is no runtime microservice boundary or message broker.
+
+```mermaid
+flowchart LR
+    User[User]
+
+    subgraph Desktop["Desktop packaging"]
+        Tauri[Tauri 2 host]
+    end
+
+    subgraph Frontend["Angular client"]
+        Pages[Pages / components]
+        State[Signals / trackers]
+        ApiClients[HTTP API clients]
+    end
+
+    subgraph Backend["FastAPI backend"]
+        API[HTTP / API layer]
+        Services[Application services]
+        Domain[Domain contracts]
+        Repositories[Persistence adapters]
+        Jobs[Process-local JobManager]
+    end
+
+    subgraph Storage["Persistence"]
+        SQL[(SQLite / PostgreSQL)]
+        Lance[(LanceDB)]
+        Files[(Runtime resources)]
+    end
+
+    subgraph External["External systems"]
+        Ollama[Ollama]
+        LLMs[Cloud LLM providers]
+        RxNav[NIH RxNav]
+    end
+
+    User --> Pages
+    Tauri --> Pages
+    Tauri --> API
+    Pages --> State
+    State --> ApiClients
+    ApiClients --> API
+    API --> Services
+    Services --> Domain
+    Services --> Repositories
+    Services --> Jobs
+    Repositories --> SQL
+    Repositories --> Lance
+    Repositories --> Files
+    Services --> Ollama
+    Services --> LLMs
+    Services --> RxNav
+```
 
 ## Repository Structure
 Maintained source-level structure, with build and cache artifacts omitted:
@@ -93,4 +151,16 @@ The release pipeline produces a no-install portable EXE, an MSI, and a SHA-256 m
 
 The tag-triggered `.github/workflows/release.yml` rebuilds both Windows artifacts from the release tag and attaches the portable EXE and MSI to the matching GitHub Release.
 
-Backend ownership is explicit: API endpoints call services, services orchestrate domain contracts, and focused repositories own persistence. Repository helpers are pure serializers and value converters, while the deterministic `ExposureTimelineService` and explicitly injected Hepatox subservices remain independent of the HTTP layer. The local database is recreated with `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs` when a clean schema cutover is required.
+Backend ownership is explicit: API endpoints call services, services
+orchestrate domain contracts, and focused repositories own persistence.
+`ClinicalKnowledgePreparation` coordinates cross-repository drug resolution and
+runtime vocabulary learning before and after `ClinicalSessionRepository`
+persists already-resolved mentions. `DataInspectionService` coordinates the
+session and revision repositories for inspection responses. Repository helpers
+are not all pure serializers: `access_keys.py` and model-configuration adapters
+own SQL sessions and transactions, while other helpers remain pure row or value
+converters. The deterministic `ExposureTimelineService` and explicitly
+injected Hepatox subservices remain independent of the HTTP layer. The local
+database is recreated with
+`app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs`
+when a clean schema cutover is required.
