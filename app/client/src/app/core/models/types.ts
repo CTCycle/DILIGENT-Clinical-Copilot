@@ -284,6 +284,7 @@ export type JobStatusResponse<TJobResult extends Record<string, unknown> = Clini
   created_at?: number | null;
   completed_at?: number | null;
   version?: number | null;
+  stop_requested?: boolean;
 };
 
 export type InspectionUpdateJobResult = {

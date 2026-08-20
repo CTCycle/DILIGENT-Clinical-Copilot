@@ -67,7 +67,7 @@ def test_runner_job_id_detection_covers_supported_and_rejected_callables(
     assert JobManager().runner_accepts_job_id(runner) is expected
 
 ###############################################################################
-def test_running_cancel_transitions_to_cancelled_immediately() -> None:
+def test_running_cancel_remains_active_until_worker_exits() -> None:
     manager = JobManager()
     started = threading.Event()
     release = threading.Event()
@@ -81,8 +81,12 @@ def test_running_cancel_transitions_to_cancelled_immediately() -> None:
     assert started.wait(timeout=1)
     snapshot = manager.cancel_job(job_id)
     assert snapshot is not None
-    assert snapshot["status"] == "cancelled"
-    assert manager.is_job_running("runtime_test") is False
+    assert snapshot["status"] == "running"
+    assert snapshot["stop_requested"] is True
+    assert manager.is_job_running("runtime_test") is True
+    running = manager.get_running_job("runtime_test")
+    assert running is not None
+    assert running["job_id"] == job_id
     release.set()
     for _ in range(20):
         terminal = manager.get_job_status(job_id)
@@ -91,9 +95,10 @@ def test_running_cancel_transitions_to_cancelled_immediately() -> None:
         time.sleep(0.05)
     assert terminal is not None
     assert terminal["status"] == "cancelled"
+    assert manager.is_job_running("runtime_test") is False
 
 ###############################################################################
-def test_running_cancel_allows_duplicate_job_submission_immediately() -> None:
+def test_running_cancel_blocks_duplicate_scope_until_worker_exits() -> None:
     manager = JobManager()
     started = threading.Event()
     release = threading.Event()
@@ -106,8 +111,13 @@ def test_running_cancel_allows_duplicate_job_submission_immediately() -> None:
     job_id = manager.start_job("runtime_test", runner)
     assert started.wait(timeout=1)
     manager.cancel_job(job_id)
-    assert manager.is_job_running("runtime_test") is False
+    assert manager.is_job_running("runtime_test") is True
     release.set()
+    for _ in range(20):
+        if not manager.is_job_running("runtime_test"):
+            break
+        time.sleep(0.05)
+    assert manager.is_job_running("runtime_test") is False
 
 ###############################################################################
 def test_job_result_merge_is_single_source_of_truth() -> None:
