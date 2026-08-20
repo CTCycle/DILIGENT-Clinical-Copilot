@@ -544,6 +544,7 @@ class OllamaClient:
         messages: list[dict[str, str]],
         format: str | None = None,
         temperature: float | None = None,
+        purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
         think: bool | None = None,
         options: dict[str, Any] | None = None,
         keep_alive: str | None = None,
@@ -554,6 +555,7 @@ class OllamaClient:
             messages=messages,
             format=format,
             temperature=temperature,
+            purpose=purpose,
             think=think,
             options=options,
             keep_alive=keep_alive,
@@ -651,6 +653,7 @@ class OllamaClient:
         schema: type[T],
         temperature: float = 0.0,
         use_json_mode: bool = True,
+        purpose: GenerationPurpose = GenerationPurpose.STRUCTURED_EXTRACTION,
         max_repair_attempts: int = 2,
     ) -> T:
         return await ollama_structured.llm_structured_call(
@@ -661,6 +664,7 @@ class OllamaClient:
             schema=schema,
             temperature=temperature,
             use_json_mode=use_json_mode,
+            purpose=purpose,
             max_repair_attempts=max_repair_attempts,
         )
 
