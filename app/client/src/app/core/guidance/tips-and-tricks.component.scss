@@ -67,9 +67,3 @@
 .guidance-tip-action:hover {
   text-decoration: underline;
 }
-
-@media (max-width: 640px) {
-  .guidance-tips-grid {
-    grid-template-columns: 1fr;
-  }
-}

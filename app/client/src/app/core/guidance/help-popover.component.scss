@@ -83,14 +83,3 @@
   background: var(--color-surface-alt);
   color: var(--color-text-primary);
 }
-
-@media (max-width: 720px) {
-  .guidance-help-panel {
-    top: auto !important;
-    right: 12px;
-    bottom: 12px;
-    left: 12px !important;
-    width: auto;
-    max-height: min(300px, calc(100vh - 24px));
-  }
-}

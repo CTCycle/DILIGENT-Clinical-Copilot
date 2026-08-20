@@ -176,22 +176,3 @@
   width: auto;
   flex: 0 1 auto;
 }
-
-@media (max-width: 600px) {
-  .preflight-issue-list {
-    max-height: 48vh;
-  }
-
-  .preflight-issue dl div {
-    grid-template-columns: 1fr;
-    gap: var(--space-xs);
-  }
-
-  .preflight-actions {
-    flex-direction: column-reverse;
-  }
-
-  .preflight-actions .btn {
-    width: 100%;
-  }
-}

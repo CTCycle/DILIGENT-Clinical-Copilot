@@ -135,25 +135,3 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
-
-@media (max-width: 720px) {
-  .guidance-tour-dialog {
-    top: auto !important;
-    right: 12px;
-    bottom: 12px;
-    left: 12px !important;
-    width: auto;
-    max-height: min(360px, calc(100vh - 24px));
-    padding: var(--space-lg);
-    border-radius: var(--radius-lg);
-  }
-
-  .guidance-tour-actions {
-    align-items: stretch;
-    flex-direction: column-reverse;
-  }
-
-  .guidance-tour-nav {
-    justify-content: flex-end;
-  }
-}

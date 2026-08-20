@@ -41,6 +41,3 @@ select:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-r
 .timeline-action-icon { width: var(--control-height-sm); padding: 0 !important; }
 .timeline-action-icon svg { width: 16px; height: 16px; }
 .is-error { color: var(--color-error); }
-@media (max-width: 920px) { .timeline-workspace { grid-template-columns: 1fr; height: auto; max-height: none; } .timeline-models { position: static; overflow: visible; padding: 0 0 var(--space-lg); } .timeline-model-actions { position: static; padding: var(--space-lg) 0 0; background: transparent; } .timeline-history { overflow: visible; padding: var(--space-lg) 0 0; border-left: 0; border-top: 1px solid var(--color-border); } }
-@media (max-width: 700px) { .timeline-row { grid-template-columns: 1fr; gap: var(--space-sm); } .timeline-actions { justify-content: flex-start; } }
-@media (max-width: 560px) { .timeline-row-summary { display: grid; grid-template-columns: 1fr; } .timeline-actions .btn { flex: 1; } }

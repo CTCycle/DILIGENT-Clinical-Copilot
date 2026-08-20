@@ -200,10 +200,7 @@
           </section>
         </div>
 
-        @if (selectedEvent() && isNarrowScreen()) {
-          <button type="button" class="inspector-backdrop" aria-label="Dismiss event inspector" (click)="closeInspector()"></button>
-        }
-        <aside class="evidence-panel" [class.is-open]="selectedEvent()" [attr.role]="isNarrowScreen() ? 'dialog' : 'complementary'" [attr.aria-modal]="isNarrowScreen() ? 'true' : null" aria-label="Event inspector" aria-live="polite">
+        <aside class="evidence-panel" [class.is-open]="selectedEvent()" role="complementary" aria-label="Event inspector" aria-live="polite">
           <div class="evidence-panel-header">
             <div>
               <span class="section-kicker">Supporting detail</span>

@@ -148,7 +148,6 @@ export class PatientTimetablePageComponent implements OnInit {
   readonly selectionAnnouncement = signal('');
   readonly evidenceFilterOptions = EVIDENCE_FILTER_OPTIONS;
   readonly densityOptions = DENSITY_OPTIONS;
-  readonly isNarrowScreen = signal(globalThis.matchMedia?.('(max-width: 720px)').matches ?? false);
   private lastFocusedElement: HTMLElement | null = null;
 
   readonly orderedEvents = computed(() => [...(this.timeline()?.events ?? [])].sort((a, b) => {
@@ -279,11 +278,6 @@ export class PatientTimetablePageComponent implements OnInit {
         const timelineId = timelineIdRaw ? Number(timelineIdRaw) : null;
         void this.handleRouteChange(sessionId, timelineId);
       });
-  }
-
-  @HostListener('window:resize')
-  handleResize(): void {
-    this.isNarrowScreen.set(globalThis.matchMedia?.('(max-width: 720px)').matches ?? false);
   }
 
   async loadTimeline(sessionId: number, timelineId: number | null): Promise<void> {

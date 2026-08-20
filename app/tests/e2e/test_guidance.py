@@ -131,11 +131,11 @@ def test_capture_guidance_screenshots_when_requested(
     page.get_by_role("button", name="Explain RAG settings").click()
     page.get_by_role("dialog", name="What RAG settings control").screenshot(path=output / "07-model-rag-popover.png")
 
-    page.set_viewport_size({"width": 420, "height": 860})
+    page.set_viewport_size({"width": 1280, "height": 800})
     page.emulate_media(color_scheme="dark")
     page.goto(base_url)
     _reset_guidance(page)
-    page.get_by_role("note", name="Get started with DILI Agent").screenshot(path=output / "08-dili-mobile-dark.png")
+    page.get_by_role("note", name="Get started with DILI Agent").screenshot(path=output / "08-dili-desktop-dark.png")
 
     # These two captures depend on a populated live inspection backend. Keep the
     # optional capture resilient for clean installations with no saved sessions.
@@ -154,3 +154,19 @@ def test_capture_guidance_screenshots_when_requested(
     if review_help.count():
         review_help.click()
         page.get_by_role("dialog", name="Review the chronology deliberately").screenshot(path=output / "10-timeline-review-popover.png")
+
+
+###############################################################################
+def test_narrow_viewport_shows_desktop_minimum_notice(page: Page, base_url: str) -> None:
+    page.set_viewport_size({"width": 1099, "height": 768})
+    page.goto(base_url)
+
+    notice = page.locator(".minimum-viewport-notice")
+    expect(notice).to_be_visible()
+    expect(notice).to_contain_text("at least 1100 pixels wide")
+    expect(page.locator(".app-runtime")).to_have_css("visibility", "hidden")
+
+    page.set_viewport_size({"width": 1100, "height": 768})
+    page.reload()
+    expect(notice).to_be_hidden()
+    expect(page.locator(".tab-bar")).to_be_visible()

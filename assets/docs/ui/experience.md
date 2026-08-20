@@ -1,5 +1,5 @@
 # Experience
-Last updated: 2026-08-18
+Last updated: 2026-08-20
 
 ## Page Structure
 - Routes:
@@ -33,13 +33,13 @@ Last updated: 2026-08-18
 - Model catalog reads reuse persisted state; **Refresh** is the explicit provider-contact action, and valid cached catalogs remain visible when a later refresh fails.
 - Access-key dialogs keep new keys inactive until explicit activation and expose only masked fingerprints after storage.
 
-## Responsiveness
-- Preserve breakpoints around:
-  - `1100px` for main grid collapse
-  - `1080px` for inspection and model layout fallback
-  - `720px` for mobile stacking and table overflow
-- Avoid clipped controls on mobile.
-- Enable horizontal scrolling for dense tables.
+## Desktop viewport
+- DILIGENT is a desktop application delivered through web technologies.
+- The supported viewport is at least `1100px` wide in CSS pixels.
+- At narrower widths, keep the desktop interface behind the minimum-window-size notice; do not switch to a mobile navigation or stacked layout.
+- Optimize for mouse and keyboard use, information density, and horizontal workspace utilization.
+- Windows tablets are supported only when they present a normal desktop browser viewport of at least `1100px`.
+- Keep horizontal scrolling for genuinely dense tables and vertical scrolling for long workspaces.
 
 ## Accessibility
 - Support keyboard navigation for navigation, tabs, modal actions, and key controls.

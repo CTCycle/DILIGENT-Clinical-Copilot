@@ -87,7 +87,7 @@ branch-status record.
 - `ui/components_and_patterns.md`
   - Controls, navigation, modal, and page composition rules.
 - `ui/experience.md`
-  - Core journeys, responsiveness, accessibility, and design principles.
+  - Core journeys, desktop viewport behavior, accessibility, and design principles.
 - `ui/ui_standards.md`
   - Practical spacing, typography, color, component, and do/don't rules for frontend UI work.
 

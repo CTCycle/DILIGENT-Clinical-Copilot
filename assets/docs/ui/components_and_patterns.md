@@ -1,9 +1,9 @@
 # Components And Patterns
-Last updated: 2026-08-18
+Last updated: 2026-08-20
 
 ## Page Layout Patterns
-- DILI page uses a responsive grid through `.stitch-dili-grid` and a sticky sidebar on desktop.
-- Model configuration uses a two-column or two-row layout through `.model-config-layout`.
+- DILI page uses a desktop split grid through `.stitch-dili-grid` with a persistent sidebar.
+- Model configuration uses a desktop multi-column layout through `.model-config-layout`.
 - Clinical Sessions uses a list-detail workspace with AI preview, session editing, metadata summaries, revision actions, and timeline actions.
 - Data Inspection uses tabbed sections with scroll-aware tables and lists for reference data and RAG resources.
 - Clinical Sessions keeps preview rendering and related view state in focused preview components; page-level orchestration should not reabsorb that logic.
@@ -41,7 +41,7 @@ Last updated: 2026-08-18
 
 ### Tables And Scroll Areas
 - Keep fixed action-column sizing where needed.
-- Preserve responsive overflow behavior for dense inspection views.
+- Preserve bounded desktop overflow behavior for dense inspection views.
 
 ## Component Usage Rules
 - Prefer shared sizing tokens before introducing new values:
@@ -56,7 +56,7 @@ Last updated: 2026-08-18
   - distinct disabled state
   - comfortable hit area
 - Page-local color values are acceptable only for page-specific illustration or background treatments.
-- Dense horizontal navigation should wrap or scroll instead of clipping on narrow widths.
+- Main navigation remains a single desktop row; the root viewport notice handles unsupported narrow widths.
 
 ## Do And Do Not
 | Do | Do not |
@@ -64,5 +64,5 @@ Last updated: 2026-08-18
 | Reuse spacing, radius, and color tokens. | Add near-duplicate one-off colors or spacing values without a reuse case. |
 | Keep heading hierarchy limited and predictable. | Create new hierarchy through arbitrary font sizes alone. |
 | Preserve visible keyboard focus. | Rely on color-only hover states as the only interaction cue. |
-| Let dense controls wrap or scroll on small screens. | Force controls into cramped rows that clip labels. |
+| Use the available desktop width for dense controls and tables. | Add mobile-only navigation or compact layouts. |
 | Keep decorative backgrounds separate from functional surfaces. | Encode functional meaning only through background hue. |

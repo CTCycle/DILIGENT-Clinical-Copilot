@@ -95,10 +95,3 @@
   background: var(--color-brand-bg);
   color: var(--color-brand);
 }
-
-@media (max-width: 720px) {
-  .guidance-feature-tip {
-    margin: var(--space-md) 0;
-    padding: var(--space-md);
-  }
-}

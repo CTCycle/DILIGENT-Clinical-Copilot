@@ -60,8 +60,7 @@ the same day remain readable without overlapping cards. Clinical, Medication,
 Laboratory, Uncertain, and Date not reported categories remain explicit through
 labels and category controls. Use its evidence filter, category collapse controls,
 dense/compact/comfortable density, and previous/next navigation to focus review.
-Selecting an event opens the Event inspector on desktop and a bottom-sheet inspector
-on narrow screens. Approximate placement, a **Fallback chronology**, and **Missing
+Selecting an event opens the desktop Event inspector. Approximate placement, a **Fallback chronology**, and **Missing
 source evidence** are visible warnings, not clinical confirmation.
 
 Use the help popover beside **Review controls** when the filter names need context. Evidence filters describe source support, density changes reading comfort, uncertain timing keeps approximate events visible, and **Inspect details** opens the event's source and confidence rationale. These controls do not alter the saved timeline.
