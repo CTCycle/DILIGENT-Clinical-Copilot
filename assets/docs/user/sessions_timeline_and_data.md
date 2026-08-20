@@ -1,10 +1,13 @@
 # Sessions, Timeline, And Data
 Last updated: 2026-08-18
 
-## Review Saved Clinical Sessions
+## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
 
-The section tabs have a contextual help popover because their responsibilities are easy to confuse: **Preview** is read-only, **Text Editor** saves manual edits, **Revision** creates a new draft, and **Timeline** manages generated chronologies.
+The section tabs have contextual help that changes with the selected page:
+**Preview** is read-only, **Text Editor** saves manual edits, **Metadata** stores
+attached evidence and JSON, **Revision** creates a new draft, and **Timeline**
+manages generated chronologies.
 
 Expected capabilities:
 - view a list of sessions
@@ -48,12 +51,12 @@ Recommended workflow:
 6. Compare exposure dates against lab abnormalities and symptoms.
 7. Use the timeline to refine DILI Agent input if needed.
 
-In the **Timeline** tab, choose a Local or Cloud runtime for each generation run.
-Cloud runs also select a provider and model; these choices do not change global model
-configuration. Saved timelines appear as compact rows that record the run's provider,
-model, date range, event count, and evidence-quality warnings. Use **Open** to reopen a specific saved timeline,
-**Use settings** to copy its available settings into the form, or **Delete** to remove
-only that saved timeline after confirmation.
+In the **Timeline** tab, the generation action uses the model assigned to the
+Timeline role in Model Configurations. Use **Manage model roles** when that
+assignment needs to change. Saved timelines appear as compact rows that record
+the run's provider, model, date range, event count, and evidence-quality
+warnings. Use **Open** to reopen a specific saved timeline or **Delete** to
+remove only that saved timeline after confirmation.
 
 The timetable presents a vertical chronology grouped by canonical date so events on
 the same day remain readable without overlapping cards. Clinical, Medication,

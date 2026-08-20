@@ -17,7 +17,8 @@ This page controls how the application calls a model during analysis. Expect con
 Recommended workflow:
 1. Decide whether the run should use a local or cloud provider.
 2. For local testing, select an Ollama-compatible model if available.
-3. For cloud use, select the intended provider and assign a catalog model to the clinical and extraction roles.
+3. Select a catalog model independently for the clinical, text extraction,
+   Revision, and Timeline roles. A model may hold more than one role.
 4. Save or apply the configuration.
 5. Add and activate an access key if the provider requires one.
 
@@ -49,6 +50,9 @@ Recommended workflow:
 Do not paste keys into screenshots, chat messages, issue reports, or shared logs.
 
 ## Local Model Notes
-- Local runtime saves only installed Ollama models for clinical and extraction roles.
+- Local runtime saves only installed Ollama models for clinical, extraction,
+  Revision, and Timeline roles.
+- Revision and Timeline pages show the configured role model and link back to
+  this page; they do not contain per-run provider/model selectors.
 - If you switch from cloud to local mode, cloud-only role selections are cleared automatically.
 - When installed, `qwen3.5:2b` is the preferred fast local extractor and `qwen3.5:9b` is the recommended stronger backup option for bounded extraction tests.

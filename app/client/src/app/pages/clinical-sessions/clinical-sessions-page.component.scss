@@ -977,6 +977,15 @@
   font-size: var(--font-sm);
 }
 
+.clinical-session-config-link {
+  flex: 0 0 auto;
+  align-self: center;
+  color: var(--color-brand);
+  font-size: var(--font-xs);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .clinical-session-revision-model-badge {
   flex: 0 0 auto;
   border: 1px solid #9ddfbd;
@@ -1058,6 +1067,37 @@
   line-height: 1.55;
   padding: var(--space-md);
   resize: vertical;
+}
+
+.clinical-session-revision-draft {
+  display: grid;
+  gap: var(--space-md);
+  border: 1px solid #bfe1cf;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+  padding: var(--space-lg);
+}
+
+.clinical-session-revision-draft .clinical-session-card-title {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  align-items: baseline;
+  color: var(--color-text-primary);
+  font-weight: 800;
+}
+
+.clinical-session-revision-draft .clinical-session-card-title small {
+  color: var(--color-text-muted);
+  font-size: var(--font-xs);
+  font-weight: 600;
+}
+
+.clinical-session-revision-draft-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+  line-height: 1.6;
 }
 
 .clinical-session-timeline-panel {

@@ -9,6 +9,7 @@ from domain.patient_timeline import (
     PatientTimeline,
     PatientTimelineEvent,
     PatientTimelineExtraction,
+    SessionTimelineRegenerateRequest,
 )
 from domain.timeline_dates import normalize_timeline_interval
 from repositories.serialization.session_timelines import build_timeline_preview_payload
@@ -225,6 +226,13 @@ def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_field
             "timeline_model": "deepseek-v4-flash",
         }
     ) == ("opencode_go", "deepseek-v4-flash")
+
+###############################################################################
+def test_timeline_request_rejects_active_model_overrides() -> None:
+    with pytest.raises(ValueError):
+        SessionTimelineRegenerateRequest.model_validate(
+            {"model_overrides": {"cloud_model": "gpt-4.1-mini"}}
+        )
 
 ###############################################################################
 def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
