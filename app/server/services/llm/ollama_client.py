@@ -779,6 +779,7 @@ class OllamaClient:
         preferred: list[str],
         temperature: float,
         use_json_mode: bool,
+        purpose: GenerationPurpose = GenerationPurpose.STRUCTURED_EXTRACTION,
         max_repair_attempts: int,
     ) -> T:
         return await ollama_structured.call_with_structured_models(
@@ -790,6 +791,7 @@ class OllamaClient:
             preferred=preferred,
             temperature=temperature,
             use_json_mode=use_json_mode,
+            purpose=purpose,
             max_repair_attempts=max_repair_attempts,
         )
 
