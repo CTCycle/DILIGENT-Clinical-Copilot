@@ -13,7 +13,7 @@ from services.runtime.jobs import JobManager
 def build_data_inspection_service(job_manager: JobManager) -> DataInspectionService:
     context = RepositoryContext.create()
     drug_catalog_repository = DrugCatalogRepository(context)
-    knowledge_repository = KnowledgeRepository(context, drug_catalog_repository)
+    knowledge_repository = KnowledgeRepository(context)
     clinical_session_repository = ClinicalSessionRepository(
         context, drug_catalog_repository, knowledge_repository
     )

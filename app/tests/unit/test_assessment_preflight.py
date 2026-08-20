@@ -4,7 +4,6 @@ from datetime import date
 from types import SimpleNamespace
 
 import pytest
-
 from common.exceptions import ServiceValidationError
 from domain.clinical.entities import ClinicalSessionRequest
 from domain.clinical.robustness import RagReadiness
@@ -12,6 +11,7 @@ from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 from services.session.preflight import validate_clinical_input_preflight
 from services.session.session_workflow import start_clinical_job_workflow
+
 
 ###############################################################################
 def _build_service():
@@ -93,7 +93,7 @@ def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> 
         lambda: False,
     )
     monkeypatch.setattr(
-        service.session_repository.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
         service.session_repository.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([], 0)
@@ -122,7 +122,7 @@ def test_malformed_sections_block_job_start(monkeypatch) -> None:
         service.session_repository.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
-        service.session_repository.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     request = ClinicalSessionRequest(
         clinical_input="ANAMNESIS\nonly anamnesis\n",
@@ -236,7 +236,12 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
         ),
     )
 
-    result = validate_clinical_input_preflight(service, request)
+    result = validate_clinical_input_preflight(
+        service,
+        request,
+        knowledge_repository=service.knowledge_repository,
+        drug_catalog_repository=service.drug_catalog_repository,
+    )
 
     assert result.ready is True
     assert result.deterministic_diagnostics["anamnesis"]["drug_count"] >= 3
@@ -278,6 +283,8 @@ def test_preflight_does_not_warn_when_deterministic_disease_matching_is_empty(
             selected_model_providers=["ollama"],
             clinical_input=_valid_input(),
         ),
+        knowledge_repository=service.knowledge_repository,
+        drug_catalog_repository=service.drug_catalog_repository,
     )
 
     assert "anamnesis_disease_context_sparse" not in {
@@ -367,7 +374,12 @@ def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
         ),
     )
 
-    result = validate_clinical_input_preflight(service, request)
+    result = validate_clinical_input_preflight(
+        service,
+        request,
+        knowledge_repository=service.knowledge_repository,
+        drug_catalog_repository=service.drug_catalog_repository,
+    )
 
     assert not any(
         issue.code == "requested_provider_mismatch" for issue in result.blocking_issues
