@@ -3365,24 +3365,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   min-height: 0;
 }
 
-.inspection-update-modal {
-  width: min(940px, calc(100vw - 48px));
-  max-width: 940px;
-  max-height: none;
-  overflow: visible;
-}
-
-.inspection-update-modal-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  overflow: visible;
-}
-
-.inspection-update-modal .modal-body {
-  overflow: visible;
-}
-
 .inspection-update-config-step {
   gap: var(--space-lg);
 }
