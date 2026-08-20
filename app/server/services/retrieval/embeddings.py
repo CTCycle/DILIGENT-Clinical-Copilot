@@ -237,15 +237,12 @@ class CloudEmbeddingGenerator:
         serializer = AccessKeySerializer()
         label = "OpenAI" if provider == "openai" else "Gemini"
         try:
-            row = serializer.get_active_key(provider, mark_used=True)
+            value = serializer.get_active_key_value(provider)
         except Exception as exc:  # noqa: BLE001
             raise LLMError(f"Failed to load active {label} access key") from exc
-        if row is None:
+        if value is None:
             raise LLMError(f"No active {label} access key configured")
-        try:
-            return serializer.decrypt_key_row(row)
-        except Exception as exc:  # noqa: BLE001
-            raise LLMError(f"Failed to decrypt active {label} access key") from exc
+        return value
 
     # -------------------------------------------------------------------------
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:

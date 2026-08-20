@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from repositories.schemas.security import AccessKey
 from repositories.schemas.base import Base
+from repositories.schemas.security import AccessKey
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
 from repositories.serialization.access_keys import AccessKeySerializer
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
+
 
 ###############################################################################
 def build_serializer() -> tuple[AccessKeySerializer, sessionmaker]:
@@ -85,11 +86,14 @@ def test_provider_scoped_activate_and_delete_for_brave() -> None:
 
 ###############################################################################
 def test_decrypt_key_row_uses_db_seeded_material() -> None:
-    serializer, _factory = build_serializer()
+    serializer, factory = build_serializer()
     plaintext = "sk-live-example-secret"
     created = serializer.create_key("openai", plaintext)
 
-    restored = serializer.decrypt_key_row(created)
+    with factory() as db_session:
+        loaded = db_session.get(AccessKey, created.id)
+        assert loaded is not None
+    restored = serializer.decrypt_key_row(loaded)
 
     assert restored == plaintext
 
