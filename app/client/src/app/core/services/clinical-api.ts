@@ -9,7 +9,6 @@ import {
 } from "../models/types";
 import {
   HTTP_TIMEOUT,
-  normalizeThrownError,
   requestJson,
 } from "./http-api";
 
@@ -81,82 +80,4 @@ export function resolvePollIntervalMs(pollIntervalSeconds: number): number {
     return 1000;
   }
   return Math.max(250, Math.round(pollIntervalSeconds * 1000));
-}
-
-export function pollClinicalJobStatus(
-  jobId: string,
-  intervalMs: number,
-  onUpdate: (status: JobStatusResponse) => void,
-  onError: (message: string) => void,
-): { stop: () => void } {
-  const safeIntervalMs = Math.max(intervalMs, 250);
-  const maxConsecutivePollErrors = 30;
-  let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
-  let stopped = false;
-  let consecutivePollErrors = 0;
-  let latestVersion = -1;
-
-  const poll = async () => {
-    if (stopped) return;
-    try {
-      const status = await fetchClinicalJobStatus(
-        jobId,
-        `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      );
-      if (stopped) return;
-      const incomingVersion =
-        typeof status.version === "number" && Number.isFinite(status.version)
-          ? status.version
-          : -1;
-      if (incomingVersion >= 0 && incomingVersion < latestVersion) {
-        timeoutId = globalThis.setTimeout(poll, safeIntervalMs);
-        return;
-      }
-      if (incomingVersion >= 0) {
-        latestVersion = incomingVersion;
-      }
-      consecutivePollErrors = 0;
-      onUpdate(status);
-      if (
-        status.status === "completed" ||
-        status.status === "failed" ||
-        status.status === "cancelled"
-      ) {
-        return;
-      }
-    } catch (error) {
-      if (stopped) return;
-      consecutivePollErrors += 1;
-      if (consecutivePollErrors < maxConsecutivePollErrors) {
-        const retryDelayMs = Math.min(
-          safeIntervalMs * 8,
-          safeIntervalMs * Math.max(1, consecutivePollErrors),
-        );
-        timeoutId = globalThis.setTimeout(poll, retryDelayMs);
-        return;
-      }
-      const message =
-        normalizeThrownError(
-          error,
-          "[ERROR] Polling could not continue. Please retry.",
-        );
-      onError(
-        `Polling failed after ${maxConsecutivePollErrors} consecutive attempts. ${message}`,
-      );
-      return;
-    }
-    if (stopped) return;
-    timeoutId = globalThis.setTimeout(poll, safeIntervalMs);
-  };
-
-  poll();
-
-  return {
-    stop: () => {
-      stopped = true;
-      if (timeoutId !== null) {
-        globalThis.clearTimeout(timeoutId);
-      }
-    },
-  };
 }
