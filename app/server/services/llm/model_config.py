@@ -242,7 +242,7 @@ class ModelConfigService:
         snapshot: ModelConfigSnapshot,
         refresh_from_ollama: bool,
     ) -> set[str]:
-        local_model_names = set(self.local_model_names)
+        local_model_names = self.known_local_model_names()
         if snapshot.clinical_model:
             local_model_names.add(snapshot.clinical_model)
         if snapshot.text_extraction_model:
@@ -587,6 +587,7 @@ class ModelConfigService:
         if provider is not None:
             provider = self.resolve_provider(provider)
 
+        known_local_model_names = self.known_local_model_names()
         for role_name, model_name in (
             ("clinical", snapshot.clinical_model),
             ("text_extraction", snapshot.text_extraction_model),
@@ -600,7 +601,7 @@ class ModelConfigService:
                     )
                 continue
             if (
-                model_name not in self.local_model_names
+                model_name not in known_local_model_names
                 and not snapshot.use_cloud_models
             ):
                 raise ServiceValidationError(
@@ -620,6 +621,16 @@ class ModelConfigService:
             return None
         normalized = value.strip()
         return normalized or None
+
+    def known_local_model_names(self) -> set[str]:
+        names = set(self.local_model_names)
+        record = model_catalog.load_catalog_record(self.catalog_cache, "ollama")
+        names.update(
+            str(item.get("id"))
+            for item in (record.models if record else [])
+            if str(item.get("id") or "").strip()
+        )
+        return names
 
     # -------------------------------------------------------------------------
     @staticmethod
