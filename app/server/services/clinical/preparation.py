@@ -332,7 +332,7 @@ RxNav and LiverTox evidence before accepting it.
                     )
                     existing = resolved_drugs.get(accepted_key)
                     resolved_drugs[accepted_key] = (
-                        resolver._merge_payload(existing, accepted_payload)
+                        resolver.merge_payload(existing, accepted_payload)
                         if existing is not None
                         else accepted_payload
                     )

@@ -221,6 +221,7 @@ class DataInspectionService(
 
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
+        self.session_revision_repository.delete_session_revisions(session_id)
         return self.clinical_session_repository.delete_session(session_id)
 
     # -------------------------------------------------------------------------

@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from repositories import values as repository_values
@@ -133,6 +133,61 @@ class SessionRevisionRepository:
     def get_next_session_version(self, root_session_id: int) -> int:
         with self.session_factory() as db_session:
             return self._next_session_version(db_session, root_session_id)
+
+    # -------------------------------------------------------------------------
+    def delete_session_revisions(self, session_id: int) -> bool:
+        safe_session_id = int(session_id)
+        with self.session_factory() as db_session:
+            root_session_id = db_session.execute(
+                select(ClinicalSessionVersion.root_session_id)
+                .where(ClinicalSessionVersion.session_id == safe_session_id)
+                .order_by(ClinicalSessionVersion.version_number.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            is_root_session = int(root_session_id or safe_session_id) == safe_session_id
+            version_scope = (
+                ClinicalSessionVersion.root_session_id == safe_session_id
+                if is_root_session
+                else ClinicalSessionVersion.session_id == safe_session_id
+            )
+            version_ids = list(
+                db_session.execute(select(ClinicalSessionVersion.id).where(version_scope)).scalars()
+            )
+            run_scope = (
+                ClinicalSessionRevisionRun.root_session_id == safe_session_id
+                if is_root_session
+                else ClinicalSessionRevisionRun.session_id == safe_session_id
+            )
+            run_ids = list(
+                db_session.execute(select(ClinicalSessionRevisionRun.id).where(run_scope)).scalars()
+            )
+            if version_ids:
+                db_session.execute(
+                    delete(ClinicalSessionRevisionReview).where(
+                        ClinicalSessionRevisionReview.revision_version_id.in_(version_ids)
+                    )
+                )
+                db_session.execute(
+                    delete(ClinicalSessionRevisionArtifact).where(
+                        ClinicalSessionRevisionArtifact.revision_version_id.in_(version_ids)
+                    )
+                )
+            if run_ids:
+                db_session.execute(
+                    delete(ClinicalSessionRevisionStep).where(
+                        ClinicalSessionRevisionStep.revision_run_id.in_(run_ids)
+                    )
+                )
+                db_session.execute(
+                    delete(ClinicalSessionRevisionArtifact).where(
+                        ClinicalSessionRevisionArtifact.revision_run_id.in_(run_ids)
+                    )
+                )
+            db_session.execute(delete(ClinicalSessionRevisionRun).where(run_scope))
+            if version_ids:
+                db_session.execute(delete(ClinicalSessionVersion).where(version_scope))
+            db_session.commit()
+            return bool(version_ids or run_ids)
 
     # -------------------------------------------------------------------------
     def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
