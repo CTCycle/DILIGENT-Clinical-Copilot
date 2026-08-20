@@ -18,6 +18,10 @@ from domain.settings.configuration import LLMRuntimeDefaults
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
+from repositories.serialization.provider_model_catalog_cache import (
+    ProviderModelCatalogCacheSerializer,
+)
+from services.llm import model_catalog
 from services.llm.provider_registry import provider_registry
 from services.llm.generation_policy import (
     GenerationPolicy,
@@ -63,6 +67,25 @@ class LLMRuntimeConfig:
     def _normalize_local_model(value: str | None, fallback: str) -> str:
         normalized = (value or "").strip()
         return normalized or fallback
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _local_model_choices() -> set[str]:
+        choices = set(get_clinical_model_choices()) | set(
+            get_text_extraction_model_choices()
+        )
+        try:
+            record = model_catalog.load_catalog_record(
+                ProviderModelCatalogCacheSerializer(), "ollama"
+            )
+        except Exception:
+            return choices
+        choices.update(
+            str(item.get("id"))
+            for item in (record.models if record else [])
+            if str(item.get("id") or "").strip()
+        )
+        return choices
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -112,9 +135,7 @@ class LLMRuntimeConfig:
                 if use_cloud_models
                 else snapshot.text_extraction_model
             )
-            local_choices = set(get_clinical_model_choices()) | set(
-                get_text_extraction_model_choices()
-            )
+            local_choices = cls._local_model_choices()
             for role_name, model_name in (
                 ("clinical", base_clinical_model),
                 ("text_extraction", base_text_extraction_model),

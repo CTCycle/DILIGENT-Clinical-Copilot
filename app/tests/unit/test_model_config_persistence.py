@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import create_engine, text
 
 import services.llm.model_config as model_config_module
+import services.llm.runtime_config as runtime_config_module
 from common.exceptions import ServiceValidationError
 from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
 from domain.model_configs import (
@@ -318,6 +319,66 @@ def test_model_config_service_rejects_switching_cloud_model_roles_to_local_mode(
         asyncio.run(service.update_state(ModelConfigUpdateRequest(use_cloud_services=False)))
 
     assert serializer.snapshot.use_cloud_models is True
+
+###############################################################################
+def test_model_config_service_allows_installed_dynamic_local_model(
+    monkeypatch,
+) -> None:
+    dynamic_model = "huihui_ai/gpt-oss-abliterated:20b"
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="deepseek-v4-flash",
+            text_extraction_model="deepseek-v4-flash",
+            revision_model="deepseek-v4-pro",
+            timeline_model="deepseek-v4-flash",
+            use_cloud_models=True,
+            cloud_provider="deepseek",
+            cloud_model="deepseek-v4-flash",
+            updated_at=datetime.now(UTC),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+    cached_catalog = ProviderModelCatalogCacheRecord(
+        provider_id="ollama",
+        configuration_fingerprint="ollama-test-fingerprint",
+        models=[{"id": dynamic_model, "display_name": dynamic_model}],
+        last_success_at=datetime.now(UTC),
+        last_attempt_at=datetime.now(UTC),
+        last_attempt_status="success",
+        last_error=None,
+    )
+
+    monkeypatch.setattr(
+        model_config_module.model_catalog,
+        "load_catalog_record",
+        lambda _cache, _provider: cached_catalog,
+    )
+
+    async def fake_list_available_ollama_models() -> set[str]:
+        return {dynamic_model}
+
+    monkeypatch.setattr(
+        service,
+        "list_available_ollama_models",
+        fake_list_available_ollama_models,
+    )
+
+    asyncio.run(
+        service.update_state(
+            ModelConfigUpdateRequest(
+                use_cloud_services=False,
+                clinical_model=dynamic_model,
+                text_extraction_model=dynamic_model,
+                revision_model=dynamic_model,
+                timeline_model=dynamic_model,
+            )
+        )
+    )
+
+    assert serializer.snapshot.use_cloud_models is False
+    assert serializer.snapshot.clinical_model == dynamic_model
+    assert serializer.snapshot.revision_model == dynamic_model
+    assert serializer.snapshot.timeline_model == dynamic_model
 
 ###############################################################################
 def test_model_config_service_rejects_invalid_persisted_local_model() -> None:
@@ -1025,6 +1086,43 @@ def test_cloud_runtime_uses_cloud_model_when_role_models_are_local() -> None:
             "openai",
             "gpt-4.1-mini",
         )
+
+###############################################################################
+def test_local_runtime_accepts_cached_dynamic_ollama_model(monkeypatch) -> None:
+    dynamic_model = "huihui_ai/gpt-oss-abliterated:20b"
+    snapshot = ModelConfigSnapshot(
+        use_cloud_models=False,
+        cloud_provider="openai",
+        cloud_model="gpt-4.1-mini",
+        clinical_model=dynamic_model,
+        text_extraction_model=dynamic_model,
+        revision_model=dynamic_model,
+        timeline_model=dynamic_model,
+    )
+    cached_catalog = ProviderModelCatalogCacheRecord(
+        provider_id="ollama",
+        configuration_fingerprint="ollama-runtime-test-fingerprint",
+        models=[{"id": dynamic_model, "display_name": dynamic_model}],
+        last_success_at=datetime.now(UTC),
+        last_attempt_at=datetime.now(UTC),
+        last_attempt_status="success",
+        last_error=None,
+    )
+    monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: snapshot)
+    monkeypatch.setattr(
+        runtime_config_module.model_catalog,
+        "load_catalog_record",
+        lambda _cache, _provider: cached_catalog,
+    )
+
+    assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
+        "ollama",
+        dynamic_model,
+    )
+    assert LLMRuntimeConfig.resolve_provider_and_model("timeline") == (
+        "ollama",
+        dynamic_model,
+    )
 
 ###############################################################################
 def test_cloud_runtime_preserves_valid_cloud_role_override() -> None:
