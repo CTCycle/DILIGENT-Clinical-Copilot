@@ -95,12 +95,12 @@ def test_clinical_jobs_endpoint_completes_dummy_three_drug_assessment(
         ),
     )
     monkeypatch.setattr(
-        service.session_repository.knowledge_repository,
+        service.knowledge_repository,
         "list_livertox_catalog",
         lambda search, offset, limit: ([{"drug_name": "Amoxicillin"}], 1),
     )
     monkeypatch.setattr(
-        service.session_repository.drug_catalog_repository,
+        service.drug_catalog_repository,
         "list_rxnav_catalog",
         lambda search, offset, limit: ([{"drug_name": "Amoxicillin"}], 1),
     )

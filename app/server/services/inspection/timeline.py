@@ -187,23 +187,26 @@ class InspectionTimelineMixin:
         persisted = session_payload.get("runtime_settings") if isinstance(session_payload, dict) else None
         settings = dict(persisted) if isinstance(persisted, dict) else {}
         provider, model = LLMRuntimeConfig.resolve_provider_and_model("timeline")
-        use_cloud_services = LLMRuntimeConfig.is_cloud_enabled()
-        settings.update(
-            {
-                "use_cloud_services": use_cloud_services,
-                "llm_provider": provider if use_cloud_services else LLMRuntimeConfig.get_llm_provider(),
-                "cloud_model": model if use_cloud_services else LLMRuntimeConfig.get_cloud_model(),
-                "timeline_model": model,
-                "text_extraction_model": (
-                    LLMRuntimeConfig.get_text_extraction_model()
-                    or coerce_optional_str(source.get("text_extraction_model"))
-                ),
-                "clinical_model": (
-                    LLMRuntimeConfig.get_clinical_model()
-                    or coerce_optional_str(source.get("clinical_model"))
-                ),
-            }
+        settings.setdefault("use_cloud_services", LLMRuntimeConfig.is_cloud_enabled())
+        settings.setdefault("llm_provider", LLMRuntimeConfig.get_llm_provider())
+        settings.setdefault("cloud_model", LLMRuntimeConfig.get_cloud_model())
+        settings.setdefault(
+            "text_extraction_model",
+            LLMRuntimeConfig.get_text_extraction_model()
+            or coerce_optional_str(source.get("text_extraction_model")),
         )
+        settings.setdefault(
+            "clinical_model",
+            LLMRuntimeConfig.get_clinical_model()
+            or coerce_optional_str(source.get("clinical_model")),
+        )
+        if "timeline_model" not in settings:
+            legacy_role = (
+                "cloud_model"
+                if settings["use_cloud_services"]
+                else "text_extraction_model"
+            )
+            settings["timeline_model"] = coerce_optional_str(settings.get(legacy_role)) or model
         settings.setdefault("ollama_reasoning", LLMRuntimeConfig.is_ollama_reasoning_enabled())
         settings.setdefault("ollama_seed", LLMRuntimeConfig.get_ollama_seed())
         return settings
