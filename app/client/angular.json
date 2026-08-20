@@ -3,7 +3,11 @@
   "version": 1,
   "cli": {
     "packageManager": "npm",
-    "analytics": false
+    "analytics": false,
+    "cache": {
+      "enabled": true,
+      "path": "../../assets/cache/angular"
+    }
   },
   "newProjectRoot": "projects",
   "projects": {

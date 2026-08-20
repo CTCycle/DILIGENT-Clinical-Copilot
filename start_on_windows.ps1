@@ -29,7 +29,18 @@ $script:ServerDir = Join-Path $RepoRoot 'app/server'
 $script:ClientDir = Join-Path $RepoRoot 'app/client'
 $script:VenvDir = Join-Path $ServerDir '.venv'
 $script:VenvPython = Join-Path $VenvDir 'Scripts/python.exe'
-$script:UvCacheDir = Join-Path $RuntimesDir '.uv-cache'
+$script:CacheDir = Join-Path $RepoRoot 'assets/cache'
+$script:AngularCacheDir = Join-Path $CacheDir 'angular'
+$script:CoverageDir = Join-Path $CacheDir 'coverage'
+$script:CargoTargetDir = Join-Path $CacheDir 'cargo'
+$script:MypyCacheDir = Join-Path $CacheDir 'mypy'
+$script:NpmCacheDir = Join-Path $CacheDir 'npm'
+$script:PipCacheDir = Join-Path $CacheDir 'pip'
+$script:PlaywrightCacheDir = Join-Path $CacheDir 'playwright'
+$script:PytestCacheDir = Join-Path $CacheDir 'pytest'
+$script:PythonBytecodeCacheDir = Join-Path $CacheDir 'python'
+$script:RuffCacheDir = Join-Path $CacheDir 'ruff'
+$script:UvCacheDir = Join-Path $CacheDir 'uv'
 $script:EnvFile = Join-Path $RepoRoot 'settings/.env'
 $script:EnvExample = Join-Path $RepoRoot 'settings/.env.example'
 $script:PythonVersion = '3.14.2'
@@ -275,9 +286,31 @@ function Import-DotEnv {
 }
 
 function Set-LauncherEnvironment {
+    New-Item -ItemType Directory -Path @(
+        $CacheDir,
+        $AngularCacheDir,
+        $CoverageDir,
+        $CargoTargetDir,
+        $MypyCacheDir,
+        $NpmCacheDir,
+        $PipCacheDir,
+        $PlaywrightCacheDir,
+        $PytestCacheDir,
+        $PythonBytecodeCacheDir,
+        $RuffCacheDir,
+        $UvCacheDir
+    ) -Force | Out-Null
     $env:UV_CACHE_DIR = $UvCacheDir
     $env:UV_PROJECT_ENVIRONMENT = $VenvDir
     $env:UV_LINK_MODE = 'copy'
+    $env:PIP_CACHE_DIR = $PipCacheDir
+    $env:NPM_CONFIG_CACHE = $NpmCacheDir
+    $env:PLAYWRIGHT_BROWSERS_PATH = $PlaywrightCacheDir
+    $env:RUFF_CACHE_DIR = $RuffCacheDir
+    $env:MYPY_CACHE_DIR = $MypyCacheDir
+    $env:COVERAGE_FILE = Join-Path $CoverageDir '.coverage'
+    $env:PYTHONPYCACHEPREFIX = $PythonBytecodeCacheDir
+    $env:CARGO_TARGET_DIR = $CargoTargetDir
     Remove-Item Env:PYTHONHOME -ErrorAction SilentlyContinue
     Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
     Remove-Item Env:PYTHONNOUSERSITE -ErrorAction SilentlyContinue
@@ -620,10 +653,12 @@ function Remove-PythonCaches {
 
 function Clear-ApplicationCache {
     Remove-PythonCaches
-    if (Test-Path -LiteralPath $UvCacheDir) {
-        Remove-Item -LiteralPath $UvCacheDir -Recurse -Force
+    if (Test-Path -LiteralPath $CacheDir) {
+        Get-ChildItem -LiteralPath $CacheDir -Force |
+            Where-Object Name -ne '.gitkeep' |
+            Remove-Item -Recurse -Force
     }
-    Write-Ok 'Python and uv caches removed'
+    Write-Ok 'Development caches and test artifacts removed from assets/cache'
 }
 
 function Uninstall-Application {
@@ -877,7 +912,7 @@ function Publish-DesktopArtifacts {
     $releasePrefix = "DILIGENT-v$Version-windows-x64"
     $portable = Join-Path $DesktopArtifactsDir "$releasePrefix-portable.exe"
     $msi = Join-Path $DesktopArtifactsDir "$releasePrefix.msi"
-    $rawExe = Get-ChildItem -LiteralPath (Join-Path $DesktopTauriDir 'target/release') -Filter '*.exe' -File -ErrorAction SilentlyContinue | Where-Object Name -notmatch 'uninstall' | Select-Object -First 1
+    $rawExe = Get-ChildItem -LiteralPath (Join-Path $CargoTargetDir 'release') -Filter '*.exe' -File -ErrorAction SilentlyContinue | Where-Object Name -notmatch 'uninstall' | Select-Object -First 1
     if ($DesktopTarget -in @('Portable', 'All')) {
         if ($null -eq $rawExe) { throw 'Tauri raw executable was not found' }
         if ((Test-Path -LiteralPath $portable) -and -not $Force) { throw "Release already exists: $portable (use -Force to replace it)" }
@@ -885,7 +920,7 @@ function Publish-DesktopArtifacts {
         Test-PortableDesktopArtifact -Path $portable
     }
     if ($DesktopTarget -in @('Msi', 'All')) {
-        $builtMsi = Get-ChildItem -LiteralPath (Join-Path $DesktopTauriDir 'target/release/bundle/msi') -Filter '*.msi' -File -ErrorAction SilentlyContinue |
+        $builtMsi = Get-ChildItem -LiteralPath (Join-Path $CargoTargetDir 'release/bundle/msi') -Filter '*.msi' -File -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -like ("*_{0}_*.msi" -f $Version) } |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
@@ -950,7 +985,7 @@ function Remove-DesktopRelease {
             if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force }
         }
     }
-    foreach ($target in @($DesktopBuildDir, $DesktopGeneratedDir, (Join-Path $DesktopTauriDir 'target'), (Join-Path $DesktopDir 'node_modules'))) {
+    foreach ($target in @($DesktopBuildDir, $DesktopGeneratedDir, $CargoTargetDir, (Join-Path $DesktopDir 'node_modules'))) {
         if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
     }
     Write-Ok 'Desktop release artifacts and generated desktop build state removed; installed applications and user data were preserved'

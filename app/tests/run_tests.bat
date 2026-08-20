@@ -7,6 +7,16 @@ set "APP_DIR=%PROJECT_ROOT%\app"
 set "SERVER_DIR=%APP_DIR%\server"
 set "CLIENT_DIR=%APP_DIR%\client"
 set "TESTS_DIR=%APP_DIR%\tests"
+set "CACHE_DIR=%PROJECT_ROOT%\assets\cache"
+set "PYTEST_CACHE_DIR=%CACHE_DIR%\pytest"
+set "PYTEST_BASETEMP=%PYTEST_CACHE_DIR%\basetemp"
+set "UV_CACHE_DIR=%CACHE_DIR%\uv"
+set "RUFF_CACHE_DIR=%CACHE_DIR%\ruff"
+set "NPM_CONFIG_CACHE=%CACHE_DIR%\npm"
+set "PLAYWRIGHT_BROWSERS_PATH=%CACHE_DIR%\playwright"
+set "MYPY_CACHE_DIR=%CACHE_DIR%\mypy"
+set "COVERAGE_FILE=%CACHE_DIR%\coverage\.coverage"
+set "PYTHONPYCACHEPREFIX=%CACHE_DIR%\python"
 set "SETTINGS_ENV=%PROJECT_ROOT%\settings\.env"
 set "VENV_PYTHON=%SERVER_DIR%\.venv\Scripts\python.exe"
 set "RUNTIME_NPM=%PROJECT_ROOT%\runtimes\nodejs\npm.cmd"
@@ -50,6 +60,9 @@ if not exist "%VENV_PYTHON%" (
   exit /b 1
 )
 set "PYTHON_CMD=%VENV_PYTHON%"
+
+if not exist "%CACHE_DIR%" mkdir "%CACHE_DIR%" >nul 2>&1
+set "PYTEST_TEMP_ARGS=--basetemp "%PYTEST_BASETEMP%" -o cache_dir="%PYTEST_CACHE_DIR%""
 
 if exist "%RUNTIME_NPM%" (
   set "NPM_CMD=%RUNTIME_NPM%"
@@ -137,7 +150,6 @@ if /i "%SUITE%"=="modelconfig" (
   set "NEED_BACKEND=1"
   set "NEED_FRONTEND=1"
   set "MODELCONFIG_KIND=slice"
-  set "UV_CACHE_DIR=%PROJECT_ROOT%\runtimes\.uv-cache"
   goto :suite_done
 )
 if /i "%SUITE%"=="modelconfigfull" (
@@ -146,7 +158,6 @@ if /i "%SUITE%"=="modelconfigfull" (
   set "NEED_BACKEND=1"
   set "NEED_FRONTEND=1"
   set "MODELCONFIG_KIND=full"
-  set "UV_CACHE_DIR=%PROJECT_ROOT%\runtimes\.uv-cache"
   goto :suite_done
 )
 
@@ -167,9 +178,9 @@ if defined MODELCONFIG_KIND (
   set "TIMESTAMP=%DATE:/=-%_%TIME::=-%"
   set "TIMESTAMP=!TIMESTAMP: =0!"
 
-  set "RUN_DB=%TEMP%\diligent-modelconfig-runner.!TIMESTAMP!.db"
-  set "PYTEST_CACHE=%TEMP%\diligent-modelconfig-pytest-cache.!TIMESTAMP!"
-  set "PYTEST_BASETEMP=%TESTS_DIR%\.basetemp-modelconfig"
+  set "RUN_DB=%PYTEST_CACHE_DIR%\modelconfig-runner.!TIMESTAMP!.db"
+  set "PYTEST_CACHE=%PYTEST_CACHE_DIR%\modelconfig-cache.!TIMESTAMP!"
+  set "PYTEST_BASETEMP=%PYTEST_CACHE_DIR%\modelconfig-basetemp.!TIMESTAMP!"
   set "DILIGENT_SQLITE_PATH=!RUN_DB!"
   set "PYTEST_TEMP_ARGS=--basetemp "!PYTEST_BASETEMP!" -o cache_dir="!PYTEST_CACHE!""
   if exist "!RUN_DB!" del /f "!RUN_DB!" >nul 2>&1
@@ -251,7 +262,7 @@ if defined MODELCONFIG_KIND (
 )
 
 echo [STEP] Running pytest...
-"%PYTHON_CMD%" -m pytest "%PYTEST_TARGET%" -v --tb=short %EXTRA_PYTEST_ARGS%
+"%PYTHON_CMD%" -m pytest "%PYTEST_TARGET%" -v --tb=short %EXTRA_PYTEST_ARGS% !PYTEST_TEMP_ARGS!
 if errorlevel 1 set "TEST_RESULT=1"
 
 :cleanup

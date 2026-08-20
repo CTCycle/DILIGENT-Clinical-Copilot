@@ -20,6 +20,11 @@ The launcher:
 - recreates a stale backend virtual environment when the repository has moved
 - provides database, test, log, cache, and uninstall maintenance options
 
+Development caches and test artifacts are kept under `assets/cache/`. The
+launcher routes uv, npm, Playwright, Ruff, pytest, Python bytecode, Angular,
+coverage, and Cargo build caches there while leaving functional frontend and
+desktop release outputs in their required runtime locations.
+
 Database startup behavior is migration-driven:
 
 - In SQLite mode, application startup creates the configured `.db` when
