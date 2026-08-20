@@ -122,6 +122,10 @@ jobs:
         working-directory: app/client
         run: npm install --no-audit --no-fund
 
+      - name: Run frontend tests
+        working-directory: app/client
+        run: npm run test -- --no-watch
+
       - name: Build frontend
         working-directory: app/client
         run: npm run build
