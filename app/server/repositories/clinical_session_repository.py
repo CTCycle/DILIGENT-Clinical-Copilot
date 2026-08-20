@@ -393,16 +393,6 @@ class ClinicalSessionRepository:
         return self.get_session_detail(safe_session_id)
 
     # -------------------------------------------------------------------------
-    def get_next_session_version(self, root_session_id: int) -> int:
-        with self.session_factory() as db_session:
-            max_version = db_session.execute(
-                select(func.max(ClinicalSessionVersion.version_number)).where(
-                    ClinicalSessionVersion.root_session_id == int(root_session_id)
-                )
-            ).scalar_one_or_none()
-            return int(max_version or 1) + 1
-
-    # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
         safe_session_id = int(session_id)
         with self.session_factory() as db_session:

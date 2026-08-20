@@ -3,6 +3,7 @@ from __future__ import annotations
 from api.inspection.sessions import InspectionSessionEndpoint
 from services.inspection.service import DataInspectionService
 
+
 ###############################################################################
 class FakeSerializer:
 
@@ -10,6 +11,10 @@ class FakeSerializer:
     def __init__(self) -> None:
         self.report_calls: list[dict[str, object]] = []
         self.metadata_calls: list[dict[str, object]] = []
+
+    # -------------------------------------------------------------------------
+    def get_session_detail(self, session_id: int) -> dict[str, object]:
+        return {"session_id": session_id, "path": "clinical"}
 
     # -------------------------------------------------------------------------
     def update_current_report_text_with_manual_audit(
@@ -45,7 +50,7 @@ class FakeSerializer:
             "metadata": metadata,
         }
         self.metadata_calls.append(call)
-        return {"session_id": session_id, "path": "metadata"}
+        return self.get_session_detail(session_id)
 
 ###############################################################################
 class FakeRouter:
@@ -129,7 +134,7 @@ def test_update_session_without_report_text_updates_metadata_only() -> None:
         metadata={"source": "manual"},
     )
 
-    assert payload == {"session_id": 7, "path": "metadata"}
+    assert payload == {"session_id": 7, "path": "clinical"}
     assert serializer.report_calls == []
     assert serializer.metadata_calls == [
         {"session_id": 7, "metadata": {"source": "manual"}}
@@ -146,7 +151,7 @@ def test_update_session_with_report_text_updates_report_only() -> None:
         metadata={"source": "manual"},
     )
 
-    assert payload == {"session_id": 9, "path": "report"}
+    assert payload == {"session_id": 9, "path": "clinical"}
     assert serializer.report_calls == [
         {
             "session_id": 9,
