@@ -434,7 +434,7 @@ class RevisionAgentRunner:
                 {
                     "patient_name": session.get("patient_name"),
                     "session_timestamp": datetime.now(UTC),
-                    "version": self.clinical_session_repository.get_next_session_version(
+                    "version": self.session_revision_repository.get_next_session_version(
                         root_session_id
                     ),
                     "root_session_id": root_session_id,

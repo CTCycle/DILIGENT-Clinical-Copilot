@@ -36,7 +36,5 @@ def build_repository_graph(
         knowledge_repository=knowledge_repository,
         clinical_session_repository=clinical_session_repository,
         session_timeline_repository=SessionTimelineRepository(context),
-        session_revision_repository=SessionRevisionRepository(
-            context, clinical_session_repository
-        ),
+        session_revision_repository=SessionRevisionRepository(context),
     )

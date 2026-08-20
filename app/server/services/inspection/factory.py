@@ -20,8 +20,6 @@ def build_data_inspection_service(job_manager: JobManager) -> DataInspectionServ
         drug_catalog_repository=drug_catalog_repository,
         knowledge_repository=knowledge_repository,
         session_timeline_repository=SessionTimelineRepository(context),
-        session_revision_repository=SessionRevisionRepository(
-            context, clinical_session_repository
-        ),
+        session_revision_repository=SessionRevisionRepository(context),
         jobs=job_manager,
     )
