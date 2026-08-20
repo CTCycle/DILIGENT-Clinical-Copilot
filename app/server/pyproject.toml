@@ -59,6 +59,7 @@ only-include = [
 "alembic.ini" = "alembic.ini"
 
 [tool.ruff]
+cache-dir = "../../assets/cache/ruff"
 exclude = [
     "**/__pycache__",
 ]
@@ -66,9 +67,8 @@ exclude = [
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]
 
-[tool.pytest.ini_options]
-testpaths = ["../tests/unit"]
-pythonpath = ["."]
+[tool.coverage.run]
+data_file = "../../assets/cache/coverage/.coverage"
 
 [tool.pyright]
 include = [

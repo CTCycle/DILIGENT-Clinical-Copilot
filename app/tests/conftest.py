@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
-import tempfile
 import threading
 import uuid
 from collections.abc import Coroutine
@@ -24,8 +23,13 @@ from repositories.database import sqlite as sqlite_module
 from services.catalogs.runtime import initialize_reference_catalog_provider
 
 ###############################################################################
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEVELOPMENT_CACHE_ROOT = REPO_ROOT / "assets" / "cache"
+PYTEST_CACHE_ROOT = DEVELOPMENT_CACHE_ROOT / "pytest"
+
+
 def _configure_test_embedded_database_path() -> None:
-    temp_root = Path(tempfile.gettempdir()) / "diligent-pytest-dbs"
+    temp_root = PYTEST_CACHE_ROOT / "databases"
     temp_root.mkdir(parents=True, exist_ok=True)
     db_path = temp_root / f"embedded-{uuid.uuid4().hex}.db"
     common_paths.DATABASE_FILE_PATH = db_path
@@ -45,10 +49,13 @@ def _configure_playwright_node_runtime() -> None:
     Ensure pytest-playwright uses the bundled Node runtime instead of ambient PATH.
     This avoids host-specific Node resolution issues during driver startup.
     """
+    os.environ.setdefault(
+        "PLAYWRIGHT_BROWSERS_PATH",
+        str(DEVELOPMENT_CACHE_ROOT / "playwright"),
+    )
     if os.getenv("PLAYWRIGHT_NODEJS_PATH"):
         return
-    repo_root = Path(__file__).resolve().parents[2]
-    bundled_node = repo_root / "runtimes" / "nodejs" / "node.exe"
+    bundled_node = REPO_ROOT / "runtimes" / "nodejs" / "node.exe"
     if bundled_node.is_file():
         os.environ["PLAYWRIGHT_NODEJS_PATH"] = str(bundled_node)
 
@@ -80,7 +87,7 @@ class WorkspaceTempPathFactory:
 ###############################################################################
 @pytest.fixture(scope="session")
 def tmp_path_factory() -> WorkspaceTempPathFactory:
-    root = Path(tempfile.gettempdir()) / "diligent-pytest-fixtures" / uuid.uuid4().hex
+    root = PYTEST_CACHE_ROOT / "fixtures" / uuid.uuid4().hex
     factory = WorkspaceTempPathFactory(root)
     yield factory
     shutil.rmtree(root, ignore_errors=True)
