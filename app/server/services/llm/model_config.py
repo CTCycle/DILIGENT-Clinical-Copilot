@@ -218,15 +218,7 @@ class ModelConfigService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _local_roles_updated(fields_set: set[str]) -> bool:
-        return bool(
-            fields_set
-            & {
-                "clinical_model",
-                "text_extraction_model",
-                "revision_model",
-                "timeline_model",
-            }
-        )
+        return bool(fields_set & {"clinical_model", "text_extraction_model", "revision_model", "timeline_model"})
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -243,12 +235,7 @@ class ModelConfigService:
         refresh_from_ollama: bool,
     ) -> set[str]:
         local_model_names = self.known_local_model_names()
-        for model_name in (
-            snapshot.clinical_model,
-            snapshot.text_extraction_model,
-            snapshot.revision_model,
-            snapshot.timeline_model,
-        ):
+        for model_name in (snapshot.clinical_model, snapshot.text_extraction_model, snapshot.revision_model, snapshot.timeline_model):
             if model_name:
                 local_model_names.add(model_name)
         if not refresh_from_ollama:
@@ -295,10 +282,7 @@ class ModelConfigService:
             # Older clients only submitted the two original roles when switching
             # back to Ollama. Keep that transition valid by carrying the parser
             # and clinical assignments into the new workflow roles.
-            for role_name, source_field in (
-                ("revision_model", "clinical_model"),
-                ("timeline_model", "text_extraction_model"),
-            ):
+            for role_name, source_field in (("revision_model", "clinical_model"), ("timeline_model", "text_extraction_model")):
                 if role_name in fields_set:
                     continue
                 source_model = (
@@ -345,12 +329,7 @@ class ModelConfigService:
         active_cloud_model: str | None,
         updates: dict[str, Any],
     ) -> None:
-        for field_name, role_name in (
-            ("clinical_model", "clinical"),
-            ("text_extraction_model", "text_extraction"),
-            ("revision_model", "revision"),
-            ("timeline_model", "timeline"),
-        ):
+        for field_name, role_name in (("clinical_model", "clinical"), ("text_extraction_model", "text_extraction"), ("revision_model", "revision"), ("timeline_model", "timeline")):
             if field_name not in fields_set:
                 continue
             updates[field_name] = self.resolve_role_model_selection(
