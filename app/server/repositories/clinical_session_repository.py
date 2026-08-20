@@ -12,8 +12,6 @@ from common.utils.logger import logger
 from common.utils.text_utils import normalize_drug_name
 from repositories import values as repository_values
 from repositories.context import RepositoryContext
-from repositories.drug_catalog_repository import DrugCatalogRepository
-from repositories.knowledge_repository import KnowledgeRepository
 from repositories.schemas.clinical import (
     ClinicalDrugMention,
     ClinicalLabObservation,
@@ -28,7 +26,6 @@ from repositories.schemas.clinical import (
     ClinicalSessionVersion,
 )
 from repositories.serialization import session_result_data
-from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
 ###############################################################################
 def _build_search_pattern(value: str | None) -> str | None:
@@ -45,15 +42,10 @@ class ClinicalSessionRepository:
     def __init__(
         self,
         context: RepositoryContext,
-        drug_catalog_repository: DrugCatalogRepository,
-        knowledge_repository: KnowledgeRepository,
     ) -> None:
         self.context = context
-        self.drug_catalog_repository = drug_catalog_repository
-        self.knowledge_repository = knowledge_repository
         self.engine = context.engine
         self.session_factory = context.session_factory
-        self._vocabulary_changed = False
 
     # -------------------------------------------------------------------------
     def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
@@ -124,12 +116,9 @@ class ClinicalSessionRepository:
                 )
             self.persist_session_sections(db_session, session_id, session_data)
             self.persist_session_labs(db_session, session_id, session_data)
-            vocabulary_changed = self.persist_session_drugs(
-                db_session, session_id, session_data
-            )
+            self.persist_session_drugs(db_session, session_id, session_data)
             self.persist_session_result_payload(db_session, session_id, session_data)
             db_session.commit()
-            self._vocabulary_changed = self._vocabulary_changed or vocabulary_changed
             return session_id
         except Exception:
             db_session.rollback()
@@ -549,7 +538,7 @@ class ClinicalSessionRepository:
     # -------------------------------------------------------------------------
     def persist_session_drugs(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
-    ) -> bool:
+    ) -> None:
         payload = session_data.get("matched_drugs")
         records: list[dict[str, Any]] = []
         if isinstance(payload, list):
@@ -565,7 +554,6 @@ class ClinicalSessionRepository:
                 if isinstance(item, str)
             )
         seen: set[str] = set()
-        vocabulary_changed = False
         for mention_ordinal, item in enumerate(records):
             raw_drug_name = repository_values.normalize_string(
                 item.get("raw_drug_name") or item.get("name")
@@ -576,17 +564,13 @@ class ClinicalSessionRepository:
             duplicate_mention = not raw_drug_name_norm or raw_drug_name_norm in seen
             seen.add(raw_drug_name_norm)
             matched_drug_name = repository_values.normalize_string(item.get("matched_drug_name"))
-            rxcui = repository_values.normalize_string(item.get("rxcui"))
-            nbk_id = repository_values.normalize_string(item.get("nbk_id"))
-            resolved_drug_id = self.drug_catalog_repository.resolve_drug_id(
-                db_session, matched_drug_name=matched_drug_name, rxcui=rxcui, nbk_id=nbk_id
+            rxcui = repository_values.normalize_string(
+                item.get("rxcui") or item.get("rxnorm_rxcui")
             )
+            nbk_id = repository_values.normalize_string(item.get("nbk_id"))
+            resolved_drug_id = repository_values.to_int(item.get("drug_id"))
             match_reason = repository_values.normalize_string(item.get("match_reason"))
             match_confidence = repository_values.to_float(item.get("match_confidence"))
-            if resolved_drug_id is None:
-                resolved_drug_id = self.knowledge_repository.resolve_drug_id_from_match_cache(
-                    db_session, normalized_drug_key=raw_drug_name_norm
-                )
             db_session.add(
                 ClinicalDrugMention(
                     session_id=session_id,
@@ -609,52 +593,6 @@ class ClinicalSessionRepository:
                     },
                 )
             )
-            if (
-                resolved_drug_id is not None
-                and match_reason == "exact_canonical"
-                and match_confidence == 1.0
-            ):
-                self.drug_catalog_repository.upsert_drug_alias(
-                    db_session,
-                    drug_id=resolved_drug_id,
-                    alias=raw_drug_name,
-                    alias_kind="observed_query",
-                    source="session",
-                    term_type=None,
-                )
-            else:
-                observation_category = (
-                    "observed_unresolved_query"
-                    if resolved_drug_id is None
-                    else "observed_unpromoted_query"
-                )
-                ReferenceCatalogSerializer(self.session_factory).upsert_runtime_observation(
-                    term=raw_drug_name,
-                    category=observation_category,
-                    source="session",
-                    is_active=True,
-                    db_session=db_session,
-                )
-                vocabulary_changed = True
-            self.knowledge_repository.upsert_high_confidence_kb_match_cache(
-                db_session,
-                raw_drug_name=raw_drug_name,
-                raw_drug_name_norm=raw_drug_name_norm,
-                normalized_drug_key=raw_drug_name_norm,
-                drug_id=resolved_drug_id,
-                rxnorm_rxcui=rxcui,
-                livertox_nbk_id=nbk_id,
-                source="rxnav" if rxcui else "livertox",
-                confidence=match_confidence,
-                evidence={
-                    "match_reason": match_reason,
-                    "match_notes": item.get("match_notes"),
-                    "matched_drug_name": matched_drug_name,
-                    "source_session_id": session_id,
-                },
-                ambiguous=bool(item.get("ambiguous_match")),
-            )
-        return vocabulary_changed
 
     # -------------------------------------------------------------------------
     def persist_session_result_payload(
@@ -677,9 +615,3 @@ class ClinicalSessionRepository:
             current_version.hepatic_pattern = repository_values.normalize_string(payload.get("hepatic_pattern"))
             current_version.total_duration = repository_values.to_float(payload.get("total_duration"))
             current_version.metadata_json = session_result_data.serialize_json_payload(payload.get("metadata"))
-
-    # -------------------------------------------------------------------------
-    def consume_vocabulary_change_signal(self) -> bool:
-        changed = self._vocabulary_changed
-        self._vocabulary_changed = False
-        return changed

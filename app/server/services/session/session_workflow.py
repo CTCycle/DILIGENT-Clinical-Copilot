@@ -625,6 +625,10 @@ async def process_single_patient_workflow(
         prepared_inputs=prepared_inputs,
         rucam_bundle=rucam_bundle,
     )
+    matched_drugs_payload = await asyncio.to_thread(
+        service.input_preparator.resolve_session_drug_ids,
+        matched_drugs_payload,
+    )
     serialized_issues = service.serialize_pipeline_issues(issues)
     pattern_strings = service.pattern_analyzer.stringify_scores(pattern_score)
     narrative = NarrativeBuilder.build_patient_narrative(
@@ -843,10 +847,19 @@ async def process_single_patient_workflow(
             },
         )
         if persisted_session_id is not None:
-            consume_signal = getattr(
-                service.session_repository, "consume_vocabulary_change_signal", None
-            )
-            if callable(consume_signal) and consume_signal():
+            try:
+                vocabulary_changed = await asyncio.to_thread(
+                    service.input_preparator.learn_session_drug_mentions,
+                    persisted_session_id,
+                    matched_drugs_payload,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Session drug vocabulary learning failed: error_type=%s",
+                    type(exc).__name__,
+                )
+                vocabulary_changed = False
+            if vocabulary_changed:
                 invalidate_text_normalization_snapshot()
             result_payload["session_id"] = persisted_session_id
             result_payload["run_bundle_index"] = build_run_bundle_index(

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-
+import services.session.session_workflow as session_workflow_module
 from domain.clinical.entities import (
     ClinicalLabEntry,
     DeterministicDrugExtractionResult,
@@ -18,13 +18,13 @@ from domain.clinical.entities import (
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
-import services.session.session_workflow as session_workflow_module
+from services.clinical.report_finalizer import ReportFinalizer
 from services.session.document_normalizer import DocumentNormalizer
+from services.session.session_service import ClinicalSessionService
 from services.session.session_shared import build_failed_session_payload
 from services.session.session_workflow import process_single_patient_workflow
-from services.clinical.report_finalizer import ReportFinalizer
-from services.session.session_service import ClinicalSessionService
 from services.session.workflow_shared import ClinicalPersistenceError
+
 
 ###############################################################################
 class FakePatternAnalyzer:
@@ -71,6 +71,23 @@ class FakeDrugsParser:
         return True
 
 ###############################################################################
+class FakeInputPreparator:
+
+    # -------------------------------------------------------------------------
+    def resolve_session_drug_ids(
+        self, matched_drugs: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        return matched_drugs
+
+    # -------------------------------------------------------------------------
+    def learn_session_drug_mentions(
+        self, session_id: int, matched_drugs: list[dict[str, Any]]
+    ) -> bool:
+        _ = session_id
+        _ = matched_drugs
+        return False
+
+###############################################################################
 class FakeSessionRepository:
 
     # -------------------------------------------------------------------------
@@ -92,6 +109,7 @@ class FakeClinicalService:
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.drugs_parser = FakeDrugsParser()
+        self.input_preparator = FakeInputPreparator()
         self.pattern_analyzer = FakePatternAnalyzer()
         self.session_repository = FakeSessionRepository()
         self.lab_extractor = SimpleNamespace(
@@ -202,7 +220,6 @@ class FakeClinicalService:
     # -------------------------------------------------------------------------
     async def run_livertox_lookup(self, **kwargs: Any) -> None:
         _ = kwargs
-        return None
 
     # -------------------------------------------------------------------------
     def reestimate_rucam_with_livertox(
