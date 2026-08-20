@@ -1,5 +1,5 @@
 # DILIGENT Clinical Copilot
-Last updated: 2026-08-17
+Last updated: 2026-08-20
 
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-GNU%20GPL%20v3-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
@@ -7,6 +7,16 @@ Last updated: 2026-08-17
 DILIGENT Clinical Copilot is a local, single-user decision-support application for structured Drug-Induced Liver Injury (DILI) evaluation. It combines a FastAPI backend with an Angular interface to collect clinical context, validate it before analysis, coordinate configured language-model services, and preserve sessions for subsequent review.
 
 It is a clinical-support tool, not a diagnostic device. A qualified clinician remains responsible for checking every input, output, conclusion, and use of any generated text.
+
+## Architecture and maintenance documentation
+
+The [documentation index](assets/docs/project_index.md) is the entry point for
+the maintained architecture and runtime notes. The most relevant architecture
+documents are the [system overview](assets/docs/architecture/system_overview.md),
+[backend layers](assets/docs/architecture/backend_layers.md),
+[persistence model](assets/docs/architecture/persistence.md),
+[background jobs](assets/docs/architecture/background_jobs.md), and
+[DILI pipeline](assets/docs/architecture/dili_assessment_pipeline.md).
 
 ![DILIGENT assessment flow (v3.2.0)](assets/figures/diligent-flow-v3.2.0.png)
 _The 3.2.0 flow runs deterministic preflight and a polled background job, persists an evidence-bounded session, and ends with human review._

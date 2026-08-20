@@ -7,14 +7,17 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 ## Current Codebase Snapshot
 
 This documentation describes the checked-out source tree, not a release claim.
-As of 2026-08-19:
+The exact source commit is intentionally read from git (`git rev-parse
+develop`) rather than duplicated here, so this index does not become a stale
+branch-status record.
 
-- The latest application commit on `develop` is `c06edaef`; the release metadata targets the synchronized `main` branch.
 - Backend, frontend, and desktop source manifests report version `3.2.0`.
 - Release versions use strict `major.minor.patch` SemVer and must remain synchronized across the frontend, backend, and desktop manifests; the backend exposes the frontend package version unless `DILIGENT_RELEASE_VERSION` is explicitly set for packaging.
 - The `v3.2.0` desktop release target is created from the synchronized `main` branch. Its portable EXE and MSI require independent artifact, tag, remote-release, and download/hash verification; the generated checksum manifest is maintainer-side verification output.
 - Model configuration reads are cache-only and non-cacheable. Provider contact is limited to explicit catalog load/refresh operations, and catalog attempts persist in `provider_model_catalog_cache`.
-- The revision workflow remains an issue-scan skeleton. It does not currently plan tools, rewrite reports, rerun DILI adjudication, or persist revised clinical entities.
+- The revision workflow is a bounded, persisted agentic workflow with context, planning, allow-listed tool traces, deterministic patch validation, QA, artifacts, and optional `agentic_revision` session finalization.
+- Running job cancellation is cooperative: pending jobs can become terminal immediately, while a running stop-requested worker remains active and occupies its concurrency scope until it exits.
+- The standard CI workflow runs the existing Angular/Vitest suite with `npm run test -- --no-watch` in addition to the frontend build.
 - Angular page and component state uses signals/computed state in current model-configuration, access-key, and clinical-session preview surfaces.
 
 ## How To Navigate

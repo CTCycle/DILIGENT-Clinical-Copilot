@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-08-13
+Last updated: 2026-08-20
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -22,6 +22,24 @@ Each job tracks:
 - `completed_at`
 - `version`
 - `stop_requested`
+
+`stop_requested` is a control signal, not a terminal status. A running job
+continues to report `running` while its worker is unwinding, which keeps its
+concurrency scope occupied and makes the API truthful about worker lifetime.
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending
+    pending --> running: worker admitted
+    pending --> cancelled: cancel before start
+    running --> running: stop_requested = true
+    running --> completed: worker returns successfully
+    running --> failed: worker raises
+    running --> cancelled: worker exits after stop request
+    completed --> [*]
+    failed --> [*]
+    cancelled --> [*]
+```
 
 ## Execution Behavior
 - Jobs run in daemon threads.
@@ -52,6 +70,9 @@ Each job tracks:
 - `session_timeline`
   - Start: `POST /api/inspection/sessions/{session_id}/timeline-jobs`
   - Poll or cancel: `GET|DELETE /api/inspection/sessions/{session_id}/timeline-jobs/{job_id}`
+- `session_revision`
+  - Start: `POST /api/inspection/sessions/{session_id}/revision/jobs`
+  - Poll or cancel: `GET|DELETE /api/inspection/sessions/revision/jobs/{job_id}`
 
 ## Polling Contract
 1. Start endpoints return `JobStartResponse` with `job_id`, `status`, and `poll_interval`.
@@ -64,21 +85,28 @@ Additional rules:
 - Clinical progress snapshots expose canonical granular stage keys such as `drugs.extracting`, `retrieval.evidence`, `report.generating`, `session.saving`, and terminal `completed`; generic internal wrapper stages are not persisted as the user-facing stage.
 - Inspection update jobs may include `phase`, `step_index`, `step_count`, `progress_message`, and `summary`.
 - Inspection update runners use cooperative cancellation and progress callbacks consistently across `rxnav`, `livertox`, and `rag`.
-- Session revision jobs start the revision-agent skeleton. The first implemented step creates a draft revision version, runs one single-model `revision_agent_issue_scan` over the persisted session input, generated report, result payload, optional selected text, and user instructions, and persists the issue inventory as revision step/artifact data.
+- Session revision jobs start the bounded revision agent. It creates a draft
+  version and run, persists context and a plan, executes allow-listed tool
+  iterations, validates the draft report, runs QA, and persists step, trace,
+  and artifact data before finalizing or retaining the draft.
 - Missing in-memory revision job status returns a recoverable failed status instead of a bare not-found response so the frontend can reload the persisted revision run and offer retry when the draft shell is still valid.
 - Clinical and session revision jobs must persist their successful result payloads before returning completion. Persistence failures move the job to failed state with sanitized error metadata.
 
-Frontend polling is implemented through app-lifetime tracker services such as
-`app/client/src/app/core/services/dili-job-tracker.service.ts` and stops on
-terminal states. Active DILI job linkage is persisted in local storage so the
-UI can reattach after route navigation, page refresh, or browser close/reopen
-while the backend worker is still running. Clinical status requests use the
-global one-hour HTTP timeout; the request timeout is independent from the
-worker duration because polling does not execute the clinical job inline.
+Frontend polling is implemented through the shared
+`app/client/src/app/core/services/job-polling.service.ts`, with feature trackers
+such as `dili-job-tracker.service.ts` interpreting status and progress. Active
+DILI job linkage is persisted in local storage so the UI can reattach after
+route navigation, page refresh, or browser close/reopen while the backend
+worker is still running. Clinical status requests use the global one-hour HTTP
+timeout; the request timeout is independent from the worker duration because
+polling does not execute the clinical job inline.
 
 ## Cancellation Rules
 - Pending jobs can be marked `cancelled` immediately.
 - Running jobs receive `stop_requested=True` and remain `running` until the worker reaches a terminal transition.
+- `is_job_running()` and scope admission continue to count a stop-requested
+  worker until its thread has exited; a conflicting job cannot start during
+  that shutdown window.
 - Runner code must check `get_job_manager().should_stop(job_id)` or an injected `JobManager` at safe checkpoints.
 
 If a runner does not check stop requests, cancellation is delayed.
@@ -101,7 +129,12 @@ If a runner does not check stop requests, cancellation is delayed.
 4. Expose start, poll, and cancel routes.
 5. Prevent conflicting duplicates where needed with `is_job_running(job_type)`.
 
-## Revision Agent Skeleton
-- Revision routes are active for issue identification only.
-- The revision agent does not rewrite the clinical report, rerun DILI adjudication, or execute tools in the current implementation.
-- Tool use is represented only as proposed `tool_intents` in the persisted issue scan until a tool manifest is added.
+## Revision Agent Runtime
+
+`RevisionAgentRunner` is an implemented bounded workflow rather than an
+issue-scan-only placeholder. It persists context and a plan, selects allow-listed tools from
+`RevisionToolRegistry`, records observations and tool traces, drafts a revised
+report, applies deterministic patch validation, runs QA, and persists revision
+artifacts. A non-dry run can create an `agentic_revision` session after the
+gates pass; dry runs and QA-blocked runs retain an auditable draft and do not
+replace the source session.

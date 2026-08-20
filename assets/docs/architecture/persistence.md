@@ -7,11 +7,189 @@ Last updated: 2026-08-20
 - Database mode and connection settings are sourced from `settings/.env`.
 - SQLite uses `<resource-root>/database.db` when `database.embedded_database=true`; the source-mode resource root defaults to `app/resources` and can be overridden with `DILIGENT_RESOURCES_PATH`. PostgreSQL is used in external database mode.
 
+## Relational Model
+
+The relational schema keeps clinical sessions, immutable revision lineage,
+knowledge/catalog data, configuration, and access keys in one SQLAlchemy
+metadata graph. Vector documents remain in LanceDB and are intentionally not
+foreign-keyed into this schema.
+
+```mermaid
+erDiagram
+    CLINICAL_SESSIONS {
+        int id PK
+        string patient_name
+        datetime session_timestamp
+        string session_status
+        string session_kind
+    }
+    CLINICAL_SESSION_RESULTS {
+        int id PK
+        int session_id FK
+        json payload_json
+    }
+    CLINICAL_SESSION_SECTIONS {
+        int id PK
+        int session_id FK
+        string section_kind
+        text content
+    }
+    CLINICAL_SESSION_TIMELINES {
+        int id PK
+        int session_id FK
+        datetime generated_at
+        string generation_status
+        json timeline_payload_json
+    }
+    CLINICAL_LAB_OBSERVATIONS {
+        int id PK
+        int session_id FK
+        string marker_name
+        float value
+        date sample_date
+    }
+    CLINICAL_DRUG_MENTIONS {
+        int id PK
+        int session_id FK
+        int drug_id FK
+        int mention_ordinal
+        string raw_mention
+        string match_status
+    }
+    CLINICAL_SESSION_VERSIONS {
+        int id PK
+        int session_id FK
+        int root_session_id FK
+        int source_version_id FK
+        int version_number
+        string revision_kind
+        string version_status
+    }
+    CLINICAL_SESSION_REVISION_RUNS {
+        int id PK
+        string pipeline_run_id UK
+        int session_id FK
+        int source_version_id FK
+        int target_revision_version_id FK
+        string status
+    }
+    CLINICAL_SESSION_REVISION_STEPS {
+        int id PK
+        int run_id FK
+        string pipeline_run_id
+        string step_name
+        int attempt
+        string status
+    }
+    CLINICAL_SESSION_REVISION_ARTIFACTS {
+        int id PK
+        int run_id FK
+        int revision_version_id FK
+        string artifact_key
+        string status
+    }
+    CLINICAL_SESSION_REVISION_REVIEWS {
+        int id PK
+        int revision_version_id FK
+        int session_id FK
+        string review_status
+    }
+    DRUGS {
+        int id PK
+        string canonical_name
+        string canonical_name_norm
+    }
+    DRUG_RXNORM_CODES {
+        int id PK
+        int drug_id FK
+        string rxcui UK
+    }
+    DRUG_ALIASES {
+        int id PK
+        int drug_id FK
+        string alias
+    }
+    DRUG_IDENTIFIERS {
+        int id PK
+        int drug_id FK
+        string identifier_system
+        string identifier_value
+    }
+    LIVERTOX_MONOGRAPHS {
+        int id PK
+        int drug_id FK
+        string monograph_key UK
+    }
+    KB_MATCH_CACHE {
+        int id PK
+        int drug_id FK
+        string normalized_key
+        string source
+        float confidence
+    }
+    ACCESS_KEYS {
+        int id PK
+        string provider
+        text encrypted_value
+        boolean is_active
+        string fingerprint
+    }
+    APPLICATION_CONFIGURATION {
+        int id PK
+        int revision
+        json payload
+    }
+    PROVIDER_MODEL_CATALOG_CACHE {
+        string provider_id PK
+        string configuration_fingerprint
+        json models
+    }
+    REFERENCE_CATALOG_ENTRIES {
+        int id PK
+        string manifest
+        int manifest_version
+        string domain
+        string category
+        string key
+    }
+    REFERENCE_CATALOG_MANIFESTS {
+        int id PK
+        string manifest UK
+        int installed_version
+        string manifest_hash
+    }
+
+    CLINICAL_SESSIONS ||--o| CLINICAL_SESSION_RESULTS : result
+    CLINICAL_SESSIONS ||--o{ CLINICAL_SESSION_SECTIONS : sections
+    CLINICAL_SESSIONS ||--o{ CLINICAL_SESSION_TIMELINES : timelines
+    CLINICAL_SESSIONS ||--o{ CLINICAL_LAB_OBSERVATIONS : labs
+    CLINICAL_SESSIONS ||--o{ CLINICAL_DRUG_MENTIONS : mentions
+    CLINICAL_SESSIONS ||--o{ CLINICAL_SESSION_VERSIONS : versions
+    CLINICAL_SESSION_VERSIONS o|--o{ CLINICAL_SESSION_VERSIONS : source_version
+    CLINICAL_SESSIONS ||--o{ CLINICAL_SESSION_REVISION_RUNS : runs
+    CLINICAL_SESSION_VERSIONS o|--o{ CLINICAL_SESSION_REVISION_RUNS : source
+    CLINICAL_SESSION_VERSIONS o|--o{ CLINICAL_SESSION_REVISION_RUNS : target
+    CLINICAL_SESSION_REVISION_RUNS o|--o{ CLINICAL_SESSION_REVISION_STEPS : steps
+    CLINICAL_SESSION_REVISION_RUNS o|--o{ CLINICAL_SESSION_REVISION_ARTIFACTS : artifacts
+    CLINICAL_SESSION_VERSIONS ||--o{ CLINICAL_SESSION_REVISION_ARTIFACTS : version_artifacts
+    CLINICAL_SESSION_VERSIONS ||--o{ CLINICAL_SESSION_REVISION_REVIEWS : reviews
+    CLINICAL_SESSIONS o|--o{ CLINICAL_SESSION_REVISION_REVIEWS : session_reviews
+    DRUGS ||--o{ DRUG_RXNORM_CODES : rxnorm
+    DRUGS ||--o{ DRUG_ALIASES : aliases
+    DRUGS ||--o{ DRUG_IDENTIFIERS : identifiers
+    DRUGS ||--o{ LIVERTOX_MONOGRAPHS : monographs
+    DRUGS o|--o{ KB_MATCH_CACHE : cached_matches
+    DRUGS o|--o{ CLINICAL_DRUG_MENTIONS : resolves
+```
+
 ## Persisted Clinical Session Contract
 
 - `clinical_sessions` is the source of truth for session records and metadata.
 - `clinical_session_versions` owns immutable version lineage, root-session relationships, version numbers, and manual edits.
-- Revision tables own the active revision-agent skeleton and canonical artifacts: `clinical_session_versions`, `clinical_session_revision_runs`, `clinical_session_revision_steps`, `clinical_session_revision_artifacts`, and `clinical_session_revision_reviews`.
+- Revision tables own the bounded revision workflow and canonical artifacts:
+  `clinical_session_versions`, `clinical_session_revision_runs`,
+  `clinical_session_revision_steps`, `clinical_session_revision_artifacts`,
+  and `clinical_session_revision_reviews`.
 - Structured revision entities are stored as `structured_case_entity` rows in `clinical_session_revision_artifacts`.
 - Manual report edits create immutable `clinical_session_versions` rows with `revision_kind=manual_edit`.
 - Patient timeline history is persisted only in `clinical_session_timelines`; session result payloads are not a timeline read source.
@@ -42,8 +220,19 @@ Last updated: 2026-08-20
 - `ClinicalSessionRepository` owns session-result persistence.
 - `SessionTimelineRepository` owns timeline rows.
 - `SessionRevisionRepository` owns revision data, steps, and artifacts.
+- `ClinicalKnowledgePreparation` is the application-level coordinator for
+  drug-identity resolution, runtime vocabulary observations, and knowledge
+  match-cache updates. `ClinicalSessionRepository` persists resolved drug
+  mentions and does not learn catalog aliases while saving a session.
+- `DataInspectionService` coordinates cross-repository inspection responses;
+  it combines clinical session detail with revision records rather than making
+  either repository depend on the other.
 - Feature-specific file serialization remains separate from SQLAlchemy persistence. `RepositoryContext` supplies the shared engine/session factory, and application services receive only the focused repositories they need. Transactions remain explicit at the repository boundary, including atomic session persistence and batch ingestion.
-- Repository serialization modules are pure row and payload conversion helpers; focused repositories own database queries and transactions and use `repositories.values` for canonical normalization.
+- `repositories/serialization` is a mixed historical package: pure row and
+  payload converters remain there, but access-key and model-configuration
+  adapters also own SQLAlchemy queries, transactions, and commits. Public
+  access-key operations return `AccessKeyRecord`; ORM rows remain internal to
+  persistence and encryption code.
 
 ## Reference Catalog Persistence
 
@@ -95,4 +284,39 @@ The extracted runtime is versioned and hash-addressed so it can be replaced duri
 
 ## Agentic Revision Artifacts
 
-Revision runs persist bounded context, plan, tool trace, draft report, QA, and finalization artifacts. Successful non-dry runs create an `agentic_revision` session and attach it to the pre-created version shell; QA blockers persist as `qa_failed` drafts for human review.
+Revision runs persist bounded context, plan, tool traces, draft reports, QA,
+and finalization artifacts. Successful non-dry runs create an
+`agentic_revision` session and attach it to the pre-created version shell; QA
+blockers persist as `qa_failed` drafts for human review.
+
+```mermaid
+sequenceDiagram
+    participant UI as Angular UI
+    participant API as Revision API
+    participant S as Inspection service
+    participant A as RevisionAgentRunner
+    participant T as RevisionToolRegistry
+    participant RR as SessionRevisionRepository
+    participant CR as ClinicalSessionRepository
+    participant DB as SQL database
+
+    UI->>API: Start revision
+    API->>S: Revision request
+    S->>RR: Create version and run shell
+    S->>A: Execute bounded revision
+    A->>RR: Persist context and plan
+    loop bounded tasks
+        A->>T: Execute allow-listed tool
+        T-->>A: Observation
+        A->>RR: Persist step and trace
+    end
+    A->>A: Validate deterministic report patch
+    A->>RR: Persist draft and QA artifacts
+    alt accepted non-dry revision
+        A->>CR: Persist agentic_revision session
+        CR->>DB: Commit revised session
+        A->>RR: Finalize lineage and run
+    else dry run or QA blocked
+        A->>RR: Retain auditable draft
+    end
+```
