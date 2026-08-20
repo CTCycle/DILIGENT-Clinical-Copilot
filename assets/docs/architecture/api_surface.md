@@ -7,6 +7,13 @@ runtime-status view. `PUT` is a persistence-only response containing the
 saved configuration and timestamp; catalog and embedding refreshes remain
 explicit GET/status operations.
 
+The persisted role assignments are independent: `clinical_model`,
+`text_extraction_model`, `revision_model`, and `timeline_model`. Revision and
+Timeline job requests do not accept active model overrides; each job resolves
+its configured role when it starts. Older configuration payloads are migrated
+with Revision falling back to the clinical role and Timeline falling back to
+the extraction role (or the shared cloud model in cloud mode).
+
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
 
@@ -111,11 +118,11 @@ latest saved configuration and provider-catalog state.
 - `DELETE /api/inspection/rag/jobs/{job_id}`
 
 ## Notes
-- `POST /api/inspection/sessions/{session_id}/timeline-jobs` accepts optional run-scoped
-  `model_overrides` and returns a job for polling. Local runs require `text_extraction_model`; cloud runs require
-  `llm_provider` and `cloud_model`. These settings are applied only for that run and
-  do not change persisted session settings or global model configuration. Timeline
-  previews include source-evidence, missing-evidence, uncertain, and undated counts.
+- `POST /api/inspection/sessions/{session_id}/timeline-jobs` accepts
+  `force_regenerate` and returns a job for polling. The job resolves the
+  persisted `timeline_model` role at start; provider/model controls are managed
+  from Model Configurations. Timeline previews include source-evidence,
+  missing-evidence, uncertain, and undated counts.
 - Timeline deletion is scoped by both session and timeline identifiers and returns 404
   when that exact persisted timeline does not exist.
 - Clinical and inspection workflows rely on job polling for long-running work.
