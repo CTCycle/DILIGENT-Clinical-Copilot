@@ -16,6 +16,8 @@ describe('buildClinicalPayload', () => {
       cloudModel: null,
       textExtractionModel: 'x',
       clinicalModel: 'y',
+      revisionModel: 'y',
+      timelineModel: 'x',
       reasoning: false,
     };
 
@@ -37,6 +39,8 @@ describe('buildClinicalPayload', () => {
       cloudModel: null,
       textExtractionModel: 'qwen3.5:9b',
       clinicalModel: 'gpt-oss:20b',
+      revisionModel: 'gpt-oss:20b',
+      timelineModel: 'qwen3.5:9b',
       reasoning: false,
     };
 

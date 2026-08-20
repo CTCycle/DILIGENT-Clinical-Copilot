@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import {
   LucideFileText,
   LucideFlaskConical,
@@ -29,6 +30,7 @@ import {
   fetchRevisionArtifacts,
   fetchRevisionPipelineSteps,
   fetchSessionRevisionJobStatus,
+  fetchSessionVersions,
   startSessionRevisionJob,
   updateRevisionClinicalReview,
 } from '../../core/services/session-revision-api';
@@ -39,7 +41,7 @@ import {
   InspectionSessionStatus,
 } from '../../core/models/inspection-types';
 import { RevisionArtifact, RevisionPipelineStep } from '../../core/models/revision-types';
-import { CloudProvider, ModelConfigStateResponse } from '../../core/models/types';
+import { ModelConfigStateResponse } from '../../core/models/types';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { JobPollingService } from '../../core/services/job-polling.service';
 import { formatErrorMessage, formatUnknownError, isRecord } from '../../core/utils';
@@ -80,6 +82,7 @@ import {
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
     ModalShellComponent,
     HelpPopoverComponent,
     ClinicalSessionEditorToolbarComponent,
@@ -154,6 +157,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionVersionId = signal<number | null>(null);
   readonly revisionSteps = signal<RevisionPipelineStep[]>([]);
   readonly revisionArtifacts = signal<RevisionArtifact[]>([]);
+  readonly revisionDraftReport = signal('');
+  readonly revisionDraftReportHtml = computed(() => this.markdownRenderer.render(this.revisionDraftReport()).html);
   readonly revisionReviewAvailable = computed(() => (
     this.revisionVersionId() !== null
     && !this.revisionRunning()
@@ -162,7 +167,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionModelLoading = signal(false);
   readonly revisionModelError = signal<string | null>(null);
   readonly revisionModelConfig = signal<ModelConfigStateResponse | null>(null);
-  readonly revisionModelProvider = signal<'ollama' | CloudProvider>('ollama');
   readonly revisionModelName = signal('');
   private revisionPollCancelled = false;
 
@@ -212,6 +216,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.labTimeline.set(this.previewLabTimeline(detail));
       this.hepatotoxicityPattern.set(this.previewHepatotoxicityPattern(detail));
       void this.loadDetectedDrugEvidence(detail);
+      void this.loadPersistedRevision(detail.session_id);
     } catch (error) {
       this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
     } finally {
@@ -287,6 +292,13 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.labSummary.set([]);
     this.labTimeline.set([]);
     this.hepatotoxicityPattern.set('N/A');
+    this.revisionStatus.set('');
+    this.revisionRunning.set(false);
+    this.revisionJobId.set(null);
+    this.revisionVersionId.set(null);
+    this.revisionSteps.set([]);
+    this.revisionArtifacts.set([]);
+    this.revisionDraftReport.set('');
     this.detailError.set(null);
   }
 
@@ -410,49 +422,12 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     try {
       const payload = await fetchModelConfigState();
       this.revisionModelConfig.set(payload);
-      const configuredProvider = payload.cloud_providers.find((provider) => provider.id === payload.llm_provider)?.id;
-      this.revisionModelProvider.set(payload.use_cloud_services ? configuredProvider || payload.cloud_providers[0]?.id || 'ollama' : 'ollama');
-      this.revisionModelName.set(this.resolveInitialRevisionModel(payload));
+      this.revisionModelName.set(payload.revision_model || this.resolveInitialRevisionModel(payload));
     } catch (error) {
       this.revisionModelError.set(formatUnknownError(error, 'Unable to load revision model options.'));
     } finally {
       this.revisionModelLoading.set(false);
     }
-  }
-
-  revisionLocalModels(): ModelConfigStateResponse['local_models'] {
-    return (this.revisionModelConfig()?.local_models || []).filter((model) => model.available_in_ollama);
-  }
-
-  revisionCloudProviders(): ModelConfigStateResponse['cloud_providers'] {
-    return this.revisionModelConfig()?.cloud_providers || [];
-  }
-
-  revisionProviderOptions(): Array<{ id: 'ollama' | CloudProvider; display_name: string }> {
-    return [{ id: 'ollama', display_name: 'Ollama' }, ...this.revisionCloudProviders()];
-  }
-
-  revisionCloudModels(): ModelConfigStateResponse['cloud_providers'][number]['models'] {
-    return this.revisionCloudProviders().find((provider) => provider.id === this.revisionModelProvider())?.models || [];
-  }
-
-  revisionModels(): Array<{ id: string; display_name?: string }> {
-    return this.revisionModelProvider() === 'ollama'
-      ? this.revisionLocalModels().map((model) => ({ id: model.name, display_name: model.name }))
-      : this.revisionCloudModels();
-  }
-
-  setRevisionModelProvider(value: string): void {
-    if (value !== 'ollama' && !this.revisionCloudProviders().some((candidate) => candidate.id === value)) return;
-    this.revisionModelProvider.set(value as 'ollama' | CloudProvider);
-    const options = this.revisionModels().map((model) => model.id);
-    if (!options.includes(this.revisionModelName())) {
-      this.revisionModelName.set(options[0] || '');
-    }
-  }
-
-  updateRevisionModelName(value: string): void {
-    this.revisionModelName.set(value);
   }
 
   private resolveInitialRevisionModel(payload: ModelConfigStateResponse): string {
@@ -480,16 +455,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     try {
       const started = await startSessionRevisionJob(detail.session_id, {
         revision_instruction: this.revisionInstruction().trim() || null,
-        model_overrides: this.revisionModelProvider() !== 'ollama'
-          ? {
-              use_cloud_models: true,
-              cloud_provider: this.revisionModelProvider(),
-              cloud_model: this.revisionModelName().trim() || null,
-            }
-          : {
-              use_cloud_models: false,
-              clinical_model: this.revisionModelName().trim() || null,
-            },
       });
       this.revisionJobId.set(started.job_id);
       await this.pollRevision(detail.session_id, started.job_id);
@@ -537,13 +502,82 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
           const pipelineRunId = typeof result?.pipeline_run_id === 'string' ? result.pipeline_run_id : null;
           const versionId = this.revisionVersionId();
           if (pipelineRunId) this.revisionSteps.set((await fetchRevisionPipelineSteps(pipelineRunId)).items);
-          if (versionId) this.revisionArtifacts.set((await fetchRevisionArtifacts(sessionId, versionId)).items);
+          if (versionId) {
+            const artifacts = (await fetchRevisionArtifacts(sessionId, versionId)).items;
+            this.revisionArtifacts.set(artifacts);
+            this.applyRevisionDraftArtifact(artifacts);
+          }
           return false;
         }
         return true;
       },
     });
   }
+
+  private async loadPersistedRevision(sessionId: number): Promise<void> {
+    try {
+      const versions = (await fetchSessionVersions(sessionId)).items
+        .filter((version) => version.revision_kind === 'llm_assisted_revision')
+        .sort((left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at));
+      const latest = versions[0];
+      if (!latest || this.selected()?.session_id !== sessionId) return;
+      this.revisionVersionId.set(latest.version_id);
+      const configuration = latest.model_configuration || {};
+      const pipelineRunId = latest.pipeline_run_id;
+      if (pipelineRunId) this.revisionSteps.set((await fetchRevisionPipelineSteps(pipelineRunId)).items);
+      const artifacts = (await fetchRevisionArtifacts(sessionId, latest.version_id)).items;
+      this.revisionArtifacts.set(artifacts);
+      this.applyRevisionDraftArtifact(artifacts);
+      const jobId = typeof configuration['job_id'] === 'string' ? configuration['job_id'] : null;
+      if (jobId && ['draft_revision', 'pending_qa'].includes(latest.version_status)) {
+        this.revisionJobId.set(jobId);
+        this.revisionRunning.set(true);
+        this.revisionStatus.set('Revision agent is working...');
+        this.revisionPollCancelled = false;
+        await this.pollRevision(sessionId, jobId);
+        return;
+      }
+      this.revisionStatus.set(
+        latest.version_status === 'qa_failed'
+          ? 'Revision completed with QA issues.'
+          : 'Revision draft loaded from persisted session data.',
+      );
+    } catch (error) {
+      if (this.selected()?.session_id === sessionId) {
+        this.revisionStatus.set(formatUnknownError(error, 'Unable to restore the saved revision draft.'));
+      }
+    }
+  }
+
+  private applyRevisionDraftArtifact(artifacts: RevisionArtifact[]): void {
+    const artifact = artifacts.find((candidate) => candidate.artifact_key === 'revision_agent_draft_report');
+    const payload = artifact?.payload;
+    const report = payload && typeof payload['revised_report_text'] === 'string'
+      ? payload['revised_report_text']
+      : '';
+    if (report.trim()) this.revisionDraftReport.set(report);
+  }
+
+  sectionHelpTitle(): string {
+    return {
+      preview: 'Preview help',
+      editor: 'Text Editor help',
+      metadata: 'Metadata help',
+      revision: 'Revision help',
+      timeline: 'Timeline help',
+    }[this.activeSection()];
+  }
+
+  sectionHelpBody(): string {
+    return {
+      preview: 'Read the persisted report and its extracted clinical evidence. This view does not change the session.',
+      editor: 'Edit the session text or report in Markdown, switch to the rendered view, and save a manual audit entry when finished.',
+      metadata: 'Attach source images or documents, then save valid JSON metadata so later review and timeline work can use that context.',
+      revision: 'Revision creates an auditable draft using the configured Revision role. Inspect the draft and trace before approving or rejecting it as a human reviewer.',
+      timeline: 'Timeline generation builds a dated chronology from the session using the configured Timeline role. Saved timelines can be reopened and compared after generation.',
+    }[this.activeSection()];
+  }
+
   updateManualEditReviewerNote(value: string): void {
     this.manualEditReviewerNote.set(value);
   }

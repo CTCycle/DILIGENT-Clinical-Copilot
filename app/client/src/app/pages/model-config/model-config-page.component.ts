@@ -317,7 +317,12 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
         ? `Cloud model selected: ${modelName} (${providerLabel}). Provider-supplied model details are not available.`
         : `No cloud model is selected for ${providerLabel}.`;
     }
-    const selectedNames = [draft.clinicalModel, draft.textExtractionModel].filter((name) => !!name);
+    const selectedNames = [
+      draft.clinicalModel,
+      draft.textExtractionModel,
+      draft.revisionModel,
+      draft.timelineModel,
+    ].filter((name) => !!name);
     const modelMap = new Map(this.localModels().map((model) => [model.name, model.description || '']));
     for (const modelName of selectedNames) {
       const description = modelMap.get(modelName);
@@ -340,7 +345,12 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     if (draft.useCloudServices) return [];
     const modelMap = new Map(this.localModels().map((model) => [model.name, model]));
     const missing = new Set<string>();
-    for (const modelName of [draft.clinicalModel, draft.textExtractionModel]) {
+    for (const modelName of [
+      draft.clinicalModel,
+      draft.textExtractionModel,
+      draft.revisionModel,
+      draft.timelineModel,
+    ]) {
       const candidate = modelName.trim();
       if (!candidate) continue;
       const localModel = modelMap.get(candidate);
@@ -376,7 +386,9 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       this.draftProvider() !== savedProvider ||
       (this.draftCloudModel() || '') !== (savedCloudModel || '') ||
       draft.clinicalModel !== settings.clinicalModel ||
-      draft.textExtractionModel !== settings.textExtractionModel;
+      draft.textExtractionModel !== settings.textExtractionModel ||
+      draft.revisionModel !== settings.revisionModel ||
+      draft.timelineModel !== settings.timelineModel;
 
     return (
       this.isLoading() ||
@@ -389,6 +401,9 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     await this.loadModelConfig(true, true);
     this.applyPreviewDefaultState();
+    if (typeof window !== 'undefined' && window.location.hash === '#model-roles') {
+      setTimeout(() => document.getElementById('model-roles')?.scrollIntoView({ block: 'start' }), 0);
+    }
   }
 
   ngOnDestroy(): void {
@@ -534,6 +549,8 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     if ('cloud_model' in patch || 'llm_provider' in patch) nextSettings.cloudModel = payload.cloud_model;
     if ('clinical_model' in patch) nextSettings.clinicalModel = payload.clinical_model || '';
     if ('text_extraction_model' in patch) nextSettings.textExtractionModel = payload.text_extraction_model || '';
+    if ('revision_model' in patch) nextSettings.revisionModel = payload.revision_model || '';
+    if ('timeline_model' in patch) nextSettings.timelineModel = payload.timeline_model || '';
     if ('ollama_reasoning' in patch) nextSettings.reasoning = payload.ollama_reasoning;
     this.appState.updateDiliAgent({ settings: nextSettings });
     if ('rag_settings' in patch) {
@@ -628,7 +645,9 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       ...previous,
       clinicalModel: role === 'clinical' ? modelName : previous.clinicalModel,
       textExtractionModel: role === 'text_extraction' ? modelName : previous.textExtractionModel,
-      cloudModel: previous.useCloudServices ? modelName : previous.cloudModel,
+      revisionModel: role === 'revision' ? modelName : previous.revisionModel,
+      timelineModel: role === 'timeline' ? modelName : previous.timelineModel,
+      cloudModel: previous.useCloudServices && !previous.cloudModel ? modelName : previous.cloudModel,
     }));
   }
 
@@ -642,7 +661,14 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       );
       return;
     }
-    this.draftConfig.update((previous) => ({ ...previous, useCloudServices: true }));
+    this.draftConfig.update((previous) => ({
+      ...previous,
+      useCloudServices: true,
+      clinicalModel: previous.cloudModel || '',
+      textExtractionModel: previous.cloudModel || '',
+      revisionModel: previous.cloudModel || '',
+      timelineModel: previous.cloudModel || '',
+    }));
   }
 
   openRagSettingsPanel(): void {
@@ -727,6 +753,8 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       cloudModel: null,
       clinicalModel: '',
       textExtractionModel: '',
+      revisionModel: '',
+      timelineModel: '',
     }));
     this.modelSearchQuery.set('');
     this.resetVisibleModelLimit();
@@ -774,6 +802,8 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       cloud_model: this.draftCloudModel(),
       clinical_model: draft.clinicalModel || null,
       text_extraction_model: draft.textExtractionModel || null,
+      revision_model: draft.revisionModel || null,
+      timeline_model: draft.timelineModel || null,
     };
     await this.persistConfigPatch(
       patch,
@@ -901,6 +931,14 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
 
   selectedExtractionModel(): string {
     return this.draftConfig().textExtractionModel || 'Not set';
+  }
+
+  selectedRevisionModel(): string {
+    return this.draftConfig().revisionModel || 'Not set';
+  }
+
+  selectedTimelineModel(): string {
+    return this.draftConfig().timelineModel || 'Not set';
   }
 
   isModelRoleSelectable(model: ModelConfigStateResponse['local_models'][number]): boolean {
