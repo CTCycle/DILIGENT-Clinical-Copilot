@@ -57,6 +57,8 @@ export function buildRuntimeSettingsFromConfig(
   );
   const resolvedClinicalModel = payload.clinical_model ?? "";
   const resolvedtextExtractionModel = payload.text_extraction_model ?? "";
+  const resolvedRevisionModel = payload.revision_model ?? resolvedClinicalModel;
+  const resolvedTimelineModel = payload.timeline_model ?? resolvedtextExtractionModel;
   return {
     ...previous,
     useCloudServices: payload.use_cloud_services,
@@ -64,6 +66,8 @@ export function buildRuntimeSettingsFromConfig(
     cloudModel,
     textExtractionModel: resolvedtextExtractionModel,
     clinicalModel: resolvedClinicalModel,
+    revisionModel: resolvedRevisionModel,
+    timelineModel: resolvedTimelineModel,
     reasoning: payload.ollama_reasoning,
   };
 }

@@ -102,9 +102,12 @@
           ></app-model-config-toggle-card>
         </section>
 
-        <section class="model-config-catalog-panel" [class.is-disabled]="isConfigurationSaving() || isLoading()" [attr.aria-disabled]="isConfigurationSaving() || isLoading()">
+        <section id="model-roles" class="model-config-catalog-panel" [class.is-disabled]="isConfigurationSaving() || isLoading()" [attr.aria-disabled]="isConfigurationSaving() || isLoading()">
           <div class="model-config-panel-heading">
-            <h2>{{ draftConfig().useCloudServices ? 'Cloud Model Catalog' : 'Local Model Catalog' }}</h2>
+            <div>
+              <h2>{{ draftConfig().useCloudServices ? 'Cloud Model Catalog' : 'Local Model Catalog' }}</h2>
+              <p class="model-config-panel-subtitle">Assign models independently to extraction, clinical, Revision, and Timeline work.</p>
+            </div>
           </div>
 
           <div class="model-config-toolbar">
@@ -233,7 +236,7 @@
                 }
                 @if (!draftConfig().useCloudServices) {
                 @for (model of visibleLocalModels(); track model.name; let index = $index) {
-                  <tr [class.is-selected]="draftConfig().clinicalModel === model.name || draftConfig().textExtractionModel === model.name">
+                  <tr [class.is-selected]="draftConfig().clinicalModel === model.name || draftConfig().textExtractionModel === model.name || draftConfig().revisionModel === model.name || draftConfig().timelineModel === model.name">
                     <td>
                       <div class="model-config-model-cell">
                         <svg class="model-config-model-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -289,6 +292,20 @@
                           [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
                           (roleSelected)="handleRoleSelection($event, model.name)"
                         />
+                        <app-model-role-action-button
+                          role="revision"
+                          [modelName]="model.name"
+                          [selected]="draftConfig().revisionModel === model.name"
+                          [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
+                          (roleSelected)="handleRoleSelection($event, model.name)"
+                        />
+                        <app-model-role-action-button
+                          role="timeline"
+                          [modelName]="model.name"
+                          [selected]="draftConfig().timelineModel === model.name"
+                          [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
+                          (roleSelected)="handleRoleSelection($event, model.name)"
+                        />
                       </div>
                     </td>
                   </tr>
@@ -333,6 +350,20 @@
                           role="text_extraction"
                           [modelName]="modelName"
                           [selected]="draftConfig().textExtractionModel === modelName"
+                          [disabled]="isConfigurationSaving() || isLoading()"
+                          (roleSelected)="handleRoleSelection($event, modelName)"
+                        />
+                        <app-model-role-action-button
+                          role="revision"
+                          [modelName]="modelName"
+                          [selected]="draftConfig().revisionModel === modelName"
+                          [disabled]="isConfigurationSaving() || isLoading()"
+                          (roleSelected)="handleRoleSelection($event, modelName)"
+                        />
+                        <app-model-role-action-button
+                          role="timeline"
+                          [modelName]="modelName"
+                          [selected]="draftConfig().timelineModel === modelName"
                           [disabled]="isConfigurationSaving() || isLoading()"
                           (roleSelected)="handleRoleSelection($event, modelName)"
                         />
@@ -404,6 +435,14 @@
           <div>
             <dt>Extraction Model</dt>
             <dd>{{ selectedExtractionModel() }}</dd>
+          </div>
+          <div>
+            <dt>Revision Model</dt>
+            <dd>{{ selectedRevisionModel() }}</dd>
+          </div>
+          <div>
+            <dt>Timeline Model</dt>
+            <dd>{{ selectedTimelineModel() }}</dd>
           </div>
           <div>
             <dt>RAG Model</dt>

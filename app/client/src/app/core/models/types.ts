@@ -12,6 +12,8 @@ export type RuntimeSettings = {
   cloudModel: string | null;
   textExtractionModel: string;
   clinicalModel: string;
+  revisionModel: string;
+  timelineModel: string;
   reasoning: boolean;
 };
 
@@ -62,6 +64,8 @@ export type ModelConfigStateResponse = {
   cloud_model: string | null;
   clinical_model: string | null;
   text_extraction_model: string | null;
+  revision_model: string | null;
+  timeline_model: string | null;
     ollama_reasoning: boolean;
     ollama_seed: number | null;
   rag_settings: RagSettings;
@@ -76,6 +80,8 @@ export type ModelConfigPersistResponse = {
   cloud_model: string | null;
   clinical_model: string | null;
   text_extraction_model: string | null;
+  revision_model: string | null;
+  timeline_model: string | null;
   ollama_reasoning: boolean;
   ollama_seed: number | null;
   rag_settings: RagSettings;
@@ -109,6 +115,8 @@ export type ModelConfigUpdateRequest = {
   cloud_model?: string | null;
   clinical_model?: string | null;
   text_extraction_model?: string | null;
+  revision_model?: string | null;
+  timeline_model?: string | null;
     ollama_reasoning?: boolean;
     ollama_seed?: number | null;
   rag_settings?: Partial<RagSettings>;
@@ -318,7 +326,6 @@ export type {
   InspectionTimelineEvent,
   InspectionSessionTimeline,
   InspectionSessionTimelineRequest,
-  InspectionSessionTimelineModelOverrides,
   InspectionSessionTimelinePreview,
   InspectionSessionTimelineListResponse,
   InspectionCatalogQuery,
