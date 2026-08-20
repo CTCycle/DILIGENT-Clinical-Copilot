@@ -169,7 +169,7 @@ def test_long_preflight_list_scrolls_without_hiding_header_or_actions(
     page: Page,
     base_url: str,
 ) -> None:
-    page.set_viewport_size({"width": 420, "height": 700})
+    page.set_viewport_size({"width": 1280, "height": 700})
     warnings = [
         _issue("non_blocking", f"warning_{index}", "clinical_input")
         for index in range(20)

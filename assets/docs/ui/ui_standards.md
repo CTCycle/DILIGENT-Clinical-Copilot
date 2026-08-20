@@ -1,5 +1,5 @@
 # UI Standards
-Last updated: 2026-08-02
+Last updated: 2026-08-20
 
 ## Spacing Scale
 - Use the root spacing tokens from `app/client/src/styles.scss`: `--space-xs` through `--space-3xl`.
@@ -23,7 +23,7 @@ Last updated: 2026-08-02
 - Buttons must have a visible hover state, visible `:focus-visible`, distinct disabled state, and comfortable hit area.
 - Inputs must have associated labels or explicit ARIA labels, tokenized padding, and a visible focus state.
 - Use `ModalShellComponent` for app dialogs unless a page has a documented specialized modal pattern.
-- Tabs and dense navigation may wrap or scroll on narrow screens; they must not clip labels.
+- Tabs and dense navigation remain desktop-oriented and must not clip labels at the supported minimum width of `1100px`.
 - Cards and panels should use `--radius-sm` through `--radius-xl` and `--shadow-sm` through `--shadow-lg`.
 
 ## Do And Don't
@@ -31,5 +31,5 @@ Last updated: 2026-08-02
 | --- | --- |
 | Reuse existing tokens before adding a new value. | Add near-duplicate colors, radii, or fractional font sizes for one screen. |
 | Preserve current workflow and information architecture. | Redesign a page when a token or spacing polish is enough. |
-| Keep dense data tables and timeline canvases horizontally scrollable. | Force dense content into narrow columns that clip controls. |
+| Keep dense data tables and timeline canvases usable within the desktop workspace. | Create small-screen layouts or touch-first substitutes. |
 | Store validation notes and screenshots in `assets/QA/`. | Scatter audit artifacts across source folders. |
