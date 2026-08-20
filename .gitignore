@@ -10,6 +10,8 @@ app/client/dist-ssr/
 app/client/logs/
 runtimes/**
 assets/QA/**
+assets/cache/**
+!assets/cache/.gitkeep
 .playwright-mcp/
 
 # Python

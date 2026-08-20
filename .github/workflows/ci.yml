@@ -12,6 +12,18 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PIP_CACHE_DIR: ${{ github.workspace }}/assets/cache/pip
+  UV_CACHE_DIR: ${{ github.workspace }}/assets/cache/uv
+  NPM_CONFIG_CACHE: ${{ github.workspace }}/assets/cache/npm
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/assets/cache/playwright
+  RUFF_CACHE_DIR: ${{ github.workspace }}/assets/cache/ruff
+  MYPY_CACHE_DIR: ${{ github.workspace }}/assets/cache/mypy
+  COVERAGE_FILE: ${{ github.workspace }}/assets/cache/coverage/.coverage
+  PYTHONPYCACHEPREFIX: ${{ github.workspace }}/assets/cache/python
+  CARGO_TARGET_DIR: ${{ github.workspace }}/assets/cache/cargo
+  PYTEST_ADDOPTS: "--basetemp=${{ github.workspace }}/assets/cache/pytest/basetemp -o cache_dir=${{ github.workspace }}/assets/cache/pytest"
+
 jobs:
   backend-quality:
     runs-on: ubuntu-latest
@@ -139,15 +151,18 @@ jobs:
         run: |
           $env:APP_TEST_FRONTEND_URL = "http://127.0.0.1:9847"
           $env:APP_TEST_BACKEND_URL = "http://127.0.0.1:7690"
+          $ciArtifactDir = Join-Path $env:GITHUB_WORKSPACE "assets/cache/ci/modelconfig"
+          $pytestArtifactDir = Join-Path $env:GITHUB_WORKSPACE "assets/cache/pytest/ci"
+          New-Item -ItemType Directory -Path $ciArtifactDir, $pytestArtifactDir -Force | Out-Null
           $ciRuntimeDir = Join-Path $env:RUNNER_TEMP "diligent-modelconfig"
           New-Item -ItemType Directory -Path $ciRuntimeDir -Force | Out-Null
           $env:DATABASE_BACKEND = "sqlite"
           $env:DATABASE_SQLITE_PATH = Join-Path $ciRuntimeDir "modelconfig.sqlite3"
           $env:DILIGENT_SQLITE_PATH = $env:DATABASE_SQLITE_PATH
-          $backendOut = "app/server/.ci-modelconfig-backend.out.log"
-          $backendErr = "app/server/.ci-modelconfig-backend.err.log"
-          $frontendOut = "app/client/.ci-modelconfig-frontend.out.log"
-          $frontendErr = "app/client/.ci-modelconfig-frontend.err.log"
+          $backendOut = Join-Path $ciArtifactDir "backend.out.log"
+          $backendErr = Join-Path $ciArtifactDir "backend.err.log"
+          $frontendOut = Join-Path $ciArtifactDir "frontend.out.log"
+          $frontendErr = Join-Path $ciArtifactDir "frontend.err.log"
           function Write-ProcessDiagnostics($label, $process, $stdoutPath, $stderrPath) {
             Write-Output "[$label] process diagnostics"
             if ($null -eq $process) {
@@ -168,7 +183,7 @@ jobs:
               }
             }
           }
-          $backend = Start-Process -FilePath "python" -ArgumentList "-m","uvicorn","app:app","--host","127.0.0.1","--port","7690" -WorkingDirectory "app/server" -RedirectStandardOutput "app/server/.ci-modelconfig-backend.out.log" -RedirectStandardError "app/server/.ci-modelconfig-backend.err.log" -WindowStyle Hidden -PassThru
+          $backend = Start-Process -FilePath "python" -ArgumentList "-m","uvicorn","app:app","--host","127.0.0.1","--port","7690" -WorkingDirectory "app/server" -RedirectStandardOutput $backendOut -RedirectStandardError $backendErr -WindowStyle Hidden -PassThru
           try {
             $backendReady = $false
             $backendDeadline = (Get-Date).AddMinutes(3)
@@ -220,12 +235,14 @@ jobs:
               throw "Frontend readiness check failed before deadline. Last probe error: $lastFrontendError"
             }
 
-            python -m pytest app/tests/unit/test_model_config_persistence.py -q --junitxml app/tests/.ci-modelconfig-unit-junit.xml
+            $unitJunit = Join-Path $pytestArtifactDir "modelconfig-unit-junit.xml"
+            $e2eJunit = Join-Path $pytestArtifactDir "modelconfig-e2e-junit.xml"
+            python -m pytest app/tests/unit/test_model_config_persistence.py -q --junitxml $unitJunit
             if ($LASTEXITCODE -ne 0) {
               throw "Model-config unit test failed with exit code $LASTEXITCODE."
             }
 
-            python -m pytest app/tests/e2e/test_model_config_api.py app/tests/e2e/test_app_flow.py -k "runtime_toggle_enables_save_and_submits_put or model_config or dili_run_burst_click_submits_single_job or dili_run_conflict_surfaces_clear_error_message" -q --junitxml app/tests/.ci-modelconfig-e2e-junit.xml
+            python -m pytest app/tests/e2e/test_model_config_api.py app/tests/e2e/test_app_flow.py -k "runtime_toggle_enables_save_and_submits_put or model_config or dili_run_burst_click_submits_single_job or dili_run_conflict_surfaces_clear_error_message" -q --junitxml $e2eJunit
             if ($LASTEXITCODE -ne 0) {
               throw "Model-config e2e slice failed with exit code $LASTEXITCODE."
             }
@@ -248,9 +265,5 @@ jobs:
           name: windows-regression-artifacts
           if-no-files-found: ignore
           path: |
-            app/server/.ci-modelconfig-backend.out.log
-            app/server/.ci-modelconfig-backend.err.log
-            app/client/.ci-modelconfig-frontend.out.log
-            app/client/.ci-modelconfig-frontend.err.log
-            app/tests/.ci-modelconfig-unit-junit.xml
-            app/tests/.ci-modelconfig-e2e-junit.xml
+            assets/cache/ci/modelconfig/**
+            assets/cache/pytest/ci/**
