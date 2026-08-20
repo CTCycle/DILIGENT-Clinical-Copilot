@@ -9,9 +9,15 @@ app/client/dist/
 app/client/dist-ssr/
 app/client/logs/
 runtimes/**
+!runtimes/cache/
+runtimes/cache/**
+!runtimes/cache/.gitkeep
 assets/QA/**
 assets/cache/**
-!assets/cache/.gitkeep
+app/tests/cache/**
+!app/tests/cache/
+app/tests/cache/**
+!app/tests/cache/.gitkeep
 .playwright-mcp/
 
 # Python

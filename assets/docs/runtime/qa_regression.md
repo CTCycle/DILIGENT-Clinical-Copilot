@@ -24,8 +24,9 @@ app\tests\run_tests.bat modelconfig
 ```
 
 This runner performs startup, health checks, focused unit and E2E commands, and cleanup.
-Pytest state, fixture databases, Playwright files, and runner temporaries are
-placed below `assets\cache\pytest`.
+Pytest state, fixture databases, and runner temporaries are placed below
+`app\tests\cache\pytest`; Playwright browser files are placed below
+`runtimes\cache\playwright`.
 
 ## Full Regression Variant
 
@@ -49,7 +50,7 @@ These set `DILIGENT_SQLITE_PATH` to a temporary database, override ports 7690/98
 ## SQLite Writeability Hardening
 Regression scripts set a per-run temporary database path through:
 
-- `DILIGENT_SQLITE_PATH=assets\cache\pytest\<per-run database>`
+- `DILIGENT_SQLITE_PATH=app\tests\cache\pytest\<per-run database>`
 
 This avoids accidental writes to a shared `app/resources/database.db` and prevents readonly-state failures during concurrent or constrained runs.
 
@@ -59,9 +60,10 @@ This avoids accidental writes to a shared `app/resources/database.db` and preven
 - The focused E2E step uses `uv --with pytest-playwright`.
 - If package metadata is not cached locally, first-run success may require outbound package access.
 
-The launcher and CI keep development dependency caches under
-`assets\cache\` (including `uv`, npm, Playwright, Ruff, and Python bytecode)
-instead of creating tool caches inside the application source directories.
+The launcher and CI keep runtime/dependency caches under `runtimes\cache\`
+(including uv, pip, npm, Playwright, Python bytecode, and Cargo) and test/tool
+caches under `app\tests\cache\` (including pytest, Ruff, Mypy, Angular, and
+coverage) instead of creating caches in unrelated application directories.
 
 ## Manual Validation Sequence
 ### 1. Start Backend And Frontend
