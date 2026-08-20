@@ -24,8 +24,9 @@ from services.catalogs.runtime import initialize_reference_catalog_provider
 
 ###############################################################################
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEVELOPMENT_CACHE_ROOT = REPO_ROOT / "assets" / "cache"
-PYTEST_CACHE_ROOT = DEVELOPMENT_CACHE_ROOT / "pytest"
+TEST_CACHE_ROOT = Path(__file__).resolve().parent / "cache"
+RUNTIME_CACHE_ROOT = REPO_ROOT / "runtimes" / "cache"
+PYTEST_CACHE_ROOT = TEST_CACHE_ROOT / "pytest"
 
 
 def _configure_test_embedded_database_path() -> None:
@@ -51,7 +52,7 @@ def _configure_playwright_node_runtime() -> None:
     """
     os.environ.setdefault(
         "PLAYWRIGHT_BROWSERS_PATH",
-        str(DEVELOPMENT_CACHE_ROOT / "playwright"),
+        str(RUNTIME_CACHE_ROOT / "playwright"),
     )
     if os.getenv("PLAYWRIGHT_NODEJS_PATH"):
         return

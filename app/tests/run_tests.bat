@@ -7,16 +7,18 @@ set "APP_DIR=%PROJECT_ROOT%\app"
 set "SERVER_DIR=%APP_DIR%\server"
 set "CLIENT_DIR=%APP_DIR%\client"
 set "TESTS_DIR=%APP_DIR%\tests"
-set "CACHE_DIR=%PROJECT_ROOT%\assets\cache"
+set "RUNTIME_CACHE_DIR=%PROJECT_ROOT%\runtimes\cache"
+set "CACHE_DIR=%TESTS_DIR%\cache"
 set "PYTEST_CACHE_DIR=%CACHE_DIR%\pytest"
 set "PYTEST_BASETEMP=%PYTEST_CACHE_DIR%\basetemp"
-set "UV_CACHE_DIR=%CACHE_DIR%\uv"
+set "UV_CACHE_DIR=%RUNTIME_CACHE_DIR%\uv"
 set "RUFF_CACHE_DIR=%CACHE_DIR%\ruff"
-set "NPM_CONFIG_CACHE=%CACHE_DIR%\npm"
-set "PLAYWRIGHT_BROWSERS_PATH=%CACHE_DIR%\playwright"
+set "NPM_CONFIG_CACHE=%RUNTIME_CACHE_DIR%\npm"
+set "PLAYWRIGHT_BROWSERS_PATH=%RUNTIME_CACHE_DIR%\playwright"
 set "MYPY_CACHE_DIR=%CACHE_DIR%\mypy"
 set "COVERAGE_FILE=%CACHE_DIR%\coverage\.coverage"
-set "PYTHONPYCACHEPREFIX=%CACHE_DIR%\python"
+set "PIP_CACHE_DIR=%RUNTIME_CACHE_DIR%\pip"
+set "PYTHONPYCACHEPREFIX=%RUNTIME_CACHE_DIR%\python"
 set "SETTINGS_ENV=%PROJECT_ROOT%\settings\.env"
 set "VENV_PYTHON=%SERVER_DIR%\.venv\Scripts\python.exe"
 set "RUNTIME_NPM=%PROJECT_ROOT%\runtimes\nodejs\npm.cmd"
@@ -61,6 +63,7 @@ if not exist "%VENV_PYTHON%" (
 )
 set "PYTHON_CMD=%VENV_PYTHON%"
 
+if not exist "%RUNTIME_CACHE_DIR%" mkdir "%RUNTIME_CACHE_DIR%" >nul 2>&1
 if not exist "%CACHE_DIR%" mkdir "%CACHE_DIR%" >nul 2>&1
 set "PYTEST_TEMP_ARGS=--basetemp "%PYTEST_BASETEMP%" -o cache_dir="%PYTEST_CACHE_DIR%""
 
