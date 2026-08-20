@@ -64,6 +64,8 @@ class ModelConfigSnapshotStore(Protocol):
         base_snapshot: ModelConfigSnapshot | None = None,
         clinical_model: str | None | object = ...,
         text_extraction_model: str | None | object = ...,
+        revision_model: str | None | object = ...,
+        timeline_model: str | None | object = ...,
         use_cloud_models: bool | object = ...,
         cloud_provider: str | None | object = ...,
         cloud_model: str | None | object = ...,
@@ -101,7 +103,12 @@ class ModelConfigService:
     async def get_state(self) -> ModelConfigStateResponse:
         snapshot = self.ensure_defaults()
         local_models = await self.list_local_model_cards(
-            selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
+            selected_models=(
+                snapshot.clinical_model,
+                snapshot.text_extraction_model,
+                snapshot.revision_model,
+                snapshot.timeline_model,
+            ),
         )
         local_catalog = model_catalog.local_catalog_metadata(self.catalog_cache)
         return self.build_response(
@@ -211,7 +218,15 @@ class ModelConfigService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _local_roles_updated(fields_set: set[str]) -> bool:
-        return "clinical_model" in fields_set or "text_extraction_model" in fields_set
+        return bool(
+            fields_set
+            & {
+                "clinical_model",
+                "text_extraction_model",
+                "revision_model",
+                "timeline_model",
+            }
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -232,6 +247,10 @@ class ModelConfigService:
             local_model_names.add(snapshot.clinical_model)
         if snapshot.text_extraction_model:
             local_model_names.add(snapshot.text_extraction_model)
+        if snapshot.revision_model:
+            local_model_names.add(snapshot.revision_model)
+        if snapshot.timeline_model:
+            local_model_names.add(snapshot.timeline_model)
         if not refresh_from_ollama:
             return local_model_names
         available_models = await self.list_available_ollama_models()
@@ -272,6 +291,28 @@ class ModelConfigService:
             ),
             updates=updates,
         )
+        if not target_use_cloud_models and "use_cloud_services" in fields_set:
+            # Older clients only submitted the two original roles when switching
+            # back to Ollama. Keep that transition valid by carrying the parser
+            # and clinical assignments into the new workflow roles.
+            for role_name, source_field in (
+                ("revision_model", "clinical_model"),
+                ("timeline_model", "text_extraction_model"),
+            ):
+                if role_name in fields_set:
+                    continue
+                source_model = (
+                    getattr(payload, source_field)
+                    if source_field in fields_set
+                    else getattr(snapshot, source_field)
+                )
+                normalized_source_model = self.normalize_optional_text(source_model)
+                if (
+                    normalized_source_model
+                    and normalized_source_model in local_model_names
+                    and normalized_source_model in available_local_model_names
+                ):
+                    updates[role_name] = normalized_source_model
         self._collect_cloud_model_updates(
             payload=payload,
             fields_set=fields_set,
@@ -327,6 +368,30 @@ class ModelConfigService:
                 active_cloud_model=active_cloud_model,
             )
             updates["text_extraction_model"] = text_extraction_model
+
+        if "revision_model" in fields_set:
+            revision_model = self.resolve_role_model_selection(
+                role_name="revision",
+                model_name=self.normalize_optional_text(payload.revision_model),
+                local_model_names=local_model_names,
+                available_local_model_names=available_local_model_names,
+                use_cloud_models=use_cloud_models,
+                cloud_provider=cloud_provider,
+                active_cloud_model=active_cloud_model,
+            )
+            updates["revision_model"] = revision_model
+
+        if "timeline_model" in fields_set:
+            timeline_model = self.resolve_role_model_selection(
+                role_name="timeline",
+                model_name=self.normalize_optional_text(payload.timeline_model),
+                local_model_names=local_model_names,
+                available_local_model_names=available_local_model_names,
+                use_cloud_models=use_cloud_models,
+                cloud_provider=cloud_provider,
+                active_cloud_model=active_cloud_model,
+            )
+            updates["timeline_model"] = timeline_model
 
     # -------------------------------------------------------------------------
     def _collect_cloud_model_updates(
@@ -474,12 +539,40 @@ class ModelConfigService:
             return self.serializer.save_snapshot(
                 clinical_model=defaults.clinical_model,
                 text_extraction_model=defaults.text_extraction_model,
+                revision_model=(
+                    defaults.cloud_model
+                    if defaults.use_cloud_services
+                    else defaults.clinical_model
+                ),
+                timeline_model=(
+                    defaults.cloud_model
+                    if defaults.use_cloud_services
+                    else defaults.text_extraction_model
+                ),
                 use_cloud_models=defaults.use_cloud_services,
                 cloud_provider=self.resolve_provider(defaults.llm_provider),
                 cloud_model=self.normalize_optional_text(defaults.cloud_model),
                 ollama_reasoning=defaults.ollama_reasoning,
             )
 
+        migration_updates: dict[str, str | None] = {}
+        if snapshot.revision_model is None:
+            migration_updates["revision_model"] = (
+                snapshot.cloud_model
+                if snapshot.use_cloud_models
+                else snapshot.clinical_model
+            )
+        if snapshot.timeline_model is None:
+            migration_updates["timeline_model"] = (
+                snapshot.cloud_model
+                if snapshot.use_cloud_models
+                else snapshot.text_extraction_model
+            )
+        if migration_updates:
+            snapshot = self.serializer.save_snapshot(
+                base_snapshot=snapshot,
+                **migration_updates,
+            )
         self.validate_current_snapshot(snapshot)
         return snapshot
 
@@ -497,6 +590,8 @@ class ModelConfigService:
         for role_name, model_name in (
             ("clinical", snapshot.clinical_model),
             ("text_extraction", snapshot.text_extraction_model),
+            ("revision", snapshot.revision_model),
+            ("timeline", snapshot.timeline_model),
         ):
             if model_name is None:
                 if not snapshot.use_cloud_models:
@@ -635,6 +730,8 @@ class ModelConfigService:
             cloud_model=self.normalize_optional_text(snapshot.cloud_model),
             clinical_model=snapshot.clinical_model,
             text_extraction_model=snapshot.text_extraction_model,
+            revision_model=snapshot.revision_model,
+            timeline_model=snapshot.timeline_model,
             ollama_reasoning=snapshot.ollama_reasoning,
             ollama_seed=snapshot.ollama_seed,
             rag_settings=rag_settings_payload(
@@ -670,6 +767,8 @@ class ModelConfigService:
             cloud_model=cloud_model,
             clinical_model=snapshot.clinical_model,
             text_extraction_model=snapshot.text_extraction_model,
+            revision_model=snapshot.revision_model,
+            timeline_model=snapshot.timeline_model,
             ollama_reasoning=snapshot.ollama_reasoning,
             ollama_seed=snapshot.ollama_seed,
             rag_settings=rag_settings_payload(
@@ -917,6 +1016,8 @@ class ModelConfigService:
                 snapshot.cloud_model,
                 snapshot.clinical_model,
                 snapshot.text_extraction_model,
+                snapshot.revision_model,
+                snapshot.timeline_model,
             )
             if isinstance(model, str) and model.strip()
         }

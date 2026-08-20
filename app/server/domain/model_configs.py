@@ -29,6 +29,8 @@ class ModelConfigSnapshot:
     use_cloud_models: bool
     cloud_provider: str | None
     cloud_model: str | None
+    revision_model: str | None = None
+    timeline_model: str | None = None
     ollama_reasoning: bool = False
     ollama_seed: int | None = 42
     rag_settings: dict[str, object] | None = None
@@ -97,6 +99,8 @@ class ModelConfigUpdateRequest(BaseModel):
     cloud_model: str | None = None
     text_extraction_model: str | None = None
     clinical_model: str | None = None
+    revision_model: str | None = None
+    timeline_model: str | None = None
     ollama_reasoning: bool | None = None
     ollama_seed: int | None = Field(default=None, ge=0)
     rag_settings: RagSettingsUpdateRequest | None = None
@@ -127,6 +131,8 @@ class ModelConfigStateResponse(BaseModel):
     cloud_model: str | None
     text_extraction_model: str | None
     clinical_model: str | None
+    revision_model: str | None
+    timeline_model: str | None
     ollama_reasoning: bool
     ollama_seed: int | None
     rag_settings: RagSettingsResponse
@@ -143,6 +149,8 @@ class ModelConfigPersistResponse(BaseModel):
     cloud_model: str | None
     text_extraction_model: str | None
     clinical_model: str | None
+    revision_model: str | None
+    timeline_model: str | None
     ollama_reasoning: bool
     ollama_seed: int | None
     rag_settings: RagSettingsResponse

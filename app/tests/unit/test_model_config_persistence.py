@@ -71,6 +71,28 @@ def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
     assert snapshot.updated_at.year > 2000
 
 ###############################################################################
+def test_model_config_serializer_persists_independent_revision_and_timeline_roles(tmp_path) -> None:
+    engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'model-config-roles.db'}")
+    Base.metadata.create_all(engine)
+    serializer = ModelConfigSerializer(engine=engine)
+
+    snapshot = serializer.save_snapshot(
+        clinical_model="clinical-model",
+        text_extraction_model="parser-model",
+        revision_model="revision-model",
+        timeline_model="timeline-model",
+        use_cloud_models=True,
+        cloud_provider="openai",
+        cloud_model="gpt-4.1-mini",
+    )
+    reloaded = serializer.load_snapshot()
+
+    assert snapshot.revision_model == "revision-model"
+    assert snapshot.timeline_model == "timeline-model"
+    assert reloaded.revision_model == "revision-model"
+    assert reloaded.timeline_model == "timeline-model"
+
+###############################################################################
 def test_model_config_service_initializes_fresh_snapshot_from_canonical_defaults() -> None:
     serializer = InMemorySerializer(
         ModelConfigSnapshot(

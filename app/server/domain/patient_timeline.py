@@ -156,40 +156,6 @@ class SessionTimelineListResponse(BaseModel):
     items: list[SessionTimelinePreview] = Field(default_factory=list)
 
 ###############################################################################
-class SessionTimelineModelOverrides(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    use_cloud_services: bool
-    llm_provider: str | None = None
-    cloud_model: str | None = None
-    text_extraction_model: str | None = None
-
-    # -------------------------------------------------------------------------
-    @field_validator("llm_provider", "cloud_model", "text_extraction_model", mode="before")
-    @classmethod
-    def normalize_optional_text(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        normalized = " ".join(str(value).split()).strip()
-        return normalized or None
-
-    # -------------------------------------------------------------------------
-    @model_validator(mode="after")
-    def validate_runtime_selection(self) -> "SessionTimelineModelOverrides":
-        if self.use_cloud_services:
-            if not self.llm_provider:
-                raise ValueError("Cloud timeline generation requires llm_provider.")
-            if not self.cloud_model:
-                raise ValueError("Cloud timeline generation requires cloud_model.")
-            if self.text_extraction_model:
-                raise ValueError("Cloud timeline generation cannot include text_extraction_model.")
-        elif not self.text_extraction_model:
-            raise ValueError("Local timeline generation requires text_extraction_model.")
-        elif self.llm_provider or self.cloud_model:
-            raise ValueError("Local timeline generation cannot include cloud model settings.")
-        return self
-
-###############################################################################
 class SessionTimelineRegenerateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     force_regenerate: bool = False
-    model_overrides: SessionTimelineModelOverrides | None = None

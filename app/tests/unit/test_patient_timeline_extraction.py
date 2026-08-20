@@ -9,7 +9,6 @@ from domain.patient_timeline import (
     PatientTimeline,
     PatientTimelineEvent,
     PatientTimelineExtraction,
-    SessionTimelineModelOverrides,
 )
 from domain.timeline_dates import normalize_timeline_interval
 from repositories.serialization.session_timelines import build_timeline_preview_payload
@@ -216,18 +215,16 @@ def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
     assert "'a':" not in prompt
 
 ###############################################################################
-def test_timeline_model_override_validation_requires_an_unambiguous_runtime_model() -> None:
-    assert SessionTimelineModelOverrides(
-        use_cloud_services=False, text_extraction_model="qwen3:8b"
-    ).text_extraction_model == "qwen3:8b"
-    assert SessionTimelineModelOverrides(
-        use_cloud_services=True, llm_provider="openai", cloud_model="gpt-4.1-mini"
-    ).cloud_model == "gpt-4.1-mini"
-
-    with pytest.raises(ValueError):
-        SessionTimelineModelOverrides(use_cloud_services=False)
-    with pytest.raises(ValueError):
-        SessionTimelineModelOverrides(use_cloud_services=True, llm_provider="openai")
+def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_fields() -> None:
+    assert PatientTimelineExtractor._resolve_provider_model_from_runtime_settings(
+        {
+            "use_cloud_services": True,
+            "llm_provider": "opencode_go",
+            "cloud_model": "fallback-cloud-model",
+            "text_extraction_model": "fallback-parser-model",
+            "timeline_model": "deepseek-v4-flash",
+        }
+    ) == ("opencode_go", "deepseek-v4-flash")
 
 ###############################################################################
 def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(

@@ -573,13 +573,11 @@ class DataInspectionService(
         session_id: int,
         *,
         force_regenerate: bool,
-        model_overrides: Any = None,
         job_id: str,
     ) -> dict[str, Any]:
         timeline = self.generate_session_timeline(
             session_id,
             force_regenerate=force_regenerate,
-            model_overrides=model_overrides,
             progress_callback=lambda p, m: self._report_timeline_progress(
                 job_id, session_id, p, m
             ),
@@ -598,7 +596,6 @@ class DataInspectionService(
         session_id: int,
         *,
         force_regenerate: bool = False,
-        model_overrides: Any = None,
     ) -> dict[str, Any]:
         safe_session_id = int(session_id)
         if self.session_timeline_repository.get_session_timeline_source(safe_session_id) is None:
@@ -610,7 +607,6 @@ class DataInspectionService(
             self.run_session_timeline_job,
             safe_session_id,
             force_regenerate=force_regenerate,
-            model_overrides=model_overrides,
         )
         job_id = self.jobs.start_job(
             job_type=self.SESSION_TIMELINE_JOB_TYPE,

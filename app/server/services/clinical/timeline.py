@@ -69,11 +69,14 @@ class PatientTimelineExtractor:
         runtime_settings: dict[str, Any] | None,
     ) -> tuple[str, str]:
         if runtime_settings is None:
-            return LLMRuntimeConfig.resolve_provider_and_model("parser")
+            return LLMRuntimeConfig.resolve_provider_and_model("timeline")
 
         use_cloud_services = bool(runtime_settings.get("use_cloud_services"))
         text_extraction_model = cls._coerce_optional_text(
             runtime_settings.get("text_extraction_model")
+        )
+        timeline_model = cls._coerce_optional_text(
+            runtime_settings.get("timeline_model")
         )
         clinical_model = cls._coerce_optional_text(
             runtime_settings.get("clinical_model")
@@ -88,10 +91,10 @@ class PatientTimelineExtractor:
             llm_provider = "openai"
 
         if use_cloud_services:
-            model = cloud_model or text_extraction_model or clinical_model
+            model = timeline_model or cloud_model or text_extraction_model or clinical_model
             return llm_provider, model
 
-        return "ollama", text_extraction_model or clinical_model
+        return "ollama", timeline_model or text_extraction_model or clinical_model
 
     # -------------------------------------------------------------------------
     async def ensure_client(

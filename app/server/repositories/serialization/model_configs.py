@@ -71,6 +71,8 @@ class ModelConfigSerializer:
         base_snapshot: ModelConfigSnapshot | None = None,
         clinical_model: str | None | object = UNSET,
         text_extraction_model: str | None | object = UNSET,
+        revision_model: str | None | object = UNSET,
+        timeline_model: str | None | object = UNSET,
         use_cloud_models: bool | object = UNSET,
         cloud_provider: str | None | object = UNSET,
         cloud_model: str | None | object = UNSET,
@@ -83,6 +85,8 @@ class ModelConfigSerializer:
         updates = {
             "clinical_model": clinical_model,
             "text_extraction_model": text_extraction_model,
+            "revision_model": revision_model,
+            "timeline_model": timeline_model,
             "use_cloud_models": use_cloud_models,
             "cloud_provider": cloud_provider,
             "cloud_model": cloud_model,
@@ -113,6 +117,8 @@ class ModelConfigSerializer:
             use_cloud_models=False,
             cloud_provider=None,
             cloud_model=None,
+            revision_model=None,
+            timeline_model=None,
             ollama_reasoning=cls.DEFAULT_OLLAMA_REASONING,
             ollama_seed=cls.DEFAULT_OLLAMA_SEED,
             rag_settings={},
@@ -132,6 +138,8 @@ class ModelConfigSerializer:
             use_cloud_models=bool(payload.get("use_cloud_models", False)),
             cloud_provider=cls.normalize_optional_text(payload.get("cloud_provider")),
             cloud_model=cls.normalize_optional_text(payload.get("cloud_model")),
+            revision_model=cls.normalize_optional_text(payload.get("revision_model")),
+            timeline_model=cls.normalize_optional_text(payload.get("timeline_model")),
             ollama_reasoning=bool(payload.get("ollama_reasoning", False)),
             ollama_seed=cls.normalize_optional_seed(
                 payload.get("ollama_seed", cls.DEFAULT_OLLAMA_SEED)

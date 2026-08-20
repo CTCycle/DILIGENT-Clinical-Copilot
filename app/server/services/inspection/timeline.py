@@ -12,7 +12,6 @@ from domain.patient_timeline import (
     PatientTimeline,
     PatientTimelineEvent,
     PatientTimelineGenerationErrorCode,
-    SessionTimelineModelOverrides,
 )
 from services.inspection.normalization import (
     extract_lab_marker,
@@ -183,29 +182,30 @@ class InspectionTimelineMixin:
         self,
         *,
         source: dict[str, Any],
-        model_overrides: SessionTimelineModelOverrides | None,
     ) -> dict[str, Any]:
         session_payload = source.get("session_result_payload")
         persisted = session_payload.get("runtime_settings") if isinstance(session_payload, dict) else None
         settings = dict(persisted) if isinstance(persisted, dict) else {}
-        settings.setdefault("use_cloud_services", LLMRuntimeConfig.is_cloud_enabled())
-        settings.setdefault("llm_provider", LLMRuntimeConfig.get_llm_provider())
-        settings.setdefault("cloud_model", LLMRuntimeConfig.get_cloud_model())
-        settings.setdefault(
-            "text_extraction_model",
-            LLMRuntimeConfig.get_text_extraction_model() or coerce_optional_str(source.get("text_extraction_model")),
-        )
-        settings.setdefault(
-            "clinical_model",
-            LLMRuntimeConfig.get_clinical_model() or coerce_optional_str(source.get("clinical_model")),
+        provider, model = LLMRuntimeConfig.resolve_provider_and_model("timeline")
+        use_cloud_services = LLMRuntimeConfig.is_cloud_enabled()
+        settings.update(
+            {
+                "use_cloud_services": use_cloud_services,
+                "llm_provider": provider if use_cloud_services else LLMRuntimeConfig.get_llm_provider(),
+                "cloud_model": model if use_cloud_services else LLMRuntimeConfig.get_cloud_model(),
+                "timeline_model": model,
+                "text_extraction_model": (
+                    LLMRuntimeConfig.get_text_extraction_model()
+                    or coerce_optional_str(source.get("text_extraction_model"))
+                ),
+                "clinical_model": (
+                    LLMRuntimeConfig.get_clinical_model()
+                    or coerce_optional_str(source.get("clinical_model"))
+                ),
+            }
         )
         settings.setdefault("ollama_reasoning", LLMRuntimeConfig.is_ollama_reasoning_enabled())
         settings.setdefault("ollama_seed", LLMRuntimeConfig.get_ollama_seed())
-        if model_overrides is not None:
-            settings["use_cloud_services"] = model_overrides.use_cloud_services
-            settings["llm_provider"] = model_overrides.llm_provider
-            settings["cloud_model"] = model_overrides.cloud_model
-            settings["text_extraction_model"] = model_overrides.text_extraction_model
         return settings
 
     # -------------------------------------------------------------------------
@@ -301,7 +301,6 @@ class InspectionTimelineMixin:
         session_id: int,
         *,
         force_regenerate: bool = False,
-        model_overrides: SessionTimelineModelOverrides | None = None,
         progress_callback: Callable[[float, str], None] | None = None,
     ) -> PatientTimeline | None:
         safe_session_id = int(session_id)
@@ -337,14 +336,12 @@ class InspectionTimelineMixin:
                     float(getattr(self.timeline_extractor, "timeout_s", 90.0)) + 20.0,
                 ),
             )
-            requested_runtime_settings = self._build_timeline_runtime_settings(
-                source=source, model_overrides=model_overrides
-            )
+            requested_runtime_settings = self._build_timeline_runtime_settings(source=source)
             _report_progress(progress_callback, 15, "Configuring timeline model")
             source_model = (
-                requested_runtime_settings["cloud_model"]
-                if requested_runtime_settings["use_cloud_services"]
-                else requested_runtime_settings["text_extraction_model"]
+                requested_runtime_settings["timeline_model"]
+                or requested_runtime_settings["cloud_model"]
+                or requested_runtime_settings["text_extraction_model"]
             )
 
             try:
