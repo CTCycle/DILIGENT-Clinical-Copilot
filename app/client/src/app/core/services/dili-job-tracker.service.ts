@@ -294,6 +294,9 @@ export class DiliJobTrackerService {
       isRunning: !terminalStatus,
       jobStartedAtMs: currentAgentState.jobStartedAtMs ?? now,
       jobLastProgressAtMs: lastProgressAtMs ?? now,
+      ...(status.stop_requested && !terminalStatus
+        ? { message: '[INFO] Cancellation requested. Waiting for worker shutdown...' }
+        : {}),
     });
 
     if (!terminalStatus) {
