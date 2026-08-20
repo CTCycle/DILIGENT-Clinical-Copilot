@@ -37,11 +37,9 @@ import {
   ClinicalSessionDetail,
   InspectionSessionItem,
   InspectionSessionStatus,
-  CloudProvider,
-  ModelConfigStateResponse,
-  RevisionArtifact,
-  RevisionPipelineStep,
-} from '../../core/models/types';
+} from '../../core/models/inspection-types';
+import { RevisionArtifact, RevisionPipelineStep } from '../../core/models/revision-types';
+import { CloudProvider, ModelConfigStateResponse } from '../../core/models/types';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { JobPollingService } from '../../core/services/job-polling.service';
 import { formatErrorMessage, formatUnknownError, isRecord } from '../../core/utils';

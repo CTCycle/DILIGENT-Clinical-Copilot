@@ -1,14 +1,13 @@
 import { API_BASE_URL } from "../constants";
 import {
-  JobCancelResponse,
-  JobStartResponse,
   RevisionArtifactListResponse,
   RevisionClinicalReviewUpdateRequest,
   RevisionClinicalReviewUpdateResponse,
   RevisionJobStatusResponse,
   RevisionPipelineStepListResponse,
   SessionRevisionRequest,
-} from "../models/types";
+} from "../models/revision-types";
+import { JobCancelResponse, JobStartResponse } from "../models/types";
 import { requestJson } from "./http-api";
 
 export async function startSessionRevisionJob(

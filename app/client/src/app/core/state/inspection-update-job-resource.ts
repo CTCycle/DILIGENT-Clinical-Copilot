@@ -9,8 +9,8 @@ import {
   InspectionUpdateJobStatusResponse,
   InspectionUpdateStartRequest,
   InspectionUpdateTarget,
-  JobStartResponse,
-} from '../models/types';
+} from '../models/inspection-types';
+import { JobStartResponse } from '../models/types';
 import { resolvePollIntervalMs } from '../services/clinical-api';
 import { JobPollingService } from '../services/job-polling.service';
 import { InspectionUpdateJobTrackerService } from './inspection-update-job-tracker.service';

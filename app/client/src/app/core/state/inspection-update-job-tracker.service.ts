@@ -4,9 +4,8 @@ import {
   InspectionUpdateJobStatusResponse,
   InspectionUpdateStartRequest,
   InspectionUpdateTarget,
-  JobStartResponse,
-  JobStatus,
-} from '../models/types';
+} from '../models/inspection-types';
+import { JobStartResponse, JobStatus } from '../models/types';
 import {
   cancelInspectionLiverToxUpdateJob,
   cancelInspectionRagUpdateJob,
