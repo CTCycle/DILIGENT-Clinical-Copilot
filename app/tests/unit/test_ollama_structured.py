@@ -4,6 +4,7 @@ import asyncio
 
 from services.llm import ollama_structured
 from services.llm.generation_policy import GenerationPurpose
+from services.llm.ollama_client import OllamaClient
 
 ###############################################################################
 def test_resolve_text_extraction_models_prefers_live_installed_models() -> None:
@@ -110,3 +111,37 @@ def test_chat_structured_model_forwards_generation_purpose() -> None:
 
     assert result == '{"ok": true}'
     assert client.captured_purpose is GenerationPurpose.STRUCTURED_EXTRACTION
+
+###############################################################################
+def test_ollama_client_forwards_generation_purpose_to_structured_models(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_call(_client, **kwargs):
+        captured.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(
+        ollama_structured,
+        "call_with_structured_models",
+        fake_call,
+    )
+
+    client = OllamaClient.__new__(OllamaClient)
+    result = asyncio.run(
+        client.call_with_structured_models(
+            parser=None,
+            messages=[],
+            system_prompt="",
+            format_instructions="",
+            preferred=["gpt-oss:20b"],
+            temperature=0.0,
+            use_json_mode=True,
+            purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
+            max_repair_attempts=1,
+        )
+    )
+
+    assert result == {"ok": True}
+    assert captured["purpose"] is GenerationPurpose.STRUCTURED_EXTRACTION
