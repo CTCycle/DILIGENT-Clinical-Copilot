@@ -516,7 +516,7 @@ class RevisionAgentRunner:
                 user_prompt=user_prompt,
                 schema=schema,
                 use_json_mode=True,
-                max_repair_attempts=1,
+                max_repair_attempts=3,
             )
         )
 
