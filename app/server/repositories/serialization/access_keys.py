@@ -111,7 +111,7 @@ class AccessKeySerializer:
             db_session.close()
 
     # -------------------------------------------------------------------------
-    def create_key(self, provider: str, plaintext_key: str) -> AccessKey:
+    def create_key(self, provider: str, plaintext_key: str) -> AccessKeyRecord:
         normalized_provider = self.normalize_provider(provider)
         normalized_key = normalize_access_key(plaintext_key)
         table = self.resolve_table(normalized_provider)
@@ -131,7 +131,7 @@ class AccessKeySerializer:
             db_session.add(row)
             db_session.commit()
             db_session.refresh(row)
-            return row
+            return self._to_record(row)
         except Exception:
             db_session.rollback()
             raise
@@ -160,7 +160,7 @@ class AccessKeySerializer:
         key_id: int,
         *,
         provider: str,
-    ) -> AccessKey:
+    ) -> AccessKeyRecord:
         db_session = self.session_factory()
         now = datetime.now(UTC)
         try:
@@ -185,7 +185,7 @@ class AccessKeySerializer:
             target.updated_at = now
             db_session.commit()
             db_session.refresh(target)
-            return target
+            return self._to_record(target)
         except Exception:
             db_session.rollback()
             raise
@@ -214,7 +214,7 @@ class AccessKeySerializer:
             db_session.close()
 
     # -------------------------------------------------------------------------
-    def get_active_key(
+    def _get_active_key_row(
         self,
         provider: str,
         *,
@@ -243,8 +243,18 @@ class AccessKeySerializer:
             db_session.close()
 
     # -------------------------------------------------------------------------
+    def get_active_key(
+        self,
+        provider: str,
+        *,
+        mark_used: bool = False,
+    ) -> AccessKeyRecord | None:
+        row = self._get_active_key_row(provider, mark_used=mark_used)
+        return None if row is None else self._to_record(row)
+
+    # -------------------------------------------------------------------------
     def get_active_key_value(self, provider: ProviderName) -> str | None:
-        row = self.get_active_key(provider, mark_used=True)
+        row = self._get_active_key_row(provider, mark_used=True)
         if row is None:
             return None
         return self.decrypt_key_row(row)

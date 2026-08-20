@@ -41,8 +41,8 @@ def catalog_configuration_fingerprint(provider: CatalogProviderId) -> str:
             active_key = AccessKeySerializer().get_active_key(
                 definition.credential_scope
             )
-            credential_fingerprint = str(
-                getattr(active_key, "fingerprint", None) or "none"
+            credential_fingerprint = (
+                active_key.key_fingerprint if active_key is not None else "none"
             )
         except Exception:
             credential_fingerprint = "unavailable"
