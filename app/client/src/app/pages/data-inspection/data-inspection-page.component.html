@@ -329,6 +329,7 @@
     title="Update {{ activeUpdateTarget() }}"
     [subtitle]="updateModalSubtitle()"
     dialogClassName="modal-container inspection-modal inspection-modal-large"
+    [footer]="true"
     closeLabel="Close update dialog"
     (close)="closeUpdateModal()"
   >
@@ -360,11 +361,11 @@
           <p class="inspection-job-message">{{ updateMessage() || 'Ready to start.' }}</p>
           @if (updateError()) { <p class="inspection-error-text">{{ updateError() }}</p> }
         </div>
-        <div class="inspection-pager-actions inspection-update-actions">
-          <button class="btn btn-primary inspection-mini-btn" type="button" (click)="startUpdateJob()" [disabled]="updateRunning()">Start Update</button>
-          <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="cancelUpdateJob()" [disabled]="!updateRunning()">Cancel</button>
-        </div>
       }
+    </div>
+    <div modal-footer class="inspection-pager-actions inspection-update-actions">
+      <button class="btn btn-primary inspection-mini-btn" type="button" (click)="startUpdateJob()" [disabled]="updateRunning()">Start Update</button>
+      <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="cancelUpdateJob()" [disabled]="!updateRunning()">Cancel</button>
     </div>
   </app-modal-shell>
 </main>
