@@ -1,4 +1,4 @@
-import { ClinicalSessionDetail } from '../../core/models/types';
+import { ClinicalSessionDetail } from '../../core/models/inspection-types';
 import {
   previewDetectedDiseases,
   previewHepatotoxicityPattern,

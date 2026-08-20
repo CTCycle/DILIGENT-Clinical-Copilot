@@ -5,8 +5,8 @@ import {
   InspectionSessionTimelineListResponse,
   InspectionSessionTimelineRequest,
   InspectionTimelineJobStatusResponse,
-  JobStartResponse,
-} from "../models/types";
+} from "../models/inspection-types";
+import { JobStartResponse } from "../models/types";
 import { requestJson } from "./http-api";
 
 const TIMELINE_REQUEST_TIMEOUT_SECONDS = 360;

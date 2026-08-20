@@ -1,4 +1,4 @@
-import { InspectionRagVectorStoreSummary } from '../models/types';
+import { InspectionRagVectorStoreSummary } from '../models/inspection-types';
 
 export type InspectionViewId =
   | 'rxnav'

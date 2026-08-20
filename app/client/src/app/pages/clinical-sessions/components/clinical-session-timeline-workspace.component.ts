@@ -5,7 +5,8 @@ import { Router } from '@angular/router';
 
 import { ModalShellComponent } from '../../../components/modal-shell/modal-shell.component';
 import { HelpPopoverComponent } from '../../../core/guidance/help-popover.component';
-import { ClinicalSessionDetail, CloudProvider, InspectionSessionTimelinePreview, ModelConfigStateResponse } from '../../../core/models/types';
+import { ClinicalSessionDetail, InspectionSessionTimelinePreview } from '../../../core/models/inspection-types';
+import { CloudProvider, ModelConfigStateResponse } from '../../../core/models/types';
 import { deleteInspectionSessionTimeline, fetchInspectionSessionTimelineJobStatus, fetchInspectionSessionTimelineList, startInspectionSessionTimelineJob } from '../../../core/services/session-timeline-api';
 import { JobPollingService } from '../../../core/services/job-polling.service';
 import { fetchModelConfigState } from '../../../core/services/model-config-api';

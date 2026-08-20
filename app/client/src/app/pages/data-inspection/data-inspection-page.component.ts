@@ -41,7 +41,7 @@ import {
   InspectionRagVectorStoreSummary,
   InspectionRxNavItem,
   InspectionUpdateTarget,
-} from '../../core/models/types';
+} from '../../core/models/inspection-types';
 import { InspectionDetailResource } from '../../core/state/inspection-detail-resource';
 import { InspectionPagedResource } from '../../core/state/inspection-paged-resource';
 import { InspectionUpdateJobResource, InspectionUpdateTargetActionsMap } from '../../core/state/inspection-update-job-resource';

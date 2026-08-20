@@ -17,7 +17,7 @@ import {
   InspectionTimelineEvent,
   InspectionTimelineEventType,
   InspectionTimelineTimingType,
-} from '../../core/models/types';
+} from '../../core/models/inspection-types';
 import {
   dayToUtcDate,
   normalizeTimelineDate,
