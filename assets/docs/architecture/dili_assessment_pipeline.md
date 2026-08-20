@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-08-02
+Last updated: 2026-08-20
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -7,6 +7,51 @@ Last updated: 2026-08-02
 LLM fallback is not part of section extraction. Content inference, fallback assignment, low-confidence semantic matches, duplicate headings, or ambiguous headings are surfaced as diagnostics or review signals.
 
 Aggregate section confidence is the minimum confidence across required extracted sections. Preflight blocks analysis when aggregate confidence is below `0.65`; confidence from `0.65` through below `0.85` is non-blocking but requires operator review acknowledgement in the DILI workspace before starting a job.
+
+## Runtime Sequence
+
+The application keeps deterministic grounding, model consultation, evidence
+construction, faithfulness auditing, and mandatory persistence as distinct
+stages.
+
+```mermaid
+sequenceDiagram
+    participant UI as Angular DILI Agent
+    participant API as Clinical API
+    participant S as ClinicalSessionService
+    participant J as JobManager
+    participant W as Clinical workflow
+    participant K as ClinicalKnowledgePreparation
+    participant L as LLM / Ollama
+    participant R as LanceDB retrieval
+    participant DB as SQL persistence
+
+    UI->>API: POST preflight
+    API->>S: Validate input, runtime, and knowledge bases
+    S-->>UI: Blocking and non-blocking findings
+    UI->>API: POST clinical job
+    API->>S: Start job
+    S->>J: Create scoped clinical job
+    J-->>UI: job_id
+    J->>W: Execute worker
+    W->>W: Normalize and extract sections
+    W->>L: Structured drug, disease, and lab extraction
+    W->>W: Deterministic validation and fallback
+    W->>W: Resolve pattern, candidates, and RUCAM
+    W->>K: Resolve identities and evidence
+    K->>R: Optional RAG retrieval
+    K->>L: Bounded clinical consultation
+    W->>W: Build evidence bundle and fact graph
+    W->>W: Render report and audit faithfulness
+    W->>DB: Persist session, result, and artifacts
+    DB-->>W: Persisted session id
+    W-->>J: Completed or failed result
+    loop while non-terminal
+        UI->>API: GET job status
+        API->>J: Read snapshot
+        J-->>UI: Progress and status
+    end
+```
 
 ## Structured Extraction Contract
 Drug, disease, and laboratory extraction use provider-agnostic structured LLM calls for both cloud and local providers. The active runtime provider and model are resolved from persisted model configuration.
@@ -126,6 +171,15 @@ Resolution statuses are:
 An available LiverTox excerpt means evidence text is available for the accepted monograph. It is not treated as proof that a ranked or ambiguous candidate is clinically correct.
 
 Pipeline issues are emitted for missing LiverTox matches, ambiguous LiverTox matches, low-confidence matches, and unvalidated RxNav aliases.
+
+Before session persistence, `ClinicalKnowledgePreparation` resolves a stable
+`drug_id` for each matched mention using the catalog and match cache. The
+`ClinicalSessionRepository` then stores the resolved mention and its audit
+fields without learning aliases or writing knowledge-cache side effects.
+After the session is committed, the preparation service records high-confidence
+aliases, runtime observations, and match-cache evidence in its own repository
+transaction. This keeps clinical session persistence and catalog learning
+separately owned while retaining the same evidence trail.
 
 Per-drug clinical assessments carry claim envelopes and narrative limits. Claim review output distinguishes source-text claims, RUCAM-linked claims, unsupported or unknown-source claims, and generated limitations so report consumers can see which statements require review.
 
