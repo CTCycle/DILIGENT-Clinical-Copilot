@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 
 from domain.inspection import SessionRevisionRequest
+from services.inspection.revision_agent import resolve_revision_agent_runtime
 
 REVISION_JOB_MISSING_STATUS_MESSAGE = (
     "Revision job worker is no longer available. Reload the persisted revision run "
@@ -98,6 +99,7 @@ class InspectionRevisionScaffoldMixin:
             )
 
         pipeline_run_id = uuid.uuid4().hex
+        runtime = resolve_revision_agent_runtime()
         model_configuration = {
             "pipeline_run_id": pipeline_run_id,
             "revision_agent": "single_model_agentic_revision",
@@ -105,7 +107,9 @@ class InspectionRevisionScaffoldMixin:
             "root_session_id": root_session_id,
             "source_session_id": int(session_id),
             "source_version_id": int(source_version["version_id"]),
-            "model_overrides": dict(revision_request.model_overrides or {}),
+            "model_role": "revision",
+            "model_provider": runtime.provider,
+            "model_name": runtime.model,
             "metadata": dict(revision_request.metadata or {}),
         }
         shell = self.session_revision_repository.create_revision_version_shell(
@@ -187,7 +191,6 @@ class InspectionRevisionScaffoldMixin:
             configuration = {}
         request = SessionRevisionRequest(
             revision_instruction=run.get("reviewer_note"),
-            model_overrides=configuration.get("model_overrides") or {},
             metadata=configuration.get("metadata") or {},
         )
         return self.start_revision_job(int(run["session_id"]), request)

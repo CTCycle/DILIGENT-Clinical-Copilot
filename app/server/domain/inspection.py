@@ -86,7 +86,6 @@ class SessionRevisionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     selected_text: str | None = Field(default=None, max_length=100000)
     revision_instruction: str | None = Field(default=None, max_length=4000)
-    model_overrides: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     max_tasks: int = Field(default=8, ge=1, le=8)

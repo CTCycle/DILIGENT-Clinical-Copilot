@@ -84,6 +84,16 @@ class LLMRuntimeConfig:
             base_cloud_model = defaults.cloud_model
             base_clinical_model = defaults.clinical_model
             base_text_extraction_model = defaults.text_extraction_model
+            base_revision_model = (
+                defaults.cloud_model
+                if defaults.use_cloud_services
+                else defaults.clinical_model
+            )
+            base_timeline_model = (
+                defaults.cloud_model
+                if defaults.use_cloud_services
+                else defaults.text_extraction_model
+            )
         else:
             base_provider = snapshot.cloud_provider
             base_cloud_model = snapshot.cloud_model
@@ -92,12 +102,24 @@ class LLMRuntimeConfig:
             use_cloud_models = cls._coerce_bool(
                 overrides.get("use_cloud_models", snapshot.use_cloud_models)
             )
+            base_revision_model = snapshot.revision_model or (
+                snapshot.cloud_model
+                if use_cloud_models
+                else snapshot.clinical_model
+            )
+            base_timeline_model = snapshot.timeline_model or (
+                snapshot.cloud_model
+                if use_cloud_models
+                else snapshot.text_extraction_model
+            )
             local_choices = set(get_clinical_model_choices()) | set(
                 get_text_extraction_model_choices()
             )
             for role_name, model_name in (
                 ("clinical", base_clinical_model),
                 ("text_extraction", base_text_extraction_model),
+                ("revision", base_revision_model),
+                ("timeline", base_timeline_model),
             ):
                 if not use_cloud_models and model_name and model_name not in local_choices:
                     raise ValueError(
@@ -132,6 +154,18 @@ class LLMRuntimeConfig:
                 if "text_extraction_model" in overrides
                 else base_text_extraction_model,
                 "" if not is_fresh else defaults.text_extraction_model,
+            ),
+            revision_model=cls._normalize_local_model(
+                cls._coerce_optional_text(overrides.get("revision_model"))
+                if "revision_model" in overrides
+                else base_revision_model,
+                "" if not is_fresh else str(base_revision_model or ""),
+            ),
+            timeline_model=cls._normalize_local_model(
+                cls._coerce_optional_text(overrides.get("timeline_model"))
+                if "timeline_model" in overrides
+                else base_timeline_model,
+                "" if not is_fresh else str(base_timeline_model or ""),
             ),
             use_cloud_models=cls._coerce_bool(
                 overrides.get("use_cloud_models", snapshot.use_cloud_models)
@@ -222,6 +256,16 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def get_revision_model(cls) -> str:
+        return (cls._load_snapshot().revision_model or "").strip()
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def get_timeline_model(cls) -> str:
+        return (cls._load_snapshot().timeline_model or "").strip()
+
+    # -------------------------------------------------------------------------
+    @classmethod
     def get_llm_provider(cls) -> str:
         return (cls._load_snapshot().cloud_provider or "").strip()
 
@@ -251,6 +295,8 @@ class LLMRuntimeConfig:
         """Capture the complete resolved runtime once for a clinical job."""
         parser_provider, parser_model = cls.resolve_provider_and_model("parser")
         clinical_provider, clinical_model = cls.resolve_provider_and_model("clinical")
+        revision_provider, revision_model = cls.resolve_provider_and_model("revision")
+        timeline_provider, timeline_model = cls.resolve_provider_and_model("timeline")
         parser_policy = cls.resolve_generation_policy(
             purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
             provider=parser_provider,
@@ -275,6 +321,12 @@ class LLMRuntimeConfig:
             "parser_model": parser_model,
             "clinical_provider": clinical_provider,
             "clinical_model_resolved": clinical_model,
+            "revision_model": cls.get_revision_model(),
+            "timeline_model": cls.get_timeline_model(),
+            "revision_provider": revision_provider,
+            "revision_model_resolved": revision_model,
+            "timeline_provider": timeline_provider,
+            "timeline_model_resolved": timeline_model,
             "sampling_policy_version": parser_policy.policy_version,
             "parser_sampling_policy": cls._policy_snapshot(parser_policy),
             "clinical_sampling_policy": cls._policy_snapshot(clinical_policy),
@@ -320,14 +372,16 @@ class LLMRuntimeConfig:
     @classmethod
     def resolve_provider_and_model(
         cls,
-        purpose: Literal["clinical", "parser"],
+        purpose: Literal["clinical", "parser", "revision", "timeline"],
     ) -> tuple[str, str]:
         snapshot = cls._load_snapshot()
-        local_model = (
-            (snapshot.text_extraction_model or "").strip()
-            if purpose == "parser"
-            else (snapshot.clinical_model or "").strip()
-        )
+        role_models = {
+            "parser": snapshot.text_extraction_model,
+            "clinical": snapshot.clinical_model,
+            "revision": snapshot.revision_model,
+            "timeline": snapshot.timeline_model,
+        }
+        local_model = (role_models[purpose] or "").strip()
         if snapshot.use_cloud_models:
             provider = (snapshot.cloud_provider or "").strip()
             cloud_model = (snapshot.cloud_model or "").strip()

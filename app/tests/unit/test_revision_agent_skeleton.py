@@ -211,7 +211,6 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
         session_id,
         SessionRevisionRequest(
             revision_instruction="Focus on unsupported claims.",
-            model_overrides={"clinical_model": "fake-revision-model"},
         ),
     )
     assert started["status"] in {"running", "completed"}
