@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from services.llm import ollama_structured
+from services.llm.generation_policy import GenerationPurpose
 
 ###############################################################################
 def test_resolve_text_extraction_models_prefers_live_installed_models() -> None:
@@ -81,3 +82,31 @@ def test_parse_with_repairs_uses_compact_repair_messages_for_schema_echo() -> No
     assert result == {"ok": '{"entries":[]}'}
     assert client.captured_messages is not None
     assert "schema or wrapper instead of data" in client.captured_messages[1]["content"]
+
+###############################################################################
+def test_chat_structured_model_forwards_generation_purpose() -> None:
+
+    ###############################################################################
+    class FakeClient:
+        captured_purpose: GenerationPurpose | None = None
+
+        # -------------------------------------------------------------------------
+        async def chat(self, **kwargs):
+            self.captured_purpose = kwargs["purpose"]
+            return '{"ok": true}'
+
+    client = FakeClient()
+
+    result = asyncio.run(
+        ollama_structured._chat_structured_model(
+            client,
+            active_model="gpt-oss:20b",
+            messages=[],
+            use_json_mode=True,
+            temperature=0.0,
+            purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
+        )
+    )
+
+    assert result == '{"ok": true}'
+    assert client.captured_purpose is GenerationPurpose.STRUCTURED_EXTRACTION
