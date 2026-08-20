@@ -14,20 +14,24 @@ import { ModalShellComponent } from '../../components/modal-shell/modal-shell.co
 import { HelpPopoverComponent } from '../../core/guidance/help-popover.component';
 
 import {
-  cancelSessionRevisionJob,
   deleteInspectionSession,
   fetchClinicalSessionDetail,
-  fetchRevisionArtifacts,
-  fetchRevisionPipelineSteps,
-  fetchInspectionLiverToxCatalog,
-  fetchInspectionRxNavCatalog,
   fetchInspectionSessions,
   manualEditClinicalSessionReport,
-  startSessionRevisionJob,
-  fetchSessionRevisionJobStatus,
   updateClinicalSession,
+} from '../../core/services/clinical-sessions-api';
+import {
+  fetchInspectionLiverToxCatalog,
+  fetchInspectionRxNavCatalog,
+} from '../../core/services/knowledge-catalog-api';
+import {
+  cancelSessionRevisionJob,
+  fetchRevisionArtifacts,
+  fetchRevisionPipelineSteps,
+  fetchSessionRevisionJobStatus,
+  startSessionRevisionJob,
   updateRevisionClinicalReview,
-} from '../../core/services/inspection-api';
+} from '../../core/services/session-revision-api';
 import { fetchModelConfigState } from '../../core/services/model-config-api';
 import {
   ClinicalSessionDetail,

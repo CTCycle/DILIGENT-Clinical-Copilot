@@ -9,7 +9,7 @@ import {
   fetchInspectionSessionTimelineJobStatus,
   fetchInspectionSessionTimelineList,
   startInspectionSessionTimelineJob,
-} from '../../core/services/inspection-api';
+} from '../../core/services/session-timeline-api';
 import { JobPollingService } from '../../core/services/job-polling.service';
 import {
   InspectionSessionTimeline,

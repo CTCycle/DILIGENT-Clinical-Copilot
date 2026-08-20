@@ -7,28 +7,30 @@ import { InspectionCatalogStatusComponent } from '../../components/inspection-ca
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import { InspectionCatalogToolbarComponent } from '../../components/inspection-catalog-toolbar/inspection-catalog-toolbar.component';
 import {
-  cancelInspectionLiverToxUpdateJob,
-  cancelInspectionRagUpdateJob,
-  cancelInspectionRxNavUpdateJob,
   deleteInspectionLiverToxDrug,
   deleteInspectionRxNavDrug,
   fetchInspectionLiverToxCatalog,
   fetchInspectionLiverToxExcerpt,
-  fetchInspectionLiverToxUpdateConfig,
-  fetchInspectionLiverToxUpdateJobStatus,
   fetchInspectionRagDocuments,
-  fetchInspectionRagUpdateConfig,
-  fetchInspectionRagUpdateJobStatus,
   fetchInspectionRagVectorStore,
   fetchInspectionRxNavAliases,
   fetchInspectionRxNavCatalog,
+  updateInspectionRxNavDrug,
+} from '../../core/services/knowledge-catalog-api';
+import {
+  cancelInspectionLiverToxUpdateJob,
+  cancelInspectionRagUpdateJob,
+  cancelInspectionRxNavUpdateJob,
+  fetchInspectionLiverToxUpdateConfig,
+  fetchInspectionLiverToxUpdateJobStatus,
+  fetchInspectionRagUpdateConfig,
+  fetchInspectionRagUpdateJobStatus,
   fetchInspectionRxNavUpdateConfig,
   fetchInspectionRxNavUpdateJobStatus,
   startInspectionLiverToxUpdateJob,
   startInspectionRagUpdateJob,
   startInspectionRxNavUpdateJob,
-  updateInspectionRxNavDrug,
-} from '../../core/services/inspection-api';
+} from '../../core/services/inspection-jobs-api';
 import { JobPollingService } from '../../core/services/job-polling.service';
 import {
   InspectionDrugAliasesResponse,
