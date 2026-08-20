@@ -564,6 +564,8 @@ function Install-OrUpdateApplication {
         -BuildFrontend $true `
         -InstallationType $selectedInstallationType `
         -PortableRuntimesReady:$portableRuntimesReady
+    Write-Step 'Synchronizing database schema'
+    Initialize-Database
     if (Test-Path -LiteralPath $UvCacheDir) {
         Write-Step 'Pruning uv cache'
         Remove-Item -LiteralPath $UvCacheDir -Recurse -Force
@@ -790,6 +792,12 @@ function Test-FrozenBackend {
         if (-not (Invoke-HealthCheck -Url "$baseUrl/api/health" -Attempts 60 -DelaySeconds 1)) { throw 'Frozen backend health check failed' }
         if ((Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/" -TimeoutSec 5).StatusCode -ne 200) { throw 'Frozen backend did not serve Angular index' }
         if ((Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/clinical-sessions" -TimeoutSec 5).StatusCode -ne 200) { throw 'Frozen backend SPA fallback failed' }
+        $migrationDatabase = Join-Path $dataRoot 'resources/database.db'
+        Invoke-Checked -FilePath $VenvPython -WorkingDirectory $ServerDir -ArgumentList @(
+            '-c',
+            'import sqlite3,sys; from repositories.database.migrations import HEAD_REVISION; connection=sqlite3.connect(sys.argv[1]); heads={row[0] for row in connection.execute("select version_num from alembic_version")}; connection.close(); assert heads == {HEAD_REVISION}, f"database heads {heads!r} != {HEAD_REVISION!r}"',
+            $migrationDatabase
+        )
         Write-Ok 'Frozen backend smoke test passed'
     }
     finally {

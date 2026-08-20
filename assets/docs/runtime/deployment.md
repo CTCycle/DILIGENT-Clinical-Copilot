@@ -1,5 +1,5 @@
 # Local Deployment
-Last updated: 2026-08-19
+Last updated: 2026-08-20
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
@@ -13,6 +13,24 @@ Last updated: 2026-08-19
 - `app/client/package-lock.json`
 - `app/desktop/package-lock.json`
 - `app/desktop/src-tauri/Cargo.lock`
+
+## Database migrations
+
+- Alembic revisions live under `app/server/migrations` and are bundled into the
+  frozen backend. The application uses the synchronous SQLAlchemy engine and
+  runs `upgrade head` before serving requests.
+- From `app/server`, generate development revisions with `uv run alembic -c
+  alembic.ini revision --autogenerate -m "describe the schema change"`, review
+  the script, then run
+  `uv run alembic -c alembic.ini upgrade head` and
+  `uv run alembic -c alembic.ini current --check-heads`, followed by
+  `uv run alembic -c alembic.ini check`.
+- Keep one linear head. Back up production data before upgrades. Automatic
+  adoption covers v2.4-v3.2 unversioned schemas; older or divergent schemas
+  require an explicit conversion plan.
+- Use Alembic downgrade commands only for reviewed development or recovery
+  procedures. The initializer's `--drop-existing` option is the explicit reset
+  workflow and destroys application rows before rebuilding to head.
 
 ## Deployment Constraints
 - Network deployment, reverse proxies, and unauthenticated multi-user access are unsupported.

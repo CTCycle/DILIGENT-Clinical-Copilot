@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-08-18
+Last updated: 2026-08-20
 
 ## Relational Database
 
@@ -19,6 +19,14 @@ Last updated: 2026-08-18
 - Evidence-locked DILI artifacts in the database-backed session result payload are `normalized_document`, `extraction_artifact`, `fact_graph`, `faithfulness_audit`, generated report metadata, discrepancy report, and `dili_evidence_bundle_index`.
 - Successful clinical workflows require persistence. Repository failures, missing persisted IDs, and failed upserts are service dependency failures rather than silent in-memory success.
 - SQLite enables foreign keys, a 30-second busy timeout, and WAL journaling.
+- Alembic is the authoritative schema-evolution mechanism. The shared
+  `repositories.schemas.Base.metadata` is the autogenerate source of truth;
+  application startup and explicit initialization never use `create_all()`.
+- Startup and installation serialize migration attempts, inspect the current
+  Alembic head, and apply pending revisions before repositories or services run.
+- Unversioned v2.4-v3.0 databases are adopted through the released baseline and
+  upgraded without dropping data. Unversioned current-schema databases are
+  stamped only after an exact metadata comparison; unknown schemas are rejected.
 - SQLAlchemy update timestamps use an application-level update hook shared by SQLite and PostgreSQL.
 - Version listing and detail reads are side-effect-free; synchronization is reserved for explicit write paths.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
@@ -41,9 +49,14 @@ Last updated: 2026-08-18
 
 - Canonical manifests live in `app/resources/catalogs/*.json` and are seeded into database tables.
 - RxNorm persistence uses `drug_rxnorm_codes` as the canonical RxCUI mapping table.
-- Explicit database initialization seeds the canonical manifests.
-- SQLite startup initializes and seeds only when the configured `.db` file is missing. An existing SQLite file is opened without schema cross-validation, reset, or reseeding.
-- PostgreSQL database creation, schema initialization, and seeding are available only through the explicit launcher database action; normal application startup never creates or resets PostgreSQL state.
+- Explicit database initialization seeds the canonical manifests after Alembic
+  reaches head.
+- SQLite startup creates the configured `.db` when missing, migrates it, and
+  seeds once. Existing SQLite files are migrated but not reseeded.
+- PostgreSQL startup connects to the configured database, creates it when the
+  configured credentials permit creation, migrates it, and seeds only a newly
+  created database. Existing databases are not reset or reseeded during normal
+  startup.
 - Full reseed or reset remains explicit through `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs`.
 
 ## Vector Persistence

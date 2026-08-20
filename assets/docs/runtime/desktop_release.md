@@ -1,5 +1,5 @@
 # DILIGENT Desktop Release
-Last updated: 2026-08-17
+Last updated: 2026-08-20
 
 ## Packaging architecture
 
@@ -84,7 +84,8 @@ The launcher validates:
 
 - PowerShell parameter and host contracts;
 - Angular production output;
-- frozen backend startup, ready-file contents, `/api/health`, `/`, and `/clinical-sessions`;
+- frozen backend startup, first-run Alembic head, ready-file contents,
+  `/api/health`, `/`, and `/clinical-sessions`;
 - deterministic runtime archive manifest and digest;
 - Tauri compilation;
 - portable executable size, MSI metadata, and SHA-256 entries.

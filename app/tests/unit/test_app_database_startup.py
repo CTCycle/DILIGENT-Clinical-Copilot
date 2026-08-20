@@ -14,8 +14,8 @@ def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ign
     monkeypatch.setattr(server_app_module, "get_server_settings", lambda: settings)
     monkeypatch.setattr(
         server_app_module,
-        "initialize_sqlite_database_if_missing",
-        lambda _database: events.append("sqlite"),
+        "ensure_database_ready",
+        lambda _database: events.append("database"),
     )
     monkeypatch.setattr(
         server_app_module,
@@ -41,9 +41,9 @@ def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ign
     return events
 
 ###############################################################################
-def test_application_startup_initializes_missing_sqlite_only(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_application_startup_synchronizes_sqlite_before_validation(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     assert _run_lifespan("sqlite", monkeypatch) == [
-        "sqlite",
+        "database",
         "provider",
         "validation",
         "running",
@@ -51,8 +51,9 @@ def test_application_startup_initializes_missing_sqlite_only(monkeypatch) -> Non
     ]
 
 ###############################################################################
-def test_application_startup_does_not_initialize_postgresql(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_application_startup_synchronizes_postgresql_before_validation(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     assert _run_lifespan("postgresql", monkeypatch) == [
+        "database",
         "provider",
         "validation",
         "running",

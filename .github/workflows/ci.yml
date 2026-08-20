@@ -35,6 +35,16 @@ jobs:
         working-directory: app/server
         run: python -m compileall -q . ../tests
 
+      - name: Validate Alembic migrations and metadata drift
+        working-directory: app/server
+        env:
+          EMBEDDED_DATABASE: "true"
+          DILIGENT_SQLITE_PATH: ${{ runner.temp }}/diligent-alembic-check.sqlite3
+        run: |
+          python -m alembic -c alembic.ini upgrade head
+          python -m alembic -c alembic.ini current --check-heads
+          python -m alembic -c alembic.ini check
+
       - name: Run Ruff
         working-directory: app/server
         run: python -m ruff check . ../tests
