@@ -68,7 +68,7 @@ Run on a Windows x64 host with Rust/Cargo, the Windows build toolchain, the pinn
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a clean worktree by default; use `-AllowDirtyTree` only when the dirty state is intentional and recorded. `-OfflineWebView2` is valid only with `-DesktopTarget Msi` or `All` and changes the MSI WebView2 installation mode.
 
-Final desktop artifacts are written directly to `release/`. Intermediate desktop staging remains under `release/.staging/`; Tauri's native Cargo output is kept under `assets/cache/cargo/release/`.
+Final desktop artifacts are written directly to `release/`. Intermediate desktop staging remains under `release/.staging/`; Tauri's native Cargo output is kept under `runtimes/cache/cargo/release/`.
 
 The build refuses to complete if the frozen backend, runtime manifest, artifact size, or MSI metadata checks fail. The portable artifact is the raw Tauri release executable copied to `release/` after those checks; remote publication is a separate maintainer action.
 

@@ -13,16 +13,16 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PIP_CACHE_DIR: ${{ github.workspace }}/assets/cache/pip
-  UV_CACHE_DIR: ${{ github.workspace }}/assets/cache/uv
-  NPM_CONFIG_CACHE: ${{ github.workspace }}/assets/cache/npm
-  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/assets/cache/playwright
-  RUFF_CACHE_DIR: ${{ github.workspace }}/assets/cache/ruff
-  MYPY_CACHE_DIR: ${{ github.workspace }}/assets/cache/mypy
-  COVERAGE_FILE: ${{ github.workspace }}/assets/cache/coverage/.coverage
-  PYTHONPYCACHEPREFIX: ${{ github.workspace }}/assets/cache/python
-  CARGO_TARGET_DIR: ${{ github.workspace }}/assets/cache/cargo
-  PYTEST_ADDOPTS: "--basetemp=${{ github.workspace }}/assets/cache/pytest/basetemp -o cache_dir=${{ github.workspace }}/assets/cache/pytest"
+  PIP_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/pip
+  UV_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/uv
+  NPM_CONFIG_CACHE: ${{ github.workspace }}/runtimes/cache/npm
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/runtimes/cache/playwright
+  RUFF_CACHE_DIR: ${{ github.workspace }}/app/tests/cache/ruff
+  MYPY_CACHE_DIR: ${{ github.workspace }}/app/tests/cache/mypy
+  COVERAGE_FILE: ${{ github.workspace }}/app/tests/cache/coverage/.coverage
+  PYTHONPYCACHEPREFIX: ${{ github.workspace }}/runtimes/cache/python
+  CARGO_TARGET_DIR: ${{ github.workspace }}/runtimes/cache/cargo
+  PYTEST_ADDOPTS: "--basetemp=${{ github.workspace }}/app/tests/cache/pytest/basetemp -o cache_dir=${{ github.workspace }}/app/tests/cache/pytest"
 
 jobs:
   backend-quality:
@@ -151,8 +151,8 @@ jobs:
         run: |
           $env:APP_TEST_FRONTEND_URL = "http://127.0.0.1:9847"
           $env:APP_TEST_BACKEND_URL = "http://127.0.0.1:7690"
-          $ciArtifactDir = Join-Path $env:GITHUB_WORKSPACE "assets/cache/ci/modelconfig"
-          $pytestArtifactDir = Join-Path $env:GITHUB_WORKSPACE "assets/cache/pytest/ci"
+          $ciArtifactDir = Join-Path $env:GITHUB_WORKSPACE "app/tests/cache/ci/modelconfig"
+          $pytestArtifactDir = Join-Path $env:GITHUB_WORKSPACE "app/tests/cache/pytest/ci"
           New-Item -ItemType Directory -Path $ciArtifactDir, $pytestArtifactDir -Force | Out-Null
           $ciRuntimeDir = Join-Path $env:RUNNER_TEMP "diligent-modelconfig"
           New-Item -ItemType Directory -Path $ciRuntimeDir -Force | Out-Null
@@ -265,5 +265,5 @@ jobs:
           name: windows-regression-artifacts
           if-no-files-found: ignore
           path: |
-            assets/cache/ci/modelconfig/**
-            assets/cache/pytest/ci/**
+            app/tests/cache/ci/modelconfig/**
+            app/tests/cache/pytest/ci/**

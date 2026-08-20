@@ -20,10 +20,12 @@ The launcher:
 - recreates a stale backend virtual environment when the repository has moved
 - provides database, test, log, cache, and uninstall maintenance options
 
-Development caches and test artifacts are kept under `assets/cache/`. The
-launcher routes uv, npm, Playwright, Ruff, pytest, Python bytecode, Angular,
-coverage, and Cargo build caches there while leaving functional frontend and
-desktop release outputs in their required runtime locations.
+Runtime and development tool caches are split between `runtimes/cache/` and
+`app/tests/cache/`. The launcher routes uv, pip, npm, Playwright, Python
+bytecode, and Cargo build caches to `runtimes/cache/`, and routes pytest, Ruff,
+Mypy, Angular, and coverage state to `app/tests/cache/`, while leaving
+functional frontend and desktop release outputs in their required runtime
+locations.
 
 Database startup behavior is migration-driven:
 

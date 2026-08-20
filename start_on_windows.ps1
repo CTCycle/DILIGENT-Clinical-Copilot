@@ -27,20 +27,23 @@ $script:NodeExe = Join-Path $NodeDir 'node.exe'
 $script:NpmCmd = Join-Path $NodeDir 'npm.cmd'
 $script:ServerDir = Join-Path $RepoRoot 'app/server'
 $script:ClientDir = Join-Path $RepoRoot 'app/client'
+$script:TestsDir = Join-Path $RepoRoot 'app/tests'
 $script:VenvDir = Join-Path $ServerDir '.venv'
 $script:VenvPython = Join-Path $VenvDir 'Scripts/python.exe'
-$script:CacheDir = Join-Path $RepoRoot 'assets/cache'
-$script:AngularCacheDir = Join-Path $CacheDir 'angular'
-$script:CoverageDir = Join-Path $CacheDir 'coverage'
-$script:CargoTargetDir = Join-Path $CacheDir 'cargo'
-$script:MypyCacheDir = Join-Path $CacheDir 'mypy'
-$script:NpmCacheDir = Join-Path $CacheDir 'npm'
-$script:PipCacheDir = Join-Path $CacheDir 'pip'
-$script:PlaywrightCacheDir = Join-Path $CacheDir 'playwright'
-$script:PytestCacheDir = Join-Path $CacheDir 'pytest'
-$script:PythonBytecodeCacheDir = Join-Path $CacheDir 'python'
-$script:RuffCacheDir = Join-Path $CacheDir 'ruff'
-$script:UvCacheDir = Join-Path $CacheDir 'uv'
+$script:RuntimeCacheDir = Join-Path $RuntimesDir 'cache'
+$script:TestCacheDir = Join-Path $TestsDir 'cache'
+$script:LegacyCacheDir = Join-Path $RepoRoot 'assets/cache'
+$script:AngularCacheDir = Join-Path $TestCacheDir 'angular'
+$script:CoverageDir = Join-Path $TestCacheDir 'coverage'
+$script:CargoTargetDir = Join-Path $RuntimeCacheDir 'cargo'
+$script:MypyCacheDir = Join-Path $TestCacheDir 'mypy'
+$script:NpmCacheDir = Join-Path $RuntimeCacheDir 'npm'
+$script:PipCacheDir = Join-Path $RuntimeCacheDir 'pip'
+$script:PlaywrightCacheDir = Join-Path $RuntimeCacheDir 'playwright'
+$script:PytestCacheDir = Join-Path $TestCacheDir 'pytest'
+$script:PythonBytecodeCacheDir = Join-Path $RuntimeCacheDir 'python'
+$script:RuffCacheDir = Join-Path $TestCacheDir 'ruff'
+$script:UvCacheDir = Join-Path $RuntimeCacheDir 'uv'
 $script:EnvFile = Join-Path $RepoRoot 'settings/.env'
 $script:EnvExample = Join-Path $RepoRoot 'settings/.env.example'
 $script:PythonVersion = '3.14.2'
@@ -287,7 +290,8 @@ function Import-DotEnv {
 
 function Set-LauncherEnvironment {
     New-Item -ItemType Directory -Path @(
-        $CacheDir,
+        $RuntimeCacheDir,
+        $TestCacheDir,
         $AngularCacheDir,
         $CoverageDir,
         $CargoTargetDir,
@@ -601,7 +605,10 @@ function Install-OrUpdateApplication {
     Initialize-Database
     if (Test-Path -LiteralPath $UvCacheDir) {
         Write-Step 'Pruning uv cache'
-        Remove-Item -LiteralPath $UvCacheDir -Recurse -Force
+        $skipped = Remove-CacheContents -RootPath $UvCacheDir
+        if ($skipped -gt 0) {
+            Write-Info "$skipped uv cache entr$(if ($skipped -eq 1) { 'y' } else { 'ies' }) could not be removed; continuing"
+        }
     }
     Write-Ok 'Installation/update completed'
 }
@@ -644,21 +651,85 @@ function Remove-ApplicationLogs {
     Write-Ok 'Application logs removed'
 }
 
+function Remove-PathSafely {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [switch]$Recurse
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -ErrorAction SilentlyContinue)) {
+        return $true
+    }
+    try {
+        Remove-Item -LiteralPath $Path -Force -Recurse:$Recurse -ErrorAction Stop
+        return $true
+    }
+    catch {
+        Write-Warning "Skipped locked or inaccessible cache item: $Path ($($_.Exception.Message))"
+        return $false
+    }
+}
+
+function Remove-CacheContents {
+    param([Parameter(Mandatory = $true)][string]$RootPath)
+
+    if (-not (Test-Path -LiteralPath $RootPath -ErrorAction SilentlyContinue)) {
+        return 0
+    }
+
+    $skipped = 0
+    $items = @(Get-ChildItem -LiteralPath $RootPath -Force -Recurse -ErrorAction SilentlyContinue |
+        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true })
+    foreach ($item in $items) {
+        if ($item.Name -eq '.gitkeep') {
+            continue
+        }
+        if (-not (Remove-PathSafely -Path $item.FullName -Recurse:$item.PSIsContainer)) {
+            $skipped++
+        }
+    }
+    return $skipped
+}
+
 function Remove-PythonCaches {
-    Get-ChildItem -LiteralPath $RepoRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
+    $skipped = 0
+    $cacheDirectories = @(Get-ChildItem -LiteralPath $RepoRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
         Where-Object Name -eq '__pycache__' |
-        Sort-Object FullName -Descending |
-        Remove-Item -Recurse -Force -ErrorAction Continue
+        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true })
+    foreach ($directory in $cacheDirectories) {
+        $skipped += Remove-CacheContents -RootPath $directory.FullName
+        if (-not (Remove-PathSafely -Path $directory.FullName -Recurse)) {
+            $skipped++
+        }
+    }
+    return $skipped
+}
+
+function Remove-ToolCacheDirectories {
+    $skipped = 0
+    $cacheDirectories = @(Get-ChildItem -LiteralPath $RepoRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -in @('.mypy_cache', '.ruff_cache') -or $_.Name -like '.pytest_cache*' } |
+        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true })
+    foreach ($directory in $cacheDirectories) {
+        $skipped += Remove-CacheContents -RootPath $directory.FullName
+        if (-not (Remove-PathSafely -Path $directory.FullName -Recurse)) {
+            $skipped++
+        }
+    }
+    return $skipped
 }
 
 function Clear-ApplicationCache {
-    Remove-PythonCaches
-    if (Test-Path -LiteralPath $CacheDir) {
-        Get-ChildItem -LiteralPath $CacheDir -Force |
-            Where-Object Name -ne '.gitkeep' |
-            Remove-Item -Recurse -Force
+    $skipped = 0
+    foreach ($cacheRoot in @($RuntimeCacheDir, $TestCacheDir, $LegacyCacheDir)) {
+        $skipped += Remove-CacheContents -RootPath $cacheRoot
     }
-    Write-Ok 'Development caches and test artifacts removed from assets/cache'
+    $skipped += Remove-PythonCaches
+    $skipped += Remove-ToolCacheDirectories
+    if ($skipped -gt 0) {
+        Write-Info "$skipped cache entr$(if ($skipped -eq 1) { 'y' } else { 'ies' }) could not be removed; rerun as administrator to remove locked entries"
+    }
+    Write-Ok 'Development caches and test artifacts cleared from runtimes/cache and app/tests/cache'
 }
 
 function Uninstall-Application {

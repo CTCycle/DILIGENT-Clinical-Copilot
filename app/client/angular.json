@@ -6,7 +6,7 @@
     "analytics": false,
     "cache": {
       "enabled": true,
-      "path": "../../assets/cache/angular"
+      "path": "../tests/cache/angular"
     }
   },
   "newProjectRoot": "projects",
