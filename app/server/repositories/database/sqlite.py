@@ -30,6 +30,12 @@ class SQLiteRepository:
     # -------------------------------------------------------------------------
     @staticmethod
     def _configure_connection(dbapi_connection, _connection_record) -> None:
+        # Python 3.12+ exposes sqlite3 transaction control explicitly.  Run
+        # connection PRAGMAs in autocommit mode, then restore the application
+        # transaction policy so migration DDL can roll back as one unit.
+        previous_autocommit = getattr(dbapi_connection, "autocommit", None)
+        if previous_autocommit is not None:
+            dbapi_connection.autocommit = True
         cursor = dbapi_connection.cursor()
         try:
             cursor.execute("PRAGMA foreign_keys=ON")
@@ -39,3 +45,5 @@ class SQLiteRepository:
             cursor.execute("PRAGMA journal_mode=WAL")
         finally:
             cursor.close()
+            if previous_autocommit is not None:
+                dbapi_connection.autocommit = previous_autocommit

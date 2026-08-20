@@ -158,8 +158,8 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
             self.engine = engine
             self.session_factory = sessionmaker(bind=engine, future=True)
 
-    def fake_create_all(_engine):
-        order.append("create_all")
+    def fake_migrate_database(_engine, **_kwargs):
+        order.append("migration")
 
     ###############################################################################
     class FakeCatalogSerializer:
@@ -179,11 +179,8 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
         order.append("catalog_seeded")
         return FakeCatalogSeedResult()
 
-    monkeypatch.setattr(
-        initializer.sqlalchemy, "create_engine", lambda *a, **k: FakeAdminEngine()
-    )
     monkeypatch.setattr(initializer, "PostgresRepository", FakePostgresRepository)
-    monkeypatch.setattr(initializer.Base.metadata, "create_all", fake_create_all)
+    monkeypatch.setattr(initializer, "migrate_database", fake_migrate_database)
     monkeypatch.setattr(
         initializer, "ReferenceCatalogSerializer", FakeCatalogSerializer
     )
@@ -192,7 +189,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     db_name = initializer.ensure_postgres_database(settings)
 
     assert db_name == "diligent"
-    assert order == ["create_all", "catalog_seeded"]
+    assert order == ["migration", "catalog_seeded"]
 
 ###############################################################################
 def test_external_material_does_not_duplicate_on_reopen(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -222,7 +219,7 @@ def test_external_material_does_not_duplicate_on_reopen(monkeypatch) -> None:  #
         shutil.rmtree(temp_root, ignore_errors=True)
 
 ###############################################################################
-def test_sqlite_startup_initializes_only_when_database_file_is_missing(
+def test_sqlite_startup_initializes_and_seeds_when_database_file_is_missing(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     database_path = tmp_path / "missing.db"
@@ -237,11 +234,11 @@ def test_sqlite_startup_initializes_only_when_database_file_is_missing(
         lambda _settings, **kwargs: calls.append(kwargs),
     )
 
-    assert initializer.initialize_sqlite_database_if_missing(settings) is True
-    assert calls == [{}]
+    assert initializer.ensure_database_ready(settings) is True
+    assert calls == [{"seed_catalogs": True}]
 
 ###############################################################################
-def test_sqlite_startup_does_not_reinitialize_existing_database(
+def test_sqlite_startup_migrates_existing_database_without_automatic_reseed(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     database_path = tmp_path / "existing.db"
@@ -251,12 +248,15 @@ def test_sqlite_startup_does_not_reinitialize_existing_database(
         "repositories.database.sqlite.DATABASE_FILE_PATH", database_path
     )
 
-    def fail_if_called(*_args, **_kwargs):
-        raise AssertionError("existing SQLite databases must not be initialized")
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        initializer,
+        "initialize_sqlite_database",
+        lambda _settings, **kwargs: calls.append(kwargs),
+    )
 
-    monkeypatch.setattr(initializer, "initialize_sqlite_database", fail_if_called)
-
-    assert initializer.initialize_sqlite_database_if_missing(settings) is False
+    assert initializer.ensure_database_ready(settings) is False
+    assert calls == [{"seed_catalogs": False}]
 
 ###############################################################################
 def test_database_initialization_converts_unavailable_connection_to_exit(

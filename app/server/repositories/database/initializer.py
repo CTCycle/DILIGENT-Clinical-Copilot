@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import urllib.parse
+
 import sqlalchemy
 from sqlalchemy import column, literal, select, table
 from sqlalchemy.exc import SQLAlchemyError
@@ -16,6 +17,7 @@ from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.catalogs import CatalogSeedResult
 from domain.settings.configuration import DatabaseSettings
+from repositories.database.migrations import MigrationError, migrate_database
 from repositories.database.postgres import PostgresRepository
 from repositories.database.sqlite import (
     SQLiteRepository,
@@ -25,12 +27,11 @@ from repositories.database.utils import (
     normalize_postgres_engine,
     validate_postgres_database_name,
 )
-from repositories.schemas.base import Base
-from repositories.serialization.catalogs import (
-    ReferenceCatalogSerializer,
-)
+from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
-###############################################################################
+POSTGRES_CREATE_DATABASE_LOCK_KEY = 7362382
+
+
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
     connect_args: dict[str, str | int] = {
         "connect_timeout": settings.connect_timeout,
@@ -42,7 +43,7 @@ def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | i
             connect_args["sslrootcert"] = settings.ssl_ca
     return connect_args
 
-###############################################################################
+
 def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
     port = settings.port or 5432
     engine_name = normalize_postgres_engine(settings.engine)
@@ -54,7 +55,7 @@ def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
         f"@{settings.host}:{port}/{safe_database_name}"
     )
 
-###############################################################################
+
 def clone_settings_with_database(
     settings: DatabaseSettings, database_name: str
 ) -> DatabaseSettings:
@@ -75,16 +76,14 @@ def clone_settings_with_database(
         select_page_size=settings.select_page_size,
     )
 
-###############################################################################
-def build_postgres_create_database_sql(
-    database_name: str,
-) -> TextClause:
+
+def build_postgres_create_database_sql(database_name: str) -> TextClause:
     safe_database_name = validate_postgres_database_name(database_name)
     return sqlalchemy.text(
-        f"CREATE DATABASE \"{safe_database_name}\" WITH ENCODING 'UTF8' TEMPLATE template0"
+        f'CREATE DATABASE "{safe_database_name}" WITH ENCODING \'UTF8\' TEMPLATE template0'
     )
 
-###############################################################################
+
 def _seed_catalogs(
     serializer: ReferenceCatalogSerializer,
     force: bool = False,
@@ -113,7 +112,25 @@ def _seed_catalogs(
         entries_written=entries_written,
     )
 
-###############################################################################
+
+def _seed_repository_catalogs(
+    repository: SQLiteRepository | PostgresRepository,
+    *,
+    backend_label: str,
+    force: bool,
+) -> None:
+    serializer = ReferenceCatalogSerializer(session_factory=repository.session_factory)
+    result = _seed_catalogs(serializer, force=force)
+    logger.info(
+        "Catalog seeding completed for %s: seen=%s seeded=%s entries=%s",
+        backend_label,
+        result.manifests_seen,
+        result.manifests_seeded,
+        result.entries_written,
+    )
+    get_catalog_provider().invalidate()
+
+
 def initialize_sqlite_database(
     settings: DatabaseSettings,
     *,
@@ -121,45 +138,36 @@ def initialize_sqlite_database(
     seed_catalogs: bool = True,
     force_reseed_catalogs: bool = False,
 ) -> None:
-    repository = SQLiteRepository(settings)
-    if drop_existing:
-        Base.metadata.drop_all(repository.engine)
-    Base.metadata.create_all(repository.engine)
-    if seed_catalogs:
-        serializer = ReferenceCatalogSerializer(
-            session_factory=repository.session_factory
-        )
-        result = _seed_catalogs(serializer, force=force_reseed_catalogs)
-        logger.info(
-            "Catalog seeding completed for SQLite: seen=%s seeded=%s entries=%s",
-            result.manifests_seen,
-            result.manifests_seeded,
-            result.entries_written,
-        )
-        get_catalog_provider().invalidate()
-    logger.info("Initialized SQLite database schema at %s", repository.db_path)
-
-###############################################################################
-def initialize_sqlite_database_if_missing(settings: DatabaseSettings) -> bool:
     database_path = resolve_sqlite_database_path(settings)
-    if database_path.is_file():
-        logger.info(
-            "Skipping SQLite initialization because the database already exists at %s",
-            database_path,
+    database_was_missing = not database_path.is_file()
+    repository = SQLiteRepository(settings)
+    try:
+        migrate_database(
+            repository.engine,
+            database_was_empty=database_was_missing,
+            drop_existing=drop_existing,
         )
-        return False
+        if seed_catalogs:
+            _seed_repository_catalogs(
+                repository,
+                backend_label="SQLite",
+                force=force_reseed_catalogs,
+            )
+        logger.info("SQLite database is synchronized at %s", repository.db_path)
+    finally:
+        repository.engine.dispose()
 
-    initialize_sqlite_database(settings)
-    return True
 
-###############################################################################
-def ensure_postgres_database(
-    settings: DatabaseSettings,
-    *,
-    drop_existing: bool = False,
-    seed_catalogs: bool = True,
-    force_reseed_catalogs: bool = False,
-) -> str:
+def _is_missing_postgres_database(error: SQLAlchemyError) -> bool:
+    original = getattr(error, "orig", error)
+    state = getattr(original, "sqlstate", None) or getattr(original, "pgcode", None)
+    if state == "3D000":
+        return True
+    message = str(original).lower()
+    return "database" in message and "does not exist" in message
+
+
+def _create_postgres_database_if_missing(settings: DatabaseSettings) -> tuple[str, bool]:
     if not settings.host:
         raise ValueError("Database host is required for PostgreSQL initialization.")
     if not settings.username:
@@ -168,11 +176,26 @@ def ensure_postgres_database(
         raise ValueError("Database name is required for PostgreSQL initialization.")
 
     target_database = validate_postgres_database_name(settings.database_name)
-    connect_args = build_postgres_connect_args(settings)
+    normalized_settings = clone_settings_with_database(settings, target_database)
+    target_repository = PostgresRepository(normalized_settings)
+    try:
+        try:
+            with target_repository.engine.connect():
+                logger.info("PostgreSQL database %s is reachable", target_database)
+                return target_database, False
+        except SQLAlchemyError as exc:
+            if not _is_missing_postgres_database(exc):
+                raise
+            logger.info(
+                "PostgreSQL database %s is not available; attempting creation",
+                target_database,
+            )
+    finally:
+        target_repository.engine.dispose()
 
-    admin_url = build_postgres_url(settings, "postgres")
+    connect_args = build_postgres_connect_args(settings)
     admin_engine = sqlalchemy.create_engine(
-        admin_url,
+        build_postgres_url(settings, "postgres"),
         echo=False,
         future=True,
         connect_args=connect_args,
@@ -186,37 +209,92 @@ def ensure_postgres_database(
         .where(pg_database.c.datname == target_database)
         .limit(1)
     )
+    try:
+        with admin_engine.connect() as connection:
+            connection.execute(
+                sqlalchemy.text("SELECT pg_advisory_lock(:lock_key)"),
+                {"lock_key": POSTGRES_CREATE_DATABASE_LOCK_KEY},
+            )
+            try:
+                exists = connection.execute(exists_stmt).scalar()
+                if exists:
+                    logger.info(
+                        "PostgreSQL database %s was created by another initializer",
+                        target_database,
+                    )
+                    return target_database, False
+                connection.execute(build_postgres_create_database_sql(target_database))
+                logger.info("Created PostgreSQL database %s", target_database)
+                return target_database, True
+            finally:
+                connection.execute(
+                    sqlalchemy.text("SELECT pg_advisory_unlock(:lock_key)"),
+                    {"lock_key": POSTGRES_CREATE_DATABASE_LOCK_KEY},
+                )
+    finally:
+        admin_engine.dispose()
 
-    with admin_engine.connect() as conn:
-        exists = conn.execute(exists_stmt).scalar()
-        if exists:
-            logger.info("PostgreSQL database %s already exists", target_database)
-        else:
-            conn.execute(build_postgres_create_database_sql(target_database))
-            logger.info("Created PostgreSQL database %s", target_database)
 
+def ensure_postgres_database(
+    settings: DatabaseSettings,
+    *,
+    drop_existing: bool = False,
+    seed_catalogs: bool = True,
+    force_reseed_catalogs: bool = False,
+) -> str:
+    target_database, _ = _create_postgres_database_if_missing(settings)
     normalized_settings = clone_settings_with_database(settings, target_database)
     repository = PostgresRepository(normalized_settings)
-    if drop_existing:
-        Base.metadata.drop_all(repository.engine)
-    Base.metadata.create_all(repository.engine)
-    if seed_catalogs:
-        serializer = ReferenceCatalogSerializer(
-            session_factory=repository.session_factory
+    try:
+        migrate_database(
+            repository.engine,
+            database_was_empty=False,
+            drop_existing=drop_existing,
         )
-        result = _seed_catalogs(serializer, force=force_reseed_catalogs)
-        logger.info(
-            "Catalog seeding completed for PostgreSQL: seen=%s seeded=%s entries=%s",
-            result.manifests_seen,
-            result.manifests_seeded,
-            result.entries_written,
-        )
-        get_catalog_provider().invalidate()
-    logger.info("Ensured PostgreSQL tables exist in %s", target_database)
-
+        if seed_catalogs:
+            _seed_repository_catalogs(
+                repository,
+                backend_label="PostgreSQL",
+                force=force_reseed_catalogs,
+            )
+        logger.info("PostgreSQL database %s is synchronized", target_database)
+    finally:
+        repository.engine.dispose()
     return target_database
 
-###############################################################################
+
+def ensure_database_ready(settings: DatabaseSettings) -> bool:
+    """Synchronize startup schema and seed only a newly created database."""
+
+    if settings.backend == "sqlite":
+        database_path = resolve_sqlite_database_path(settings)
+        database_was_missing = not database_path.is_file()
+        initialize_sqlite_database(
+            settings,
+            seed_catalogs=database_was_missing,
+        )
+        return database_was_missing
+
+    if settings.backend != "postgresql":
+        raise ValueError(f"Unsupported database backend: {settings.backend}")
+
+    target_database, database_was_created = _create_postgres_database_if_missing(settings)
+    normalized_settings = clone_settings_with_database(settings, target_database)
+    repository = PostgresRepository(normalized_settings)
+    try:
+        migrate_database(repository.engine, database_was_empty=False)
+        if database_was_created:
+            _seed_repository_catalogs(
+                repository,
+                backend_label="PostgreSQL",
+                force=False,
+            )
+        logger.info("PostgreSQL database %s is synchronized", target_database)
+    finally:
+        repository.engine.dispose()
+    return database_was_created
+
+
 def run_database_initialization(
     *,
     drop_existing: bool = False,
@@ -224,28 +302,28 @@ def run_database_initialization(
     force_reseed_catalogs: bool = False,
 ) -> None:
     settings = get_server_settings().database
-    init_kwargs = {
-        "drop_existing": drop_existing,
-        "seed_catalogs": seed_catalogs,
-        "force_reseed_catalogs": force_reseed_catalogs,
-    }
     if settings.backend == "sqlite":
-        logger.info("Running SQLite initialization path.")
-        initialize_sqlite_database(settings, **init_kwargs)
+        logger.info("Running SQLite Alembic initialization path")
+        initialize_sqlite_database(
+            settings,
+            drop_existing=drop_existing,
+            seed_catalogs=seed_catalogs,
+            force_reseed_catalogs=force_reseed_catalogs,
+        )
         return
 
-    logger.info("Running PostgreSQL initialization path (manual trigger expected).")
+    logger.info("Running PostgreSQL Alembic initialization path")
     engine_name = normalize_postgres_engine(settings.engine).lower()
-    if engine_name not in {
-        "postgres",
-        "postgresql",
-        "postgresql+psycopg",
-    }:
+    if engine_name not in {"postgres", "postgresql", "postgresql+psycopg"}:
         raise ValueError(f"Unsupported database engine: {settings.engine}")
+    ensure_postgres_database(
+        settings,
+        drop_existing=drop_existing,
+        seed_catalogs=seed_catalogs,
+        force_reseed_catalogs=force_reseed_catalogs,
+    )
 
-    ensure_postgres_database(settings, **init_kwargs)
 
-###############################################################################
 def initialize_database(
     drop_existing: bool = False,
     seed_catalogs: bool = True,
@@ -257,7 +335,7 @@ def initialize_database(
             seed_catalogs=seed_catalogs,
             force_reseed_catalogs=force_reseed_catalogs,
         )
-    except (SQLAlchemyError, ValueError) as exc:
+    except (MigrationError, SQLAlchemyError, ValueError) as exc:
         logger.error("Database initialization failed: %s", exc)
         raise SystemExit(1) from exc
     except Exception as exc:

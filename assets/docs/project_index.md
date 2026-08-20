@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-08-19
+Last updated: 2026-08-20
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.

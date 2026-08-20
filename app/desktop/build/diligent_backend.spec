@@ -35,6 +35,21 @@ for package in native_packages:
     binaries.extend(collect_dynamic_libs(package))
     datas.extend(collect_data_files(package))
 
+migrations_root = server_root / "migrations"
+for migration_file in migrations_root.rglob("*"):
+    relative_path = migration_file.relative_to(migrations_root)
+    if (
+        migration_file.is_file()
+        and "__pycache__" not in relative_path.parts
+        and migration_file.suffix not in {".pyc", ".pyo"}
+    ):
+        datas.append(
+            (
+                str(migration_file),
+                str(Path("migrations") / relative_path.parent),
+            )
+        )
+
 excludedimports = [
     "pytest", "pytest_cov", "playwright", "ruff", "pyright", "IPython",
     "notebook", "pip", "setuptools", "wheel", "torch", "transformers",
