@@ -54,10 +54,10 @@ def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
-        service.session_repository.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     monkeypatch.setattr(
-        service.session_repository.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
     )
     request = ClinicalSessionRequest(
         clinical_input=(

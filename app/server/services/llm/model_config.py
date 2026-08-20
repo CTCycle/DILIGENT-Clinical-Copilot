@@ -243,14 +243,14 @@ class ModelConfigService:
         refresh_from_ollama: bool,
     ) -> set[str]:
         local_model_names = self.known_local_model_names()
-        if snapshot.clinical_model:
-            local_model_names.add(snapshot.clinical_model)
-        if snapshot.text_extraction_model:
-            local_model_names.add(snapshot.text_extraction_model)
-        if snapshot.revision_model:
-            local_model_names.add(snapshot.revision_model)
-        if snapshot.timeline_model:
-            local_model_names.add(snapshot.timeline_model)
+        for model_name in (
+            snapshot.clinical_model,
+            snapshot.text_extraction_model,
+            snapshot.revision_model,
+            snapshot.timeline_model,
+        ):
+            if model_name:
+                local_model_names.add(model_name)
         if not refresh_from_ollama:
             return local_model_names
         available_models = await self.list_available_ollama_models()
@@ -345,53 +345,23 @@ class ModelConfigService:
         active_cloud_model: str | None,
         updates: dict[str, Any],
     ) -> None:
-        if "clinical_model" in fields_set:
-            clinical_model = self.resolve_role_model_selection(
-                role_name="clinical",
-                model_name=self.normalize_optional_text(payload.clinical_model),
+        for field_name, role_name in (
+            ("clinical_model", "clinical"),
+            ("text_extraction_model", "text_extraction"),
+            ("revision_model", "revision"),
+            ("timeline_model", "timeline"),
+        ):
+            if field_name not in fields_set:
+                continue
+            updates[field_name] = self.resolve_role_model_selection(
+                role_name=role_name,
+                model_name=self.normalize_optional_text(getattr(payload, field_name)),
                 local_model_names=local_model_names,
                 available_local_model_names=available_local_model_names,
                 use_cloud_models=use_cloud_models,
                 cloud_provider=cloud_provider,
                 active_cloud_model=active_cloud_model,
             )
-            updates["clinical_model"] = clinical_model
-
-        if "text_extraction_model" in fields_set:
-            text_extraction_model = self.resolve_role_model_selection(
-                role_name="text_extraction",
-                model_name=self.normalize_optional_text(payload.text_extraction_model),
-                local_model_names=local_model_names,
-                available_local_model_names=available_local_model_names,
-                use_cloud_models=use_cloud_models,
-                cloud_provider=cloud_provider,
-                active_cloud_model=active_cloud_model,
-            )
-            updates["text_extraction_model"] = text_extraction_model
-
-        if "revision_model" in fields_set:
-            revision_model = self.resolve_role_model_selection(
-                role_name="revision",
-                model_name=self.normalize_optional_text(payload.revision_model),
-                local_model_names=local_model_names,
-                available_local_model_names=available_local_model_names,
-                use_cloud_models=use_cloud_models,
-                cloud_provider=cloud_provider,
-                active_cloud_model=active_cloud_model,
-            )
-            updates["revision_model"] = revision_model
-
-        if "timeline_model" in fields_set:
-            timeline_model = self.resolve_role_model_selection(
-                role_name="timeline",
-                model_name=self.normalize_optional_text(payload.timeline_model),
-                local_model_names=local_model_names,
-                available_local_model_names=available_local_model_names,
-                use_cloud_models=use_cloud_models,
-                cloud_provider=cloud_provider,
-                active_cloud_model=active_cloud_model,
-            )
-            updates["timeline_model"] = timeline_model
 
     # -------------------------------------------------------------------------
     def _collect_cloud_model_updates(
