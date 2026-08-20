@@ -159,32 +159,27 @@ class JobManager:
             state = self.jobs.get(job_id)
         if state is None:
             return None
-        if state.status not in ("pending", "running"):
-            return None
-        if state.status == "pending":
-            state.update(
-                stop_requested=True, status="cancelled", completed_at=monotonic()
-            )
-            logger.info("Cancelled pending job %s", job_id)
-            return state.snapshot()
+        already_requested = False
+        was_pending = False
         with state.lock:
-            state.stop_requested = True
-            state.status = "cancelled"
-            state.completed_at = monotonic()
-            state.version += 1
-            snapshot = {
-                "job_id": state.job_id,
-                "job_type": state.job_type,
-                "status": state.status,
-                "progress": state.progress,
-                "result": state.result,
-                "error": state.error,
-                "created_at": state.created_at,
-                "completed_at": state.completed_at,
-                "version": state.version,
-            }
-        logger.info("Cancellation requested for job %s", job_id)
-        return snapshot
+            if state.status not in ("pending", "running"):
+                return None
+            if state.stop_requested:
+                already_requested = True
+            else:
+                state.stop_requested = True
+                state.version += 1
+                if state.status == "pending":
+                    was_pending = True
+                    state.status = "cancelled"
+                    state.completed_at = monotonic()
+        if already_requested:
+            return state.snapshot()
+        if was_pending:
+            logger.info("Cancelled pending job %s", job_id)
+        else:
+            logger.info("Cancellation requested for job %s", job_id)
+        return state.snapshot()
 
     # -------------------------------------------------------------------------
     def is_job_running(
@@ -192,8 +187,6 @@ class JobManager:
     ) -> bool:
         with self.lock:
             for state in self.jobs.values():
-                if state.stop_requested:
-                    continue
                 if state.status in ("pending", "running"):
                     if job_type is not None and state.job_type != job_type:
                         continue
@@ -209,8 +202,6 @@ class JobManager:
         with self.lock:
             states = list(self.jobs.values())
         for state in states:
-            if state.stop_requested:
-                continue
             if state.job_type != job_type:
                 continue
             if scope_key is not None and state.scope_key != scope_key:

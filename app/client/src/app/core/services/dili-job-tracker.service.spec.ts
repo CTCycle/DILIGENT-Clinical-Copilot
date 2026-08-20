@@ -147,4 +147,44 @@ describe('DiliJobTrackerService', () => {
 
     tracker.clearJobState();
   });
+
+  it('keeps a stop-requested worker active while waiting for shutdown', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          job_id: 'job-cancelling',
+          job_type: 'clinical',
+          status: 'running',
+          stop_requested: true,
+          progress: 48,
+          result: null,
+          error: null,
+          version: 4,
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    );
+
+    appState.updateDiliAgent({
+      jobId: 'job-cancelling',
+      jobStatus: 'running',
+      isStarting: false,
+      isRunning: true,
+      jobStartedAtMs: Date.now() - 5_000,
+      jobLastProgressAtMs: Date.now() - 5_000,
+      pollIntervalMs: 250,
+    });
+
+    const tracker = TestBed.inject(DiliJobTrackerService);
+    await flushAsyncWork();
+
+    expect(appState.state().diliAgent.jobStatus).toBe('running');
+    expect(appState.state().diliAgent.isRunning).toBeTruthy();
+    expect(appState.state().diliAgent.message).toContain('Waiting for worker shutdown');
+
+    tracker.clearJobState();
+  });
 });

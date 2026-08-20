@@ -23,6 +23,7 @@ class JobStatusResponse(BaseModel):
     created_at: float | None = None
     completed_at: float | None = None
     version: int | None = None
+    stop_requested: bool = False
 
 ###############################################################################
 class JobListResponse(BaseModel):

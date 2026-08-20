@@ -51,6 +51,7 @@ class JobState:
                 "completed_at": self.completed_at,
                 "last_activity_at": self.last_activity_at,
                 "version": self.version,
+                "stop_requested": self.stop_requested,
             }
 
     # -------------------------------------------------------------------------
@@ -70,4 +71,5 @@ class JobState:
                 created_at=self.created_at,
                 completed_at=self.completed_at,
                 version=self.version,
+                stop_requested=self.stop_requested,
             )
