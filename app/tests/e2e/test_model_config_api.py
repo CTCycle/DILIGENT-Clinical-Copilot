@@ -18,6 +18,8 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
     assert "cloud_model" in payload
     assert "clinical_model" in payload
     assert "text_extraction_model" in payload
+    assert "revision_model" in payload
+    assert "timeline_model" in payload
     assert payload["local_catalog"]["status"] in {
         "available",
         "cached",

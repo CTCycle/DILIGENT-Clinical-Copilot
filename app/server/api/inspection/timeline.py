@@ -57,7 +57,6 @@ class InspectionTimelineEndpoint(InspectionJobEndpointMixin):
             payload = self.service.start_session_timeline_job(
                 session_id,
                 force_regenerate=bool(request.force_regenerate),
-                model_overrides=request.model_overrides,
             )
         except KeyError as exc:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.") from exc

@@ -67,11 +67,8 @@ def _safe_json(value: Any, limit: int = MAX_JSON_CHARS) -> str:
 
 ###############################################################################
 def resolve_revision_agent_runtime(
-    model_overrides: dict[str, Any] | None,
 ) -> RevisionAgentRuntime:
-    overrides = dict(model_overrides or {})
-    with LLMRuntimeConfig.override_for_run(overrides):
-        provider, model = LLMRuntimeConfig.resolve_provider_and_model("clinical")
+    provider, model = LLMRuntimeConfig.resolve_provider_and_model("revision")
     return RevisionAgentRuntime(
         provider=provider,
         model=model,
@@ -167,7 +164,7 @@ class RevisionAgentRunner:
         model_configuration: dict[str, Any],
     ) -> dict[str, Any]:
         del job_id
-        runtime = resolve_revision_agent_runtime(request.model_overrides)
+        runtime = resolve_revision_agent_runtime()
         user_prompt = build_revision_agent_user_prompt(
             session=session,
             request=request,
@@ -294,7 +291,7 @@ class RevisionAgentRunner:
         model_configuration: dict[str, Any],
     ) -> dict[str, Any]:
         del job_id
-        runtime = resolve_revision_agent_runtime(request.model_overrides)
+        runtime = resolve_revision_agent_runtime()
         lineage = self.session_revision_repository.list_session_versions(int(session["session_id"]))
         context = build_revision_context(
             session=session,
