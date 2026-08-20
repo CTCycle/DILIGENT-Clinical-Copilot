@@ -1,29 +1,29 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
-from sqlalchemy import create_engine
-
+from common.prompts.revision_agent import editor_prompt
 from domain.inspection import (
     RevisionAgentToolCall,
     RevisionIssueScanResult,
     SessionRevisionRequest,
 )
+from pydantic import ValidationError
 from repositories.schemas.base import Base
 from repository_fixtures import build_repository_graph
 from services.inspection.revision_agent import (
     RevisionAgentRunner,
     build_revision_agent_user_prompt,
 )
-from common.prompts.revision_agent import editor_prompt
 from services.inspection.revision_scaffold import SessionRevisionConflictError
 from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
+from sqlalchemy import create_engine
+
 
 ###############################################################################
 def build_file_serializer(tmp_path: Path) -> Any:
@@ -38,7 +38,7 @@ def save_revision_source_session(serializer: Any) -> int:
     session_id = serializer.clinical_session_repository.save_clinical_session(
         {
             "patient_name": "Revision Patient",
-            "session_timestamp": datetime(2026, 1, 15, 10, 0),
+            "session_timestamp": datetime(2026, 1, 15, 10, 0, tzinfo=UTC),
             "session_status": "successful",
             "anamnesis": "Patient has jaundice after antibiotic exposure.",
             "drugs": "Amoxicillin started 2026-01-01.",
@@ -423,7 +423,8 @@ def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
         status="failed",
     )
 
-    assert serializer.clinical_session_repository.delete_session(session_id) is True
+    inspection_service = build_service(serializer, JobManager())
+    assert inspection_service.delete_session(session_id) is True
     assert serializer.clinical_session_repository.get_session_detail(session_id) is None
     assert serializer.session_revision_repository.get_revision_run(pipeline_run_id) is None
 

@@ -45,7 +45,7 @@ class DrugResolutionService:
         for mention in mentions:
             cached = self._try_cache(mention)
             if cached is not None:
-                resolved[cached["lookup_key"]] = self._merge_payload(
+                resolved[cached["lookup_key"]] = self.merge_payload(
                     resolved.get(cached["lookup_key"]),
                     cached,
                 )
@@ -74,7 +74,7 @@ class DrugResolutionService:
                 matched_row=matched_row,
                 excerpts=excerpts,
             )
-            resolved[payload["lookup_key"]] = self._merge_payload(
+            resolved[payload["lookup_key"]] = self.merge_payload(
                 resolved.get(payload["lookup_key"]),
                 payload,
             )
@@ -207,7 +207,7 @@ class DrugResolutionService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _merge_payload(
+    def merge_payload(
         existing: dict[str, Any] | None,
         incoming: dict[str, Any],
     ) -> dict[str, Any]:
