@@ -145,3 +145,29 @@ def test_ollama_client_forwards_generation_purpose_to_structured_models(
 
     assert result == {"ok": True}
     assert captured["purpose"] is GenerationPurpose.STRUCTURED_EXTRACTION
+
+###############################################################################
+def test_ollama_client_forwards_generation_purpose_to_structured_chat(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_chat(_client, **kwargs):
+        captured.update(kwargs)
+        return "{\"ok\": true}"
+
+    monkeypatch.setattr(ollama_structured, "_chat_structured_model", fake_chat)
+
+    client = OllamaClient.__new__(OllamaClient)
+    result = asyncio.run(
+        client._chat_structured_model(
+            active_model="gpt-oss:20b",
+            messages=[],
+            use_json_mode=True,
+            temperature=0.0,
+            purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
+        )
+    )
+
+    assert result == '{"ok": true}'
+    assert captured["purpose"] is GenerationPurpose.STRUCTURED_EXTRACTION
