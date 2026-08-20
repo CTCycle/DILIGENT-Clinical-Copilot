@@ -8,8 +8,9 @@ from common.catalogs.model_choices import (
     get_text_extraction_model_choices,
 )
 from common.utils.logger import logger
-from services.llm.runtime_config import LLMRuntimeConfig
+from services.llm.generation_policy import GenerationPurpose
 from services.llm.ollama_runtime import OllamaError
+from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.structured import (
     StructuredOutputParser,
     T,
@@ -48,6 +49,7 @@ async def llm_structured_call(
     schema: type[T],
     temperature: float = 0.0,
     use_json_mode: bool = True,
+    purpose: GenerationPurpose = GenerationPurpose.STRUCTURED_EXTRACTION,
     max_repair_attempts: int = 2,
 ) -> T:
     """
@@ -78,6 +80,7 @@ async def llm_structured_call(
         preferred=preferred,
         temperature=temperature,
         use_json_mode=use_json_mode,
+        purpose=purpose,
         max_repair_attempts=max_repair_attempts,
     )
 
@@ -141,6 +144,7 @@ async def _chat_structured_model(
     messages: list[dict[str, str]],
     use_json_mode: bool,
     temperature: float,
+    purpose: GenerationPurpose,
 ) -> dict[str, Any] | str:
     try:
         return await self.chat(
@@ -148,6 +152,7 @@ async def _chat_structured_model(
             messages=messages,
             format="json" if use_json_mode else None,
             temperature=temperature,
+            purpose=purpose,
         )
     except OllamaError as err:
         if self.is_missing_model_error(err):
@@ -258,6 +263,7 @@ async def call_with_structured_models(
     preferred: list[str],
     temperature: float,
     use_json_mode: bool,
+    purpose: GenerationPurpose,
     max_repair_attempts: int,
 ) -> T:
     queue = preferred.copy()
@@ -278,6 +284,7 @@ async def call_with_structured_models(
                 messages=messages,
                 use_json_mode=use_json_mode,
                 temperature=temperature,
+                purpose=purpose,
             )
         except OllamaError as e:
             missing.append(active_model)
@@ -342,6 +349,7 @@ async def parse_with_repairs(
                     messages=repair_messages,
                     format="json" if use_json_mode else None,
                     temperature=0.0,
+                    purpose=GenerationPurpose.JSON_REPAIR,
                 )
                 text = self._coerce_llm_text(raw)
 
