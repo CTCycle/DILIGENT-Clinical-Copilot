@@ -7,7 +7,7 @@ import {
   InspectionSessionQuery,
   ManualReportEditRequest,
   ManualReportEditResponse,
-} from "../models/types";
+} from "../models/inspection-types";
 import { buildQueryString, requestJson } from "./http-api";
 
 export async function fetchInspectionSessions(

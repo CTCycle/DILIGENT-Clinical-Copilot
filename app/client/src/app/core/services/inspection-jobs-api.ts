@@ -6,9 +6,8 @@ import {
   InspectionUpdateConfigResponse,
   InspectionUpdateJobListResponse,
   InspectionUpdateJobStatusResponse,
-  JobCancelResponse,
-  JobStartResponse,
-} from "../models/types";
+} from "../models/inspection-types";
+import { JobCancelResponse, JobStartResponse } from "../models/types";
 import { requestJson } from "./http-api";
 
 const INSPECTION_JOB_STATUS_TIMEOUT_SECONDS = 20;

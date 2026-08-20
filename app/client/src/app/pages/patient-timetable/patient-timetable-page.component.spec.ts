@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
-import { InspectionSessionTimeline } from '../../core/models/types';
+import { InspectionSessionTimeline } from '../../core/models/inspection-types';
 import { PatientTimetablePageComponent } from './patient-timetable-page.component';
 import { createTimelineScale, normalizeTimelineDate } from './timeline-date';
 
