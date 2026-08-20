@@ -3354,10 +3354,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-modal {
   max-width: 760px;
+  overflow: hidden;
 }
 
 .inspection-modal-large {
   max-width: 920px;
+}
+
+.inspection-modal .modal-body {
+  min-height: 0;
 }
 
 .inspection-update-modal {
