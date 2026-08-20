@@ -149,10 +149,16 @@ class DataInspectionService(
         *,
         version_id: int,
     ) -> dict[str, Any] | None:
-        return self.session_revision_repository.get_session_version_detail(
+        detail = self.session_revision_repository.get_session_version_detail(
             session_id,
             version_id=version_id,
         )
+        if detail is None:
+            return None
+        detail["session"] = self.clinical_session_repository.get_session_detail(
+            session_id
+        )
+        return detail
 
     # -------------------------------------------------------------------------
     def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
@@ -179,8 +185,10 @@ class DataInspectionService(
                 edited_by=edited_by,
                 metadata=metadata,
             )
-            return updated["session"] if isinstance(updated, dict) else None
-        return self.session_revision_repository.update_session_metadata(
+            if updated is None:
+                return None
+            return self.clinical_session_repository.get_session_detail(session_id)
+        return self.clinical_session_repository.update_session_metadata(
             session_id,
             metadata=metadata,
         )
@@ -196,7 +204,7 @@ class DataInspectionService(
         edited_by: str | None,
         metadata: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
-        return self.session_revision_repository.update_current_report_text_with_manual_audit(
+        updated = self.session_revision_repository.update_current_report_text_with_manual_audit(
             session_id,
             report_text=report_text,
             edited_fields=edited_fields,
@@ -204,6 +212,12 @@ class DataInspectionService(
             edited_by=edited_by,
             metadata=metadata,
         )
+        if updated is None:
+            return None
+        session = self.clinical_session_repository.get_session_detail(session_id)
+        if session is None:
+            return None
+        return {"session": session, "audit": updated["audit"]}
 
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:

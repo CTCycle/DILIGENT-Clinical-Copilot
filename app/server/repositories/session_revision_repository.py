@@ -8,7 +8,6 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from repositories import values as repository_values
-from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.context import RepositoryContext
 from repositories.schemas.clinical import (
     ClinicalSession,
@@ -46,12 +45,10 @@ class SessionRevisionRepository:
     def __init__(
         self,
         context: RepositoryContext,
-        clinical_session_repository: ClinicalSessionRepository,
     ) -> None:
         self.context = context
         self.engine = context.engine
         self.session_factory = context.session_factory
-        self.clinical_session_repository = clinical_session_repository
 
     # -------------------------------------------------------------------------
     def _root_session_id(self, db_session: Session, session_id: int) -> int | None:
@@ -62,6 +59,16 @@ class SessionRevisionRepository:
             .limit(1)
         ).scalar_one_or_none()
         return int(root) if root is not None else int(session_id)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _next_session_version(db_session: Session, root_session_id: int) -> int:
+        maximum = db_session.execute(
+            select(func.max(ClinicalSessionVersion.version_number)).where(
+                ClinicalSessionVersion.root_session_id == int(root_session_id)
+            )
+        ).scalar_one_or_none()
+        return int(maximum or 1) + 1
 
     # -------------------------------------------------------------------------
     def _manual_edit_row(self, row: ClinicalSessionVersion) -> dict[str, Any]:
@@ -104,14 +111,7 @@ class SessionRevisionRepository:
             row = db_session.get(ClinicalSessionVersion, int(version_id))
             if row is None or int(row.root_session_id) != root_session_id:
                 return None
-            return {
-                "version": serialize_version_row(row),
-                "session": (
-                    self.clinical_session_repository.get_session_detail(int(row.session_id))
-                    if row.session_id
-                    else None
-                ),
-            }
+            return {"version": serialize_version_row(row)}
 
     # -------------------------------------------------------------------------
     def get_version_record_for_session(self, session_id: int) -> dict[str, Any] | None:
@@ -132,12 +132,7 @@ class SessionRevisionRepository:
     # -------------------------------------------------------------------------
     def get_next_session_version(self, root_session_id: int) -> int:
         with self.session_factory() as db_session:
-            maximum = db_session.execute(
-                select(func.max(ClinicalSessionVersion.version_number)).where(
-                    ClinicalSessionVersion.root_session_id == int(root_session_id)
-                )
-            ).scalar_one_or_none()
-            return int(maximum or 1) + 1
+            return self._next_session_version(db_session, root_session_id)
 
     # -------------------------------------------------------------------------
     def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
@@ -201,11 +196,6 @@ class SessionRevisionRepository:
                 for field in (edited_fields or ["report_text"])
                 if isinstance(field, str) and field.strip()
             ] or ["report_text"]
-            max_version = db_session.execute(
-                select(func.max(ClinicalSessionVersion.version_number)).where(
-                    ClinicalSessionVersion.root_session_id == int(current.root_session_id)
-                )
-            ).scalar_one_or_none()
             current.version_status = "superseded"
             audit_payload = {
                 "manual_edit_audit": {
@@ -226,7 +216,9 @@ class SessionRevisionRepository:
                     session_id=safe_session_id,
                     root_session_id=int(current.root_session_id),
                     source_version_id=int(current.id),
-                    version_number=int(max_version or current.version_number) + 1,
+                    version_number=self._next_session_version(
+                        db_session, int(current.root_session_id)
+                    ),
                     version_status="current",
                     revision_kind="manual_edit",
                     llm_qa_status="not_run",
@@ -239,12 +231,7 @@ class SessionRevisionRepository:
             )
             db_session.commit()
         audits = self.list_manual_report_edits(safe_session_id)
-        return {
-            "session": self.clinical_session_repository.get_session_detail(
-                safe_session_id
-            ),
-            "audit": audits[0],
-        }
+        return {"audit": audits[0]}
 
     # -------------------------------------------------------------------------
     def create_revision_version_shell(
@@ -273,16 +260,13 @@ class SessionRevisionRepository:
             ).scalar_one_or_none()
             if existing is not None:
                 return serialize_version_row(existing)
-            maximum = db_session.execute(
-                select(func.max(ClinicalSessionVersion.version_number)).where(
-                    ClinicalSessionVersion.root_session_id == int(source.root_session_id)
-                )
-            ).scalar_one_or_none()
             shell = ClinicalSessionVersion(
                 session_id=None,
                 root_session_id=int(source.root_session_id),
                 source_version_id=int(source.id),
-                version_number=int(maximum or 1) + 1,
+                version_number=self._next_session_version(
+                    db_session, int(source.root_session_id)
+                ),
                 version_status="draft_revision",
                 revision_kind="llm_assisted_revision",
                 llm_qa_status="pending",
@@ -686,14 +670,3 @@ class SessionRevisionRepository:
             db_session.commit()
             db_session.refresh(row)
             return serialize_version_row(row)
-
-    # -------------------------------------------------------------------------
-    def update_session_metadata(self, session_id: int, *, metadata: dict[str, Any] | None) -> dict[str, Any] | None:
-        with self.session_factory() as db_session:
-            session = db_session.get(ClinicalSession, int(session_id))
-            if session is None:
-                return None
-            if metadata is not None:
-                session.metadata_json = serialize_json_payload(metadata or {})
-            db_session.commit()
-        return self.clinical_session_repository.get_session_detail(int(session_id))
