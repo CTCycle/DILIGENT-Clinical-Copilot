@@ -18,7 +18,7 @@ import {
   startInspectionLiverToxUpdateJob,
   startInspectionRagUpdateJob,
   startInspectionRxNavUpdateJob,
-} from '../services/inspection-api';
+} from '../services/inspection-jobs-api';
 import { resolvePollIntervalMs } from '../services/clinical-api';
 import { JobPollingService } from '../services/job-polling.service';
 
