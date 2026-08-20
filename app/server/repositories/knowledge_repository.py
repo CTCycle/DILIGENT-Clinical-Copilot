@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -10,11 +11,17 @@ from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from common.constants import (
+    DRUG_NAME_ALLOWED_PATTERN,
     LIVERTOX_COLUMNS,
     LIVERTOX_MASTER_COLUMNS,
     LIVERTOX_REQUIRED_COLUMNS,
 )
-from common.utils.text_utils import coerce_text, normalize_drug_name
+from common.utils.text_utils import (
+    coerce_text,
+    normalize_drug_name,
+    parse_synonym_list,
+    split_synonym_variants,
+)
 from configurations.startup import get_server_settings
 from repositories import values as repository_values
 from repositories.context import RepositoryContext
@@ -23,12 +30,12 @@ from repositories.database.upsert import (
     upsert_drug_aliases,
     upsert_livertox_monographs,
 )
-from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.queries.drugs import DrugRepositoryQueries
 from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
     KbMatchCache,
+    DrugRxnormCode,
     LiverToxMonograph,
 )
 
@@ -36,11 +43,8 @@ from repositories.schemas.knowledge import (
 class KnowledgeRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(
-        self, context: RepositoryContext, drug_catalog_repository: DrugCatalogRepository
-    ) -> None:
+    def __init__(self, context: RepositoryContext) -> None:
         self.context = context
-        self.drug_catalog_repository = drug_catalog_repository
         self.engine = context.engine
         self.session_factory = context.session_factory
 
@@ -331,7 +335,12 @@ class KnowledgeRepository:
             cache.invalidated_at = datetime.now(UTC)
             cache.invalidation_reason = "matched_drug_deleted"
             return None
-        if cache.rxnorm_rxcui and self.drug_catalog_repository.get_drug_by_rxcui(db_session, cache.rxnorm_rxcui) is None:
+        if cache.rxnorm_rxcui and db_session.execute(
+            select(Drug)
+            .join(DrugRxnormCode, DrugRxnormCode.drug_id == Drug.id)
+            .where(DrugRxnormCode.rxcui == cache.rxnorm_rxcui)
+            .limit(1)
+        ).scalars().first() is None:
             cache.invalidated_at = datetime.now(UTC)
             cache.invalidation_reason = "rxnorm_code_no_longer_resolves"
             return None
@@ -563,11 +572,33 @@ class KnowledgeRepository:
 
     # -------------------------------------------------------------------------
     def extract_text_candidates(self, value: Any) -> list[str]:
-        return self.drug_catalog_repository.extract_text_candidates(value)
+        collected: list[str] = []
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, str):
+                    collected.extend(split_synonym_variants(item))
+        else:
+            text_value = repository_values.normalize_string(value)
+            if text_value is not None:
+                collected.extend(split_synonym_variants(text_value))
+        return self.unique_text(collected)
 
     # -------------------------------------------------------------------------
     def extract_synonym_candidates(self, value: Any) -> list[str]:
-        return self.drug_catalog_repository.extract_synonym_candidates(value)
+        collected: list[str] = []
+        for item in parse_synonym_list(value):
+            collected.extend(split_synonym_variants(item))
+        return self.unique_text(collected)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def unique_text(values: list[str]) -> list[str]:
+        unique: dict[str, str] = {}
+        for value in values:
+            normalized = repository_values.normalize_string(value)
+            if normalized is not None:
+                unique.setdefault(normalized.casefold(), normalized)
+        return list(unique.values())
 
     # -------------------------------------------------------------------------
     def group_aliases_by_kind(self, aliases: list[DrugAlias]) -> dict[str, set[str]]:
@@ -639,5 +670,5 @@ class KnowledgeRepository:
         return (
             ingestion.drug_name_min_length <= len(value) <= ingestion.drug_name_max_length
             and len(value.split()) <= ingestion.drug_name_max_tokens
-            and self.drug_catalog_repository.is_valid_drug_name(value)
+            and re.fullmatch(DRUG_NAME_ALLOWED_PATTERN, value.strip()) is not None
         )

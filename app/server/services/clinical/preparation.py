@@ -496,7 +496,7 @@ RxNav and LiverTox evidence before accepting it.
             )
             self.livertox_matcher = None
             return False
-        catalog_stream = self.knowledge_repository.drug_catalog_repository.stream_drugs_catalog()
+        catalog_stream = self.drug_catalog_repository.stream_drugs_catalog()
         try:
             self.livertox_matcher = await asyncio.to_thread(
                 LiverToxMatcher,

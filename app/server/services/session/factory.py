@@ -14,6 +14,8 @@ from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.parser import DrugsParser
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.clinical.rucam import RucamScoreEstimator
+from services.llm.model_config import ModelConfigService
+from repositories.serialization.model_configs import ModelConfigSerializer
 from services.runtime.jobs import JobManager
 from services.session.payload import PayloadSanitizationService
 from services.session.session_service import ClinicalSessionService
@@ -24,7 +26,7 @@ def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionSe
     disease_timeout_s = float(get_server_settings().runtime.disease_llm_timeout)
     context = RepositoryContext.create()
     drug_catalog_repository = DrugCatalogRepository(context)
-    knowledge_repository = KnowledgeRepository(context, drug_catalog_repository)
+    knowledge_repository = KnowledgeRepository(context)
     session_repository = ClinicalSessionRepository(
         context, drug_catalog_repository, knowledge_repository
     )
@@ -35,6 +37,8 @@ def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionSe
         pattern_analyzer=HepatotoxicityPatternAnalyzer(),
         rucam_estimator=RucamScoreEstimator(),
         session_repository=session_repository,
+        drug_catalog_repository=drug_catalog_repository,
+        knowledge_repository=knowledge_repository,
         payload_sanitizer=PayloadSanitizationService(),
         input_preparator=ClinicalKnowledgePreparation(
             knowledge_repository=knowledge_repository,
@@ -42,4 +46,5 @@ def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionSe
         ),
         hepatox_consultation_cls=HepatoxConsultation,
         job_manager=job_manager,
+        model_config_service=ModelConfigService(serializer=ModelConfigSerializer()),
     )

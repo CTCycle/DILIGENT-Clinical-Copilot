@@ -14,6 +14,7 @@ from services.session.preflight import (
     validate_clinical_input_preflight,
 )
 
+
 ###############################################################################
 def test_blocking_issue_is_enriched_with_modal_metadata() -> None:
     issue = _present_preflight_issue(
@@ -54,12 +55,12 @@ def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
         apply_persisted_runtime_configuration=lambda: None,
         session_repository=SimpleNamespace(
             session_factory=lambda: nullcontext(SimpleNamespace(connection=lambda: None)),
-            knowledge_repository=SimpleNamespace(
-                list_livertox_catalog=lambda **kwargs: ([{"id": 1}], 1),
-            ),
-            drug_catalog_repository=SimpleNamespace(
-                list_rxnav_catalog=lambda **kwargs: ([{"id": 1}], 1),
-            ),
+        ),
+        knowledge_repository=SimpleNamespace(
+            list_livertox_catalog=lambda **kwargs: ([{"id": 1}], 1),
+        ),
+        drug_catalog_repository=SimpleNamespace(
+            list_rxnav_catalog=lambda **kwargs: ([{"id": 1}], 1),
         ),
         serializer=SimpleNamespace(
             list_livertox_catalog=lambda **kwargs: ([{"id": 1}], 1),
@@ -94,6 +95,8 @@ def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
             selected_model_providers=["ollama"],
             use_rag=True,
         ),
+        knowledge_repository=service.knowledge_repository,
+        drug_catalog_repository=service.drug_catalog_repository,
     )
 
     rag_issue = next(

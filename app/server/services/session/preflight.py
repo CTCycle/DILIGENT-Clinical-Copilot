@@ -15,6 +15,8 @@ from domain.clinical.robustness import (
     ClinicalInputPreflightIssue,
     ClinicalInputPreflightResult,
 )
+from repositories.drug_catalog_repository import DrugCatalogRepository
+from repositories.knowledge_repository import KnowledgeRepository
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.llm.provider_factory import select_llm_provider
 from services.llm.provider_registry import provider_registry
@@ -148,6 +150,9 @@ async def check_parser_batch_capacity(
 def validate_clinical_input_preflight(
     service: Any,
     request_payload: ClinicalSessionRequest,
+    *,
+    knowledge_repository: KnowledgeRepository,
+    drug_catalog_repository: DrugCatalogRepository,
 ) -> ClinicalInputPreflightResult:
     blocking: list[ClinicalInputPreflightIssue] = []
     non_blocking: list[ClinicalInputPreflightIssue] = []
@@ -180,7 +185,9 @@ def validate_clinical_input_preflight(
                 field="clinical_input",
             )
         )
-    _validate_knowledge_bases(service, blocking)
+    _validate_knowledge_bases(
+        knowledge_repository, drug_catalog_repository, blocking
+    )
     if not clinical_input:
         return _result(
             blocking,
@@ -412,16 +419,17 @@ def validate_clinical_input_preflight(
 
 ###############################################################################
 def _validate_knowledge_bases(
-    service: Any,
+    knowledge_repository: KnowledgeRepository,
+    drug_catalog_repository: DrugCatalogRepository,
     blocking: list[ClinicalInputPreflightIssue],
 ) -> None:
     try:
-        livertox_rows, _ = service.session_repository.knowledge_repository.list_livertox_catalog(
+        livertox_rows, _ = knowledge_repository.list_livertox_catalog(
             search=None,
             offset=0,
             limit=1,
         )
-        rxnav_rows, _ = service.session_repository.drug_catalog_repository.list_rxnav_catalog(
+        rxnav_rows, _ = drug_catalog_repository.list_rxnav_catalog(
             search=None,
             offset=0,
             limit=1,
