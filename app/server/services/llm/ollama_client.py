@@ -699,6 +699,7 @@ class OllamaClient:
         messages: list[dict[str, str]],
         use_json_mode: bool,
         temperature: float,
+        purpose: GenerationPurpose,
     ) -> dict[str, Any] | str:
         return await ollama_structured._chat_structured_model(
             self,
@@ -706,6 +707,7 @@ class OllamaClient:
             messages=messages,
             use_json_mode=use_json_mode,
             temperature=temperature,
+            purpose=purpose,
         )
 
     # -------------------------------------------------------------------------
