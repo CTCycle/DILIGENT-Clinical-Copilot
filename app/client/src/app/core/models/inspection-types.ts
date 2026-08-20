@@ -166,14 +166,6 @@ export type InspectionSessionTimeline = {
 
 export type InspectionSessionTimelineRequest = {
   force_regenerate?: boolean;
-  model_overrides?: InspectionSessionTimelineModelOverrides | null;
-};
-
-export type InspectionSessionTimelineModelOverrides = {
-  use_cloud_services: boolean;
-  llm_provider?: string | null;
-  cloud_model?: string | null;
-  text_extraction_model?: string | null;
 };
 
 export type InspectionSessionTimelinePreview = {

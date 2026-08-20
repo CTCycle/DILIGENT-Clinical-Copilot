@@ -26,6 +26,8 @@ export const DEFAULT_SETTINGS: RuntimeSettings = {
   cloudModel: null,
   textExtractionModel: LLM_RUNTIME_DEFAULTS.text_extraction_model,
   clinicalModel: LLM_RUNTIME_DEFAULTS.clinical_model,
+  revisionModel: LLM_RUNTIME_DEFAULTS.clinical_model,
+  timelineModel: LLM_RUNTIME_DEFAULTS.text_extraction_model,
   reasoning: LLM_RUNTIME_DEFAULTS.ollama_reasoning,
 };
 

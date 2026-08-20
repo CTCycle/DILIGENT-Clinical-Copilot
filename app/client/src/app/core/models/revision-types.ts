@@ -7,7 +7,6 @@ import type {
 export type SessionRevisionRequest = {
   selected_text?: string | null;
   revision_instruction?: string | null;
-  model_overrides?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   max_tasks?: number;
   max_tool_iterations?: number;
@@ -89,6 +88,11 @@ export type SessionVersionSummary = {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+};
+
+export type SessionVersionDetailResponse = {
+  version: SessionVersionSummary;
+  session: Record<string, unknown> | null;
 };
 
 export type RevisionClinicalReviewAction = {

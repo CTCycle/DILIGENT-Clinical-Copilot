@@ -36,6 +36,8 @@ describe('ModelConfigPageComponent', () => {
       cloudModel: 'gpt-4.1-mini',
       clinicalModel: 'gpt-oss:20b',
       textExtractionModel: 'qwen3:14b',
+      revisionModel: 'gpt-oss:20b',
+      timelineModel: 'qwen3:14b',
     });
 
     component.handleCloudSwitchChange(true);
@@ -47,8 +49,10 @@ describe('ModelConfigPageComponent', () => {
         use_cloud_services: true,
         llm_provider: 'openai',
         cloud_model: 'gpt-4.1-mini',
-        clinical_model: 'gpt-oss:20b',
-        text_extraction_model: 'qwen3:14b',
+        clinical_model: 'gpt-4.1-mini',
+        text_extraction_model: 'gpt-4.1-mini',
+        revision_model: 'gpt-4.1-mini',
+        timeline_model: 'gpt-4.1-mini',
       },
       'Configuration saved.',
       true,
@@ -70,6 +74,8 @@ describe('ModelConfigPageComponent', () => {
       cloudModel: 'gpt-4.1-mini',
       clinicalModel: 'gpt-4.1-mini',
       textExtractionModel: 'gpt-4.1-mini',
+      revisionModel: 'gpt-4.1-mini',
+      timelineModel: 'gpt-4.1-mini',
     });
     component.setModelSearchQuery('gpt');
 
@@ -79,6 +85,8 @@ describe('ModelConfigPageComponent', () => {
     expect(component.draftCloudModel()).toBeNull();
     expect(component.draftConfig().clinicalModel).toBe('');
     expect(component.draftConfig().textExtractionModel).toBe('');
+    expect(component.draftConfig().revisionModel).toBe('');
+    expect(component.draftConfig().timelineModel).toBe('');
     expect(component.modelSearchQuery()).toBe('');
   });
 
@@ -100,6 +108,8 @@ describe('ModelConfigPageComponent', () => {
       cloud_model: null,
       clinical_model: 'qwen3.5:2b',
       text_extraction_model: 'qwen3.5:2b',
+      revision_model: 'qwen3.5:2b',
+      timeline_model: 'qwen3.5:2b',
       ollama_reasoning: true,
       ollama_seed: 42,
       rag_settings: component.ragSettings(),
@@ -126,6 +136,8 @@ describe('ModelConfigPageComponent', () => {
       cloudModel: 'gpt-4.1-mini',
       clinicalModel: 'gpt-4.1-mini',
       textExtractionModel: 'gpt-4.1-mini',
+      revisionModel: 'gpt-4.1-mini',
+      timelineModel: 'gpt-4.1-mini',
     });
     vi.spyOn(component as unknown as { applyConfigToState: (...args: unknown[]) => void }, 'applyConfigToState')
       .mockImplementation(() => undefined);

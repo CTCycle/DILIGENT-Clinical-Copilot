@@ -2,7 +2,7 @@ import { CloudProvider, RagSettings } from '../../core/models/types';
 
 export type ModelFilterKey = 'installed' | 'missing' | 'small' | 'large' | 'quantized';
 
-export type ModelRole = 'clinical' | 'text_extraction';
+export type ModelRole = 'clinical' | 'text_extraction' | 'revision' | 'timeline';
 
 export type DraftRuntimeConfig = {
   useCloudServices: boolean;
@@ -10,6 +10,8 @@ export type DraftRuntimeConfig = {
   cloudModel: string | null;
   clinicalModel: string;
   textExtractionModel: string;
+  revisionModel: string;
+  timelineModel: string;
 };
 
 export type DraftRagSettings = RagSettings;

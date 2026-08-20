@@ -71,6 +71,8 @@ export function resolveDraftFromSettings(runtimeSettings: RuntimeSettings): Draf
     cloudModel,
     clinicalModel: runtimeSettings.clinicalModel || '',
     textExtractionModel: runtimeSettings.textExtractionModel || '',
+    revisionModel: runtimeSettings.revisionModel || runtimeSettings.clinicalModel || '',
+    timelineModel: runtimeSettings.timelineModel || runtimeSettings.textExtractionModel || '',
   };
 }
 
@@ -83,5 +85,7 @@ export function normalizeDraftForLocalRuntime(
     useCloudServices: false,
     clinicalModel: resolveLocalDraftModel(draft.clinicalModel, localModels),
     textExtractionModel: resolveLocalDraftModel(draft.textExtractionModel, localModels),
+    revisionModel: resolveLocalDraftModel(draft.revisionModel, localModels),
+    timelineModel: resolveLocalDraftModel(draft.timelineModel, localModels),
   };
 }

@@ -332,6 +332,13 @@
   font-size: 16px;
 }
 
+.model-config-panel-subtitle {
+  margin: 3px 0 0;
+  color: var(--mc-muted);
+  font-size: var(--font-xs);
+  line-height: 1.45;
+}
+
 .model-config-model-cell span {
   display: grid;
   gap: 2px;
@@ -631,7 +638,7 @@
 .model-config-actions {
   display: inline-flex;
   justify-content: flex-start;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   width: 100%;
