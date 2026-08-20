@@ -20,6 +20,7 @@ from domain.clinical import (
 from domain.clinical.entities import DeterministicDrugExtractionResult
 from services.clinical.preparation import HepatoxPreparedInputs
 
+
 ###############################################################################
 def get_session_service() -> Any:
     for route in session_module.router.routes:
@@ -46,6 +47,20 @@ class FakeSerializer:
 
 ###############################################################################
 class FakeInputPreparator:
+
+    # -------------------------------------------------------------------------
+    def resolve_session_drug_ids(
+        self, matched_drugs: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        return matched_drugs
+
+    # -------------------------------------------------------------------------
+    def learn_session_drug_mentions(
+        self, session_id: int, matched_drugs: list[dict[str, Any]]
+    ) -> bool:
+        _ = session_id
+        _ = matched_drugs
+        return False
 
     # -------------------------------------------------------------------------
     async def prepare_inputs(self, *args: Any, **kwargs: Any) -> HepatoxPreparedInputs:

@@ -14,8 +14,10 @@ from domain.clinical.entities import (
     PipelineIssue,
 )
 from domain.clinical.extras import HepatoxPreparedInputs
+from repositories import values as repository_values
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
+from repositories.serialization.catalogs import ReferenceCatalogSerializer
 from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.drug_resolution import DrugResolutionService
 from services.llm.generation_policy import GenerationPurpose
@@ -49,6 +51,127 @@ RxNav and LiverTox evidence before accepting it.
             knowledge_repository=knowledge_repository
         )
         self.livertox_matcher: LiverToxMatcher | None = None
+
+    # -------------------------------------------------------------------------
+    def resolve_session_drug_ids(
+        self, matched_drugs: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        if not matched_drugs:
+            return []
+        resolved: list[dict[str, Any]] = []
+        with self.knowledge_repository.session_factory() as db_session:
+            for source_item in matched_drugs:
+                item = dict(source_item)
+                raw_name = repository_values.normalize_string(
+                    item.get("raw_drug_name") or item.get("name")
+                )
+                if raw_name is None:
+                    resolved.append(item)
+                    continue
+                rxcui = repository_values.normalize_string(
+                    item.get("rxcui")
+                    or item.get("accepted_rxnav_rxcui")
+                    or item.get("rxnorm_rxcui")
+                )
+                nbk_id = repository_values.normalize_string(
+                    item.get("nbk_id") or item.get("accepted_livertox_nbk_id")
+                )
+                drug_id = repository_values.to_int(item.get("drug_id"))
+                if drug_id is None:
+                    drug_id = self.drug_catalog_repository.resolve_drug_id(
+                        db_session,
+                        matched_drug_name=repository_values.normalize_string(
+                            item.get("matched_drug_name")
+                            or item.get("accepted_livertox_name")
+                        ),
+                        rxcui=rxcui,
+                        nbk_id=nbk_id,
+                    )
+                if drug_id is None:
+                    drug_id = self.knowledge_repository.resolve_drug_id_from_match_cache(
+                        db_session,
+                        normalized_drug_key=normalize_drug_query_name(raw_name),
+                    )
+                item["drug_id"] = drug_id
+                resolved.append(item)
+        return resolved
+
+    # -------------------------------------------------------------------------
+    def learn_session_drug_mentions(
+        self, session_id: int, matched_drugs: list[dict[str, Any]]
+    ) -> bool:
+        vocabulary_changed = False
+        catalog_serializer = ReferenceCatalogSerializer(
+            self.knowledge_repository.session_factory
+        )
+        with self.knowledge_repository.session_factory() as db_session:
+            for item in matched_drugs:
+                raw_name = repository_values.normalize_string(
+                    item.get("raw_drug_name") or item.get("name")
+                )
+                if raw_name is None:
+                    continue
+                raw_name_norm = normalize_drug_query_name(raw_name)
+                drug_id = repository_values.to_int(item.get("drug_id"))
+                match_reason = repository_values.normalize_string(item.get("match_reason"))
+                match_confidence = repository_values.to_float(item.get("match_confidence"))
+                matched_drug_name = repository_values.normalize_string(
+                    item.get("matched_drug_name") or item.get("accepted_livertox_name")
+                )
+                rxcui = repository_values.normalize_string(
+                    item.get("rxcui")
+                    or item.get("accepted_rxnav_rxcui")
+                    or item.get("rxnorm_rxcui")
+                )
+                nbk_id = repository_values.normalize_string(
+                    item.get("nbk_id") or item.get("accepted_livertox_nbk_id")
+                )
+                if (
+                    drug_id is not None
+                    and match_reason == "exact_canonical"
+                    and match_confidence == 1.0
+                ):
+                    self.drug_catalog_repository.upsert_drug_alias(
+                        db_session,
+                        drug_id=drug_id,
+                        alias=raw_name,
+                        alias_kind="observed_query",
+                        source="session",
+                        term_type=None,
+                    )
+                else:
+                    catalog_serializer.upsert_runtime_observation(
+                        term=raw_name,
+                        category=(
+                            "observed_unresolved_query"
+                            if drug_id is None
+                            else "observed_unpromoted_query"
+                        ),
+                        source="session",
+                        is_active=True,
+                        db_session=db_session,
+                    )
+                    vocabulary_changed = True
+                self.knowledge_repository.upsert_high_confidence_kb_match_cache(
+                    db_session,
+                    raw_drug_name=raw_name,
+                    raw_drug_name_norm=raw_name_norm,
+                    normalized_drug_key=raw_name_norm,
+                    drug_id=drug_id,
+                    rxnorm_rxcui=rxcui,
+                    livertox_nbk_id=nbk_id,
+                    source="rxnav" if rxcui else "livertox",
+                    confidence=match_confidence,
+                    evidence={
+                        "match_reason": match_reason,
+                        "match_notes": item.get("match_notes"),
+                        "matched_drug_name": matched_drug_name,
+                        "source_session_id": int(session_id),
+                    },
+                    ambiguous=bool(item.get("ambiguous_match")),
+                )
+            db_session.commit()
+        return vocabulary_changed
 
     # -------------------------------------------------------------------------
     async def prepare_inputs(

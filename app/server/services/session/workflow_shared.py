@@ -85,6 +85,7 @@ def build_single_matched_drug_row(
     )
     return {
         "raw_drug_name": detected_name,
+        "drug_id": resolved.get("drug_id"),
         "matched_drug_name": matched_row.get("drug_name"),
         "nbk_id": matched_row.get("nbk_id"),
         "rxnorm_rxcui": matched_row.get("rxnorm_rxcui"),

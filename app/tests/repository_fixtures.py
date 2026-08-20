@@ -29,9 +29,7 @@ def build_repository_graph(
     context = RepositoryContext.create(engine=engine, session_factory=session_factory)
     drug_catalog_repository = DrugCatalogRepository(context)
     knowledge_repository = KnowledgeRepository(context)
-    clinical_session_repository = ClinicalSessionRepository(
-        context, drug_catalog_repository, knowledge_repository
-    )
+    clinical_session_repository = ClinicalSessionRepository(context)
     return RepositoryGraph(
         context=context,
         drug_catalog_repository=drug_catalog_repository,
