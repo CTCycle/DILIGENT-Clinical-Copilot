@@ -161,6 +161,11 @@ def test_revision_agent_tool_call_accepts_provider_rationale_within_budget() -> 
     assert len(decision.rationale) > 1000
 
 ###############################################################################
+def test_revision_request_rejects_active_model_overrides() -> None:
+    with pytest.raises(ValidationError):
+        SessionRevisionRequest.model_validate({"model_overrides": {"clinical_model": "x"}})
+
+###############################################################################
 def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
     prompt = build_revision_agent_user_prompt(
         session={

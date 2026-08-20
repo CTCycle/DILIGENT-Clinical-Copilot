@@ -1013,6 +1013,8 @@ def test_cloud_runtime_uses_cloud_model_when_role_models_are_local() -> None:
             "cloud_model": "gpt-4.1-mini",
             "clinical_model": "gpt-oss:20b",
             "text_extraction_model": "qwen3:8b",
+            "revision_model": "gpt-oss:20b",
+            "timeline_model": "qwen3:8b",
         }
     ):
         assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
@@ -1033,6 +1035,8 @@ def test_cloud_runtime_preserves_valid_cloud_role_override() -> None:
             "cloud_model": "gpt-4.1-mini",
             "clinical_model": "gpt-4.1",
             "text_extraction_model": "gpt-4.1-mini",
+            "revision_model": "gpt-4.1",
+            "timeline_model": "gpt-4.1-mini",
         }
     ):
         assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
@@ -1052,6 +1056,8 @@ def test_cloud_runtime_accepts_persisted_cloud_role_models(monkeypatch) -> None:
         cloud_model="gpt-4.1-mini",
         clinical_model="gpt-4.1-mini",
         text_extraction_model="gpt-4.1-mini",
+        revision_model="gpt-4.1",
+        timeline_model="gpt-4.1-mini",
     )
     monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: snapshot)
 
