@@ -84,18 +84,3 @@
 .inspection-update-actions {
   margin-top: var(--space-sm);
 }
-
-@media (max-width: 900px) {
-  .inspection-rag-path-editor {
-    width: auto;
-  }
-
-  .inspection-rag-selected-path {
-    max-width: 11rem;
-  }
-
-  .inspection-rag-summary-row {
-    grid-template-columns: 1fr;
-    gap: 0.35rem;
-  }
-}

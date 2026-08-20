@@ -200,19 +200,3 @@
 :host-context([data-theme="dark"]) .access-key-state {
   background: rgba(22, 163, 74, 0.18);
 }
-
-@media (max-width: 720px) {
-  .access-key-input-row,
-  .access-key-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .access-key-actions {
-    justify-content: flex-end;
-  }
-
-  .access-key-meta-top {
-    flex-wrap: wrap;
-  }
-}

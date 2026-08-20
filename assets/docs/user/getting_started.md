@@ -1,5 +1,5 @@
 # Getting Started
-Last updated: 2026-08-18
+Last updated: 2026-08-20
 
 ## Purpose
 DILIGENT is a local clinical copilot interface for Drug-Induced Liver Injury review workflows. It helps users enter clinical context, configure model providers, inspect local data, run DILI-oriented analysis, and review saved sessions.
@@ -30,6 +30,9 @@ http://127.0.0.1:9847
 http://127.0.0.1:7690/api/health
 ```
 
+- DILIGENT is designed for desktop browser windows at least `1100px` wide. If the window is narrower, enlarge it to continue.
+- Windows tablets are supported when they behave like a normal desktop browser and can display the desktop interface at that width.
+
 - If `settings/.env` uses different ports, use the local configured values instead. Packaged desktop uses a random localhost backend port recorded in `desktop-backend-ready.json`.
 
 ## Safety And Privacy Expectations
@@ -39,6 +42,9 @@ http://127.0.0.1:7690/api/health
 - For local-only evaluation, prefer a local provider such as Ollama and verify that the selected model is running locally.
 
 ## Application Layout
+
+DILIGENT uses desktop-style navigation and information-dense workspaces designed for mouse and keyboard interaction. It does not provide a mobile phone or tablet layout.
+
 Main navigation sections:
 - **DILI Agent**
 - **Model Configurations**
