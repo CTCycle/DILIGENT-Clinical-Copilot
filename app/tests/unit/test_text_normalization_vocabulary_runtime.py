@@ -11,9 +11,11 @@ from repositories.schemas.knowledge import (
     DrugAlias,
 )
 from repository_fixtures import build_repository_graph
+from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.text import vocabulary as vocabulary_module
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
+
 
 ###############################################################################
 def test_runtime_upsert_list_and_deactivate_term() -> None:
@@ -73,9 +75,11 @@ def test_session_learning_promotes_only_direct_high_confidence_aliases() -> None
     engine = create_engine("sqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, future=True, expire_on_commit=False)
-    serializer = build_repository_graph(
-        engine=engine, session_factory=factory
-    ).clinical_session_repository
+    graph = build_repository_graph(engine=engine, session_factory=factory)
+    preparation = ClinicalKnowledgePreparation(
+        knowledge_repository=graph.knowledge_repository,
+        drug_catalog_repository=graph.drug_catalog_repository,
+    )
 
     db_session = factory()
     try:
@@ -95,36 +99,36 @@ def test_session_learning_promotes_only_direct_high_confidence_aliases() -> None
             patient_name="Test", session_status="successful"
         )
         db_session.add(session)
-        db_session.flush()
-
-        serializer.persist_session_drugs(
-            db_session,
-            int(session.id),
-            {
-                "matched_drugs": [
-                    {
-                        "raw_drug_name": "Atorvastatina",
-                        "matched_drug_name": "atorvastatin",
-                        "match_reason": "exact_canonical",
-                        "match_confidence": 1.0,
-                    },
-                    {
-                        "raw_drug_name": "Furosemide",
-                        "matched_drug_name": "Loop Diuretics",
-                        "match_reason": "exact_alias_ranked",
-                        "match_confidence": 0.92,
-                    },
-                    {
-                        "raw_drug_name": "Unknown Herb",
-                        "matched_drug_name": None,
-                        "match_reason": "no_match",
-                        "match_confidence": None,
-                    },
-                ]
-            },
-        )
         db_session.commit()
+        session_id = int(session.id)
+    finally:
+        db_session.close()
 
+    matched_drugs = [
+        {
+            "raw_drug_name": "Atorvastatina",
+            "matched_drug_name": "atorvastatin",
+            "match_reason": "exact_canonical",
+            "match_confidence": 1.0,
+        },
+        {
+            "raw_drug_name": "Furosemide",
+            "matched_drug_name": "Loop Diuretics",
+            "match_reason": "exact_alias_ranked",
+            "match_confidence": 0.92,
+        },
+        {
+            "raw_drug_name": "Unknown Herb",
+            "matched_drug_name": None,
+            "match_reason": "no_match",
+            "match_confidence": None,
+        },
+    ]
+    resolved_drugs = preparation.resolve_session_drug_ids(matched_drugs)
+    assert preparation.learn_session_drug_mentions(session_id, resolved_drugs) is True
+
+    db_session = factory()
+    try:
         aliases = db_session.execute(
             select(DrugAlias.alias, DrugAlias.drug_id).where(
                 DrugAlias.source == "session"

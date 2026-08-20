@@ -27,9 +27,7 @@ def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionSe
     context = RepositoryContext.create()
     drug_catalog_repository = DrugCatalogRepository(context)
     knowledge_repository = KnowledgeRepository(context)
-    session_repository = ClinicalSessionRepository(
-        context, drug_catalog_repository, knowledge_repository
-    )
+    session_repository = ClinicalSessionRepository(context)
     return ClinicalSessionService(
         drugs_parser=DrugsParser(timeout_s=parser_timeout_s),
         disease_extractor=DiseaseExtractor(timeout_s=disease_timeout_s),
