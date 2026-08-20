@@ -226,7 +226,9 @@ erDiagram
   mentions and does not learn catalog aliases while saving a session.
 - `DataInspectionService` coordinates cross-repository inspection responses;
   it combines clinical session detail with revision records rather than making
-  either repository depend on the other.
+  either repository depend on the other. Session deletion follows the same
+  ownership boundary: it asks `SessionRevisionRepository` to remove
+  revision-owned rows before `ClinicalSessionRepository` removes the session.
 - Feature-specific file serialization remains separate from SQLAlchemy persistence. `RepositoryContext` supplies the shared engine/session factory, and application services receive only the focused repositories they need. Transactions remain explicit at the repository boundary, including atomic session persistence and batch ingestion.
 - `repositories/serialization` is a mixed historical package: pure row and
   payload converters remain there, but access-key and model-configuration
