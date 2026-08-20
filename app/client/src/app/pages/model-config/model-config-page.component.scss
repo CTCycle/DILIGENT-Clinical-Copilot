@@ -567,6 +567,23 @@
   padding-left: 18px;
 }
 
+/* Four independent role buttons need a little more room, while the context
+   label must wrap instead of spilling into the adjacent Quant column. */
+.model-config-table th:first-child,
+.model-config-table td:first-child { width: 27%; }
+.model-config-table th:nth-child(2),
+.model-config-table td:nth-child(2) { width: 8%; }
+.model-config-table th:nth-child(3),
+.model-config-table td:nth-child(3) {
+  width: 14%;
+}
+.model-config-table th:nth-child(4),
+.model-config-table td:nth-child(4) { width: 8%; }
+.model-config-table th:nth-child(5),
+.model-config-table td:nth-child(5) { width: 16%; }
+.model-config-table th:nth-child(6),
+.model-config-table td:nth-child(6) { width: 27%; }
+
 .model-config-table td {
   color: var(--mc-text);
   font-size: 12px;
@@ -574,6 +591,12 @@
 
 .model-config-table td:nth-child(n + 2) {
   white-space: nowrap;
+}
+
+.model-config-table th:nth-child(3),
+.model-config-table td:nth-child(3) {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .model-config-table tbody tr:last-child td {
