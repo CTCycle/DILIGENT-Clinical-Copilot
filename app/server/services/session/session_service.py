@@ -27,9 +27,8 @@ from domain.jobs import (
     JobStatusResponse,
 )
 from repositories.clinical_session_repository import ClinicalSessionRepository
-from repositories.serialization.model_configs import (
-    ModelConfigSerializer,
-)
+from repositories.drug_catalog_repository import DrugCatalogRepository
+from repositories.knowledge_repository import KnowledgeRepository
 from services.clinical.disease import DiseaseExtractor
 from services.clinical.drug_blocks import isolate_drug_blocks
 from services.clinical.hepatox_core import HepatoxConsultation
@@ -95,11 +94,14 @@ class ClinicalSessionService(
         pattern_analyzer: HepatotoxicityPatternAnalyzer,
         rucam_estimator: RucamScoreEstimator,
         session_repository: ClinicalSessionRepository,
+        drug_catalog_repository: DrugCatalogRepository,
+        knowledge_repository: KnowledgeRepository,
         payload_sanitizer: PayloadSanitizationService,
         input_preparator: ClinicalKnowledgePreparation | None = None,
         clinical_input_extractor: ClinicalInputExtractor | None = None,
         hepatox_consultation_cls: type[HepatoxConsultation] | None = None,
         job_manager: JobManager,
+        model_config_service: ModelConfigService,
     ) -> None:
         self.drugs_parser = drugs_parser
         self.disease_extractor = disease_extractor
@@ -107,6 +109,8 @@ class ClinicalSessionService(
         self.pattern_analyzer = pattern_analyzer
         self.rucam_estimator = rucam_estimator
         self.session_repository = session_repository
+        self.drug_catalog_repository = drug_catalog_repository
+        self.knowledge_repository = knowledge_repository
         self.payload_sanitizer = payload_sanitizer
         if input_preparator is None:
             raise ValueError("input_preparator is required")
@@ -116,9 +120,7 @@ class ClinicalSessionService(
         )
         self.hepatox_consultation_cls = hepatox_consultation_cls or HepatoxConsultation
         self.job_manager = job_manager
-        self.model_config_service = ModelConfigService(
-            serializer=ModelConfigSerializer()
-        )
+        self.model_config_service = model_config_service
         self.reset_runtime_diagnostics()
 
     # -------------------------------------------------------------------------
@@ -391,7 +393,7 @@ class ClinicalSessionService(
         if not request_payload.visit_date:
             raise ServiceValidationError("Visit date is required.")
 
-        livertox_rows, _ = self.session_repository.knowledge_repository.list_livertox_catalog(
+        livertox_rows, _ = self.knowledge_repository.list_livertox_catalog(
             search=None, offset=0, limit=1
         )
         if not livertox_rows:
@@ -399,7 +401,7 @@ class ClinicalSessionService(
                 "LiverTox catalog is empty. Run the LiverTox update job from Data "
                 "Inspection before clinical analysis."
             )
-        rxnav_rows, _ = self.session_repository.drug_catalog_repository.list_rxnav_catalog(
+        rxnav_rows, _ = self.drug_catalog_repository.list_rxnav_catalog(
             search=None, offset=0, limit=1
         )
         if not rxnav_rows:
@@ -638,7 +640,12 @@ class ClinicalSessionService(
         self,
         request_payload: ClinicalSessionRequest,
     ) -> ClinicalInputPreflightResult:
-        return validate_clinical_input_preflight(self, request_payload)
+        return validate_clinical_input_preflight(
+            self,
+            request_payload,
+            knowledge_repository=self.knowledge_repository,
+            drug_catalog_repository=self.drug_catalog_repository,
+        )
 
     # -------------------------------------------------------------------------
     def get_clinical_job_status(self, job_id: str) -> JobStatusResponse:

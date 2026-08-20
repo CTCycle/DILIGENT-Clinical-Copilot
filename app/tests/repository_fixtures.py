@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
-
 from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.context import RepositoryContext
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
 from repositories.session_revision_repository import SessionRevisionRepository
 from repositories.session_timeline_repository import SessionTimelineRepository
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import sessionmaker
+
 
 ###############################################################################
 @dataclass(frozen=True, slots=True)
@@ -28,7 +28,7 @@ def build_repository_graph(
 ) -> RepositoryGraph:
     context = RepositoryContext.create(engine=engine, session_factory=session_factory)
     drug_catalog_repository = DrugCatalogRepository(context)
-    knowledge_repository = KnowledgeRepository(context, drug_catalog_repository)
+    knowledge_repository = KnowledgeRepository(context)
     clinical_session_repository = ClinicalSessionRepository(
         context, drug_catalog_repository, knowledge_repository
     )
