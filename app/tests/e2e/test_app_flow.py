@@ -777,7 +777,7 @@ def test_timetable_deterministic_chronology_inspector_and_cluster_layout(
     chronology = page.get_by_role("region", name="Clinical chronology")
     expect(chronology).to_be_visible()
     expect(chronology).to_contain_text("December 2024 – February 2025")
-    january_group = page.get_by_role("region", name="Jan 5, 2025")
+    january_group = page.get_by_role("region", name="5 Jan 2025")
     expect(january_group).to_be_visible()
     expect(january_group).to_contain_text("4 events")
     expect(january_group.get_by_role("heading", name="Therapy 1")).to_be_visible()
@@ -786,7 +786,7 @@ def test_timetable_deterministic_chronology_inspector_and_cluster_layout(
     inspector = page.get_by_role("complementary", name="Event inspector")
     expect(inspector).to_be_visible()
     expect(inspector).to_contain_text("Therapy 1")
-    expect(inspector).to_contain_text("Jan 5, 2025")
+    expect(inspector).to_contain_text("5 Jan 2025")
     page.keyboard.press("Escape")
     expect(inspector).to_contain_text("Select an event")
 
