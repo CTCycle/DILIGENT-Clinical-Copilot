@@ -56,12 +56,12 @@ def test_model_config_serializer_has_no_clean_break_migration() -> None:
 @pytest.mark.parametrize(
     ("payload", "expected"),
     [
-        ({"ollama_reasoning": False}, "off"),
-        ({"ollama_reasoning": True}, "medium"),
-        ({"reasoning_level": "high", "ollama_reasoning": False}, "high"),
+        ({}, "off"),
+        ({"reasoning_level": "invalid"}, "off"),
+        ({"reasoning_level": "high"}, "high"),
     ],
 )
-def test_model_config_serializer_reads_reasoning_level_and_legacy_boolean(
+def test_model_config_serializer_reads_only_reasoning_level(
     payload: dict[str, object], expected: str
 ) -> None:
     snapshot = ModelConfigSerializer.snapshot_from_payload(payload, updated_at=None)
