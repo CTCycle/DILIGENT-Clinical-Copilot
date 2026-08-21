@@ -30,10 +30,9 @@
       </div>
       <p id="guidance-tour-description">{{ currentStep()?.body }}</p>
       @if (!targetRect()) {
-        <p class="guidance-tour-unavailable" role="status">This control is not available on the current screen. You can continue or skip the walkthrough.</p>
+        <p class="guidance-tour-unavailable" role="status">This control is not available on the current screen. You can continue or close the walkthrough.</p>
       }
       <div class="guidance-tour-actions">
-        <button type="button" class="guidance-tour-skip" (click)="skip()">Skip walkthrough</button>
         <div class="guidance-tour-nav">
           <button type="button" class="btn btn-secondary" (click)="back()" [disabled]="tour.stepIndex === 0">Back</button>
           <button type="button" class="btn btn-primary" data-tour-initial-focus (click)="next()">

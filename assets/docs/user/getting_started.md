@@ -1,5 +1,5 @@
 # Getting Started
-Last updated: 2026-08-20
+Last updated: 2026-08-21
 
 ## Purpose
 DILIGENT is a local clinical copilot interface for Drug-Induced Liver Injury review workflows. It helps users enter clinical context, configure model providers, inspect local data, run DILI-oriented analysis, and review saved sessions.
@@ -65,7 +65,7 @@ Typical journey:
 10. Inspect or update local data resources if needed.
 
 ## Optional Help And Tips
-The **Help** action in the existing header opens **Tips & Tricks**. It is a short, optional reference for model roles, RAG behavior, Clinical Session sections, and timeline review. Use **Show me** to restart the three-step DILI assessment walkthrough at any time.
+The **Help** action in the existing header opens **Tips & Tricks**. It is a short, optional reference for model roles, RAG behavior, Clinical Session sections, and timeline review. Use **Show me** to restart the four-step DILI assessment walkthrough at any time. The walkthrough can be closed with its X button.
 
 The first time the DILI Agent is opened with an empty assessment, a small **Get started with DILI Agent** callout may appear in the report area. **Show me** opens the walkthrough, **Open Configurations** takes you to model setup, and the close button dismisses the callout. The callout will not return after it has been seen or dismissed in the same browser unless its content version changes.
 

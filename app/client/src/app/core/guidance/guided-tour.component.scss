@@ -102,7 +102,7 @@
 .guidance-tour-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--space-md);
   margin-top: var(--space-xl);
 }
@@ -110,20 +110,6 @@
 .guidance-tour-nav {
   display: inline-flex;
   gap: var(--space-sm);
-}
-
-.guidance-tour-skip {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: var(--font-sm);
-  cursor: pointer;
-}
-
-.guidance-tour-skip:hover {
-  color: var(--color-text-primary);
-  text-decoration: underline;
 }
 
 .guidance-tour-live-copy {
