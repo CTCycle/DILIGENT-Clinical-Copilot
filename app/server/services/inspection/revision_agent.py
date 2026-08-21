@@ -293,12 +293,18 @@ class RevisionAgentRunner:
         del job_id
         runtime = resolve_revision_agent_runtime()
         lineage = self.session_revision_repository.list_session_versions(int(session["session_id"]))
+        context_effective = LLMRuntimeConfig.resolve_effective_inference_config(
+            purpose=GenerationPurpose.REVISION_PLANNING,
+            provider=runtime.provider,
+            model=runtime.model,
+        )
         context = build_revision_context(
             session=session,
             manual_edits=session.get("manual_edit_history") or [],
             lineage=lineage,
             selected_text=request.selected_text,
             instruction=request.revision_instruction,
+            input_budget=context_effective.input_budget,
         )
         registry = RevisionToolRegistry(
             clinical_session_repository=self.clinical_session_repository,
@@ -315,7 +321,10 @@ class RevisionAgentRunner:
             payload=context,
         )
         plan = self._call_schema(
-            runtime, planner_prompt(context, manifest), RevisionAgentPlan
+            runtime,
+            planner_prompt(context, manifest),
+            RevisionAgentPlan,
+            purpose=GenerationPurpose.REVISION_PLANNING,
         )
         plan.tasks = plan.tasks[: request.max_tasks]
         self.session_revision_repository.persist_revision_artifact(
@@ -351,6 +360,7 @@ class RevisionAgentRunner:
                             task.model_dump(mode="json"), task_observations, manifest
                         ),
                         RevisionAgentToolCall,
+                        purpose=GenerationPurpose.REVISION_TOOL_SELECTION,
                     )
                     if decision.task_complete:
                         break
@@ -395,7 +405,10 @@ class RevisionAgentRunner:
             payload={"observations": observations},
         )
         draft = self._call_schema(
-            runtime, editor_prompt(context, observations), RevisionDraftResult
+            runtime,
+            editor_prompt(context, observations),
+            RevisionDraftResult,
+            purpose=GenerationPurpose.REVISION_EDITING,
         )
         source_report = str(
             session.get("official_report_text") or session.get("report") or ""
@@ -415,6 +428,7 @@ class RevisionAgentRunner:
             runtime,
             qa_prompt(context, draft.model_dump(mode="json")),
             RevisionAgentQaResult,
+            purpose=GenerationPurpose.REVISION_QA,
         )
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
@@ -494,7 +508,12 @@ class RevisionAgentRunner:
 
     # -------------------------------------------------------------------------
     def _call_schema(
-        self, runtime: RevisionAgentRuntime, user_prompt: str, schema: type[Any]
+        self,
+        runtime: RevisionAgentRuntime,
+        user_prompt: str,
+        schema: type[Any],
+        *,
+        purpose: GenerationPurpose,
     ) -> Any:
         if self.structured_call is not None:
             return schema.model_validate(
@@ -503,7 +522,7 @@ class RevisionAgentRunner:
                     system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
                     user_prompt=user_prompt,
                     schema=schema,
-                    purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
+                    purpose=purpose,
                 )
             )
         client = select_llm_provider(
@@ -515,6 +534,7 @@ class RevisionAgentRunner:
                 system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
                 schema=schema,
+                purpose=purpose,
                 use_json_mode=True,
                 max_repair_attempts=3,
             )
@@ -533,7 +553,7 @@ class RevisionAgentRunner:
                 system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
                 schema=RevisionIssueScanResult,
-                purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
+                purpose=GenerationPurpose.REVISION_SCAN,
             )
             if isinstance(value, RevisionIssueScanResult):
                 return value
@@ -549,6 +569,7 @@ class RevisionAgentRunner:
                 system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
                 schema=RevisionIssueScanResult,
+                purpose=GenerationPurpose.REVISION_SCAN,
                 use_json_mode=True,
                 max_repair_attempts=1,
             )

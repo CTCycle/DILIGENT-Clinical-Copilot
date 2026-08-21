@@ -214,6 +214,16 @@ def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
     assert '{"a":"x","b":2}' in prompt
     assert "Source payload SHA-256:" in prompt
     assert "'a':" not in prompt
+    assert client.last_kwargs["purpose"].value == "timeline_extraction"
+    assert client.last_kwargs["timeline_complexity"] == "simple"
+
+###############################################################################
+def test_timeline_complexity_is_deterministic_and_escalates_for_large_payloads() -> None:
+    assert PatientTimelineExtractor.classify_complexity({"note": "short"}) == "simple"
+    moderate_payload = {"note": "2026-01-01 " * 10}
+    assert PatientTimelineExtractor.classify_complexity(moderate_payload) == "moderate"
+    complex_payload = {"note": "2026-01-01 " * 30, "details": "x" * 60000}
+    assert PatientTimelineExtractor.classify_complexity(complex_payload) == "complex"
 
 ###############################################################################
 def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_fields() -> None:

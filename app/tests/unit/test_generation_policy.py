@@ -9,39 +9,45 @@ from services.llm.generation_policy import (
     validate_catalog,
 )
 from domain.model_configs import ReasoningLevel
+from services.llm.model_capabilities import (
+    resolve_effective_inference_config,
+    resolve_model_capabilities,
+)
 
 ###############################################################################
 @pytest.mark.parametrize(
-    ("model", "reasoning", "expected"),
+    ("model", "reasoning_level", "expected"),
     [
-        ("qwen3:8b", True, 0.6),
-        ("qwen3:8b", False, 0.7),
-        ("qwen3.5:2b", False, 1.0),
-        ("qwen3.5:9b", True, 1.0),
-        ("qwen3.5:9b", False, 0.7),
-        ("deepseek-r1:14b", False, 0.6),
-        ("phi4-reasoning:14b", False, 0.8),
+        ("qwen3:8b", ReasoningLevel.MEDIUM, 0.2),
+        ("qwen3:8b", ReasoningLevel.OFF, 0.2),
+        ("qwen3.5:2b", ReasoningLevel.OFF, 0.2),
+        ("qwen3.5:9b", ReasoningLevel.HIGH, 0.2),
+        ("qwen3.5:9b", ReasoningLevel.OFF, 0.2),
+        ("deepseek-r1:14b", ReasoningLevel.OFF, 0.2),
+        ("phi4-reasoning:14b", ReasoningLevel.OFF, 0.2),
     ],
 )
-def test_local_policy_matrix(model: str, reasoning: bool, expected: float) -> None:
+def test_local_policy_matrix(
+    model: str, reasoning_level: ReasoningLevel, expected: float
+) -> None:
     policy = resolve_generation_policy(
         purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
         provider="ollama",
         model=model,
-        reasoning_enabled=reasoning,
+        user_reasoning_level=reasoning_level,
     )
     assert policy.temperature == expected
 
 ###############################################################################
-def test_restricted_and_unknown_models_use_defaults() -> None:
+def test_known_provider_defaults_use_base_temperature() -> None:
     for provider, model in (("anthropic", "claude-opus-4-6"), ("gemini", "gemini-3-pro"), ("ollama", "new-model:1b")):
         policy = resolve_generation_policy(
             purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
             provider=provider,
             model=model,
         )
-        assert policy.temperature is None
-        assert policy.uses_model_default
+        assert policy.temperature == 0.0
+        assert not policy.uses_model_default
 
 ###############################################################################
 def test_openai_and_deepseek_are_purpose_specific() -> None:
@@ -59,7 +65,7 @@ def test_openai_and_deepseek_are_purpose_specific() -> None:
         purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
         provider="deepseek",
         model="deepseek-chat",
-    ).temperature == 1.0
+    ).temperature == 0.2
     assert resolve_generation_policy(
         purpose=GenerationPurpose.CONNECTIVITY_CHECK,
         provider="openai",
@@ -74,7 +80,12 @@ def test_gpt5_and_gpt_oss_omit_temperature() -> None:
             provider=provider,
             model=model,
         )
-        assert policy.temperature is None
+        assert policy.temperature == 0.2
+        effective = resolve_effective_inference_config(
+            policy=policy,
+            capabilities=resolve_model_capabilities(provider=provider, model=model),
+        )
+        assert effective.temperature is None
 
 ###############################################################################
 def test_policy_is_immutable_and_catalog_validates() -> None:
@@ -83,7 +94,7 @@ def test_policy_is_immutable_and_catalog_validates() -> None:
         purpose=GenerationPurpose.JSON_REPAIR,
         provider="ollama",
         model="qwen3:8b",
-        reasoning_enabled=True,
+        user_reasoning_level=ReasoningLevel.HIGH,
     )
     assert isinstance(policy, GenerationPolicy)
     with pytest.raises(AttributeError):

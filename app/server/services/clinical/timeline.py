@@ -148,6 +148,22 @@ class PatientTimelineExtractor:
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def classify_complexity(source_payload: dict[str, Any]) -> str:
+        serialized = json.dumps(
+            source_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        date_count = len(ISO_PARTIAL_DATE_RE.findall(serialized))
+        if len(serialized) <= 12000 and date_count <= 8:
+            return "simple"
+        if len(serialized) <= 50000 and date_count <= 24:
+            return "moderate"
+        return "complex"
+
+    # -------------------------------------------------------------------------
     def normalize_events(
         self, events: list[PatientTimelineEvent]
     ) -> list[PatientTimelineEvent]:
@@ -231,6 +247,7 @@ class PatientTimelineExtractor:
         source_payload_hash = hashlib.sha256(
             source_payload_json.encode("utf-8")
         ).hexdigest()
+        timeline_complexity = self.classify_complexity(source_payload)
         user_prompt = (
             "Build a structured clinical timeline from this patient session payload.\n"
             "Focus on therapy start/stop, disease manifestation, lab milestones, and other dated events.\n\n"
@@ -245,7 +262,8 @@ class PatientTimelineExtractor:
                     system_prompt=PATIENT_TIMELINE_EXTRACTION_PROMPT.strip(),
                     user_prompt=user_prompt,
                     schema=PatientTimelineExtraction,
-                    purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
+                    purpose=GenerationPurpose.TIMELINE_EXTRACTION,
+                    timeline_complexity=timeline_complexity,
                     use_json_mode=True,
                     max_repair_attempts=2,
                 )

@@ -19,9 +19,15 @@ class OpenAIResponsesTransport(StructuredTransportMixin):
             item["content"] for item in request.messages if item.get("role") == "system"
         )
         inputs = [item for item in request.messages if item.get("role") != "system"]
-        kwargs = {"model": request.model, "input": inputs}
+        kwargs = {"model": request.model, "input": inputs, **request.options}
         if instructions:
             kwargs["instructions"] = instructions
+        if request.output_token_limit is not None:
+            kwargs["max_output_tokens"] = request.output_token_limit
+        if request.reasoning_level and request.reasoning_level != "off":
+            kwargs.pop("temperature", None)
+            if request.reasoning_parameter in {"effort", "level"}:
+                kwargs["reasoning"] = {"effort": request.reasoning_level}
         response = await self.client.responses.create(**kwargs)
         return ChatResult(content=response.output_text)
 

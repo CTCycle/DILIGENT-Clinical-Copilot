@@ -146,6 +146,10 @@ export type CloudModelDescriptor = {
   display_name: string;
   endpoint_family: string | null;
   capabilities: ProviderCapabilities | null;
+  input_token_limit: number | null;
+  output_token_limit: number | null;
+  supports_thinking: boolean | null;
+  supports_temperature: boolean | null;
 };
 
 export type CloudProviderDescriptor = {

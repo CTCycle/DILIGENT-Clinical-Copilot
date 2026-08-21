@@ -3,16 +3,16 @@
   "source_review_date": "2026-08-21",
   "profiles": {
     "provider_default": {
-      "structured_extraction": null,
-      "clinical_synthesis": null,
-      "faithful_rewrite": null,
-      "revision_scan": null,
-      "revision_planning": null,
-      "revision_tool_selection": null,
-      "revision_editing": null,
-      "revision_qa": null,
-      "timeline_extraction": null,
-      "json_repair": null,
+      "structured_extraction": 0.0,
+      "clinical_synthesis": 0.2,
+      "faithful_rewrite": 0.0,
+      "revision_scan": 0.0,
+      "revision_planning": 0.0,
+      "revision_tool_selection": 0.0,
+      "revision_editing": 0.0,
+      "revision_qa": 0.0,
+      "timeline_extraction": 0.0,
+      "json_repair": 0.0,
       "connectivity_check": null
     },
     "local_instruction": {
@@ -48,41 +48,23 @@
     "opencode_zen": {"profile": "provider_default"},
     "opencode_go": {"profile": "provider_default"},
     "openai": {"profile": "openai_ordinary"},
-    "deepseek": {
-      "structured_extraction": 0.0,
-      "clinical_synthesis": 1.0,
-      "faithful_rewrite": 0.0,
-      "revision_scan": 0.0,
-      "revision_planning": 0.0,
-      "revision_tool_selection": 0.0,
-      "revision_editing": 0.0,
-      "revision_qa": 0.0,
-      "timeline_extraction": 0.0,
-      "json_repair": 0.0,
-      "connectivity_check": null
-    },
+    "deepseek": {"profile": "provider_default"},
     "ollama": {"profile": "provider_default"}
   },
   "exact_models": {
     "openai:gpt-5": {"profile": "provider_default"},
     "openai:gpt-5-mini": {"profile": "provider_default"},
     "openai:gpt-5-nano": {"profile": "provider_default"},
-    "ollama:qwen3.5:2b": {"all": 1.0},
-    "ollama:qwen3.5:9b": {
-      "reasoning_enabled": {"all": 1.0},
-      "reasoning_disabled": {"all": 0.7}
-    }
+    "ollama:qwen3.5:2b": {"profile": "local_instruction"},
+    "ollama:qwen3.5:9b": {"profile": "local_instruction"}
   },
   "families": {
     "openai:gpt-5": {"profile": "provider_default"},
-    "ollama:qwen3": {
-      "reasoning_enabled": {"all": 0.6},
-      "reasoning_disabled": {"all": 0.7}
-    },
-    "ollama:deepseek-r1": {"all": 0.6},
-    "ollama:phi4-reasoning": {"all": 0.8},
+    "ollama:qwen3": {"profile": "local_instruction"},
+    "ollama:deepseek-r1": {"profile": "local_instruction"},
+    "ollama:phi4-reasoning": {"profile": "local_instruction"},
     "ollama:gpt-oss": {"profile": "provider_default"},
-    "ollama:phi4-mini-reasoning": {"profile": "provider_default"}
+    "ollama:phi4-mini-reasoning": {"profile": "local_instruction"}
   },
   "local_models": {
     "default_profile": "local_instruction",

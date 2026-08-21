@@ -27,11 +27,27 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
             list[MessageParam],
             [item for item in request.messages if item.get("role") != "system"],
         )
+        requested_max_tokens = request.options.get("max_tokens")
+        max_tokens = int(request.output_token_limit or requested_max_tokens or 0)
+        kwargs: dict[str, object] = {
+            "model": request.model,
+            "system": system,
+            "messages": messages,
+        }
+        if request.reasoning_level and request.reasoning_level != "off":
+            budget_tokens = max(1024, int(request.reasoning_reserve or 0))
+            max_tokens = max(max_tokens, int(request.output_token_limit or 0) + budget_tokens)
+            kwargs["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": budget_tokens,
+            }
+        if max_tokens <= 0:
+            raise ValueError("Anthropic requests require an output token limit")
+        kwargs["max_tokens"] = max_tokens
+        if "temperature" in request.options and request.reasoning_level in {None, "off"}:
+            kwargs["temperature"] = request.options["temperature"]
         response = await self.client.messages.create(
-            model=request.model,
-            system=system,
-            messages=messages,
-            max_tokens=int(request.options.get("max_tokens", 4096)),
+            **kwargs,
         )
         text = "".join(getattr(block, "text", "") for block in response.content)
         return ChatResult(content=text)

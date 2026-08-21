@@ -50,6 +50,7 @@ async def llm_structured_call(
     temperature: float = 0.0,
     use_json_mode: bool = True,
     purpose: GenerationPurpose = GenerationPurpose.STRUCTURED_EXTRACTION,
+    timeline_complexity: str = "moderate",
     max_repair_attempts: int = 2,
 ) -> T:
     """
@@ -81,6 +82,7 @@ async def llm_structured_call(
         temperature=temperature,
         use_json_mode=use_json_mode,
         purpose=purpose,
+        timeline_complexity=timeline_complexity,
         max_repair_attempts=max_repair_attempts,
     )
 
@@ -145,6 +147,7 @@ async def _chat_structured_model(
     use_json_mode: bool,
     temperature: float,
     purpose: GenerationPurpose,
+    timeline_complexity: str = "moderate",
 ) -> dict[str, Any] | str:
     try:
         return await self.chat(
@@ -153,6 +156,7 @@ async def _chat_structured_model(
             format="json" if use_json_mode else None,
             temperature=temperature,
             purpose=purpose,
+            timeline_complexity=timeline_complexity,
         )
     except OllamaError as err:
         if self.is_missing_model_error(err):
@@ -264,6 +268,7 @@ async def call_with_structured_models(
     temperature: float,
     use_json_mode: bool,
     purpose: GenerationPurpose,
+    timeline_complexity: str = "moderate",
     max_repair_attempts: int,
 ) -> T:
     queue = preferred.copy()
@@ -285,6 +290,7 @@ async def call_with_structured_models(
                 use_json_mode=use_json_mode,
                 temperature=temperature,
                 purpose=purpose,
+                timeline_complexity=timeline_complexity,
             )
         except OllamaError as e:
             missing.append(active_model)

@@ -51,7 +51,12 @@ class StructuredTransportMixin:
             ChatRequest(
                 model=request.model,
                 messages=request.messages,
+                options=request.options,
                 json_mode=True,
+                reasoning_level=request.reasoning_level,
+                reasoning_parameter=request.reasoning_parameter,
+                reasoning_reserve=request.reasoning_reserve,
+                output_token_limit=request.output_token_limit,
             )
         )
         return request.schema_type.model_validate_json(result.content)

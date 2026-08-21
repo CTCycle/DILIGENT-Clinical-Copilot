@@ -312,11 +312,18 @@ class OllamaClient:
         model: str,
         purpose: GenerationPurpose,
         temperature: float | None,
-        think: bool | None,
+        think: bool | str | None,
         options: dict[str, Any] | None,
-    ) -> tuple[float | None, bool, dict[str, Any] | None]:
+        timeline_complexity: str = "moderate",
+    ) -> tuple[float | None, bool | str | None, dict[str, Any] | None]:
         return ollama_chat.prepare_generation_parameters(
-            self, model=model, purpose=purpose, temperature=temperature, think=think, options=options
+            self,
+            model=model,
+            purpose=purpose,
+            temperature=temperature,
+            think=think,
+            options=options,
+            timeline_complexity=timeline_complexity,
         )
 
     # -------------------------------------------------------------------------
@@ -341,7 +348,7 @@ class OllamaClient:
         stream: bool,
         format: str | None,
         temperature: float | None,
-        think: bool,
+        think: bool | str | None,
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> dict[str, Any]:
@@ -364,9 +371,16 @@ class OllamaClient:
         model: str,
         messages: list[dict[str, str]] | None,
         options: dict[str, Any] | None,
+        purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
+        timeline_complexity: str = "moderate",
     ) -> dict[str, Any] | None:
         return await ollama_chat.ensure_context_option(
-            self, model=model, messages=messages, options=options
+            self,
+            model=model,
+            messages=messages,
+            options=options,
+            purpose=purpose,
+            timeline_complexity=timeline_complexity,
         )
 
     # -------------------------------------------------------------------------
@@ -375,11 +389,12 @@ class OllamaClient:
         *,
         model: str,
         temperature: float | None,
-        think: bool | None,
+        think: bool | str | None,
         options: dict[str, Any] | None,
         messages: list[dict[str, str]] | None = None,
         purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
-    ) -> tuple[str, float | None, bool, dict[str, Any] | None]:
+        timeline_complexity: str = "moderate",
+    ) -> tuple[str, float | None, bool | str | None, dict[str, Any] | None]:
         return await ollama_chat.prepare_common_options(
             self,
             model=model,
@@ -388,6 +403,7 @@ class OllamaClient:
             think=think,
             options=options,
             messages=messages,
+            timeline_complexity=timeline_complexity,
         )
 
     # -------------------------------------------------------------------------
@@ -545,9 +561,10 @@ class OllamaClient:
         format: str | None = None,
         temperature: float | None = None,
         purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
-        think: bool | None = None,
+        think: bool | str | None = None,
         options: dict[str, Any] | None = None,
         keep_alive: str | None = None,
+        timeline_complexity: str = "moderate",
     ) -> dict[str, Any] | str:
         return await ollama_chat.chat(
             self,
@@ -559,6 +576,7 @@ class OllamaClient:
             think=think,
             options=options,
             keep_alive=keep_alive,
+            timeline_complexity=timeline_complexity,
         )
 
     # -------------------------------------------------------------------------
@@ -569,9 +587,11 @@ class OllamaClient:
         messages: list[dict[str, str]],
         format: str | None = None,
         temperature: float | None = None,
-        think: bool | None = None,
+        think: bool | str | None = None,
+        purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
         options: dict[str, Any] | None = None,
         keep_alive: str | None = None,
+        timeline_complexity: str = "moderate",
     ) -> AsyncGenerator[dict[str, Any], None]:
         async for event in ollama_chat.chat_stream(
             self,
@@ -579,9 +599,11 @@ class OllamaClient:
             messages=messages,
             format=format,
             temperature=temperature,
+            purpose=purpose,
             think=think,
             options=options,
             keep_alive=keep_alive,
+            timeline_complexity=timeline_complexity,
         ):
             yield event
 
@@ -608,6 +630,8 @@ class OllamaClient:
         min_ctx: int = 2048,
         padding_tokens: int = 128,
         slack_ratio: float = 0.75,
+        purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
+        timeline_complexity: str = "moderate",
     ) -> int | None:
         return await ollama_chat.calculate_context_window(
             self,
@@ -616,6 +640,8 @@ class OllamaClient:
             min_ctx=min_ctx,
             padding_tokens=padding_tokens,
             slack_ratio=slack_ratio,
+            purpose=purpose,
+            timeline_complexity=timeline_complexity,
         )
 
     # -------------------------------------------------------------------------
@@ -654,6 +680,7 @@ class OllamaClient:
         temperature: float = 0.0,
         use_json_mode: bool = True,
         purpose: GenerationPurpose = GenerationPurpose.STRUCTURED_EXTRACTION,
+        timeline_complexity: str = "moderate",
         max_repair_attempts: int = 2,
     ) -> T:
         return await ollama_structured.llm_structured_call(
@@ -665,6 +692,7 @@ class OllamaClient:
             temperature=temperature,
             use_json_mode=use_json_mode,
             purpose=purpose,
+            timeline_complexity=timeline_complexity,
             max_repair_attempts=max_repair_attempts,
         )
 
@@ -700,6 +728,7 @@ class OllamaClient:
         use_json_mode: bool,
         temperature: float,
         purpose: GenerationPurpose,
+        timeline_complexity: str = "moderate",
     ) -> dict[str, Any] | str:
         return await ollama_structured._chat_structured_model(
             self,
@@ -708,6 +737,7 @@ class OllamaClient:
             use_json_mode=use_json_mode,
             temperature=temperature,
             purpose=purpose,
+            timeline_complexity=timeline_complexity,
         )
 
     # -------------------------------------------------------------------------
@@ -782,6 +812,7 @@ class OllamaClient:
         temperature: float,
         use_json_mode: bool,
         purpose: GenerationPurpose = GenerationPurpose.STRUCTURED_EXTRACTION,
+        timeline_complexity: str = "moderate",
         max_repair_attempts: int,
     ) -> T:
         return await ollama_structured.call_with_structured_models(
@@ -794,6 +825,7 @@ class OllamaClient:
             temperature=temperature,
             use_json_mode=use_json_mode,
             purpose=purpose,
+            timeline_complexity=timeline_complexity,
             max_repair_attempts=max_repair_attempts,
         )
 

@@ -199,12 +199,7 @@ def resolve_generation_policy(
     model: str,
     user_reasoning_level: ReasoningLevel = ReasoningLevel.OFF,
     timeline_complexity: TimelineComplexity = "moderate",
-    reasoning_enabled: bool | None = None,
 ) -> GenerationPolicy:
-    if reasoning_enabled is not None:
-        user_reasoning_level = (
-            ReasoningLevel.MEDIUM if reasoning_enabled else ReasoningLevel.OFF
-        )
     requested_reasoning_level = _reasoning_target(
         purpose=purpose,
         user_reasoning_level=user_reasoning_level,

@@ -32,8 +32,14 @@ class GeminiTransport(StructuredTransportMixin):
             )
         config = types.GenerateContentConfig(
             system_instruction=system or None,
-            temperature=request.options.get("temperature"),
+            temperature=(
+                None
+                if request.reasoning_level and request.reasoning_level != "off"
+                else request.options.get("temperature")
+            ),
+            max_output_tokens=request.output_token_limit,
             response_mime_type="application/json" if request.json_mode else None,
+            thinking_config=self._thinking_config(request),
         )
         response = await asyncio.to_thread(
             self.client.models.generate_content,
@@ -42,6 +48,20 @@ class GeminiTransport(StructuredTransportMixin):
             config=config,
         )
         return ChatResult(content=str(response.text or ""))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _thinking_config(request: ChatRequest) -> types.ThinkingConfig | None:
+        if not request.reasoning_level or request.reasoning_parameter != "level":
+            return None
+        if request.reasoning_level == "off":
+            return types.ThinkingConfig(thinking_budget=0)
+        sdk_level = (
+            types.ThinkingLevel.LOW
+            if request.reasoning_level in {"low", "medium"}
+            else types.ThinkingLevel.HIGH
+        )
+        return types.ThinkingConfig(thinking_level=sdk_level)
 
     # -------------------------------------------------------------------------
     async def list_models(
@@ -53,6 +73,18 @@ class GeminiTransport(StructuredTransportMixin):
             CloudModelDescriptor(
                 id=str(item.name).removeprefix("models/"),
                 display_name=str(item.display_name or item.name),
+                input_token_limit=getattr(item, "input_token_limit", None),
+                output_token_limit=getattr(item, "output_token_limit", None),
+                supports_thinking=(
+                    bool(getattr(item, "thinking", None))
+                    if getattr(item, "thinking", None) is not None
+                    else None
+                ),
+                supports_temperature=(
+                    bool(getattr(item, "temperature", None))
+                    if getattr(item, "temperature", None) is not None
+                    else None
+                ),
             )
             for item in page
             if "generateContent" in (item.supported_actions or [])

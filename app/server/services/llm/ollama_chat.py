@@ -16,6 +16,7 @@ from common.utils.logger import logger
 from common.utils.types import extract_positive_int
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.generation_policy import GenerationPurpose
+from domain.model_configs import ReasoningLevel
 from configurations.startup import get_server_settings
 from services.llm.ollama_residency import (
     get_available_memory_bytes,
@@ -144,26 +145,38 @@ def prepare_generation_parameters(
     model: str,
     purpose: GenerationPurpose,
     temperature: float | None,
-    think: bool | None,
+    think: bool | str | None,
     options: dict[str, Any] | None,
-) -> tuple[float | None, bool, dict[str, Any] | None]:
-    if think is None:
-        think_value = LLMRuntimeConfig.is_ollama_reasoning_enabled()
-    else:
-        think_value = bool(think)
-    options_payload = {key: value for key, value in (options or {}).items() if key != "temperature"}
-    policy = LLMRuntimeConfig.resolve_generation_policy(
+    timeline_complexity: str = "moderate",
+) -> tuple[float | None, bool | str | None, dict[str, Any] | None]:
+    user_reasoning_level: ReasoningLevel | None = None
+    if isinstance(think, bool):
+        user_reasoning_level = ReasoningLevel.MEDIUM if think else ReasoningLevel.OFF
+    elif isinstance(think, str):
+        try:
+            user_reasoning_level = ReasoningLevel(think.strip().lower())
+        except ValueError:
+            user_reasoning_level = ReasoningLevel.OFF
+    effective = LLMRuntimeConfig.resolve_effective_inference_config(
         purpose=purpose,
         provider="ollama",
         model=model,
-        reasoning_enabled=think_value,
+        user_reasoning_level=user_reasoning_level,
+        timeline_complexity=timeline_complexity,
     )
+    options_payload = {key: value for key, value in (options or {}).items() if key != "temperature"}
     configured_seed = LLMRuntimeConfig.get_ollama_seed()
     if configured_seed is not None:
         options_payload.setdefault("seed", configured_seed)
     if not options_payload:
         options_payload = None
-    return policy.temperature, think_value, options_payload
+    if effective.reasoning_parameter == "level":
+        think_value: bool | str | None = effective.effective_reasoning_level.value
+    elif effective.reasoning_parameter == "none":
+        think_value = None
+    else:
+        think_value = effective.effective_reasoning_level is not ReasoningLevel.OFF
+    return effective.temperature, think_value, options_payload
 
 ###############################################################################
 def compose_payload(
@@ -190,16 +203,17 @@ def build_chat_payload(
     stream: bool,
     format: str | None,
     temperature: float | None,
-    think: bool,
+    think: bool | str | None,
     options: dict[str, Any] | None,
     keep_alive: str | None,
 ) -> dict[str, Any]:
-    payload = {
+    payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "stream": stream,
-        "think": think,
     }
+    if think is not None:
+        payload["think"] = think
     if temperature is not None:
         payload["temperature"] = temperature
     return self.compose_payload(
@@ -216,12 +230,16 @@ async def ensure_context_option(
     model: str,
     messages: list[dict[str, str]] | None,
     options: dict[str, Any] | None,
+    purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
+    timeline_complexity: str = "moderate",
 ) -> dict[str, Any] | None:
     if options and "num_ctx" in options:
         return options
     context_window = await self.calculate_context_window(
         model=model,
         messages=messages,
+        purpose=purpose,
+        timeline_complexity=timeline_complexity,
     )
     if not context_window:
         return options
@@ -235,11 +253,12 @@ async def prepare_common_options(
     *,
     model: str,
     temperature: float | None,
-    think: bool | None,
+    think: bool | str | None,
     options: dict[str, Any] | None,
     messages: list[dict[str, str]] | None = None,
     purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
-) -> tuple[str, float | None, bool, dict[str, Any] | None]:
+    timeline_complexity: str = "moderate",
+) -> tuple[str, float | None, bool | str | None, dict[str, Any] | None]:
     resolved_model = self.resolve_model_name(model)
     await self.ensure_model_ready(resolved_model)
     temp_value, think_value, options_payload = self.prepare_generation_parameters(
@@ -248,11 +267,14 @@ async def prepare_common_options(
         temperature=temperature,
         think=think,
         options=options,
+        timeline_complexity=timeline_complexity,
     )
     enriched = await self.ensure_context_option(
         model=resolved_model,
         messages=messages,
         options=options_payload,
+        purpose=purpose,
+        timeline_complexity=timeline_complexity,
     )
     return resolved_model, temp_value, think_value, enriched
 
@@ -550,9 +572,10 @@ async def chat(
     format: str | None = None,
     temperature: float | None = None,
     purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
-    think: bool | None = None,
+    think: bool | str | None = None,
     options: dict[str, Any] | None = None,
     keep_alive: str | None = None,
+    timeline_complexity: str = "moderate",
 ) -> dict[str, Any] | str:
     """
     Non-streaming chat. Returns parsed JSON (dict) if possible, else raw string.
@@ -570,6 +593,7 @@ async def chat(
         think=think,
         options=options,
         messages=messages,
+        timeline_complexity=timeline_complexity,
     )
     resolved_keep_alive = await self.resolve_policy_keep_alive(
         active_model=resolved_model,
@@ -613,9 +637,10 @@ async def chat_stream(
     format: str | None = None,
     temperature: float | None = None,
     purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
-    think: bool | None = None,
+    think: bool | str | None = None,
     options: dict[str, Any] | None = None,
     keep_alive: str | None = None,
+    timeline_complexity: str = "moderate",
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
     Streamed chat. Yields each event (already JSON-decoded).
@@ -634,6 +659,7 @@ async def chat_stream(
         think=think,
         options=options,
         messages=messages,
+        timeline_complexity=timeline_complexity,
     )
     resolved_keep_alive = await self.resolve_policy_keep_alive(
         active_model=resolved_model,
@@ -856,11 +882,9 @@ async def calculate_context_window(
     padding_tokens: int = 128,
     slack_ratio: float = 0.75,
     output_headroom: int = 4096,
+    purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
+    timeline_complexity: str = "moderate",
 ) -> int | None:
-    feasible = await self.estimate_max_feasible_context(model)
-    if feasible and feasible >= min_ctx:
-        return feasible
-
     contents: list[str] = []
     if messages:
         for message in messages:
@@ -872,15 +896,34 @@ async def calculate_context_window(
     total_tokens = sum(self.estimate_tokens(chunk) for chunk in contents)
     if total_tokens <= 0:
         return None
-    expanded = (
-        int(math.ceil(total_tokens * (1 + slack_ratio)))
-        + padding_tokens
-        + output_headroom
+    native_limit = await self.get_model_context_limit(model)
+    feasible = await self.estimate_max_feasible_context(model)
+    capacity_limits = [
+        limit for limit in (native_limit, feasible) if limit is not None and limit > 0
+    ]
+    runtime_context_limit = min(capacity_limits) if capacity_limits else None
+    effective = LLMRuntimeConfig.resolve_effective_inference_config(
+        purpose=purpose,
+        provider="ollama",
+        model=model,
+        runtime_context_limit=runtime_context_limit,
+        selected_input_tokens=total_tokens,
+        timeline_complexity=timeline_complexity,
     )
-    target = max(min_ctx, expanded)
-    limit = await self.get_model_context_limit(model)
-    if limit and limit > 0:
-        upper = min(limit, target)
-        floor = min(limit, min_ctx)
-        return max(upper, floor)
-    return target
+    output_reserve = min(
+        max(0, int(output_headroom)),
+        effective.output_token_limit,
+    )
+    bounded_slack_ratio = min(max(float(slack_ratio), 0.0), 0.15)
+    target = max(
+        min_ctx,
+        total_tokens
+        + int(math.ceil(total_tokens * bounded_slack_ratio))
+        + output_reserve
+        + effective.reasoning_reserve
+        + effective.context_safety_reserve
+        + max(0, padding_tokens),
+    )
+    if runtime_context_limit is None:
+        return target
+    return min(runtime_context_limit, max(min_ctx, target))
