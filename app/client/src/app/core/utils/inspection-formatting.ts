@@ -1,4 +1,5 @@
 import { InspectionRagVectorStoreSummary } from '../models/inspection-types';
+import { formatAppDateTime } from './date-formatting';
 
 export type InspectionViewId =
   | 'rxnav'
@@ -16,9 +17,7 @@ export function inspectionTabId(view: InspectionViewId): string {
 }
 
 export function formatInspectionDateTime(value: string | null): string {
-  if (!value) return 'N/A';
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+  return formatAppDateTime(value);
 }
 
 export function formatInspectionDuration(seconds: number | null): string {

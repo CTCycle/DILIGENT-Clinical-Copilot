@@ -9,6 +9,7 @@ import {
 import { HelpPopoverComponent } from '../../core/guidance/help-popover.component';
 import { AppStateService } from '../../core/state/app-state.service';
 import { formatUnknownError } from '../../core/utils';
+import { formatAppDateTime } from '../../core/utils/date-formatting';
 import {
   buildRuntimeSettingsFromConfig,
   resolveCloudChoices,
@@ -300,11 +301,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     if (!updatedAt) {
       return 'Not saved in this session';
     }
-    const parsed = new Date(updatedAt);
-    if (Number.isNaN(parsed.getTime())) {
-      return updatedAt;
-    }
-    return parsed.toLocaleString();
+    return formatAppDateTime(updatedAt, updatedAt);
   });
 
   readonly selectedModelDescription = computed(() => {

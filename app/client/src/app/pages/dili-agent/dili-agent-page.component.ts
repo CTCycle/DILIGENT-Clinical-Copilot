@@ -24,6 +24,7 @@ import {
   formatUnknownError,
   normalizeVisitDateInput,
 } from '../../core/utils';
+import { formatAppDateOnly } from '../../core/utils/date-formatting';
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const STALL_THRESHOLD_MS = 600_000;
@@ -535,14 +536,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   get recordedDateLabel(): string {
-    if (!this.vm.form.visitDate) {
-      return 'Not set';
-    }
-    return new Date(`${this.vm.form.visitDate}T00:00:00`).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+    return formatAppDateOnly(this.vm.form.visitDate, 'Not set');
   }
 
 

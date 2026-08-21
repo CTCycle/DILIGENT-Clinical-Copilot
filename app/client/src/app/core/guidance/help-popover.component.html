@@ -8,7 +8,7 @@
     [attr.aria-controls]="open() ? panelId : null"
     (click)="toggle()"
   >
-    <span aria-hidden="true">?</span>
+    <svg lucideCircleHelp size="16" aria-hidden="true"></svg>
   </button>
 
   @if (open()) {
@@ -24,7 +24,7 @@
     >
       <div class="guidance-help-panel-heading">
         <h3>{{ title }}</h3>
-        <button type="button" class="guidance-help-panel-close" aria-label="Close help" (click)="close()">×</button>
+        <button type="button" class="guidance-help-panel-close" aria-label="Close help" (click)="close()"><svg lucideX size="16"></svg></button>
       </div>
       <p>{{ body }}</p>
     </section>

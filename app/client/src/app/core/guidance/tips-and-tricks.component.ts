@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { LucideSparkles } from '@lucide/angular';
 
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import { DILI_ASSESSMENT_TOUR, TIPS_AND_TRICKS } from './guidance-content';
@@ -10,7 +11,7 @@ import { TipAction } from './guidance.types';
 @Component({
   selector: 'app-tips-and-tricks',
   standalone: true,
-  imports: [CommonModule, ModalShellComponent],
+  imports: [CommonModule, ModalShellComponent, LucideSparkles],
   templateUrl: './tips-and-tricks.component.html',
   styleUrl: './tips-and-tricks.component.scss',
 })
