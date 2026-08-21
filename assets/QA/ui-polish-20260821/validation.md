@@ -16,7 +16,7 @@ Published commits: `ced4db78`, `20b6038c`, `33ada28e`, `59c0e825`
 ## Automated results
 
 - `npm run test -- --no-watch`: 16 test files, 67 tests passed.
-- `npm run build`: passed. Existing warning remains: `clinical-sessions-page.component.scss` is 20.16 kB against the 20.00 kB component-style budget.
+- `npm run build`: passed. Existing warning remains: `clinical-sessions-page.component.scss` is 20.43 kB against the 20.00 kB component-style budget.
 - `pytest app/tests/e2e/test_guidance.py app/tests/e2e/test_ui_polish.py -q`: 13 passed.
 - Initial-load regression slice for DILI Agent, Model Configurations, and Clinical Sessions: 3 passed with no console errors or failed requests.
 - `ruff check app/tests/e2e/test_guidance.py app/tests/e2e/test_ui_polish.py`: passed.
@@ -44,9 +44,11 @@ All QA artifacts are stored under this directory; no API, persistence, or schema
 
 - Clinical Sessions section and extracted-data separators now use the shared theme divider token for clearer hierarchy while remaining lightweight.
 - Historical CSS review confirmed that the pre-`444ca06e` preview used defined `1px` section borders. The follow-up now uses `--cs-border-strong` for the flat section rules and column divider, restoring that definition without bringing back full boxed cards.
+- The historical independent-scroll behavior is restored: the main report content and extracted-data column are separate bounded scroll regions, while the workspace remains stationary. In-app Browser verification at `1100x768` recorded main content scroll `260px`, side scroll `124px`, and workspace scroll `0px`.
 - Empty native date inputs no longer paint their browser-generated segments beneath the localized `dd/mm/yyyy` hint; the hint remains contained at both desktop widths.
 - In-app Browser follow-up at `1440x1000` and `1100x768` in light and dark themes showed the corrected date filter and separators with no console errors. The temporary viewport override was reset after the check.
 - [Clinical Sessions light, desktop follow-up](followup/clinical-sessions-light-1440x1000.png)
 - [Clinical Sessions dark, desktop follow-up](followup/clinical-sessions-dark-1440x1000.png)
 - [Clinical Sessions light, narrow follow-up](followup/clinical-sessions-light-1100x768.png)
 - [Clinical Sessions dark, narrow follow-up](followup/clinical-sessions-dark-1100x768.png)
+- [Clinical Sessions independent-scroll proof, dark narrow](followup/clinical-sessions-scroll-dark-1100x768.png)

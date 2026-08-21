@@ -129,15 +129,44 @@ def test_clinical_session_preview_keeps_report_sections_structured(
     expect(side).to_be_visible()
 
     content_style = content.evaluate(
-        "element => ({overflow: getComputedStyle(element).overflow, height: getComputedStyle(element).height})"
+        "element => ({overflow: getComputedStyle(element).overflowY, height: getComputedStyle(element).height, canScroll: element.scrollHeight > element.clientHeight})"
     )
-    assert content_style["overflow"] == "visible"
+    assert content_style["overflow"] in {"auto", "scroll"}
     assert content_style["height"] != "0px"
+    assert content_style["canScroll"] is True
+    workspace = page.locator(".clinical-session-workspace")
+    workspace_style = workspace.evaluate(
+        "element => ({clientHeight: element.clientHeight, scrollHeight: element.scrollHeight})"
+    )
+    assert workspace_style["scrollHeight"] <= workspace_style["clientHeight"] + 1
     side_style = side.evaluate(
-        "element => ({border: getComputedStyle(element).borderInlineStartWidth, overflow: getComputedStyle(element).overflowY})"
+        "element => ({border: getComputedStyle(element).borderInlineStartWidth, overflow: getComputedStyle(element).overflowY, canScroll: element.scrollHeight > element.clientHeight, clientHeight: element.clientHeight, scrollHeight: element.scrollHeight})"
     )
     assert side_style["border"] == "1px"
-    assert side_style["overflow"] in {"auto", "scroll", "visible"}
+    assert side_style["overflow"] in {"auto", "scroll"}
+    assert side_style["scrollHeight"] >= side_style["clientHeight"]
+
+    scroll_positions = page.evaluate(
+        """() => {
+          const content = document.querySelector('.clinical-session-preview-content');
+          const side = document.querySelector('.clinical-session-preview-side');
+          const workspace = document.querySelector('.clinical-session-workspace');
+          content.scrollTop = 120;
+          side.scrollTop = Math.min(120, side.scrollHeight - side.clientHeight);
+          return {content: content.scrollTop, side: side.scrollTop, workspace: workspace.scrollTop};
+        }"""
+    )
+    assert scroll_positions["content"] > 0
+    if side_style["canScroll"]:
+        assert scroll_positions["side"] > 0
+    else:
+        assert scroll_positions["side"] == 0
+    assert scroll_positions["workspace"] == 0
+
+    _capture(
+        page,
+        f"clinical-sessions-scroll-{color_scheme}-{viewport['width']}x{viewport['height']}.png",
+    )
 
     headings = content.locator("h2, h3")
     if headings.count() > 1:
