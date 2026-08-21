@@ -150,3 +150,57 @@ def test_clinical_session_preview_keeps_report_sections_structured(
         page,
         f"clinical-sessions-{color_scheme}-{viewport['width']}x{viewport['height']}.png",
     )
+
+
+@pytest.mark.parametrize(
+    "viewport",
+    [
+        pytest.param({"width": 1440, "height": 1000}, id="desktop"),
+        pytest.param({"width": 1100, "height": 768}, id="narrow-desktop"),
+    ],
+)
+@pytest.mark.parametrize(
+    "color_scheme",
+    [pytest.param("light", id="light"), pytest.param("dark", id="dark")],
+)
+def test_clinical_sessions_date_hint_has_single_aligned_rendering(
+    page: Page,
+    base_url: str,
+    viewport: dict[str, int],
+    color_scheme: str,
+) -> None:
+    page.set_viewport_size(viewport)
+    page.emulate_media(color_scheme=color_scheme)
+    page.goto(f"{base_url}/clinical-sessions")
+
+    shell = page.locator(".clinical-sessions-date-input-shell")
+    date_input = page.get_by_label("Session filter date")
+    expect(shell).to_be_visible(timeout=15000)
+    expect(date_input).to_be_disabled()
+
+    rendering = date_input.evaluate(
+        """element => {
+          const shell = element.closest('.clinical-sessions-date-input-shell');
+          const shellRect = shell.getBoundingClientRect();
+          const after = getComputedStyle(shell, '::after');
+          const afterRight = parseFloat(after.left) + parseFloat(after.width);
+          const color = getComputedStyle(element).color;
+          return {
+            nativeTextIsHidden: color === 'transparent' || color === 'rgba(0, 0, 0, 0)',
+            hintContent: after.content,
+            hintFitsShell: afterRight <= shellRect.width,
+          };
+        }"""
+    )
+    assert rendering == {
+        "nativeTextIsHidden": True,
+        "hintContent": '"dd/mm/yyyy"',
+        "hintFitsShell": True,
+    }
+
+    page.get_by_label("Date filter mode").select_option("exact")
+    expect(date_input).to_be_enabled()
+    assert date_input.evaluate(
+        "element => getComputedStyle(element).color === 'transparent' || "
+        "getComputedStyle(element).color === 'rgba(0, 0, 0, 0)'"
+    )
