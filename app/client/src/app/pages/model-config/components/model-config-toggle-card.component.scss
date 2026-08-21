@@ -47,6 +47,8 @@
 }
 
 .model-config-reasoning-level {
+  --reasoning-thumb-size: 12px;
+  --reasoning-track-inset: calc(var(--reasoning-thumb-size) / 2);
   display: grid;
   gap: 8px;
   margin-top: auto;
@@ -57,10 +59,10 @@
 .model-config-reasoning-slider {
   position: static;
   inset: auto;
-  width: calc(100% - 12px);
+  width: calc(100% - (2 * var(--reasoning-track-inset)));
   height: 4px;
   min-height: 4px;
-  margin: 0 6px;
+  margin: 0 var(--reasoning-track-inset);
   opacity: 1;
   accent-color: var(--mc-brand);
   cursor: pointer;
@@ -69,10 +71,10 @@
 .model-config-rag-card .model-config-reasoning-slider {
   position: relative;
   inset: auto;
-  width: calc(100% - 12px);
+  width: calc(100% - (2 * var(--reasoning-track-inset)));
   height: 4px;
   min-height: 4px;
-  margin: 0 6px;
+  margin: 0 var(--reasoning-track-inset);
   opacity: 1;
   appearance: none;
   border: 1px solid color-mix(in srgb, var(--mc-border-strong) 70%, transparent);
@@ -114,14 +116,36 @@
 }
 
 .model-config-reasoning-level-labels {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-xs);
-  padding: 0 6px;
+  position: relative;
+  height: 12px;
+  margin: 0 var(--reasoning-track-inset);
   color: var(--mc-faint);
   font-size: 10px;
   line-height: 1.2;
+}
+
+.model-config-reasoning-level-labels span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
   text-align: center;
+  white-space: nowrap;
+}
+
+.model-config-reasoning-level-labels span:nth-child(1) {
+  left: 0;
+}
+
+.model-config-reasoning-level-labels span:nth-child(2) {
+  left: 33.3333%;
+}
+
+.model-config-reasoning-level-labels span:nth-child(3) {
+  left: 66.6667%;
+}
+
+.model-config-reasoning-level-labels span:nth-child(4) {
+  left: 100%;
 }
 
 .model-config-rag-card input {

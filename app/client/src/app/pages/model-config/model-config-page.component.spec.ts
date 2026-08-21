@@ -17,6 +17,13 @@ describe('ModelConfigPageComponent', () => {
     component = fixture.componentInstance;
   });
 
+  it('uses the supported OpenAI provider logo asset', () => {
+    expect(component.providerLogo('openai')).toEqual({
+      src: '/logos/openai-blossom-light.svg',
+      alt: 'OpenAI logo',
+    });
+  });
+
   it('builds a cloud save patch with role assignments after runtime toggle', async () => {
     const persistSpy = vi
       .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<void> }, 'persistConfigPatch')
