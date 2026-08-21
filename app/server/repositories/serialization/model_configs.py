@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from domain.model_configs import ModelConfigSnapshot
+from domain.model_configs import ModelConfigSnapshot, ReasoningLevel
 from repositories.database.session import resolve_engine, resolve_session_factory
 from repositories.schemas.configuration import ApplicationConfiguration
 from repositories.serialization.application_configuration import (
@@ -35,7 +35,7 @@ class ModelConfigSerializer:
             "embedding_offline_mode",
         }
     )
-    DEFAULT_OLLAMA_REASONING = False
+    DEFAULT_REASONING_LEVEL = ReasoningLevel.OFF
     DEFAULT_OLLAMA_SEED = 42
 
     # -------------------------------------------------------------------------
@@ -76,7 +76,7 @@ class ModelConfigSerializer:
         use_cloud_models: bool | object = UNSET,
         cloud_provider: str | None | object = UNSET,
         cloud_model: str | None | object = UNSET,
-        ollama_reasoning: bool | object = UNSET,
+        reasoning_level: ReasoningLevel | object = UNSET,
         ollama_seed: int | None | object = UNSET,
         rag_settings: dict[str, object] | object = UNSET,
     ) -> ModelConfigSnapshot:
@@ -90,14 +90,15 @@ class ModelConfigSerializer:
             "use_cloud_models": use_cloud_models,
             "cloud_provider": cloud_provider,
             "cloud_model": cloud_model,
-            "ollama_reasoning": ollama_reasoning,
+            "reasoning_level": reasoning_level,
             "ollama_seed": ollama_seed,
             "rag_settings": rag_settings,
         }
         for key, value in updates.items():
             if value is not UNSET:
                 current[key] = value
-        current["ollama_reasoning"] = bool(current.get("ollama_reasoning", False))
+        current["reasoning_level"] = self.reasoning_level_from_payload(current)
+        current.pop("ollama_reasoning", None)
         current["ollama_seed"] = self.normalize_optional_seed(
             current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
         )
@@ -119,7 +120,7 @@ class ModelConfigSerializer:
             cloud_model=None,
             revision_model=None,
             timeline_model=None,
-            ollama_reasoning=cls.DEFAULT_OLLAMA_REASONING,
+            reasoning_level=cls.DEFAULT_REASONING_LEVEL,
             ollama_seed=cls.DEFAULT_OLLAMA_SEED,
             rag_settings={},
             updated_at=None,
@@ -140,7 +141,7 @@ class ModelConfigSerializer:
             cloud_model=cls.normalize_optional_text(payload.get("cloud_model")),
             revision_model=cls.normalize_optional_text(payload.get("revision_model")),
             timeline_model=cls.normalize_optional_text(payload.get("timeline_model")),
-            ollama_reasoning=bool(payload.get("ollama_reasoning", False)),
+            reasoning_level=cls.reasoning_level_from_payload(payload),
             ollama_seed=cls.normalize_optional_seed(
                 payload.get("ollama_seed", cls.DEFAULT_OLLAMA_SEED)
             ),
@@ -155,6 +156,25 @@ class ModelConfigSerializer:
             return None
         normalized = str(value).strip()
         return normalized or None
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def reasoning_level_from_payload(cls, payload: dict[str, object]) -> ReasoningLevel:
+        raw_level = payload.get("reasoning_level")
+        if isinstance(raw_level, ReasoningLevel):
+            return raw_level
+        if isinstance(raw_level, str):
+            try:
+                return ReasoningLevel(raw_level.strip().lower())
+            except ValueError:
+                pass
+
+        legacy_value = payload.get("ollama_reasoning")
+        if isinstance(legacy_value, str):
+            legacy_enabled = legacy_value.strip().lower() in {"1", "true", "yes", "on"}
+        else:
+            legacy_enabled = bool(legacy_value)
+        return ReasoningLevel.MEDIUM if legacy_enabled else cls.DEFAULT_REASONING_LEVEL
 
     # -------------------------------------------------------------------------
     @classmethod

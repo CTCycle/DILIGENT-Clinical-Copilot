@@ -20,6 +20,8 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
     assert "text_extraction_model" in payload
     assert "revision_model" in payload
     assert "timeline_model" in payload
+    assert payload["reasoning_level"] in {"off", "low", "medium", "high"}
+    assert "ollama_reasoning" not in payload
     assert payload["local_catalog"]["status"] in {
         "available",
         "cached",
@@ -62,15 +64,16 @@ def test_model_config_put_returns_persisted_values_without_catalog_refresh(
 ):
     original = api_context.get("/api/model-config")
     assert original.status == 200
-    original_reasoning = bool(original.json().get("ollama_reasoning"))
+    original_reasoning = original.json().get("reasoning_level")
+    next_reasoning = "high" if original_reasoning != "high" else "low"
     try:
         response = api_context.put(
             "/api/model-config",
-            data={"ollama_reasoning": not original_reasoning},
+            data={"reasoning_level": next_reasoning},
         )
         assert response.status == 200
         payload = response.json()
-        assert payload["ollama_reasoning"] is not original_reasoning
+        assert payload["reasoning_level"] == next_reasoning
         assert "updated_at" in payload
         assert "local_models" not in payload
         assert "cloud_providers" not in payload
@@ -79,7 +82,7 @@ def test_model_config_put_returns_persisted_values_without_catalog_refresh(
     finally:
         restored = api_context.put(
             "/api/model-config",
-            data={"ollama_reasoning": original_reasoning},
+            data={"reasoning_level": original_reasoning},
         )
         assert restored.status == 200
 

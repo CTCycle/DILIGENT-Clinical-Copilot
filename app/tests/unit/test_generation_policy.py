@@ -8,6 +8,7 @@ from services.llm.generation_policy import (
     resolve_generation_policy,
     validate_catalog,
 )
+from domain.model_configs import ReasoningLevel
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -87,3 +88,58 @@ def test_policy_is_immutable_and_catalog_validates() -> None:
     assert isinstance(policy, GenerationPolicy)
     with pytest.raises(AttributeError):
         policy.temperature = 0.9  # type: ignore[misc]
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("purpose", "complexity", "expected"),
+    [
+        (GenerationPurpose.CLINICAL_SYNTHESIS, "moderate", ["off", "low", "medium", "high"]),
+        (GenerationPurpose.STRUCTURED_EXTRACTION, "moderate", ["off", "low", "low", "low"]),
+        (GenerationPurpose.FAITHFUL_REWRITE, "moderate", ["off", "low", "low", "low"]),
+        (GenerationPurpose.REVISION_SCAN, "moderate", ["off", "low", "low", "medium"]),
+        (GenerationPurpose.REVISION_EDITING, "moderate", ["off", "low", "low", "medium"]),
+        (GenerationPurpose.JSON_REPAIR, "moderate", ["off", "off", "off", "off"]),
+        (GenerationPurpose.CONNECTIVITY_CHECK, "moderate", ["off", "off", "off", "off"]),
+        (GenerationPurpose.TIMELINE_EXTRACTION, "simple", ["off", "low", "low", "low"]),
+        (GenerationPurpose.TIMELINE_EXTRACTION, "moderate", ["off", "low", "medium", "medium"]),
+        (GenerationPurpose.TIMELINE_EXTRACTION, "complex", ["off", "low", "medium", "high"]),
+    ],
+)
+def test_responsibility_reasoning_matrix(
+    purpose: GenerationPurpose,
+    complexity: str,
+    expected: list[str],
+) -> None:
+    levels = [ReasoningLevel.OFF, ReasoningLevel.LOW, ReasoningLevel.MEDIUM, ReasoningLevel.HIGH]
+
+    actual = [
+        resolve_generation_policy(
+            purpose=purpose,
+            provider="openai",
+            model="gpt-4.1-mini",
+            user_reasoning_level=level,
+            timeline_complexity=complexity,
+        ).requested_reasoning_level.value
+        for level in levels
+    ]
+
+    assert actual == expected
+
+###############################################################################
+def test_reasoning_target_is_monotonic_for_each_responsibility() -> None:
+    levels = [ReasoningLevel.OFF, ReasoningLevel.LOW, ReasoningLevel.MEDIUM, ReasoningLevel.HIGH]
+    rank = {level.value: index for index, level in enumerate(levels)}
+    for purpose in GenerationPurpose:
+        values = [
+            rank[
+                resolve_generation_policy(
+                    purpose=purpose,
+                    provider="openai",
+                    model="gpt-4.1-mini",
+                    user_reasoning_level=level,
+                    timeline_complexity="complex",
+                ).requested_reasoning_level.value
+            ]
+            for level in levels
+        ]
+        assert values == sorted(values)

@@ -737,7 +737,7 @@ async def process_single_patient_workflow(
             "cloud_model": LLMRuntimeConfig.get_cloud_model(),
             "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
             "clinical_model": LLMRuntimeConfig.get_clinical_model(),
-            "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
+            "reasoning_level": LLMRuntimeConfig.get_reasoning_level().value,
             "ollama_seed": LLMRuntimeConfig.get_ollama_seed(),
             "use_rag": bool(payload.use_rag),
             "resolved_runtime": dict(service.resolved_runtime),

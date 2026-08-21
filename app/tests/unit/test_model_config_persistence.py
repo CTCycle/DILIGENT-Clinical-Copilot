@@ -53,6 +53,22 @@ def test_model_config_serializer_has_no_clean_break_migration() -> None:
     assert not hasattr(ModelConfigSerializer, "migrate_cloud_selection_clean_break")
 
 ###############################################################################
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        ({"ollama_reasoning": False}, "off"),
+        ({"ollama_reasoning": True}, "medium"),
+        ({"reasoning_level": "high", "ollama_reasoning": False}, "high"),
+    ],
+)
+def test_model_config_serializer_reads_reasoning_level_and_legacy_boolean(
+    payload: dict[str, object], expected: str
+) -> None:
+    snapshot = ModelConfigSerializer.snapshot_from_payload(payload, updated_at=None)
+
+    assert snapshot.reasoning_level.value == expected
+
+###############################################################################
 def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
     engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'model-config.db'}")
     Base.metadata.create_all(engine)
@@ -299,7 +315,7 @@ def test_model_config_service_rejects_switching_cloud_model_roles_to_local_mode(
             use_cloud_models=True,
             cloud_provider="deepseek",
             cloud_model="deepseek-v4-flash",
-            ollama_reasoning=True,
+            reasoning_level="medium",
             ollama_seed=42,
             updated_at=datetime.now(),
         )
@@ -505,7 +521,7 @@ def test_model_config_cloud_save_does_not_refresh_remote_catalogs_or_ollama(
 @pytest.mark.parametrize(
     "patch",
     [
-        {"ollama_reasoning": True},
+        {"reasoning_level": "medium"},
         {"rag_settings": {"use_hybrid_search": False}},
     ],
 )

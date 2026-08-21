@@ -6,6 +6,8 @@ export type CloudProvider =
   | "opencode_zen"
   | "opencode_go";
 
+export type ReasoningLevel = "off" | "low" | "medium" | "high";
+
 export type RuntimeSettings = {
   useCloudServices: boolean;
   provider: CloudProvider;
@@ -14,7 +16,7 @@ export type RuntimeSettings = {
   clinicalModel: string;
   revisionModel: string;
   timelineModel: string;
-  reasoning: boolean;
+  reasoning: ReasoningLevel;
 };
 
 export type LocalModelCard = {
@@ -66,8 +68,8 @@ export type ModelConfigStateResponse = {
   text_extraction_model: string | null;
   revision_model: string | null;
   timeline_model: string | null;
-    ollama_reasoning: boolean;
-    ollama_seed: number | null;
+  reasoning_level: ReasoningLevel;
+  ollama_seed: number | null;
   rag_settings: RagSettings;
   embedding_runtime: EmbeddingRuntimeStatus;
   embedding_index: EmbeddingIndexStatus;
@@ -82,7 +84,7 @@ export type ModelConfigPersistResponse = {
   text_extraction_model: string | null;
   revision_model: string | null;
   timeline_model: string | null;
-  ollama_reasoning: boolean;
+  reasoning_level: ReasoningLevel;
   ollama_seed: number | null;
   rag_settings: RagSettings;
   updated_at: string | null;
@@ -117,8 +119,8 @@ export type ModelConfigUpdateRequest = {
   text_extraction_model?: string | null;
   revision_model?: string | null;
   timeline_model?: string | null;
-    ollama_reasoning?: boolean;
-    ollama_seed?: number | null;
+  reasoning_level?: ReasoningLevel;
+  ollama_seed?: number | null;
   rag_settings?: Partial<RagSettings>;
 };
 

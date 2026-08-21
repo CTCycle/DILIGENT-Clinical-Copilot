@@ -230,7 +230,7 @@ def _default_llm_runtime_defaults(
         llm_provider=provider_default,
         cloud_model=cloud_default,
         use_cloud_services=False,
-        ollama_reasoning=False,
+        reasoning_level="off",
         ollama_host_default=resolve_ollama_base_url(
             ollama_url=environment.ollama_url,
             ollama_host=environment.ollama_host,
