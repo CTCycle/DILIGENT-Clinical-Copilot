@@ -3,6 +3,7 @@
   --cs-surface-alt: var(--color-surface-alt);
   --cs-border: var(--color-border-subtle);
   --cs-border-strong: var(--color-border);
+  --cs-section-divider: var(--color-divider);
   --cs-text: var(--color-text-primary);
   --cs-muted: var(--color-text-secondary);
   --cs-faint: var(--color-text-muted);
@@ -144,6 +145,10 @@
 .clinical-sessions-date-input:disabled {
   color: var(--color-text-muted);
   background: var(--color-surface-alt);
+}
+
+.clinical-sessions-date-input-shell.is-empty .clinical-sessions-date-input {
+  color: transparent;
 }
 
 .clinical-sessions-layout {
@@ -410,14 +415,14 @@
 .clinical-session-preview-side {
   max-height: 100%;
   overflow-y: auto;
-  border-inline-start: 1px solid var(--cs-border);
+  border-inline-start: 1px solid var(--cs-section-divider);
   padding-inline-start: var(--space-lg);
   padding-right: 2px;
 }
 
 .clinical-session-preview-card {
   border: 0;
-  border-top: 1px solid var(--cs-border);
+  border-top: 1px solid var(--cs-section-divider);
   border-radius: 0;
   background: transparent;
   padding: var(--space-md) 0 0;
@@ -485,7 +490,7 @@
 
 :host ::ng-deep .clinical-session-preview-content :is(h2, h3) {
   margin-top: var(--space-lg);
-  border-top: 1px solid var(--cs-border);
+  border-top: 1px solid var(--cs-section-divider);
   padding-top: var(--space-md);
 }
 
