@@ -4,6 +4,7 @@ import {
 import {
   Component,
   HostListener,
+  OnDestroy,
   computed,
   effect,
   inject,
@@ -29,7 +30,7 @@ const FOCUSABLE_SELECTOR = [
   templateUrl: './guided-tour.component.html',
   styleUrl: './guided-tour.component.scss',
 })
-export class GuidedTourComponent {
+export class GuidedTourComponent implements OnDestroy {
   private readonly tourService = inject(GuidanceTourService);
 
   readonly active = this.tourService.activeTour;
@@ -44,8 +45,15 @@ export class GuidedTourComponent {
   private wasActive = false;
   private currentTarget: HTMLElement | null = null;
   private syncToken = 0;
+  private positionRefreshTimer: number | null = null;
+
+  private readonly handleCapturedScroll = (): void => {
+    this.queuePositionRefresh();
+  };
 
   constructor() {
+    document.addEventListener('scroll', this.handleCapturedScroll, true);
+    window.addEventListener('resize', this.handleCapturedScroll);
     effect(() => {
       const active = this.active();
       if (!active) {
@@ -69,6 +77,15 @@ export class GuidedTourComponent {
       const token = ++this.syncToken;
       queueMicrotask(() => this.syncStep(active, token));
     });
+  }
+
+  ngOnDestroy(): void {
+    document.removeEventListener('scroll', this.handleCapturedScroll, true);
+    window.removeEventListener('resize', this.handleCapturedScroll);
+    if (this.positionRefreshTimer !== null) {
+      window.clearTimeout(this.positionRefreshTimer);
+      this.positionRefreshTimer = null;
+    }
   }
 
   next(): void {
@@ -116,8 +133,7 @@ export class GuidedTourComponent {
       target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' });
       window.setTimeout(() => {
         if (token !== this.syncToken) return;
-        this.targetRect.set(target.getBoundingClientRect());
-        this.positionCard(target.getBoundingClientRect(), step?.preferredPlacement);
+        this.refreshTargetPosition();
         this.focusDialog();
       }, reducedMotion ? 0 : 160);
       return;
@@ -126,6 +142,30 @@ export class GuidedTourComponent {
     this.targetRect.set(null);
     this.positionCard(null, step?.preferredPlacement);
     this.focusDialog();
+  }
+
+  private queuePositionRefresh(): void {
+    if (!this.active() || this.positionRefreshTimer !== null) return;
+    this.positionRefreshTimer = window.setTimeout(() => {
+      this.positionRefreshTimer = null;
+      this.refreshTargetPosition();
+    }, 0);
+  }
+
+  private refreshTargetPosition(): void {
+    const active = this.active();
+    const step = active?.definition.steps[active.stepIndex];
+    const target = step ? document.querySelector<HTMLElement>(step.target) : null;
+    this.currentTarget = target;
+    if (!target) {
+      this.targetRect.set(null);
+      this.positionCard(null, step?.preferredPlacement);
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    this.targetRect.set(rect);
+    this.positionCard(rect, step?.preferredPlacement);
   }
 
   private focusDialog(): void {

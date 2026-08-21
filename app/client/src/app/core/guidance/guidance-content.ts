@@ -1,12 +1,13 @@
 import { GuidedTourDefinition, TipDefinition } from './guidance.types';
 
 export const GUIDANCE_CONTENT_VERSION = 1;
+const DILI_ASSESSMENT_TOUR_VERSION = 2;
 
 export const DILI_ASSESSMENT_TOUR: GuidedTourDefinition = {
   id: 'dili-assessment-tour',
-  version: GUIDANCE_CONTENT_VERSION,
+  version: DILI_ASSESSMENT_TOUR_VERSION,
   title: 'Run a DILI assessment',
-  description: 'A short tour of the three controls that shape a first assessment.',
+  description: 'A short tour of the four controls that shape a first assessment.',
   route: '/',
   steps: [
     {
@@ -16,13 +17,19 @@ export const DILI_ASSESSMENT_TOUR: GuidedTourDefinition = {
       preferredPlacement: 'right',
     },
     {
+      target: '[data-guidance-target="dili-patient-details"]',
+      title: 'Set the patient details',
+      body: 'Enter the patient name and visit date here. These details identify the assessment and anchor the clinical timeline.',
+      preferredPlacement: 'left',
+    },
+    {
       target: '[data-guidance-target="dili-rag-toggle"]',
       title: 'Add indexed evidence when useful',
       body: 'RAG adds references from the configured local index to this run. The checkbox only affects the assessment you are about to start.',
       preferredPlacement: 'left',
     },
     {
-      target: '[data-guidance-target="dili-run-action"]',
+      target: '[data-guidance-target="dili-review-run"]',
       title: 'Review, then run',
       body: 'Run opens a pre-flight review first. Fix blocking items or continue only after accepting any warnings.',
       preferredPlacement: 'top',
