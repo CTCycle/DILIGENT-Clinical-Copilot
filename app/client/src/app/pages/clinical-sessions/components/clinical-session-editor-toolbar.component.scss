@@ -84,9 +84,3 @@
 .clinical-session-editor-toolbar button:focus-visible,
 .clinical-session-editor-toolbar select:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 .clinical-session-editor-font-size { min-width: 44px; color: var(--color-text-secondary); font-size: var(--font-sm); font-weight: 700; text-align: center; }
-
-:host-context([data-theme="dark"]) .clinical-session-editor-toolbar { background: transparent; border-color: rgba(128, 158, 174, 0.28); }
-:host-context([data-theme="dark"]) .clinical-session-editor-toolbar button,
-:host-context([data-theme="dark"]) .clinical-session-toolbar-group-format select { background: #0f1f2d; border-color: rgba(123, 151, 168, 0.34); color: #e7f0f2; }
-:host-context([data-theme="dark"]) .clinical-session-toolbar-group { background: transparent; border-color: transparent; }
-:host-context([data-theme="dark"]) .clinical-session-view-mode button.is-active { background: rgba(26, 103, 78, 0.74); border-color: rgba(83, 220, 170, 0.66); color: #f3faf9; }
