@@ -601,7 +601,6 @@ function Install-OrUpdateApplication {
         -BuildFrontend $true `
         -InstallationType $selectedInstallationType `
         -PortableRuntimesReady:$portableRuntimesReady
-    Write-Step 'Synchronizing database schema'
     Initialize-Database
     if (Test-Path -LiteralPath $UvCacheDir) {
         Write-Step 'Pruning uv cache'
@@ -621,6 +620,7 @@ function Initialize-Database {
     if (-not (Test-Path -LiteralPath $databaseScript)) {
         throw "Database initializer is missing: $databaseScript"
     }
+    Write-Step 'Synchronizing database schema'
     Invoke-Checked -FilePath $UvExe -WorkingDirectory $RepoRoot -ArgumentList @(
         'run', '--project', 'app/server', '--python', $PythonExe, 'python',
         'app/scripts/initialize_database.py', '--seed-catalogs'
