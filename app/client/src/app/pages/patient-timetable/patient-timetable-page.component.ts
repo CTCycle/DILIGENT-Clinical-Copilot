@@ -2,8 +2,17 @@ import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import {
+  LucideArrowLeft,
+  LucideCircleDot,
+  LucideCircleHelp,
+  LucideExternalLink,
+  LucideFilterX,
+  LucideX,
+} from '@lucide/angular';
 
 import { HelpPopoverComponent } from '../../core/guidance/help-popover.component';
+import { APP_LOCALE } from '../../core/constants';
 import {
   fetchInspectionSessionTimelineById,
   fetchInspectionSessionTimelineJobStatus,
@@ -81,18 +90,18 @@ const TIMETABLE_LANE_LABELS: Record<TimetableLane, string> = {
 };
 
 const TIMETABLE_LANES: TimetableLane[] = ['clinical', 'therapy', 'labs', 'uncertainty', 'unanchored'];
-const TIMELINE_DAY_FORMATTER = new Intl.DateTimeFormat('en-US', {
+const TIMELINE_DAY_FORMATTER = new Intl.DateTimeFormat(APP_LOCALE, {
   month: 'short',
   day: 'numeric',
   year: 'numeric',
   timeZone: 'UTC',
 });
-const TIMELINE_MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', {
+const TIMELINE_MONTH_FORMATTER = new Intl.DateTimeFormat(APP_LOCALE, {
   month: 'long',
   year: 'numeric',
   timeZone: 'UTC',
 });
-const TIMELINE_YEAR_FORMATTER = new Intl.DateTimeFormat('en-US', {
+const TIMELINE_YEAR_FORMATTER = new Intl.DateTimeFormat(APP_LOCALE, {
   year: 'numeric',
   timeZone: 'UTC',
 });
@@ -118,7 +127,18 @@ function isTimelineDensity(value: string): value is TimelineDensity {
 @Component({
   selector: 'app-patient-timetable-page',
   standalone: true,
-  imports: [CommonModule, RouterLink, TimetableFilterSelectComponent, HelpPopoverComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    TimetableFilterSelectComponent,
+    HelpPopoverComponent,
+    LucideArrowLeft,
+    LucideCircleDot,
+    LucideCircleHelp,
+    LucideExternalLink,
+    LucideFilterX,
+    LucideX,
+  ],
   templateUrl: './patient-timetable-page.component.html',
   styleUrl: './patient-timetable-page.component.scss',
 })

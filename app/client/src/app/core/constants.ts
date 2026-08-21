@@ -2,6 +2,8 @@ import { ClinicalFormState, CloudProvider, ReasoningLevel, RuntimeSettings } fro
 
 export const API_BASE_URL = "/api";
 
+export const APP_LOCALE = "en-GB";
+
 export type LLMRuntimeDefaults = {
   text_extraction_model: string;
   clinical_model: string;

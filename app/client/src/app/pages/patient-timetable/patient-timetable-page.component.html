@@ -3,7 +3,7 @@
   <section class="timetable-shell">
     <header class="timetable-header">
       <div class="timetable-heading">
-        <a class="back-link" routerLink="/clinical-sessions">← Clinical sessions</a>
+        <a class="back-link" routerLink="/clinical-sessions"><svg lucideArrowLeft size="15" aria-hidden="true"></svg> Clinical sessions</a>
         <p class="eyebrow">Session {{ sessionId() ?? '' }}</p>
         <h1>Patient timeline</h1>
         <p class="page-intro">A chronological review of clinically relevant events, supporting evidence, and timing certainty.</p>
@@ -127,7 +127,7 @@
 
             @if (timelineGroups().length === 0) {
               <div class="empty-state">
-                <span class="empty-state-icon" aria-hidden="true">⌁</span>
+                <span class="empty-state-icon" aria-hidden="true"><svg lucideFilterX size="28"></svg></span>
                 <h3>No events match these filters</h3>
                 <p>Try showing uncertain timing or choosing a different evidence filter.</p>
               </div>
@@ -137,7 +137,11 @@
                   <section class="event-group" [class.is-unanchored]="group.isUnanchored" [attr.aria-labelledby]="'group-' + group.key">
                     <header class="event-group-header">
                       <div class="event-group-marker" [class.is-unanchored]="group.isUnanchored" aria-hidden="true">
-                        <span>{{ group.isUnanchored ? '?' : '•' }}</span>
+                        @if (group.isUnanchored) {
+                          <svg lucideCircleHelp size="16"></svg>
+                        } @else {
+                          <svg lucideCircleDot size="16"></svg>
+                        }
                       </div>
                       <div class="event-group-copy">
                         <span class="section-kicker">{{ group.eyebrow }}</span>
@@ -161,7 +165,7 @@
                               </div>
                               <button type="button" class="event-inspect-button" [attr.aria-label]="'Inspect ' + event.title + ' details'" [attr.aria-pressed]="selectedEventId() === event.event_id" [attr.data-event-id]="event.event_id" [attr.tabindex]="0" (click)="selectEvent(event)" (keydown)="handleEventKeydown($event, event)">
                                 <span>Inspect details</span>
-                                <span aria-hidden="true">↗</span>
+                                <svg lucideExternalLink size="14" aria-hidden="true"></svg>
                               </button>
                             </div>
                             <div class="event-meta-row">
@@ -206,7 +210,7 @@
               <span class="section-kicker">Supporting detail</span>
               <h2>Event inspector</h2>
             </div>
-            <button type="button" class="icon-button" aria-label="Close event inspector" (click)="closeInspector()">×</button>
+            <button type="button" class="icon-button" aria-label="Close event inspector" (click)="closeInspector()"><svg lucideX size="16" aria-hidden="true"></svg></button>
           </div>
           @if (selectedEvent(); as event) {
             <section class="inspector-hero">
@@ -275,7 +279,7 @@
             }
           } @else {
             <div class="inspector-placeholder">
-              <span aria-hidden="true">⌁</span>
+              <span aria-hidden="true"><svg lucideCircleHelp size="28"></svg></span>
               <h3>Select an event</h3>
               <p>Choose Inspect details on any event to review its description, timing, confidence, and source evidence.</p>
             </div>

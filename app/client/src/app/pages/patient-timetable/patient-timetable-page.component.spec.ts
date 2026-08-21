@@ -159,7 +159,7 @@ describe('PatientTimetablePageComponent', () => {
     });
 
     expect(component.timelineGroups().map((group) => [group.label, group.events.length])).toEqual([
-      ['Feb 3, 2025', 2],
+      ['3 Feb 2025', 2],
       ['Date not reported', 1],
     ]);
     expect(component.eventDateSummary(component.timeline()!.events[2])).toBe('No canonical date · After treatment');

@@ -9,6 +9,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { LucideCircleHelp, LucideX } from '@lucide/angular';
 
 let nextPopoverId = 0;
 type HelpPopoverPlacement = 'auto' | 'top' | 'bottom' | 'left' | 'right';
@@ -16,6 +17,7 @@ type HelpPopoverPlacement = 'auto' | 'top' | 'bottom' | 'left' | 'right';
 @Component({
   selector: 'app-help-popover',
   standalone: true,
+  imports: [LucideCircleHelp, LucideX],
   templateUrl: './help-popover.component.html',
   styleUrl: './help-popover.component.scss',
 })

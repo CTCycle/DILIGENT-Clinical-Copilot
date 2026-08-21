@@ -26,7 +26,7 @@
           <p class="guidance-tour-progress">{{ tour.stepIndex + 1 }} of {{ tour.definition.steps.length }}</p>
           <h2 id="guidance-tour-title">{{ currentStep()?.title }}</h2>
         </div>
-        <button type="button" class="guidance-tour-close" aria-label="Close walkthrough" (click)="skip()">×</button>
+        <button type="button" class="guidance-tour-close" aria-label="Close walkthrough" (click)="skip()"><svg lucideX size="16"></svg></button>
       </div>
       <p id="guidance-tour-description">{{ currentStep()?.body }}</p>
       @if (!targetRect()) {
