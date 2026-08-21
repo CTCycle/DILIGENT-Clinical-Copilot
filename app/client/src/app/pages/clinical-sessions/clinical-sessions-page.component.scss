@@ -410,6 +410,8 @@
 .clinical-session-preview-side {
   max-height: 100%;
   overflow-y: auto;
+  border-inline-start: 1px solid var(--cs-border);
+  padding-inline-start: var(--space-lg);
   padding-right: 2px;
 }
 
@@ -457,15 +459,18 @@
 }
 
 .clinical-session-preview-content {
-  max-height: 100%;
-  height: 100%;
-  overflow: auto;
+  height: auto;
+  max-height: none;
+  min-width: 0;
+  overflow: visible;
   color: var(--cs-text);
   font: 13px/1.55 "Inter", "Segoe UI", sans-serif;
 }
 
 :host ::ng-deep .clinical-session-preview-content > :first-child {
   margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
 }
 
 :host ::ng-deep .clinical-session-preview-content > :last-child {
@@ -476,6 +481,12 @@
   margin: 18px 0 8px;
   color: var(--cs-text);
   line-height: 1.2;
+}
+
+:host ::ng-deep .clinical-session-preview-content :is(h2, h3) {
+  margin-top: var(--space-lg);
+  border-top: 1px solid var(--cs-border);
+  padding-top: var(--space-md);
 }
 
 :host ::ng-deep .clinical-session-preview-content h1 {
