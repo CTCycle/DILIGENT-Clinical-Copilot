@@ -1,4 +1,5 @@
 import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+import { LucideSparkles, LucideX } from '@lucide/angular';
 
 import { GuidanceStateService } from './guidance-state.service';
 import { GuidanceId } from './guidance.types';
@@ -6,6 +7,7 @@ import { GuidanceId } from './guidance.types';
 @Component({
   selector: 'app-feature-tip',
   standalone: true,
+  imports: [LucideSparkles, LucideX],
   templateUrl: './feature-tip.component.html',
   styleUrl: './feature-tip.component.scss',
 })

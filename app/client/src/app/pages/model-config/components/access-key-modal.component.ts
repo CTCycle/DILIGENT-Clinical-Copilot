@@ -20,6 +20,7 @@ import {
 } from '../../../core/services/model-config-api';
 import { ModalShellComponent } from '../../../components/modal-shell/modal-shell.component';
 import { StatusMessageComponent } from '../../../components/status-message/status-message.component';
+import { formatAppDateTime } from '../../../core/utils/date-formatting';
 
 const MASKED_KEY_LABEL = '********************';
 const MIN_ACCESS_KEY_LENGTH = 16;
@@ -33,14 +34,7 @@ function obfuscateFingerprint(value: string): string {
 }
 
 function formatTimestamp(value: string | null): string {
-  if (!value) {
-    return 'Not used';
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return 'Not used';
-  }
-  return parsed.toLocaleString();
+  return formatAppDateTime(value, 'Not used');
 }
 
 @Component({

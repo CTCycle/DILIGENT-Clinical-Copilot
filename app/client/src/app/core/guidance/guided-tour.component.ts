@@ -9,6 +9,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { LucideX } from '@lucide/angular';
 
 import { ActiveGuidedTour, GuidanceTourService } from './guidance-tour.service';
 
@@ -24,7 +25,7 @@ const FOCUSABLE_SELECTOR = [
 @Component({
   selector: 'app-guided-tour',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LucideX],
   templateUrl: './guided-tour.component.html',
   styleUrl: './guided-tour.component.scss',
 })

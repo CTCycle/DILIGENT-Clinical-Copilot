@@ -1,10 +1,10 @@
 @if (visible()) {
   <aside class="guidance-feature-tip" role="note" [attr.aria-label]="title">
-    <div class="guidance-feature-tip-icon" aria-hidden="true">✦</div>
+    <div class="guidance-feature-tip-icon" aria-hidden="true"><svg lucideSparkles size="18"></svg></div>
     <div class="guidance-feature-tip-copy">
       <div class="guidance-feature-tip-heading">
         <strong>{{ title }}</strong>
-        <button type="button" class="guidance-feature-tip-dismiss" aria-label="Dismiss this tip" (click)="dismiss()">×</button>
+        <button type="button" class="guidance-feature-tip-dismiss" aria-label="Dismiss this tip" (click)="dismiss()"><svg lucideX size="16"></svg></button>
       </div>
       <p>{{ body }}</p>
       <div class="guidance-feature-tip-actions">

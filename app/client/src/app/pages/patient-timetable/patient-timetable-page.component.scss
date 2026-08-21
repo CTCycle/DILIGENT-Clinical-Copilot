@@ -760,6 +760,20 @@ button:disabled {
   line-height: 1;
 }
 
+.empty-state-icon svg,
+.inspector-placeholder > span svg,
+.event-group-marker svg,
+.event-inspect-button svg,
+.icon-button svg,
+.back-link svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.back-link {
+  gap: var(--space-xs);
+}
+
 .empty-state h3,
 .inspector-placeholder h3 {
   margin: var(--space-md) 0 var(--space-xs);
