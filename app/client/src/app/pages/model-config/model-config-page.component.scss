@@ -763,6 +763,7 @@
 
 .model-config-provider-mark.is-openai {
   color: var(--mc-text);
+  overflow: hidden;
 }
 
 .model-config-provider-logo-switch {
@@ -793,7 +794,9 @@
 
 .model-config-provider-mark.is-openai .model-config-provider-logo {
   filter: none;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: left center;
+  transform: translateX(3px) scale(1.75);
 }
 
 .model-config-provider-name strong,
