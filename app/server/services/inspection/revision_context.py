@@ -22,6 +22,15 @@ def _json_text(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
 
 ###############################################################################
+def _selected_context_value(
+    values: dict[str, Any],
+    selected_keys: set[str],
+    key: str,
+    default: Any = None,
+) -> Any:
+    return values[key] if key in selected_keys else default
+
+###############################################################################
 def build_revision_context(
     *,
     session: dict[str, Any],
@@ -145,16 +154,13 @@ def build_revision_context(
     plan = build_context_plan(segments, input_budget=planning_budget)
     selected_keys = {segment.key for segment in plan.selected}
 
-    def selected_value(key: str, default: Any = None) -> Any:
-        return values[key] if key in selected_keys else default
-
     selected_sections = {
-        name: selected_value(f"clinical.section.{name}")
+        name: _selected_context_value(values, selected_keys, f"clinical.section.{name}")
         for name in sorted(sections)
         if f"clinical.section.{name}" in selected_keys
     }
     structured_fields = {
-        name: selected_value(f"clinical.structured.{name}")
+        name: _selected_context_value(values, selected_keys, f"clinical.structured.{name}")
         for name in (
             "structured_case",
             "lab_timeline",
@@ -175,7 +181,9 @@ def build_revision_context(
     )
 
     clinical_evidence: dict[str, Any] = {
-        "source_text": selected_value("clinical.source_text", {"omitted": True}),
+        "source_text": _selected_context_value(
+            values, selected_keys, "clinical.source_text", {"omitted": True}
+        ),
         "sections": selected_sections,
     }
     for field_name, value in structured_fields.items():
@@ -188,19 +196,31 @@ def build_revision_context(
         },
         "clinical_evidence": clinical_evidence,
         "review_target": {
-            "official_report": selected_value(
+            "official_report": _selected_context_value(
+                values,
+                selected_keys,
                 "review.official_report", {"omitted": True}
             ),
-            "final_report": selected_value("review.final_report", {"omitted": True}),
+            "final_report": _selected_context_value(
+                values, selected_keys, "review.final_report", {"omitted": True}
+            ),
         },
         "audit": {
-            "manual_edits": selected_value("audit.manual_edits", []),
-            "version_lineage": selected_value("audit.version_lineage", []),
-            "metadata": selected_value("audit.metadata", {}),
+            "manual_edits": _selected_context_value(
+                values, selected_keys, "audit.manual_edits", []
+            ),
+            "version_lineage": _selected_context_value(
+                values, selected_keys, "audit.version_lineage", []
+            ),
+            "metadata": _selected_context_value(values, selected_keys, "audit.metadata", {}),
         },
         "user_steering": {
-            "selected_text": selected_value("user.selected_text", {"omitted": True}),
-            "instruction": selected_value("user.instruction", {"omitted": True}),
+            "selected_text": _selected_context_value(
+                values, selected_keys, "user.selected_text", {"omitted": True}
+            ),
+            "instruction": _selected_context_value(
+                values, selected_keys, "user.instruction", {"omitted": True}
+            ),
         },
         "context_budget": {
             "status": plan.status,
