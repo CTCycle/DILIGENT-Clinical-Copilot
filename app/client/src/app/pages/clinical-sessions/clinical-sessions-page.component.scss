@@ -400,8 +400,9 @@
   grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.8fr);
   gap: var(--space-md);
   align-items: start;
-  height: auto;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .clinical-session-preview-main,
@@ -410,6 +411,12 @@
   gap: var(--space-md);
   min-width: 0;
   min-height: 0;
+}
+
+.clinical-session-preview-main {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .clinical-session-preview-side {
@@ -427,6 +434,7 @@
   background: transparent;
   padding: var(--space-md) 0 0;
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -464,10 +472,10 @@
 }
 
 .clinical-session-preview-content {
-  height: auto;
-  max-height: none;
+  height: 100%;
+  max-height: 100%;
   min-width: 0;
-  overflow: visible;
+  overflow: auto;
   color: var(--cs-text);
   font: 13px/1.55 "Inter", "Segoe UI", sans-serif;
 }
