@@ -266,12 +266,6 @@ class LLMRuntimeConfig:
     ) -> ReasoningLevel:
         if "reasoning_level" in overrides:
             return cls._coerce_reasoning_level(overrides["reasoning_level"])
-        if "ollama_reasoning" in overrides:
-            return (
-                ReasoningLevel.MEDIUM
-                if cls._coerce_bool(overrides["ollama_reasoning"])
-                else ReasoningLevel.OFF
-            )
         return persisted_level
 
     # -------------------------------------------------------------------------
