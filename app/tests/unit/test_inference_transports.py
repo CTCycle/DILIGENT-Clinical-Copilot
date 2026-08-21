@@ -12,9 +12,12 @@ from services.llm.transports.openai_responses import OpenAIResponsesTransport
 
 ###############################################################################
 class FakeOpenAIChatResponse:
+
+    # -------------------------------------------------------------------------
     def raise_for_status(self) -> None:
         return None
 
+    # -------------------------------------------------------------------------
     def json(self) -> dict[str, Any]:
         return {"choices": [{"message": {"content": "ok"}}]}
 
@@ -22,7 +25,10 @@ class FakeOpenAIChatResponse:
 def test_openai_chat_transport_normalizes_reasoning_and_output_options() -> None:
     captured: dict[str, Any] = {}
 
+    ###############################################################################
     class FakeClient:
+
+        # -------------------------------------------------------------------------
         async def post(self, path: str, *, json: dict[str, Any]) -> FakeOpenAIChatResponse:
             captured["path"] = path
             captured["json"] = json
@@ -56,7 +62,10 @@ def test_openai_chat_transport_normalizes_reasoning_and_output_options() -> None
 def test_openai_responses_transport_preserves_options_and_normalizes_limits() -> None:
     captured: dict[str, Any] = {}
 
+    ###############################################################################
     class FakeResponses:
+
+        # -------------------------------------------------------------------------
         async def create(self, **kwargs: Any) -> SimpleNamespace:
             captured.update(kwargs)
             return SimpleNamespace(output_text="ok")
@@ -89,7 +98,10 @@ def test_openai_responses_transport_preserves_options_and_normalizes_limits() ->
 def test_anthropic_transport_reserves_reasoning_budget_without_fixed_default() -> None:
     captured: dict[str, Any] = {}
 
+    ###############################################################################
     class FakeMessages:
+
+        # -------------------------------------------------------------------------
         async def create(self, **kwargs: Any) -> SimpleNamespace:
             captured.update(kwargs)
             return SimpleNamespace(content=[SimpleNamespace(text="ok")])

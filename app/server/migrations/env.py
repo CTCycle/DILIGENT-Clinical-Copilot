@@ -13,6 +13,7 @@ config = context.config
 target_metadata = Base.metadata
 
 
+###############################################################################
 def _build_connectable():
     settings = get_server_settings().database
     if settings.backend == "sqlite":
@@ -23,6 +24,7 @@ def _build_connectable():
     raise ValueError(f"Unsupported database backend: {settings.backend}")
 
 
+###############################################################################
 def _configure(connection: Connection) -> None:
     context.configure(
         connection=connection,
@@ -35,12 +37,14 @@ def _configure(connection: Connection) -> None:
     )
 
 
+###############################################################################
 def _run_migrations(connection: Connection) -> None:
     _configure(connection)
     with context.begin_transaction():
         context.run_migrations()
 
 
+###############################################################################
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     if not url:
@@ -61,6 +65,7 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+###############################################################################
 def run_migrations_online() -> None:
     supplied_connection = config.attributes.get("connection")
     if supplied_connection is not None:

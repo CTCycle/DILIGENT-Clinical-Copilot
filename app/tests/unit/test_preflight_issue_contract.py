@@ -14,7 +14,6 @@ from services.session.preflight import (
     validate_clinical_input_preflight,
 )
 
-
 ###############################################################################
 def test_blocking_issue_is_enriched_with_modal_metadata() -> None:
     issue = _present_preflight_issue(

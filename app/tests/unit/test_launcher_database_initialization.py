@@ -19,7 +19,7 @@ def test_launcher_keeps_database_initialization_explicit() -> None:
     assert initialize_database > start_application
     assert "app/scripts/initialize_database.py" in script[initialize_database:]
     assert "'InitializeDatabase' { Initialize-Database }" in script
-    assert "'^4$' { Initialize-Database }" in script
+    assert "'^6$' { Initialize-Database }" in script
     assert "Initialize-Database" in script[install_application:install_end]
     initialize_database_end = script.index("function Invoke-TestSuite")
     assert "Write-Step 'Synchronizing database schema'" in script[
