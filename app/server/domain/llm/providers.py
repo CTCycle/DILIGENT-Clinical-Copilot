@@ -63,6 +63,10 @@ class CloudModelDescriptor(BaseModel):
     display_name: str
     endpoint_family: str | None = None
     capabilities: ProviderCapabilities | None = None
+    input_token_limit: int | None = Field(default=None, ge=1)
+    output_token_limit: int | None = Field(default=None, ge=1)
+    supports_thinking: bool | None = None
+    supports_temperature: bool | None = None
 
 ###############################################################################
 class CloudProviderDescriptor(BaseModel):

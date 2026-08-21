@@ -18,7 +18,7 @@ describe('buildClinicalPayload', () => {
       clinicalModel: 'y',
       revisionModel: 'y',
       timelineModel: 'x',
-      reasoning: false,
+      reasoning: 'off',
     };
 
     const payload = buildClinicalPayload(form, settings);
@@ -41,7 +41,7 @@ describe('buildClinicalPayload', () => {
       clinicalModel: 'gpt-oss:20b',
       revisionModel: 'gpt-oss:20b',
       timelineModel: 'qwen3.5:9b',
-      reasoning: false,
+      reasoning: 'off',
     };
 
     const payload = buildClinicalPayload(form, settings);

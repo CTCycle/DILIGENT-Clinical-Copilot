@@ -23,6 +23,7 @@ import {
   ModelConfigPersistResponse,
   ModelConfigUpdateRequest,
   RagSettings,
+  ReasoningLevel,
   RuntimeSettings,
 } from '../../core/models/types';
 import {
@@ -53,6 +54,7 @@ import {
 } from './model-config.types';
 
 const MODEL_BATCH_SIZE = 12;
+const REASONING_LEVELS: readonly ReasoningLevel[] = ['off', 'low', 'medium', 'high'];
 type SaveOperation = 'configuration' | 'reasoning' | 'rag';
 
 const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
@@ -157,7 +159,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   readonly statusMessage = signal('');
   readonly openProviderModal = signal<AccessKeyProvider | null>(null);
   readonly modelPullProgress = signal<Record<string, ModelPullProgressState>>({});
-  readonly previewReasoningLevel = signal(2);
+  readonly previewReasoningLevel = signal(0);
   readonly previewCloudModelOverrides = signal<Partial<Record<CloudProvider, string>>>({});
   readonly ragSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
   readonly draftRagSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
@@ -464,7 +466,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
 
   private applyPreviewDefaultState(): void {
     const state = this.appState.state().diliAgent;
-    this.previewReasoningLevel.set(state.settings.reasoning ? 2 : 0);
+    this.previewReasoningLevel.set(REASONING_LEVELS.indexOf(state.settings.reasoning));
   }
 
   async persistConfigPatch(
@@ -551,7 +553,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     if ('text_extraction_model' in patch) nextSettings.textExtractionModel = payload.text_extraction_model || '';
     if ('revision_model' in patch) nextSettings.revisionModel = payload.revision_model || '';
     if ('timeline_model' in patch) nextSettings.timelineModel = payload.timeline_model || '';
-    if ('ollama_reasoning' in patch) nextSettings.reasoning = payload.ollama_reasoning;
+    if ('reasoning_level' in patch) nextSettings.reasoning = payload.reasoning_level;
     this.appState.updateDiliAgent({ settings: nextSettings });
     if ('rag_settings' in patch) {
       const nextRagSettings = this.normalizeRagSettings(payload.rag_settings);
@@ -771,20 +773,20 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
 
   handleReasoningLevelChange(level: number): void {
     const normalizedLevel = Math.max(0, Math.min(3, Math.round(level)));
-    const enabled = normalizedLevel > 0;
+    const reasoningLevel = REASONING_LEVELS[normalizedLevel];
     this.previewReasoningLevel.set(normalizedLevel);
     const currentSettings = this.appState.state().diliAgent.settings;
     this.appState.updateDiliAgent({
       settings: {
         ...currentSettings,
-        reasoning: enabled,
+        reasoning: reasoningLevel,
       },
     });
     if (this.reasoningSaveTimer) {
       clearTimeout(this.reasoningSaveTimer);
     }
     this.reasoningSaveTimer = setTimeout(() => {
-      void this.persistConfigPatch({ ollama_reasoning: enabled }, 'Extra parameters saved.', false, 'reasoning');
+      void this.persistConfigPatch({ reasoning_level: reasoningLevel }, 'Reasoning preference saved.', false, 'reasoning');
       this.reasoningSaveTimer = null;
     }, 250);
   }

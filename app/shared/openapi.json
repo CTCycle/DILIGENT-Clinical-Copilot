@@ -3,7 +3,7 @@
   "info": {
     "title": "DILI Backend",
     "description": "FastAPI backend",
-    "version": "3.0.0"
+    "version": "3.2.0"
   },
   "paths": {
     "/api/clinical/section-template": {
@@ -4247,6 +4247,11 @@
               }
             ],
             "title": "Version"
+          },
+          "stop_requested": {
+            "type": "boolean",
+            "title": "Stop Requested",
+            "default": false
           }
         },
         "type": "object",
@@ -4835,9 +4840,30 @@
             ],
             "title": "Clinical Model"
           },
-          "ollama_reasoning": {
-            "type": "boolean",
-            "title": "Ollama Reasoning"
+          "revision_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Model"
+          },
+          "timeline_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeline Model"
+          },
+          "reasoning_level": {
+            "$ref": "#/components/schemas/ReasoningLevel"
           },
           "ollama_seed": {
             "anyOf": [
@@ -4873,7 +4899,9 @@
           "cloud_model",
           "text_extraction_model",
           "clinical_model",
-          "ollama_reasoning",
+          "revision_model",
+          "timeline_model",
+          "reasoning_level",
           "ollama_seed",
           "rag_settings"
         ],
@@ -4948,9 +4976,30 @@
             ],
             "title": "Clinical Model"
           },
-          "ollama_reasoning": {
-            "type": "boolean",
-            "title": "Ollama Reasoning"
+          "revision_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Model"
+          },
+          "timeline_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeline Model"
+          },
+          "reasoning_level": {
+            "$ref": "#/components/schemas/ReasoningLevel"
           },
           "ollama_seed": {
             "anyOf": [
@@ -4995,7 +5044,9 @@
           "cloud_model",
           "text_extraction_model",
           "clinical_model",
-          "ollama_reasoning",
+          "revision_model",
+          "timeline_model",
+          "reasoning_level",
           "ollama_seed",
           "rag_settings",
           "embedding_runtime",
@@ -5068,16 +5119,37 @@
             ],
             "title": "Clinical Model"
           },
-          "ollama_reasoning": {
+          "revision_model": {
             "anyOf": [
               {
-                "type": "boolean"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Ollama Reasoning"
+            "title": "Revision Model"
+          },
+          "timeline_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeline Model"
+          },
+          "reasoning_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasoningLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "ollama_seed": {
             "anyOf": [
@@ -5860,6 +5932,16 @@
         "additionalProperties": false,
         "type": "object",
         "title": "RagSettingsUpdateRequest"
+      },
+      "ReasoningLevel": {
+        "type": "string",
+        "enum": [
+          "off",
+          "low",
+          "medium",
+          "high"
+        ],
+        "title": "ReasoningLevel"
       },
       "ReferenceCatalogRuntimeObservationResponse": {
         "properties": {
@@ -7362,11 +7444,6 @@
             ],
             "title": "Revision Instruction"
           },
-          "model_overrides": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Model Overrides"
-          },
           "metadata": {
             "additionalProperties": true,
             "type": "object",
@@ -7434,53 +7511,6 @@
         "additionalProperties": false,
         "type": "object",
         "title": "SessionTimelineListResponse"
-      },
-      "SessionTimelineModelOverrides": {
-        "properties": {
-          "use_cloud_services": {
-            "type": "boolean",
-            "title": "Use Cloud Services"
-          },
-          "llm_provider": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Llm Provider"
-          },
-          "cloud_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cloud Model"
-          },
-          "text_extraction_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Text Extraction Model"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "use_cloud_services"
-        ],
-        "title": "SessionTimelineModelOverrides"
       },
       "SessionTimelinePreview": {
         "properties": {
@@ -7682,16 +7712,6 @@
             "type": "boolean",
             "title": "Force Regenerate",
             "default": false
-          },
-          "model_overrides": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SessionTimelineModelOverrides"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "additionalProperties": false,
@@ -7985,4 +8005,4 @@
       }
     }
   }
-}
+}\n

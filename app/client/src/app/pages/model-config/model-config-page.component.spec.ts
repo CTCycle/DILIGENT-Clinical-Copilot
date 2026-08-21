@@ -110,7 +110,7 @@ describe('ModelConfigPageComponent', () => {
       text_extraction_model: 'qwen3.5:2b',
       revision_model: 'qwen3.5:2b',
       timeline_model: 'qwen3.5:2b',
-      ollama_reasoning: true,
+      reasoning_level: 'medium',
       ollama_seed: 42,
       rag_settings: component.ragSettings(),
       updated_at: new Date().toISOString(),

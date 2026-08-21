@@ -22,6 +22,7 @@ def iter_catalog_manifest_paths() -> list[Path]:
         not in {
             "cloud_providers.json",
             "llm_generation_policies.json",
+            "llm_model_capabilities.json",
             "llm_models.json",
             "local_models.json",
         }
