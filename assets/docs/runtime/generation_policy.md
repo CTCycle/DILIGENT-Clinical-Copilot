@@ -1,27 +1,63 @@
-# Automatic generation policy
+# Effective LLM inference policy
 
-Last updated: 2026-08-02
+Last updated: 2026-08-21
 
-DILIGENT selects sampling behavior automatically immediately before an LLM
-request. Operators configure providers, models, reasoning, and retrieval only.
-Temperature is not an operator, deployment, API, or per-run setting.
+DILIGENT resolves an effective inference configuration immediately before each
+LLM request. Operators choose the provider, model, and one global reasoning
+level: `off`, `low`, `medium`, or `high`. The selected level is persisted as
+`reasoning_level`. A legacy persisted `ollama_reasoning=false` is read as
+`off`, and `true` is read as `medium`; new writes use only `reasoning_level`.
 
-Resolution is deterministic: exact model, model family, catalogued local model
-profile, provider compatibility, then the provider/model default. A `null`
-temperature means the provider payload omits the parameter. Caller options are
-sanitized and cannot override the policy.
+## Purpose responsibility
 
-The policy version is recorded in run provenance together with parser and
-clinical policy IDs, purpose, provider, model, match kind, and effective
-temperature or `provider_default`.
+The global preference is transformed into a task-level request so structured
+work does not inherit the same reasoning cost as clinical synthesis.
 
-The current policy uses `0.0`/`0.2` as DILIGENT defaults for ordinary supported
-instruction models, not as vendor guarantees. Qwen, DeepSeek-R1, Phi-4
-Reasoning, Gemini, Anthropic, GPT-5, and GPT-OSS follow their documented model
-compatibility behavior in the source-controlled catalog. Unsupported and
-unknown models use the model/provider default.
+| Purpose | Off | Low | Medium | High |
+| --- | --- | --- | --- | --- |
+| Clinical synthesis | off | low | medium | high |
+| Structured extraction | off | low | low | low |
+| Faithful rewrite | off | low | low | low |
+| Revision scan/planning/tool selection/editing/QA | off | low | low | medium |
+| Timeline, simple | off | low | low | low |
+| Timeline, moderate | off | low | medium | medium |
+| Timeline, complex | off | low | medium | high |
+| JSON repair/connectivity | off | off | off | off |
 
-When adding a model, add or update the catalog rule, verify the primary vendor
-recommendation, add a resolver test, run provider payload tests, and update the
-source review date. Do not add unrelated sampling controls such as `top_p`,
-penalties, or a user override.
+The policy records both the user-requested and purpose-requested levels. The
+capability resolver then records the provider-effective level and an explicit
+coercion reason when a model cannot honor the request.
+
+## Sampling and output budgets
+
+The catalog at `app/resources/catalogs/llm_generation_policies.json` defines
+the deterministic base temperatures: clinical synthesis `0.2`; extraction,
+timeline, revision, and faithful rewrite `0.0`; JSON repair and connectivity
+omit temperature. Capability rules may omit temperature when the selected
+model does not support sampling controls or when active reasoning makes the
+provider parameter invalid. Caller options cannot override the effective
+configuration.
+
+The capability catalog at
+`app/resources/catalogs/llm_model_capabilities.json` resolves exact model,
+longest family prefix, provider, then conservative fallback. Context capacity
+is the intersection of catalog/model capacity and live local runtime capacity.
+The input budget is that capacity less visible output, reasoning reserve, and
+safety reserve. Capacity is a ceiling, not a target: context segments are
+deduplicated, prioritized, and reported when omitted or overflowing.
+
+## Provider normalization
+
+OpenAI Responses preserves normalized options and uses `max_output_tokens`;
+OpenAI Chat Completions uses `max_tokens`; Anthropic reserves a separate
+thinking budget; Gemini maps the four levels to its supported thinking levels;
+and Ollama sends `think=false`, `think=true`, or the GPT-OSS level string as
+supported by the selected model. Unknown or unsupported reasoning is visible
+in the effective configuration rather than silently treated as enabled.
+
+The policy version, purpose, provider, model, requested/effective levels,
+temperature, capability source, reserves, input budget, and compact context
+selection report are captured in runtime provenance.
+
+When adding a model, update both catalogs, verify the primary vendor contract,
+add resolver and provider-payload tests, and update the source review date.
