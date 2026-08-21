@@ -1,5 +1,5 @@
 # Experience
-Last updated: 2026-08-20
+Last updated: 2026-08-21
 
 ## Page Structure
 - Routes:
@@ -51,7 +51,7 @@ Last updated: 2026-08-20
 ## Contextual Guidance
 - Help is available from the existing header and opens the concise **Tips & Tricks** modal.
 - Only the DILI Agent first-assessment callout appears automatically, and only until it is seen or dismissed in that browser.
-- The optional DILI walkthrough has three steps, can be skipped or closed at any point, supports Back and restart from Help, and uses stable `data-guidance-target` anchors.
+- The optional DILI walkthrough has four steps for clinical input, patient name/date, RAG evidence, and review/run. It can be closed at any point, supports Back and restart from Help, and uses stable `data-guidance-target` anchors.
 - Runtime/RAG, Clinical Session sections, timeline generation, and Patient Timeline review controls use click-or-keyboard popovers rather than automatic tutorials.
 - Guidance state is browser-local, versioned per definition, and tolerant of unavailable local storage. A revised content version can reintroduce only the affected guidance.
 - Guidance popovers and tours must restore focus, remain keyboard navigable, avoid covering the highlighted control, and honor `prefers-reduced-motion`.

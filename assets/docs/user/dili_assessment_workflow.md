@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-08-18
+Last updated: 2026-08-21
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -19,7 +19,7 @@ Typical input areas include:
 - run or submit action
 - generated assessment output
 
-On a first empty assessment, the page may show a small optional **Get started with DILI Agent** callout. Use **Show me** for the three-step tour of clinical input, RAG evidence, and Run, or use **Open Configurations** to choose a runtime and model. The tour can be skipped and reopened from header **Help**.
+On a first empty assessment, the page may show a small optional **Get started with DILI Agent** callout. Use **Show me** for the four-step tour of clinical input, patient name/date, RAG evidence, and review/run, or use **Open Configurations** to choose a runtime and model. The tour can be closed with its X button and reopened from header **Help**.
 
 ## Enter Clinical Context
 Use clear, specific, structured text. Prefer input like:
