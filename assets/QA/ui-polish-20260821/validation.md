@@ -43,6 +43,7 @@ All QA artifacts are stored under this directory; no API, persistence, or schema
 ## Follow-up visual polish
 
 - Clinical Sessions section and extracted-data separators now use the shared theme divider token for clearer hierarchy while remaining lightweight.
+- Historical CSS review confirmed that the pre-`444ca06e` preview used defined `1px` section borders. The follow-up now uses `--cs-border-strong` for the flat section rules and column divider, restoring that definition without bringing back full boxed cards.
 - Empty native date inputs no longer paint their browser-generated segments beneath the localized `dd/mm/yyyy` hint; the hint remains contained at both desktop widths.
 - In-app Browser follow-up at `1440x1000` and `1100x768` in light and dark themes showed the corrected date filter and separators with no console errors. The temporary viewport override was reset after the check.
 - [Clinical Sessions light, desktop follow-up](followup/clinical-sessions-light-1440x1000.png)
