@@ -465,7 +465,6 @@ class LLMRuntimeConfig:
         model: str,
         user_reasoning_level: ReasoningLevel | None = None,
         timeline_complexity: str = "moderate",
-        reasoning_enabled: bool | None = None,
     ) -> GenerationPolicy:
         return resolve_policy(
             purpose=purpose,
@@ -477,7 +476,6 @@ class LLMRuntimeConfig:
                 else LLMRuntimeConfig.get_reasoning_level()
             ),
             timeline_complexity=timeline_complexity,
-            reasoning_enabled=reasoning_enabled,
         )
 
     # -------------------------------------------------------------------------

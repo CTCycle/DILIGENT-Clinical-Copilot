@@ -20,7 +20,7 @@ from openai import (
 from common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
-from services.llm.generation_policy import GenerationPurpose, GenerationPolicy
+from services.llm.generation_policy import GenerationPurpose
 from configurations.startup import get_server_settings
 from repositories.serialization.access_keys import AccessKeySerializer
 from services.llm.structured import (
@@ -35,6 +35,7 @@ from services.llm.transports.anthropic_messages import AnthropicMessagesTranspor
 from services.llm.transports.base import CloudTransport
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.routed_gateway import RoutedGatewayTransport
+from services.llm.model_capabilities import EffectiveInferenceConfig
 
 ProviderName = CloudProviderId
 
@@ -260,15 +261,53 @@ class CloudLLMClient:
             }
             if not model_id or "generatecontent" not in normalized_actions:
                 continue
+            input_token_limit = self._coerce_optional_int(
+                getattr(item, "input_token_limit", None)
+            )
+            output_token_limit = self._coerce_optional_int(
+                getattr(item, "output_token_limit", None)
+            )
+            thinking_metadata = getattr(item, "thinking", None)
+            if thinking_metadata is None:
+                thinking_metadata = getattr(item, "thinking_config", None)
+            supports_thinking = (
+                bool(thinking_metadata)
+                if thinking_metadata is not None
+                else (
+                    any("think" in action for action in normalized_actions)
+                    if any("think" in action for action in normalized_actions)
+                    else None
+                )
+            )
+            temperature_metadata = getattr(item, "temperature", None)
             models.append(
                 CloudModelDescriptor(
                     id=model_id,
                     display_name=str(
                         getattr(item, "display_name", None) or model_id
                     ),
+                    input_token_limit=input_token_limit,
+                    output_token_limit=output_token_limit,
+                    supports_thinking=supports_thinking,
+                    supports_temperature=(
+                        bool(temperature_metadata)
+                        if temperature_metadata is not None
+                        else None
+                    ),
                 )
             )
         return models
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _coerce_optional_int(value: object) -> int | None:
+        if value is None:
+            return None
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed > 0 else None
 
     # -------------------------------------------------------------------------
     async def check_model_availability(self, name: str) -> None:
@@ -306,21 +345,23 @@ class CloudLLMClient:
         format: str | None = None,
         options: dict[str, Any] | None = None,
         purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
+        timeline_complexity: str = "moderate",
     ) -> dict[str, Any] | str:
         resolved_model = model or self.default_model
         if not resolved_model:
             raise LLMError("Model is required")
-        policy = LLMRuntimeConfig.resolve_generation_policy(
+        effective = LLMRuntimeConfig.resolve_effective_inference_config(
             purpose=purpose,
             provider=self.provider,
             model=resolved_model,
-            reasoning_enabled=False,
+            timeline_complexity=timeline_complexity,
         )
         options_payload = {
             key: value for key, value in (options or {}).items() if key != "temperature"
         }
-        if policy.temperature is not None:
-            options_payload["temperature"] = policy.temperature
+        if effective.temperature is not None:
+            options_payload["temperature"] = effective.temperature
+        options_payload.setdefault("max_output_tokens", effective.output_token_limit)
 
         try:
             if self.transport is not None:
@@ -330,6 +371,10 @@ class CloudLLMClient:
                         messages=messages,
                         options=options_payload,
                         json_mode=format == "json",
+                        reasoning_level=effective.effective_reasoning_level.value,
+                        reasoning_parameter=effective.reasoning_parameter,
+                        reasoning_reserve=effective.reasoning_reserve,
+                        output_token_limit=effective.output_token_limit,
                     )
                 )
                 return self._normalize_content(result.content)
@@ -339,6 +384,7 @@ class CloudLLMClient:
                     format=format,
                     options=options_payload,
                     messages=messages,
+                    effective=effective,
                 )
             if self.provider == "gemini":
                 return await self._chat_gemini(
@@ -347,6 +393,7 @@ class CloudLLMClient:
                     messages=messages,
                     schema=None,
                     json_mode=format == "json",
+                    effective=effective,
                 )
         except Exception as exc:  # noqa: BLE001
             raise self._map_provider_exception(exc) from exc
@@ -360,6 +407,7 @@ class CloudLLMClient:
         format: str | None,
         options: dict[str, Any] | None,
         messages: list[dict[str, str]],
+        effective: EffectiveInferenceConfig,
     ) -> dict[str, Any] | str:
         if self.openai_client is None:
             raise LLMError("OpenAI client is not configured")
@@ -372,6 +420,13 @@ class CloudLLMClient:
             kwargs["temperature"] = float(options["temperature"])
         if supports_sampling and options and "top_p" in options:
             kwargs["top_p"] = float(options["top_p"])
+        if effective.output_token_limit > 0:
+            kwargs["max_output_tokens"] = effective.output_token_limit
+        if effective.effective_reasoning_level.value != "off" and effective.reasoning_parameter in {
+            "effort",
+            "level",
+        }:
+            kwargs["reasoning"] = {"effort": effective.effective_reasoning_level.value}
         if format == "json":
             json_instruction = "Return the response as one valid JSON object."
             kwargs["instructions"] = (
@@ -396,6 +451,7 @@ class CloudLLMClient:
         messages: list[dict[str, str]],
         schema: type[T] | None,
         json_mode: bool,
+        effective: EffectiveInferenceConfig | None = None,
     ) -> dict[str, Any] | str:
         if self.gemini_client is None:
             raise LLMError("Gemini client is not configured")
@@ -411,6 +467,22 @@ class CloudLLMClient:
             config_kwargs["response_mime_type"] = "application/json"
         if schema is not None:
             config_kwargs["response_json_schema"] = schema.model_json_schema()
+        if effective is not None:
+            config_kwargs["max_output_tokens"] = effective.output_token_limit
+            if effective.reasoning_parameter == "level":
+                if effective.effective_reasoning_level.value == "off":
+                    config_kwargs["thinking_config"] = genai_types.ThinkingConfig(
+                        thinking_budget=0
+                    )
+                else:
+                    sdk_level = (
+                        genai_types.ThinkingLevel.LOW
+                        if effective.effective_reasoning_level.value in {"low", "medium"}
+                        else genai_types.ThinkingLevel.HIGH
+                    )
+                    config_kwargs["thinking_config"] = genai_types.ThinkingConfig(
+                        thinking_level=sdk_level
+                    )
         config = self._build_gemini_config(config_kwargs)
         response = await asyncio.to_thread(
             self.gemini_client.models.generate_content,
@@ -701,6 +773,7 @@ class CloudLLMClient:
         purpose: GenerationPurpose = GenerationPurpose.STRUCTURED_EXTRACTION,
         use_json_mode: bool = True,
         max_repair_attempts: int = 2,
+        timeline_complexity: str = "moderate",
     ) -> T:
         parser = StructuredOutputParser(schema=schema)
         format_instructions = parser.get_format_instructions()
@@ -713,14 +786,18 @@ class CloudLLMClient:
 
         if self.provider == "openai" and use_json_mode:
             try:
+                effective = LLMRuntimeConfig.resolve_effective_inference_config(
+                    purpose=purpose,
+                    provider=self.provider,
+                    model=resolved_model,
+                    timeline_complexity=timeline_complexity,
+                )
                 return await self._structured_openai(
                     model=resolved_model,
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     schema=schema,
-                    policy=LLMRuntimeConfig.resolve_generation_policy(
-                        purpose=purpose, provider=self.provider, model=resolved_model
-                    ),
+                    effective=effective,
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning(
@@ -730,6 +807,12 @@ class CloudLLMClient:
 
         if self.provider == "gemini" and use_json_mode:
             try:
+                effective = LLMRuntimeConfig.resolve_effective_inference_config(
+                    purpose=purpose,
+                    provider=self.provider,
+                    model=resolved_model,
+                    timeline_complexity=timeline_complexity,
+                )
                 raw = await self._chat_gemini(
                     resolved_model=resolved_model,
                     options=None,
@@ -739,6 +822,7 @@ class CloudLLMClient:
                     ],
                     schema=schema,
                     json_mode=True,
+                    effective=effective,
                 )
                 text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
                 return parser.parse(text)
@@ -751,6 +835,7 @@ class CloudLLMClient:
             format="json" if use_json_mode else None,
             options=None,
             purpose=purpose,
+            timeline_complexity=timeline_complexity,
         )
         text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
         return await self.parse_with_repairs(
@@ -771,7 +856,7 @@ class CloudLLMClient:
         system_prompt: str,
         user_prompt: str,
         schema: type[T],
-        policy: GenerationPolicy,
+        effective: EffectiveInferenceConfig,
     ) -> T:
         if self.openai_client is None:
             raise LLMError("OpenAI client is not configured")
@@ -781,8 +866,14 @@ class CloudLLMClient:
             "input": [{"role": "user", "content": user_prompt}],
             "text_format": schema,
         }
-        if policy.temperature is not None:
-            kwargs["temperature"] = policy.temperature
+        if effective.temperature is not None:
+            kwargs["temperature"] = effective.temperature
+        kwargs["max_output_tokens"] = effective.output_token_limit
+        if effective.effective_reasoning_level.value != "off" and effective.reasoning_parameter in {
+            "effort",
+            "level",
+        }:
+            kwargs["reasoning"] = {"effort": effective.effective_reasoning_level.value}
         try:
             response = await self.openai_client.responses.parse(**kwargs)
         except Exception as exc:  # noqa: BLE001
