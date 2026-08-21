@@ -25,10 +25,12 @@ HEAD_REVISION = "202608200002"
 MIGRATION_LOCK_KEY = 7362381
 
 
+###############################################################################
 class MigrationError(RuntimeError):
     """Raised when a database cannot be safely adopted or migrated."""
 
 
+###############################################################################
 @dataclass(frozen=True, slots=True)
 class MigrationResult:
     current_heads: tuple[str, ...]
@@ -37,11 +39,13 @@ class MigrationResult:
     adopted_revision: str | None
     reset: bool
 
+    # -------------------------------------------------------------------------
     @property
     def upgraded(self) -> bool:
         return self.current_heads != self.target_heads or self.reset
 
 
+###############################################################################
 def resolve_migrations_path() -> Path:
     frozen_root = getattr(sys, "_MEIPASS", None)
     if frozen_root:
@@ -55,6 +59,7 @@ def resolve_migrations_path() -> Path:
     raise MigrationError(f"Alembic migration directory is missing: {source_path}")
 
 
+###############################################################################
 def build_alembic_config() -> Config:
     migrations_path = resolve_migrations_path()
     ini_path = migrations_path.parent / "alembic.ini"
@@ -64,10 +69,12 @@ def build_alembic_config() -> Config:
     return config
 
 
+###############################################################################
 def _script_directory(config: Config) -> ScriptDirectory:
     return ScriptDirectory.from_config(config)
 
 
+###############################################################################
 def _target_heads(config: Config) -> tuple[str, ...]:
     heads = tuple(sorted(_script_directory(config).get_heads()))
     if heads != (HEAD_REVISION,):
@@ -78,15 +85,18 @@ def _target_heads(config: Config) -> tuple[str, ...]:
     return heads
 
 
+###############################################################################
 def _current_heads(connection: Connection) -> tuple[str, ...]:
     context = MigrationContext.configure(connection)
     return tuple(sorted(context.get_current_heads()))
 
 
+###############################################################################
 def _user_tables(connection: Connection) -> set[str]:
     return set(inspect(connection).get_table_names()) - {"alembic_version"}
 
 
+###############################################################################
 def _schema_differences(connection: Connection) -> list[tuple[object, ...]]:
     migration_context = MigrationContext.configure(
         connection,
@@ -100,6 +110,7 @@ def _schema_differences(connection: Connection) -> list[tuple[object, ...]]:
     return list(compare_metadata(migration_context, Base.metadata))
 
 
+###############################################################################
 def _is_legacy_v24_schema(differences: list[tuple[object, ...]]) -> bool:
     if len(differences) != 1:
         return False
@@ -117,12 +128,14 @@ def _is_legacy_v24_schema(differences: list[tuple[object, ...]]) -> bool:
     )
 
 
+###############################################################################
 def _format_differences(differences: list[tuple[object, ...]]) -> str:
     if not differences:
         return "none"
     return "; ".join(str(difference) for difference in differences[:5])
 
 
+###############################################################################
 def _begin_sqlite_exclusive(connection: Connection) -> None:
     driver_connection: Any = connection.connection.driver_connection
     previous_autocommit = getattr(driver_connection, "autocommit", None)
@@ -135,6 +148,7 @@ def _begin_sqlite_exclusive(connection: Connection) -> None:
             driver_connection.autocommit = previous_autocommit
 
 
+###############################################################################
 @contextmanager
 def _migration_transaction(engine: Engine) -> Iterator[Connection]:
     exclusive_listener = None
@@ -159,6 +173,7 @@ def _migration_transaction(engine: Engine) -> Iterator[Connection]:
             event.remove(engine, "begin", exclusive_listener)
 
 
+###############################################################################
 def _run_command(connection: Connection, action: Literal["upgrade", "stamp", "downgrade"], revision: str) -> None:
     config = build_alembic_config()
     config.attributes["connection"] = connection
@@ -176,6 +191,7 @@ def _run_command(connection: Connection, action: Literal["upgrade", "stamp", "do
         ) from exc
 
 
+###############################################################################
 def _validate_known_revision(config: Config, current_heads: tuple[str, ...]) -> None:
     script = _script_directory(config)
     known_revisions = {revision.revision for revision in script.walk_revisions()}
@@ -187,6 +203,7 @@ def _validate_known_revision(config: Config, current_heads: tuple[str, ...]) -> 
         )
 
 
+###############################################################################
 def _adopt_unversioned_database(
     connection: Connection,
     config: Config,
@@ -217,6 +234,7 @@ def _adopt_unversioned_database(
     )
 
 
+###############################################################################
 def migrate_database(
     engine: Engine,
     *,

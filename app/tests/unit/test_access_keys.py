@@ -9,7 +9,6 @@ from repositories.serialization.access_keys import AccessKeySerializer
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 def build_serializer() -> tuple[AccessKeySerializer, sessionmaker]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)

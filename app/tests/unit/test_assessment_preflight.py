@@ -12,7 +12,6 @@ from services.session.factory import build_clinical_session_service
 from services.session.preflight import validate_clinical_input_preflight
 from services.session.session_workflow import start_clinical_job_workflow
 
-
 ###############################################################################
 def _build_service():
     return build_clinical_session_service(get_job_manager())
