@@ -26,8 +26,22 @@ class OpenAIChatTransport(StructuredTransportMixin):
         payload = {
             "model": request.model,
             "messages": request.messages,
-            **request.options,
+            **{
+                key: value
+                for key, value in request.options.items()
+                if key != "max_output_tokens"
+            },
         }
+        if request.output_token_limit is not None:
+            payload["max_tokens"] = request.output_token_limit
+        if request.reasoning_level and request.reasoning_level != "off":
+            payload.pop("temperature", None)
+            if request.reasoning_parameter == "boolean":
+                payload["thinking"] = {"type": "enabled"}
+            elif request.reasoning_parameter in {"effort", "level"}:
+                payload["reasoning_effort"] = request.reasoning_level
+        elif request.reasoning_parameter == "boolean":
+            payload["thinking"] = {"type": "disabled"}
         if request.json_mode:
             payload["response_format"] = {"type": "json_object"}
         response = await self.client.post("chat/completions", json=payload)

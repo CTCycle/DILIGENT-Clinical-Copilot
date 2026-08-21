@@ -368,7 +368,7 @@ class DrugAnalysisService:
                 {"role": "system", "content": repair_system},
                 {"role": "user", "content": repair_user},
             ],
-            purpose=GenerationPurpose.JSON_REPAIR,
+            purpose=GenerationPurpose.FAITHFUL_REWRITE,
         )
         return self.coerce_chat_text(repaired).strip()
 
@@ -386,7 +386,11 @@ class DrugAnalysisService:
                 messages=messages,
                 purpose=purpose,
             )
-        return await self.llm_client.chat(model=model, messages=messages)
+        return await self.llm_client.chat(
+            model=model,
+            messages=messages,
+            purpose=purpose,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

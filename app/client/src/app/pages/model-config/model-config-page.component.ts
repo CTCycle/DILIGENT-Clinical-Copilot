@@ -466,7 +466,9 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
 
   private applyPreviewDefaultState(): void {
     const state = this.appState.state().diliAgent;
-    this.previewReasoningLevel.set(REASONING_LEVELS.indexOf(state.settings.reasoning));
+    this.previewReasoningLevel.set(
+      Math.max(0, REASONING_LEVELS.indexOf(state.settings.reasoning)),
+    );
   }
 
   async persistConfigPatch(

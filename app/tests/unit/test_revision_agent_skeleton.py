@@ -8,7 +8,10 @@ from typing import Any
 import pytest
 from common.prompts.revision_agent import editor_prompt
 from domain.inspection import (
+    RevisionAgentPlan,
+    RevisionAgentQaResult,
     RevisionAgentToolCall,
+    RevisionDraftResult,
     RevisionIssueScanResult,
     SessionRevisionRequest,
 )
@@ -17,11 +20,13 @@ from repositories.schemas.base import Base
 from repository_fixtures import build_repository_graph
 from services.inspection.revision_agent import (
     RevisionAgentRunner,
+    RevisionAgentRuntime,
     build_revision_agent_user_prompt,
 )
 from services.inspection.revision_scaffold import SessionRevisionConflictError
 from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
+from services.llm.generation_policy import GenerationPurpose
 from sqlalchemy import create_engine
 
 
@@ -126,6 +131,8 @@ def fake_issue_scan_call(**kwargs: Any) -> dict[str, Any]:
             "supported_claim_count": 0,
             "manual_review_required": True,
         }
+    if schema_name == "RevisionIssueScanResult":
+        return {"summary": "No issues detected."}
     raise AssertionError(f"Unexpected schema: {schema_name}")
 
 ###############################################################################
@@ -200,6 +207,35 @@ def test_revision_editor_prompt_requires_exact_source_patches() -> None:
     assert "zero-based Python slice offsets" in prompt
     assert "expected_text must equal the exact source substring" in prompt
     assert "return patches as an empty list" in prompt
+
+###############################################################################
+def test_revision_agent_assigns_stage_specific_generation_purposes(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    calls: list[GenerationPurpose] = []
+
+    def structured_call(**kwargs: Any) -> dict[str, Any]:
+        calls.append(kwargs["purpose"])
+        return fake_issue_scan_call(**kwargs)
+
+    runner = build_runner(serializer, structured_call=structured_call)
+    runtime = RevisionAgentRuntime(provider="ollama", model="revision-model")
+    for schema, purpose in (
+        (RevisionAgentPlan, GenerationPurpose.REVISION_PLANNING),
+        (RevisionAgentToolCall, GenerationPurpose.REVISION_TOOL_SELECTION),
+        (RevisionDraftResult, GenerationPurpose.REVISION_EDITING),
+        (RevisionAgentQaResult, GenerationPurpose.REVISION_QA),
+    ):
+        runner._call_schema(runtime, "{}", schema, purpose=purpose)
+
+    runner._run_structured_scan(runtime=runtime, user_prompt="{}")
+
+    assert calls == [
+        GenerationPurpose.REVISION_PLANNING,
+        GenerationPurpose.REVISION_TOOL_SELECTION,
+        GenerationPurpose.REVISION_EDITING,
+        GenerationPurpose.REVISION_QA,
+        GenerationPurpose.REVISION_SCAN,
+    ]
 
 ###############################################################################
 def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> None:
