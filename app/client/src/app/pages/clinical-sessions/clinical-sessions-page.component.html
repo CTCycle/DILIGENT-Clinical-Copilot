@@ -61,14 +61,17 @@
             <option value="before">Before</option>
             <option value="exact">On date</option>
           </select>
-          <input
-            class="clinical-sessions-date-input"
-            type="date"
-            aria-label="Session filter date"
-            [disabled]="dateFilterMode() === 'any'"
-            [ngModel]="dateFilter()"
-            (ngModelChange)="updateDateFilter($event)"
-          />
+          <div class="clinical-sessions-date-input-shell" [class.is-empty]="!dateFilter()">
+            <input
+              class="clinical-sessions-date-input"
+              type="date"
+              lang="en-GB"
+              aria-label="Session filter date"
+              [disabled]="dateFilterMode() === 'any'"
+              [ngModel]="dateFilter()"
+              (ngModelChange)="updateDateFilter($event)"
+            />
+          </div>
         </div>
       </div>
       <div class="clinical-sessions-results">
