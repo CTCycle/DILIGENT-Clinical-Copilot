@@ -67,7 +67,7 @@ const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
   brave: 'Brave',
 };
 const PROVIDER_LOGOS: Partial<Record<AccessKeyProvider, { src: string; alt: string }>> = {
-  openai: { src: '/logos/openai.svg', alt: 'OpenAI logo' },
+  openai: { src: '/logos/openai-blossom-light.svg', alt: 'OpenAI logo' },
   gemini: { src: '/logos/google-g.svg', alt: 'Google logo' },
   deepseek: { src: '/logos/deepseek.svg', alt: 'DeepSeek logo' },
   anthropic: { src: '/logos/anthropic.svg', alt: 'Anthropic logo' },
