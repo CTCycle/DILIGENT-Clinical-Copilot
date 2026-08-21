@@ -1010,17 +1010,29 @@ function Read-InstallationType {
 }
 
 function Assert-DesktopParameterContract {
+    param([switch]$Interactive)
+
     if ($OfflineWebView2 -and $Action -ne 'BuildDesktopRelease') {
         throw '-OfflineWebView2 is valid only with BuildDesktopRelease'
     }
     if ($OfflineWebView2 -and $DesktopTarget -eq 'Portable') {
         throw '-OfflineWebView2 requires an MSI target'
     }
-    if ($AllDesktopReleases -and $Action -ne 'RemoveDesktopRelease') {
+    if ($AllDesktopReleases -and $Action -ne 'RemoveDesktopRelease' -and -not $Interactive) {
         throw '-AllDesktopReleases is valid only with RemoveDesktopRelease'
     }
-    if ($Action -eq 'RemoveDesktopRelease' -and -not $AllDesktopReleases -and -not $Version) {
+    if ($Action -eq 'RemoveDesktopRelease' -and -not $AllDesktopReleases -and -not $Version -and -not $Interactive) {
         throw 'RemoveDesktopRelease requires -Version or -AllDesktopReleases'
+    }
+}
+
+function Get-DesktopReleaseArtifactPaths {
+    param([Parameter(Mandatory = $true)][string]$Version)
+    $prefix = "DILIGENT-v$Version-windows-x64"
+    return [pscustomobject]@{
+        Portable = Join-Path $DesktopArtifactsDir "$prefix-portable.exe"
+        Msi = Join-Path $DesktopArtifactsDir "$prefix.msi"
+        Checksum = Join-Path $DesktopArtifactsDir "$prefix.sha256"
     }
 }
 
@@ -1217,9 +1229,9 @@ function Test-MsiMetadata {
 function Publish-DesktopArtifacts {
     param([Parameter(Mandatory = $true)][string]$Version)
     New-Item -ItemType Directory -Path $DesktopArtifactsDir -Force | Out-Null
-    $releasePrefix = "DILIGENT-v$Version-windows-x64"
-    $portable = Join-Path $DesktopArtifactsDir "$releasePrefix-portable.exe"
-    $msi = Join-Path $DesktopArtifactsDir "$releasePrefix.msi"
+    $paths = Get-DesktopReleaseArtifactPaths -Version $Version
+    $portable = $paths.Portable
+    $msi = $paths.Msi
     $rawExe = Get-ChildItem -LiteralPath (Join-Path $CargoTargetDir 'release') -Filter '*.exe' -File -ErrorAction SilentlyContinue | Where-Object Name -notmatch 'uninstall' | Select-Object -First 1
     if ($DesktopTarget -in @('Portable', 'All')) {
         if ($null -eq $rawExe) { throw 'Tauri raw executable was not found' }
@@ -1242,14 +1254,27 @@ function Publish-DesktopArtifacts {
 
 function Write-DesktopChecksums {
     param([Parameter(Mandatory = $true)][string]$Version)
-    $prefix = "DILIGENT-v$Version-windows-x64"
-    $checksumPath = Join-Path $DesktopArtifactsDir "$prefix.sha256"
-    $lines = @()
-    foreach ($artifact in @("$prefix-portable.exe", "$prefix.msi")) {
-        $path = Join-Path $DesktopArtifactsDir $artifact
-        if (Test-Path -LiteralPath $path) { $lines += "SHA256  $artifact"; $lines += ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() + "  $artifact") }
+    $paths = Get-DesktopReleaseArtifactPaths -Version $Version
+    $entries = @()
+    foreach ($artifact in @(
+        [pscustomobject]@{ Name = (Split-Path -Leaf $paths.Portable); Path = $paths.Portable }
+        [pscustomobject]@{ Name = (Split-Path -Leaf $paths.Msi); Path = $paths.Msi }
+    )) {
+        if (Test-Path -LiteralPath $artifact.Path -PathType Leaf) {
+            $entries += [pscustomobject]@{
+                Name = $artifact.Name
+                Hash = (Get-FileHash -LiteralPath $artifact.Path -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+        }
     }
-    Set-Content -LiteralPath $checksumPath -Value $lines -Encoding ascii
+    if ($entries.Count -eq 0) {
+        throw "No desktop release artifacts exist for version $Version"
+    }
+    $lines = foreach ($entry in $entries) {
+        "SHA256  $($entry.Name)"
+        "$($entry.Hash)  $($entry.Name)"
+    }
+    Set-Content -LiteralPath $paths.Checksum -Value $lines -Encoding ascii
 }
 
 function Build-DesktopRelease {
@@ -1282,21 +1307,58 @@ function Get-DesktopReleaseVersions {
     } | Sort-Object -Unique
 }
 
+function Remove-DesktopGeneratedState {
+    foreach ($target in @($DesktopBuildDir, $CargoTargetDir, (Join-Path $DesktopDir 'node_modules'))) {
+        if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
+    }
+    if (Test-Path -LiteralPath $DesktopGeneratedDir) {
+        Get-ChildItem -LiteralPath $DesktopGeneratedDir -Force |
+            Where-Object { $_.Name -ne '.gitkeep' } |
+            ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+    }
+}
+
 function Remove-DesktopRelease {
-    Assert-DesktopParameterContract
+    param(
+        [ValidateSet('Portable', 'Msi', 'Checksum', 'All')]
+        [string]$ArtifactTarget,
+        [switch]$Interactive
+    )
+
+    Assert-DesktopParameterContract -Interactive:$Interactive
+    $selectedTarget = if ($ArtifactTarget) { $ArtifactTarget } else { $DesktopTarget }
+    $removeBuildState = $AllDesktopReleases -or $selectedTarget -eq 'All'
     if ($AllDesktopReleases) {
         if (Test-Path -LiteralPath $DesktopArtifactsDir) { Get-ChildItem -LiteralPath $DesktopArtifactsDir -File | Where-Object Name -match '^DILIGENT-v\d+\.\d+\.\d+-windows-x64' | Remove-Item -Force }
     }
     else {
-        foreach ($suffix in @('-portable.exe', '.msi', '.sha256')) {
-            $target = Join-Path $DesktopArtifactsDir "DILIGENT-v$Version-windows-x64$suffix"
-            if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force }
+        $resolvedVersion = if ($Version) { $Version } else { Resolve-DesktopReleaseVersion }
+        $paths = Get-DesktopReleaseArtifactPaths -Version $resolvedVersion
+        $targets = switch ($selectedTarget) {
+            'Portable' { @($paths.Portable) }
+            'Msi' { @($paths.Msi) }
+            'Checksum' { @($paths.Checksum) }
+            'All' { @($paths.Portable, $paths.Msi, $paths.Checksum) }
+        }
+        foreach ($target in $targets) {
+            if (Test-Path -LiteralPath $target -PathType Leaf) { Remove-Item -LiteralPath $target -Force }
+        }
+        if ($selectedTarget -in @('Portable', 'Msi')) {
+            if ((Test-Path -LiteralPath $paths.Portable -PathType Leaf) -or (Test-Path -LiteralPath $paths.Msi -PathType Leaf)) {
+                Write-DesktopChecksums -Version $resolvedVersion
+            }
+            elseif (Test-Path -LiteralPath $paths.Checksum -PathType Leaf) {
+                Remove-Item -LiteralPath $paths.Checksum -Force
+            }
         }
     }
-    foreach ($target in @($DesktopBuildDir, $DesktopGeneratedDir, $CargoTargetDir, (Join-Path $DesktopDir 'node_modules'))) {
-        if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
+    if ($removeBuildState) {
+        Remove-DesktopGeneratedState
+        Write-Ok 'Selected desktop release artifacts and generated desktop build state removed; installed applications and user data were preserved'
     }
-    Write-Ok 'Desktop release artifacts and generated desktop build state removed; installed applications and user data were preserved'
+    else {
+        Write-Ok 'Selected desktop release artifact(s) removed; the checksum manifest was synchronized when applicable and other generated state was preserved'
+    }
 }
 
 # ============================================================
@@ -1361,8 +1423,8 @@ function Show-MainMenu {
     Write-MenuOption -Number '10.' -Label 'Remove all data' -Description 'Delete local user data only'
     Write-MenuOption -Number '11.' -Label 'Uninstall application' -Description 'Remove generated dependencies'
     Write-MenuSection -Title 'DESKTOP RELEASE'
-    Write-MenuOption -Number '12.' -Label 'Build desktop release' -Description 'Create portable / MSI packages'
-    Write-MenuOption -Number '13.' -Label 'Remove desktop release artifacts' -Description 'Delete generated release state'
+    Write-MenuOption -Number '12.' -Label 'Create release artifacts' -Description 'Choose package, manifest, or all'
+    Write-MenuOption -Number '13.' -Label 'Remove release artifacts' -Description 'Choose artifact(s) or all versions'
     Write-MenuLine -Text '' -Color DarkCyan
     Write-MenuLine -Text '14. Exit'
     Write-MenuRule
@@ -1372,6 +1434,75 @@ function Wait-ForMenu {
     Write-Host ''
     Write-Host 'Press any key to return to menu...'
     [Console]::ReadKey($true) | Out-Null
+}
+
+function Read-DesktopArtifactSelection {
+    param([ValidateSet('Create', 'Remove')][string]$Operation)
+
+    Write-Host ''
+    if ($Operation -eq 'Create') {
+        Write-Host 'CREATE DESKTOP RELEASE ARTIFACTS' -ForegroundColor Yellow
+        Write-Host '  [1] Portable executable'
+        Write-Host '  [2] MSI installer'
+        Write-Host '  [3] SHA-256 manifest (from existing artifacts)'
+        Write-Host '  [4] All distribution artifacts'
+        Write-Host '  [5] Back'
+        $selection = (Read-Host '  Select an artifact to create [1-5]').Trim()
+        switch ($selection) {
+            '1' { return [pscustomobject]@{ Target = 'Portable'; AllVersions = $false } }
+            '2' { return [pscustomobject]@{ Target = 'Msi'; AllVersions = $false } }
+            '3' { return [pscustomobject]@{ Target = 'Checksum'; AllVersions = $false } }
+            '4' { return [pscustomobject]@{ Target = 'All'; AllVersions = $false } }
+            '5' { return $null }
+            default { throw 'Invalid selection. Enter a number from 1 through 5.' }
+        }
+    }
+
+    Write-Host 'REMOVE DESKTOP RELEASE ARTIFACTS' -ForegroundColor Yellow
+    Write-Host '  [1] Portable executable (selected version)'
+    Write-Host '  [2] MSI installer (selected version)'
+    Write-Host '  [3] SHA-256 manifest (selected version)'
+    Write-Host '  [4] All artifacts for one version'
+    Write-Host '  [5] All versions and artifacts'
+    Write-Host '  [6] Back'
+    $selection = (Read-Host '  Select artifacts to remove [1-6]').Trim()
+    switch ($selection) {
+        '1' { return [pscustomobject]@{ Target = 'Portable'; AllVersions = $false } }
+        '2' { return [pscustomobject]@{ Target = 'Msi'; AllVersions = $false } }
+        '3' { return [pscustomobject]@{ Target = 'Checksum'; AllVersions = $false } }
+        '4' { return [pscustomobject]@{ Target = 'All'; AllVersions = $false } }
+        '5' { return [pscustomobject]@{ Target = 'All'; AllVersions = $true } }
+        '6' { return $null }
+        default { throw 'Invalid selection. Enter a number from 1 through 6.' }
+    }
+}
+
+function Invoke-CreateDesktopReleaseMenu {
+    $selection = Read-DesktopArtifactSelection -Operation 'Create'
+    if ($null -eq $selection) { return }
+
+    if ($selection.Target -eq 'Checksum') {
+        $resolvedVersion = Resolve-DesktopReleaseVersion
+        $paths = Get-DesktopReleaseArtifactPaths -Version $resolvedVersion
+        if (-not (Test-Path -LiteralPath $paths.Portable -PathType Leaf) -and -not (Test-Path -LiteralPath $paths.Msi -PathType Leaf)) {
+            throw "Cannot create a checksum manifest because no release artifact exists for version $resolvedVersion"
+        }
+        Write-DesktopChecksums -Version $resolvedVersion
+        Write-Ok "SHA-256 manifest created for desktop release $resolvedVersion"
+        return
+    }
+
+    $script:DesktopTarget = $selection.Target
+    Build-DesktopRelease
+}
+
+function Invoke-RemoveDesktopReleaseMenu {
+    $selection = Read-DesktopArtifactSelection -Operation 'Remove'
+    if ($null -eq $selection) { return }
+
+    $script:DesktopTarget = $selection.Target
+    $script:AllDesktopReleases = [bool]$selection.AllVersions
+    Remove-DesktopRelease -Interactive
 }
 
 if ($Action) {
@@ -1418,8 +1549,8 @@ while ($true) {
             '^9$' { Clear-ApplicationCache }
             '^10$' { Remove-AllData }
             '^11$' { Uninstall-Application }
-            '^12$' { Build-DesktopRelease; exit 0 }
-            '^13$' { Remove-DesktopRelease }
+            '^12$' { Invoke-CreateDesktopReleaseMenu }
+            '^13$' { Invoke-RemoveDesktopReleaseMenu }
             '^14$' { exit 0 }
             default {
                 Write-Host '[ERROR] Select a number from 1 through 14.' -ForegroundColor Red
