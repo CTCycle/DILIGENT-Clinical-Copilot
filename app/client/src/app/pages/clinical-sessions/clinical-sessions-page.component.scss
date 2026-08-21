@@ -192,8 +192,12 @@
 }
 
 .clinical-session-workspace {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   padding: var(--space-lg);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .clinical-session-preview,
@@ -291,15 +295,6 @@
   border-color: var(--cs-error-border);
   background: var(--cs-error-bg);
   color: var(--cs-error-text);
-}
-
-.clinical-session-workspace {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: var(--space-lg);
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
 .clinical-session-toolbar {
@@ -410,9 +405,6 @@
   gap: var(--space-md);
   min-width: 0;
   min-height: 0;
-}
-
-.clinical-session-preview-main {
 }
 
 .clinical-session-preview-side {
