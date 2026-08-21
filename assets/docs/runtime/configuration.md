@@ -1,8 +1,16 @@
 # Configuration
-Last updated: 2026-08-20
+Last updated: 2026-08-21
 
 Temperature is not a deployment or operator setting; it is resolved by the
-source-controlled automatic generation policy immediately before each LLM call.
+source-controlled effective inference policy immediately before each LLM call.
+The model configuration API persists `reasoning_level` as `off`, `low`,
+`medium`, or `high`. Existing singleton configuration payloads containing the
+legacy `ollama_reasoning` boolean remain readable (`false` -> `off`, `true` ->
+`medium`) and are normalized on the next write; no schema migration is needed.
+
+See [generation policy](generation_policy.md) for the purpose responsibility
+matrix, capability catalog, provider transport rules, and context-budget
+provenance.
 
 ## Primary Runtime Files
 - Active env file: `settings/.env`
@@ -56,7 +64,7 @@ precedence. Packaged desktop mode uses `DILIGENT_RUNTIME_ROOT` and
   - external timeout and concurrency settings
   - excludes all database mode and connection settings
 - `app/resources/catalogs/*.json`
-  - canonical deterministic reference catalogs for text normalization, extraction, matching, DILI behavior, language, and security filters
+  - canonical deterministic reference catalogs for text normalization, extraction, matching, DILI behavior, language, security filters, generation policy, and model capabilities
 
 ## LLM Time Budgets
 
