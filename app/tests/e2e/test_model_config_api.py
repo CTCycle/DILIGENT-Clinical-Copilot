@@ -21,7 +21,6 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
     assert "revision_model" in payload
     assert "timeline_model" in payload
     assert payload["reasoning_level"] in {"off", "low", "medium", "high"}
-    assert "ollama_reasoning" not in payload
     assert payload["local_catalog"]["status"] in {
         "available",
         "cached",
@@ -31,6 +30,18 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
     }
     assert "cloud_temperature" not in payload
     assert "ollama_temperature" not in payload
+
+###############################################################################
+def test_model_config_put_rejects_removed_reasoning_boolean(
+    api_context: APIRequestContext,
+):
+    response = api_context.put(
+        "/api/model-config",
+        data={"ollama_reasoning": True},
+    )
+    assert response.status == 422
+    detail = response.json().get("detail") or []
+    assert any("ollama_reasoning" in str(item.get("loc", [])) for item in detail)
 
 ###############################################################################
 def test_model_config_put_rejects_removed_temperature_field(

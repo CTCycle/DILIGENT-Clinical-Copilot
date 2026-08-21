@@ -98,7 +98,6 @@ class ModelConfigSerializer:
             if value is not UNSET:
                 current[key] = value
         current["reasoning_level"] = self.reasoning_level_from_payload(current)
-        current.pop("ollama_reasoning", None)
         current["ollama_seed"] = self.normalize_optional_seed(
             current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
         )
@@ -168,13 +167,7 @@ class ModelConfigSerializer:
                 return ReasoningLevel(raw_level.strip().lower())
             except ValueError:
                 pass
-
-        legacy_value = payload.get("ollama_reasoning")
-        if isinstance(legacy_value, str):
-            legacy_enabled = legacy_value.strip().lower() in {"1", "true", "yes", "on"}
-        else:
-            legacy_enabled = bool(legacy_value)
-        return ReasoningLevel.MEDIUM if legacy_enabled else cls.DEFAULT_REASONING_LEVEL
+        return cls.DEFAULT_REASONING_LEVEL
 
     # -------------------------------------------------------------------------
     @classmethod

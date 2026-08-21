@@ -4,9 +4,8 @@ Last updated: 2026-08-21
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
 The model configuration API persists `reasoning_level` as `off`, `low`,
-`medium`, or `high`. Existing singleton configuration payloads containing the
-legacy `ollama_reasoning` boolean remain readable (`false` -> `off`, `true` ->
-`medium`) and are normalized on the next write; no schema migration is needed.
+`medium`, or `high`. The obsolete boolean reasoning field is not accepted or
+translated; callers must send `reasoning_level` explicitly.
 
 See [generation policy](generation_policy.md) for the purpose responsibility
 matrix, capability catalog, provider transport rules, and context-budget

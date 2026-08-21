@@ -5,8 +5,7 @@ Last updated: 2026-08-21
 DILIGENT resolves an effective inference configuration immediately before each
 LLM request. Operators choose the provider, model, and one global reasoning
 level: `off`, `low`, `medium`, or `high`. The selected level is persisted as
-`reasoning_level`. A legacy persisted `ollama_reasoning=false` is read as
-`off`, and `true` is read as `medium`; new writes use only `reasoning_level`.
+`reasoning_level`; no boolean reasoning alias is supported.
 
 ## Purpose responsibility
 
