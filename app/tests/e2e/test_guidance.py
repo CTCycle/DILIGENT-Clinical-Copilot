@@ -155,7 +155,6 @@ def test_capture_guidance_screenshots_when_requested(
         review_help.click()
         page.get_by_role("dialog", name="Review the chronology deliberately").screenshot(path=output / "10-timeline-review-popover.png")
 
-
 ###############################################################################
 def test_narrow_viewport_shows_desktop_minimum_notice(page: Page, base_url: str) -> None:
     page.set_viewport_size({"width": 1099, "height": 768})

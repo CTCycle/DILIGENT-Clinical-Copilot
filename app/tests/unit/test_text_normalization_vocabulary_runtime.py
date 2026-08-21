@@ -16,7 +16,6 @@ from services.text import vocabulary as vocabulary_module
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 def test_runtime_upsert_list_and_deactivate_term() -> None:
     engine = create_engine("sqlite:///:memory:", future=True)

@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 ###############################################################################
 def _launcher_text() -> str:
     repository_root = Path(__file__).resolve().parents[3]
     return (repository_root / "start_on_windows.ps1").read_text(encoding="utf-8")
-
 
 ###############################################################################
 def test_launcher_exposes_frontend_only_rebuild_action() -> None:
@@ -19,8 +17,8 @@ def test_launcher_exposes_frontend_only_rebuild_action() -> None:
 
     assert "[ValidateSet('Launch', 'Install', 'RebuildFrontend'" in script
     assert "'RebuildFrontend' { Rebuild-Frontend }" in script
-    assert "'^3$' { Rebuild-Frontend }" in script
-    assert "Write-MenuOption -Number '3.' -Label 'Rebuild frontend'" in script
+    assert "'^5$' { Rebuild-Frontend }" in script
+    assert "Write-MenuOption -Number '5.' -Label 'Rebuild frontend'" in script
     assert "function Install-FrontendDependencies" in script
     assert "function Build-Frontend" in script
     assert rebuild_frontend > install_dependencies

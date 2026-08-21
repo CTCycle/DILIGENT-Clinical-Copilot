@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-08-20
+Last updated: 2026-08-21
 
 ## Recommended Local Startup
 On Windows, use:
@@ -13,12 +13,12 @@ The launcher:
 - ensures portable Python, `uv`, and Node runtimes under `runtimes/`
 - runs `uv sync`
 - installs frontend dependencies
-- rebuilds the frontend when the main-menu install/update option 2 or frontend rebuild option 3 is executed, or when option 1 detects missing or unusable dependencies or frontend output during recovery
+- rebuilds the frontend when the main-menu install option 4 or frontend rebuild option 5 is executed, or when option 1 detects missing or unusable dependencies or frontend output during recovery
 - validates that the frontend build is available before starting the preview server
 - starts the backend with the synchronized virtual-environment Python and `uvicorn`
 - starts the frontend preview server
 - recreates a stale backend virtual environment when the repository has moved
-- provides database, test, log, cache, and uninstall maintenance options
+- provides grouped source-control, database, test, log, cache, user-data, uninstall, and desktop-release options
 
 Runtime and development tool caches are split between `runtimes/cache/` and
 `app/tests/cache/`. The launcher routes uv, pip, npm, Playwright, Python
@@ -40,11 +40,11 @@ Database startup behavior is migration-driven:
 - The explicit `InitializeDatabase` action remains the repeatable operator path
   for either backend. It applies pending migrations and seeds idempotently;
   `--drop-existing` is the explicit destructive reset path.
-- Install/update option 2 runs the same database synchronization after backend
+- Install option 4 runs the same database synchronization after backend
   and frontend dependencies are ready. Launch performs the check again so
   startup remains safe when installation was skipped.
 
-Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. On a fresh checkout, execute option 2 first to install/update dependencies, synchronize the database, and build the frontend, then execute option 1 to launch the application. Use option 3, or `.\start_on_windows.ps1 -Action RebuildFrontend`, to rebuild only the frontend after frontend changes or when its production output needs refreshing; this does not synchronize Python dependencies or the database. Option 1 also recovers missing or unusable environments and frontend output. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
+Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. On a fresh checkout, execute option 4 first to install dependencies, synchronize the database, and build the frontend, then execute option 1 to launch the application. Use option 5, or `.\start_on_windows.ps1 -Action RebuildFrontend`, to rebuild only the frontend after frontend changes or when its production output needs refreshing; this does not synchronize Python dependencies or the database. Option 2 checks `origin/main` with `git ls-remote` and does not download or apply changes. Option 3 runs `git pull origin main` against the current checkout. Option 10 removes local user data, including the SQLite database and generated/user-created resource files, while preserving tracked application files; use `.\start_on_windows.ps1 -Action RemoveAllData -Force` for a non-interactive invocation. Option 1 also recovers missing or unusable environments and frontend output. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
 
 ## Packaged desktop startup
 

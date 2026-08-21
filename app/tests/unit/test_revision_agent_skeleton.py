@@ -29,7 +29,6 @@ from services.runtime.jobs import JobManager
 from services.llm.generation_policy import GenerationPurpose
 from sqlalchemy import create_engine
 
-
 ###############################################################################
 def build_file_serializer(tmp_path: Path) -> Any:
     engine = create_engine(

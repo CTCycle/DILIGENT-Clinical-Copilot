@@ -29,15 +29,21 @@ def test_ollama_gpt_oss_preserves_level_reasoning_and_omits_temperature(monkeypa
 
 ###############################################################################
 def test_ollama_context_window_is_task_sized_and_intersects_runtime_capacity() -> None:
+
+    ###############################################################################
     class FakeOllama:
+
+        # -------------------------------------------------------------------------
         @staticmethod
         def estimate_tokens(text: str) -> int:
             return max(1, len(text.split()))
 
+        # -------------------------------------------------------------------------
         async def get_model_context_limit(self, model: str) -> int:
             assert model == "qwen3:8b"
             return 8192
 
+        # -------------------------------------------------------------------------
         async def estimate_max_feasible_context(self, model: str) -> int:
             assert model == "qwen3:8b"
             return 4096
@@ -57,7 +63,11 @@ def test_ollama_context_window_is_task_sized_and_intersects_runtime_capacity() -
 
 ###############################################################################
 def test_ollama_payload_omits_think_when_transport_does_not_support_reasoning() -> None:
+
+    ###############################################################################
     class FakeOllama:
+
+        # -------------------------------------------------------------------------
         @staticmethod
         def compose_payload(
             payload: dict[str, object],

@@ -1,6 +1,9 @@
+# ============================================================
+# Launcher parameters and repository paths
+# ============================================================
 [CmdletBinding()]
 param(
-    [ValidateSet('Launch', 'Install', 'RebuildFrontend', 'InitializeDatabase', 'Test', 'Uninstall', 'BuildDesktopRelease', 'RemoveDesktopRelease')]
+    [ValidateSet('Launch', 'Install', 'RebuildFrontend', 'InitializeDatabase', 'Test', 'Uninstall', 'Update', 'CheckForUpdates', 'RemoveAllData', 'BuildDesktopRelease', 'RemoveDesktopRelease')]
     [string]$Action,
     [ValidateSet('Standard', 'Development')]
     [string]$InstallationType,
@@ -58,6 +61,9 @@ $script:DesktopNpmCmd = Join-Path $NodeDir 'npm.cmd'
 $script:DesktopTauriCli = Join-Path $DesktopDir 'node_modules/.bin/tauri.cmd'
 $script:PyInstallerVersion = '6.21.0'
 
+# ============================================================
+# Shared output and process helpers
+# ============================================================
 function Write-Step([string]$Message) {
     Write-Host "[STEP] $Message" -ForegroundColor Cyan
 }
@@ -168,6 +174,9 @@ function Invoke-HealthCheck {
     }
 }
 
+# ============================================================
+# Portable runtimes and launcher environment
+# ============================================================
 function Initialize-PortableNodeRuntime {
     New-Item -ItemType Directory -Path $NodeDir -Force | Out-Null
 
@@ -419,6 +428,9 @@ function Build-Frontend {
     }
 }
 
+# ============================================================
+# Application lifecycle
+# ============================================================
 function Rebuild-Frontend {
     Initialize-PortableNodeRuntime
     Import-DotEnv
@@ -589,6 +601,69 @@ function Start-Application {
     Write-Host "Frontend: $uiUrl (launcher PID $($frontendProcess.Id))"
 }
 
+# ============================================================
+# Source control and update status
+# ============================================================
+function Get-GitRevision {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$ArgumentList
+    )
+
+    $revision = & git.exe -C $RepoRoot @ArgumentList 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        return $null
+    }
+    $firstRevision = $revision | Select-Object -First 1
+    if ($null -eq $firstRevision) {
+        return $null
+    }
+    $value = ([string]$firstRevision).Trim()
+    if ($value) {
+        return $value
+    }
+    return $null
+}
+
+function Check-ForUpdates {
+    Write-Step 'Checking origin/main for updates'
+    $remoteResult = @(& git.exe -C $RepoRoot ls-remote origin refs/heads/main 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to check origin/main: $($remoteResult -join ' ')"
+    }
+
+    $remoteLine = $remoteResult |
+        Where-Object { $_ -match '^[0-9a-f]{40}\s+refs/heads/main$' } |
+        Select-Object -First 1
+    if (-not $remoteLine) {
+        throw 'Remote origin does not expose a main branch.'
+    }
+    $remoteRevision = ($remoteLine -split '\s+')[0]
+    $localMainRevision = Get-GitRevision -ArgumentList @('rev-parse', '--verify', 'refs/remotes/origin/main^{commit}')
+    $currentRevision = Get-GitRevision -ArgumentList @('rev-parse', '--verify', 'HEAD^{commit}')
+
+    if (($localMainRevision -and $localMainRevision -eq $remoteRevision) -or
+        ($currentRevision -and $currentRevision -eq $remoteRevision)) {
+        Write-Ok "No updates available; origin/main is at $($remoteRevision.Substring(0, 8))."
+    }
+    else {
+        Write-Info "An update is available on origin/main ($($remoteRevision.Substring(0, 8)))."
+        Write-Info 'Check complete; no files were downloaded or changed.'
+    }
+}
+
+function Update-Application {
+    $currentBranch = Get-GitRevision -ArgumentList @('branch', '--show-current')
+    if (-not $currentBranch) {
+        $currentBranch = 'detached HEAD'
+    }
+    Write-Step "Pulling origin/main into the current checkout ($currentBranch)"
+    Invoke-Checked -FilePath 'git.exe' -WorkingDirectory $RepoRoot -ArgumentList @('pull', 'origin', 'main')
+    Write-Ok 'Application update from origin/main completed'
+}
+
+# ============================================================
+# Dependency, database, and test maintenance
+# ============================================================
 function Install-OrUpdateApplication {
     $selectedInstallationType = $InstallationType
     $portableRuntimesReady = $false
@@ -641,6 +716,9 @@ function Invoke-TestSuite {
     Write-Ok 'Test suite completed'
 }
 
+# ============================================================
+# User data and cleanup maintenance
+# ============================================================
 function Remove-ApplicationLogs {
     $logDir = Join-Path $RepoRoot 'app/resources/logs'
     if (-not (Test-Path -LiteralPath $logDir)) {
@@ -761,6 +839,165 @@ function Uninstall-Application {
     Write-Ok 'Application runtimes and generated dependencies removed; settings and user data were preserved'
 }
 
+function Resolve-LauncherPath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $expandedPath = [Environment]::ExpandEnvironmentVariables($Path.Trim())
+    if ([IO.Path]::IsPathRooted($expandedPath)) {
+        return [IO.Path]::GetFullPath($expandedPath)
+    }
+    return [IO.Path]::GetFullPath((Join-Path $RepoRoot $expandedPath))
+}
+
+function Test-TrackedApplicationFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf -ErrorAction SilentlyContinue)) {
+        return $false
+    }
+
+    $repositoryRoot = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
+    $candidate = [IO.Path]::GetFullPath((Get-Item -LiteralPath $Path).FullName)
+    $repositoryPrefix = "$repositoryRoot\"
+    if (-not $candidate.StartsWith($repositoryPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        return $false
+    }
+
+    $gitCommand = Get-Command git.exe -ErrorAction SilentlyContinue
+    if ($null -eq $gitCommand) {
+        return $true
+    }
+    $relativePath = $candidate.Substring($repositoryPrefix.Length).Replace('\', '/')
+    $null = & $gitCommand.Source -C $RepoRoot ls-files --error-unmatch -- $relativePath 2>$null
+    return $LASTEXITCODE -eq 0
+}
+
+function Remove-UserDataPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -ErrorAction SilentlyContinue)) {
+        return [pscustomobject]@{ Removed = 0; Skipped = 0 }
+    }
+
+    $removed = 0
+    $skipped = 0
+    $item = Get-Item -LiteralPath $Path -Force
+    if (-not $item.PSIsContainer) {
+        if (Test-TrackedApplicationFile -Path $item.FullName) {
+            Write-Info "Preserved tracked application file: $($item.FullName)"
+            return [pscustomobject]@{ Removed = 0; Skipped = 1 }
+        }
+        if (Remove-PathSafely -Path $item.FullName) {
+            return [pscustomobject]@{ Removed = 1; Skipped = 0 }
+        }
+        return [pscustomobject]@{ Removed = 0; Skipped = 1 }
+    }
+
+    $children = @(Get-ChildItem -LiteralPath $item.FullName -Force -Recurse -ErrorAction SilentlyContinue |
+        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true })
+    foreach ($child in $children) {
+        if ($child.PSIsContainer) {
+            $remaining = @(Get-ChildItem -LiteralPath $child.FullName -Force -ErrorAction SilentlyContinue)
+            if ($remaining.Count -eq 0 -and (Remove-PathSafely -Path $child.FullName -Recurse)) {
+                $removed++
+            }
+            continue
+        }
+
+        if (Test-TrackedApplicationFile -Path $child.FullName) {
+            Write-Info "Preserved tracked application file: $($child.FullName)"
+            $skipped++
+            continue
+        }
+        if (Remove-PathSafely -Path $child.FullName) {
+            $removed++
+        }
+        else {
+            $skipped++
+        }
+    }
+
+    if ($removed -gt 0 -or $skipped -gt 0) {
+        Write-Info "${Label}: removed $removed item(s); preserved or skipped $skipped item(s)"
+    }
+    return [pscustomobject]@{ Removed = $removed; Skipped = $skipped }
+}
+
+function Confirm-RemoveAllData {
+    param([switch]$Force)
+
+    if ($Force) {
+        return
+    }
+    if (-not [Environment]::UserInteractive -or [Console]::IsInputRedirected) {
+        throw 'Remove All Data requires -Force when the console is not interactive.'
+    }
+
+    Write-Host 'This permanently deletes local user data, including the database, settings, logs, RAG data, exports, and state.' -ForegroundColor Yellow
+    Write-Host 'Tracked application files are preserved.' -ForegroundColor Yellow
+    $confirmation = Read-Host 'Type REMOVE ALL DATA to continue'
+    if ($confirmation -cne 'REMOVE ALL DATA') {
+        throw 'Remove All Data cancelled.'
+    }
+}
+
+function Remove-AllData {
+    Import-DotEnv
+    Confirm-RemoveAllData -Force:$Force
+
+    $resourceRootValue = if ($env:DILIGENT_RESOURCES_PATH) { $env:DILIGENT_RESOURCES_PATH } else { 'app/resources' }
+    $resourceRoot = Resolve-LauncherPath -Path $resourceRootValue
+    $databasePath = if ($env:DILIGENT_SQLITE_PATH) {
+        Resolve-LauncherPath -Path $env:DILIGENT_SQLITE_PATH
+    }
+    else {
+        Join-Path $resourceRoot 'database.db'
+    }
+    $keyMaterialPath = if ($env:DILIGENT_ACCESS_KEY_MATERIAL_FILE) {
+        Resolve-LauncherPath -Path $env:DILIGENT_ACCESS_KEY_MATERIAL_FILE
+    }
+    else {
+        Join-Path $resourceRoot 'access-key-material.json'
+    }
+
+    $targets = @(
+        [pscustomobject]@{ Path = $EnvFile; Label = 'local settings' },
+        [pscustomobject]@{ Path = $databasePath; Label = 'SQLite database' },
+        [pscustomobject]@{ Path = ('{0}-wal' -f $databasePath); Label = 'SQLite write-ahead log' },
+        [pscustomobject]@{ Path = ('{0}-shm' -f $databasePath); Label = 'SQLite shared-memory file' },
+        [pscustomobject]@{ Path = $keyMaterialPath; Label = 'access-key material' },
+        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'logs'); Label = 'application logs' },
+        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'models/embeddings'); Label = 'generated embedding models' },
+        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'sources/archives'); Label = 'downloaded source archives' },
+        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'sources/documents'); Label = 'user source documents' },
+        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'sources/vectors'); Label = 'generated vector index' },
+        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'exports'); Label = 'user exports' },
+        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'state'); Label = 'runtime state' }
+    )
+
+    $removed = 0
+    $skipped = 0
+    foreach ($target in $targets) {
+        $result = Remove-UserDataPath -Path $target.Path -Label $target.Label
+        $removed += $result.Removed
+        $skipped += $result.Skipped
+    }
+
+    if ($env:EMBEDDED_DATABASE -and $env:EMBEDDED_DATABASE -notmatch '^(?i:true)$') {
+        Write-Info 'External database mode is configured; no external database was modified.'
+    }
+    if ($skipped -gt 0) {
+        Write-Info "$skipped item(s) were preserved or could not be removed. Review the messages above before restarting."
+    }
+    Write-Ok "All removable local user data was cleared ($removed item(s) removed); application files were preserved"
+}
+
+# ============================================================
+# Desktop release management
+# ============================================================
 function Read-InstallationType {
     Write-Host '  [1] Development - include Ruff, Pyright, and pytest'
     Write-Host '  [2] Standard    - install runtime dependencies only'
@@ -1062,6 +1299,9 @@ function Remove-DesktopRelease {
     Write-Ok 'Desktop release artifacts and generated desktop build state removed; installed applications and user data were preserved'
 }
 
+# ============================================================
+# Interactive menu and action dispatch
+# ============================================================
 $script:MenuContentWidth = 72
 $script:MenuFramePadding = 4
 
@@ -1094,30 +1334,37 @@ function Write-MenuOption {
     Write-MenuLine -Text $content
 }
 
+function Write-MenuSection([string]$Title) {
+    Write-MenuLine -Text '' -Color DarkCyan
+    Write-MenuLine -Text $Title -Color Yellow
+}
+
 function Show-MainMenu {
     Write-Host ''
     Write-MenuRule
     Write-MenuLine -Text 'DILIGENT  /  CLINICAL COPILOT' -Color Cyan
     Write-MenuLine -Text 'Local development and maintenance console' -Color DarkGray
     Write-MenuRule
-    Write-MenuLine -Text '' -Color DarkCyan
-    Write-MenuLine -Text 'APPLICATION' -Color Yellow
+    Write-MenuSection -Title 'APPLICATION'
     Write-MenuOption -Number '1.' -Label 'Launch application' -Description 'Start local services'
+    Write-MenuSection -Title 'SOURCE CONTROL'
+    Write-MenuOption -Number '2.' -Label 'Check for updates' -Description 'Report origin/main status only'
+    Write-MenuOption -Number '3.' -Label 'Update application' -Description 'Pull latest changes from origin/main'
+    Write-MenuSection -Title 'SETUP & MAINTENANCE'
+    Write-MenuOption -Number '4.' -Label 'Install dependencies' -Description 'Sync runtimes + packages'
+    Write-MenuOption -Number '5.' -Label 'Rebuild frontend' -Description 'Recreate Angular production output'
+    Write-MenuOption -Number '6.' -Label 'Initialize database' -Description 'Prepare local data store'
+    Write-MenuOption -Number '7.' -Label 'Run test suite' -Description 'Execute project checks'
+    Write-MenuSection -Title 'DATA & CLEANUP'
+    Write-MenuOption -Number '8.' -Label 'Remove logs' -Description 'Delete application logs'
+    Write-MenuOption -Number '9.' -Label 'Clear cache' -Description 'Remove temporary caches'
+    Write-MenuOption -Number '10.' -Label 'Remove all data' -Description 'Delete local user data only'
+    Write-MenuOption -Number '11.' -Label 'Uninstall application' -Description 'Remove generated dependencies'
+    Write-MenuSection -Title 'DESKTOP RELEASE'
+    Write-MenuOption -Number '12.' -Label 'Build desktop release' -Description 'Create portable / MSI packages'
+    Write-MenuOption -Number '13.' -Label 'Remove desktop release artifacts' -Description 'Delete generated release state'
     Write-MenuLine -Text '' -Color DarkCyan
-    Write-MenuLine -Text 'MAINTENANCE' -Color Yellow
-    Write-MenuOption -Number '2.' -Label 'Install / update dependencies' -Description 'Sync runtimes + packages'
-    Write-MenuOption -Number '3.' -Label 'Rebuild frontend' -Description 'Recreate Angular production output'
-    Write-MenuOption -Number '4.' -Label 'Initialize database' -Description 'Prepare local data store'
-    Write-MenuOption -Number '5.' -Label 'Run test suite' -Description 'Execute project checks'
-    Write-MenuOption -Number '6.' -Label 'Remove logs' -Description 'Delete application logs'
-    Write-MenuOption -Number '7.' -Label 'Clear cache' -Description 'Remove temporary caches'
-    Write-MenuOption -Number '8.' -Label 'Uninstall application' -Description 'Remove generated files'
-    Write-MenuLine -Text '' -Color DarkCyan
-    Write-MenuLine -Text 'DESKTOP RELEASE' -Color Yellow
-    Write-MenuOption -Number '9.' -Label 'Build desktop release' -Description 'Create portable / MSI packages'
-    Write-MenuOption -Number '10.' -Label 'Remove desktop release artifacts' -Description 'Delete generated release state'
-    Write-MenuLine -Text '' -Color DarkCyan
-    Write-MenuLine -Text '11. Exit'
+    Write-MenuLine -Text '14. Exit'
     Write-MenuRule
 }
 
@@ -1135,6 +1382,9 @@ if ($Action) {
         'InitializeDatabase' { Initialize-Database }
         'Test' { Invoke-TestSuite }
         'Uninstall' { Uninstall-Application }
+        'Update' { Update-Application }
+        'CheckForUpdates' { Check-ForUpdates }
+        'RemoveAllData' { Remove-AllData }
         'BuildDesktopRelease' { Build-DesktopRelease }
         'RemoveDesktopRelease' { Remove-DesktopRelease }
     }
@@ -1146,7 +1396,7 @@ while ($true) {
         Clear-Host
     }
     Show-MainMenu
-    $rawSelection = Read-Host 'Select an option (1-11)'
+    $rawSelection = Read-Host 'Select an option (1-14)'
     if ($null -eq $rawSelection) {
         exit 0
     }
@@ -1158,18 +1408,21 @@ while ($true) {
                 Start-Application
                 exit 0
             }
-            '^2$' { Install-OrUpdateApplication }
-            '^3$' { Rebuild-Frontend }
-            '^4$' { Initialize-Database }
-            '^5$' { Invoke-TestSuite }
-            '^6$' { Remove-ApplicationLogs }
-            '^7$' { Clear-ApplicationCache }
-            '^8$' { Uninstall-Application }
-            '^9$' { Build-DesktopRelease; exit 0 }
-            '^10$' { Remove-DesktopRelease }
-            '^11$' { exit 0 }
+            '^2$' { Check-ForUpdates }
+            '^3$' { Update-Application }
+            '^4$' { Install-OrUpdateApplication }
+            '^5$' { Rebuild-Frontend }
+            '^6$' { Initialize-Database }
+            '^7$' { Invoke-TestSuite }
+            '^8$' { Remove-ApplicationLogs }
+            '^9$' { Clear-ApplicationCache }
+            '^10$' { Remove-AllData }
+            '^11$' { Uninstall-Application }
+            '^12$' { Build-DesktopRelease; exit 0 }
+            '^13$' { Remove-DesktopRelease }
+            '^14$' { exit 0 }
             default {
-                Write-Host '[ERROR] Select a number from 1 through 11.' -ForegroundColor Red
+                Write-Host '[ERROR] Select a number from 1 through 14.' -ForegroundColor Red
                 Wait-ForMenu
                 continue
             }

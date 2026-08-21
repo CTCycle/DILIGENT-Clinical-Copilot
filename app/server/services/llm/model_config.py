@@ -572,6 +572,7 @@ class ModelConfigService:
         normalized = value.strip()
         return normalized or None
 
+    # -------------------------------------------------------------------------
     def known_local_model_names(self) -> set[str]:
         names = set(self.local_model_names)
         record = model_catalog.load_catalog_record(self.catalog_cache, "ollama")

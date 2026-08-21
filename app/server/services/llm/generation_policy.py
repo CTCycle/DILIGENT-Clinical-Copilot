@@ -86,6 +86,7 @@ _REVISION_PURPOSES = frozenset(
 )
 
 
+###############################################################################
 def _values(
     rule: dict[str, Any], purpose: GenerationPurpose, reasoning_level: ReasoningLevel
 ) -> float | None:
@@ -105,6 +106,7 @@ def _values(
     return selected.get(purpose.value)
 
 
+###############################################################################
 def _reasoning_target(
     *,
     purpose: GenerationPurpose,
@@ -134,6 +136,7 @@ def _reasoning_target(
     return user_reasoning_level
 
 
+###############################################################################
 def _requirements(
     purpose: GenerationPurpose, reasoning_level: ReasoningLevel
 ) -> tuple[int, int, int, int, str]:

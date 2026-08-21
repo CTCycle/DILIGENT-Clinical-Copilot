@@ -25,7 +25,6 @@ from services.session.session_shared import build_failed_session_payload
 from services.session.session_workflow import process_single_patient_workflow
 from services.session.workflow_shared import ClinicalPersistenceError
 
-
 ###############################################################################
 class FakePatternAnalyzer:
 

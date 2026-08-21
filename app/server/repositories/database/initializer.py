@@ -32,6 +32,7 @@ from repositories.serialization.catalogs import ReferenceCatalogSerializer
 POSTGRES_CREATE_DATABASE_LOCK_KEY = 7362382
 
 
+###############################################################################
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
     connect_args: dict[str, str | int] = {
         "connect_timeout": settings.connect_timeout,
@@ -44,6 +45,7 @@ def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | i
     return connect_args
 
 
+###############################################################################
 def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
     port = settings.port or 5432
     engine_name = normalize_postgres_engine(settings.engine)
@@ -56,6 +58,7 @@ def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
     )
 
 
+###############################################################################
 def clone_settings_with_database(
     settings: DatabaseSettings, database_name: str
 ) -> DatabaseSettings:
@@ -77,6 +80,7 @@ def clone_settings_with_database(
     )
 
 
+###############################################################################
 def build_postgres_create_database_sql(database_name: str) -> TextClause:
     safe_database_name = validate_postgres_database_name(database_name)
     return sqlalchemy.text(
@@ -84,6 +88,7 @@ def build_postgres_create_database_sql(database_name: str) -> TextClause:
     )
 
 
+###############################################################################
 def _seed_catalogs(
     serializer: ReferenceCatalogSerializer,
     force: bool = False,
@@ -113,6 +118,7 @@ def _seed_catalogs(
     )
 
 
+###############################################################################
 def _seed_repository_catalogs(
     repository: SQLiteRepository | PostgresRepository,
     *,
@@ -131,6 +137,7 @@ def _seed_repository_catalogs(
     get_catalog_provider().invalidate()
 
 
+###############################################################################
 def initialize_sqlite_database(
     settings: DatabaseSettings,
     *,
@@ -158,6 +165,7 @@ def initialize_sqlite_database(
         repository.engine.dispose()
 
 
+###############################################################################
 def _is_missing_postgres_database(error: SQLAlchemyError) -> bool:
     original = getattr(error, "orig", error)
     state = getattr(original, "sqlstate", None) or getattr(original, "pgcode", None)
@@ -167,6 +175,7 @@ def _is_missing_postgres_database(error: SQLAlchemyError) -> bool:
     return "database" in message and "does not exist" in message
 
 
+###############################################################################
 def _create_postgres_database_if_missing(settings: DatabaseSettings) -> tuple[str, bool]:
     if not settings.host:
         raise ValueError("Database host is required for PostgreSQL initialization.")
@@ -235,6 +244,7 @@ def _create_postgres_database_if_missing(settings: DatabaseSettings) -> tuple[st
         admin_engine.dispose()
 
 
+###############################################################################
 def ensure_postgres_database(
     settings: DatabaseSettings,
     *,
@@ -263,6 +273,7 @@ def ensure_postgres_database(
     return target_database
 
 
+###############################################################################
 def ensure_database_ready(settings: DatabaseSettings) -> bool:
     """Synchronize startup schema and seed only a newly created database."""
 
@@ -295,6 +306,7 @@ def ensure_database_ready(settings: DatabaseSettings) -> bool:
     return database_was_created
 
 
+###############################################################################
 def run_database_initialization(
     *,
     drop_existing: bool = False,
@@ -324,6 +336,7 @@ def run_database_initialization(
     )
 
 
+###############################################################################
 def initialize_database(
     drop_existing: bool = False,
     seed_catalogs: bool = True,

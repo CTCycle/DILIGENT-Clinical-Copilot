@@ -22,6 +22,7 @@ CatalogStatus = Literal[
     "available", "cached", "not_loaded", "unavailable", "authentication_required"
 ]
 
+###############################################################################
 class ReasoningLevel(StrEnum):
     OFF = "off"
     LOW = "low"

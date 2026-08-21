@@ -3,7 +3,6 @@ from __future__ import annotations
 from api.inspection.sessions import InspectionSessionEndpoint
 from services.inspection.service import DataInspectionService
 
-
 ###############################################################################
 class FakeSerializer:
 

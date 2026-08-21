@@ -20,7 +20,6 @@ from domain.clinical import (
 from domain.clinical.entities import DeterministicDrugExtractionResult
 from services.clinical.preparation import HepatoxPreparedInputs
 
-
 ###############################################################################
 def get_session_service() -> Any:
     for route in session_module.router.routes:
