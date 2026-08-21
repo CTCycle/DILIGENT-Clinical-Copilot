@@ -1,22 +1,43 @@
 {
-  "policy_version": "2026-07-19",
-  "source_review_date": "2026-07-19",
+  "policy_version": "2026-08-21",
+  "source_review_date": "2026-08-21",
   "profiles": {
     "provider_default": {
       "structured_extraction": null,
       "clinical_synthesis": null,
+      "faithful_rewrite": null,
+      "revision_scan": null,
+      "revision_planning": null,
+      "revision_tool_selection": null,
+      "revision_editing": null,
+      "revision_qa": null,
+      "timeline_extraction": null,
       "json_repair": null,
       "connectivity_check": null
     },
     "local_instruction": {
       "structured_extraction": 0.0,
       "clinical_synthesis": 0.2,
+      "faithful_rewrite": 0.0,
+      "revision_scan": 0.0,
+      "revision_planning": 0.0,
+      "revision_tool_selection": 0.0,
+      "revision_editing": 0.0,
+      "revision_qa": 0.0,
+      "timeline_extraction": 0.0,
       "json_repair": 0.0,
       "connectivity_check": null
     },
     "openai_ordinary": {
       "structured_extraction": 0.0,
       "clinical_synthesis": 0.2,
+      "faithful_rewrite": 0.0,
+      "revision_scan": 0.0,
+      "revision_planning": 0.0,
+      "revision_tool_selection": 0.0,
+      "revision_editing": 0.0,
+      "revision_qa": 0.0,
+      "timeline_extraction": 0.0,
       "json_repair": 0.0,
       "connectivity_check": null
     }
@@ -30,6 +51,13 @@
     "deepseek": {
       "structured_extraction": 0.0,
       "clinical_synthesis": 1.0,
+      "faithful_rewrite": 0.0,
+      "revision_scan": 0.0,
+      "revision_planning": 0.0,
+      "revision_tool_selection": 0.0,
+      "revision_editing": 0.0,
+      "revision_qa": 0.0,
+      "timeline_extraction": 0.0,
       "json_repair": 0.0,
       "connectivity_check": null
     },

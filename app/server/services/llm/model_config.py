@@ -32,6 +32,7 @@ from domain.model_configs import (
     ModelConfigSnapshot,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
+    ReasoningLevel,
 )
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
@@ -69,7 +70,7 @@ class ModelConfigSnapshotStore(Protocol):
         use_cloud_models: bool | object = ...,
         cloud_provider: str | None | object = ...,
         cloud_model: str | None | object = ...,
-        ollama_reasoning: bool | object = ...,
+        reasoning_level: ReasoningLevel | object = ...,
         ollama_seed: int | None | object = ...,
         rag_settings: dict[str, object] | object = ...,
     ) -> ModelConfigSnapshot: ...
@@ -374,8 +375,8 @@ class ModelConfigService:
         if "use_cloud_services" in fields_set:
             updates["use_cloud_models"] = bool(payload.use_cloud_services)
 
-        if "ollama_reasoning" in fields_set and payload.ollama_reasoning is not None:
-            updates["ollama_reasoning"] = payload.ollama_reasoning
+        if "reasoning_level" in fields_set and payload.reasoning_level is not None:
+            updates["reasoning_level"] = payload.reasoning_level
         if "ollama_seed" in fields_set:
             updates["ollama_seed"] = payload.ollama_seed
 
@@ -501,7 +502,7 @@ class ModelConfigService:
                 use_cloud_models=defaults.use_cloud_services,
                 cloud_provider=self.resolve_provider(defaults.llm_provider),
                 cloud_model=self.normalize_optional_text(defaults.cloud_model),
-                ollama_reasoning=defaults.ollama_reasoning,
+                reasoning_level=defaults.reasoning_level,
             )
 
         migration_updates: dict[str, str | None] = {}
@@ -692,7 +693,7 @@ class ModelConfigService:
             text_extraction_model=snapshot.text_extraction_model,
             revision_model=snapshot.revision_model,
             timeline_model=snapshot.timeline_model,
-            ollama_reasoning=snapshot.ollama_reasoning,
+            reasoning_level=snapshot.reasoning_level,
             ollama_seed=snapshot.ollama_seed,
             rag_settings=rag_settings_payload(
                 build_effective_rag_settings(
@@ -729,7 +730,7 @@ class ModelConfigService:
             text_extraction_model=snapshot.text_extraction_model,
             revision_model=snapshot.revision_model,
             timeline_model=snapshot.timeline_model,
-            ollama_reasoning=snapshot.ollama_reasoning,
+            reasoning_level=snapshot.reasoning_level,
             ollama_seed=snapshot.ollama_seed,
             rag_settings=rag_settings_payload(
                 build_effective_rag_settings(persisted_settings=snapshot.rag_settings)

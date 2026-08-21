@@ -207,7 +207,7 @@ class InspectionTimelineMixin:
                 else "text_extraction_model"
             )
             settings["timeline_model"] = coerce_optional_str(settings.get(legacy_role)) or model
-        settings.setdefault("ollama_reasoning", LLMRuntimeConfig.is_ollama_reasoning_enabled())
+        settings.setdefault("reasoning_level", LLMRuntimeConfig.get_reasoning_level().value)
         settings.setdefault("ollama_seed", LLMRuntimeConfig.get_ollama_seed())
         return settings
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from domain.model_configs import ReasoningLevel
+
 ###############################################################################
 class FastAPISettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -109,7 +111,7 @@ class LLMRuntimeDefaults(BaseModel):
     llm_provider: str
     cloud_model: str
     use_cloud_services: bool
-    ollama_reasoning: bool
+    reasoning_level: ReasoningLevel
     ollama_host_default: str
 
 ###############################################################################

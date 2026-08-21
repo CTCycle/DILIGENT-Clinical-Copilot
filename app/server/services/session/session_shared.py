@@ -49,7 +49,7 @@ def build_failed_session_payload(
         "cloud_model": LLMRuntimeConfig.get_cloud_model(),
         "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
         "clinical_model": LLMRuntimeConfig.get_clinical_model(),
-        "ollama_reasoning": bool(LLMRuntimeConfig.is_ollama_reasoning_enabled()),
+        "reasoning_level": LLMRuntimeConfig.get_reasoning_level().value,
         "resolved_runtime": {},
         "stage_elapsed_ms": {},
         "fallback_reasons": {},

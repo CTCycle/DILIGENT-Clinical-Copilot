@@ -251,7 +251,7 @@ class ClinicalSessionService(
             parser_model,
             clinical_provider,
             clinical_model_resolved,
-            LLMRuntimeConfig.is_ollama_reasoning_enabled(),
+            LLMRuntimeConfig.get_reasoning_level().value,
         )
 
     # -------------------------------------------------------------------------

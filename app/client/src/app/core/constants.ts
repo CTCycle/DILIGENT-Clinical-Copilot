@@ -1,4 +1,4 @@
-import { ClinicalFormState, CloudProvider, RuntimeSettings } from "./models/types";
+import { ClinicalFormState, CloudProvider, ReasoningLevel, RuntimeSettings } from "./models/types";
 
 export const API_BASE_URL = "/api";
 
@@ -8,7 +8,7 @@ export type LLMRuntimeDefaults = {
   llm_provider: CloudProvider;
   cloud_model: string;
   use_cloud_services: boolean;
-  ollama_reasoning: boolean;
+  reasoning_level: ReasoningLevel;
 };
 
 export const LLM_RUNTIME_DEFAULTS: Readonly<LLMRuntimeDefaults> = {
@@ -17,7 +17,7 @@ export const LLM_RUNTIME_DEFAULTS: Readonly<LLMRuntimeDefaults> = {
   llm_provider: "openai",
   cloud_model: "gpt-4o-mini",
   use_cloud_services: false,
-  ollama_reasoning: false,
+  reasoning_level: "off",
 };
 
 export const DEFAULT_SETTINGS: RuntimeSettings = {
@@ -28,7 +28,7 @@ export const DEFAULT_SETTINGS: RuntimeSettings = {
   clinicalModel: LLM_RUNTIME_DEFAULTS.clinical_model,
   revisionModel: LLM_RUNTIME_DEFAULTS.clinical_model,
   timelineModel: LLM_RUNTIME_DEFAULTS.text_extraction_model,
-  reasoning: LLM_RUNTIME_DEFAULTS.ollama_reasoning,
+  reasoning: LLM_RUNTIME_DEFAULTS.reasoning_level,
 };
 
 export const DEFAULT_FORM_STATE: ClinicalFormState = {

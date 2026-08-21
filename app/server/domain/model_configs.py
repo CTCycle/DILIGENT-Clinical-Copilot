@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,6 +22,12 @@ CatalogStatus = Literal[
     "available", "cached", "not_loaded", "unavailable", "authentication_required"
 ]
 
+class ReasoningLevel(StrEnum):
+    OFF = "off"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
 ###############################################################################
 @dataclass(frozen=True)
 class ModelConfigSnapshot:
@@ -31,7 +38,7 @@ class ModelConfigSnapshot:
     cloud_model: str | None
     revision_model: str | None = None
     timeline_model: str | None = None
-    ollama_reasoning: bool = False
+    reasoning_level: ReasoningLevel = ReasoningLevel.OFF
     ollama_seed: int | None = 42
     rag_settings: dict[str, object] | None = None
     updated_at: datetime | None = None
@@ -101,7 +108,7 @@ class ModelConfigUpdateRequest(BaseModel):
     clinical_model: str | None = None
     revision_model: str | None = None
     timeline_model: str | None = None
-    ollama_reasoning: bool | None = None
+    reasoning_level: ReasoningLevel | None = None
     ollama_seed: int | None = Field(default=None, ge=0)
     rag_settings: RagSettingsUpdateRequest | None = None
 
@@ -133,7 +140,7 @@ class ModelConfigStateResponse(BaseModel):
     clinical_model: str | None
     revision_model: str | None
     timeline_model: str | None
-    ollama_reasoning: bool
+    reasoning_level: ReasoningLevel
     ollama_seed: int | None
     rag_settings: RagSettingsResponse
     embedding_runtime: EmbeddingRuntimeStatus
@@ -151,7 +158,7 @@ class ModelConfigPersistResponse(BaseModel):
     clinical_model: str | None
     revision_model: str | None
     timeline_model: str | None
-    ollama_reasoning: bool
+    reasoning_level: ReasoningLevel
     ollama_seed: int | None
     rag_settings: RagSettingsResponse
     updated_at: datetime | None = None

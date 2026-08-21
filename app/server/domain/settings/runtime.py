@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from domain.model_configs import ReasoningLevel
+
 ###############################################################################
 class LLMRuntimeState(BaseModel):
     model_config = ConfigDict(frozen=False)
@@ -10,5 +12,5 @@ class LLMRuntimeState(BaseModel):
     llm_provider: str = ""
     cloud_model: str = ""
     use_cloud_services: bool = False
-    ollama_reasoning: bool = False
+    reasoning_level: ReasoningLevel = ReasoningLevel.OFF
     revision: int = 0

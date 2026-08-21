@@ -12,7 +12,7 @@ from common.catalogs.model_choices import (
     get_clinical_model_choices,
     get_text_extraction_model_choices,
 )
-from domain.model_configs import ModelConfigSnapshot
+from domain.model_configs import ModelConfigSnapshot, ReasoningLevel
 from domain.llm.providers import CloudProviderId
 from domain.settings.configuration import LLMRuntimeDefaults
 from repositories.serialization.model_configs import (
@@ -27,6 +27,11 @@ from services.llm.generation_policy import (
     GenerationPolicy,
     GenerationPurpose,
     resolve_generation_policy as resolve_policy,
+)
+from services.llm.model_capabilities import (
+    EffectiveInferenceConfig,
+    resolve_effective_inference_config as resolve_effective_config,
+    resolve_model_capabilities,
 )
 
 ###############################################################################
@@ -107,6 +112,7 @@ class LLMRuntimeConfig:
             base_cloud_model = defaults.cloud_model
             base_clinical_model = defaults.clinical_model
             base_text_extraction_model = defaults.text_extraction_model
+            base_reasoning_level = defaults.reasoning_level
             base_revision_model = (
                 defaults.cloud_model
                 if defaults.use_cloud_services
@@ -122,6 +128,7 @@ class LLMRuntimeConfig:
             base_cloud_model = snapshot.cloud_model
             base_clinical_model = snapshot.clinical_model
             base_text_extraction_model = snapshot.text_extraction_model
+            base_reasoning_level = snapshot.reasoning_level
             use_cloud_models = cls._coerce_bool(
                 overrides.get("use_cloud_models", snapshot.use_cloud_models)
             )
@@ -193,10 +200,9 @@ class LLMRuntimeConfig:
             ),
             cloud_provider=provider,
             cloud_model=cloud_model,
-            ollama_reasoning=(
-                cls._coerce_bool(overrides.get("ollama_reasoning"))
-                if "ollama_reasoning" in overrides
-                else bool(snapshot.ollama_reasoning)
+            reasoning_level=cls._resolve_reasoning_level(
+                overrides=overrides,
+                persisted_level=base_reasoning_level,
             ),
             ollama_seed=(
                 cls._coerce_optional_int(overrides.get("ollama_seed"))
@@ -252,6 +258,36 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def _resolve_reasoning_level(
+        cls,
+        *,
+        overrides: dict[str, object],
+        persisted_level: ReasoningLevel,
+    ) -> ReasoningLevel:
+        if "reasoning_level" in overrides:
+            return cls._coerce_reasoning_level(overrides["reasoning_level"])
+        if "ollama_reasoning" in overrides:
+            return (
+                ReasoningLevel.MEDIUM
+                if cls._coerce_bool(overrides["ollama_reasoning"])
+                else ReasoningLevel.OFF
+            )
+        return persisted_level
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _coerce_reasoning_level(value: object) -> ReasoningLevel:
+        if isinstance(value, ReasoningLevel):
+            return value
+        if isinstance(value, str):
+            try:
+                return ReasoningLevel(value.strip().lower())
+            except ValueError:
+                pass
+        return ReasoningLevel.OFF
+
+    # -------------------------------------------------------------------------
+    @classmethod
     @contextmanager
     def override_for_run(cls, overrides: dict[str, object] | None):
         normalized = {str(key): value for key, value in (overrides or {}).items()}
@@ -302,8 +338,8 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def is_ollama_reasoning_enabled(cls) -> bool:
-        return bool(cls._load_snapshot().ollama_reasoning)
+    def get_reasoning_level(cls) -> ReasoningLevel:
+        return cls._load_snapshot().reasoning_level
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -328,13 +364,45 @@ class LLMRuntimeConfig:
             provider=clinical_provider,
             model=clinical_model,
         )
+        revision_policy = cls.resolve_generation_policy(
+            purpose=GenerationPurpose.REVISION_PLANNING,
+            provider=revision_provider,
+            model=revision_model,
+        )
+        timeline_policy = cls.resolve_generation_policy(
+            purpose=GenerationPurpose.TIMELINE_EXTRACTION,
+            provider=timeline_provider,
+            model=timeline_model,
+            timeline_complexity="moderate",
+        )
+        parser_effective = cls.resolve_effective_inference_config(
+            purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
+            provider=parser_provider,
+            model=parser_model,
+        )
+        clinical_effective = cls.resolve_effective_inference_config(
+            purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
+            provider=clinical_provider,
+            model=clinical_model,
+        )
+        revision_effective = cls.resolve_effective_inference_config(
+            purpose=GenerationPurpose.REVISION_PLANNING,
+            provider=revision_provider,
+            model=revision_model,
+        )
+        timeline_effective = cls.resolve_effective_inference_config(
+            purpose=GenerationPurpose.TIMELINE_EXTRACTION,
+            provider=timeline_provider,
+            model=timeline_model,
+            timeline_complexity="moderate",
+        )
         snapshot: dict[str, object] = {
             "use_cloud_services": cls.is_cloud_enabled(),
             "llm_provider": cls.get_llm_provider(),
             "cloud_model": cls.get_cloud_model(),
             "text_extraction_model": cls.get_text_extraction_model(),
             "clinical_model": cls.get_clinical_model(),
-            "ollama_reasoning": cls.is_ollama_reasoning_enabled(),
+            "reasoning_level": cls.get_reasoning_level().value,
             "ollama_seed": cls.get_ollama_seed(),
             "use_rag": bool(use_rag),
             "rag_settings": cls._load_snapshot().rag_settings or {},
@@ -349,8 +417,10 @@ class LLMRuntimeConfig:
             "timeline_provider": timeline_provider,
             "timeline_model_resolved": timeline_model,
             "sampling_policy_version": parser_policy.policy_version,
-            "parser_sampling_policy": cls._policy_snapshot(parser_policy),
-            "clinical_sampling_policy": cls._policy_snapshot(clinical_policy),
+            "parser_sampling_policy": cls._policy_snapshot(parser_policy, parser_effective),
+            "clinical_sampling_policy": cls._policy_snapshot(clinical_policy, clinical_effective),
+            "revision_sampling_policy": cls._policy_snapshot(revision_policy, revision_effective),
+            "timeline_sampling_policy": cls._policy_snapshot(timeline_policy, timeline_effective),
         }
         canonical = json.dumps(
             snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
@@ -359,26 +429,83 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _policy_snapshot(policy: GenerationPolicy) -> dict[str, object]:
+    def _policy_snapshot(
+        policy: GenerationPolicy,
+        effective: EffectiveInferenceConfig,
+    ) -> dict[str, object]:
         return {
             "policy_id": policy.policy_id,
+            "policy_version": policy.policy_version,
             "temperature": policy.temperature if policy.temperature is not None else "provider_default",
             "match_kind": policy.match_kind.value,
             "provider": policy.provider,
             "model": policy.model,
             "purpose": policy.purpose.value,
+            "user_reasoning_level": effective.user_reasoning_level.value,
+            "requested_reasoning_level": effective.requested_reasoning_level.value,
+            "effective_reasoning_level": effective.effective_reasoning_level.value,
+            "reasoning_adjustment_reason": effective.reasoning_adjustment_reason,
+            "capability_source": effective.capability_source,
+            "model_context_limit": effective.model_context_limit,
+            "effective_runtime_context_limit": effective.effective_runtime_context_limit,
+            "input_budget": effective.input_budget,
+            "visible_output_reserve": effective.visible_output_reserve,
+            "reasoning_reserve": effective.reasoning_reserve,
+            "output_token_limit": effective.output_token_limit,
+            "context_safety_reserve": effective.context_safety_reserve,
+            "context_selection_report": dict(effective.context_selection_report),
         }
 
     # -------------------------------------------------------------------------
     @staticmethod
     def resolve_generation_policy(
-        *, purpose: GenerationPurpose, provider: str, model: str, reasoning_enabled: bool = False
+        *,
+        purpose: GenerationPurpose,
+        provider: str,
+        model: str,
+        user_reasoning_level: ReasoningLevel | None = None,
+        timeline_complexity: str = "moderate",
+        reasoning_enabled: bool | None = None,
     ) -> GenerationPolicy:
         return resolve_policy(
             purpose=purpose,
             provider=provider,
             model=model,
+            user_reasoning_level=(
+                user_reasoning_level
+                if user_reasoning_level is not None
+                else LLMRuntimeConfig.get_reasoning_level()
+            ),
+            timeline_complexity=timeline_complexity,
             reasoning_enabled=reasoning_enabled,
+        )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def resolve_effective_inference_config(
+        cls,
+        *,
+        purpose: GenerationPurpose,
+        provider: str,
+        model: str,
+        user_reasoning_level: ReasoningLevel | None = None,
+        timeline_complexity: str = "moderate",
+        runtime_context_limit: int | None = None,
+        selected_input_tokens: int = 0,
+    ) -> EffectiveInferenceConfig:
+        policy = cls.resolve_generation_policy(
+            purpose=purpose,
+            provider=provider,
+            model=model,
+            user_reasoning_level=user_reasoning_level,
+            timeline_complexity=timeline_complexity,
+        )
+        capabilities = resolve_model_capabilities(provider=provider, model=model)
+        return resolve_effective_config(
+            policy=policy,
+            capabilities=capabilities,
+            runtime_context_limit=runtime_context_limit,
+            selected_input_tokens=selected_input_tokens,
         )
 
     # -------------------------------------------------------------------------

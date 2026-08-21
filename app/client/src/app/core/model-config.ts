@@ -68,7 +68,7 @@ export function buildRuntimeSettingsFromConfig(
     clinicalModel: resolvedClinicalModel,
     revisionModel: resolvedRevisionModel,
     timelineModel: resolvedTimelineModel,
-    reasoning: payload.ollama_reasoning,
+    reasoning: payload.reasoning_level,
   };
 }
 
