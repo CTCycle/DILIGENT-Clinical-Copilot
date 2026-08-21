@@ -39,6 +39,7 @@ from common.utils.types import (
     coerce_str,
     coerce_str_or_none,
 )
+from domain.model_configs import ReasoningLevel
 from domain.settings.configuration import (
     DatabaseSettings,
     DrugsMatcherSettings,
@@ -230,7 +231,7 @@ def _default_llm_runtime_defaults(
         llm_provider=provider_default,
         cloud_model=cloud_default,
         use_cloud_services=False,
-        reasoning_level="off",
+        reasoning_level=ReasoningLevel.OFF,
         ollama_host_default=resolve_ollama_base_url(
             ollama_url=environment.ollama_url,
             ollama_host=environment.ollama_host,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 from anthropic import AsyncAnthropic
 from anthropic.types import MessageParam
@@ -46,7 +46,7 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
         kwargs["max_tokens"] = max_tokens
         if "temperature" in request.options and request.reasoning_level in {None, "off"}:
             kwargs["temperature"] = request.options["temperature"]
-        response = await self.client.messages.create(
+        response = await cast(Any, self.client.messages).create(
             **kwargs,
         )
         text = "".join(getattr(block, "text", "") for block in response.content)

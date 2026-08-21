@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 PatientTimelineEventType = Literal["therapy", "disease", "lab", "other"]
 PatientTimelineGenerationStatus = Literal["llm_generated", "fallback"]
