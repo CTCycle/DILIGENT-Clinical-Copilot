@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "DILIGENT"
-version = "3.2.0"
+version = "3.3.0"
 requires-python = ">=3.14"
 
 dependencies = [
@@ -41,6 +41,11 @@ test = [
     "ruff==0.16.3",
     "pyright>=1.1.407",
     "playwright>=1.55.0",
+]
+
+[dependency-groups]
+desktop-build = [
+    "pyinstaller==6.21.0",
 ]
 
 [tool.hatch.build.targets.wheel]

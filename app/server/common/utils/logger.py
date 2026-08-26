@@ -5,6 +5,7 @@ import logging.config
 import os
 from datetime import datetime
 from functools import lru_cache
+from logging.handlers import RotatingFileHandler
 from typing import Any
 
 from common.paths import LOGS_PATH
@@ -52,6 +53,28 @@ LOG_CONFIG: dict[str, Any] = {
 def configure_logging() -> None:
 
     LOGS_PATH.mkdir(parents=True, exist_ok=True)
+    if os.getenv("DILIGENT_DESKTOP", "").strip().casefold() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%d-%m-%Y %H:%M:%S",
+            handlers=[
+                RotatingFileHandler(
+                    LOGS_PATH / "desktop-backend.log",
+                    maxBytes=5 * 1024 * 1024,
+                    backupCount=2,
+                    encoding="utf-8",
+                )
+            ],
+            force=True,
+        )
+        return
+
     current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     log_filename = str(LOGS_PATH / f"DILIGENT_{current_timestamp}_{os.getpid()}.log")
 

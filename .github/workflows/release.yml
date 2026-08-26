@@ -18,21 +18,24 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout tagged release
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22"
+          node-version: "22.13.0"
           cache: npm
           cache-dependency-path: |
             app/client/package-lock.json
             app/desktop/package-lock.json
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master 2026-08-26
+        with:
+          toolchain: 1.95.0
+          targets: x86_64-pc-windows-msvc
 
       - name: Isolate Python DLL search path
         shell: pwsh
@@ -107,6 +110,32 @@ jobs:
             throw "Desktop release build failed with exit code $LASTEXITCODE"
           }
 
+      - name: Verify release version contract
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = $env:RELEASE_TAG.Substring(1)
+          $jsonPaths = @("app/client/package.json", "app/desktop/package.json")
+          foreach ($path in $jsonPaths) {
+            $actual = (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).version
+            if ($actual -ne $version) { throw "Version mismatch in $path: $actual != $version" }
+          }
+          $textChecks = @(
+            @("app/server/pyproject.toml", '(?m)^version\s*=\s*"([^"]+)"'),
+            @("app/desktop/src-tauri/Cargo.toml", '(?m)^version\s*=\s*"([^"]+)"'),
+            @("app/desktop/src-tauri/tauri.conf.json", '"version"\s*:\s*"([^"]+)"'),
+            @("app/shared/openapi.json", '"version"\s*:\s*"([^"]+)"')
+          )
+          foreach ($check in $textChecks) {
+            $match = [regex]::Match((Get-Content -LiteralPath $check[0] -Raw), $check[1])
+            if (-not $match.Success -or $match.Groups[1].Value -ne $version) { throw "Version mismatch in $($check[0])" }
+          }
+          $lockMatch = [regex]::Match((Get-Content -LiteralPath "app/server/uv.lock" -Raw), '(?ms)\[\[package\]\]\s*name = "diligent"\s*version = "([^"]+)"')
+          if (-not $lockMatch.Success -or $lockMatch.Groups[1].Value -ne $version) { throw "uv.lock does not match $version" }
+          Write-Output "Release version contract verified: $version"
+
       - name: Verify release artifacts
         shell: pwsh
         env:
@@ -129,6 +158,14 @@ jobs:
             }
             Write-Output "$($item.Name): $($item.Length) bytes"
           }
+          $checksumText = Get-Content -LiteralPath $artifacts[2] -Raw
+          foreach ($artifact in $artifacts[0..1]) {
+            $name = Split-Path -Leaf $artifact
+            $hash = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($checksumText -notmatch [regex]::Escape("$hash  $name")) {
+              throw "Checksum manifest does not match $name"
+            }
+          }
 
       - name: Create or update GitHub Release
         shell: pwsh
@@ -147,9 +184,26 @@ jobs:
               throw "GitHub Release creation failed with exit code $LASTEXITCODE"
             }
           }
-          $portable = Join-Path "release" "DILIGENT-v$version-windows-x64-portable.exe"
-          $msi = Join-Path "release" "DILIGENT-v$version-windows-x64.msi"
-          gh release upload $tag --repo $repo $portable $msi --clobber
-          if ($LASTEXITCODE -ne 0) {
-            throw "GitHub Release asset upload failed with exit code $LASTEXITCODE"
+          $artifacts = @(
+            (Join-Path "release" "DILIGENT-v$version-windows-x64-portable.exe"),
+            (Join-Path "release" "DILIGENT-v$version-windows-x64.msi"),
+            (Join-Path "release" "DILIGENT-v$version-windows-x64.sha256")
+          )
+          $existingNames = @(gh release view $tag --repo $repo --json assets --jq '.assets[].name')
+          $downloadDir = Join-Path $env:RUNNER_TEMP "diligent-release-existing"
+          New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
+          foreach ($artifact in $artifacts) {
+            $name = Split-Path -Leaf $artifact
+            if ($existingNames -contains $name) {
+              gh release download $tag --repo $repo --pattern $name --dir $downloadDir --clobber
+              if ($LASTEXITCODE -ne 0) { throw "Could not download existing release asset $name" }
+              $existing = Join-Path $downloadDir $name
+              $localHash = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
+              $existingHash = (Get-FileHash -LiteralPath $existing -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($localHash -ne $existingHash) { throw "Refusing to overwrite non-identical release asset $name" }
+              Write-Output "Existing release asset is byte-identical: $name"
+              continue
+            }
+            gh release upload $tag --repo $repo $artifact
+            if ($LASTEXITCODE -ne 0) { throw "GitHub Release asset upload failed for $name" }
           }

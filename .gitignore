@@ -33,7 +33,6 @@ build/
 .coverage
 htmlcov/
 __pycache__/
-app/server/uv.lock
 
 # Node / JS
 **/node_modules/
@@ -75,5 +74,6 @@ app/desktop/src-tauri/generated/**
 app/desktop/src-tauri/target/
 !app/desktop/package-lock.json
 !app/desktop/src-tauri/Cargo.lock
+!app/server/uv.lock
 !app/desktop/build/
 !app/desktop/build/**
