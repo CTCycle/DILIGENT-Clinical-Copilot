@@ -4,9 +4,9 @@ import threading
 import time
 
 import pytest
-
 from services.runtime.jobs import JobManager
 from services.session.session_service import ClinicalSessionService
+
 
 ###############################################################################
 def accepts_named_job_id(job_id: str) -> dict[str, object]:
@@ -159,3 +159,44 @@ def test_job_running_checks_can_be_scoped() -> None:
     finally:
         manager.cancel_job(job_id)
         release.set()
+
+###############################################################################
+def test_shutdown_stops_new_work_and_waits_for_cooperative_worker() -> None:
+    manager = JobManager()
+    started = threading.Event()
+    release = threading.Event()
+
+    def runner() -> dict[str, int]:
+        started.set()
+        release.wait(timeout=2)
+        return {"ok": 1}
+
+    job_id = manager.start_job("shutdown_test", runner)
+    assert started.wait(timeout=1)
+    assert manager.shutdown(timeout=0.01) is False
+    with pytest.raises(RuntimeError, match="shutting down"):
+        manager.start_job("shutdown_test", dict)
+    release.set()
+    for _ in range(20):
+        if not manager.threads:
+            break
+        time.sleep(0.05)
+    assert manager.get_job_status(job_id)["status"] == "cancelled"
+    assert manager.shutdown(timeout=1) is True
+
+
+###############################################################################
+def test_terminal_job_records_are_bounded() -> None:
+    manager = JobManager()
+    manager.max_terminal_jobs = 2
+    job_ids = [manager.start_job("bounded_test", dict) for _ in range(3)]
+    for job_id in job_ids:
+        for _ in range(20):
+            if manager.get_job_status(job_id) is None or manager.get_job_status(job_id)["status"] in {
+                "completed",
+                "failed",
+                "cancelled",
+            }:
+                break
+            time.sleep(0.05)
+    assert len(manager.jobs) <= 2

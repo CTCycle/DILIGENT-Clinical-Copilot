@@ -11,9 +11,9 @@ The exact source commit is intentionally read from git (`git rev-parse
 develop`) rather than duplicated here, so this index does not become a stale
 branch-status record.
 
-- Backend, frontend, and desktop source manifests report version `3.2.0`.
+- Backend, frontend, and desktop source manifests report version `3.3.0`.
 - Release versions use strict `major.minor.patch` SemVer and must remain synchronized across the frontend, backend, and desktop manifests; the backend exposes the frontend package version unless `DILIGENT_RELEASE_VERSION` is explicitly set for packaging.
-- The `v3.2.0` desktop release target is created from the synchronized `main` branch. Its portable EXE and MSI require independent artifact, tag, remote-release, and download/hash verification; the generated checksum manifest is maintainer-side verification output.
+- The `v3.3.0` desktop release target is created from the synchronized `main` branch. Its portable EXE, MSI, and published checksum manifest require independent artifact, tag, remote-release, and download/hash verification.
 - Model configuration reads are cache-only and non-cacheable. Provider contact is limited to explicit catalog load/refresh operations, and catalog attempts persist in `provider_model_catalog_cache`.
 - The revision workflow is a bounded, persisted agentic workflow with context, planning, allow-listed tool traces, deterministic patch validation, QA, artifacts, and optional `agentic_revision` session finalization.
 - Running job cancellation is cooperative: pending jobs can become terminal immediately, while a running stop-requested worker remains active and occupies its concurrency scope until it exits.

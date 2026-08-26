@@ -1,22 +1,18 @@
 use std::{
-    fs,
+    fs::{self, OpenOptions},
     io::Read,
     path::{Path, PathBuf},
+    thread,
+    time::{Duration, Instant},
 };
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 use zip::ZipArchive;
 
-const EMBEDDED_ARCHIVE: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/generated/diligent-runtime.zip"
-));
-const EMBEDDED_DIGEST: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/generated/diligent-runtime.sha256"
-));
+const EMBEDDED_ARCHIVE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/diligent-runtime.zip"));
+const EMBEDDED_DIGEST: &str = include_str!(concat!(env!("OUT_DIR"), "/diligent-runtime.sha256"));
 
 #[derive(Debug, Clone)]
 pub struct RuntimePaths {
@@ -25,17 +21,34 @@ pub struct RuntimePaths {
     pub backend: PathBuf,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct RuntimeManifest {
     release_version: String,
     files: Vec<RuntimeFile>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct RuntimeFile {
     path: String,
     size: u64,
     sha256: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ExtractionMarker {
+    release_version: String,
+    archive_digest: String,
+    manifest_sha256: String,
+    file_count: usize,
+    total_size: u64,
+}
+
+struct RuntimeLock(PathBuf);
+
+impl Drop for RuntimeLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
 }
 
 fn archive_digest() -> String {
@@ -44,7 +57,8 @@ fn archive_digest() -> String {
 
 fn safe_member_path(name: &str) -> Result<PathBuf, String> {
     let path = Path::new(name);
-    if path.is_absolute()
+    if name.trim().is_empty()
+        || path.is_absolute()
         || name.starts_with('/')
         || name.starts_with('\\')
         || name.contains(':')
@@ -74,27 +88,85 @@ fn sha256_file(path: &Path) -> Result<String, String> {
     Ok(format!("{:x}", digest.finalize()))
 }
 
-fn validate_extracted_runtime(root: &Path, expected_version: &str) -> Result<(), String> {
-    let manifest_path = root.join("runtime-manifest.json");
+fn load_manifest(root: &Path, expected_version: &str) -> Result<(RuntimeManifest, String), String> {
+    let manifest_bytes =
+        fs::read(root.join("runtime-manifest.json")).map_err(|error| error.to_string())?;
     let manifest: RuntimeManifest =
-        serde_json::from_slice(&fs::read(&manifest_path).map_err(|error| error.to_string())?)
-            .map_err(|error| error.to_string())?;
+        serde_json::from_slice(&manifest_bytes).map_err(|error| error.to_string())?;
     if manifest.release_version != expected_version {
         return Err("runtime version mismatch".into());
     }
-    for file in manifest.files {
+    Ok((manifest, format!("{:x}", Sha256::digest(manifest_bytes))))
+}
+
+fn validate_manifest_entries(
+    root: &Path,
+    manifest: &RuntimeManifest,
+    hash_files: bool,
+) -> Result<(usize, u64), String> {
+    let mut total_size = 0_u64;
+    for file in &manifest.files {
         let relative = safe_member_path(&file.path)?;
         let path = root.join(relative);
         let metadata = fs::symlink_metadata(&path).map_err(|error| error.to_string())?;
-        if !metadata.is_file() || metadata.len() != file.size || sha256_file(&path)? != file.sha256
-        {
-            return Err(format!("runtime manifest mismatch: {}", file.path));
+        if !metadata.is_file() || metadata.len() != file.size {
+            return Err(format!("runtime manifest size mismatch: {}", file.path));
         }
+        if hash_files && sha256_file(&path)? != file.sha256 {
+            return Err(format!("runtime manifest hash mismatch: {}", file.path));
+        }
+        total_size = total_size
+            .checked_add(file.size)
+            .ok_or_else(|| "runtime manifest size overflow".to_string())?;
     }
     if !root.join("backend").join("DILIGENTBackend.exe").is_file() {
         return Err("packaged backend executable is missing".into());
     }
+    Ok((manifest.files.len(), total_size))
+}
+
+fn read_marker(path: &Path) -> Result<ExtractionMarker, String> {
+    serde_json::from_slice(&fs::read(path).map_err(|error| error.to_string())?)
+        .map_err(|error| error.to_string())
+}
+
+fn fast_validate_extracted_runtime(
+    root: &Path,
+    expected_version: &str,
+    expected_digest: &str,
+) -> Result<(), String> {
+    let marker = read_marker(&root.join("extraction.complete"))?;
+    if marker.release_version != expected_version || marker.archive_digest != expected_digest {
+        return Err("runtime extraction marker mismatch".into());
+    }
+    let (manifest, manifest_sha256) = load_manifest(root, expected_version)?;
+    if marker.manifest_sha256 != manifest_sha256 {
+        return Err("runtime manifest marker mismatch".into());
+    }
+    let (file_count, total_size) = validate_manifest_entries(root, &manifest, false)?;
+    if marker.file_count != file_count || marker.total_size != total_size {
+        return Err("runtime extraction statistics mismatch".into());
+    }
     Ok(())
+}
+
+fn acquire_runtime_lock(path: &Path) -> Result<RuntimeLock, String> {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        match OpenOptions::new().write(true).create_new(true).open(path) {
+            Ok(file) => {
+                drop(file);
+                return Ok(RuntimeLock(path.to_path_buf()));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                if Instant::now() >= deadline {
+                    return Err("timed out waiting for runtime extraction lock".into());
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+            Err(error) => return Err(error.to_string()),
+        }
+    }
 }
 
 fn local_app_root() -> Result<PathBuf, String> {
@@ -109,20 +181,29 @@ pub fn prepare_runtime(version: &str) -> Result<RuntimePaths, String> {
         return Err("embedded runtime digest mismatch".into());
     }
     let app_root = local_app_root()?.join("DILIGENT");
-    let runtime_parent = app_root.join("runtime").join(version);
+    let runtime_base = app_root.join("runtime");
+    let runtime_parent = runtime_base.join(version);
     let runtime_root = runtime_parent.join(&actual_digest);
-    if !runtime_root.join("extraction.complete").is_file()
-        || validate_extracted_runtime(&runtime_root, version).is_err()
-    {
+    fs::create_dir_all(&runtime_base).map_err(|error| error.to_string())?;
+    let _lock = acquire_runtime_lock(&runtime_base.join(".runtime.lock"))?;
+
+    if fast_validate_extracted_runtime(&runtime_root, version, &actual_digest).is_err() {
         fs::create_dir_all(&runtime_parent).map_err(|error| error.to_string())?;
         let temporary = runtime_parent.join(format!(".extract-{}", Uuid::new_v4()));
         fs::create_dir_all(&temporary).map_err(|error| error.to_string())?;
         let extraction_result = (|| {
             let cursor = std::io::Cursor::new(EMBEDDED_ARCHIVE);
             let mut archive = ZipArchive::new(cursor).map_err(|error| error.to_string())?;
+            let mut members = std::collections::HashSet::new();
             for index in 0..archive.len() {
                 let mut member = archive.by_index(index).map_err(|error| error.to_string())?;
                 let relative = safe_member_path(member.name())?;
+                if !members.insert(relative.clone()) {
+                    return Err(format!(
+                        "duplicate runtime archive member: {}",
+                        member.name()
+                    ));
+                }
                 if member.is_dir() {
                     fs::create_dir_all(temporary.join(relative))
                         .map_err(|error| error.to_string())?;
@@ -142,9 +223,20 @@ pub fn prepare_runtime(version: &str) -> Result<RuntimePaths, String> {
                     fs::File::create(destination).map_err(|error| error.to_string())?;
                 std::io::copy(&mut member, &mut output).map_err(|error| error.to_string())?;
             }
-            validate_extracted_runtime(&temporary, version)?;
-            fs::write(temporary.join("extraction.complete"), b"complete\n")
-                .map_err(|error| error.to_string())?;
+            let (manifest, manifest_sha256) = load_manifest(&temporary, version)?;
+            let (file_count, total_size) = validate_manifest_entries(&temporary, &manifest, true)?;
+            let marker = ExtractionMarker {
+                release_version: version.to_string(),
+                archive_digest: actual_digest.clone(),
+                manifest_sha256,
+                file_count,
+                total_size,
+            };
+            fs::write(
+                temporary.join("extraction.complete"),
+                serde_json::to_vec_pretty(&marker).map_err(|error| error.to_string())?,
+            )
+            .map_err(|error| error.to_string())?;
             if runtime_root.exists() {
                 fs::remove_dir_all(&runtime_root).map_err(|error| error.to_string())?;
             }
@@ -166,6 +258,45 @@ pub fn prepare_runtime(version: &str) -> Result<RuntimePaths, String> {
     })
 }
 
+pub fn prune_runtime_cache(version: &str) {
+    let Ok(app_root) = local_app_root().map(|path| path.join("DILIGENT")) else {
+        return;
+    };
+    let runtime_base = app_root.join("runtime");
+    let Ok(entries) = fs::read_dir(&runtime_base) else {
+        return;
+    };
+    for (inspected, entry) in entries.flatten().enumerate() {
+        if inspected >= 64 {
+            break;
+        }
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name == ".runtime.lock" {
+            continue;
+        }
+        if name != version {
+            if path.is_dir() {
+                let _ = fs::remove_dir_all(path);
+            }
+            continue;
+        }
+        let Ok(children) = fs::read_dir(path) else {
+            continue;
+        };
+        for (child_count, child) in children.flatten().enumerate() {
+            if child_count >= 64 {
+                break;
+            }
+            let child_path = child.path();
+            let child_name = child.file_name().to_string_lossy().into_owned();
+            if child_name.starts_with(".extract-") {
+                let _ = fs::remove_dir_all(child_path);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::safe_member_path;
@@ -175,5 +306,6 @@ mod tests {
         assert!(safe_member_path("../escape").is_err());
         assert!(safe_member_path("C:/escape").is_err());
         assert!(safe_member_path("/escape").is_err());
+        assert!(safe_member_path("\\escape").is_err());
     }
 }

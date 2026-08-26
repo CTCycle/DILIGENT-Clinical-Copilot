@@ -18,10 +18,10 @@ documents are the [system overview](assets/docs/architecture/system_overview.md)
 [background jobs](assets/docs/architecture/background_jobs.md), and
 [DILI pipeline](assets/docs/architecture/dili_assessment_pipeline.md).
 
-![DILIGENT assessment flow (v3.2.0)](assets/figures/diligent-flow-v3.2.0.png)
-_The 3.2.0 flow runs deterministic preflight and a polled background job, persists an evidence-bounded session, and ends with human review._
+![DILIGENT assessment flow (v3.3.0)](assets/figures/diligent-flow-v3.2.0.png)
+_The 3.3.0 flow runs deterministic preflight and a polled background job, persists an evidence-bounded session, and ends with human review._
 
-![DILIGENT Clinical Copilot system overview (v3.2.0)](assets/figures/clinical-copilot-overview-v3.2.0.png)
+![DILIGENT Clinical Copilot system overview (v3.3.0)](assets/figures/clinical-copilot-overview-v3.2.0.png)
 _The current system keeps the Angular workspace, FastAPI contracts, local persistence, configured model runtime, and human-review boundary explicit._
 
 ## What DILIGENT helps with
@@ -36,9 +36,9 @@ _The current system keeps the Angular workspace, FastAPI contracts, local persis
 
 The application deliberately distinguishes model-generated suggestions from persisted, backend-confirmed evidence. Treat all generated clinical text as a draft requiring clinical review.
 
-## v3.2.0 release highlights
+## v3.3.0 release highlights
 
-The v3.2.0 release improves Patient Timeline generation for explicitly selected OpenCode Go models by preserving persisted model settings and routing requests even when the model catalog is temporarily unavailable. It also hardens Tauri MSI artifact selection to match the requested release version.
+The v3.3.0 release hardens the Windows desktop package with deterministic runtime assembly, authenticated loopback access, single-instance behavior, graceful shutdown, and reproducible toolchain/version gates.
 
 ## Before you use it
 
@@ -53,29 +53,29 @@ The supported deployment profile is local, single-user operation. Network deploy
 
 ## Get the source release
 
-Download `DILIGENT-Clinical-Copilot-3.2.0.zip` from the [v3.2.0 GitHub release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.2.0), extract it, and follow the source-startup instructions below.
+Download `DILIGENT-Clinical-Copilot-3.3.0.zip` from the [v3.3.0 GitHub release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.3.0), extract it, and follow the source-startup instructions below.
 
 The source archive contains the verified repository at the release commit. It is intended for development and local launcher-based operation; it is separate from the Windows desktop packages.
 
 ## Windows desktop release
 
-The v3.2.0 release also publishes these Windows x64 desktop artifacts:
+The v3.3.0 release also publishes these Windows x64 desktop artifacts:
 
 ```text
-release/DILIGENT-v3.2.0-windows-x64-portable.exe
-release/DILIGENT-v3.2.0-windows-x64.msi
+release/DILIGENT-v3.3.0-windows-x64-portable.exe
+release/DILIGENT-v3.3.0-windows-x64.msi
 ```
 
 The portable executable is a single-file Tauri application. It does not require a separate Python, Node.js, Rust, npm, uv, or source checkout on the target machine. On first launch it verifies and extracts the embedded PyInstaller backend and Angular assets under `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>`, starts the backend on a random localhost port, and opens the desktop window. User settings, database, logs, models, source documents, vectors, exports, state, and access-key material remain under `%LOCALAPPDATA%\DILIGENT\data`.
 
-The MSI installs the same Tauri shell and packaged runtime. It may use the configured WebView2 bootstrapper; an offline WebView2 installer is available only when the maintainer builds with `-OfflineWebView2`. The build also generates `release/DILIGENT-v3.2.0-windows-x64.sha256` for maintainer-side verification; the standard GitHub release attaches the portable EXE and MSI only.
+The MSI installs the same Tauri shell and packaged runtime. It may use the configured WebView2 bootstrapper; an offline WebView2 installer is available only when the maintainer builds with `-OfflineWebView2`. The build also generates `release/DILIGENT-v3.3.0-windows-x64.sha256`, which is published with the portable EXE and MSI.
 
 To use the published desktop build, download the portable EXE for no-install use or the MSI for an installed shortcut. Desktop startup does not use the development ports `7690` and `9847`.
 
 For maintainers building a release on Windows x64:
 
 ```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.2.0 -DesktopTarget All -Force
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.3.0 -DesktopTarget All -Force
 ```
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a Windows x64 host and a clean worktree unless `-AllowDirtyTree` is supplied explicitly. Add `-OfflineWebView2` only when building an MSI that must install WebView2 without network access. Pushing a `vX.Y.Z` tag runs the Windows packaging workflow in `.github/workflows/release.yml`, which attaches the portable EXE and MSI to the matching GitHub Release. See [desktop release documentation](assets/docs/runtime/desktop_release.md) for the build pipeline, artifact validation, runtime layout, and cleanup.
@@ -100,11 +100,11 @@ When startup finishes, open the local UI at `http://127.0.0.1:9847`. If the page
 
 ### macOS and Linux
 
-Manual startup requires Python 3.14 or later, Node.js, and npm. From the repository root:
+Manual startup requires Python 3.14, Node.js, npm, and uv. From the repository root:
 
 ```bash
 cd app/server
-python -m pip install -e ".[test]"
+uv sync --locked --all-extras
 uvicorn app:app --host 127.0.0.1 --port 7690
 ```
 

@@ -18,22 +18,22 @@ The runtime allowlist excludes source code, tests, documentation, credentials, `
 
 ## Current source and artifact status
 
-The current source manifests report version `3.2.0`. The `v3.2.0` desktop release
+The current source manifests report version `3.3.0`. The `v3.3.0` desktop release
 is created from the synchronized `main` branch. Publication is confirmed only
 after the portable EXE and MSI, annotated tag, remote-release metadata, and
 downloaded hash evidence have all been verified.
 
-The expected output names for a verified `3.2.0` build are:
+The expected output names for a verified `3.3.0` build are:
 
 ```text
-release/DILIGENT-v3.2.0-windows-x64-portable.exe
-release/DILIGENT-v3.2.0-windows-x64.msi
-release/DILIGENT-v3.2.0-windows-x64.sha256
+release/DILIGENT-v3.3.0-windows-x64-portable.exe
+release/DILIGENT-v3.3.0-windows-x64.msi
+release/DILIGENT-v3.3.0-windows-x64.sha256
 ```
 
 The portable executable is a single distribution file for no-install use. The MSI installs the same Tauri shell and packaged runtime. The `.sha256` file contains one SHA-256 entry per built artifact and must be checked before distribution. Publication requires separate tag, remote-release, and download/hash evidence.
 
-The standard GitHub release attaches the portable EXE and MSI only. The `.sha256` file remains local maintainer-side verification output.
+The GitHub release attaches the portable EXE, MSI, and `.sha256` manifest. Existing remote assets are never replaced unless the local and remote bytes are identical.
 
 ## Runtime and data layout
 
@@ -43,7 +43,7 @@ At launch, Tauri verifies the embedded archive digest and extracts immutable con
 %LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>
 ```
 
-The shell starts `backend\DILIGENTBackend.exe` on a random localhost port, waits for `state\desktop-backend-ready.json` and `/api/health`, then shows the desktop window. The backend is attached to a Windows Job Object and is stopped when the shell exits.
+The shell shows a loading window immediately, extracts the runtime and starts `backend\DILIGENTBackend.exe` on a random localhost port off the UI-critical path, waits for `state\desktop-backend-ready.json` and `/api/health`, then navigates to the authenticated local interface. The backend is attached to a Windows Job Object and is asked to shut down cooperatively when the shell exits, with a bounded hard-kill fallback.
 
 Mutable user data is kept outside the extracted runtime:
 
@@ -60,15 +60,15 @@ Artifact cleanup and MSI uninstall do not remove this user data. The extracted r
 
 ## Build
 
-Run on a Windows x64 host with Rust/Cargo, the Windows build toolchain, the pinned portable runtimes, and network access for dependencies and the default WebView2 bootstrapper:
+Run on a Windows x64 host with Rust 1.95.0/Cargo, the Windows build toolchain, the pinned portable runtimes, and network access for dependencies and the default WebView2 bootstrapper. The launcher pins Python 3.14.2, Node.js 22.13.0, uv 0.11.30, and PyInstaller 6.21.0; downloaded Python, Node, and uv archives are SHA-256 checked before extraction:
 
 ```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.2.0 -DesktopTarget All -Force
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.3.0 -DesktopTarget All -Force
 ```
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a clean worktree by default; use `-AllowDirtyTree` only when the dirty state is intentional and recorded. `-OfflineWebView2` is valid only with `-DesktopTarget Msi` or `All` and changes the MSI WebView2 installation mode.
 
-Final desktop artifacts are written directly to `release/`. Intermediate desktop staging remains under `release/.staging/`; Tauri's native Cargo output is kept under `runtimes/cache/cargo/release/`.
+Final desktop artifacts are written directly to `release/`. Intermediate desktop staging remains under `assets/QA/desktop-release-staging/`, with validation output under `assets/QA/release-audit-20260826/`; the release-only native Cargo output is kept under `assets/QA/desktop-cargo-target/x86_64-pc-windows-msvc/release/`.
 
 ### Interactive artifact menu
 
@@ -80,7 +80,7 @@ The build refuses to complete if the frozen backend, runtime manifest, artifact 
 
 ## GitHub Actions publication
 
-`.github/workflows/release.yml` runs on a `vX.Y.Z` tag. It builds both Windows desktop targets from that tagged commit, creates or updates the matching GitHub Release, and attaches the portable EXE and MSI. The generated `.sha256` manifest remains a local maintainer-side verification file. Create the tag only after `develop` and `main` have been synchronized and local release validation has passed.
+`.github/workflows/release.yml` runs on a `vX.Y.Z` tag. It builds both Windows desktop targets from that tagged commit, creates or updates the matching GitHub Release, and attaches the portable EXE, MSI, and `.sha256` manifest. It refuses to overwrite an existing non-identical asset. Create the tag only after `develop` and `main` have been synchronized and local release validation has passed.
 
 The workflow uses the launcher's pinned portable Python runtime rather than installing a second host Python. The launcher removes inherited Git/MinGW, AWS CLI, hosted-Python, and other PATH entries that can provide competing `libffi` or `_ctypes` native files immediately before starting the release venv. The PyInstaller bootstrap removes hosted-toolcache Python entries from `sys.path`, registers only the pinned venv and `runtimes/python` native directories, explicitly loads the matching `libffi-8.dll` by absolute path through the CFFI bridge, preloads the supported CFFI native backend, and only then imports `ctypes`. Together these keep PyInstaller on the same embedded-Python and DLL set used by the release launcher, even when a hosted runner reconstructs PATH between workflow steps.
 
@@ -101,7 +101,7 @@ After publishing, perform a Windows host smoke test by opening the portable EXE,
 ## Cleanup
 
 ```powershell
-.\start_on_windows.ps1 -Action RemoveDesktopRelease -Version 3.2.0
+.\start_on_windows.ps1 -Action RemoveDesktopRelease -Version 3.3.0
 .\start_on_windows.ps1 -Action RemoveDesktopRelease -AllDesktopReleases
 ```
 

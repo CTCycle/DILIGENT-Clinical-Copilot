@@ -54,32 +54,34 @@ def run_desktop_backend(*, ready_file: Path, host: str = "127.0.0.1") -> None:
     if host != "127.0.0.1":
         raise ValueError("Desktop backend host must be 127.0.0.1")
     release_version = _validate_desktop_environment()
-
-    # Import the application only after the packaged roots have been checked.
-    application = import_module("app").app
-
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind((host, 0))
-    server_socket.listen(socket.SOMAXCONN)
-    server_socket.set_inheritable(False)
-    port = int(server_socket.getsockname()[1])
-    _write_ready_file(
-        ready_file,
-        {"port": port, "pid": os.getpid(), "release_version": release_version},
-    )
 
-    config = uvicorn.Config(
-        application,
-        host=host,
-        port=port,
-        reload=False,
-        workers=1,
-        log_level="info",
-        access_log=True,
-    )
-    server = uvicorn.Server(config)
     try:
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.bind((host, 0))
+        server_socket.listen(socket.SOMAXCONN)
+        server_socket.set_inheritable(False)
+        port = int(server_socket.getsockname()[1])
+        os.environ["DILIGENT_DESKTOP_PORT"] = str(port)
+        _write_ready_file(
+            ready_file,
+            {"port": port, "pid": os.getpid(), "release_version": release_version},
+        )
+
+        # Import the application only after the packaged roots and bound port
+        # have been checked. The port is needed by host validation middleware.
+        application = import_module("app").app
+        config = uvicorn.Config(
+            application,
+            host=host,
+            port=port,
+            reload=False,
+            workers=1,
+            log_level="info",
+            access_log=False,
+        )
+        server = uvicorn.Server(config)
+        application.state.desktop_server = server
         server.run(sockets=[server_socket])
     finally:
         ready_file.unlink(missing_ok=True)

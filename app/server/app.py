@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api.access_keys import router as access_keys_router
 from api.data_inspection import router as data_inspection_router
+from api.desktop import router as desktop_router
 from api.error_handling import register_error_handling
 from api.health import router as health_router
 from api.model_config import router as model_config_router
@@ -31,6 +32,7 @@ from common.paths import (
     CLIENT_DIST_PATH,
     CLIENT_INDEX_FILE_PATH,
 )
+from common.security.desktop import DesktopSecurityMiddleware, DesktopSessionSecurity
 from common.version import resolve_application_version
 from configurations.startup import (
     get_server_settings,
@@ -40,6 +42,7 @@ from repositories.database.initializer import ensure_database_ready
 from services.startup_validation import run_startup_validations
 from services.catalogs.runtime import initialize_reference_catalog_provider
 from services.retrieval.embedding_runtime import close_embedding_runtime
+from services.runtime.jobs import get_job_manager
 
 ###############################################################################
 def _client_build_available() -> bool:
@@ -78,6 +81,7 @@ def redirect_root_to_docs() -> RedirectResponse:
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     settings = get_server_settings()
 
+    get_job_manager().begin_startup()
     ensure_database_ready(settings.database)
     initialize_reference_catalog_provider()
     run_startup_validations(settings)
@@ -86,6 +90,7 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        get_job_manager().shutdown(timeout=5.0)
         close_embedding_runtime()
 
 ###############################################################################
@@ -101,7 +106,10 @@ def create_app() -> FastAPI:
         openapi_url=FASTAPI_OPENAPI_URL,
         lifespan=app_lifespan,
     )
+    desktop_security = DesktopSessionSecurity()
+    application.state.desktop_security = desktop_security
     register_error_handling(application)
+    application.add_middleware(DesktopSecurityMiddleware, security=desktop_security)
 
     for router in (
         session_router,
@@ -110,6 +118,7 @@ def create_app() -> FastAPI:
         ollama_router,
         model_config_router,
         access_keys_router,
+        desktop_router,
     ):
         application.include_router(router, prefix=FASTAPI_API_PREFIX)
 

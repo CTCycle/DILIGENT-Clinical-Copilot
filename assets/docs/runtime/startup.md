@@ -11,7 +11,7 @@ On Windows, use:
 The launcher:
 - creates `settings/.env` from `settings/.env.example` on first application start when the local environment file is missing
 - ensures portable Python, `uv`, and Node runtimes under `runtimes/`
-- runs `uv sync`
+- runs `uv sync --locked` against the tracked `app/server/uv.lock`
 - installs frontend dependencies
 - rebuilds the frontend when the main-menu install option 4 or frontend rebuild option 5 is executed, or when option 1 detects missing or unusable dependencies or frontend output during recovery
 - validates that the frontend build is available before starting the preview server
