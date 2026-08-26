@@ -105,6 +105,13 @@ class JobManager:
         self.jobs: dict[str, JobState] = {}
         self.threads: dict[str, threading.Thread] = {}
         self.lock = threading.Lock()
+        self.accepting_jobs = True
+        self.max_terminal_jobs = 256
+
+    # -------------------------------------------------------------------------
+    def begin_startup(self) -> None:
+        with self.lock:
+            self.accepting_jobs = True
 
     # -------------------------------------------------------------------------
     def start_job(
@@ -127,9 +134,6 @@ class JobManager:
         if self.runner_accepts_job_id(runner):
             runner_kwargs["job_id"] = job_id
 
-        with self.lock:
-            self.jobs[job_id] = state
-
         thread = threading.Thread(
             target=self.run_job,
             args=(job_id, runner, args, runner_kwargs),
@@ -137,10 +141,12 @@ class JobManager:
         )
 
         with self.lock:
+            if not self.accepting_jobs:
+                raise RuntimeError("Job manager is shutting down")
+            self.jobs[job_id] = state
             self.threads[job_id] = thread
-
-        state.update(status="running")
-        thread.start()
+            state.update(status="running")
+            thread.start()
 
         logger.info("Started job %s (type=%s scope=%s)", job_id, job_type, scope_key)
         return job_id
@@ -176,6 +182,8 @@ class JobManager:
         if already_requested:
             return state.snapshot()
         if was_pending:
+            with self.lock:
+                self._prune_terminal_jobs_locked()
             logger.info("Cancelled pending job %s", job_id)
         else:
             logger.info("Cancellation requested for job %s", job_id)
@@ -229,6 +237,37 @@ class JobManager:
         return state.stop_requested
 
     # -------------------------------------------------------------------------
+    def shutdown(self, timeout: float = 5.0) -> bool:
+        """Stop new work and wait briefly for cooperative workers to finish."""
+        with self.lock:
+            self.accepting_jobs = False
+            states = list(self.jobs.values())
+            threads = list(self.threads.values())
+
+        for state in states:
+            with state.lock:
+                if state.status not in ("pending", "running"):
+                    continue
+                state.stop_requested = True
+                state.version += 1
+                if state.status == "pending":
+                    state.status = "cancelled"
+                    state.completed_at = monotonic()
+
+        with self.lock:
+            self._prune_terminal_jobs_locked()
+        deadline = monotonic() + max(0.0, timeout)
+        for thread in threads:
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                break
+            thread.join(timeout=remaining)
+        with self.lock:
+            finished = not any(thread.is_alive() for thread in self.threads.values())
+            self._prune_terminal_jobs_locked()
+        return finished
+
+    # -------------------------------------------------------------------------
     def update_progress(self, job_id: str, progress: float) -> None:
         with self.lock:
             state = self.jobs.get(job_id)
@@ -256,44 +295,92 @@ class JobManager:
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
     ) -> None:
-        with self.lock:
-            state = self.jobs.get(job_id)
-        if state is None:
-            return
-        if state.stop_requested:
-            state.update(status="cancelled", completed_at=monotonic())
-            logger.info("Job %s cancelled before execution", job_id)
-            return
-
         try:
-            result = runner(*args, **kwargs)
+            with self.lock:
+                state = self.jobs.get(job_id)
+            if state is None:
+                return
             if state.stop_requested:
-                state.update(status="cancelled", completed_at=monotonic())
-            else:
-                result_payload = result or {}
-                with state.lock:
-                    merged = {**(state.result or {}), **result_payload}
-                state.update(
-                    status="completed",
-                    result=merged if merged else None,
-                    progress=100.0,
+                self._finish_terminal_state(
+                    state,
+                    status="cancelled",
                     completed_at=monotonic(),
                 )
-                logger.info("Job %s completed successfully", job_id)
-        except Exception as exc:  # noqa: BLE001
-            if state.stop_requested:
-                state.update(status="cancelled", completed_at=monotonic())
-                logger.info("Job %s cancelled during execution", job_id)
                 return
-            error_msg = JobErrorSanitizer.build_safe_job_error_message(exc)
-            state.update(status="failed", error=error_msg, completed_at=monotonic())
-            logger.error(
-                "Job %s failed type=%s message=%s",
-                job_id,
-                type(exc).__name__,
-                error_msg,
-            )
-            logger.debug("Job %s error details", job_id, exc_info=True)
+            try:
+                result = runner(*args, **kwargs)
+                if state.stop_requested:
+                    self._finish_terminal_state(
+                        state,
+                        status="cancelled",
+                        completed_at=monotonic(),
+                    )
+                else:
+                    result_payload = result or {}
+                    with state.lock:
+                        merged = {**(state.result or {}), **result_payload}
+                    self._finish_terminal_state(
+                        state,
+                        status="completed",
+                        result=merged if merged else None,
+                        progress=100.0,
+                        completed_at=monotonic(),
+                    )
+                    logger.info("Job %s completed successfully", job_id)
+            except Exception as exc:  # noqa: BLE001
+                if state.stop_requested:
+                    self._finish_terminal_state(
+                        state,
+                        status="cancelled",
+                        completed_at=monotonic(),
+                    )
+                    logger.info("Job %s cancelled during execution", job_id)
+                    return
+                error_msg = JobErrorSanitizer.build_safe_job_error_message(exc)
+                self._finish_terminal_state(
+                    state,
+                    status="failed",
+                    error=error_msg,
+                    completed_at=monotonic(),
+                )
+                logger.error(
+                    "Job %s failed type=%s message=%s",
+                    job_id,
+                    type(exc).__name__,
+                    error_msg,
+                )
+                logger.debug("Job %s error details", job_id, exc_info=True)
+        finally:
+            with self.lock:
+                self.threads.pop(job_id, None)
+                self._prune_terminal_jobs_locked()
+
+    # -------------------------------------------------------------------------
+    def _finish_terminal_state(self, state: JobState, **updates: Any) -> None:
+        with self.lock:
+            if self.jobs.get(state.job_id) is not state:
+                return
+            state.update(**updates)
+            self._prune_terminal_jobs_locked()
+
+    # -------------------------------------------------------------------------
+    def _prune_terminal_jobs_locked(self) -> None:
+        terminal = [
+            state
+            for state in self.jobs.values()
+            if state.status in {"completed", "failed", "cancelled"}
+        ]
+        overflow = len(terminal) - self.max_terminal_jobs
+        if overflow <= 0:
+            return
+        terminal.sort(
+            key=lambda state: state.completed_at
+            if state.completed_at is not None
+            else state.created_at
+        )
+        for state in terminal[:overflow]:
+            if state.job_id not in self.threads:
+                self.jobs.pop(state.job_id, None)
 
     # -------------------------------------------------------------------------
     def runner_accepts_job_id(self, runner: Callable[..., dict[str, Any]]) -> bool:

@@ -2,7 +2,7 @@
 Last updated: 2026-08-02
 
 ## Runtime And Tooling
-- Target Python version: `>=3.14` from `pyproject.toml`.
+- Target Python runtime: `3.14.2` for the launcher and release workflow; the project metadata remains compatible with Python 3.14.
 - Use `app/server/.venv` when available, otherwise `runtimes/.venv`.
 - Keep dependency resolution aligned with `uv` and `app/server/uv.lock`.
 - Preferred quality tools:

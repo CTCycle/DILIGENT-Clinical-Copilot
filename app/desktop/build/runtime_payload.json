@@ -8,14 +8,14 @@
     { "source": "app/resources/catalogs/drug_matching.json", "destination": "app/resources/catalogs/drug_matching.json", "required": true },
     { "source": "app/resources/catalogs/language_detection.json", "destination": "app/resources/catalogs/language_detection.json", "required": true },
     { "source": "app/resources/catalogs/llm_generation_policies.json", "destination": "app/resources/catalogs/llm_generation_policies.json", "required": true },
+    { "source": "app/resources/catalogs/llm_model_capabilities.json", "destination": "app/resources/catalogs/llm_model_capabilities.json", "required": true },
     { "source": "app/resources/catalogs/llm_models.json", "destination": "app/resources/catalogs/llm_models.json", "required": true },
     { "source": "app/resources/catalogs/local_models.json", "destination": "app/resources/catalogs/local_models.json", "required": true },
     { "source": "app/resources/catalogs/security_text_filters.json", "destination": "app/resources/catalogs/security_text_filters.json", "required": true },
     { "source": "app/resources/catalogs/text_normalization.json", "destination": "app/resources/catalogs/text_normalization.json", "required": true },
-    { "source": "app/resources/tools", "destination": "app/resources/tools", "required": false },
     { "source": "settings/.env.example", "destination": "settings/.env.example", "required": true },
     { "source": "settings/configurations.json", "destination": "settings/configurations.json", "required": true }
   ],
-  "forbidden_extensions": [".env", ".db", ".log", ".pyc"],
+  "forbidden_extensions": [".env", ".db", ".log", ".pyc", ".pyo", ".h", ".hpp", ".lib", ".pyx", ".pxd", ".pyi", ".c", ".cpp", ".map"],
   "forbidden_directories": [".git", ".github", "assets", "node_modules", ".venv", "runtimes", "release", "target", "__pycache__", ".pytest_cache", ".angular"]
 }

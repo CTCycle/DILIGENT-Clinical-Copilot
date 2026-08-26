@@ -4,10 +4,18 @@ use sha2::{Digest, Sha256};
 
 fn main() {
     tauri_build::build();
-    let generated = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("generated");
-    fs::create_dir_all(&generated).unwrap();
-    let archive = generated.join("diligent-runtime.zip");
-    if !archive.exists() {
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    fs::create_dir_all(&out_dir).unwrap();
+    let archive = out_dir.join("diligent-runtime.zip");
+    let configured_archive = env::var_os("DILIGENT_RUNTIME_ARCHIVE").map(PathBuf::from);
+    let source_archive = configured_archive
+        .as_ref()
+        .filter(|path| path.is_file())
+        .cloned();
+    if let Some(source_archive) = source_archive {
+        fs::copy(&source_archive, &archive).unwrap();
+        println!("cargo:rerun-if-changed={}", source_archive.display());
+    } else if env::var("PROFILE").as_deref() == Ok("debug") {
         // An empty archive keeps cargo check/test useful before a release build.
         fs::write(
             &archive,
@@ -16,12 +24,14 @@ fn main() {
             ],
         )
         .unwrap();
+    } else {
+        panic!("DILIGENT_RUNTIME_ARCHIVE must point to a built runtime ZIP for release builds");
     }
+    println!("cargo:rerun-if-env-changed=DILIGENT_RUNTIME_ARCHIVE");
     let digest = Sha256::digest(fs::read(&archive).unwrap());
     fs::write(
-        generated.join("diligent-runtime.sha256"),
+        out_dir.join("diligent-runtime.sha256"),
         format!("{digest:x}\n"),
     )
     .unwrap();
-    println!("cargo:rerun-if-changed={}", archive.display());
 }

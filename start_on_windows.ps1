@@ -38,7 +38,7 @@ $script:TestCacheDir = Join-Path $TestsDir 'cache'
 $script:LegacyCacheDir = Join-Path $RepoRoot 'assets/cache'
 $script:AngularCacheDir = Join-Path $TestCacheDir 'angular'
 $script:CoverageDir = Join-Path $TestCacheDir 'coverage'
-$script:CargoTargetDir = Join-Path $RuntimeCacheDir 'cargo'
+$script:CargoTargetDir = Join-Path $RepoRoot 'assets/QA/desktop-cargo-target'
 $script:MypyCacheDir = Join-Path $TestCacheDir 'mypy'
 $script:NpmCacheDir = Join-Path $RuntimeCacheDir 'npm'
 $script:PipCacheDir = Join-Path $RuntimeCacheDir 'pip'
@@ -46,20 +46,27 @@ $script:PlaywrightCacheDir = Join-Path $RuntimeCacheDir 'playwright'
 $script:PytestCacheDir = Join-Path $TestCacheDir 'pytest'
 $script:PythonBytecodeCacheDir = Join-Path $RuntimeCacheDir 'python'
 $script:RuffCacheDir = Join-Path $TestCacheDir 'ruff'
-$script:UvCacheDir = Join-Path $RuntimeCacheDir 'uv'
+$script:UvCacheDir = Join-Path $RepoRoot 'assets/QA/desktop-release-uv-cache'
 $script:EnvFile = Join-Path $RepoRoot 'settings/.env'
 $script:EnvExample = Join-Path $RepoRoot 'settings/.env.example'
 $script:PythonVersion = '3.14.2'
 $script:NodeVersion = '22.13.0'
+$script:UvVersion = '0.11.30'
+$script:RustVersion = '1.95.0'
+$script:PythonArchiveSha256 = 'f05e28d161c6b15af64a7cb7f08b4a22b3a6b03eee71baee24ea557b3bdd5798'
+$script:NodeArchiveSha256 = 'b0feb09ebf41328628e7383f7a092fb7342ce1e05c867a90cf8f1379205a8429'
+$script:UvArchiveSha256 = 'be8d78c992312212e5cc05e9f9de3fa996db73b7c86a186dfb9231eb9f91d33e'
 $script:DesktopDir = Join-Path $RepoRoot 'app/desktop'
 $script:DesktopTauriDir = Join-Path $DesktopDir 'src-tauri'
-$script:DesktopBuildDir = Join-Path $RepoRoot 'release/.staging'
+$script:DesktopBuildDir = Join-Path $RepoRoot 'assets/QA/desktop-release-staging'
 $script:DesktopGeneratedDir = Join-Path $DesktopTauriDir 'generated'
 $script:DesktopArtifactsDir = Join-Path $RepoRoot 'release'
 $script:DesktopStageRoot = Join-Path $DesktopBuildDir 'staging'
 $script:DesktopNpmCmd = Join-Path $NodeDir 'npm.cmd'
 $script:DesktopTauriCli = Join-Path $DesktopDir 'node_modules/.bin/tauri.cmd'
+$script:DesktopFrontendOutputDir = $null
 $script:PyInstallerVersion = '6.21.0'
+$script:DesktopTargetTriple = 'x86_64-pc-windows-msvc'
 
 # ============================================================
 # Shared output and process helpers
@@ -104,7 +111,8 @@ function Invoke-DownloadAndExtract {
     param(
         [Parameter(Mandatory = $true)][string]$Uri,
         [Parameter(Mandatory = $true)][string]$ArchivePath,
-        [Parameter(Mandatory = $true)][string]$DestinationPath
+        [Parameter(Mandatory = $true)][string]$DestinationPath,
+        [string]$ExpectedSha256
     )
     $prevProgress = $ProgressPreference
     $ProgressPreference = 'SilentlyContinue'
@@ -112,6 +120,12 @@ function Invoke-DownloadAndExtract {
         New-Item -ItemType Directory -Path (Split-Path -Parent $ArchivePath) -Force | Out-Null
         New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
         Invoke-WebRequest -Uri $Uri -OutFile $ArchivePath
+        if ($ExpectedSha256) {
+            $actualSha256 = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualSha256 -ne $ExpectedSha256.ToLowerInvariant()) {
+                throw "Downloaded archive checksum mismatch for $Uri"
+            }
+        }
         Expand-Archive -LiteralPath $ArchivePath -DestinationPath $DestinationPath -Force
         Remove-Item -LiteralPath $ArchivePath -Force
     }
@@ -198,7 +212,8 @@ function Initialize-PortableNodeRuntime {
             Invoke-DownloadAndExtract `
                 -Uri $nodeUrl `
                 -ArchivePath (Join-Path $RuntimesDir $nodeZipName) `
-                -DestinationPath $nodeStageDir
+                -DestinationPath $nodeStageDir `
+                -ExpectedSha256 $NodeArchiveSha256
 
             $expandedNodeDir = Join-Path $nodeStageDir "node-v$NodeVersion-win-x64"
             if (-not (Test-Path -LiteralPath (Join-Path $expandedNodeDir 'node.exe'))) {
@@ -233,26 +248,31 @@ function Initialize-PortableRuntimes {
         Invoke-DownloadAndExtract `
             -Uri $pythonUrl `
             -ArchivePath (Join-Path $PythonDir $pythonZipName) `
-            -DestinationPath $PythonDir
+            -DestinationPath $PythonDir `
+            -ExpectedSha256 $PythonArchiveSha256
     }
 
     Patch-PythonPth -Path $PythonPth
     $pythonVersionFound = Invoke-PythonVersionCheck -PythonExecutable $PythonExe
     Write-Ok "Python ready: $pythonVersionFound"
 
-    if (-not (Test-Path -LiteralPath $UvExe)) {
-        $uvTarget = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
-            'uv-aarch64-pc-windows-msvc.zip'
+    $uvNeedsInstall = -not (Test-Path -LiteralPath $UvExe)
+    if (-not $uvNeedsInstall) {
+        $installedUv = (& $UvExe --version).Trim()
+        $uvNeedsInstall = $installedUv -notmatch "^uv $([regex]::Escape($UvVersion))\b"
+        if ($uvNeedsInstall) {
+            Write-Info "Replacing unsupported portable uv $installedUv with $UvVersion"
         }
-        else {
-            'uv-x86_64-pc-windows-msvc.zip'
-        }
-        $uvUrl = "https://github.com/astral-sh/uv/releases/latest/download/$uvTarget"
+    }
+    if ($uvNeedsInstall) {
+        $uvTarget = 'uv-x86_64-pc-windows-msvc.zip'
+        $uvUrl = "https://github.com/astral-sh/uv/releases/download/$UvVersion/$uvTarget"
         Write-Info "Downloading $uvUrl"
         Invoke-DownloadAndExtract `
             -Uri $uvUrl `
             -ArchivePath (Join-Path $UvDir 'uv.zip') `
-            -DestinationPath $UvDir
+            -DestinationPath $UvDir `
+            -ExpectedSha256 $UvArchiveSha256
         $foundUv = Find-UvExecutable -SearchRoot $UvDir
         if ($foundUv -ne $UvExe) {
             Copy-Item -LiteralPath $foundUv -Destination $UvExe -Force
@@ -367,7 +387,8 @@ function Install-ApplicationDependencies {
         [bool]$BuildFrontend = $false,
         [ValidateSet('Standard', 'Development')]
         [string]$InstallationType = 'Standard',
-        [switch]$PortableRuntimesReady
+        [switch]$PortableRuntimesReady,
+        [switch]$DesktopBuild
     )
 
     if (-not $PortableRuntimesReady) {
@@ -377,7 +398,10 @@ function Install-ApplicationDependencies {
     Set-LauncherEnvironment
 
     Write-Step 'Installing Python dependencies'
-    $syncArguments = @('sync', '--python', $PythonExe)
+    $syncArguments = @('sync', '--locked', '--python', $PythonExe)
+    if ($DesktopBuild) {
+        $syncArguments += @('--group', 'desktop-build')
+    }
     if ($InstallationType -eq 'Development') {
         $syncArguments += '--all-extras'
     }
@@ -422,8 +446,13 @@ function Install-FrontendDependencies {
 
 function Build-Frontend {
     Write-Step 'Building frontend'
-    Invoke-Checked -FilePath $NpmCmd -ArgumentList @('run', 'build') -WorkingDirectory $ClientDir
-    if (-not (Test-Path -LiteralPath (Join-Path $ClientDir 'dist/browser/index.html') -PathType Leaf)) {
+    $buildArguments = @('run', 'build')
+    if ($script:DesktopFrontendOutputDir) {
+        $buildArguments += @('--', '--output-path', $script:DesktopFrontendOutputDir)
+    }
+    Invoke-Checked -FilePath $NpmCmd -ArgumentList $buildArguments -WorkingDirectory $ClientDir
+    $outputRoot = if ($script:DesktopFrontendOutputDir) { $script:DesktopFrontendOutputDir } else { Join-Path $ClientDir 'dist' }
+    if (-not (Test-Path -LiteralPath (Join-Path $outputRoot 'browser/index.html') -PathType Leaf)) {
         throw 'Angular production output was not generated'
     }
 }
@@ -825,16 +854,6 @@ function Uninstall-Application {
         }
     }
 
-    $files = @(
-        (Join-Path $ClientDir 'package-lock.json'),
-        (Join-Path $ServerDir 'uv.lock'),
-        (Join-Path $RepoRoot 'uv.lock')
-    )
-    foreach ($file in $files) {
-        if (Test-Path -LiteralPath $file) {
-            Remove-Item -LiteralPath $file -Force
-        }
-    }
     Remove-PythonCaches
     Write-Ok 'Application runtimes and generated dependencies removed; settings and user data were preserved'
 }
@@ -1050,6 +1069,48 @@ function Resolve-DesktopReleaseVersion {
     return $resolved
 }
 
+function Assert-DesktopReleaseVersion {
+    param([Parameter(Mandatory = $true)][string]$ExpectedVersion)
+
+    $jsonManifests = @(
+        (Join-Path $ClientDir 'package.json'),
+        (Join-Path $DesktopDir 'package.json')
+    )
+    foreach ($path in $jsonManifests) {
+        $actual = (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).version
+        if ($actual -ne $ExpectedVersion) {
+            throw "Version mismatch in ${path}: expected $ExpectedVersion, found $actual"
+        }
+    }
+
+    $textManifests = @(
+        [pscustomobject]@{ Path = (Join-Path $ServerDir 'pyproject.toml'); Pattern = '(?m)^version\s*=\s*"([^"]+)"' },
+        [pscustomobject]@{ Path = (Join-Path $DesktopTauriDir 'Cargo.toml'); Pattern = '(?m)^version\s*=\s*"([^"]+)"' },
+        [pscustomobject]@{ Path = (Join-Path $DesktopTauriDir 'tauri.conf.json'); Pattern = '"version"\s*:\s*"([^"]+)"' },
+        [pscustomobject]@{ Path = (Join-Path $RepoRoot 'app/shared/openapi.json'); Pattern = '"version"\s*:\s*"([^"]+)"' }
+    )
+    foreach ($manifest in $textManifests) {
+        $content = Get-Content -LiteralPath $manifest.Path -Raw
+        $match = [regex]::Match($content, $manifest.Pattern)
+        if (-not $match.Success -or $match.Groups[1].Value -ne $ExpectedVersion) {
+            throw "Version mismatch in $($manifest.Path): expected $ExpectedVersion"
+        }
+    }
+
+    $lockFiles = @(
+        [pscustomobject]@{ Path = (Join-Path $ServerDir 'uv.lock'); Pattern = '(?ms)\[\[package\]\]\s*name = "diligent"\s*version = "([^"]+)"' },
+        [pscustomobject]@{ Path = (Join-Path $DesktopTauriDir 'Cargo.lock'); Pattern = '(?ms)name = "diligent-desktop"\s*version = "([^"]+)"' }
+    )
+    foreach ($lock in $lockFiles) {
+        $content = Get-Content -LiteralPath $lock.Path -Raw
+        $match = [regex]::Match($content, $lock.Pattern)
+        if (-not $match.Success -or $match.Groups[1].Value -ne $ExpectedVersion) {
+            throw "Version mismatch in $($lock.Path): expected $ExpectedVersion"
+        }
+    }
+    Write-Ok "Release version contract verified: $ExpectedVersion"
+}
+
 function Get-RepositoryCommit {
     $commit = (& git -C $RepoRoot rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or -not $commit) { throw 'Unable to resolve the repository commit SHA' }
@@ -1065,7 +1126,7 @@ function Assert-CleanReleaseTree {
 }
 
 function Assert-DesktopBuildHost {
-    if ($env:PROCESSOR_ARCHITECTURE -notin @('AMD64', 'x86')) {
+    if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64' -or [Environment]::Is64BitOperatingSystem -ne $true) {
         throw 'Desktop releases require a Windows x64 build host'
     }
     foreach ($tool in @('cargo', 'rustc')) {
@@ -1076,14 +1137,18 @@ function Assert-DesktopBuildHost {
     if (-not (Get-Command msbuild -ErrorAction SilentlyContinue) -and -not $env:VisualStudioVersion) {
         Write-Info 'MSBuild was not found on PATH; Tauri will use the configured Visual Studio toolchain if available.'
     }
+    $rustHost = (& rustc -vV | Select-String '^host:').ToString()
+    if ($rustHost -notmatch [regex]::Escape($DesktopTargetTriple)) {
+        throw "Rust host must be $DesktopTargetTriple; found $rustHost"
+    }
+    $actualRustVersion = (& rustc --version).Trim()
+    if ($actualRustVersion -notmatch "^rustc $([regex]::Escape($RustVersion))(?:\s|$)") {
+        throw "Rust release builds require rustc $RustVersion; found $actualRustVersion"
+    }
 }
 
 function Initialize-DesktopBuildDependencies {
-    Install-ApplicationDependencies -BuildFrontend $true
-    Write-Step "Installing PyInstaller $PyInstallerVersion in the build environment"
-    Invoke-Checked -FilePath $UvExe -WorkingDirectory $ServerDir -ArgumentList @(
-        'pip', 'install', '--python', $VenvPython, "pyinstaller==$PyInstallerVersion"
-    )
+    Install-ApplicationDependencies -BuildFrontend $false -DesktopBuild
     if (-not (Test-Path -LiteralPath $DesktopTauriCli)) {
         Invoke-Checked -FilePath $DesktopNpmCmd -WorkingDirectory $DesktopDir -ArgumentList @(
             'ci', '--ignore-scripts', '--no-audit', '--no-fund'
@@ -1092,9 +1157,13 @@ function Initialize-DesktopBuildDependencies {
 }
 
 function Build-DesktopFrontend {
-    Invoke-Checked -FilePath $DesktopNpmCmd -WorkingDirectory $ClientDir -ArgumentList @('run', 'build')
-    if (-not (Test-Path -LiteralPath (Join-Path $ClientDir 'dist/browser/index.html'))) {
-        throw 'Angular production output was not generated'
+    $previousCi = $env:CI
+    $env:CI = '1'
+    try {
+        Build-Frontend
+    }
+    finally {
+        if ($null -eq $previousCi) { Remove-Item Env:CI -ErrorAction SilentlyContinue } else { $env:CI = $previousCi }
     }
 }
 
@@ -1121,21 +1190,44 @@ function Test-FrozenBackend {
     $backend = Join-Path $backendRoot 'DILIGENTBackend.exe'
     $dataRoot = Join-Path $StageRoot 'frozen-data'
     $readyFile = Join-Path $dataRoot 'state/ready.json'
-    New-Item -ItemType Directory -Path (Split-Path -Parent $readyFile) -Force | Out-Null
+    $qaRoot = Join-Path $RepoRoot 'assets/QA/release-audit-20260826'
+    $stdoutPath = Join-Path $qaRoot 'launcher-frozen-backend.stdout.log'
+    $stderrPath = Join-Path $qaRoot 'launcher-frozen-backend.stderr.log'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $readyFile), (Join-Path $dataRoot 'resources') -Force | Out-Null
+    $previousSqlitePath = $env:DILIGENT_SQLITE_PATH
+    $previousResourcesPath = $env:DILIGENT_RESOURCES_PATH
+    try {
+        $env:DILIGENT_SQLITE_PATH = Join-Path $dataRoot 'resources/database.db'
+        $env:DILIGENT_RESOURCES_PATH = Join-Path $RepoRoot 'app/resources'
+        Invoke-Checked -FilePath $VenvPython -WorkingDirectory $ServerDir -ArgumentList @(
+            (Join-Path $RepoRoot 'app/scripts/initialize_database.py'), '--seed-catalogs'
+        )
+    }
+    finally {
+        if ($null -eq $previousSqlitePath) { Remove-Item Env:DILIGENT_SQLITE_PATH -ErrorAction SilentlyContinue } else { $env:DILIGENT_SQLITE_PATH = $previousSqlitePath }
+        if ($null -eq $previousResourcesPath) { Remove-Item Env:DILIGENT_RESOURCES_PATH -ErrorAction SilentlyContinue } else { $env:DILIGENT_RESOURCES_PATH = $previousResourcesPath }
+    }
     $psi = [Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $backend
     $psi.Arguments = "--ready-file `"$readyFile`" --host 127.0.0.1"
     $psi.WorkingDirectory = $backendRoot
     $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $sessionSecret = [guid]::NewGuid().ToString('N')
     foreach ($pair in @{
-        DILIGENT_DESKTOP='true'; DILIGENT_RELEASE_VERSION=$Version; DILIGENT_RUNTIME_ROOT=(Join-Path $StageRoot 'runtime-stage')
+        DILIGENT_DESKTOP='true'; DILIGENT_DESKTOP_SESSION_SECRET=$sessionSecret; DILIGENT_RELEASE_VERSION=$Version; DILIGENT_RUNTIME_ROOT=(Join-Path $StageRoot 'runtime-stage')
         DILIGENT_DATA_ROOT=$dataRoot; DILIGENT_SQLITE_PATH=(Join-Path $dataRoot 'resources/database.db')
-        DILIGENT_ACCESS_KEY_MATERIAL_FILE=(Join-Path $dataRoot 'resources/access-key-material.json'); RELOAD='false'
+        DILIGENT_ACCESS_KEY_MATERIAL_FILE=(Join-Path $dataRoot 'resources/access-key-material.json'); DILIGENT_RESOURCES_PATH=(Join-Path $StageRoot 'runtime-stage/app/resources'); RELOAD='false'
     }.GetEnumerator()) { $psi.Environment[$pair.Key] = [string]$pair.Value }
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $psi
+    $stdoutTask = $null
+    $stderrTask = $null
     try {
         if (-not $process.Start()) { throw 'Frozen backend did not start' }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
         $ready = $null
         for ($attempt = 0; $attempt -lt 120 -and $null -eq $ready; $attempt++) {
             if (Test-Path -LiteralPath $readyFile) { $ready = Get-Content -LiteralPath $readyFile -Raw | ConvertFrom-Json }
@@ -1144,9 +1236,29 @@ function Test-FrozenBackend {
         }
         if ($null -eq $ready) { throw 'Frozen backend ready-file timeout' }
         $baseUrl = "http://127.0.0.1:$($ready.port)"
-        if (-not (Invoke-HealthCheck -Url "$baseUrl/api/health" -Attempts 60 -DelaySeconds 1)) { throw 'Frozen backend health check failed' }
+        if (-not (Invoke-HealthCheck -Url "$baseUrl/api/health" -Attempts 60 -DelaySeconds 1)) {
+            $process.Refresh()
+            $exitState = if ($process.HasExited) { "exited with code $($process.ExitCode)" } else { 'still running' }
+            throw "Frozen backend health check failed; process was $exitState"
+        }
         if ((Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/" -TimeoutSec 5).StatusCode -ne 200) { throw 'Frozen backend did not serve Angular index' }
         if ((Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/clinical-sessions" -TimeoutSec 5).StatusCode -ne 200) { throw 'Frozen backend SPA fallback failed' }
+        $unauthorizedStatus = 0
+        try {
+            Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/api/model-config" -TimeoutSec 5 | Out-Null
+        }
+        catch {
+            $unauthorizedStatus = [int]$_.Exception.Response.StatusCode.value__
+        }
+        if ($unauthorizedStatus -ne 401) { throw "Frozen backend unauthorized API check returned $unauthorizedStatus" }
+        $desktopSession = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
+        $bootstrapHeaders = @{ Origin = $baseUrl }
+        Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/api/desktop/bootstrap" -Method Post `
+            -Headers $bootstrapHeaders -ContentType 'application/json' -Body (@{ token = $sessionSecret } | ConvertTo-Json) `
+            -WebSession $desktopSession -TimeoutSec 5 | Out-Null
+        $authorizedConfig = Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/api/model-config" `
+            -WebSession $desktopSession -TimeoutSec 30
+        if ($authorizedConfig.StatusCode -ne 200) { throw 'Frozen backend authorized model-config check failed' }
         $migrationDatabase = Join-Path $dataRoot 'resources/database.db'
         Invoke-Checked -FilePath $VenvPython -WorkingDirectory $ServerDir -ArgumentList @(
             '-c',
@@ -1157,6 +1269,8 @@ function Test-FrozenBackend {
     }
     finally {
         if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit(10000) | Out-Null }
+        if ($stdoutTask) { $stdoutTask.Result | Set-Content -LiteralPath $stdoutPath -Encoding utf8 }
+        if ($stderrTask) { $stderrTask.Result | Set-Content -LiteralPath $stderrPath -Encoding utf8 }
         Remove-Item -LiteralPath $dataRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
@@ -1169,7 +1283,8 @@ function New-DesktopRuntimeArchive {
     foreach ($relative in @('app/client/dist/browser', 'app/resources/catalogs', 'settings')) {
         New-Item -ItemType Directory -Path (Join-Path $payloadRoot $relative) -Force | Out-Null
     }
-    Copy-Item -Path (Join-Path $ClientDir 'dist/browser/*') -Destination (Join-Path $payloadRoot 'app/client/dist/browser') -Recurse -Force
+    $frontendOutputRoot = if ($script:DesktopFrontendOutputDir) { Join-Path $script:DesktopFrontendOutputDir 'browser' } else { Join-Path $ClientDir 'dist/browser' }
+    Copy-Item -Path (Join-Path $frontendOutputRoot '*') -Destination (Join-Path $payloadRoot 'app/client/dist/browser') -Recurse -Force
     Copy-Item -Path (Join-Path $RepoRoot 'app/resources/catalogs/*') -Destination (Join-Path $payloadRoot 'app/resources/catalogs') -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'settings/.env.example') -Destination (Join-Path $payloadRoot 'settings/.env.example')
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'settings/configurations.json') -Destination (Join-Path $payloadRoot 'settings/configurations.json')
@@ -1183,9 +1298,11 @@ function New-DesktopRuntimeArchive {
         '--pyinstaller-version', $PyInstallerVersion, '--tauri-version', '2.11.5', '--frontend-package-version', $clientVersion,
         '--source-commit-sha', (Get-RepositoryCommit), '--dirty-tree', ([string]$DirtyTree)
     )
-    Copy-Item -LiteralPath $runtimeOutput -Destination (Join-Path $DesktopGeneratedDir 'diligent-runtime.zip') -Force
-    $digest = (Get-FileHash -LiteralPath $runtimeOutput -Algorithm SHA256).Hash.ToLowerInvariant()
-    Set-Content -LiteralPath (Join-Path $DesktopGeneratedDir 'diligent-runtime.sha256') -Value $digest -Encoding ascii
+    Invoke-Checked -FilePath $VenvPython -WorkingDirectory $RepoRoot -ArgumentList @(
+        (Join-Path $DesktopDir 'build/validate_runtime_archive.py'), '--archive', $runtimeOutput, '--version', $Version
+    )
+    $env:DILIGENT_RUNTIME_ARCHIVE = $runtimeOutput
+    Write-Info "Runtime archive is ready for OUT_DIR embedding: $runtimeOutput"
 }
 
 function New-TauriReleaseConfiguration {
@@ -1210,20 +1327,75 @@ function Build-TauriApplication {
         $env:CARGO_BUILD_JOBS = '1'
         Write-Info 'Using one Cargo build job to keep release compilation within host memory limits.'
     }
-    Invoke-Checked -FilePath $DesktopTauriCli -WorkingDirectory $DesktopDir -ArgumentList @('build', '--config', $ConfigurationPath, '--no-bundle')
+    Invoke-Checked -FilePath $DesktopTauriCli -WorkingDirectory $DesktopDir -ArgumentList @(
+        'build', '--target', $DesktopTargetTriple, '--config', $ConfigurationPath, '--no-bundle'
+    )
     if ($DesktopTarget -in @('Msi', 'All')) {
-        Invoke-Checked -FilePath $DesktopTauriCli -WorkingDirectory $DesktopDir -ArgumentList @('bundle', '--config', $ConfigurationPath, '--bundles', 'msi')
+        Invoke-Checked -FilePath $DesktopTauriCli -WorkingDirectory $DesktopDir -ArgumentList @(
+            'bundle', '--target', $DesktopTargetTriple, '--config', $ConfigurationPath, '--bundles', 'msi'
+        )
     }
 }
 
 function Test-PortableDesktopArtifact {
     param([Parameter(Mandatory = $true)][string]$Path)
     if (-not (Test-Path -LiteralPath $Path) -or (Get-Item -LiteralPath $Path).Length -lt 1MB) { throw "Portable desktop artifact is missing or unexpectedly small: $Path" }
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        $reader = [IO.BinaryReader]::new($stream)
+        if ($reader.ReadUInt16() -ne 0x5A4D) { throw 'Portable artifact is not a PE executable' }
+        $stream.Seek(0x3C, [IO.SeekOrigin]::Begin) | Out-Null
+        $peOffset = $reader.ReadInt32()
+        $stream.Seek($peOffset, [IO.SeekOrigin]::Begin) | Out-Null
+        if ($reader.ReadUInt32() -ne 0x00004550) { throw 'Portable artifact has an invalid PE signature' }
+        if ($reader.ReadUInt16() -ne 0x8664) { throw 'Portable artifact is not AMD64' }
+    }
+    finally {
+        $stream.Dispose()
+    }
 }
 
 function Test-MsiMetadata {
     param([Parameter(Mandatory = $true)][string]$Path)
     if (-not (Test-Path -LiteralPath $Path) -or (Get-Item -LiteralPath $Path).Length -lt 1KB) { throw "MSI artifact is missing or unexpectedly small: $Path" }
+    $installer = New-Object -ComObject WindowsInstaller.Installer
+    $database = $null
+    try {
+        $database = $installer.OpenDatabase($Path, 0)
+        $manufacturerView = $database.OpenView("SELECT `Value` FROM `Property` WHERE `Property`='Manufacturer'")
+        $manufacturerView.Execute()
+        $manufacturerRecord = $manufacturerView.Fetch()
+        $manufacturer = if ($null -eq $manufacturerRecord) { '' } else { $manufacturerRecord.StringData(1) }
+        $upgradeView = $database.OpenView('SELECT DISTINCT UpgradeCode FROM Upgrade')
+        $upgradeView.Execute()
+        $upgradeRecord = $upgradeView.Fetch()
+        $upgradeCode = if ($null -eq $upgradeRecord) { '' } else { $upgradeRecord.StringData(1) }
+        if ($manufacturer -ne 'CTCycle') { throw "MSI Manufacturer must be CTCycle; found $manufacturer" }
+        if ($upgradeCode.Trim('{}').ToUpperInvariant() -ne '2CF8EF35-4160-59EB-89D8-01EC7D19A887') {
+            throw "MSI UpgradeCode did not preserve the release identity: $upgradeCode"
+        }
+    }
+    finally {
+        if ($database) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database) }
+        if ($installer) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
+    }
+}
+
+function Copy-DesktopArtifact {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+    if (Test-Path -LiteralPath $Destination -PathType Leaf) {
+        $sourceHash = (Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash.ToLowerInvariant()
+        $destinationHash = (Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($sourceHash -eq $destinationHash) {
+            Write-Info "Keeping byte-identical existing release artifact: $Destination"
+            return
+        }
+        throw "Refusing to overwrite a non-identical release artifact: $Destination"
+    }
+    Copy-Item -LiteralPath $Source -Destination $Destination
 }
 
 function Publish-DesktopArtifacts {
@@ -1232,21 +1404,17 @@ function Publish-DesktopArtifacts {
     $paths = Get-DesktopReleaseArtifactPaths -Version $Version
     $portable = $paths.Portable
     $msi = $paths.Msi
-    $rawExe = Get-ChildItem -LiteralPath (Join-Path $CargoTargetDir 'release') -Filter '*.exe' -File -ErrorAction SilentlyContinue | Where-Object Name -notmatch 'uninstall' | Select-Object -First 1
+    $rawExe = Join-Path $CargoTargetDir "$DesktopTargetTriple/release/diligent-desktop.exe"
     if ($DesktopTarget -in @('Portable', 'All')) {
-        if ($null -eq $rawExe) { throw 'Tauri raw executable was not found' }
-        if ((Test-Path -LiteralPath $portable) -and -not $Force) { throw "Release already exists: $portable (use -Force to replace it)" }
-        Copy-Item -LiteralPath $rawExe.FullName -Destination $portable -Force
+        if (-not (Test-Path -LiteralPath $rawExe -PathType Leaf)) { throw "Tauri x64 raw executable was not found: $rawExe" }
+        Copy-DesktopArtifact -Source $rawExe -Destination $portable
         Test-PortableDesktopArtifact -Path $portable
     }
     if ($DesktopTarget -in @('Msi', 'All')) {
-        $builtMsi = Get-ChildItem -LiteralPath (Join-Path $CargoTargetDir 'release/bundle/msi') -Filter '*.msi' -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -like ("*_{0}_*.msi" -f $Version) } |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-        if ($null -eq $builtMsi) { throw 'Tauri MSI artifact was not found' }
-        if ((Test-Path -LiteralPath $msi) -and -not $Force) { throw "Release already exists: $msi (use -Force to replace it)" }
-        Copy-Item -LiteralPath $builtMsi.FullName -Destination $msi -Force
+        $msiName = "DILIGENT Clinical Copilot_${Version}_x64_en-US.msi"
+        $builtMsi = Join-Path $CargoTargetDir "$DesktopTargetTriple/release/bundle/msi/$msiName"
+        if (-not (Test-Path -LiteralPath $builtMsi -PathType Leaf)) { throw "Tauri x64 MSI artifact was not found: $builtMsi" }
+        Copy-DesktopArtifact -Source $builtMsi -Destination $msi
         Test-MsiMetadata -Path $msi
     }
     Write-DesktopChecksums -Version $Version
@@ -1280,10 +1448,12 @@ function Write-DesktopChecksums {
 function Build-DesktopRelease {
     Assert-DesktopParameterContract
     $resolvedVersion = Resolve-DesktopReleaseVersion
+    Assert-DesktopReleaseVersion -ExpectedVersion $resolvedVersion
     $dirtyTree = Assert-CleanReleaseTree
     Assert-DesktopBuildHost
     $stageRoot = Join-Path $DesktopStageRoot "$resolvedVersion/$PID"
     New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+    $script:DesktopFrontendOutputDir = Join-Path $stageRoot 'frontend-dist'
     try {
         Initialize-DesktopBuildDependencies
         Build-DesktopFrontend
@@ -1293,10 +1463,11 @@ function Build-DesktopRelease {
         $configuration = New-TauriReleaseConfiguration -Version $resolvedVersion
         Build-TauriApplication -ConfigurationPath $configuration -Version $resolvedVersion
         Publish-DesktopArtifacts -Version $resolvedVersion
-        Write-Ok "Desktop release $resolvedVersion published under $DesktopArtifactsDir"
+        Write-Ok "Desktop release $resolvedVersion built under $DesktopArtifactsDir"
     }
     finally {
         if (Test-Path -LiteralPath $stageRoot) { Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue }
+        $script:DesktopFrontendOutputDir = $null
     }
 }
 

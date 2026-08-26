@@ -15,7 +15,15 @@
   <body>
     <main aria-live="polite">
       <div class="mark">DILIGENT</div>
-      <p>Starting Clinical Copilot…</p>
+      <p id="desktop-status">Starting Clinical Copilot…</p>
     </main>
+    <script>
+      window.showStartupError = function (message) {
+        const status = document.getElementById('desktop-status');
+        if (status) {
+          status.textContent = message;
+        }
+      };
+    </script>
   </body>
 </html>

@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Local desktop window with no application IPC commands",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": []
 }
