@@ -855,7 +855,7 @@ function Uninstall-Application {
     }
 
     Remove-PythonCaches
-    Write-Ok 'Application runtimes and generated dependencies removed; settings and user data were preserved'
+    Write-Ok 'Application runtimes, dependencies, and build outputs removed. Dependency lockfiles and user data were preserved.'
 }
 
 function Resolve-LauncherPath {
