@@ -24,11 +24,15 @@ _SECURITY_HEADERS = {
 }
 
 
+###############################################################################
 def _is_true(value: str) -> bool:
     return value.strip().casefold() in {"1", "true", "yes", "on"}
 
 
+###############################################################################
 class DesktopSessionSecurity:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.enabled = _is_true(os.getenv("DILIGENT_DESKTOP", ""))
         self.secret = os.getenv("DILIGENT_DESKTOP_SESSION_SECRET", "")
@@ -40,16 +44,20 @@ class DesktopSessionSecurity:
         self._bootstrap_lock = threading.Lock()
         self._bootstrap_consumed = False
 
+    # -------------------------------------------------------------------------
     @property
     def origin(self) -> str:
         return f"http://127.0.0.1:{self.port}"
 
+    # -------------------------------------------------------------------------
     def host_is_allowed(self, host: str) -> bool:
         return self.enabled and self.port > 0 and host == f"127.0.0.1:{self.port}"
 
+    # -------------------------------------------------------------------------
     def origin_is_allowed(self, origin: str) -> bool:
         return origin == self.origin
 
+    # -------------------------------------------------------------------------
     def consume_bootstrap_token(self, token: str) -> bool:
         if not self.enabled or not self.secret or not hmac.compare_digest(token, self.secret):
             return False
@@ -59,22 +67,28 @@ class DesktopSessionSecurity:
             self._bootstrap_consumed = True
             return True
 
+    # -------------------------------------------------------------------------
     def request_has_session(self, request: Request) -> bool:
         cookie = request.cookies.get(DESKTOP_SESSION_COOKIE, "")
         return bool(self.secret) and hmac.compare_digest(cookie, self.secret)
 
 
+###############################################################################
 def _secured(response: Response) -> Response:
     for name, value in _SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
     return response
 
 
+###############################################################################
 def _rejected(status_code: int) -> Response:
     return _secured(JSONResponse({"detail": "Desktop request is not authorized."}, status_code=status_code))
 
 
+###############################################################################
 class DesktopSecurityMiddleware(BaseHTTPMiddleware):
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         app: ASGIApp,
@@ -84,6 +98,7 @@ class DesktopSecurityMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.security = security
 
+    # -------------------------------------------------------------------------
     async def dispatch(
         self,
         request: Request,

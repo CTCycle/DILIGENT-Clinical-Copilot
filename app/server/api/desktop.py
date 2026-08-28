@@ -8,12 +8,14 @@ from common.security.desktop import DESKTOP_SESSION_COOKIE, DesktopSessionSecuri
 router = APIRouter(prefix="/desktop", tags=["desktop"])
 
 
+###############################################################################
 class DesktopBootstrapRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     token: str
 
 
+###############################################################################
 def _security(request: Request) -> DesktopSessionSecurity:
     security = getattr(request.app.state, "desktop_security", None)
     if not isinstance(security, DesktopSessionSecurity):
@@ -21,6 +23,7 @@ def _security(request: Request) -> DesktopSessionSecurity:
     return security
 
 
+###############################################################################
 @router.post("/bootstrap", status_code=status.HTTP_204_NO_CONTENT)
 def bootstrap_desktop_session(
     payload: DesktopBootstrapRequest,
@@ -43,6 +46,7 @@ def bootstrap_desktop_session(
     )
 
 
+###############################################################################
 @router.post("/shutdown", status_code=status.HTTP_202_ACCEPTED)
 def request_desktop_shutdown(request: Request) -> dict[str, str]:
     _security(request)

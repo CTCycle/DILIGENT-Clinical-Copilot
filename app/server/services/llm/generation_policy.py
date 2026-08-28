@@ -85,7 +85,6 @@ _REVISION_PURPOSES = frozenset(
     }
 )
 
-
 ###############################################################################
 def _values(
     rule: dict[str, Any], purpose: GenerationPurpose, reasoning_level: ReasoningLevel
@@ -104,7 +103,6 @@ def _values(
     if isinstance(selected, dict) and "all" in selected:
         return selected["all"]
     return selected.get(purpose.value)
-
 
 ###############################################################################
 def _reasoning_target(
@@ -134,7 +132,6 @@ def _reasoning_target(
             return ReasoningLevel.MEDIUM
         return ReasoningLevel.LOW
     return user_reasoning_level
-
 
 ###############################################################################
 def _requirements(

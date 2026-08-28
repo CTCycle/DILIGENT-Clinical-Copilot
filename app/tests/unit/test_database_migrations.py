@@ -17,7 +17,6 @@ from repositories.database.migrations import (
     migrate_database,
 )
 
-
 ###############################################################################
 def _engine(path: Path):
     return create_engine(
@@ -26,7 +25,6 @@ def _engine(path: Path):
         connect_args={"timeout": 30.0, "autocommit": False},
     )
 
-
 ###############################################################################
 def _upgrade_to_baseline(engine) -> None:  # type: ignore[no-untyped-def]
     config = build_alembic_config()
@@ -34,7 +32,6 @@ def _upgrade_to_baseline(engine) -> None:  # type: ignore[no-untyped-def]
         with connection.begin():
             config.attributes["connection"] = connection
             command.upgrade(config, BASELINE_REVISION)
-
 
 ###############################################################################
 def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) -> None:
@@ -53,7 +50,6 @@ def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) ->
             assert connection.execute(text("select version_num from alembic_version")).scalar_one() == HEAD_REVISION
     finally:
         engine.dispose()
-
 
 ###############################################################################
 def test_unversioned_v24_schema_is_adopted_without_losing_data(tmp_path: Path) -> None:
@@ -86,7 +82,6 @@ def test_unversioned_v24_schema_is_adopted_without_losing_data(tmp_path: Path) -
     finally:
         engine.dispose()
 
-
 ###############################################################################
 def test_unversioned_current_schema_is_stamped_without_recreating_tables(
     tmp_path: Path,
@@ -115,7 +110,6 @@ def test_unversioned_current_schema_is_stamped_without_recreating_tables(
     finally:
         engine.dispose()
 
-
 ###############################################################################
 def test_unknown_unversioned_schema_is_rejected_before_version_table_creation(
     tmp_path: Path,
@@ -133,7 +127,6 @@ def test_unknown_unversioned_schema_is_rejected_before_version_table_creation(
             assert not inspect(connection).has_table("alembic_version")
     finally:
         engine.dispose()
-
 
 ###############################################################################
 def test_unknown_versioned_schema_is_rejected_without_changing_revision(
@@ -157,7 +150,6 @@ def test_unknown_versioned_schema_is_rejected_without_changing_revision(
             ).scalar_one() == "unknown_revision"
     finally:
         engine.dispose()
-
 
 ###############################################################################
 def test_failed_migration_rolls_back_schema_and_version_changes(
@@ -184,7 +176,6 @@ def test_failed_migration_rolls_back_schema_and_version_changes(
     finally:
         engine.dispose()
 
-
 ###############################################################################
 def test_drop_existing_resets_managed_database_through_alembic(tmp_path: Path) -> None:
     database_path = tmp_path / "reset.db"
@@ -210,7 +201,6 @@ def test_drop_existing_resets_managed_database_through_alembic(tmp_path: Path) -
             assert connection.execute(text("select version_num from alembic_version")).scalar_one() == HEAD_REVISION
     finally:
         engine.dispose()
-
 
 ###############################################################################
 def test_concurrent_sqlite_startup_attempts_serialize(tmp_path: Path) -> None:
