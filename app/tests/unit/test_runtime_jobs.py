@@ -7,7 +7,6 @@ import pytest
 from services.runtime.jobs import JobManager
 from services.session.session_service import ClinicalSessionService
 
-
 ###############################################################################
 def accepts_named_job_id(job_id: str) -> dict[str, object]:
     return {"job_id": job_id}
@@ -183,7 +182,6 @@ def test_shutdown_stops_new_work_and_waits_for_cooperative_worker() -> None:
         time.sleep(0.05)
     assert manager.get_job_status(job_id)["status"] == "cancelled"
     assert manager.shutdown(timeout=1) is True
-
 
 ###############################################################################
 def test_terminal_job_records_are_bounded() -> None:
