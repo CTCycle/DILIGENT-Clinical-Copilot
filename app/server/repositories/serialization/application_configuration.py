@@ -7,7 +7,10 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from repositories.database.session import resolve_engine, resolve_session_factory, unit_of_work
-from repositories.database.upsert import upsert_application_configuration
+from repositories.database.upsert import (
+    insert_application_configuration_if_missing,
+    upsert_application_configuration,
+)
 from repositories.schemas.configuration import ApplicationConfiguration
 
 ###############################################################################
@@ -70,3 +73,13 @@ class ApplicationConfigurationSerializer:
             if return_metadata:
                 return saved_payload, row.updated_at
             return saved_payload
+
+    # -------------------------------------------------------------------------
+    def save_if_missing(self, payload: dict[str, Any]) -> bool:
+        """Seed the singleton only when initialization has no saved state."""
+        json_safe_payload = json.loads(json.dumps(payload, default=str))
+        with unit_of_work(session_factory=self.session_factory) as db_session:
+            return insert_application_configuration_if_missing(
+                db_session,
+                payload=json_safe_payload,
+            )

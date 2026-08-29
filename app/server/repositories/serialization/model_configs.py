@@ -19,6 +19,13 @@ UNSET = object()
 class ModelConfigSerializer:
     """Persist the validated model configuration as one singleton document."""
 
+    REQUIRED_ROLE_FIELDS = (
+        "clinical_model",
+        "text_extraction_model",
+        "revision_model",
+        "timeline_model",
+    )
+
     RAG_OPERATIONAL_FIELDS = frozenset(
         {
             "chunk_size",
@@ -60,9 +67,30 @@ class ModelConfigSerializer:
         with self.session_factory() as db_session:
             row = db_session.get(ApplicationConfiguration, 1)
             if row is None:
-                return self.empty_snapshot()
+                raise ValueError(
+                    "Persisted model configuration is missing; database initialization "
+                    "must seed the canonical configuration before the service starts."
+                )
+            if not isinstance(row.payload, dict):
+                raise ValueError("Persisted model configuration payload must be an object.")
             payload = dict(row.payload)
             return self.snapshot_from_payload(payload, updated_at=row.updated_at)
+
+    # -------------------------------------------------------------------------
+    def seed_if_missing(self, payload: dict[str, object]) -> bool:
+        """Seed a complete configuration without replacing existing state."""
+        self._require_required_roles(payload)
+        normalized_payload = dict(payload)
+        normalized_payload["reasoning_level"] = self.reasoning_level_from_payload(
+            normalized_payload
+        )
+        normalized_payload["ollama_seed"] = self.normalize_optional_seed(
+            normalized_payload.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
+        )
+        normalized_payload["rag_settings"] = self.normalize_rag_settings(
+            normalized_payload.get("rag_settings")
+        )
+        return self.application_configuration.save_if_missing(normalized_payload)
 
     # -------------------------------------------------------------------------
     def save_snapshot(
@@ -97,6 +125,7 @@ class ModelConfigSerializer:
         for key, value in updates.items():
             if value is not UNSET:
                 current[key] = value
+        self._require_required_roles(current)
         current["reasoning_level"] = self.reasoning_level_from_payload(current)
         current["ollama_seed"] = self.normalize_optional_seed(
             current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
@@ -110,26 +139,10 @@ class ModelConfigSerializer:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def empty_snapshot(cls) -> ModelConfigSnapshot:
-        return ModelConfigSnapshot(
-            clinical_model=None,
-            text_extraction_model=None,
-            use_cloud_models=False,
-            cloud_provider=None,
-            cloud_model=None,
-            revision_model=None,
-            timeline_model=None,
-            reasoning_level=cls.DEFAULT_REASONING_LEVEL,
-            ollama_seed=cls.DEFAULT_OLLAMA_SEED,
-            rag_settings={},
-            updated_at=None,
-        )
-
-    # -------------------------------------------------------------------------
-    @classmethod
     def snapshot_from_payload(
         cls, payload: dict[str, object], *, updated_at: datetime | None
     ) -> ModelConfigSnapshot:
+        cls._require_required_roles(payload)
         return ModelConfigSnapshot(
             clinical_model=cls.normalize_optional_text(payload.get("clinical_model")),
             text_extraction_model=cls.normalize_optional_text(
@@ -147,6 +160,20 @@ class ModelConfigSerializer:
             rag_settings=cls.normalize_rag_settings(payload.get("rag_settings")),
             updated_at=updated_at,
         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _require_required_roles(cls, payload: dict[str, object]) -> None:
+        missing = [
+            field_name
+            for field_name in cls.REQUIRED_ROLE_FIELDS
+            if cls.normalize_optional_text(payload.get(field_name)) is None
+        ]
+        if missing:
+            raise ValueError(
+                "Persisted model configuration is missing required role assignments: "
+                + ", ".join(missing)
+            )
 
     # -------------------------------------------------------------------------
     @staticmethod

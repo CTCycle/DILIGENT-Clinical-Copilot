@@ -7,26 +7,21 @@ from pathlib import Path
 from typing import Any, Iterator, Literal
 
 from alembic import command
-from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.sql.schema import Column
-from sqlalchemy.sql.sqltypes import Integer
 
 from common.utils.logger import logger
-from repositories.schemas import Base
 
-BASELINE_REVISION = "202608200001"
-HEAD_REVISION = "202608200002"
+HEAD_REVISION = "202608200003"
 MIGRATION_LOCK_KEY = 7362381
 
 ###############################################################################
 class MigrationError(RuntimeError):
-    """Raised when a database cannot be safely adopted or migrated."""
+    """Raised when a database cannot be safely migrated."""
 
 ###############################################################################
 @dataclass(frozen=True, slots=True)
@@ -34,7 +29,6 @@ class MigrationResult:
     current_heads: tuple[str, ...]
     target_heads: tuple[str, ...]
     database_was_empty: bool
-    adopted_revision: str | None
     reset: bool
 
     # -------------------------------------------------------------------------
@@ -86,42 +80,6 @@ def _current_heads(connection: Connection) -> tuple[str, ...]:
 ###############################################################################
 def _user_tables(connection: Connection) -> set[str]:
     return set(inspect(connection).get_table_names()) - {"alembic_version"}
-
-###############################################################################
-def _schema_differences(connection: Connection) -> list[tuple[object, ...]]:
-    migration_context = MigrationContext.configure(
-        connection,
-        opts={
-            "target_metadata": Base.metadata,
-            "compare_type": True,
-            "compare_server_default": True,
-            "render_as_batch": True,
-        },
-    )
-    return list(compare_metadata(migration_context, Base.metadata))
-
-###############################################################################
-def _is_legacy_v24_schema(differences: list[tuple[object, ...]]) -> bool:
-    if len(differences) != 1:
-        return False
-    difference = differences[0]
-    if len(difference) != 4 or difference[0] != "remove_column":
-        return False
-    _, schema, table_name, column = difference
-    return (
-        schema is None
-        and table_name == "application_configuration"
-        and isinstance(column, Column)
-        and column.name == "schema_version"
-        and isinstance(column.type, Integer)
-        and not column.nullable
-    )
-
-###############################################################################
-def _format_differences(differences: list[tuple[object, ...]]) -> str:
-    if not differences:
-        return "none"
-    return "; ".join(str(difference) for difference in differences[:5])
 
 ###############################################################################
 def _begin_sqlite_exclusive(connection: Connection) -> None:
@@ -188,36 +146,6 @@ def _validate_known_revision(config: Config, current_heads: tuple[str, ...]) -> 
         )
 
 ###############################################################################
-def _adopt_unversioned_database(
-    connection: Connection,
-    config: Config,
-    *,
-    database_was_empty: bool,
-) -> str | None:
-    if database_was_empty:
-        return None
-
-    differences = _schema_differences(connection)
-    if not differences:
-        _run_command(connection, "stamp", HEAD_REVISION)
-        logger.info("Stamped unversioned database at current Alembic head")
-        return HEAD_REVISION
-
-    if _is_legacy_v24_schema(differences):
-        _run_command(connection, "stamp", BASELINE_REVISION)
-        logger.info(
-            "Adopted unversioned v2.4-v3.0 database at Alembic revision %s",
-            BASELINE_REVISION,
-        )
-        return BASELINE_REVISION
-
-    raise MigrationError(
-        "Unversioned database schema is not a recognized v2.4+ DILIGENT schema; "
-        "no migration changes were applied. Differences: "
-        f"{_format_differences(differences)}"
-    )
-
-###############################################################################
 def migrate_database(
     engine: Engine,
     *,
@@ -232,7 +160,6 @@ def migrate_database(
             initial_heads = _current_heads(connection)
             user_tables = _user_tables(connection)
             database_is_empty = not user_tables
-            adopted_revision: str | None = None
             reset = False
 
             logger.info(
@@ -251,10 +178,11 @@ def migrate_database(
                         "application tables; refusing to guess its migration history."
                     )
                 else:
-                    adopted_revision = _adopt_unversioned_database(
-                        connection,
-                        config,
-                        database_was_empty=database_is_empty,
+                    raise MigrationError(
+                        "Database is populated but has no Alembic revision; refusing "
+                        "to guess its migration history. Restore a supported backup "
+                        "or run the documented administrative conversion before "
+                        "startup. No migration changes were applied."
                     )
 
             current_heads = _current_heads(connection)
@@ -284,7 +212,6 @@ def migrate_database(
                 current_heads=initial_heads,
                 target_heads=target_heads,
                 database_was_empty=database_was_empty,
-                adopted_revision=adopted_revision,
                 reset=reset,
             )
     except MigrationError:

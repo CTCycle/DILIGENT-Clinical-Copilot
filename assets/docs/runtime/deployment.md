@@ -26,9 +26,10 @@ Last updated: 2026-08-21
   `uv run alembic -c alembic.ini upgrade head` and
   `uv run alembic -c alembic.ini current --check-heads`, followed by
   `uv run alembic -c alembic.ini check`.
-- Keep one linear head. Back up production data before upgrades. Automatic
-  adoption covers v2.4-v3.2 unversioned schemas; older or divergent schemas
-  require an explicit conversion plan.
+- Keep one linear head. Back up production data before upgrades. Populated
+  databases without an Alembic revision are rejected; the runtime does not
+  guess or stamp unversioned migration history. Older or divergent schemas
+  require an explicit administrative conversion plan.
 - Use Alembic downgrade commands only for reviewed development or recovery
   procedures. The initializer's `--drop-existing` option is the explicit reset
   workflow and destroys application rows before rebuilding to head.

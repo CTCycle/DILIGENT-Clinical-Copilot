@@ -161,6 +161,9 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     def fake_migrate_database(_engine, **_kwargs):
         order.append("migration")
 
+    def fake_seed_model_configuration(_repository):
+        order.append("model_config_seeded")
+
     ###############################################################################
     class FakeCatalogSerializer:
 
@@ -181,6 +184,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
 
     monkeypatch.setattr(initializer, "PostgresRepository", FakePostgresRepository)
     monkeypatch.setattr(initializer, "migrate_database", fake_migrate_database)
+    monkeypatch.setattr(initializer, "_seed_model_configuration", fake_seed_model_configuration)
     monkeypatch.setattr(
         initializer, "ReferenceCatalogSerializer", FakeCatalogSerializer
     )
@@ -189,7 +193,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     db_name = initializer.ensure_postgres_database(settings)
 
     assert db_name == "diligent"
-    assert order == ["migration", "catalog_seeded"]
+    assert order == ["migration", "model_config_seeded", "catalog_seeded"]
 
 ###############################################################################
 def test_external_material_does_not_duplicate_on_reopen(monkeypatch) -> None:  # type: ignore[no-untyped-def]

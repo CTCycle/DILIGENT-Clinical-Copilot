@@ -3,18 +3,17 @@ from __future__ import annotations
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from datetime import datetime
+from dataclasses import replace
 import hashlib
 import json
 from typing import Literal, cast
 
-from configurations.startup import get_server_settings
 from common.catalogs.model_choices import (
     get_clinical_model_choices,
     get_text_extraction_model_choices,
 )
 from domain.model_configs import ModelConfigSnapshot, ReasoningLevel
 from domain.llm.providers import CloudProviderId
-from domain.settings.configuration import LLMRuntimeDefaults
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
@@ -43,11 +42,6 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _get_defaults() -> LLMRuntimeDefaults:
-        return get_server_settings().llm_defaults
-
-    # -------------------------------------------------------------------------
-    @staticmethod
     def _normalize_provider(value: str | None) -> CloudProviderId:
         normalized = (value or "").strip().lower()
         try:
@@ -68,11 +62,6 @@ class LLMRuntimeConfig:
         return normalized
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _normalize_local_model(value: str | None, fallback: str) -> str:
-        normalized = (value or "").strip()
-        return normalized or fallback
-
     # -------------------------------------------------------------------------
     @staticmethod
     def _local_model_choices() -> set[str]:
@@ -95,122 +84,70 @@ class LLMRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def _load_snapshot(cls) -> ModelConfigSnapshot:
-        defaults = cls._get_defaults()
         snapshot = ModelConfigSerializer().load_snapshot()
         overrides = cls._runtime_override.get() or {}
-        is_fresh = snapshot.updated_at is None and all(
-            value is None
-            for value in (
-                snapshot.clinical_model,
-                snapshot.text_extraction_model,
-                snapshot.cloud_provider,
-                snapshot.cloud_model,
-            )
+        if not overrides:
+            return snapshot
+
+        use_cloud_models = cls._coerce_bool(
+            overrides.get("use_cloud_models", snapshot.use_cloud_models)
         )
-        if is_fresh:
-            base_provider = defaults.llm_provider
-            base_cloud_model = defaults.cloud_model
-            base_clinical_model = defaults.clinical_model
-            base_text_extraction_model = defaults.text_extraction_model
-            base_reasoning_level = defaults.reasoning_level
-            base_revision_model = (
-                defaults.cloud_model
-                if defaults.use_cloud_services
-                else defaults.clinical_model
-            )
-            base_timeline_model = (
-                defaults.cloud_model
-                if defaults.use_cloud_services
-                else defaults.text_extraction_model
-            )
-        else:
-            base_provider = snapshot.cloud_provider
-            base_cloud_model = snapshot.cloud_model
-            base_clinical_model = snapshot.clinical_model
-            base_text_extraction_model = snapshot.text_extraction_model
-            base_reasoning_level = snapshot.reasoning_level
-            use_cloud_models = cls._coerce_bool(
-                overrides.get("use_cloud_models", snapshot.use_cloud_models)
-            )
-            base_revision_model = snapshot.revision_model or (
-                snapshot.cloud_model
-                if use_cloud_models
-                else snapshot.clinical_model
-            )
-            base_timeline_model = snapshot.timeline_model or (
-                snapshot.cloud_model
-                if use_cloud_models
-                else snapshot.text_extraction_model
-            )
-            local_choices = cls._local_model_choices()
-            for role_name, model_name in (
-                ("clinical", base_clinical_model),
-                ("text_extraction", base_text_extraction_model),
-                ("revision", base_revision_model),
-                ("timeline", base_timeline_model),
-            ):
-                if not use_cloud_models and model_name and model_name not in local_choices:
-                    raise ValueError(
-                        f"Model '{model_name}' is not supported for role '{role_name}'"
-                    )
         provider = cls._normalize_provider(
             cls._coerce_optional_text(overrides.get("cloud_provider"))
             if "cloud_provider" in overrides
-            else base_provider
+            else snapshot.cloud_provider
         )
         requested_cloud_model = (
             cls._coerce_optional_text(overrides.get("cloud_model"))
             if "cloud_model" in overrides
-            else base_cloud_model
+            else snapshot.cloud_model
         )
         cloud_model = (
             cls._normalize_cloud_model(provider, requested_cloud_model)
-            if requested_cloud_model or cls._coerce_bool(
-                overrides.get("use_cloud_models", snapshot.use_cloud_models)
-            )
-            else ""
+            if use_cloud_models
+            else requested_cloud_model
         )
-        return ModelConfigSnapshot(
-            clinical_model=cls._normalize_local_model(
-                cls._coerce_optional_text(overrides.get("clinical_model"))
-                if "clinical_model" in overrides
-                else base_clinical_model,
-                "" if not is_fresh else defaults.clinical_model,
-            ),
-            text_extraction_model=cls._normalize_local_model(
-                cls._coerce_optional_text(overrides.get("text_extraction_model"))
-                if "text_extraction_model" in overrides
-                else base_text_extraction_model,
-                "" if not is_fresh else defaults.text_extraction_model,
-            ),
-            revision_model=cls._normalize_local_model(
-                cls._coerce_optional_text(overrides.get("revision_model"))
-                if "revision_model" in overrides
-                else base_revision_model,
-                "" if not is_fresh else str(base_revision_model or ""),
-            ),
-            timeline_model=cls._normalize_local_model(
-                cls._coerce_optional_text(overrides.get("timeline_model"))
-                if "timeline_model" in overrides
-                else base_timeline_model,
-                "" if not is_fresh else str(base_timeline_model or ""),
-            ),
-            use_cloud_models=cls._coerce_bool(
-                overrides.get("use_cloud_models", snapshot.use_cloud_models)
-            ),
+        role_values: dict[str, str] = {}
+        for field_name in (
+            "clinical_model",
+            "text_extraction_model",
+            "revision_model",
+            "timeline_model",
+        ):
+            value = (
+                cls._coerce_optional_text(overrides[field_name])
+                if field_name in overrides
+                else getattr(snapshot, field_name)
+            )
+            if not value:
+                raise ValueError(
+                    f"Runtime configuration requires an explicit '{field_name}' assignment."
+                )
+            role_values[field_name] = value
+
+        if not use_cloud_models:
+            local_choices = cls._local_model_choices()
+            for field_name, model_name in role_values.items():
+                if model_name not in local_choices:
+                    raise ValueError(
+                        f"Model '{model_name}' is not supported for role '{field_name}'."
+                    )
+
+        return replace(
+            snapshot,
+            **role_values,
+            use_cloud_models=use_cloud_models,
             cloud_provider=provider,
             cloud_model=cloud_model,
             reasoning_level=cls._resolve_reasoning_level(
                 overrides=overrides,
-                persisted_level=base_reasoning_level,
+                persisted_level=snapshot.reasoning_level,
             ),
             ollama_seed=(
                 cls._coerce_optional_int(overrides.get("ollama_seed"))
                 if "ollama_seed" in overrides
                 else snapshot.ollama_seed
             ),
-            rag_settings=snapshot.rag_settings,
-            updated_at=snapshot.updated_at,
         )
 
     # -------------------------------------------------------------------------
@@ -522,17 +459,13 @@ class LLMRuntimeConfig:
             "timeline": snapshot.timeline_model,
         }
         local_model = (role_models[purpose] or "").strip()
+        if not local_model:
+            raise ValueError(
+                f"Persisted model configuration has no assignment for '{purpose}'."
+            )
         if snapshot.use_cloud_models:
             provider = (snapshot.cloud_provider or "").strip()
-            cloud_model = (snapshot.cloud_model or "").strip()
-            local_choices = set(get_clinical_model_choices()) | set(
-                get_text_extraction_model_choices()
-            )
-            if (
-                local_model
-                and local_model not in local_choices
-                and provider_registry.is_valid_model(cast(CloudProviderId, provider), local_model)
-            ):
-                return provider, local_model
-            return provider, cloud_model
+            if not provider:
+                raise ValueError("Persisted model configuration has no cloud provider.")
+            return provider, local_model
         return "ollama", local_model

@@ -407,4 +407,4 @@ class ClinicalSessionConsultationMixin:
 
     # -------------------------------------------------------------------------
     def apply_persisted_runtime_configuration(self: Any) -> None:
-        self.model_config_service.ensure_defaults()
+        self.model_config_service.load_current_snapshot()

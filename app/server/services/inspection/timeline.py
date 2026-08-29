@@ -200,13 +200,7 @@ class InspectionTimelineMixin:
             LLMRuntimeConfig.get_clinical_model()
             or coerce_optional_str(source.get("clinical_model")),
         )
-        if "timeline_model" not in settings:
-            legacy_role = (
-                "cloud_model"
-                if settings["use_cloud_services"]
-                else "text_extraction_model"
-            )
-            settings["timeline_model"] = coerce_optional_str(settings.get(legacy_role)) or model
+        settings.setdefault("timeline_model", model)
         settings.setdefault("reasoning_level", LLMRuntimeConfig.get_reasoning_level().value)
         settings.setdefault("ollama_seed", LLMRuntimeConfig.get_ollama_seed())
         return settings

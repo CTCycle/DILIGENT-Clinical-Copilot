@@ -72,29 +72,21 @@ class PatientTimelineExtractor:
             return LLMRuntimeConfig.resolve_provider_and_model("timeline")
 
         use_cloud_services = bool(runtime_settings.get("use_cloud_services"))
-        text_extraction_model = cls._coerce_optional_text(
-            runtime_settings.get("text_extraction_model")
-        )
         timeline_model = cls._coerce_optional_text(
             runtime_settings.get("timeline_model")
         )
-        clinical_model = cls._coerce_optional_text(
-            runtime_settings.get("clinical_model")
-        )
-        cloud_model = cls._coerce_optional_text(runtime_settings.get("cloud_model"))
         llm_provider = cls._coerce_optional_text(
             runtime_settings.get("llm_provider")
         ).lower()
         if llm_provider not in get_cloud_model_choices():
-            llm_provider = LLMRuntimeConfig.get_llm_provider().strip().lower()
-        if llm_provider not in get_cloud_model_choices():
-            llm_provider = "openai"
+            raise ValueError(f"Unsupported cloud provider: {llm_provider or '<empty>'}")
+        if not timeline_model:
+            raise ValueError("Runtime settings require an explicit timeline_model.")
 
         if use_cloud_services:
-            model = timeline_model or cloud_model or text_extraction_model or clinical_model
-            return llm_provider, model
+            return llm_provider, timeline_model
 
-        return "ollama", timeline_model or text_extraction_model or clinical_model
+        return "ollama", timeline_model
 
     # -------------------------------------------------------------------------
     async def ensure_client(

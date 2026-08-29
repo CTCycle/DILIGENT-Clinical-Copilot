@@ -202,9 +202,11 @@ erDiagram
   application startup and explicit initialization never use `create_all()`.
 - Startup and installation serialize migration attempts, inspect the current
   Alembic head, and apply pending revisions before repositories or services run.
-- Unversioned v2.4-v3.0 databases are adopted through the released baseline and
-  upgraded without dropping data. Unversioned current-schema databases are
-  stamped only after an exact metadata comparison; unknown schemas are rejected.
+- Fresh databases are upgraded through the linear Alembic history before the
+  application starts. Populated databases without an Alembic revision are
+  rejected before application tables are changed; the runtime never guesses or
+  stamps migration history. Unknown or divergent versioned schemas are also
+  rejected.
 - SQLAlchemy update timestamps use an application-level update hook shared by SQLite and PostgreSQL.
 - Version listing and detail reads are side-effect-free; synchronization is reserved for explicit write paths.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
@@ -278,6 +280,9 @@ The extracted runtime is versioned and hash-addressed so it can be replaced duri
 ## Model Configuration Persistence
 
 - A newly initialized database receives canonical model defaults.
+- The one-time model-role migration fills a missing `revision_model` from the
+  stored clinical assignment and a missing `timeline_model` from the stored
+  text-extraction assignment.
 - Existing provider and model selections are read as stored; unsupported values fail validation and are not silently translated.
 - Provider model catalogs are persisted in `provider_model_catalog_cache`, keyed by provider and a fingerprint of the catalog endpoint plus the active credential (or normalized Ollama endpoint). Secrets are never stored.
 - `GET /api/model-config` reads cached catalog state only. The provider-specific `load` operation contacts a provider only for a cold cache, while `refresh` is the explicit replacement operation.

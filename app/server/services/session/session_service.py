@@ -235,7 +235,7 @@ class ClinicalSessionService(
 
     # -------------------------------------------------------------------------
     def apply_persisted_runtime_configuration(self) -> None:
-        self.model_config_service.ensure_defaults()
+        self.model_config_service.load_current_snapshot()
         parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model(
             "parser"
         )
