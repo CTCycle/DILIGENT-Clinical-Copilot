@@ -13,11 +13,12 @@ def run_startup_validations(settings: ServerSettings | None = None) -> None:
     if not catalog_snapshot.entries_by_scope:
         raise RuntimeError("Reference catalogs must be available at startup.")
 
-    model_snapshot = ModelConfigService().ensure_defaults()
-    if not (model_snapshot.clinical_model or "").strip():
-        raise RuntimeError("Clinical model defaults could not be resolved.")
-    if not (model_snapshot.text_extraction_model or "").strip():
-        raise RuntimeError("Text extraction model defaults could not be resolved.")
+    try:
+        ModelConfigService().load_current_snapshot()
+    except Exception as exc:
+        raise RuntimeError(
+            "Persisted model configuration could not be resolved."
+        ) from exc
 
     if resolved_settings.database.backend == "sqlite":
         return

@@ -15,10 +15,12 @@ class _FakeModelConfigService:
         self._snapshot = SimpleNamespace(
             clinical_model=clinical_model,
             text_extraction_model=text_extraction_model,
+            revision_model=clinical_model,
+            timeline_model=text_extraction_model,
         )
 
     # -------------------------------------------------------------------------
-    def ensure_defaults(self) -> SimpleNamespace:
+    def load_current_snapshot(self) -> SimpleNamespace:
         return self._snapshot
 
 ###############################################################################

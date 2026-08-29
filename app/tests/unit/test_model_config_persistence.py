@@ -64,6 +64,13 @@ def test_model_config_serializer_has_no_clean_break_migration() -> None:
 def test_model_config_serializer_reads_only_reasoning_level(
     payload: dict[str, object], expected: str
 ) -> None:
+    payload = {
+        "clinical_model": "clinical-model",
+        "text_extraction_model": "parser-model",
+        "revision_model": "revision-model",
+        "timeline_model": "timeline-model",
+        **payload,
+    }
     snapshot = ModelConfigSerializer.snapshot_from_payload(payload, updated_at=None)
 
     assert snapshot.reasoning_level.value == expected
@@ -73,6 +80,17 @@ def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
     engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'model-config.db'}")
     Base.metadata.create_all(engine)
     serializer = ModelConfigSerializer(engine=engine)
+    serializer.seed_if_missing(
+        {
+            "clinical_model": "qwen3.5:2b",
+            "text_extraction_model": "qwen3.5:2b",
+            "revision_model": "qwen3.5:2b",
+            "timeline_model": "qwen3.5:2b",
+            "use_cloud_models": False,
+            "cloud_provider": "openai",
+            "cloud_model": None,
+        }
+    )
     serializer.save_snapshot(clinical_model="qwen3.5:2b")
     with engine.begin() as connection:
         connection.execute(
@@ -93,6 +111,17 @@ def test_model_config_serializer_persists_independent_revision_and_timeline_role
     Base.metadata.create_all(engine)
     serializer = ModelConfigSerializer(engine=engine)
 
+    serializer.seed_if_missing(
+        {
+            "clinical_model": "clinical-model",
+            "text_extraction_model": "parser-model",
+            "revision_model": "revision-model",
+            "timeline_model": "timeline-model",
+            "use_cloud_models": True,
+            "cloud_provider": "openai",
+            "cloud_model": "gpt-4.1-mini",
+        }
+    )
     snapshot = serializer.save_snapshot(
         clinical_model="clinical-model",
         text_extraction_model="parser-model",
@@ -110,7 +139,7 @@ def test_model_config_serializer_persists_independent_revision_and_timeline_role
     assert reloaded.timeline_model == "timeline-model"
 
 ###############################################################################
-def test_model_config_service_initializes_fresh_snapshot_from_canonical_defaults() -> None:
+def test_model_config_service_rejects_missing_current_role_assignments() -> None:
     serializer = InMemorySerializer(
         ModelConfigSnapshot(
             clinical_model=None,
@@ -121,10 +150,8 @@ def test_model_config_service_initializes_fresh_snapshot_from_canonical_defaults
             updated_at=None,
         )
     )
-    snapshot = ModelConfigService(serializer=serializer).ensure_defaults()
-    assert snapshot.clinical_model
-    assert snapshot.text_extraction_model
-    assert snapshot.cloud_provider
+    with pytest.raises(ServiceValidationError, match="required role assignments"):
+        ModelConfigService(serializer=serializer).load_current_snapshot()
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -138,6 +165,8 @@ def test_model_config_service_rejects_invalid_persisted_cloud_selection(
         ModelConfigSnapshot(
             clinical_model="qwen3.5:2b",
             text_extraction_model="qwen3.5:2b",
+            revision_model="qwen3.5:2b",
+            timeline_model="qwen3.5:2b",
             use_cloud_models=False,
             cloud_provider=cloud_provider,
             cloud_model=cloud_model,
@@ -145,7 +174,7 @@ def test_model_config_service_rejects_invalid_persisted_cloud_selection(
         )
     )
     with pytest.raises(ServiceValidationError):
-        ModelConfigService(serializer=serializer).ensure_defaults()
+        ModelConfigService(serializer=serializer).load_current_snapshot()
 
 ###############################################################################
 def test_model_config_service_allows_persisted_deepseek_model_before_refresh() -> None:
@@ -153,6 +182,8 @@ def test_model_config_service_allows_persisted_deepseek_model_before_refresh() -
         ModelConfigSnapshot(
             clinical_model="deepseek-v4-flash",
             text_extraction_model="deepseek-v4-flash",
+            revision_model="deepseek-v4-flash",
+            timeline_model="deepseek-v4-flash",
             use_cloud_models=True,
             cloud_provider="deepseek",
             cloud_model="deepseek-v4-flash",
@@ -160,7 +191,7 @@ def test_model_config_service_allows_persisted_deepseek_model_before_refresh() -
         )
     )
 
-    snapshot = ModelConfigService(serializer=serializer).ensure_defaults()
+    snapshot = ModelConfigService(serializer=serializer).load_current_snapshot()
 
     assert snapshot.cloud_provider == "deepseek"
     assert snapshot.cloud_model == "deepseek-v4-flash"
@@ -171,6 +202,8 @@ def test_model_config_state_survives_provider_catalog_drift(monkeypatch) -> None
         ModelConfigSnapshot(
             clinical_model="gpt-4.1-mini",
             text_extraction_model="gpt-4.1-mini",
+            revision_model="gpt-4.1-mini",
+            timeline_model="gpt-4.1-mini",
             use_cloud_models=True,
             cloud_provider="deepseek",
             cloud_model="gpt-4.1-mini",
@@ -202,6 +235,8 @@ def test_model_config_state_returns_persisted_rag_settings(monkeypatch) -> None:
         ModelConfigSnapshot(
             clinical_model="qwen3.5:2b",
             text_extraction_model="qwen3.5:2b",
+            revision_model="qwen3.5:2b",
+            timeline_model="qwen3.5:2b",
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -237,6 +272,47 @@ def test_model_config_state_returns_persisted_rag_settings(monkeypatch) -> None:
     assert response.rag_settings.reranker_model == "persisted-reranker"
 
 ###############################################################################
+def test_get_state_does_not_write_persisted_configuration(monkeypatch, tmp_path) -> None:
+    snapshot = ModelConfigSnapshot(
+        clinical_model="qwen3.5:2b",
+        text_extraction_model="qwen3.5:2b",
+        revision_model="qwen3.5:2b",
+        timeline_model="qwen3.5:2b",
+        use_cloud_models=False,
+        cloud_provider="openai",
+        cloud_model=None,
+        updated_at=datetime.now(UTC),
+    )
+
+    class ReadOnlySerializer(InMemorySerializer):
+
+        # -------------------------------------------------------------------------
+        def save_snapshot(self, **_: Any) -> ModelConfigSnapshot:
+            raise AssertionError("GET model configuration must not persist state")
+
+    service = _catalog_test_service(tmp_path, snapshot)
+    service.serializer = ReadOnlySerializer(snapshot)
+
+    async def fake_list_local_model_cards(**_: Any) -> list[Any]:
+        return []
+
+    async def fake_discover_provider_descriptors(
+        _snapshot: ModelConfigSnapshot,
+    ) -> list[CloudProviderDescriptor]:
+        return []
+
+    monkeypatch.setattr(service, "list_local_model_cards", fake_list_local_model_cards)
+    monkeypatch.setattr(
+        service, "discover_provider_descriptors", fake_discover_provider_descriptors
+    )
+
+    response = asyncio.run(service.get_state())
+
+    assert response.clinical_model == "qwen3.5:2b"
+    assert response.revision_model == "qwen3.5:2b"
+    assert response.timeline_model == "qwen3.5:2b"
+
+###############################################################################
 def test_malformed_cached_catalog_entry_is_skipped() -> None:
     record = ProviderModelCatalogCacheRecord(
         provider_id="openai",
@@ -263,6 +339,8 @@ def test_model_config_catalog_keeps_configured_model_when_refresh_fails(
         ModelConfigSnapshot(
             clinical_model="gpt-4.1-mini",
             text_extraction_model="gpt-4.1-mini",
+            revision_model="gpt-4.1-mini",
+            timeline_model="gpt-4.1-mini",
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -312,6 +390,8 @@ def test_model_config_service_rejects_switching_cloud_model_roles_to_local_mode(
         ModelConfigSnapshot(
             clinical_model="deepseek-v4-flash",
             text_extraction_model="deepseek-v4-flash",
+            revision_model="deepseek-v4-flash",
+            timeline_model="deepseek-v4-flash",
             use_cloud_models=True,
             cloud_provider="deepseek",
             cloud_model="deepseek-v4-flash",
@@ -402,6 +482,8 @@ def test_model_config_service_rejects_invalid_persisted_local_model() -> None:
         ModelConfigSnapshot(
             clinical_model="legacy-local-model",
             text_extraction_model="qwen3.5:2b",
+            revision_model="qwen3.5:2b",
+            timeline_model="qwen3.5:2b",
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -409,7 +491,7 @@ def test_model_config_service_rejects_invalid_persisted_local_model() -> None:
         )
     )
     with pytest.raises(ServiceValidationError):
-        ModelConfigService(serializer=serializer).ensure_defaults()
+        ModelConfigService(serializer=serializer).load_current_snapshot()
 
 ###############################################################################
 def test_model_config_roundtrip_preserves_cloud_selection() -> None:
@@ -417,6 +499,8 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
         ModelConfigSnapshot(
             clinical_model="gpt-oss:20b",
             text_extraction_model="qwen3:1.7b",
+            revision_model="gpt-oss:20b",
+            timeline_model="qwen3:1.7b",
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -456,6 +540,8 @@ def test_model_config_service_accepts_cloud_models_for_role_assignments() -> Non
         ModelConfigSnapshot(
             clinical_model="gpt-oss:20b",
             text_extraction_model="qwen3:14b",
+            revision_model="gpt-oss:20b",
+            timeline_model="qwen3:14b",
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -487,6 +573,8 @@ def test_model_config_cloud_save_does_not_refresh_remote_catalogs_or_ollama(
         ModelConfigSnapshot(
             clinical_model="gpt-4.1-mini",
             text_extraction_model="gpt-4.1-mini",
+            revision_model="gpt-4.1-mini",
+            timeline_model="gpt-4.1-mini",
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -532,6 +620,8 @@ def test_local_option_saves_do_not_probe_ollama(
         ModelConfigSnapshot(
             clinical_model="qwen3.5:2b",
             text_extraction_model="qwen3.5:2b",
+            revision_model="qwen3.5:2b",
+            timeline_model="qwen3.5:2b",
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -558,6 +648,8 @@ def test_local_model_save_reuses_cached_availability(monkeypatch) -> None:
         ModelConfigSnapshot(
             clinical_model="gpt-4.1-mini",
             text_extraction_model="gpt-4.1-mini",
+            revision_model="gpt-4.1-mini",
+            timeline_model="gpt-4.1-mini",
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -575,6 +667,8 @@ def test_local_model_save_reuses_cached_availability(monkeypatch) -> None:
                 use_cloud_services=False,
                 clinical_model="qwen3.5:2b",
                 text_extraction_model="qwen3.5:2b",
+                revision_model="qwen3.5:2b",
+                timeline_model="qwen3.5:2b",
             )
         )
     )
@@ -588,6 +682,8 @@ def test_cold_local_catalog_loads_ollama_once(monkeypatch) -> None:
         ModelConfigSnapshot(
             clinical_model="gpt-4.1-mini",
             text_extraction_model="gpt-4.1-mini",
+            revision_model="gpt-4.1-mini",
+            timeline_model="gpt-4.1-mini",
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -633,6 +729,8 @@ def test_model_config_service_rejects_stale_local_roles_in_cloud_mode() -> None:
         ModelConfigSnapshot(
             clinical_model="gemma4:31b",
             text_extraction_model="qwen3.5:9b",
+            revision_model="gemma4:31b",
+            timeline_model="qwen3.5:9b",
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -658,6 +756,8 @@ def test_model_config_service_rejects_uninstalled_local_models(monkeypatch) -> N
         ModelConfigSnapshot(
             clinical_model="qwen3.5:2b",
             text_extraction_model="qwen3.5:2b",
+            revision_model="qwen3.5:2b",
+            timeline_model="qwen3.5:2b",
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -692,6 +792,8 @@ def test_model_config_service_prioritizes_recommended_installed_local_models(
         ModelConfigSnapshot(
             clinical_model="qwen3.5:2b",
             text_extraction_model="qwen3.5:9b",
+            revision_model="qwen3.5:2b",
+            timeline_model="qwen3.5:9b",
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -721,6 +823,8 @@ def test_failed_ollama_catalog_load_is_persisted_without_retry(monkeypatch) -> N
         ModelConfigSnapshot(
             clinical_model="gpt-oss:20b",
             text_extraction_model="qwen3:14b",
+            revision_model="gpt-oss:20b",
+            timeline_model="qwen3:14b",
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -764,6 +868,8 @@ def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> No
         ModelConfigSnapshot(
             clinical_model="gpt-oss:20b",
             text_extraction_model="qwen3.5:9b",
+            revision_model="gpt-oss:20b",
+            timeline_model="qwen3.5:9b",
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -813,6 +919,8 @@ def test_connectivity_check_reports_llm_error(monkeypatch) -> None:
         ModelConfigSnapshot(
             clinical_model="gpt-oss:20b",
             text_extraction_model="qwen3.5:9b",
+            revision_model="gpt-oss:20b",
+            timeline_model="qwen3.5:9b",
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model=None,
@@ -894,6 +1002,8 @@ def test_empty_ollama_catalog_is_saved_as_a_valid_empty_result(monkeypatch, tmp_
         ModelConfigSnapshot(
             clinical_model="gpt-oss:20b",
             text_extraction_model="qwen3:14b",
+            revision_model="gpt-oss:20b",
+            timeline_model="qwen3:14b",
             use_cloud_models=False,
             cloud_provider="openai",
             cloud_model=None,
@@ -949,6 +1059,8 @@ def test_catalog_provider_switching_keeps_provider_specific_lists(
         ModelConfigSnapshot(
             clinical_model="gpt-4.1-mini",
             text_extraction_model="gpt-4.1-mini",
+            revision_model="gpt-4.1-mini",
+            timeline_model="gpt-4.1-mini",
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -1002,6 +1114,8 @@ def test_concurrent_catalog_loads_share_one_provider_fetch(monkeypatch, tmp_path
         ModelConfigSnapshot(
             clinical_model="gpt-4.1-mini",
             text_extraction_model="gpt-4.1-mini",
+            revision_model="gpt-4.1-mini",
+            timeline_model="gpt-4.1-mini",
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -1058,6 +1172,8 @@ def test_catalog_fingerprint_change_invalidates_saved_models(tmp_path, monkeypat
         ModelConfigSnapshot(
             clinical_model="gpt-4.1-mini",
             text_extraction_model="gpt-4.1-mini",
+            revision_model="gpt-4.1-mini",
+            timeline_model="gpt-4.1-mini",
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-4.1-mini",
@@ -1082,7 +1198,7 @@ def test_catalog_fingerprint_change_invalidates_saved_models(tmp_path, monkeypat
     assert openai.models == []
 
 ###############################################################################
-def test_cloud_runtime_uses_cloud_model_when_role_models_are_local() -> None:
+def test_cloud_runtime_uses_each_configured_role_model() -> None:
     with LLMRuntimeConfig.override_for_run(
         {
             "use_cloud_models": True,
@@ -1096,11 +1212,11 @@ def test_cloud_runtime_uses_cloud_model_when_role_models_are_local() -> None:
     ):
         assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
             "openai",
-            "gpt-4.1-mini",
+            "gpt-oss:20b",
         )
         assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
             "openai",
-            "gpt-4.1-mini",
+            "qwen3:8b",
         )
 
 ###############################################################################
