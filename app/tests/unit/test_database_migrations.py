@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+import json
 from pathlib import Path
 from threading import Barrier
 
@@ -10,7 +11,6 @@ from sqlalchemy import create_engine, inspect, text
 
 import repositories.database.migrations as migration_coordinator
 from repositories.database.migrations import (
-    BASELINE_REVISION,
     HEAD_REVISION,
     MigrationError,
     build_alembic_config,
@@ -26,12 +26,12 @@ def _engine(path: Path):
     )
 
 ###############################################################################
-def _upgrade_to_baseline(engine) -> None:  # type: ignore[no-untyped-def]
+def _upgrade_to(engine, revision: str) -> None:  # type: ignore[no-untyped-def]
     config = build_alembic_config()
     with engine.connect() as connection:
         with connection.begin():
             config.attributes["connection"] = connection
-            command.upgrade(config, BASELINE_REVISION)
+            command.upgrade(config, revision)
 
 ###############################################################################
 def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) -> None:
@@ -52,11 +52,11 @@ def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) ->
         engine.dispose()
 
 ###############################################################################
-def test_unversioned_v24_schema_is_adopted_without_losing_data(tmp_path: Path) -> None:
+def test_populated_unversioned_schema_is_rejected_without_stamping(tmp_path: Path) -> None:
     database_path = tmp_path / "legacy.db"
     engine = _engine(database_path)
     try:
-        _upgrade_to_baseline(engine)
+        _upgrade_to(engine, "202608200002")
         with engine.begin() as connection:
             connection.execute(
                 text(
@@ -67,11 +67,10 @@ def test_unversioned_v24_schema_is_adopted_without_losing_data(tmp_path: Path) -
             )
             connection.execute(text("drop table alembic_version"))
 
-        result = migrate_database(engine, database_was_empty=False)
-
-        assert result.adopted_revision == BASELINE_REVISION
+        with pytest.raises(MigrationError, match="no Alembic revision"):
+            migrate_database(engine, database_was_empty=False)
         with engine.connect() as connection:
-            assert connection.execute(text("select version_num from alembic_version")).scalar_one() == HEAD_REVISION
+            assert not inspect(connection).has_table("alembic_version")
             assert connection.execute(
                 text("select payload from application_configuration where id = 1")
             ).scalar_one() == '{"clinical_model": "legacy"}'
@@ -83,7 +82,7 @@ def test_unversioned_v24_schema_is_adopted_without_losing_data(tmp_path: Path) -
         engine.dispose()
 
 ###############################################################################
-def test_unversioned_current_schema_is_stamped_without_recreating_tables(
+def test_unversioned_current_schema_is_rejected_without_recreating_tables(
     tmp_path: Path,
 ) -> None:
     database_path = tmp_path / "current-unversioned.db"
@@ -100,10 +99,10 @@ def test_unversioned_current_schema_is_stamped_without_recreating_tables(
             )
             connection.execute(text("drop table alembic_version"))
 
-        result = migrate_database(engine, database_was_empty=False)
-
-        assert result.adopted_revision == HEAD_REVISION
+        with pytest.raises(MigrationError, match="no Alembic revision"):
+            migrate_database(engine, database_was_empty=False)
         with engine.connect() as connection:
+            assert not inspect(connection).has_table("alembic_version")
             assert connection.execute(
                 text("select payload from application_configuration where id = 1")
             ).scalar_one() == '{"preserve": true}'
@@ -120,11 +119,51 @@ def test_unknown_unversioned_schema_is_rejected_before_version_table_creation(
         with engine.begin() as connection:
             connection.execute(text("create table unrelated (id integer primary key)"))
 
-        with pytest.raises(MigrationError, match="not a recognized"):
+        with pytest.raises(MigrationError, match="no Alembic revision"):
             migrate_database(engine, database_was_empty=False)
 
         with engine.connect() as connection:
             assert not inspect(connection).has_table("alembic_version")
+    finally:
+        engine.dispose()
+
+###############################################################################
+def test_model_role_data_migration_populates_only_missing_roles(tmp_path: Path) -> None:
+    database_path = tmp_path / "model-role-migration.db"
+    engine = _engine(database_path)
+    try:
+        _upgrade_to(engine, "202608200002")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "insert into application_configuration "
+                    "(id, revision, payload) values (1, 0, :payload)"
+                ),
+                {
+                    "payload": json.dumps(
+                        {
+                            "clinical_model": "clinical-model",
+                            "text_extraction_model": "parser-model",
+                            "revision_model": "saved-revision-model",
+                        }
+                    )
+                },
+            )
+
+        migrate_database(engine, database_was_empty=False)
+
+        with engine.connect() as connection:
+            payload = json.loads(
+                connection.execute(
+                    text("select payload from application_configuration where id = 1")
+                ).scalar_one()
+            )
+        assert payload == {
+            "clinical_model": "clinical-model",
+            "text_extraction_model": "parser-model",
+            "revision_model": "saved-revision-model",
+            "timeline_model": "parser-model",
+        }
     finally:
         engine.dispose()
 

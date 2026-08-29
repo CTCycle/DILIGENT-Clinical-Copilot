@@ -28,6 +28,7 @@ from repositories.database.utils import (
     validate_postgres_database_name,
 )
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
+from repositories.serialization.model_configs import ModelConfigSerializer
 
 POSTGRES_CREATE_DATABASE_LOCK_KEY = 7362382
 
@@ -131,6 +132,45 @@ def _seed_repository_catalogs(
     get_catalog_provider().invalidate()
 
 ###############################################################################
+def _default_model_configuration_payload() -> dict[str, object]:
+    defaults = get_server_settings().llm_defaults
+    return {
+        "use_cloud_models": defaults.use_cloud_services,
+        "cloud_provider": defaults.llm_provider,
+        "cloud_model": defaults.cloud_model or None,
+        "clinical_model": defaults.clinical_model,
+        "text_extraction_model": defaults.text_extraction_model,
+        "revision_model": (
+            defaults.cloud_model
+            if defaults.use_cloud_services
+            else defaults.clinical_model
+        ),
+        "timeline_model": (
+            defaults.cloud_model
+            if defaults.use_cloud_services
+            else defaults.text_extraction_model
+        ),
+        "reasoning_level": defaults.reasoning_level,
+        "ollama_seed": 42,
+        "rag_settings": {},
+    }
+
+###############################################################################
+def _seed_model_configuration(
+    repository: SQLiteRepository | PostgresRepository,
+) -> None:
+    serializer = ModelConfigSerializer(
+        engine=repository.engine,
+        session_factory=repository.session_factory,
+    )
+    inserted = serializer.seed_if_missing(_default_model_configuration_payload())
+    logger.info(
+        "Model configuration initialization completed for %s: seeded=%s",
+        "SQLite" if isinstance(repository, SQLiteRepository) else "PostgreSQL",
+        inserted,
+    )
+
+###############################################################################
 def initialize_sqlite_database(
     settings: DatabaseSettings,
     *,
@@ -147,6 +187,7 @@ def initialize_sqlite_database(
             database_was_empty=database_was_missing,
             drop_existing=drop_existing,
         )
+        _seed_model_configuration(repository)
         if seed_catalogs:
             _seed_repository_catalogs(
                 repository,
@@ -251,6 +292,7 @@ def ensure_postgres_database(
             database_was_empty=False,
             drop_existing=drop_existing,
         )
+        _seed_model_configuration(repository)
         if seed_catalogs:
             _seed_repository_catalogs(
                 repository,
@@ -283,6 +325,7 @@ def ensure_database_ready(settings: DatabaseSettings) -> bool:
     repository = PostgresRepository(normalized_settings)
     try:
         migrate_database(repository.engine, database_was_empty=False)
+        _seed_model_configuration(repository)
         if database_was_created:
             _seed_repository_catalogs(
                 repository,

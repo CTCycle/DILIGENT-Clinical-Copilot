@@ -12,7 +12,6 @@ from common.exceptions import ServiceValidationError
 from common.paths import VECTOR_DB_PATH
 from common.utils.catalog_loader import CatalogLoader
 from common.utils.logger import logger
-from configurations.startup import get_server_settings
 from domain.llm.providers import (
     CloudModelDescriptor,
     CloudProviderDescriptor,
@@ -102,7 +101,7 @@ class ModelConfigService:
 
     # -------------------------------------------------------------------------
     async def get_state(self) -> ModelConfigStateResponse:
-        snapshot = self.ensure_defaults()
+        snapshot = self.load_current_snapshot()
         local_models = await self.list_local_model_cards(
             selected_models=(
                 snapshot.clinical_model,
@@ -123,7 +122,7 @@ class ModelConfigService:
     async def update_state(
         self, payload: ModelConfigUpdateRequest
     ) -> ModelConfigPersistResponse:
-        snapshot = self.ensure_defaults()
+        snapshot = self.load_current_snapshot()
         fields_set = payload.model_fields_set
         local_roles_updated = self._local_roles_updated(fields_set)
         target_use_cloud_models = (
@@ -279,25 +278,6 @@ class ModelConfigService:
             ),
             updates=updates,
         )
-        if not target_use_cloud_models and "use_cloud_services" in fields_set:
-            # Older clients only submitted the two original roles when switching
-            # back to Ollama. Keep that transition valid by carrying the parser
-            # and clinical assignments into the new workflow roles.
-            for role_name, source_field in (("revision_model", "clinical_model"), ("timeline_model", "text_extraction_model")):
-                if role_name in fields_set:
-                    continue
-                source_model = (
-                    getattr(payload, source_field)
-                    if source_field in fields_set
-                    else getattr(snapshot, source_field)
-                )
-                normalized_source_model = self.normalize_optional_text(source_model)
-                if (
-                    normalized_source_model
-                    and normalized_source_model in local_model_names
-                    and normalized_source_model in available_local_model_names
-                ):
-                    updates[role_name] = normalized_source_model
         self._collect_cloud_model_updates(
             payload=payload,
             fields_set=fields_set,
@@ -472,70 +452,39 @@ class ModelConfigService:
         }
 
     # -------------------------------------------------------------------------
-    def ensure_defaults(self) -> ModelConfigSnapshot:
-        snapshot = self.serializer.load_snapshot()
-        defaults = get_server_settings().llm_defaults
-        is_fresh = snapshot.updated_at is None and all(
-            value is None
-            for value in (
-                snapshot.clinical_model,
-                snapshot.text_extraction_model,
-                snapshot.cloud_provider,
-                snapshot.cloud_model,
-            )
-        )
-
-        if is_fresh:
-            return self.serializer.save_snapshot(
-                clinical_model=defaults.clinical_model,
-                text_extraction_model=defaults.text_extraction_model,
-                revision_model=(
-                    defaults.cloud_model
-                    if defaults.use_cloud_services
-                    else defaults.clinical_model
-                ),
-                timeline_model=(
-                    defaults.cloud_model
-                    if defaults.use_cloud_services
-                    else defaults.text_extraction_model
-                ),
-                use_cloud_models=defaults.use_cloud_services,
-                cloud_provider=self.resolve_provider(defaults.llm_provider),
-                cloud_model=self.normalize_optional_text(defaults.cloud_model),
-                reasoning_level=defaults.reasoning_level,
-            )
-
-        migration_updates: dict[str, str | None] = {}
-        if snapshot.revision_model is None:
-            migration_updates["revision_model"] = (
-                snapshot.cloud_model
-                if snapshot.use_cloud_models
-                else snapshot.clinical_model
-            )
-        if snapshot.timeline_model is None:
-            migration_updates["timeline_model"] = (
-                snapshot.cloud_model
-                if snapshot.use_cloud_models
-                else snapshot.text_extraction_model
-            )
-        if migration_updates:
-            snapshot = self.serializer.save_snapshot(
-                base_snapshot=snapshot,
-                **migration_updates,
-            )
+    def load_current_snapshot(self) -> ModelConfigSnapshot:
+        """Load the canonical persisted configuration without changing it."""
+        try:
+            snapshot = self.serializer.load_snapshot()
+        except ValueError as exc:
+            raise ServiceValidationError(str(exc)) from exc
         self.validate_current_snapshot(snapshot)
         return snapshot
 
     # -------------------------------------------------------------------------
     def validate_current_snapshot(self, snapshot: ModelConfigSnapshot) -> None:
-        provider = snapshot.cloud_provider
-        cloud_model = self.normalize_optional_text(snapshot.cloud_model)
-        if provider is None and cloud_model is not None:
-            raise ServiceValidationError(
-                "A cloud model cannot be configured without a cloud provider."
+        missing_roles = [
+            field_name
+            for field_name, model_name in (
+                ("clinical_model", snapshot.clinical_model),
+                ("text_extraction_model", snapshot.text_extraction_model),
+                ("revision_model", snapshot.revision_model),
+                ("timeline_model", snapshot.timeline_model),
             )
-        if provider is not None:
-            provider = self.resolve_provider(provider)
+            if self.normalize_optional_text(model_name) is None
+        ]
+        if missing_roles:
+            raise ServiceValidationError(
+                "Persisted model configuration is missing required role assignments: "
+                + ", ".join(missing_roles)
+            )
+        provider = self.normalize_optional_text(snapshot.cloud_provider)
+        cloud_model = self.normalize_optional_text(snapshot.cloud_model)
+        if provider is None:
+            raise ServiceValidationError(
+                "Model configuration requires a cloud provider selection."
+            )
+        provider = self.resolve_provider(provider)
 
         known_local_model_names = self.known_local_model_names()
         for role_name, model_name in (
@@ -544,12 +493,11 @@ class ModelConfigService:
             ("revision", snapshot.revision_model),
             ("timeline", snapshot.timeline_model),
         ):
+            model_name = self.normalize_optional_text(model_name)
             if model_name is None:
-                if not snapshot.use_cloud_models:
-                    raise ServiceValidationError(
-                        f"A model is required for the local '{role_name}' role."
-                    )
-                continue
+                raise ServiceValidationError(
+                    f"An explicit model is required for the '{role_name}' role."
+                )
             if (
                 model_name not in known_local_model_names
                 and not snapshot.use_cloud_models

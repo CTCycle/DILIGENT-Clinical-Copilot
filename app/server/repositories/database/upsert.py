@@ -41,6 +41,23 @@ def upsert_application_configuration(
     return row
 
 ###############################################################################
+def insert_application_configuration_if_missing(
+    db_session: Session,
+    *,
+    payload: dict[str, Any],
+) -> bool:
+    """Insert the fixed-id configuration row without overwriting user state."""
+    statement = dialect_insert(
+        db_session,
+        ApplicationConfiguration,
+    ).values(id=1, payload=payload)
+    statement = statement.on_conflict_do_nothing(
+        index_elements=[ApplicationConfiguration.id]
+    )
+    result = db_session.execute(statement)
+    return bool(result.rowcount)
+
+###############################################################################
 def dialect_insert(db_session: Session, model: Any) -> Any:
     dialect = db_session.get_bind().dialect.name
     if dialect == "sqlite":

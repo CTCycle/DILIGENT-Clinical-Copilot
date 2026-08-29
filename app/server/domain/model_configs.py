@@ -137,10 +137,10 @@ class ModelConfigStateResponse(BaseModel):
     use_cloud_services: bool
     llm_provider: CloudProviderId
     cloud_model: str | None
-    text_extraction_model: str | None
-    clinical_model: str | None
-    revision_model: str | None
-    timeline_model: str | None
+    text_extraction_model: str
+    clinical_model: str
+    revision_model: str
+    timeline_model: str
     reasoning_level: ReasoningLevel
     ollama_seed: int | None
     rag_settings: RagSettingsResponse
@@ -155,10 +155,10 @@ class ModelConfigPersistResponse(BaseModel):
     use_cloud_services: bool
     llm_provider: CloudProviderId
     cloud_model: str | None
-    text_extraction_model: str | None
-    clinical_model: str | None
-    revision_model: str | None
-    timeline_model: str | None
+    text_extraction_model: str
+    clinical_model: str
+    revision_model: str
+    timeline_model: str
     reasoning_level: ReasoningLevel
     ollama_seed: int | None
     rag_settings: RagSettingsResponse
