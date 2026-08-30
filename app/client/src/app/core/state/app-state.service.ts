@@ -1,16 +1,13 @@
 import { Injectable, effect, signal } from '@angular/core';
 
-import { DEFAULT_FORM_STATE, DEFAULT_SETTINGS } from '../constants';
-import { buildRuntimeSettingsFromConfig } from '../model-config';
-import { fetchModelConfigState } from '../services/model-config-api';
-import { ClinicalFormState, JobStatus, RuntimeSettings } from '../models/types';
-import { isRecord } from '../utils';
+import { DEFAULT_FORM_STATE } from '../constants';
+import { ClinicalFormState, JobStatus } from '../models/types';
 
 export type PageId = 'dili-agent' | 'clinical-sessions' | 'data-inspection' | 'model-config';
 export type ThemeMode = 'light' | 'dark';
 
 const DEFAULT_PAGE: PageId = 'dili-agent';
-const DILI_AGENT_PERSISTED_STATE_KEY = 'dili-agent-state-v2';
+const DILI_AGENT_UI_STATE_KEY = 'dili-agent-ui-state-v1';
 const PAGE_PATHS: Record<PageId, string> = {
   'dili-agent': '/',
   'clinical-sessions': '/clinical-sessions',
@@ -40,7 +37,6 @@ export function resolvePathFromPage(page: PageId): string {
 }
 
 export interface DiliAgentState {
-  settings: RuntimeSettings;
   form: ClinicalFormState;
   message: string;
   exportUrl: string | null;
@@ -64,25 +60,11 @@ export interface AppState {
   diliAgent: DiliAgentState;
 }
 
-type PersistedDiliAgentState = {
-  settings: RuntimeSettings;
-  form: ClinicalFormState;
-  message: string;
-  jobId: string | null;
-  jobProgress: number;
-  jobStatus: JobStatus | null;
-  jobStage: string | null;
-  jobStageMessage: string | null;
-  isStarting: boolean;
-  isRunning: boolean;
+type PersistedDiliAgentUiState = {
   isExpanded: boolean;
-  jobStartedAtMs: number | null;
-  jobLastProgressAtMs: number | null;
-  pollIntervalMs: number | null;
 };
 
 const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
-  settings: DEFAULT_SETTINGS,
   form: DEFAULT_FORM_STATE,
   message: '',
   exportUrl: null,
@@ -100,123 +82,43 @@ const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
   pollIntervalMs: null,
 };
 
-function isJobStatus(value: unknown): value is JobStatus | null {
-  return value === null
-    || value === 'pending'
-    || value === 'running'
-    || value === 'completed'
-    || value === 'failed'
-    || value === 'cancelled';
-}
-
-function readFiniteNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function readOptionalString(value: unknown): string | null {
-  return typeof value === 'string' ? value : null;
-}
-
-function readPersistedDiliAgentState(): Partial<DiliAgentState> | null {
+function readPersistedDiliAgentUiState(): Pick<DiliAgentState, 'isExpanded'> | null {
   if (!('localStorage' in globalThis)) {
     return null;
   }
 
   try {
-    const serializedState = globalThis.localStorage.getItem(DILI_AGENT_PERSISTED_STATE_KEY);
+    const serializedState = globalThis.localStorage.getItem(DILI_AGENT_UI_STATE_KEY);
     if (!serializedState) {
       return null;
     }
 
     const parsedState: unknown = JSON.parse(serializedState);
-    if (!isRecord(parsedState)) {
+    if (typeof parsedState !== 'object' || parsedState === null) {
       return null;
     }
-
-    const persistedState = parsedState as Partial<PersistedDiliAgentState>;
-    const settings = persistedState.settings;
-    const form = persistedState.form;
-    const message = persistedState.message;
-    const jobId = persistedState.jobId;
-    const jobProgress = persistedState.jobProgress;
-    const jobStatus = persistedState.jobStatus;
-    const jobStage = persistedState.jobStage;
-    const jobStageMessage = persistedState.jobStageMessage;
-    const isStarting = persistedState.isStarting;
-    const isRunning = persistedState.isRunning;
-    const isExpanded = persistedState.isExpanded;
-    const jobStartedAtMs = persistedState.jobStartedAtMs;
-    const jobLastProgressAtMs = persistedState.jobLastProgressAtMs;
-    const pollIntervalMs = persistedState.pollIntervalMs;
-
-    if (
-      !settings ||
-      !form ||
-      typeof message !== 'string' ||
-      !isJobStatus(jobStatus) ||
-      (jobId !== null && typeof jobId !== 'string') ||
-      typeof isExpanded !== 'boolean' ||
-      typeof isStarting !== 'boolean' ||
-      typeof isRunning !== 'boolean'
-    ) {
+    const isExpanded = (parsedState as Partial<PersistedDiliAgentUiState>).isExpanded;
+    if (typeof isExpanded !== 'boolean') {
       return null;
     }
-
-    const normalizedJobProgress = readFiniteNumber(jobProgress) ?? (jobStatus === 'completed' ? 100 : 0);
-
-    return {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        ...settings,
-      },
-      form: {
-        ...DEFAULT_FORM_STATE,
-        ...form,
-      },
-      message,
-      jobId,
-      jobProgress: normalizedJobProgress,
-      jobStatus,
-      jobStage: readOptionalString(jobStage),
-      jobStageMessage: readOptionalString(jobStageMessage),
-      isStarting,
-      isRunning,
-      isExpanded,
-      jobStartedAtMs: readFiniteNumber(jobStartedAtMs),
-      jobLastProgressAtMs: readFiniteNumber(jobLastProgressAtMs),
-      pollIntervalMs: readFiniteNumber(pollIntervalMs),
-      exportUrl: null,
-    };
+    return { isExpanded };
   } catch {
     return null;
   }
 }
 
-function writePersistedDiliAgentState(state: DiliAgentState): void {
+function writePersistedDiliAgentState(isExpanded: boolean): void {
   if (!('localStorage' in globalThis)) {
     return;
   }
 
-  const persistedState: PersistedDiliAgentState = {
-    settings: state.settings,
-    form: state.form,
-    message: state.message,
-    jobId: state.jobId,
-    jobProgress: state.jobProgress,
-    jobStatus: state.jobStatus,
-    jobStage: state.jobStage,
-    jobStageMessage: state.jobStageMessage,
-    isStarting: state.isStarting,
-    isRunning: state.isRunning,
-    isExpanded: state.isExpanded,
-    jobStartedAtMs: state.jobStartedAtMs,
-    jobLastProgressAtMs: state.jobLastProgressAtMs,
-    pollIntervalMs: state.pollIntervalMs,
+  const persistedState: PersistedDiliAgentUiState = {
+    isExpanded,
   };
 
   try {
     globalThis.localStorage.setItem(
-      DILI_AGENT_PERSISTED_STATE_KEY,
+      DILI_AGENT_UI_STATE_KEY,
       JSON.stringify(persistedState),
     );
   } catch {
@@ -224,18 +126,20 @@ function writePersistedDiliAgentState(state: DiliAgentState): void {
   }
 }
 
-const DEFAULT_APP_STATE: AppState = {
-  activePage: resolvePageIdFromPath(globalThis.location?.pathname ?? '/'),
-  theme: globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light',
-  diliAgent: {
-    ...DEFAULT_DILI_AGENT_STATE,
-    ...readPersistedDiliAgentState(),
-  },
-};
+function createDefaultAppState(): AppState {
+  return {
+    activePage: resolvePageIdFromPath(globalThis.location?.pathname ?? '/'),
+    theme: globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light',
+    diliAgent: {
+      ...DEFAULT_DILI_AGENT_STATE,
+      ...readPersistedDiliAgentUiState(),
+    },
+  };
+}
 
 @Injectable({ providedIn: 'root' })
 export class AppStateService {
-  readonly state = signal<AppState>(DEFAULT_APP_STATE);
+  readonly state = signal<AppState>(createDefaultAppState());
 
   constructor() {
     effect(() => {
@@ -245,12 +149,8 @@ export class AppStateService {
     });
 
     effect(() => {
-      writePersistedDiliAgentState(this.state().diliAgent);
+      writePersistedDiliAgentState(this.state().diliAgent.isExpanded);
     });
-
-    if (this.state().activePage !== 'model-config') {
-      void this.hydrateSettings();
-    }
   }
 
   setActivePage(page: PageId): void {
@@ -267,21 +167,6 @@ export class AppStateService {
 
   updateDiliAgent(updates: Partial<DiliAgentState>): void {
     this.state.update((prev) => ({ ...prev, diliAgent: { ...prev.diliAgent, ...updates } }));
-  }
-
-  private async hydrateSettings(): Promise<void> {
-    try {
-      const payload = await fetchModelConfigState();
-      this.state.update((prev) => ({
-        ...prev,
-        diliAgent: {
-          ...prev.diliAgent,
-          settings: buildRuntimeSettingsFromConfig(payload, prev.diliAgent.settings),
-        },
-      }));
-    } catch {
-      // keep defaults
-    }
   }
 }
 

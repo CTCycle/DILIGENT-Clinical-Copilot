@@ -18,6 +18,7 @@ import { validateClinicalInput, fetchClinicalSectionTemplate } from '../../core/
 import { DiliJobTrackerService } from '../../core/services/dili-job-tracker.service';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { AppStateService } from '../../core/state/app-state.service';
+import { ModelConfigStateService } from '../../core/state/model-config-state.service';
 import {
   buildClinicalPayload,
   createDownloadUrl,
@@ -61,6 +62,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   @ViewChild('runAnalysisButton') private runAnalysisButton?: ElementRef<HTMLButtonElement>;
 
   readonly stateService = inject(AppStateService);
+  readonly modelConfigState = inject(ModelConfigStateService);
   readonly guidanceDefinitions = GUIDANCE_DEFINITIONS;
   private readonly router = inject(Router);
   private readonly guidanceTour = inject(GuidanceTourService);
@@ -101,6 +103,7 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   constructor() {
     void this.loadClinicalSectionTemplate();
+    void this.modelConfigState.load().catch(() => undefined);
     effect(() => {
       const state = this.vm;
       if (
@@ -301,7 +304,29 @@ export class DiliAgentPageComponent implements OnDestroy {
     this.lockRunAction();
     this.isCancelling.set(false);
     this.invalidatePreflightState();
-    const payload = payloadOverride ?? buildClinicalPayload(this.vm.form, this.vm.settings);
+    let payload = payloadOverride;
+    if (!payload) {
+      try {
+        let settings = this.modelConfigState.settings();
+        if (!settings) {
+          await this.modelConfigState.load();
+          settings = this.modelConfigState.settings();
+        }
+        if (!settings) {
+          throw new Error('Persisted model configuration is unavailable.');
+        }
+        payload = buildClinicalPayload(this.vm.form, settings);
+      } catch (error) {
+        this.stateService.updateDiliAgent({
+          message: formatUnknownError(
+            error,
+            '[ERROR] Model configuration could not be loaded. Retry after the backend is available.',
+          ),
+        });
+        this.clearRunActionLock();
+        return;
+      }
+    }
     const attempt = ++this.preflightAttempt;
     this.isPreflightChecking.set(true);
 

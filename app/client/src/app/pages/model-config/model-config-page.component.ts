@@ -11,7 +11,6 @@ import { AppStateService } from '../../core/state/app-state.service';
 import { formatUnknownError } from '../../core/utils';
 import { formatAppDateTime } from '../../core/utils/date-formatting';
 import {
-  buildRuntimeSettingsFromConfig,
   resolveCloudChoices,
   resolveCloudModel,
   resolveProvider,
@@ -25,10 +24,8 @@ import {
   ModelConfigUpdateRequest,
   RagSettings,
   ReasoningLevel,
-  RuntimeSettings,
 } from '../../core/models/types';
 import {
-  fetchModelConfigState,
   loadModelCatalog,
   refreshModelCatalog,
   updateModelConfigState,
@@ -37,13 +34,13 @@ import {
   ModelPullJobService,
   ModelPullProgressState,
 } from '../../core/services/model-pull-job.service';
+import { ModelConfigStateService } from '../../core/state/model-config-state.service';
 import { AccessKeyModalComponent } from './components/access-key-modal.component';
 import { ModelConfigToggleCardComponent } from './components/model-config-toggle-card.component';
 import { ModelRoleActionButtonComponent } from './components/model-role-action-button.component';
 import {
   MODEL_FILTERS,
   modelMatchesFilters,
-  normalizeDraftForLocalRuntime,
   resolveDraftFromSettings,
 } from './model-catalog';
 import {
@@ -53,19 +50,12 @@ import {
   ModelRole,
   RagSettingsSectionKey,
 } from './model-config.types';
+import { EMPTY_RUNTIME_SETTINGS } from '../../core/model-config';
 
 const MODEL_BATCH_SIZE = 12;
 const REASONING_LEVELS: readonly ReasoningLevel[] = ['off', 'low', 'medium', 'high'];
 type SaveOperation = 'configuration' | 'reasoning' | 'rag';
 
-const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
-  openai: 'OpenAI',
-  gemini: 'Gemini',
-  deepseek: 'DeepSeek',
-  anthropic: 'Anthropic Claude',
-  opencode: 'OpenCode',
-  brave: 'Brave',
-};
 const PROVIDER_LOGOS: Partial<Record<AccessKeyProvider, { src: string; alt: string }>> = {
   openai: { src: '/logos/openai-blossom-light.svg', alt: 'OpenAI logo' },
   gemini: { src: '/logos/google-g.svg', alt: 'Google logo' },
@@ -73,15 +63,6 @@ const PROVIDER_LOGOS: Partial<Record<AccessKeyProvider, { src: string; alt: stri
   anthropic: { src: '/logos/anthropic.svg', alt: 'Anthropic logo' },
   opencode: { src: '/logos/opencode.svg', alt: 'OpenCode logo' },
 };
-const RUNTIME_PROVIDER_LABELS: Record<CloudProvider, string> = {
-  openai: 'OpenAI',
-  gemini: 'Google Gemini',
-  deepseek: 'DeepSeek',
-  anthropic: 'Anthropic Claude',
-  opencode_zen: 'OpenCode Zen',
-  opencode_go: 'OpenCode Go',
-};
-
 const DEFAULT_RAG_SETTINGS_SECTION: RagSettingsSectionKey = 'general';
 const RERANKER_PROFILE_OPTIONS = [
   { value: 'lightweight-balanced-v1', label: 'Balanced' },
@@ -105,18 +86,21 @@ const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
   embedding_offline_mode: false,
 };
 
-function isCloudProvider(provider: string): provider is CloudProvider {
-  return ['openai', 'gemini', 'deepseek', 'anthropic', 'opencode_zen', 'opencode_go'].includes(provider);
-}
+const EMPTY_LOCAL_CATALOG: ModelConfigStateResponse['local_catalog'] = {
+  status: 'not_loaded',
+  updated_at: null,
+  message: null,
+};
 
-function resolveProviderLabel(provider: string): string {
-  if (isCloudProvider(provider)) {
-    return RUNTIME_PROVIDER_LABELS[provider];
-  }
-  if (provider in PROVIDER_LABELS) {
-    return PROVIDER_LABELS[provider as AccessKeyProvider];
-  }
-  return provider;
+type CredentialProviderOption = {
+  provider: AccessKeyProvider;
+  label: string;
+  description: string;
+};
+
+function resolveProviderLabel(provider: string, cloudProviders: ModelConfigStateResponse['cloud_providers']): string {
+  const descriptor = cloudProviders.find((candidate) => candidate.id === provider);
+  return descriptor?.display_name?.trim() || provider;
 }
 
 @Component({
@@ -136,6 +120,7 @@ function resolveProviderLabel(provider: string): string {
 })
 export class ModelConfigPageComponent implements OnInit, OnDestroy {
   readonly appState = inject(AppStateService);
+  readonly modelConfigState = inject(ModelConfigStateService);
   private readonly modelPullJobs = inject(ModelPullJobService);
 
   readonly modelFilters = MODEL_FILTERS;
@@ -147,14 +132,15 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   readonly isConfigurationSaving = computed(() => this.savingOperations().has('configuration'));
   readonly isReasoningSaving = computed(() => this.savingOperations().has('reasoning'));
   readonly isRagSaving = computed(() => this.savingOperations().has('rag'));
-  readonly localModels = signal<ModelConfigStateResponse['local_models']>([]);
-  readonly localCatalog = signal<ModelConfigStateResponse['local_catalog']>({
-    status: 'not_loaded',
-    updated_at: null,
-    message: null,
-  });
-  readonly cloudChoices = signal(resolveCloudChoices(undefined));
-  readonly cloudProviders = signal<ModelConfigStateResponse['cloud_providers']>([]);
+  readonly localModels = computed(() => this.modelConfigState.data()?.local_models ?? []);
+  readonly localCatalog = computed(() => this.modelConfigState.data()?.local_catalog ?? EMPTY_LOCAL_CATALOG);
+  readonly cloudProviders = computed(() => this.modelConfigState.data()?.cloud_providers ?? []);
+  readonly cloudChoices = computed(() => resolveCloudChoices(Object.fromEntries(
+    this.cloudProviders().map((provider) => [
+      provider.id,
+      provider.models.map((model) => model.id),
+    ]),
+  )));
   readonly modelSearchQuery = signal('');
   readonly visibleModelLimit = signal(MODEL_BATCH_SIZE);
   readonly statusMessage = signal('');
@@ -162,12 +148,12 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   readonly modelPullProgress = signal<Record<string, ModelPullProgressState>>({});
   readonly previewReasoningLevel = signal(0);
   readonly previewCloudModelOverrides = signal<Partial<Record<CloudProvider, string>>>({});
-  readonly ragSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
+  readonly ragSettings = computed(() => this.normalizeRagSettings(this.modelConfigState.data()?.rag_settings));
   readonly draftRagSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
   readonly ragSettingsModalOpen = signal(false);
   readonly activeRagSettingsSection = signal<RagSettingsSectionKey>(DEFAULT_RAG_SETTINGS_SECTION);
-  readonly embeddingRuntime = signal<ModelConfigStateResponse['embedding_runtime'] | null>(null);
-  readonly embeddingIndex = signal<ModelConfigStateResponse['embedding_index'] | null>(null);
+  readonly embeddingRuntime = computed(() => this.modelConfigState.data()?.embedding_runtime ?? null);
+  readonly embeddingIndex = computed(() => this.modelConfigState.data()?.embedding_index ?? null);
   readonly activeFilters = signal<Record<ModelFilterKey, boolean>>({
     installed: false,
     missing: false,
@@ -175,8 +161,8 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     large: false,
     quantized: false,
   });
-  readonly draftConfig = signal<DraftRuntimeConfig>(resolveDraftFromSettings(this.appState.state().diliAgent.settings));
-  readonly lastUpdatedAt = signal<string | null>(null);
+  readonly draftConfig = signal<DraftRuntimeConfig>(resolveDraftFromSettings(EMPTY_RUNTIME_SETTINGS));
+  readonly lastUpdatedAt = computed(() => this.modelConfigState.data()?.updated_at ?? null);
   readonly catalogProviderInFlight = signal<CatalogProvider | null>(null);
   private reasoningSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly saveRevisions: Record<SaveOperation, number> = {
@@ -241,7 +227,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   );
 
   readonly draftCloudModel = computed(() =>
-    resolveCloudModel(this.draftProvider(), this.draftConfig().cloudModel, this.cloudChoices()),
+    resolveCloudModel(this.draftProvider(), this.draftConfig().cloudModel, this.cloudChoices(), true),
   );
 
   readonly activeCloudModels = computed(() => this.cloudChoices()[this.draftProvider()] || []);
@@ -263,7 +249,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
 
   readonly runtimeLabel = computed(() =>
     this.draftConfig().useCloudServices
-      ? `Cloud (${resolveProviderLabel(this.draftProvider())})`
+      ? `Cloud (${resolveProviderLabel(this.draftProvider(), this.cloudProviders())})`
       : 'Local (Ollama)',
   );
 
@@ -310,7 +296,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     }
     const draft = this.draftConfig();
     if (draft.useCloudServices) {
-      const providerLabel = resolveProviderLabel(this.draftProvider());
+      const providerLabel = resolveProviderLabel(this.draftProvider(), this.cloudProviders());
       const modelName = this.draftCloudModel() || draft.cloudModel;
       return modelName
         ? `Cloud model selected: ${modelName} (${providerLabel}). Provider-supplied model details are not available.`
@@ -335,9 +321,32 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   readonly cloudProviderOptions = computed<CloudProvider[]>(() => {
     return this.cloudProviders().map((provider) => provider.id);
   });
-  readonly credentialProviderOptions: readonly AccessKeyProvider[] = [
-    'openai', 'gemini', 'deepseek', 'anthropic', 'opencode',
-  ];
+  readonly cloudProviderSummary = computed(() => {
+    const names = this.cloudProviders()
+      .map((provider) => provider.display_name.trim())
+      .filter((name) => !!name);
+    return names.length ? names.join(', ') : 'Configured by the backend catalog';
+  });
+  readonly credentialProviderOptions = computed<CredentialProviderOption[]>(() => {
+    const grouped = new Map<AccessKeyProvider, ModelConfigStateResponse['cloud_providers']>();
+    for (const provider of this.cloudProviders()) {
+      const current = grouped.get(provider.credential_scope) || [];
+      grouped.set(provider.credential_scope, [...current, provider]);
+    }
+    return Array.from(grouped.entries()).map(([provider, descriptors]) => {
+      const labels = descriptors
+        .map((descriptor) => descriptor.display_name.trim())
+        .filter((label) => !!label);
+      const label = labels.length > 1 ? labels.join(' / ') : labels[0] || provider;
+      const description = labels.length > 1
+        ? `This credential is used by ${labels.join(' and ')} cloud models.`
+        : `Manage the API keys used to access ${label} cloud models.`;
+      return { provider, label, description };
+    });
+  });
+  readonly selectedCredentialProvider = computed<AccessKeyProvider | null>(() =>
+    this.cloudProviders().find((provider) => provider.id === this.draftProvider())?.credential_scope || null,
+  );
 
   readonly missingRequiredModels = computed(() => {
     const draft = this.draftConfig();
@@ -376,10 +385,17 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   });
 
   readonly saveDisabled = computed(() => {
-    const settings = this.appState.state().diliAgent.settings;
+    const settings = this.modelConfigState.settings();
+    if (!settings) return true;
     const draft = this.draftConfig();
     const savedProvider = resolveProvider(settings.provider, this.cloudChoices());
-    const savedCloudModel = resolveCloudModel(savedProvider, settings.cloudModel, this.cloudChoices());
+    const savedCloudModel = resolveCloudModel(savedProvider, settings.cloudModel, this.cloudChoices(), true);
+    const hasAllRoleAssignments = [
+      draft.clinicalModel,
+      draft.textExtractionModel,
+      draft.revisionModel,
+      draft.timelineModel,
+    ].every((modelName) => modelName.trim().length > 0);
     const hasPendingChanges =
       draft.useCloudServices !== settings.useCloudServices ||
       this.draftProvider() !== savedProvider ||
@@ -393,6 +409,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       this.isLoading() ||
       this.isConfigurationSaving() ||
       !hasPendingChanges ||
+      !hasAllRoleAssignments ||
       (draft.useCloudServices && !this.draftCloudModel())
     );
   });
@@ -418,7 +435,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   ): Promise<void> {
     this.isLoading.set(true);
     try {
-      const payload = await fetchModelConfigState();
+      const payload = await this.modelConfigState.load(true);
       this.applyConfigToState(payload, syncDraft);
       this.statusMessage.set('');
       if (initializeCatalog) {
@@ -432,25 +449,14 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   }
 
   private applyConfigToState(payload: ModelConfigStateResponse, syncDraft: boolean): void {
-    this.localModels.set(payload.local_models || []);
-    this.localCatalog.set(payload.local_catalog);
-    this.cloudProviders.set(payload.cloud_providers || []);
-    this.lastUpdatedAt.set(payload.updated_at);
-    this.embeddingRuntime.set(payload.embedding_runtime);
-    this.embeddingIndex.set(payload.embedding_index);
-    const nextRagSettings = this.normalizeRagSettings(payload.rag_settings);
-    this.ragSettings.set(nextRagSettings);
+    this.modelConfigState.setFromApiState(payload);
+    const nextRagSettings = this.ragSettings();
     if (!this.ragSettingsModalOpen()) {
       this.draftRagSettings.set({ ...nextRagSettings });
     }
-    const choices = resolveCloudChoices(Object.fromEntries(
-      (payload.cloud_providers || []).map((provider) => [provider.id, provider.models.map((model) => model.id)]),
-    ));
-    this.cloudChoices.set(choices);
 
-    const current = this.appState.state().diliAgent.settings;
-    const nextSettings: RuntimeSettings = buildRuntimeSettingsFromConfig(payload, current);
-    this.appState.updateDiliAgent({ settings: nextSettings });
+    const nextSettings = this.modelConfigState.settings();
+    if (!nextSettings) return;
     this.previewCloudModelOverrides.update((previous) => ({
       ...previous,
       [nextSettings.provider]: nextSettings.cloudModel || undefined,
@@ -462,9 +468,9 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   }
 
   private applyPreviewDefaultState(): void {
-    const state = this.appState.state().diliAgent;
+    const settings = this.modelConfigState.settings();
     this.previewReasoningLevel.set(
-      Math.max(0, REASONING_LEVELS.indexOf(state.settings.reasoning)),
+      Math.max(0, REASONING_LEVELS.indexOf(settings?.reasoning || 'off')),
     );
   }
 
@@ -542,21 +548,11 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     patch: ModelConfigUpdateRequest,
     syncDraft: boolean,
   ): void {
-    this.lastUpdatedAt.set(payload.updated_at);
-    const current = this.appState.state().diliAgent.settings;
-    const nextSettings: RuntimeSettings = { ...current };
-    if ('use_cloud_services' in patch) nextSettings.useCloudServices = payload.use_cloud_services;
-    if ('llm_provider' in patch) nextSettings.provider = payload.llm_provider;
-    if ('cloud_model' in patch || 'llm_provider' in patch) nextSettings.cloudModel = payload.cloud_model;
-    if ('clinical_model' in patch) nextSettings.clinicalModel = payload.clinical_model || '';
-    if ('text_extraction_model' in patch) nextSettings.textExtractionModel = payload.text_extraction_model || '';
-    if ('revision_model' in patch) nextSettings.revisionModel = payload.revision_model || '';
-    if ('timeline_model' in patch) nextSettings.timelineModel = payload.timeline_model || '';
-    if ('reasoning_level' in patch) nextSettings.reasoning = payload.reasoning_level;
-    this.appState.updateDiliAgent({ settings: nextSettings });
+    this.modelConfigState.applyPersistedResponse(payload);
+    const nextSettings = this.modelConfigState.settings();
+    if (!nextSettings) return;
     if ('rag_settings' in patch) {
-      const nextRagSettings = this.normalizeRagSettings(payload.rag_settings);
-      this.ragSettings.set(nextRagSettings);
+      const nextRagSettings = this.ragSettings();
       if (!this.ragSettingsModalOpen()) this.draftRagSettings.set({ ...nextRagSettings });
     }
     this.previewCloudModelOverrides.update((previous) => ({
@@ -653,22 +649,14 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   }
 
   handleCloudSwitchChange(value: boolean): void {
-    if (!value) {
-      this.draftConfig.update((previous) =>
-        normalizeDraftForLocalRuntime(
-          { ...previous, useCloudServices: false },
-          this.localModels(),
-        ),
-      );
-      return;
-    }
     this.draftConfig.update((previous) => ({
       ...previous,
-      useCloudServices: true,
-      clinicalModel: previous.cloudModel || '',
-      textExtractionModel: previous.cloudModel || '',
-      revisionModel: previous.cloudModel || '',
-      timelineModel: previous.cloudModel || '',
+      useCloudServices: value,
+      cloudModel: value ? previous.cloudModel : null,
+      clinicalModel: '',
+      textExtractionModel: '',
+      revisionModel: '',
+      timelineModel: '',
     }));
   }
 
@@ -774,13 +762,6 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     const normalizedLevel = Math.max(0, Math.min(3, Math.round(level)));
     const reasoningLevel = REASONING_LEVELS[normalizedLevel];
     this.previewReasoningLevel.set(normalizedLevel);
-    const currentSettings = this.appState.state().diliAgent.settings;
-    this.appState.updateDiliAgent({
-      settings: {
-        ...currentSettings,
-        reasoning: reasoningLevel,
-      },
-    });
     if (this.reasoningSaveTimer) {
       clearTimeout(this.reasoningSaveTimer);
     }
@@ -792,6 +773,15 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
 
   async handleSaveConfiguration(): Promise<void> {
     const draft = this.draftConfig();
+    if ([
+      draft.clinicalModel,
+      draft.textExtractionModel,
+      draft.revisionModel,
+      draft.timelineModel,
+    ].some((modelName) => !modelName.trim())) {
+      this.statusMessage.set('[ERROR] Select a model for every configured role before saving.');
+      return;
+    }
     const missingLocalModels = this.missingRequiredModels();
     if (!draft.useCloudServices && missingLocalModels.length) {
       this.statusMessage.set(`[ERROR] Install selected local models before saving: ${missingLocalModels.join(', ')}.`);
@@ -801,10 +791,10 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       use_cloud_services: draft.useCloudServices,
       llm_provider: this.draftProvider(),
       cloud_model: this.draftCloudModel(),
-      clinical_model: draft.clinicalModel || null,
-      text_extraction_model: draft.textExtractionModel || null,
-      revision_model: draft.revisionModel || null,
-      timeline_model: draft.timelineModel || null,
+      clinical_model: draft.clinicalModel,
+      text_extraction_model: draft.textExtractionModel,
+      revision_model: draft.revisionModel,
+      timeline_model: draft.timelineModel,
     };
     await this.persistConfigPatch(
       patch,
@@ -878,16 +868,14 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  getProviderLabel(provider: AccessKeyProvider): string {
-    return PROVIDER_LABELS[provider];
-  }
-
   providerLogo(provider: AccessKeyProvider): { src: string; alt: string } | null {
     return PROVIDER_LOGOS[provider] || null;
   }
 
   resolveProviderLabel(provider: string): string {
-    return resolveProviderLabel(provider);
+    const cloudLabel = resolveProviderLabel(provider, this.cloudProviders());
+    if (cloudLabel !== provider) return cloudLabel;
+    return this.credentialProviderOptions().find((option) => option.provider === provider)?.label || provider;
   }
 
   progressForModel(name: string): ModelPullProgressState | null {

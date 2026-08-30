@@ -1,24 +1,33 @@
-import { DEFAULT_SETTINGS } from "./constants";
 import {
-  LocalModelCard,
   CloudProvider,
   ModelConfigStateResponse,
   RuntimeSettings,
 } from "./models/types";
 
-export type CloudModelChoices = Record<CloudProvider, string[]>;
+export type CloudModelChoices = Record<string, string[]>;
 
-type IncomingCloudModelChoices = Partial<Record<CloudProvider, string[]>>;
+type IncomingCloudModelChoices = Record<string, string[]>;
 
-const CLOUD_PROVIDER_IDS: readonly CloudProvider[] = ["openai", "gemini", "deepseek", "anthropic", "opencode_zen", "opencode_go"];
-function isCloudProvider(provider: string): provider is CloudProvider {
-  return CLOUD_PROVIDER_IDS.includes(provider as CloudProvider);
-}
+export const EMPTY_RUNTIME_SETTINGS: RuntimeSettings = {
+  useCloudServices: false,
+  provider: "",
+  cloudModel: null,
+  textExtractionModel: "",
+  clinicalModel: "",
+  revisionModel: "",
+  timelineModel: "",
+  reasoning: "off",
+};
 
 export function resolveCloudChoices(
   cloudChoices: IncomingCloudModelChoices | null | undefined,
 ): CloudModelChoices {
-  return Object.fromEntries(CLOUD_PROVIDER_IDS.map((id) => [id, cloudChoices?.[id] || []])) as CloudModelChoices;
+  return Object.fromEntries(
+    Object.entries(cloudChoices || {}).map(([provider, models]) => [
+      provider,
+      Array.isArray(models) ? models.filter((model) => typeof model === "string") : [],
+    ]),
+  );
 }
 
 export function resolveProvider(
@@ -26,19 +35,19 @@ export function resolveProvider(
   cloudChoices: CloudModelChoices,
 ): CloudProvider {
   const normalized = (provider || "").trim().toLowerCase();
-  if (isCloudProvider(normalized)) {
-    return normalized;
-  }
-  return DEFAULT_SETTINGS.provider;
+  if (!normalized) return "";
+  const configuredProvider = Object.keys(cloudChoices).find((candidate) => candidate === normalized);
+  return configuredProvider || normalized;
 }
 
 export function resolveCloudModel(
   provider: CloudProvider,
   cloudModel: string | null | undefined,
   cloudChoices: CloudModelChoices,
+  preserveConfiguredModel = false,
 ): string | null {
   const options = cloudChoices[provider] || [];
-  if (cloudModel && (!options.length || options.includes(cloudModel))) {
+  if (cloudModel && (preserveConfiguredModel || !options.length || options.includes(cloudModel))) {
     return cloudModel;
   }
   return null;
@@ -46,60 +55,23 @@ export function resolveCloudModel(
 
 export function buildRuntimeSettingsFromConfig(
   payload: ModelConfigStateResponse,
-  previous: RuntimeSettings,
 ): RuntimeSettings {
   const cloudChoices = resolveCloudChoices(Object.fromEntries(payload.cloud_providers.map((provider) => [provider.id, provider.models.map((model) => model.id)])));
-  const provider = resolveProvider(payload.llm_provider ?? DEFAULT_SETTINGS.provider, cloudChoices);
+  const provider = resolveProvider(payload.llm_provider, cloudChoices);
   const cloudModel = resolveCloudModel(
     provider,
     payload.cloud_model,
     cloudChoices,
+    true,
   );
-  const resolvedClinicalModel = payload.clinical_model ?? "";
-  const resolvedtextExtractionModel = payload.text_extraction_model ?? "";
-  const resolvedRevisionModel = payload.revision_model ?? resolvedClinicalModel;
-  const resolvedTimelineModel = payload.timeline_model ?? resolvedtextExtractionModel;
   return {
-    ...previous,
     useCloudServices: payload.use_cloud_services,
     provider,
     cloudModel,
-    textExtractionModel: resolvedtextExtractionModel,
-    clinicalModel: resolvedClinicalModel,
-    revisionModel: resolvedRevisionModel,
-    timelineModel: resolvedTimelineModel,
+    textExtractionModel: payload.text_extraction_model,
+    clinicalModel: payload.clinical_model,
+    revisionModel: payload.revision_model,
+    timelineModel: payload.timeline_model,
     reasoning: payload.reasoning_level,
   };
 }
-
-function recommendedLocalModelName(
-  localModels: LocalModelCard[],
-): string {
-  const installed = localModels.filter((model) => model.available_in_ollama);
-  const recommended = installed.find(
-    (model) => model.recommended_for_local_extraction,
-  );
-  if (recommended) {
-    return recommended.name;
-  }
-  return installed[0]?.name || "";
-}
-
-export function resolveLocalDraftModel(
-  candidate: string | null | undefined,
-  localModels: LocalModelCard[],
-): string {
-  const normalized = (candidate || "").trim();
-  if (!normalized) {
-    return recommendedLocalModelName(localModels);
-  }
-  const installed = localModels.find(
-    (model) => model.available_in_ollama && model.name === normalized,
-  );
-  if (installed) {
-    return installed.name;
-  }
-  return recommendedLocalModelName(localModels);
-}
-
-

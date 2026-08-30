@@ -34,16 +34,15 @@ import {
   startSessionRevisionJob,
   updateRevisionClinicalReview,
 } from '../../core/services/session-revision-api';
-import { fetchModelConfigState } from '../../core/services/model-config-api';
 import {
   ClinicalSessionDetail,
   InspectionSessionItem,
   InspectionSessionStatus,
 } from '../../core/models/inspection-types';
 import { RevisionArtifact, RevisionPipelineStep } from '../../core/models/revision-types';
-import { ModelConfigStateResponse } from '../../core/models/types';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { JobPollingService } from '../../core/services/job-polling.service';
+import { ModelConfigStateService } from '../../core/state/model-config-state.service';
 import { formatErrorMessage, formatUnknownError, isRecord } from '../../core/utils';
 import {
   DEFAULT_CLINICAL_SESSION_METADATA_TEXT,
@@ -100,6 +99,7 @@ import {
 export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   private readonly markdownRenderer = inject(MarkdownRendererService);
   private readonly jobPolling = inject(JobPollingService);
+  private readonly modelConfigState = inject(ModelConfigStateService);
 
   readonly sessions = signal<InspectionSessionItem[]>([]);
   readonly statusFilter = signal<'all' | InspectionSessionStatus>('all');
@@ -164,10 +164,12 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     && !this.revisionRunning()
     && this.revisionStatus().trim().toLowerCase() === 'completed'
   ));
-  readonly revisionModelLoading = signal(false);
-  readonly revisionModelError = signal<string | null>(null);
-  readonly revisionModelConfig = signal<ModelConfigStateResponse | null>(null);
-  readonly revisionModelName = signal('');
+  readonly revisionModelLoading = computed(() => this.modelConfigState.status() === 'loading');
+  readonly revisionModelError = computed(() => {
+    const error = this.modelConfigState.error();
+    return error ? formatUnknownError(error, 'Unable to load revision model options.') : null;
+  });
+  readonly revisionModelName = computed(() => this.modelConfigState.settings()?.revisionModel ?? '');
   private revisionPollCancelled = false;
 
   ngOnInit(): void {
@@ -417,30 +419,11 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   async loadRevisionModelConfig(): Promise<void> {
-    this.revisionModelLoading.set(true);
-    this.revisionModelError.set(null);
     try {
-      const payload = await fetchModelConfigState();
-      this.revisionModelConfig.set(payload);
-      this.revisionModelName.set(payload.revision_model || this.resolveInitialRevisionModel(payload));
-    } catch (error) {
-      this.revisionModelError.set(formatUnknownError(error, 'Unable to load revision model options.'));
-    } finally {
-      this.revisionModelLoading.set(false);
+      await this.modelConfigState.load();
+    } catch {
+      // The shared model-config resource exposes the visible error state.
     }
-  }
-
-  private resolveInitialRevisionModel(payload: ModelConfigStateResponse): string {
-    if (payload.use_cloud_services) {
-      const provider = payload.cloud_providers.find((candidate) => candidate.id === payload.llm_provider);
-      return provider?.models.some((model) => model.id === payload.cloud_model)
-        ? payload.cloud_model || ''
-        : provider?.models[0]?.id || '';
-    }
-    const localModels = payload.local_models.filter((model) => model.available_in_ollama);
-    return localModels.some((model) => model.name === payload.clinical_model)
-      ? payload.clinical_model || ''
-      : localModels[0]?.name || payload.clinical_model || '';
   }
 
   async startRevision(): Promise<void> {

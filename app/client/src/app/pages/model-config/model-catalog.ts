@@ -2,7 +2,6 @@ import { LocalModelCard, RuntimeSettings } from '../../core/models/types';
 import {
   resolveCloudChoices,
   resolveCloudModel,
-  resolveLocalDraftModel,
   resolveProvider,
 } from '../../core/model-config';
 import { DraftRuntimeConfig, ModelFilterKey } from './model-config.types';
@@ -31,12 +30,10 @@ export function parseModelSizeInBillions(name: string): number | null {
   }
   return match[2].toLowerCase() === 'm' ? value / 1000 : value;
 }
-
 export function isSmallModel(model: LocalModelCard): boolean {
   const size = parseModelSizeInBillions(model.name);
   return size !== null && size <= 8;
 }
-
 export function isLargeModel(model: LocalModelCard): boolean {
   const size = parseModelSizeInBillions(model.name);
   return size !== null && size > 8;
@@ -64,28 +61,14 @@ export function modelMatchesFilters(
 export function resolveDraftFromSettings(runtimeSettings: RuntimeSettings): DraftRuntimeConfig {
   const choices = resolveCloudChoices(undefined);
   const provider = resolveProvider(runtimeSettings.provider, choices);
-  const cloudModel = resolveCloudModel(provider, runtimeSettings.cloudModel, choices);
+  const cloudModel = resolveCloudModel(provider, runtimeSettings.cloudModel, choices, true);
   return {
     useCloudServices: runtimeSettings.useCloudServices,
     provider,
     cloudModel,
-    clinicalModel: runtimeSettings.clinicalModel || '',
-    textExtractionModel: runtimeSettings.textExtractionModel || '',
-    revisionModel: runtimeSettings.revisionModel || runtimeSettings.clinicalModel || '',
-    timelineModel: runtimeSettings.timelineModel || runtimeSettings.textExtractionModel || '',
-  };
-}
-
-export function normalizeDraftForLocalRuntime(
-  draft: DraftRuntimeConfig,
-  localModels: LocalModelCard[],
-): DraftRuntimeConfig {
-  return {
-    ...draft,
-    useCloudServices: false,
-    clinicalModel: resolveLocalDraftModel(draft.clinicalModel, localModels),
-    textExtractionModel: resolveLocalDraftModel(draft.textExtractionModel, localModels),
-    revisionModel: resolveLocalDraftModel(draft.revisionModel, localModels),
-    timelineModel: resolveLocalDraftModel(draft.timelineModel, localModels),
+    clinicalModel: runtimeSettings.clinicalModel,
+    textExtractionModel: runtimeSettings.textExtractionModel,
+    revisionModel: runtimeSettings.revisionModel,
+    timelineModel: runtimeSettings.timelineModel,
   };
 }

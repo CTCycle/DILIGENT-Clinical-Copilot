@@ -5,10 +5,9 @@ import { Router, RouterLink } from '@angular/router';
 import { ModalShellComponent } from '../../../components/modal-shell/modal-shell.component';
 import { HelpPopoverComponent } from '../../../core/guidance/help-popover.component';
 import { ClinicalSessionDetail, InspectionSessionTimelinePreview } from '../../../core/models/inspection-types';
-import { ModelConfigStateResponse } from '../../../core/models/types';
 import { deleteInspectionSessionTimeline, fetchInspectionSessionTimelineJobStatus, fetchInspectionSessionTimelineList, startInspectionSessionTimelineJob } from '../../../core/services/session-timeline-api';
 import { JobPollingService } from '../../../core/services/job-polling.service';
-import { fetchModelConfigState } from '../../../core/services/model-config-api';
+import { ModelConfigStateService } from '../../../core/state/model-config-state.service';
 import { formatUnknownError } from '../../../core/utils';
 
 @Component({
@@ -21,15 +20,19 @@ import { formatUnknownError } from '../../../core/utils';
 export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
   private readonly router = inject(Router);
   private readonly jobPolling = inject(JobPollingService);
+  private readonly modelConfigState = inject(ModelConfigStateService);
   @Input({ required: true }) session!: ClinicalSessionDetail;
 
   readonly timelinePreviews = signal<InspectionSessionTimelinePreview[]>([]);
   readonly timelineListLoading = signal(false);
   readonly timelineListError = signal<string | null>(null);
-  readonly modelConfig = signal<ModelConfigStateResponse | null>(null);
-  readonly modelConfigLoading = signal(false);
-  readonly modelConfigError = signal<string | null>(null);
-  readonly modelName = signal('');
+  readonly modelConfig = this.modelConfigState.data;
+  readonly modelConfigLoading = computed(() => this.modelConfigState.status() === 'loading');
+  readonly modelConfigError = computed(() => {
+    const error = this.modelConfigState.error();
+    return error ? formatUnknownError(error, 'Unable to load timeline model options.') : null;
+  });
+  readonly modelName = computed(() => this.modelConfigState.settings()?.timelineModel ?? '');
   readonly generationRunning = signal(false);
   readonly generationStatus = signal<string | null>(null);
   readonly generationError = signal<string | null>(null);
@@ -40,7 +43,6 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
   readonly deletingTimelineId = signal<number | null>(null);
   readonly deleteError = signal<string | null>(null);
   private generationPollToken = 0;
-  private readonly timelineJobStoragePrefix = 'clinical-session-timeline-job:';
 
   readonly selectedConfigurationLabel = computed(() => this.modelName() || 'No Timeline model configured');
   readonly canGenerate = computed(() => Boolean(this.modelName()) && !this.generationRunning() && !this.modelConfigLoading() && !this.modelConfigError());
@@ -54,17 +56,15 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
     this.stopTimelinePolling();
     this.timelinePreviews.set([]); this.timelineListError.set(null); this.generationError.set(null); this.generationStatus.set(null);
     this.generationJobId.set(null); this.generationProgress.set(0); this.generationProgressMessage.set(null); this.generationRunning.set(false);
-    void this.loadModelConfiguration(); void this.loadTimelineHistory(); void this.restoreTimelineJob();
+    void this.loadModelConfiguration(); void this.loadTimelineHistory();
   }
 
   async loadModelConfiguration(): Promise<void> {
-    this.modelConfigLoading.set(true); this.modelConfigError.set(null);
     try {
-      const config = await fetchModelConfigState();
-      this.modelConfig.set(config);
-      this.modelName.set(config.timeline_model || (config.use_cloud_services ? config.cloud_model || '' : config.text_extraction_model || ''));
-    } catch (error) { this.modelConfigError.set(formatUnknownError(error, 'Unable to load timeline model options.')); }
-    finally { this.modelConfigLoading.set(false); }
+      await this.modelConfigState.load();
+    } catch {
+      // The shared model-config resource exposes the visible error state.
+    }
   }
 
   async loadTimelineHistory(): Promise<void> {
@@ -84,17 +84,9 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
     } catch (error) { this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(formatUnknownError(error, 'Unable to start timeline generation.')); }
   }
 
-  private timelineJobStorageKey(): string { return `${this.timelineJobStoragePrefix}${this.session.session_id}`; }
-  private persistTimelineJob(jobId: string): void { if (typeof localStorage !== 'undefined') localStorage.setItem(this.timelineJobStorageKey(), jobId); }
-  private clearPersistedTimelineJob(): void { if (typeof localStorage !== 'undefined') localStorage.removeItem(this.timelineJobStorageKey()); }
-  private restoreTimelineJob(): void {
-    if (!this.session?.session_id || typeof localStorage === 'undefined') return;
-    const jobId = localStorage.getItem(this.timelineJobStorageKey());
-    if (jobId) this.attachToTimelineJob(jobId, 1, true);
-  }
-  private attachToTimelineJob(jobId: string, pollIntervalSeconds: number, restoring = false): void {
-    this.stopTimelinePolling(); this.persistTimelineJob(jobId); this.generationJobId.set(jobId); this.generationRunning.set(true);
-    this.generationStatus.set(restoring ? 'Restoring timeline generation…' : 'Generating timeline…'); void this.pollTimelineJob(jobId, pollIntervalSeconds);
+  private attachToTimelineJob(jobId: string, pollIntervalSeconds: number): void {
+    this.stopTimelinePolling(); this.generationJobId.set(jobId); this.generationRunning.set(true);
+    this.generationStatus.set('Generating timeline…'); void this.pollTimelineJob(jobId, pollIntervalSeconds);
   }
   private stopTimelinePolling(): void { this.generationPollToken += 1; }
   private async pollTimelineJob(jobId: string, pollIntervalSeconds: number): Promise<void> {
@@ -112,14 +104,14 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
           const message = job.result?.progress_message;
           if (typeof message === 'string' && message) this.generationProgressMessage.set(message);
           if (job.status === 'completed') {
-            this.generationProgress.set(100); this.generationRunning.set(false); this.generationStatus.set('Timeline generated and saved.'); this.clearPersistedTimelineJob(); this.generationJobId.set(null); await this.loadTimelineHistory(); return false;
+            this.generationProgress.set(100); this.generationRunning.set(false); this.generationStatus.set('Timeline generated and saved.'); this.generationJobId.set(null); await this.loadTimelineHistory(); return false;
           }
           if (job.status === 'failed' || job.status === 'cancelled') {
-            this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(job.error || 'Timeline generation did not complete.'); this.clearPersistedTimelineJob(); this.generationJobId.set(null); return false;
+            this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(job.error || 'Timeline generation did not complete.'); this.generationJobId.set(null); return false;
           }
         } catch (error) {
           consecutiveErrors += 1;
-          if (consecutiveErrors >= 5) { this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(formatUnknownError(error, 'Unable to restore timeline generation status.')); this.clearPersistedTimelineJob(); this.generationJobId.set(null); return false; }
+          if (consecutiveErrors >= 5) { this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(formatUnknownError(error, 'Unable to load timeline generation status.')); this.generationJobId.set(null); return false; }
         }
         return true;
       },

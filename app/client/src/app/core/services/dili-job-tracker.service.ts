@@ -14,7 +14,7 @@ import { normalizeThrownError } from './http-api';
 import { createDownloadUrl, formatErrorMessage, formatUnknownError } from '../utils';
 
 const POLL_WATCHDOG_MIN_STALE_MS = 15_000;
-const STALE_JOB_REATTACH_MESSAGE =
+const STALE_JOB_MESSAGE =
   '[WARN] The previous background analysis is no longer available. Start a new run to continue.';
 
 function isTerminalJobStatus(status: JobStatus | null): boolean {
@@ -36,10 +36,6 @@ export class DiliJobTrackerService {
   private lastProgressSignature = '';
   private pollRecoveryInFlight = false;
   private pollWatchdogTimer: ReturnType<typeof globalThis.setInterval> | null = null;
-
-  constructor() {
-    void this.reattachPersistedJob();
-  }
 
   async startSession(
     payload: Parameters<typeof startClinicalJob>[0],
@@ -137,57 +133,6 @@ export class DiliJobTrackerService {
     const currentExportUrl = this.stateService.state().diliAgent.exportUrl;
     if (currentExportUrl) {
       URL.revokeObjectURL(currentExportUrl);
-    }
-  }
-
-  private async reattachPersistedJob(): Promise<void> {
-    const vm = this.stateService.state().diliAgent;
-    if (!vm.jobId || isTerminalJobStatus(vm.jobStatus) || (!vm.isRunning && !vm.isStarting)) {
-      return;
-    }
-
-    const intervalMs = Math.max(vm.pollIntervalMs ?? 1000, 250);
-    this.stateService.updateDiliAgent({
-      isStarting: false,
-      isRunning: true,
-      pollIntervalMs: intervalMs,
-      jobStartedAtMs: vm.jobStartedAtMs ?? Date.now(),
-      jobLastProgressAtMs: vm.jobLastProgressAtMs ?? Date.now(),
-    });
-
-    try {
-      const status = await fetchClinicalJobStatus(
-        vm.jobId,
-        `reattach-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      );
-      this.applyJobStatus(status);
-      if (!isTerminalJobStatus(status.status) && this.stateService.state().diliAgent.jobId === vm.jobId) {
-        this.beginPolling(vm.jobId, intervalMs, true);
-      }
-    } catch (error) {
-      const message = normalizeThrownError(
-        error,
-        '[ERROR] Polling could not continue. Please retry.',
-      );
-      if (isJobNotFoundError(message)) {
-        this.stopPolling();
-        this.stateService.updateDiliAgent({
-          message: STALE_JOB_REATTACH_MESSAGE,
-          exportUrl: null,
-          jobId: null,
-          jobProgress: 0,
-          jobStatus: null,
-          jobStage: null,
-          jobStageMessage: null,
-          isStarting: false,
-          isRunning: false,
-          jobStartedAtMs: null,
-          jobLastProgressAtMs: null,
-          pollIntervalMs: null,
-        });
-        return;
-      }
-      this.handlePollingError(message);
     }
   }
 
@@ -341,7 +286,7 @@ export class DiliJobTrackerService {
     this.revokeCurrentExportUrl();
     this.stateService.updateDiliAgent({
       message: isJobNotFoundError(message)
-        ? STALE_JOB_REATTACH_MESSAGE
+        ? STALE_JOB_MESSAGE
         : message.startsWith('[ERROR]')
           ? message
           : `[ERROR] ${message}`,
