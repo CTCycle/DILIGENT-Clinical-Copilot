@@ -272,6 +272,7 @@ def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
                 "use_cloud_services": True,
                 "llm_provider": " OpenCode_Go ",
                 "cloud_model": " deepseek-v4-flash ",
+                "timeline_model": " deepseek-v4-flash ",
             }
         )
     )
