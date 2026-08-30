@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelConfigPageComponent } from './model-config-page.component';
-import { ModelConfigPersistResponse } from '../../core/models/types';
+import { ModelConfigPersistResponse, ModelConfigStateResponse } from '../../core/models/types';
 
 describe('ModelConfigPageComponent', () => {
   let fixture: ComponentFixture<ModelConfigPageComponent>;
@@ -24,19 +24,11 @@ describe('ModelConfigPageComponent', () => {
     });
   });
 
-  it('builds a cloud save patch with role assignments after runtime toggle', async () => {
+  it('requires and saves explicit cloud role assignments after runtime toggle', async () => {
     const persistSpy = vi
       .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<void> }, 'persistConfigPatch')
       .mockResolvedValue();
 
-    component.cloudChoices.set({
-      openai: ['gpt-4.1-mini'],
-      gemini: ['gemini-2.5-pro'],
-      deepseek: [],
-      anthropic: [],
-      opencode_zen: [],
-      opencode_go: [],
-    });
     component.draftConfig.set({
       useCloudServices: false,
       provider: 'openai',
@@ -48,6 +40,19 @@ describe('ModelConfigPageComponent', () => {
     });
 
     component.handleCloudSwitchChange(true);
+    expect(component.draftConfig()).toMatchObject({
+      clinicalModel: '',
+      textExtractionModel: '',
+      revisionModel: '',
+      timelineModel: '',
+    });
+    component.draftConfig.update((previous) => ({
+      ...previous,
+      clinicalModel: 'gpt-4.1-mini',
+      textExtractionModel: 'gpt-4.1-mini',
+      revisionModel: 'gpt-4.1-mini',
+      timelineModel: 'gpt-4.1-mini',
+    }));
 
     await component.handleSaveConfiguration();
 
@@ -67,14 +72,6 @@ describe('ModelConfigPageComponent', () => {
   });
 
   it('switches providers without retaining stale cloud selections or search', () => {
-    component.cloudChoices.set({
-      openai: ['gpt-4.1-mini'],
-      gemini: ['gemini-3.5-flash'],
-      deepseek: ['deepseek-v4-flash'],
-      anthropic: [],
-      opencode_zen: [],
-      opencode_go: [],
-    });
     component.draftConfig.set({
       useCloudServices: true,
       provider: 'openai',
@@ -107,8 +104,6 @@ describe('ModelConfigPageComponent', () => {
       recommended_rank: 0,
     }];
     const cloudCatalog = component.cloudProviders();
-    component.localModels.set(localCatalog);
-    component.cloudProviders.set(cloudCatalog);
     const payload: ModelConfigPersistResponse = {
       use_cloud_services: false,
       llm_provider: 'openai',
@@ -122,6 +117,31 @@ describe('ModelConfigPageComponent', () => {
       rag_settings: component.ragSettings(),
       updated_at: new Date().toISOString(),
     };
+    const statePayload: ModelConfigStateResponse = {
+      ...payload,
+      local_models: localCatalog,
+      cloud_providers: cloudCatalog,
+      local_catalog: {
+        status: 'available',
+        updated_at: null,
+        message: null,
+      },
+      embedding_runtime: {
+        model_display_name: 'Embedding model',
+        model_revision: 'test',
+        device: 'cpu',
+        cache_status: 'ready',
+        loaded: false,
+      },
+      embedding_index: {
+        status: 'ready',
+        fingerprint: null,
+        document_count: 0,
+        chunk_count: 0,
+        built_at: null,
+      },
+    };
+    component.modelConfigState.setFromApiState(statePayload);
     const apply = (component as unknown as {
       applyPersistedConfigToState(
         response: ModelConfigPersistResponse,

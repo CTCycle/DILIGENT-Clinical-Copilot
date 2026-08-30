@@ -1,10 +1,4 @@
-export type CloudProvider =
-  | "openai"
-  | "gemini"
-  | "deepseek"
-  | "anthropic"
-  | "opencode_zen"
-  | "opencode_go";
+export type CloudProvider = string;
 
 export type ReasoningLevel = "off" | "low" | "medium" | "high";
 
@@ -64,10 +58,10 @@ export type ModelConfigStateResponse = {
   use_cloud_services: boolean;
   llm_provider: string;
   cloud_model: string | null;
-  clinical_model: string | null;
-  text_extraction_model: string | null;
-  revision_model: string | null;
-  timeline_model: string | null;
+  clinical_model: string;
+  text_extraction_model: string;
+  revision_model: string;
+  timeline_model: string;
   reasoning_level: ReasoningLevel;
   ollama_seed: number | null;
   rag_settings: RagSettings;
@@ -80,10 +74,10 @@ export type ModelConfigPersistResponse = {
   use_cloud_services: boolean;
   llm_provider: CloudProvider;
   cloud_model: string | null;
-  clinical_model: string | null;
-  text_extraction_model: string | null;
-  revision_model: string | null;
-  timeline_model: string | null;
+  clinical_model: string;
+  text_extraction_model: string;
+  revision_model: string;
+  timeline_model: string;
   reasoning_level: ReasoningLevel;
   ollama_seed: number | null;
   rag_settings: RagSettings;
@@ -115,10 +109,10 @@ export type ModelConfigUpdateRequest = {
   use_cloud_services?: boolean;
   llm_provider?: CloudProvider;
   cloud_model?: string | null;
-  clinical_model?: string | null;
-  text_extraction_model?: string | null;
-  revision_model?: string | null;
-  timeline_model?: string | null;
+  clinical_model?: string;
+  text_extraction_model?: string;
+  revision_model?: string;
+  timeline_model?: string;
   reasoning_level?: ReasoningLevel;
   ollama_seed?: number | null;
   rag_settings?: Partial<RagSettings>;

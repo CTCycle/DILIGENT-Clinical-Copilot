@@ -51,7 +51,7 @@
                 </svg>
                 <span>
                   <strong>Cloud</strong>
-                  <small>OpenAI, Gemini, DeepSeek, Claude, or OpenCode</small>
+                   <small>{{ cloudProviderSummary() }}</small>
                 </span>
                 <i class="model-config-radio-dot" aria-hidden="true"></i>
               </label>
@@ -383,26 +383,22 @@
 
         <section class="model-config-cloud-options">
           <h2>Cloud Provider Keys</h2>
-          @for (provider of credentialProviderOptions; track provider) {
-            <div class="model-config-cloud-row" [class.is-active]="draftProvider() === provider || (provider === 'opencode' && (draftProvider() === 'opencode_zen' || draftProvider() === 'opencode_go'))">
+          @for (provider of credentialProviderOptions(); track provider.provider) {
+            <div class="model-config-cloud-row" [class.is-active]="selectedCredentialProvider() === provider.provider">
               <div class="model-config-provider-name">
-                <span class="model-config-provider-mark" [class.is-openai]="provider === 'openai'" [class.is-gemini]="provider === 'gemini'" [class.is-monochrome]="provider === 'openai' || provider === 'anthropic' || provider === 'opencode'">
-                  @if (providerLogo(provider); as logo) {
+                <span class="model-config-provider-mark" [class.is-openai]="provider.provider === 'openai'" [class.is-gemini]="provider.provider === 'gemini'" [class.is-monochrome]="provider.provider === 'openai' || provider.provider === 'anthropic' || provider.provider === 'opencode'">
+                  @if (providerLogo(provider.provider); as logo) {
                     <img class="model-config-provider-logo" [src]="logo.src" [alt]="logo.alt" />
                   } @else {
-                    <span aria-hidden="true">{{ getProviderLabel(provider).slice(0, 1) }}</span>
+                    <span aria-hidden="true">{{ provider.label.slice(0, 1) }}</span>
                   }
                 </span>
                 <span>
-                  <strong>{{ provider === 'gemini' ? 'Google Gemini' : getProviderLabel(provider) }}</strong>
-                  @if (provider === 'opencode') {
-                    <small>This credential is used by both OpenCode Zen and OpenCode Go. Access to each runtime depends on the services enabled for the OpenCode account.</small>
-                  } @else {
-                    <small>Manage the API keys used to access {{ provider === 'gemini' ? 'Google Gemini' : getProviderLabel(provider) }} cloud models.</small>
-                  }
+                  <strong>{{ provider.label }}</strong>
+                  <small>{{ provider.description }}</small>
                 </span>
               </div>
-              <button type="button" class="model-config-test-btn" (click)="openKeys(provider)" [disabled]="isConfigurationSaving() || isLoading()">
+              <button type="button" class="model-config-test-btn" (click)="openKeys(provider.provider)" [disabled]="isConfigurationSaving() || isLoading()">
                 Manage keys
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <circle cx="12" cy="12" r="8.25" />
