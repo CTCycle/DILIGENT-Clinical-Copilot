@@ -26,9 +26,9 @@ from services.clinical.rag_support import RagSupportService
 from services.clinical.report_finalizer import ReportFinalizer
 from services.clinical.exposure_timeline import ExposureTimelineService
 
+
 ###############################################################################
 class HepatoxConsultation:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -122,7 +122,9 @@ class HepatoxConsultation:
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
         if prepared_inputs is None:
-            logger.info("No prepared inputs provided; skipping hepatotoxicity consultation")
+            logger.info(
+                "No prepared inputs provided; skipping hepatotoxicity consultation"
+            )
             return None
         if not prepared_inputs.resolved_drugs:
             logger.info("No matched drugs available for hepatotoxicity consultation")
@@ -151,10 +153,14 @@ class HepatoxConsultation:
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
         if prepared_inputs is None:
-            logger.info("No prepared inputs provided; skipping revision hepatotoxicity consultation")
+            logger.info(
+                "No prepared inputs provided; skipping revision hepatotoxicity consultation"
+            )
             return None
         if not prepared_inputs.resolved_drugs:
-            logger.info("No matched drugs available for revision hepatotoxicity consultation")
+            logger.info(
+                "No matched drugs available for revision hepatotoxicity consultation"
+            )
             return None
         report = await self.analysis_runner.compile_revision_clinical_assessment(
             prepared_inputs.resolved_drugs,

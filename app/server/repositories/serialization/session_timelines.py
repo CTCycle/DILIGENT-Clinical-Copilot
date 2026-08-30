@@ -8,6 +8,7 @@ from domain.timeline_dates import timeline_date_sort_key
 from repositories.schemas.clinical import ClinicalSessionTimeline
 from repositories.values import normalize_string
 
+
 ###############################################################################
 def parse_timeline_payload(payload_json: str | None) -> dict[str, Any] | None:
     normalized_payload = normalize_string(payload_json)
@@ -19,6 +20,7 @@ def parse_timeline_payload(payload_json: str | None) -> dict[str, Any] | None:
         return None
     return payload if isinstance(payload, dict) else None
 
+
 ###############################################################################
 def serialize_timeline_payload(payload: Any) -> str | None:
     if payload is None:
@@ -27,8 +29,9 @@ def serialize_timeline_payload(payload: Any) -> str | None:
         return normalize_string(payload)
     try:
         return json.dumps(payload, ensure_ascii=False, default=str)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return normalize_string(payload)
+
 
 ###############################################################################
 def validate_timeline_payload(payload: dict[str, Any] | None) -> PatientTimeline | None:
@@ -39,13 +42,16 @@ def validate_timeline_payload(payload: dict[str, Any] | None) -> PatientTimeline
     except Exception:
         return None
 
+
 ###############################################################################
 def build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
     dated_events = [event.event_date for event in payload.events if event.event_date]
     sorted_dates = sorted(dated_events, key=timeline_date_sort_key)
     title = payload.events[0].title if payload.events else None
     source_evidence_event_count = sum(
-        1 for event in payload.events if event.source_evidence and event.source_evidence.strip()
+        1
+        for event in payload.events
+        if event.source_evidence and event.source_evidence.strip()
     )
     return SessionTimelinePreview(
         timeline_id=payload.timeline_id,
@@ -64,10 +70,13 @@ def build_timeline_preview_payload(payload: PatientTimeline) -> dict[str, Any]:
         source_evidence_event_count=source_evidence_event_count,
         missing_evidence_event_count=len(payload.events) - source_evidence_event_count,
         uncertain_event_count=sum(
-            1 for event in payload.events if event.timing_type in {"uncertain", "ordering"}
+            1
+            for event in payload.events
+            if event.timing_type in {"uncertain", "ordering"}
         ),
         undated_event_count=sum(1 for event in payload.events if not event.event_date),
     ).model_dump(mode="json")
+
 
 ###############################################################################
 def timeline_from_row(
@@ -75,7 +84,9 @@ def timeline_from_row(
     *,
     session_id: int,
 ) -> PatientTimeline | None:
-    timeline = validate_timeline_payload(parse_timeline_payload(row.timeline_payload_json))
+    timeline = validate_timeline_payload(
+        parse_timeline_payload(row.timeline_payload_json)
+    )
     if timeline is None:
         return None
     return PatientTimeline(

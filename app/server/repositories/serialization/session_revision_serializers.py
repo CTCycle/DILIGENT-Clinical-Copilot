@@ -33,14 +33,17 @@ REVISION_LIVERTOX_DECISION_SCHEMA_NAME = "revision_livertox_decision"
 REVISION_DILI_ASSESSMENT_SCHEMA_NAME = "revised_dili_assessment"
 REVISION_ENTITY_SCHEMA_VERSION = "1"
 
+
 ###############################################################################
 def build_text_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
 
 ###############################################################################
 def build_payload_hash(payload: Any) -> str:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
 
 ###############################################################################
 def normalize_text_key(value: str | None) -> str | None:
@@ -49,9 +52,11 @@ def normalize_text_key(value: str | None) -> str | None:
         return None
     return normalized.casefold()
 
+
 ###############################################################################
 def default_version_status(*, is_latest: bool) -> str:
     return "current" if is_latest else "superseded"
+
 
 ###############################################################################
 def sync_preserved_version_status(
@@ -64,25 +69,31 @@ def sync_preserved_version_status(
         return default_version_status(is_latest=is_latest_completed)
     return normalized
 
+
 ###############################################################################
 def validate_revised_drug_payload(payload: Any) -> RevisedDrugPayload:
     return RevisedDrugPayload.model_validate(payload)
+
 
 ###############################################################################
 def validate_revised_disease_payload(payload: Any) -> RevisedDiseasePayload:
     return RevisedDiseasePayload.model_validate(payload)
 
+
 ###############################################################################
 def validate_revised_lab_payload(payload: Any) -> RevisedLabPayload:
     return RevisedLabPayload.model_validate(payload)
+
 
 ###############################################################################
 def validate_revision_livertox_decision(payload: Any) -> RevisionLiverToxDecision:
     return RevisionLiverToxDecision.model_validate(payload)
 
+
 ###############################################################################
 def validate_revised_dili_assessment(payload: Any) -> RevisedDiliAssessment:
     return RevisedDiliAssessment.model_validate(payload)
+
 
 ###############################################################################
 def serialize_version_row(row: ClinicalSessionVersion) -> dict[str, Any]:
@@ -90,7 +101,9 @@ def serialize_version_row(row: ClinicalSessionVersion) -> dict[str, Any]:
         "version_id": int(row.id),
         "session_id": int(row.session_id) if row.session_id is not None else None,
         "root_session_id": int(row.root_session_id),
-        "source_version_id": int(row.source_version_id) if row.source_version_id is not None else None,
+        "source_version_id": int(row.source_version_id)
+        if row.source_version_id is not None
+        else None,
         "revision_version_id": int(row.id),
         "version_number": int(row.version_number),
         "version_status": row.version_status,
@@ -98,11 +111,15 @@ def serialize_version_row(row: ClinicalSessionVersion) -> dict[str, Any]:
         "llm_qa_status": row.llm_qa_status,
         "clinical_review_status": row.clinical_review_status,
         "pipeline_run_id": repository_values.normalize_string(row.pipeline_run_id),
-        "model_configuration": parse_session_result_payload(row.model_configuration_json) or {},
+        "model_configuration": parse_session_result_payload(
+            row.model_configuration_json
+        )
+        or {},
         "created_at": row.created_at,
         "updated_at": row.updated_at,
         "completed_at": row.completed_at,
     }
+
 
 ###############################################################################
 def serialize_revision_run_row(row: ClinicalSessionRevisionRun) -> dict[str, Any]:
@@ -111,14 +128,18 @@ def serialize_revision_run_row(row: ClinicalSessionRevisionRun) -> dict[str, Any
         "session_id": int(row.session_id),
         "root_session_id": int(row.root_session_id),
         "source_version_id": int(row.source_version_id),
-        "target_revision_version_id": int(row.target_revision_version_id) if row.target_revision_version_id is not None else None,
+        "target_revision_version_id": int(row.target_revision_version_id)
+        if row.target_revision_version_id is not None
+        else None,
         "revision_mode": row.revision_mode,
         "revision_kind": row.revision_kind,
         "configuration": parse_session_result_payload(row.configuration_json) or {},
         "reviewer_note": repository_values.normalize_string(row.reviewer_note),
         "initiated_by": repository_values.normalize_string(row.initiated_by),
         "actor_id": repository_values.normalize_string(row.actor_id),
-        "actor_display_name": repository_values.normalize_string(row.actor_display_name),
+        "actor_display_name": repository_values.normalize_string(
+            row.actor_display_name
+        ),
         "actor_source": row.actor_source,
         "actor_confidence": row.actor_confidence,
         "started_at": row.started_at,
@@ -127,11 +148,14 @@ def serialize_revision_run_row(row: ClinicalSessionRevisionRun) -> dict[str, Any
         "error": parse_session_result_payload(row.error_json),
         "token_usage": parse_session_result_payload(row.token_usage_json),
         "latency_ms": int(row.latency_ms) if row.latency_ms is not None else None,
-        "cost_estimate": float(row.cost_estimate) if row.cost_estimate is not None else None,
+        "cost_estimate": float(row.cost_estimate)
+        if row.cost_estimate is not None
+        else None,
         "trace_id": repository_values.normalize_string(row.trace_id),
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }
+
 
 ###############################################################################
 def serialize_revision_step_row(row: ClinicalSessionRevisionStep) -> dict[str, Any]:
@@ -164,8 +188,11 @@ def serialize_revision_step_row(row: ClinicalSessionRevisionStep) -> dict[str, A
         "updated_at": row.updated_at,
     }
 
+
 ###############################################################################
-def serialize_revision_artifact_row(row: ClinicalSessionRevisionArtifact) -> dict[str, Any]:
+def serialize_revision_artifact_row(
+    row: ClinicalSessionRevisionArtifact,
+) -> dict[str, Any]:
     return {
         "revision_version_id": int(row.revision_version_id),
         "pipeline_run_id": row.pipeline_run_id,
@@ -180,8 +207,11 @@ def serialize_revision_artifact_row(row: ClinicalSessionRevisionArtifact) -> dic
         "updated_at": row.updated_at,
     }
 
+
 ###############################################################################
-def serialize_revision_entity_row(row: ClinicalSessionRevisionArtifact) -> dict[str, Any]:
+def serialize_revision_entity_row(
+    row: ClinicalSessionRevisionArtifact,
+) -> dict[str, Any]:
     artifact_payload = parse_session_result_payload(row.payload_json) or {}
     entity = artifact_payload.get("entity")
     payload = artifact_payload.get("payload")
@@ -213,6 +243,7 @@ def serialize_revision_entity_row(row: ClinicalSessionRevisionArtifact) -> dict[
         "superseded_at": None,
     }
 
+
 ###############################################################################
 def serialize_revision_review_row(row: ClinicalSessionRevisionReview) -> dict[str, Any]:
     return {
@@ -222,7 +253,9 @@ def serialize_revision_review_row(row: ClinicalSessionRevisionReview) -> dict[st
         "reviewer_note": repository_values.normalize_string(row.reviewer_note),
         "reviewed_by": repository_values.normalize_string(row.reviewed_by),
         "actor_id": repository_values.normalize_string(row.actor_id),
-        "actor_display_name": repository_values.normalize_string(row.actor_display_name),
+        "actor_display_name": repository_values.normalize_string(
+            row.actor_display_name
+        ),
         "actor_source": row.actor_source,
         "actor_confidence": row.actor_confidence,
         "metadata": parse_session_result_payload(row.metadata_json) or {},
@@ -230,6 +263,7 @@ def serialize_revision_review_row(row: ClinicalSessionRevisionReview) -> dict[st
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }
+
 
 ###############################################################################
 def create_revision_artifact_row(
@@ -256,6 +290,7 @@ def create_revision_artifact_row(
         schema_version=repository_values.normalize_string(schema_version),
         payload_json=serialize_json_payload(payload),
     )
+
 
 ###############################################################################
 def create_revision_entity_row(

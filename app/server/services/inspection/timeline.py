@@ -19,6 +19,7 @@ from services.inspection.normalization import (
 )
 from services.inspection.runtime import coerce_optional_str
 
+
 ###############################################################################
 def _report_progress(
     callback: Callable[[float, str], None] | None,
@@ -27,6 +28,7 @@ def _report_progress(
 ) -> None:
     if callback is not None:
         callback(progress, message)
+
 
 _TIMELINE_ERROR_CODES: frozenset[PatientTimelineGenerationErrorCode] = frozenset(
     {
@@ -42,6 +44,7 @@ _TIMELINE_ERROR_CODES: frozenset[PatientTimelineGenerationErrorCode] = frozenset
     }
 )
 
+
 ###############################################################################
 def _timeline_error_code(exc: BaseException) -> PatientTimelineGenerationErrorCode:
     current: BaseException | None = exc
@@ -54,15 +57,24 @@ def _timeline_error_code(exc: BaseException) -> PatientTimelineGenerationErrorCo
             return cast(PatientTimelineGenerationErrorCode, candidate)
         provider_error_seen = provider_error_seen or candidate == "provider_error"
         text = " ".join(str(current).split()).casefold()
-        if any(token in text for token in ("401", "403", "authentication", "api key", "credential")):
+        if any(
+            token in text
+            for token in ("401", "403", "authentication", "api key", "credential")
+        ):
             return "authentication"
         if "429" in text or "rate limit" in text or "rate-limit" in text:
             return "rate_limited"
         if any(token in text for token in ("timed out", "timeout", "time out")):
             return "timeout"
-        if any(token in text for token in ("connect", "network", "socket", "winerror 10013")):
+        if any(
+            token in text
+            for token in ("connect", "network", "socket", "winerror 10013")
+        ):
             return "network_unavailable"
-        if any(token in text for token in ("invalid json", "validation", "structured output")):
+        if any(
+            token in text
+            for token in ("invalid json", "validation", "structured output")
+        ):
             return "invalid_response"
         if "http 5" in text or "service unavailable" in text:
             return "upstream_error"
@@ -83,6 +95,7 @@ def _timeline_error_code(exc: BaseException) -> PatientTimelineGenerationErrorCo
             return "configuration"
         current = current.__cause__ or current.__context__
     return "provider_error" if provider_error_seen else "unknown"
+
 
 ###############################################################################
 def _timeline_fallback_note(
@@ -111,7 +124,10 @@ def _timeline_fallback_note(
             "configuration": "The provider or model configuration is incomplete. Check model settings and retry.",
             "provider_error": "The provider request failed. Check backend logs and retry.",
         }
-        message = messages.get(error_code, "The provider request failed unexpectedly. Check backend logs and retry.")
+        message = messages.get(
+            error_code,
+            "The provider request failed unexpectedly. Check backend logs and retry.",
+        )
         return f"Cloud timeline extraction using {provider_label} / {model_label} did not complete. {message}"
     local_messages = {
         "timeout": "The local model runtime did not respond before the configured timeout.",
@@ -125,6 +141,7 @@ def _timeline_fallback_note(
     )
     return f"Local timeline extraction did not complete. {message} Retry when ready."
 
+
 ###############################################################################
 class InspectionTimelineMixin:
     session_timeline_repository: Any
@@ -136,7 +153,9 @@ class InspectionTimelineMixin:
 
     # -------------------------------------------------------------------------
     def get_session_timeline(self, session_id: int) -> PatientTimeline | None:
-        payload = self.session_timeline_repository.get_latest_session_timeline_record(session_id)
+        payload = self.session_timeline_repository.get_latest_session_timeline_record(
+            session_id
+        )
         if not isinstance(payload, dict):
             return None
         try:
@@ -155,7 +174,9 @@ class InspectionTimelineMixin:
         session_id: int,
         timeline_id: int,
     ) -> PatientTimeline | None:
-        payload = self.session_timeline_repository.get_session_timeline_record(session_id, timeline_id)
+        payload = self.session_timeline_repository.get_session_timeline_record(
+            session_id, timeline_id
+        )
         if not isinstance(payload, dict):
             return None
         try:
@@ -175,7 +196,9 @@ class InspectionTimelineMixin:
 
     # -------------------------------------------------------------------------
     def delete_session_timeline(self, session_id: int, timeline_id: int) -> bool:
-        return self.session_timeline_repository.delete_session_timeline_record(session_id, timeline_id)
+        return self.session_timeline_repository.delete_session_timeline_record(
+            session_id, timeline_id
+        )
 
     # -------------------------------------------------------------------------
     def _build_timeline_runtime_settings(
@@ -184,7 +207,11 @@ class InspectionTimelineMixin:
         source: dict[str, Any],
     ) -> dict[str, Any]:
         session_payload = source.get("session_result_payload")
-        persisted = session_payload.get("runtime_settings") if isinstance(session_payload, dict) else None
+        persisted = (
+            session_payload.get("runtime_settings")
+            if isinstance(session_payload, dict)
+            else None
+        )
         settings = dict(persisted) if isinstance(persisted, dict) else {}
         provider, model = LLMRuntimeConfig.resolve_provider_and_model("timeline")
         settings.setdefault("use_cloud_services", LLMRuntimeConfig.is_cloud_enabled())
@@ -201,7 +228,9 @@ class InspectionTimelineMixin:
             or coerce_optional_str(source.get("clinical_model")),
         )
         settings.setdefault("timeline_model", model)
-        settings.setdefault("reasoning_level", LLMRuntimeConfig.get_reasoning_level().value)
+        settings.setdefault(
+            "reasoning_level", LLMRuntimeConfig.get_reasoning_level().value
+        )
         settings.setdefault("ollama_seed", LLMRuntimeConfig.get_ollama_seed())
         return settings
 
@@ -323,7 +352,9 @@ class InspectionTimelineMixin:
                 return cached
         try:
             _report_progress(progress_callback, 5, "Preparing session timeline source")
-            source = self.session_timeline_repository.get_session_timeline_source(session_id)
+            source = self.session_timeline_repository.get_session_timeline_source(
+                session_id
+            )
             if source is None:
                 return None
             timeline_timeout_s = max(
@@ -333,7 +364,9 @@ class InspectionTimelineMixin:
                     float(getattr(self.timeline_extractor, "timeout_s", 90.0)) + 20.0,
                 ),
             )
-            requested_runtime_settings = self._build_timeline_runtime_settings(source=source)
+            requested_runtime_settings = self._build_timeline_runtime_settings(
+                source=source
+            )
             _report_progress(progress_callback, 15, "Configuring timeline model")
             source_model = (
                 requested_runtime_settings["timeline_model"]
@@ -342,7 +375,9 @@ class InspectionTimelineMixin:
             )
 
             try:
-                _report_progress(progress_callback, 25, "Extracting clinical timeline events")
+                _report_progress(
+                    progress_callback, 25, "Extracting clinical timeline events"
+                )
                 with LLMRuntimeConfig.override_for_run(requested_runtime_settings):
                     timeline = asyncio.run(
                         asyncio.wait_for(
@@ -382,7 +417,9 @@ class InspectionTimelineMixin:
                     session_id=safe_session_id,
                     source=source,
                     generation_note=_timeline_fallback_note(
-                        use_cloud_services=bool(requested_runtime_settings["use_cloud_services"]),
+                        use_cloud_services=bool(
+                            requested_runtime_settings["use_cloud_services"]
+                        ),
                         provider=requested_runtime_settings.get("llm_provider"),
                         model=source_model,
                         error_code=error_code,
@@ -401,7 +438,9 @@ class InspectionTimelineMixin:
                         "model_provider": requested_runtime_settings["llm_provider"],
                     }
                 )
-                _report_progress(progress_callback, 82, "Using deterministic fallback chronology")
+                _report_progress(
+                    progress_callback, 82, "Using deterministic fallback chronology"
+                )
             else:
                 _report_progress(progress_callback, 82, "Timeline events extracted")
             _report_progress(progress_callback, 92, "Saving generated timeline")

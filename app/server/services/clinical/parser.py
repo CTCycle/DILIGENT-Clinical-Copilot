@@ -27,6 +27,7 @@ from services.clinical.parser_validation import get_parser_validation_data
 from services.clinical.parser_llm import DrugLlmExtractionMixin
 from services.clinical.parser_rules import DrugRulesMixin
 
+
 ###############################################################################
 class DrugsParser(DrugLlmExtractionMixin, DrugRulesMixin):
     LLM_CLIENT_NOT_INITIALIZED_ERROR = (

@@ -6,6 +6,7 @@ from domain.health import HealthResponse
 
 router = APIRouter(tags=["health"])
 
+
 ###############################################################################
 def health_check() -> HealthResponse:
     return HealthResponse(status="ok")

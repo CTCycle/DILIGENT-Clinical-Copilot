@@ -33,6 +33,7 @@ from services.llm.model_capabilities import (
     resolve_model_capabilities,
 )
 
+
 ###############################################################################
 class LLMRuntimeConfig:
     _runtime_override: ContextVar[dict[str, object] | None] = ContextVar(
@@ -55,7 +56,9 @@ class LLMRuntimeConfig:
         normalized = (value or "").strip()
         if not normalized:
             raise ValueError("Cloud model is required")
-        if not provider or not provider_registry.is_valid_model(cast(CloudProviderId, provider), normalized):
+        if not provider or not provider_registry.is_valid_model(
+            cast(CloudProviderId, provider), normalized
+        ):
             raise ValueError(
                 f"Model '{normalized}' is not valid for provider '{provider}'"
             )
@@ -177,7 +180,7 @@ class LLMRuntimeConfig:
             return None
         try:
             return max(0, int(str(value).strip()))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------
@@ -348,10 +351,18 @@ class LLMRuntimeConfig:
             "timeline_provider": timeline_provider,
             "timeline_model_resolved": timeline_model,
             "sampling_policy_version": parser_policy.policy_version,
-            "parser_sampling_policy": cls._policy_snapshot(parser_policy, parser_effective),
-            "clinical_sampling_policy": cls._policy_snapshot(clinical_policy, clinical_effective),
-            "revision_sampling_policy": cls._policy_snapshot(revision_policy, revision_effective),
-            "timeline_sampling_policy": cls._policy_snapshot(timeline_policy, timeline_effective),
+            "parser_sampling_policy": cls._policy_snapshot(
+                parser_policy, parser_effective
+            ),
+            "clinical_sampling_policy": cls._policy_snapshot(
+                clinical_policy, clinical_effective
+            ),
+            "revision_sampling_policy": cls._policy_snapshot(
+                revision_policy, revision_effective
+            ),
+            "timeline_sampling_policy": cls._policy_snapshot(
+                timeline_policy, timeline_effective
+            ),
         }
         canonical = json.dumps(
             snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
@@ -367,7 +378,9 @@ class LLMRuntimeConfig:
         return {
             "policy_id": policy.policy_id,
             "policy_version": policy.policy_version,
-            "temperature": policy.temperature if policy.temperature is not None else "provider_default",
+            "temperature": policy.temperature
+            if policy.temperature is not None
+            else "provider_default",
             "match_kind": policy.match_kind.value,
             "provider": policy.provider,
             "model": policy.model,

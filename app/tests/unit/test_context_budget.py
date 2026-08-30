@@ -7,11 +7,13 @@ from services.llm.context_budget import (
     estimate_tokens,
 )
 
+
 ###############################################################################
 def test_estimate_tokens_is_deterministic_and_nonzero_for_text() -> None:
     assert estimate_tokens("") == 0
     assert estimate_tokens("alpha beta") == estimate_tokens("alpha beta")
     assert estimate_tokens("alpha beta") > 0
+
 
 ###############################################################################
 def test_exact_fit_selects_required_and_optional_segments() -> None:
@@ -27,6 +29,7 @@ def test_exact_fit_selects_required_and_optional_segments() -> None:
     assert [segment.key for segment in plan.selected] == ["required", "optional"]
     assert plan.omitted == ()
 
+
 ###############################################################################
 def test_priority_selection_omits_lower_priority_optional_context() -> None:
     segments = [
@@ -38,6 +41,7 @@ def test_priority_selection_omits_lower_priority_optional_context() -> None:
 
     assert [segment.key for segment in plan.selected] == ["high"]
     assert [segment.key for segment in plan.omitted] == ["low"]
+
 
 ###############################################################################
 def test_duplicate_segments_keep_the_required_or_higher_priority_variant() -> None:
@@ -63,6 +67,7 @@ def test_duplicate_segments_keep_the_required_or_higher_priority_variant() -> No
     assert plan.deduplicated_count == 1
     assert [segment.key for segment in plan.selected] == ["structured"]
 
+
 ###############################################################################
 def test_required_overflow_is_explicit() -> None:
     plan = build_context_plan(
@@ -74,6 +79,7 @@ def test_required_overflow_is_explicit() -> None:
     assert plan.required_overflow is True
     assert plan.omitted == ()
 
+
 ###############################################################################
 def test_unknown_capacity_does_not_invent_a_context_ceiling() -> None:
     plan = build_context_plan(
@@ -84,11 +90,15 @@ def test_unknown_capacity_does_not_invent_a_context_ceiling() -> None:
     assert plan.status == "unknown_capacity"
     assert [segment.key for segment in plan.selected] == ["one"]
 
+
 ###############################################################################
 def test_reserve_exhaustion_never_makes_input_budget_negative() -> None:
-    assert calculate_input_budget(
-        context_limit=100,
-        visible_output_reserve=80,
-        reasoning_reserve=40,
-        safety_reserve=20,
-    ) == 0
+    assert (
+        calculate_input_budget(
+            context_limit=100,
+            visible_output_reserve=80,
+            reasoning_reserve=40,
+            safety_reserve=20,
+        )
+        == 0
+    )

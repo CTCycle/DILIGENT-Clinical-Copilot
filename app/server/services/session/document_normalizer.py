@@ -18,6 +18,7 @@ BIBLIOGRAPHY_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 class DocumentNormalizer:
     MAX_BLOCK_TEXT_CHARS = 5000

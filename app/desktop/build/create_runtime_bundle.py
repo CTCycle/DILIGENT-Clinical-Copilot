@@ -43,12 +43,16 @@ def _collect_files(staging: Path, payload: dict[str, Any]) -> dict[str, Path]:
         destination = _safe_relative(str(entry["destination"]))
         if not source.exists():
             if entry.get("required", True):
-                raise FileNotFoundError(f"Required runtime payload is missing: {source}")
+                raise FileNotFoundError(
+                    f"Required runtime payload is missing: {source}"
+                )
             continue
         paths = [source] if source.is_file() else sorted(source.rglob("*"))
         for item in paths:
             if item.is_symlink():
-                raise RuntimeError(f"Symlinks are not allowed in runtime payload: {item}")
+                raise RuntimeError(
+                    f"Symlinks are not allowed in runtime payload: {item}"
+                )
             if item.is_dir():
                 continue
             relative = item.relative_to(source) if source.is_dir() else Path()
@@ -58,7 +62,9 @@ def _collect_files(staging: Path, payload: dict[str, Any]) -> dict[str, Path]:
             if archive_path.suffix in forbidden_extensions:
                 raise RuntimeError(f"Forbidden runtime file: {archive_path}")
             if archive_path.as_posix().endswith("/.env") or archive_path.name == ".env":
-                raise RuntimeError(f"User environment file cannot be packaged: {archive_path}")
+                raise RuntimeError(
+                    f"User environment file cannot be packaged: {archive_path}"
+                )
             if archive_path.as_posix() in collected:
                 raise RuntimeError(f"Duplicate runtime path: {archive_path}")
             collected[archive_path.as_posix()] = item
@@ -70,7 +76,9 @@ def _collect_files(staging: Path, payload: dict[str, Any]) -> dict[str, Path]:
 def create_bundle(args: argparse.Namespace) -> None:
     staging = Path(args.staging).resolve()
     collected = _collect_files(staging, _load_payload(Path(args.payload)))
-    largest = sorted(collected.items(), key=lambda item: item[1].stat().st_size, reverse=True)
+    largest = sorted(
+        collected.items(), key=lambda item: item[1].stat().st_size, reverse=True
+    )
     files = [
         {"path": name, "size": source.stat().st_size, "sha256": _sha256(source)}
         for name, source in sorted(collected.items())
@@ -86,12 +94,16 @@ def create_bundle(args: argparse.Namespace) -> None:
         "dirty_tree": args.dirty_tree.lower() == "true",
         "files": files,
     }
-    manifest_bytes = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    manifest_bytes = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
     output = Path(args.output).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(output.suffix + f".{os.getpid()}.tmp")
     try:
-        with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        with zipfile.ZipFile(
+            temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+        ) as archive:
             for name, source in sorted(collected.items()):
                 info = zipfile.ZipInfo(name, ARCHIVE_TIMESTAMP)
                 info.compress_type = zipfile.ZIP_DEFLATED
@@ -105,7 +117,11 @@ def create_bundle(args: argparse.Namespace) -> None:
         Path(args.manifest).write_bytes(manifest_bytes)
     finally:
         temporary.unlink(missing_ok=True)
-    print(json.dumps({"archive": str(output), "sha256": _sha256(output), "files": len(files)}))
+    print(
+        json.dumps(
+            {"archive": str(output), "sha256": _sha256(output), "files": len(files)}
+        )
+    )
     print("20 largest runtime files:")
     for name, source in largest[:20]:
         print(f"{source.stat().st_size:>12} {name}")
@@ -114,7 +130,9 @@ def create_bundle(args: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--staging", required=True)
-    parser.add_argument("--payload", default=str(Path(__file__).with_name("runtime_payload.json")))
+    parser.add_argument(
+        "--payload", default=str(Path(__file__).with_name("runtime_payload.json"))
+    )
     parser.add_argument("--version", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--manifest", required=True)

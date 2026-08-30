@@ -13,6 +13,7 @@ import pandas as pd
 from common.utils.logger import logger
 from repositories import values as repository_values
 
+
 ###############################################################################
 def decode_patient_image(value: Any) -> bytes | None:
     normalized = repository_values.normalize_string(value)
@@ -23,9 +24,10 @@ def decode_patient_image(value: Any) -> bytes | None:
         payload = payload.split(",", maxsplit=1)[1].strip()
     try:
         return base64.b64decode(payload, validate=True)
-    except (binascii.Error, ValueError):
+    except binascii.Error, ValueError:
         logger.warning("Skipping invalid patient image payload during session save")
         return None
+
 
 ###############################################################################
 def parse_datetime(value: Any) -> datetime | None:
@@ -40,6 +42,7 @@ def parse_datetime(value: Any) -> datetime | None:
         return parsed.to_pydatetime()
     return parsed.to_pydatetime() if hasattr(parsed, "to_pydatetime") else parsed
 
+
 ###############################################################################
 def parse_session_result_payload(payload_json: str | None) -> dict[str, Any] | None:
     normalized_payload = repository_values.normalize_string(payload_json)
@@ -51,6 +54,7 @@ def parse_session_result_payload(payload_json: str | None) -> dict[str, Any] | N
         return None
     return parsed if isinstance(parsed, dict) else None
 
+
 ###############################################################################
 def serialize_json_payload(payload: Any) -> str | None:
     if payload is None:
@@ -59,5 +63,5 @@ def serialize_json_payload(payload: Any) -> str | None:
         return repository_values.normalize_string(payload)
     try:
         return json.dumps(payload, ensure_ascii=False, default=str)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return repository_values.normalize_string(payload)

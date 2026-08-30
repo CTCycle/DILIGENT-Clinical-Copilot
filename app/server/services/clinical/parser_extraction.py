@@ -20,6 +20,7 @@ SUSPENSION_RE = DRUG_SUSPENSION_RE
 SUSPENSION_DATE_RE = DRUG_SUSPENSION_DATE_RE
 START_DATE_RE = DRUG_START_DATE_RE
 
+
 ###############################################################################
 def _phrase_pattern(values: list[str], *, anchor_word: bool = True) -> re.Pattern[str]:
     escaped = [re.escape(value.strip()) for value in values if value and value.strip()]
@@ -29,6 +30,7 @@ def _phrase_pattern(values: list[str], *, anchor_word: bool = True) -> re.Patter
     if anchor_word:
         return re.compile(r"\b(?:" + body + r")\b", re.IGNORECASE)
     return re.compile(r"(?:" + body + r")", re.IGNORECASE)
+
 
 ###############################################################################
 def _build_timing_terms() -> list[str]:
@@ -58,6 +60,7 @@ def _build_timing_terms() -> list[str]:
     )
     return [value for value in values if value]
 
+
 ###############################################################################
 def build_route_patterns() -> tuple[tuple[str, re.Pattern[str]], ...]:
     snapshot = get_reference_catalog_snapshot()
@@ -77,6 +80,7 @@ def build_route_patterns() -> tuple[tuple[str, re.Pattern[str]], ...]:
             patterns.append((key, regex))
     return tuple(patterns)
 
+
 ###############################################################################
 def build_dose_cue_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
@@ -90,6 +94,7 @@ def build_dose_cue_re() -> re.Pattern[str]:
         re.IGNORECASE,
     )
 
+
 ###############################################################################
 def build_dosage_temporal_split_re() -> re.Pattern[str]:
     terms = _build_timing_terms()
@@ -100,6 +105,7 @@ def build_dosage_temporal_split_re() -> re.Pattern[str]:
         r"(?:[,;]\s*|\s+)(?:" + cue + r")\b.*$",
         re.IGNORECASE,
     )
+
 
 ###############################################################################
 def build_name_temporal_split_re() -> re.Pattern[str]:
@@ -114,6 +120,7 @@ def build_name_temporal_split_re() -> re.Pattern[str]:
         re.IGNORECASE,
     )
 
+
 ###############################################################################
 def build_trailing_route_token_re() -> re.Pattern[str]:
     snapshot = get_reference_catalog_snapshot()
@@ -125,6 +132,7 @@ def build_trailing_route_token_re() -> re.Pattern[str]:
     return re.compile(
         r"\b(?:" + "|".join(sorted(set(escaped))) + r")\s*$", re.IGNORECASE
     )
+
 
 ###############################################################################
 def build_start_event_re() -> re.Pattern[str]:
@@ -149,6 +157,7 @@ def build_start_event_re() -> re.Pattern[str]:
         r"\b(?:" + cue + r")\b(?P<tail>[^,;\n]*)",
         re.IGNORECASE,
     )
+
 
 ###############################################################################
 def build_suspension_event_re() -> re.Pattern[str]:

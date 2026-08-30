@@ -15,6 +15,7 @@ from services.clinical.matches_core import LiverToxMatcher
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from repository_fixtures import build_repository_graph
 
+
 ###############################################################################
 def build_preparation() -> ClinicalKnowledgePreparation:
     graph = build_repository_graph()
@@ -22,6 +23,7 @@ def build_preparation() -> ClinicalKnowledgePreparation:
         knowledge_repository=graph.knowledge_repository,
         drug_catalog_repository=graph.drug_catalog_repository,
     )
+
 
 ###############################################################################
 def test_prepare_inputs_exposes_resolution_audit_payload() -> None:
@@ -68,6 +70,7 @@ def test_prepare_inputs_exposes_resolution_audit_payload() -> None:
     assert payload["accepted_rxnav_rxcui"] == "161"
     assert payload["accepted_livertox_nbk_id"] == "NBK100"
     assert payload["requires_human_review"] is False
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -126,6 +129,7 @@ def test_brand_and_qualified_names_resolve_through_catalog_normalization(
     assert payload["accepted_livertox_nbk_id"] == "NBK-BRAND"
     assert payload["match_confidence"] >= 0.9
 
+
 ###############################################################################
 def test_brand_qualified_duplicate_mentions_are_merged() -> None:
     frame = pd.DataFrame(
@@ -161,6 +165,7 @@ def test_brand_qualified_duplicate_mentions_are_merged() -> None:
     payload = next(iter(prepared.resolved_drugs.values()))
     assert payload["raw_mentions"] == ["Pregabalin", "Pregabalin Pfizer"]
 
+
 ###############################################################################
 def test_catalog_missing_medication_label_reaches_resolution_policy() -> None:
     preparation = build_preparation()
@@ -193,6 +198,7 @@ def test_catalog_missing_medication_label_reaches_resolution_policy() -> None:
     assert payload["decision_status"] == "missing_livertox"
     assert payload["resolution_decision"]
 
+
 ###############################################################################
 def test_two_edit_international_spelling_resolves_uniquely() -> None:
     preparation = build_preparation()
@@ -224,9 +230,9 @@ def test_two_edit_international_spelling_resolves_uniquely() -> None:
     assert payload["accepted_livertox_name"] == "Loop Diuretics"
     assert payload["extracted_excerpts"] == ["Loop diuretic excerpt."]
 
+
 ###############################################################################
 class IdentityClientStub:
-
     # -------------------------------------------------------------------------
     def __init__(self, batch: DrugIdentityProposalBatch) -> None:
         self.batch = batch
@@ -237,6 +243,7 @@ class IdentityClientStub:
         assert kwargs["schema"] is DrugIdentityProposalBatch
         self.calls += 1
         return self.batch
+
 
 ###############################################################################
 def test_llm_combination_identity_candidates_remain_ambiguous() -> None:
@@ -293,6 +300,7 @@ def test_llm_combination_identity_candidates_remain_ambiguous() -> None:
     assert payload["requires_human_review"] is True
     assert set(payload["match_candidates"]) == {"Valerian", "Hops"}
     assert payload["accepted_livertox_name"] is None
+
 
 ###############################################################################
 def test_single_llm_identity_is_accepted_only_after_local_validation() -> None:
@@ -351,6 +359,7 @@ def test_single_llm_identity_is_accepted_only_after_local_validation() -> None:
         "identity accepted only after unique local evidence resolution",
     ]
     assert payload["resolution_decision"]["reasons"] == payload["match_notes"]
+
 
 ###############################################################################
 def test_unvalidated_llm_identity_remains_unresolved() -> None:

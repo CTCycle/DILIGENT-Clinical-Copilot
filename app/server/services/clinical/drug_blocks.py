@@ -6,6 +6,7 @@ from functools import lru_cache
 
 from services.catalogs.runtime import get_reference_catalog_snapshot
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class DrugBlock:
@@ -19,6 +20,7 @@ UPPER_TOKEN_RE = re.compile(r"^[A-ZÀ-ÖØ-Þ][\wÀ-ÖØ-öø-ÿ'/-]+")
 _MAX_BLOCK_WORDS = 8
 _MAX_BLOCK_CHARS = 80
 _SENTENCE_BOUNDARY_RE = re.compile(r"(?<!\d)[;:]|(?<!\d)\.(?=\s|$)")
+
 
 ###############################################################################
 @lru_cache(maxsize=1)
@@ -36,6 +38,7 @@ def _metadata_re() -> re.Pattern[str]:
         re.IGNORECASE,
     )
 
+
 ###############################################################################
 @lru_cache(maxsize=1)
 def _continuation_prefix_re() -> re.Pattern[str]:
@@ -47,6 +50,7 @@ def _continuation_prefix_re() -> re.Pattern[str]:
         r"^(?:" + prefix_body + r"|\d+(?:[.,]\d+)?\s*kg\b)",
         re.IGNORECASE,
     )
+
 
 ###############################################################################
 @lru_cache(maxsize=1)
@@ -69,6 +73,7 @@ def _regimen_split_re() -> re.Pattern[str]:
         return re.compile(r"$^")
     return re.compile(r"(?:%s)" % "|".join(escaped), re.IGNORECASE)
 
+
 ###############################################################################
 def _likely_drug_start(value: str) -> bool:
     text = value.strip()
@@ -79,6 +84,7 @@ def _likely_drug_start(value: str) -> bool:
     if not UPPER_TOKEN_RE.search(text):
         return False
     return bool(_metadata_re().search(text))
+
 
 ###############################################################################
 def _truncate_at_sentence_boundary(text: str) -> str:
@@ -91,6 +97,7 @@ def _truncate_at_sentence_boundary(text: str) -> str:
     if boundary:
         return text[: boundary.start()].rstrip()
     return text[:_MAX_BLOCK_CHARS].rstrip()
+
 
 ###############################################################################
 def isolate_drug_blocks(text: str) -> list[DrugBlock]:

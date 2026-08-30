@@ -39,9 +39,9 @@ from repositories.schemas.knowledge import (
     LiverToxMonograph,
 )
 
+
 ###############################################################################
 class KnowledgeRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, context: RepositoryContext) -> None:
         self.context = context
@@ -60,12 +60,16 @@ class KnowledgeRepository:
                 {
                     "canonical_name": row["_drug_name"],
                     "canonical_name_norm": row["_canonical_name_norm"],
-                    "livertox_nbk_id": repository_values.normalize_string(row.get("nbk_id")),
+                    "livertox_nbk_id": repository_values.normalize_string(
+                        row.get("nbk_id")
+                    ),
                 },
             )
         with self.session_factory() as db_session:
             try:
-                drug_insert = dialect_insert(db_session, Drug).values(list(drug_values.values()))
+                drug_insert = dialect_insert(db_session, Drug).values(
+                    list(drug_values.values())
+                )
                 drug_insert = drug_insert.on_conflict_do_update(
                     index_elements=[Drug.canonical_name_norm],
                     set_={
@@ -94,19 +98,27 @@ class KnowledgeRepository:
                         (row["_drug_name"], "canonical"),
                         *[
                             (item, "ingredient")
-                            for item in self.extract_text_candidates(row.get("ingredient"))
+                            for item in self.extract_text_candidates(
+                                row.get("ingredient")
+                            )
                         ],
                         *[
                             (item, "brand")
-                            for item in self.extract_text_candidates(row.get("brand_name"))
+                            for item in self.extract_text_candidates(
+                                row.get("brand_name")
+                            )
                         ],
                         *[
                             (item, "synonym")
-                            for item in self.extract_synonym_candidates(row.get("synonyms"))
+                            for item in self.extract_synonym_candidates(
+                                row.get("synonyms")
+                            )
                         ],
                     ]:
                         clean_alias = repository_values.normalize_string(alias)
-                        alias_norm = normalize_drug_name(clean_alias) if clean_alias else None
+                        alias_norm = (
+                            normalize_drug_name(clean_alias) if clean_alias else None
+                        )
                         if clean_alias is None or not alias_norm:
                             continue
                         key = (drug_id, alias_norm, alias_kind, "livertox")
@@ -119,23 +131,45 @@ class KnowledgeRepository:
                             "term_type": None,
                         }
                     monograph_key = self.build_livertox_monograph_key(row)
-                    flag = repository_values.normalize_flag(row.get("include_in_livertox"))
+                    flag = repository_values.normalize_flag(
+                        row.get("include_in_livertox")
+                    )
                     monographs[monograph_key] = {
                         "drug_id": drug_id,
                         "monograph_key": monograph_key,
                         "drug_name_norm": row["_canonical_name_norm"],
                         "nbk_id": repository_values.normalize_string(row.get("nbk_id")),
-                        "excerpt": repository_values.normalize_string(row.get("excerpt")),
-                        "likelihood_score": repository_values.normalize_string(row.get("likelihood_score")),
-                        "last_update": repository_values.normalize_date(row.get("last_update")),
-                        "reference_count": repository_values.to_int(row.get("reference_count")),
-                        "year_approved": repository_values.to_int(row.get("year_approved")),
-                        "agent_classification": repository_values.normalize_string(row.get("agent_classification")),
-                        "primary_classification": repository_values.normalize_string(row.get("primary_classification")),
-                        "secondary_classification": repository_values.normalize_string(row.get("secondary_classification")),
+                        "excerpt": repository_values.normalize_string(
+                            row.get("excerpt")
+                        ),
+                        "likelihood_score": repository_values.normalize_string(
+                            row.get("likelihood_score")
+                        ),
+                        "last_update": repository_values.normalize_date(
+                            row.get("last_update")
+                        ),
+                        "reference_count": repository_values.to_int(
+                            row.get("reference_count")
+                        ),
+                        "year_approved": repository_values.to_int(
+                            row.get("year_approved")
+                        ),
+                        "agent_classification": repository_values.normalize_string(
+                            row.get("agent_classification")
+                        ),
+                        "primary_classification": repository_values.normalize_string(
+                            row.get("primary_classification")
+                        ),
+                        "secondary_classification": repository_values.normalize_string(
+                            row.get("secondary_classification")
+                        ),
                         "include_in_livertox": None if flag is None else flag == 1,
-                        "source_url": repository_values.normalize_string(row.get("source_url")),
-                        "source_last_modified": repository_values.normalize_string(row.get("source_last_modified")),
+                        "source_url": repository_values.normalize_string(
+                            row.get("source_url")
+                        ),
+                        "source_last_modified": repository_values.normalize_string(
+                            row.get("source_last_modified")
+                        ),
                     }
                 upsert_drug_aliases(db_session, list(aliases.values()))
                 upsert_livertox_monographs(db_session, list(monographs.values()))
@@ -174,35 +208,63 @@ class KnowledgeRepository:
             for monograph in monographs:
                 records.append(
                     {
-                        "drug_name": repository_values.normalize_string(drug.canonical_name),
+                        "drug_name": repository_values.normalize_string(
+                            drug.canonical_name
+                        ),
                         "nbk_id": repository_values.normalize_string(monograph.nbk_id),
-                        "ingredient": repository_values.join_values(grouped.get("ingredient", set())),
-                        "brand_name": repository_values.join_values(grouped.get("brand", set())),
-                        "synonyms": repository_values.join_values(grouped.get("synonym", set())),
-                        "excerpt": repository_values.normalize_string(monograph.excerpt),
-                        "likelihood_score": repository_values.normalize_string(monograph.likelihood_score),
-                        "last_update": repository_values.normalize_string(monograph.last_update),
+                        "ingredient": repository_values.join_values(
+                            grouped.get("ingredient", set())
+                        ),
+                        "brand_name": repository_values.join_values(
+                            grouped.get("brand", set())
+                        ),
+                        "synonyms": repository_values.join_values(
+                            grouped.get("synonym", set())
+                        ),
+                        "excerpt": repository_values.normalize_string(
+                            monograph.excerpt
+                        ),
+                        "likelihood_score": repository_values.normalize_string(
+                            monograph.likelihood_score
+                        ),
+                        "last_update": repository_values.normalize_string(
+                            monograph.last_update
+                        ),
                         "reference_count": monograph.reference_count,
                         "year_approved": monograph.year_approved,
-                        "agent_classification": repository_values.normalize_string(monograph.agent_classification),
-                        "primary_classification": repository_values.normalize_string(monograph.primary_classification),
-                        "secondary_classification": repository_values.normalize_string(monograph.secondary_classification),
+                        "agent_classification": repository_values.normalize_string(
+                            monograph.agent_classification
+                        ),
+                        "primary_classification": repository_values.normalize_string(
+                            monograph.primary_classification
+                        ),
+                        "secondary_classification": repository_values.normalize_string(
+                            monograph.secondary_classification
+                        ),
                         "include_in_livertox": monograph.include_in_livertox,
-                        "source_url": repository_values.normalize_string(monograph.source_url),
-                        "source_last_modified": repository_values.normalize_string(monograph.source_last_modified),
+                        "source_url": repository_values.normalize_string(
+                            monograph.source_url
+                        ),
+                        "source_last_modified": repository_values.normalize_string(
+                            monograph.source_last_modified
+                        ),
                     }
                 )
         frame = pd.DataFrame(records)
         if frame.empty:
             return pd.DataFrame(columns=LIVERTOX_COLUMNS)
-        return frame.where(pd.notnull(frame), cast(Any, None)).reindex(columns=LIVERTOX_COLUMNS)
+        return frame.where(pd.notnull(frame), cast(Any, None)).reindex(
+            columns=LIVERTOX_COLUMNS
+        )
 
     # -------------------------------------------------------------------------
     def get_livertox_master_list(self) -> pd.DataFrame:
         frame = self.get_livertox_records()
         if frame.empty:
             return pd.DataFrame(columns=LIVERTOX_MASTER_COLUMNS)
-        available = [column for column in LIVERTOX_MASTER_COLUMNS if column in frame.columns]
+        available = [
+            column for column in LIVERTOX_MASTER_COLUMNS if column in frame.columns
+        ]
         return (
             frame.reindex(columns=available or ["drug_name"])
             .dropna(subset=["drug_name"])
@@ -228,8 +290,12 @@ class KnowledgeRepository:
             )
             conditions.append(
                 or_(
-                    func.lower(func.coalesce(Drug.canonical_name, "")).like(search_pattern, escape="\\"),
-                    func.lower(func.coalesce(LiverToxMonograph.excerpt, "")).like(search_pattern, escape="\\"),
+                    func.lower(func.coalesce(Drug.canonical_name, "")).like(
+                        search_pattern, escape="\\"
+                    ),
+                    func.lower(func.coalesce(LiverToxMonograph.excerpt, "")).like(
+                        search_pattern, escape="\\"
+                    ),
                     alias_match,
                 )
             )
@@ -237,8 +303,10 @@ class KnowledgeRepository:
             records_stmt = select(
                 Drug.id, Drug.canonical_name, LiverToxMonograph.last_update
             ).join(LiverToxMonograph, Drug.id == LiverToxMonograph.drug_id)
-            count_stmt = select(func.count()).select_from(Drug).join(
-                LiverToxMonograph, Drug.id == LiverToxMonograph.drug_id
+            count_stmt = (
+                select(func.count())
+                .select_from(Drug)
+                .join(LiverToxMonograph, Drug.id == LiverToxMonograph.drug_id)
             )
             if conditions:
                 combined = and_(*conditions)
@@ -246,7 +314,9 @@ class KnowledgeRepository:
                 count_stmt = count_stmt.where(combined)
             total = int(db_session.execute(count_stmt).scalar_one())
             rows = db_session.execute(
-                records_stmt.order_by(func.lower(func.coalesce(Drug.canonical_name, "")), Drug.id.asc())
+                records_stmt.order_by(
+                    func.lower(func.coalesce(Drug.canonical_name, "")), Drug.id.asc()
+                )
                 .offset(safe_offset)
                 .limit(safe_limit)
             ).all()
@@ -263,7 +333,12 @@ class KnowledgeRepository:
     def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             row = db_session.execute(
-                select(Drug.id, Drug.canonical_name, LiverToxMonograph.excerpt, LiverToxMonograph.last_update)
+                select(
+                    Drug.id,
+                    Drug.canonical_name,
+                    LiverToxMonograph.excerpt,
+                    LiverToxMonograph.last_update,
+                )
                 .join(LiverToxMonograph, Drug.id == LiverToxMonograph.drug_id)
                 .where(Drug.id == int(drug_id))
             ).one_or_none()
@@ -285,14 +360,28 @@ class KnowledgeRepository:
         with self.session_factory() as db_session:
             drug = db_session.get(Drug, safe_drug_id)
             if drug is None:
-                return {"drug_id": safe_drug_id, "drug_name": None, "livertox_excerpt": None}
-            monographs = db_session.execute(
-                select(LiverToxMonograph)
-                .where(LiverToxMonograph.drug_id == safe_drug_id)
-                .order_by(LiverToxMonograph.last_update.desc(), LiverToxMonograph.id.asc())
-            ).scalars().all()
+                return {
+                    "drug_id": safe_drug_id,
+                    "drug_name": None,
+                    "livertox_excerpt": None,
+                }
+            monographs = (
+                db_session.execute(
+                    select(LiverToxMonograph)
+                    .where(LiverToxMonograph.drug_id == safe_drug_id)
+                    .order_by(
+                        LiverToxMonograph.last_update.desc(), LiverToxMonograph.id.asc()
+                    )
+                )
+                .scalars()
+                .all()
+            )
             excerpt = next(
-                (item.excerpt for item in monographs if repository_values.normalize_string(item.excerpt)),
+                (
+                    item.excerpt
+                    for item in monographs
+                    if repository_values.normalize_string(item.excerpt)
+                ),
                 None,
             )
             return {
@@ -323,7 +412,8 @@ class KnowledgeRepository:
             .where(
                 KbMatchCache.normalized_drug_key == normalized_drug_key,
                 KbMatchCache.invalidated_at.is_(None),
-                KbMatchCache.confidence >= get_server_settings().drugs_matcher.min_confidence,
+                KbMatchCache.confidence
+                >= get_server_settings().drugs_matcher.min_confidence,
             )
             .order_by(KbMatchCache.updated_at.desc(), KbMatchCache.id.desc())
             .limit(1)
@@ -335,21 +425,31 @@ class KnowledgeRepository:
             cache.invalidated_at = datetime.now(UTC)
             cache.invalidation_reason = "matched_drug_deleted"
             return None
-        if cache.rxnorm_rxcui and db_session.execute(
-            select(Drug)
-            .join(DrugRxnormCode, DrugRxnormCode.drug_id == Drug.id)
-            .where(DrugRxnormCode.rxcui == cache.rxnorm_rxcui)
-            .limit(1)
-        ).scalars().first() is None:
+        if (
+            cache.rxnorm_rxcui
+            and db_session.execute(
+                select(Drug)
+                .join(DrugRxnormCode, DrugRxnormCode.drug_id == Drug.id)
+                .where(DrugRxnormCode.rxcui == cache.rxnorm_rxcui)
+                .limit(1)
+            )
+            .scalars()
+            .first()
+            is None
+        ):
             cache.invalidated_at = datetime.now(UTC)
             cache.invalidation_reason = "rxnorm_code_no_longer_resolves"
             return None
-        if cache.livertox_monograph_key and db_session.scalar(
-            select(LiverToxMonograph).where(
-                LiverToxMonograph.monograph_key == cache.livertox_monograph_key,
-                LiverToxMonograph.drug_id == cache.drug_id,
+        if (
+            cache.livertox_monograph_key
+            and db_session.scalar(
+                select(LiverToxMonograph).where(
+                    LiverToxMonograph.monograph_key == cache.livertox_monograph_key,
+                    LiverToxMonograph.drug_id == cache.drug_id,
+                )
             )
-        ) is None:
+            is None
+        ):
             cache.invalidated_at = datetime.now(UTC)
             cache.invalidation_reason = "livertox_monograph_identity_changed"
             return None
@@ -372,7 +472,13 @@ class KnowledgeRepository:
         ambiguous: bool,
     ) -> None:
         minimum_confidence = get_server_settings().drugs_matcher.min_confidence
-        if drug_id is None or confidence is None or confidence < minimum_confidence or ambiguous or source not in {"rxnav", "livertox", "rag"}:
+        if (
+            drug_id is None
+            or confidence is None
+            or confidence < minimum_confidence
+            or ambiguous
+            or source not in {"rxnav", "livertox", "rag"}
+        ):
             return
         monograph = db_session.scalar(
             select(LiverToxMonograph)
@@ -382,9 +488,9 @@ class KnowledgeRepository:
         )
         if livertox_nbk_id:
             matching_count = db_session.scalar(
-                select(func.count()).select_from(LiverToxMonograph).where(
-                    LiverToxMonograph.nbk_id == livertox_nbk_id
-                )
+                select(func.count())
+                .select_from(LiverToxMonograph)
+                .where(LiverToxMonograph.nbk_id == livertox_nbk_id)
             )
             if matching_count and int(matching_count) > 1 and monograph is None:
                 return
@@ -396,9 +502,7 @@ class KnowledgeRepository:
             )
         )
         now = datetime.now(UTC)
-        deterministic_version = (
-            f"rxnorm:{rxnorm_rxcui}" if rxnorm_rxcui else None
-        )
+        deterministic_version = f"rxnorm:{rxnorm_rxcui}" if rxnorm_rxcui else None
         if monograph is not None:
             deterministic_version = f"livertox:{monograph.monograph_key}"
         if existing is None:
@@ -409,7 +513,9 @@ class KnowledgeRepository:
                     normalized_drug_key=normalized_drug_key,
                     drug_id=drug_id,
                     rxnorm_rxcui=rxnorm_rxcui,
-                    livertox_monograph_key=monograph.monograph_key if monograph else None,
+                    livertox_monograph_key=monograph.monograph_key
+                    if monograph
+                    else None,
                     livertox_nbk_id=livertox_nbk_id,
                     source=source,
                     confidence=confidence,
@@ -447,7 +553,9 @@ class KnowledgeRepository:
                     KbMatchCache.confidence >= 0.95,
                     KbMatchCache.livertox_monograph_key.isnot(None),
                 )
-                .order_by(KbMatchCache.confidence.desc(), KbMatchCache.updated_at.desc())
+                .order_by(
+                    KbMatchCache.confidence.desc(), KbMatchCache.updated_at.desc()
+                )
                 .limit(1)
             )
             if cache is None or cache.drug_id is None:
@@ -466,7 +574,7 @@ class KnowledgeRepository:
                     parsed = json.loads(cache.evidence_json)
                     if isinstance(parsed, dict):
                         evidence = parsed
-                except (json.JSONDecodeError, TypeError):
+                except json.JSONDecodeError, TypeError:
                     evidence = {}
             return {
                 "drug_id": int(cache.drug_id),
@@ -491,7 +599,9 @@ class KnowledgeRepository:
         if records.empty:
             return []
         prepared: list[dict[str, Any]] = []
-        for row in records.where(pd.notnull(records), cast(Any, None)).to_dict(orient="records"):
+        for row in records.where(pd.notnull(records), cast(Any, None)).to_dict(
+            orient="records"
+        ):
             drug_name = repository_values.normalize_string(row.get("drug_name"))
             canonical_name_norm = normalize_drug_name(drug_name) if drug_name else None
             if drug_name is None or not canonical_name_norm:
@@ -501,9 +611,18 @@ class KnowledgeRepository:
                     **row,
                     "_drug_name": drug_name,
                     "_canonical_name_norm": canonical_name_norm,
-                    "_source_last_modified": repository_values.normalize_string(row.get("source_last_modified")) or "",
-                    "_source_url": repository_values.normalize_string(row.get("source_url")) or "",
-                    "_last_update": repository_values.normalize_date(row.get("last_update")) or "",
+                    "_source_last_modified": repository_values.normalize_string(
+                        row.get("source_last_modified")
+                    )
+                    or "",
+                    "_source_url": repository_values.normalize_string(
+                        row.get("source_url")
+                    )
+                    or "",
+                    "_last_update": repository_values.normalize_date(
+                        row.get("last_update")
+                    )
+                    or "",
                 }
             )
         prepared.sort(key=self.livertox_row_sort_key)
@@ -518,7 +637,9 @@ class KnowledgeRepository:
             if column not in frame.columns:
                 frame[column] = None
         frame = cast(pd.DataFrame, frame[LIVERTOX_REQUIRED_COLUMNS])
-        required = [column for column in LIVERTOX_REQUIRED_COLUMNS if column not in {"synonyms"}]
+        required = [
+            column for column in LIVERTOX_REQUIRED_COLUMNS if column not in {"synonyms"}
+        ]
         frame = frame.dropna(subset=required)
         drug_names = cast(pd.Series, frame["drug_name"]).map(coerce_text)
         frame["drug_name"] = drug_names
@@ -551,24 +672,46 @@ class KnowledgeRepository:
             db_session.add(monograph)
         monograph.nbk_id = repository_values.normalize_string(row.get("nbk_id"))
         monograph.excerpt = repository_values.normalize_string(row.get("excerpt"))
-        monograph.likelihood_score = repository_values.normalize_string(row.get("likelihood_score"))
+        monograph.likelihood_score = repository_values.normalize_string(
+            row.get("likelihood_score")
+        )
         monograph.last_update = repository_values.normalize_date(row.get("last_update"))
         monograph.reference_count = repository_values.to_int(row.get("reference_count"))
         monograph.year_approved = repository_values.to_int(row.get("year_approved"))
-        monograph.agent_classification = repository_values.normalize_string(row.get("agent_classification"))
-        monograph.primary_classification = repository_values.normalize_string(row.get("primary_classification"))
-        monograph.secondary_classification = repository_values.normalize_string(row.get("secondary_classification"))
+        monograph.agent_classification = repository_values.normalize_string(
+            row.get("agent_classification")
+        )
+        monograph.primary_classification = repository_values.normalize_string(
+            row.get("primary_classification")
+        )
+        monograph.secondary_classification = repository_values.normalize_string(
+            row.get("secondary_classification")
+        )
         monograph.include_in_livertox = None if flag is None else flag == 1
         monograph.source_url = repository_values.normalize_string(row.get("source_url"))
-        monograph.source_last_modified = repository_values.normalize_string(row.get("source_last_modified"))
+        monograph.source_last_modified = repository_values.normalize_string(
+            row.get("source_last_modified")
+        )
 
     # -------------------------------------------------------------------------
-    def get_monograph_by_key(self, db_session: Session, monograph_key: str) -> LiverToxMonograph | None:
-        return db_session.execute(DrugRepositoryQueries.monograph_by_key(monograph_key)).scalars().first()
+    def get_monograph_by_key(
+        self, db_session: Session, monograph_key: str
+    ) -> LiverToxMonograph | None:
+        return (
+            db_session.execute(DrugRepositoryQueries.monograph_by_key(monograph_key))
+            .scalars()
+            .first()
+        )
 
     # -------------------------------------------------------------------------
-    def get_monograph_by_drug_id(self, db_session: Session, drug_id: int) -> LiverToxMonograph | None:
-        return db_session.execute(DrugRepositoryQueries.monograph_by_drug_id(drug_id)).scalars().first()
+    def get_monograph_by_drug_id(
+        self, db_session: Session, drug_id: int
+    ) -> LiverToxMonograph | None:
+        return (
+            db_session.execute(DrugRepositoryQueries.monograph_by_drug_id(drug_id))
+            .scalars()
+            .first()
+        )
 
     # -------------------------------------------------------------------------
     def extract_text_candidates(self, value: Any) -> list[str]:
@@ -611,18 +754,25 @@ class KnowledgeRepository:
         return grouped
 
     # -------------------------------------------------------------------------
-    def alias_model_values_for_kind(self, aliases: list[DrugAlias], alias_kind: str) -> set[str]:
+    def alias_model_values_for_kind(
+        self, aliases: list[DrugAlias], alias_kind: str
+    ) -> set[str]:
         return {
             normalized
             for alias in aliases
-            if (repository_values.normalize_string(alias.alias_kind) or "").casefold() == alias_kind.casefold()
+            if (repository_values.normalize_string(alias.alias_kind) or "").casefold()
+            == alias_kind.casefold()
             for normalized in [repository_values.normalize_string(alias.alias)]
             if normalized is not None
         }
 
     # -------------------------------------------------------------------------
-    def first_alias_model_value(self, aliases: list[DrugAlias], alias_kind: str) -> str | None:
-        values = sorted(self.alias_model_values_for_kind(aliases, alias_kind), key=str.casefold)
+    def first_alias_model_value(
+        self, aliases: list[DrugAlias], alias_kind: str
+    ) -> str | None:
+        values = sorted(
+            self.alias_model_values_for_kind(aliases, alias_kind), key=str.casefold
+        )
         return values[0] if values else None
 
     # -------------------------------------------------------------------------
@@ -637,7 +787,13 @@ class KnowledgeRepository:
     def livertox_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
         return tuple(
             self.to_sortable_text(row.get(key))
-            for key in ("_canonical_name_norm", "_source_last_modified", "_source_url", "_last_update", "_drug_name")
+            for key in (
+                "_canonical_name_norm",
+                "_source_last_modified",
+                "_source_url",
+                "_last_update",
+                "_drug_name",
+            )
         )
 
     # -------------------------------------------------------------------------
@@ -647,10 +803,17 @@ class KnowledgeRepository:
     # -------------------------------------------------------------------------
     def build_livertox_monograph_key(self, row: dict[str, Any]) -> str:
         payload = {
-            "drug_name_norm": repository_values.normalize_string(row.get("_canonical_name_norm")) or "",
+            "drug_name_norm": repository_values.normalize_string(
+                row.get("_canonical_name_norm")
+            )
+            or "",
             "nbk_id": repository_values.normalize_string(row.get("nbk_id")) or "",
-            "source_url": repository_values.normalize_string(row.get("source_url")) or "",
-            "source_last_modified": repository_values.normalize_string(row.get("source_last_modified")) or "",
+            "source_url": repository_values.normalize_string(row.get("source_url"))
+            or "",
+            "source_last_modified": repository_values.normalize_string(
+                row.get("source_last_modified")
+            )
+            or "",
         }
         return hashlib.sha256(
             json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -661,14 +824,21 @@ class KnowledgeRepository:
         normalized = repository_values.normalize_string(search)
         if normalized is None:
             return None
-        escaped = normalized.casefold().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        escaped = (
+            normalized.casefold()
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
         return f"%{escaped}%"
 
     # -------------------------------------------------------------------------
     def _is_valid_drug_name_text(self, value: str) -> bool:
         ingestion = get_server_settings().ingestion
         return (
-            ingestion.drug_name_min_length <= len(value) <= ingestion.drug_name_max_length
+            ingestion.drug_name_min_length
+            <= len(value)
+            <= ingestion.drug_name_max_length
             and len(value.split()) <= ingestion.drug_name_max_tokens
             and re.fullmatch(DRUG_NAME_ALLOWED_PATTERN, value.strip()) is not None
         )

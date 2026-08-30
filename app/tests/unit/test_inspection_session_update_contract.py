@@ -3,9 +3,9 @@ from __future__ import annotations
 from api.inspection.sessions import InspectionSessionEndpoint
 from services.inspection.service import DataInspectionService
 
+
 ###############################################################################
 class FakeSerializer:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.report_calls: list[dict[str, object]] = []
@@ -51,16 +51,16 @@ class FakeSerializer:
         self.metadata_calls.append(call)
         return self.get_session_detail(session_id)
 
+
 ###############################################################################
 class FakeRouter:
-
     # -------------------------------------------------------------------------
     def add_api_route(self, *args: object, **kwargs: object) -> None:
         _ = (args, kwargs)
 
+
 ###############################################################################
 class FakeEndpointService:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
@@ -92,9 +92,9 @@ class FakeEndpointService:
             "metadata": metadata or {},
         }
 
+
 ###############################################################################
 class FakeRequest:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -110,6 +110,7 @@ class FakeRequest:
         self.edited_by = None
         self.metadata = metadata
 
+
 ###############################################################################
 def build_service(serializer: FakeSerializer) -> DataInspectionService:
     return DataInspectionService(
@@ -121,6 +122,7 @@ def build_service(serializer: FakeSerializer) -> DataInspectionService:
         timeline_extractor=object(),
         jobs=object(),  # type: ignore[arg-type]
     )
+
 
 ###############################################################################
 def test_update_session_without_report_text_updates_metadata_only() -> None:
@@ -138,6 +140,7 @@ def test_update_session_without_report_text_updates_metadata_only() -> None:
     assert serializer.metadata_calls == [
         {"session_id": 7, "metadata": {"source": "manual"}}
     ]
+
 
 ###############################################################################
 def test_update_session_with_report_text_updates_report_only() -> None:
@@ -162,6 +165,7 @@ def test_update_session_with_report_text_updates_report_only() -> None:
         }
     ]
     assert serializer.metadata_calls == []
+
 
 ###############################################################################
 def test_session_endpoint_does_not_treat_session_text_as_report_text() -> None:

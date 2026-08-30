@@ -13,6 +13,7 @@ from services.llm.transports.base import CloudTransport, StructuredTransportMixi
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
 
+
 ###############################################################################
 class RoutedGatewayTransport(StructuredTransportMixin):
     _opencode_go_models_path = "/zen/go/v1/models"

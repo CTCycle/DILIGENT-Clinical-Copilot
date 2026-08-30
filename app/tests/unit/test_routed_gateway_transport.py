@@ -8,6 +8,7 @@ from domain.llm.transports import ChatRequest, ChatResult
 from services.llm.transports import routed_gateway
 from services.llm.transports.routed_gateway import RoutedGatewayTransport
 
+
 ###############################################################################
 def _transport(models_path: str = "/zen/go/v1/models") -> RoutedGatewayTransport:
     return RoutedGatewayTransport(
@@ -16,6 +17,7 @@ def _transport(models_path: str = "/zen/go/v1/models") -> RoutedGatewayTransport
         models_path=models_path,
         timeout=1.0,
     )
+
 
 ###############################################################################
 def test_opencode_go_deepseek_flash_uses_documented_chat_endpoint() -> None:
@@ -28,6 +30,7 @@ def test_opencode_go_deepseek_flash_uses_documented_chat_endpoint() -> None:
 
     assert endpoint == "chat/completions"
 
+
 ###############################################################################
 def test_opencode_go_anthropic_models_use_messages_endpoint() -> None:
     endpoint = _transport()._resolve_transport_endpoint(
@@ -36,6 +39,7 @@ def test_opencode_go_anthropic_models_use_messages_endpoint() -> None:
 
     assert endpoint == "messages"
 
+
 ###############################################################################
 def test_other_routed_gateways_still_require_model_endpoint_metadata() -> None:
     endpoint = _transport("/zen/v1/models")._resolve_transport_endpoint(
@@ -43,6 +47,7 @@ def test_other_routed_gateways_still_require_model_endpoint_metadata() -> None:
     )
 
     assert endpoint == ""
+
 
 ###############################################################################
 def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
@@ -54,7 +59,6 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
 
     ###############################################################################
     class FakeChatTransport:
-
         # -------------------------------------------------------------------------
         def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
             captured.update(
@@ -72,7 +76,9 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
         async def close(self) -> None:
             return None
 
-    async def catalog_failure(*, force_refresh: bool = False) -> list[CloudModelDescriptor]:
+    async def catalog_failure(
+        *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
         raise RuntimeError("catalog unavailable")
 
     monkeypatch.setattr(routed_gateway, "OpenAIChatTransport", FakeChatTransport)
@@ -98,6 +104,7 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
     assert "route_source=known_opencode_go_route" in caplog.text
     assert "Cloud chat request attempted" in caplog.text
 
+
 ###############################################################################
 def test_opencode_go_missing_catalog_model_uses_direct_route(
     monkeypatch: pytest.MonkeyPatch,
@@ -111,7 +118,6 @@ def test_opencode_go_missing_catalog_model_uses_direct_route(
 
     ###############################################################################
     class FakeChatTransport:
-
         # -------------------------------------------------------------------------
         def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
             captured["base_url"] = base_url
@@ -125,7 +131,9 @@ def test_opencode_go_missing_catalog_model_uses_direct_route(
         async def close(self) -> None:
             return None
 
-    async def catalog_failure(*, force_refresh: bool = False) -> list[CloudModelDescriptor]:
+    async def catalog_failure(
+        *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
         raise AssertionError("OpenCode Go should not require catalog refresh")
 
     monkeypatch.setattr(routed_gateway, "OpenAIChatTransport", FakeChatTransport)
@@ -143,6 +151,7 @@ def test_opencode_go_missing_catalog_model_uses_direct_route(
     assert result.content == "ok"
     assert captured["base_url"] == "https://opencode.ai/zen/go/v1"
 
+
 ###############################################################################
 def test_opencode_go_connectivity_check_uses_direct_route(
     monkeypatch: pytest.MonkeyPatch,
@@ -152,7 +161,6 @@ def test_opencode_go_connectivity_check_uses_direct_route(
 
     ###############################################################################
     class FakeChatTransport:
-
         # -------------------------------------------------------------------------
         def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
             captured["base_url"] = base_url
@@ -177,13 +185,16 @@ def test_opencode_go_connectivity_check_uses_direct_route(
     assert isinstance(request, ChatRequest)
     assert request.messages == [{"role": "user", "content": "Reply with exactly: OK"}]
 
+
 ###############################################################################
 def test_other_routed_gateways_keep_strict_catalog_requirement(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     transport = _transport("/zen/v1/models")
 
-    async def catalog_failure(*, force_refresh: bool = False) -> list[CloudModelDescriptor]:
+    async def catalog_failure(
+        *, force_refresh: bool = False
+    ) -> list[CloudModelDescriptor]:
         raise RuntimeError("catalog unavailable")
 
     monkeypatch.setattr(transport, "list_models", catalog_failure)

@@ -14,6 +14,7 @@ from services.session.preflight import (
     validate_clinical_input_preflight,
 )
 
+
 ###############################################################################
 def test_blocking_issue_is_enriched_with_modal_metadata() -> None:
     issue = _present_preflight_issue(
@@ -31,6 +32,7 @@ def test_blocking_issue_is_enriched_with_modal_metadata() -> None:
     assert issue.consequence
     assert issue.continuation_allowed is False
 
+
 ###############################################################################
 def test_unknown_warning_receives_safe_fallback_metadata() -> None:
     issue = _present_preflight_issue(
@@ -46,6 +48,7 @@ def test_unknown_warning_receives_safe_fallback_metadata() -> None:
     assert issue.affected_section == "Future Section"
     assert issue.continuation_allowed is True
 
+
 ###############################################################################
 def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
     monkeypatch,
@@ -53,7 +56,9 @@ def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
     service = SimpleNamespace(
         apply_persisted_runtime_configuration=lambda: None,
         session_repository=SimpleNamespace(
-            session_factory=lambda: nullcontext(SimpleNamespace(connection=lambda: None)),
+            session_factory=lambda: nullcontext(
+                SimpleNamespace(connection=lambda: None)
+            ),
         ),
         knowledge_repository=SimpleNamespace(
             list_livertox_catalog=lambda **kwargs: ([{"id": 1}], 1),

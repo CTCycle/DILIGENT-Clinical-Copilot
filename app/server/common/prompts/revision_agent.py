@@ -39,13 +39,16 @@ Output requirements:
 - If no issue is found, return an empty issues array and explain the limits of the review in the summary.
 """
 
+
 ###############################################################################
 def planner_prompt(context: object, manifest: object) -> str:
     return f"{SAFETY_RULES}\nPlan bounded revision tasks from this context: {context}\nAllowed tools: {manifest}"
 
+
 ###############################################################################
 def tool_prompt(task: object, observations: object, manifest: object) -> str:
     return f"{SAFETY_RULES}\nChoose exactly one allowed tool or mark task_complete: {task}\nObservations: {observations}\nManifest: {manifest}"
+
 
 ###############################################################################
 def editor_prompt(context: object, observations: object) -> str:
@@ -67,6 +70,7 @@ def editor_prompt(context: object, observations: object) -> str:
         "evidence_references.\n"
         f"Context: {context}\nObservations: {observations}"
     )
+
 
 ###############################################################################
 def qa_prompt(context: object, draft: object) -> str:

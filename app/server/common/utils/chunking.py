@@ -8,6 +8,7 @@ from typing import NamedTuple, cast
 
 from common.utils.seed_terms import SeedTermCatalog, detect_seed_matches
 
+
 ###############################################################################
 class TextLineIndex(NamedTuple):
     text: str
@@ -16,6 +17,7 @@ class TextLineIndex(NamedTuple):
     def line_for_offset(self, offset: int) -> int:
         bounded = max(0, min(offset, len(self.text)))
         return self.text.count("\n", 0, bounded) + 1
+
 
 ###############################################################################
 class ChunkSourceSpan(NamedTuple):
@@ -26,6 +28,7 @@ class ChunkSourceSpan(NamedTuple):
     char_start: int
     char_end: int
 
+
 ###############################################################################
 class SmartChunk(NamedTuple):
     text: str
@@ -34,9 +37,9 @@ class SmartChunk(NamedTuple):
     chunk_index_number: int
     metadata: dict[str, object]
 
+
 ###############################################################################
 class SmartDocumentChunker:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -280,6 +283,7 @@ class SmartDocumentChunker:
         slug = re.sub(r"[^a-z0-9]+", "-", value.casefold()).strip("-")
         return slug[:48] or "section"
 
+
 ###############################################################################
 class TokenWindowDocumentChunker:
     """Chunk documents by the canonical model tokenizer, not characters."""
@@ -315,7 +319,9 @@ class TokenWindowDocumentChunker:
         if not callable(encode) or not callable(decode):
             raise TypeError("Canonical tokenizer must provide encode and decode")
         source_text = text or ""
-        token_ids = list(cast(Iterable[int], encode(source_text, add_special_tokens=False)))
+        token_ids = list(
+            cast(Iterable[int], encode(source_text, add_special_tokens=False))
+        )
         if not token_ids:
             return []
         step = max(self.target_tokens - self.overlap_tokens, 1)
