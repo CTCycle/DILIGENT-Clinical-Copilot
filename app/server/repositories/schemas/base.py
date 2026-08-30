@@ -16,6 +16,7 @@ NAMING_CONVENTION = {
     "pk": "pk_%(table_name)s",
 }
 
+
 ###############################################################################
 class UtcDateTime(TypeDecorator[datetime]):
     """Store UTC-normalized datetimes while returning aware Python values."""
@@ -41,9 +42,11 @@ class UtcDateTime(TypeDecorator[datetime]):
             return None
         return value.replace(tzinfo=UTC)
 
+
 ###############################################################################
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
 
 ###############################################################################
 @event.listens_for(Base, "before_update", propagate=True)

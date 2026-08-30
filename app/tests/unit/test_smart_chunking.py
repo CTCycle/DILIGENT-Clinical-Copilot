@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from common.utils.chunking import SmartDocumentChunker
 
+
 ###############################################################################
 def test_chunk_ids_and_uid_are_stable() -> None:
     chunker = SmartDocumentChunker(target_chars=40, max_chars=80)
@@ -23,6 +24,7 @@ def test_chunk_ids_and_uid_are_stable() -> None:
     assert chunks_a
     assert chunks_a[0].chunk_index == "doc.txt::p1-1::section::c1"
     assert [c.chunk_uid for c in chunks_a] == [c.chunk_uid for c in chunks_b]
+
 
 ###############################################################################
 def test_page_and_line_metadata_present() -> None:

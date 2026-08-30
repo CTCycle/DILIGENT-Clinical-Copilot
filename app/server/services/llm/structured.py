@@ -9,9 +9,9 @@ from pydantic import BaseModel, ValidationError
 
 T = TypeVar("T", bound=BaseModel)
 
+
 ###############################################################################
 class StructuredOutputParser(Generic[T]):
-
     # -------------------------------------------------------------------------
     def __init__(self, *, schema: type[T]) -> None:
         self.schema = schema
@@ -33,6 +33,7 @@ class StructuredOutputParser(Generic[T]):
     def parse(self, text: str) -> T:
         payload = parse_json_object_strict(text)
         return self.schema.model_validate(payload)
+
 
 ###############################################################################
 def parse_json_object_strict(raw: str) -> dict[str, Any]:
@@ -58,9 +59,9 @@ def parse_json_object_strict(raw: str) -> dict[str, Any]:
         raise ValueError("trailing_prose_not_allowed")
     return parsed
 
+
 ###############################################################################
 class StructuredOutputAdapter:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

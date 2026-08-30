@@ -6,9 +6,9 @@ from pathlib import Path
 from common.paths import CATALOGS_PATH
 from domain.llm.providers import CloudProviderDefinition, CloudProviderId
 
+
 ###############################################################################
 class ProviderRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(
         self, definitions: tuple[CloudProviderDefinition, ...] | None = None

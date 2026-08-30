@@ -31,7 +31,6 @@ def _is_true(value: str) -> bool:
 
 ###############################################################################
 class DesktopSessionSecurity:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.enabled = _is_true(os.getenv("DILIGENT_DESKTOP", ""))
@@ -59,7 +58,11 @@ class DesktopSessionSecurity:
 
     # -------------------------------------------------------------------------
     def consume_bootstrap_token(self, token: str) -> bool:
-        if not self.enabled or not self.secret or not hmac.compare_digest(token, self.secret):
+        if (
+            not self.enabled
+            or not self.secret
+            or not hmac.compare_digest(token, self.secret)
+        ):
             return False
         with self._bootstrap_lock:
             if self._bootstrap_consumed:
@@ -82,12 +85,15 @@ def _secured(response: Response) -> Response:
 
 ###############################################################################
 def _rejected(status_code: int) -> Response:
-    return _secured(JSONResponse({"detail": "Desktop request is not authorized."}, status_code=status_code))
+    return _secured(
+        JSONResponse(
+            {"detail": "Desktop request is not authorized."}, status_code=status_code
+        )
+    )
 
 
 ###############################################################################
 class DesktopSecurityMiddleware(BaseHTTPMiddleware):
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -110,8 +116,9 @@ class DesktopSecurityMiddleware(BaseHTTPMiddleware):
         if not self.security.host_is_allowed(request.headers.get("host", "")):
             return _rejected(403)
 
-        if request.method in _STATE_CHANGING_METHODS and not self.security.origin_is_allowed(
-            request.headers.get("origin", "")
+        if (
+            request.method in _STATE_CHANGING_METHODS
+            and not self.security.origin_is_allowed(request.headers.get("origin", ""))
         ):
             return _rejected(403)
 

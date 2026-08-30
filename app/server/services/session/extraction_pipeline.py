@@ -22,6 +22,7 @@ from domain.clinical.extras import HepatoxPreparedInputs
 from services.retrieval.query import DILIQueryBuilder
 from services.llm.runtime_config import LLMRuntimeConfig
 
+
 ###############################################################################
 class ClinicalSessionExtractionOwner(Protocol):
     drugs_parser: Any
@@ -45,9 +46,9 @@ class ClinicalSessionExtractionOwner(Protocol):
     build_fallback_therapy_drugs: Callable[..., PatientDrugs]
     append_knowledge_base_unavailable_issue: Callable[..., None]
 
+
 ###############################################################################
 class ClinicalSessionExtractionPipelineMixin:
-
     # -------------------------------------------------------------------------
     async def extract_therapy_drugs(
         self: ClinicalSessionExtractionOwner,

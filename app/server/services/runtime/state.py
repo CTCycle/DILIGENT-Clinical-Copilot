@@ -8,6 +8,7 @@ from typing import Any
 
 from domain.jobs import JobStatusResponse
 
+
 ###############################################################################
 @dataclass
 class JobState:

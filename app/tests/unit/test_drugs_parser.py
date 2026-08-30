@@ -9,9 +9,9 @@ from domain.clinical.extractor_contracts import LocalDrugEntryDraft, LocalPatien
 from services.clinical.drug_blocks import isolate_drug_blocks
 from services.clinical.parser import DrugsParser
 
+
 ###############################################################################
 class RecordingCorpusStructuredClient:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.user_prompts: list[str] = []
@@ -29,9 +29,9 @@ class RecordingCorpusStructuredClient:
             ]
         )
 
+
 ###############################################################################
 class RecordingLocalStructuredClient:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.schemas: list[type[Any]] = []
@@ -49,9 +49,9 @@ class RecordingLocalStructuredClient:
             ]
         )
 
+
 ###############################################################################
 class MultilineStructuredClient:
-
     # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
         source = str(kwargs["user_prompt"])
@@ -76,9 +76,9 @@ class MultilineStructuredClient:
             ]
         )
 
+
 ###############################################################################
 class RecordingStructuredClient:
-
     # -------------------------------------------------------------------------
     def __init__(self, response: PatientDrugs) -> None:
         self.response = response
@@ -91,9 +91,9 @@ class RecordingStructuredClient:
         self.user_prompts.append(str(kwargs.get("user_prompt", "")))
         return self.response
 
+
 ###############################################################################
 class FakeStructuredClient:
-
     # -------------------------------------------------------------------------
     def __init__(self, responses: Sequence[PatientDrugs]) -> None:
         self.responses = list(responses)
@@ -107,9 +107,9 @@ class FakeStructuredClient:
             return self.responses.pop(0)
         return schema(entries=[])
 
+
 ###############################################################################
 class RecordingSequenceStructuredClient:
-
     # -------------------------------------------------------------------------
     def __init__(self, responses: Sequence[PatientDrugs]) -> None:
         self.responses = list(responses)
@@ -125,9 +125,9 @@ class RecordingSequenceStructuredClient:
             return self.responses.pop(0)
         return schema(entries=[])
 
+
 ###############################################################################
 class RecordingLocalSectionClient:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.schemas: list[type[Any]] = []
@@ -145,12 +145,13 @@ class RecordingLocalSectionClient:
             ]
         )
 
+
 ###############################################################################
 class AlwaysFailingStructuredClient:
-
     # -------------------------------------------------------------------------
     async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
         raise RuntimeError("simulated llm failure")
+
 
 ###############################################################################
 def test_therapy_extraction_uses_complete_multiline_corpus_once() -> None:
@@ -163,6 +164,7 @@ def test_therapy_extraction_uses_complete_multiline_corpus_once() -> None:
     assert [entry.name for entry in parsed.entries] == ["Cardiomed"]
     assert len(client.user_prompts) == 1
     assert source in client.user_prompts[0]
+
 
 ###############################################################################
 def test_multiline_corpus_rejects_truncated_and_status_fragments() -> None:
@@ -192,6 +194,7 @@ def test_multiline_corpus_rejects_truncated_and_status_fragments() -> None:
     assert "Hou" not in therapy_names
     assert anamnesis_names == ["Bactrim"]
 
+
 ###############################################################################
 def test_whole_section_extraction_uses_local_compact_schema_for_ollama() -> None:
     client = RecordingLocalStructuredClient()
@@ -210,6 +213,7 @@ def test_whole_section_extraction_uses_local_compact_schema_for_ollama() -> None
     assert len(parsed.entries) == 1
     assert parsed.entries[0].name == "Ciproflax"
     assert parsed.entries[0].dosage == "500 mg"
+
 
 ###############################################################################
 def test_extract_drugs_from_therapy_parses_schedule_route_and_dates() -> None:
@@ -242,6 +246,7 @@ def test_extract_drugs_from_therapy_parses_schedule_route_and_dates() -> None:
     assert second.suspension_date == "2024-01-03"
     assert second.temporal_classification == "temporal_known"
 
+
 ###############################################################################
 def test_extract_drugs_from_therapy_missing_schedule_remains_parseable() -> None:
     parser = DrugsParser(client=object())
@@ -259,6 +264,7 @@ def test_extract_drugs_from_therapy_missing_schedule_remains_parseable() -> None
     assert entry.source == "therapy"
     assert entry.historical_flag is False
 
+
 ###############################################################################
 def test_extract_drugs_from_therapy_supports_decimal_schedule_padding() -> None:
     parser = DrugsParser(client=object())
@@ -272,6 +278,7 @@ def test_extract_drugs_from_therapy_supports_decimal_schedule_padding() -> None:
     assert entry.administration_pattern == "0.5-0-0"
     assert entry.daytime_administration == [0.5, 0.0, 0.0, 0.0]
     assert entry.temporal_classification == "temporal_known"
+
 
 ###############################################################################
 def test_extract_drugs_from_therapy_detects_ongoing_vs_suspended() -> None:
@@ -297,6 +304,7 @@ def test_extract_drugs_from_therapy_detects_ongoing_vs_suspended() -> None:
     assert ongoing.therapy_start_date == "2024-02-11"
     assert ongoing.temporal_classification == "temporal_known"
 
+
 ###############################################################################
 def test_extract_drugs_from_therapy_strips_temporal_tail_from_name() -> None:
     parser = DrugsParser(client=object())
@@ -314,6 +322,7 @@ def test_extract_drugs_from_therapy_strips_temporal_tail_from_name() -> None:
         "Trastuzumab deruxtecan",
     ]
     assert [entry.route for entry in parsed.entries] == ["iv", "iv", "iv"]
+
 
 ###############################################################################
 def test_extract_drugs_from_therapy_does_not_parse_iso_dates_as_schedule() -> None:
@@ -335,6 +344,7 @@ def test_extract_drugs_from_therapy_does_not_parse_iso_dates_as_schedule() -> No
     assert entry.therapy_start_date == "2026-02-10"
     assert entry.suspension_status is True
     assert entry.suspension_date == "2026-02-16"
+
 
 ###############################################################################
 def test_fragment_guard_rejects_multiline_status_and_truncated_compound_names() -> None:
@@ -374,6 +384,7 @@ def test_fragment_guard_rejects_multiline_status_and_truncated_compound_names() 
         is None
     )
 
+
 ###############################################################################
 def test_extract_drugs_from_therapy_skips_non_assumed_drug_line() -> None:
     parser = DrugsParser(client=object())
@@ -385,6 +396,7 @@ def test_extract_drugs_from_therapy_skips_non_assumed_drug_line() -> None:
     parsed = asyncio.run(parser.extract_drugs_from_therapy(therapy_text))
 
     assert [entry.name for entry in parsed.entries] == ["Esomeprazolo"]
+
 
 ###############################################################################
 def test_extract_drugs_from_therapy_keeps_continuation_lines_with_drug_blocks() -> None:
@@ -408,6 +420,7 @@ def test_extract_drugs_from_therapy_keeps_continuation_lines_with_drug_blocks() 
         "Diovan",
         "Domperidon axapharm lingual cpr orodisp",
     ]
+
 
 ###############################################################################
 def test_extract_drugs_from_therapy_uses_rules_before_llm_for_structured_blocks() -> (
@@ -441,6 +454,7 @@ def test_extract_drugs_from_therapy_uses_rules_before_llm_for_structured_blocks(
         "Pantozol",
     ]
 
+
 ###############################################################################
 def test_extract_drugs_from_therapy_splits_reserve_drugs_without_bullets() -> None:
     parser = DrugsParser(client=object())
@@ -470,6 +484,7 @@ def test_extract_drugs_from_therapy_splits_reserve_drugs_without_bullets() -> No
         "Rivotril",
     ]
 
+
 ###############################################################################
 def test_extract_drugs_from_therapy_empty_input_is_safe() -> None:
     parser = DrugsParser(client=object())
@@ -477,6 +492,7 @@ def test_extract_drugs_from_therapy_empty_input_is_safe() -> None:
     parsed = asyncio.run(parser.extract_drugs_from_therapy(""))
 
     assert parsed.entries == []
+
 
 ###############################################################################
 def test_normalize_entry_filters_non_drug_fragments() -> None:
@@ -530,6 +546,7 @@ def test_normalize_entry_filters_non_drug_fragments() -> None:
     assert kept is not None
     assert kept.name == "Pemetrexed"
 
+
 ###############################################################################
 def test_post_process_llm_entry_splits_dosage_from_temporal_details() -> None:
     parser = DrugsParser(client=object())
@@ -564,6 +581,7 @@ def test_post_process_llm_entry_splits_dosage_from_temporal_details() -> None:
 ###############################################################################
 # ── Anamnesis-specific extraction tests (from test_anamnesis_drug_extraction.py) ─
 
+
 ###############################################################################
 def test_extract_drugs_from_anamnesis_sends_full_context_to_llm() -> None:
     client = RecordingStructuredClient(
@@ -589,6 +607,7 @@ def test_extract_drugs_from_anamnesis_sends_full_context_to_llm() -> None:
     assert "the second cycle." in combined_prompts
     assert "Trialmycin 1-0-1" in combined_prompts
     assert [entry.name for entry in parsed.entries if entry.name == "Trialmycin"]
+
 
 ###############################################################################
 def test_extract_drugs_from_anamnesis_sends_complete_anamnesis_to_llm() -> None:
@@ -616,6 +635,7 @@ def test_extract_drugs_from_anamnesis_sends_complete_anamnesis_to_llm() -> None:
     assert "Trialmycin 1-0-1" in combined_prompt
     assert [entry.name for entry in parsed.entries if entry.name == "Trialmycin"]
 
+
 ###############################################################################
 def test_extract_drugs_from_anamnesis_sets_historical_tags() -> None:
     fake_client = FakeStructuredClient(
@@ -640,6 +660,7 @@ def test_extract_drugs_from_anamnesis_sets_historical_tags() -> None:
     assert entry.source == "anamnesis"
     assert entry.historical_flag is True
 
+
 ###############################################################################
 def test_extract_drugs_from_anamnesis_uses_local_compact_schema_for_ollama() -> None:
     client = RecordingLocalSectionClient()
@@ -660,6 +681,7 @@ def test_extract_drugs_from_anamnesis_uses_local_compact_schema_for_ollama() -> 
     assert entry.historical_flag is True
     assert entry.temporal_classification == "temporal_uncertain"
 
+
 ###############################################################################
 def test_extract_drugs_from_anamnesis_empty_result_is_allowed() -> None:
     parser = DrugsParser(client=FakeStructuredClient([PatientDrugs(entries=[])]))
@@ -669,6 +691,7 @@ def test_extract_drugs_from_anamnesis_empty_result_is_allowed() -> None:
     )
 
     assert parsed.entries == []
+
 
 ###############################################################################
 def test_extract_drugs_from_anamnesis_rule_fallback_recovers_drug_lines() -> None:
@@ -686,6 +709,7 @@ def test_extract_drugs_from_anamnesis_rule_fallback_recovers_drug_lines() -> Non
     assert entry.source == "anamnesis"
     assert entry.historical_flag is True
 
+
 ###############################################################################
 def test_extract_drugs_from_anamnesis_sends_long_input_as_single_chunk() -> None:
     client = FakeStructuredClient(
@@ -702,6 +726,7 @@ def test_extract_drugs_from_anamnesis_sends_long_input_as_single_chunk() -> None
 
     assert client.call_count == 2
     assert parsed.entries == []
+
 
 ###############################################################################
 def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
@@ -736,6 +761,7 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
         "Rescuecin",
     ]
 
+
 ###############################################################################
 def test_extract_drugs_from_anamnesis_rejects_grounded_non_medication_entities() -> (
     None
@@ -764,6 +790,7 @@ def test_extract_drugs_from_anamnesis_rejects_grounded_non_medication_entities()
     assert client.call_count == 1
     assert parsed.entries == []
 
+
 ###############################################################################
 def test_extract_drugs_from_anamnesis_accepts_medication_syntax_without_dose() -> None:
     client = FakeStructuredClient(
@@ -789,6 +816,7 @@ def test_extract_drugs_from_anamnesis_accepts_medication_syntax_without_dose() -
     assert [entry.name for entry in parsed.entries] == ["Narramed"]
     assert parsed.entries[0].source_span is not None
 
+
 ###############################################################################
 def test_extract_drugs_from_anamnesis_llm_failure_uses_rule_fallback() -> None:
     parser = DrugsParser(client=AlwaysFailingStructuredClient())
@@ -799,6 +827,7 @@ def test_extract_drugs_from_anamnesis_llm_failure_uses_rule_fallback() -> None:
     assert [entry.name for entry in parsed.entries] == ["Sleepmed"]
     assert parsed.entries[0].historical_flag is True
     assert parsed.entries[0].source == "anamnesis"
+
 
 ###############################################################################
 def test_extract_drugs_from_therapy_uses_llm_before_rule_fallback() -> None:
@@ -815,6 +844,7 @@ def test_extract_drugs_from_therapy_uses_llm_before_rule_fallback() -> None:
     assert [entry.name for entry in parsed.entries] == ["Cardiomed"]
     assert parsed.entries[0].source == "therapy"
     assert parsed.entries[0].historical_flag is False
+
 
 ###############################################################################
 def test_extract_drugs_retries_semantically_invalid_llm_output() -> None:
@@ -838,6 +868,7 @@ def test_extract_drugs_retries_semantically_invalid_llm_output() -> None:
     assert "Artifact descriptor" in client.user_prompts[1]
     assert [entry.name for entry in parsed.entries] == ["Retrymed"]
 
+
 ###############################################################################
 def test_extract_drugs_from_therapy_falls_back_after_llm_failure() -> None:
     parser = DrugsParser(client=AlwaysFailingStructuredClient())
@@ -852,11 +883,13 @@ def test_extract_drugs_from_therapy_falls_back_after_llm_failure() -> None:
 ###############################################################################
 # ── Drug-block isolation tests (from test_drug_block_isolation.py) ────────────
 
+
 ###############################################################################
 def test_bullet_list_blocks() -> None:
     text = "- Esomeprazolo 20 mg\n- Boswellia serrata 1 cps"
     blocks = isolate_drug_blocks(text)
     assert len(blocks) == 2
+
 
 ###############################################################################
 def test_wrapped_bullet_continuation_attached() -> None:
@@ -864,11 +897,13 @@ def test_wrapped_bullet_continuation_attached() -> None:
     blocks = isolate_drug_blocks(text)
     assert "al mattino" in blocks[0].text
 
+
 ###############################################################################
 def test_free_prose_returns_single_block() -> None:
     text = "Paziente in terapia cronica senza dettagli posologici specifici."
     blocks = isolate_drug_blocks(text)
     assert len(blocks) == 1
+
 
 ###############################################################################
 def test_sentence_style_therapy_list_splits_into_blocks() -> None:
@@ -884,6 +919,7 @@ def test_sentence_style_therapy_list_splits_into_blocks() -> None:
         "Ceftriaxone started 2024-01-03.",
     ]
 
+
 ###############################################################################
 def test_overlong_block_is_truncated_at_sentence_boundary() -> None:
     text = (
@@ -896,6 +932,7 @@ def test_overlong_block_is_truncated_at_sentence_boundary() -> None:
 
 ###############################################################################
 # ── Drug traceability tests (from test_anamnesis_extraction_traceability.py) ──
+
 
 ###############################################################################
 def test_drug_llm_post_processing_downgrades_ungrounded_evidence() -> None:
@@ -914,6 +951,7 @@ def test_drug_llm_post_processing_downgrades_ungrounded_evidence() -> None:
 
 ###############################################################################
 # ── Deterministic anamnesis drug extraction tests (from test_deterministic_anamnesis_extraction.py) ──
+
 
 ###############################################################################
 def test_deterministic_anamnesis_regimen_extraction_captures_oncology_history() -> None:
@@ -935,6 +973,7 @@ def test_deterministic_anamnesis_regimen_extraction_captures_oncology_history() 
     assert "Olaparib" in names
     assert "Gemcitabina" in names
     assert result.regimen_lines
+
 
 ###############################################################################
 def test_deterministic_anamnesis_ignores_iso_date_in_symptom_sentence() -> None:

@@ -57,11 +57,13 @@ from domain.settings.environment import (
     EnvironmentSnapshot,
 )
 
+
 ###############################################################################
 def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
+
 
 ###############################################################################
 def load_configuration_data(path: str | Path) -> dict[str, Any]:
@@ -77,9 +79,9 @@ def load_configuration_data(path: str | Path) -> dict[str, Any]:
         raise RuntimeError("Configuration must be a JSON object.")
     return data
 
+
 ###############################################################################
 class ConfigurationManager:
-
     # -------------------------------------------------------------------------
     def __init__(self, config_path: str | None = None) -> None:
         self._config_path = Path(config_path or CONFIGURATIONS_FILE)
@@ -129,6 +131,7 @@ class ConfigurationManager:
         block = self.get_block(block_name)
         return block.get(key, default)
 
+
 ###############################################################################
 def _resolve_ollama_url_with_scheme(
     normalized_host: str,
@@ -149,12 +152,14 @@ def _resolve_ollama_url_with_scheme(
     resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
     return f"{scheme}://{host_port}:{resolved_port}"
 
+
 ###############################################################################
 def _normalize_ollama_host(host: str) -> str:
     normalized = host.strip()
     if normalized.lower() in {"localhost", "::1", "[::1]"}:
         return "127.0.0.1"
     return normalized
+
 
 ###############################################################################
 def resolve_ollama_base_url(
@@ -181,6 +186,7 @@ def resolve_ollama_base_url(
     if port_value is not None:
         return f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{port_value}"
     return fallback.rstrip("/")
+
 
 ###############################################################################
 def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
@@ -213,6 +219,7 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
         ),
     )
 
+
 ###############################################################################
 def _default_llm_runtime_defaults(
     environment: EnvironmentSnapshot,
@@ -239,6 +246,7 @@ def _default_llm_runtime_defaults(
         ),
     )
 
+
 ###############################################################################
 def _build_fastapi_settings() -> FastAPISettings:
     return FastAPISettings(
@@ -247,6 +255,7 @@ def _build_fastapi_settings() -> FastAPISettings:
         description=FASTAPI_DESCRIPTION,
     )
 
+
 ###############################################################################
 def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     payload = ensure_mapping(data)
@@ -254,6 +263,7 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     if polling_interval <= 0:
         polling_interval = 1.0
     return JobsSettings(polling_interval=polling_interval)
+
 
 ###############################################################################
 def _parse_database_url(url: str | None) -> dict[str, Any]:
@@ -269,6 +279,7 @@ def _parse_database_url(url: str | None) -> dict[str, Any]:
         "username": parsed.username or None,
         "password": parsed.password or None,
     }
+
 
 ###############################################################################
 def _build_database_settings(
@@ -326,9 +337,9 @@ def _build_database_settings(
         minimum=1,
         maximum=65535,
     )
-    database_name = coerce_str_or_none(
-        environment.database_name
-    ) or coerce_str_or_none(url_payload.get("database_name"))
+    database_name = coerce_str_or_none(environment.database_name) or coerce_str_or_none(
+        url_payload.get("database_name")
+    )
     username = coerce_str_or_none(environment.username) or coerce_str_or_none(
         url_payload.get("username")
     )
@@ -356,6 +367,7 @@ def _build_database_settings(
         insert_commit_interval=commit_interval,
         select_page_size=read_page_size,
     )
+
 
 ###############################################################################
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
@@ -399,6 +411,7 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
         ),
     )
 
+
 ###############################################################################
 def _build_rag_settings(
     data: dict[str, Any], defaults: LLMRuntimeDefaults
@@ -435,6 +448,7 @@ def _build_rag_settings(
         ),
         embedding_offline_mode=coerce_bool(data.get("embedding_offline_mode"), False),
     )
+
 
 ###############################################################################
 def _build_runtime_settings(
@@ -506,6 +520,7 @@ def _build_runtime_settings(
         ),
     )
 
+
 ###############################################################################
 def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
     min_length = coerce_positive_int(data.get("drug_name_min_length"), 3)
@@ -517,6 +532,7 @@ def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
         drug_name_max_length=max_length,
         drug_name_max_tokens=coerce_positive_int(data.get("drug_name_max_tokens"), 8),
     )
+
 
 ###############################################################################
 def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSettings:
@@ -544,6 +560,7 @@ def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSet
             4,
         ),
     )
+
 
 ###############################################################################
 def build_settings_payload_from_json(

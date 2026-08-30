@@ -17,6 +17,7 @@ from repositories.database.migrations import (
     migrate_database,
 )
 
+
 ###############################################################################
 def _engine(path: Path):
     return create_engine(
@@ -25,6 +26,7 @@ def _engine(path: Path):
         connect_args={"timeout": 30.0, "autocommit": False},
     )
 
+
 ###############################################################################
 def _upgrade_to(engine, revision: str) -> None:  # type: ignore[no-untyped-def]
     config = build_alembic_config()
@@ -32,6 +34,7 @@ def _upgrade_to(engine, revision: str) -> None:  # type: ignore[no-untyped-def]
         with connection.begin():
             config.attributes["connection"] = connection
             command.upgrade(config, revision)
+
 
 ###############################################################################
 def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) -> None:
@@ -47,12 +50,20 @@ def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) ->
         assert inspect(engine).has_table("clinical_sessions")
         assert inspect(engine).has_table("alembic_version")
         with engine.connect() as connection:
-            assert connection.execute(text("select version_num from alembic_version")).scalar_one() == HEAD_REVISION
+            assert (
+                connection.execute(
+                    text("select version_num from alembic_version")
+                ).scalar_one()
+                == HEAD_REVISION
+            )
     finally:
         engine.dispose()
 
+
 ###############################################################################
-def test_populated_unversioned_schema_is_rejected_without_stamping(tmp_path: Path) -> None:
+def test_populated_unversioned_schema_is_rejected_without_stamping(
+    tmp_path: Path,
+) -> None:
     database_path = tmp_path / "legacy.db"
     engine = _engine(database_path)
     try:
@@ -63,7 +74,7 @@ def test_populated_unversioned_schema_is_rejected_without_stamping(tmp_path: Pat
                     "insert into application_configuration "
                     "(id, revision, payload) values (1, 0, :payload)"
                 ),
-                {"payload": "{\"clinical_model\": \"legacy\"}"},
+                {"payload": '{"clinical_model": "legacy"}'},
             )
             connection.execute(text("drop table alembic_version"))
 
@@ -71,15 +82,21 @@ def test_populated_unversioned_schema_is_rejected_without_stamping(tmp_path: Pat
             migrate_database(engine, database_was_empty=False)
         with engine.connect() as connection:
             assert not inspect(connection).has_table("alembic_version")
-            assert connection.execute(
-                text("select payload from application_configuration where id = 1")
-            ).scalar_one() == '{"clinical_model": "legacy"}'
+            assert (
+                connection.execute(
+                    text("select payload from application_configuration where id = 1")
+                ).scalar_one()
+                == '{"clinical_model": "legacy"}'
+            )
             assert "schema_version" not in {
                 column["name"]
-                for column in inspect(connection).get_columns("application_configuration")
+                for column in inspect(connection).get_columns(
+                    "application_configuration"
+                )
             }
     finally:
         engine.dispose()
+
 
 ###############################################################################
 def test_unversioned_current_schema_is_rejected_without_recreating_tables(
@@ -95,7 +112,7 @@ def test_unversioned_current_schema_is_rejected_without_recreating_tables(
                     "insert into application_configuration "
                     "(id, revision, payload) values (1, 0, :payload)"
                 ),
-                {"payload": "{\"preserve\": true}"},
+                {"payload": '{"preserve": true}'},
             )
             connection.execute(text("drop table alembic_version"))
 
@@ -103,11 +120,15 @@ def test_unversioned_current_schema_is_rejected_without_recreating_tables(
             migrate_database(engine, database_was_empty=False)
         with engine.connect() as connection:
             assert not inspect(connection).has_table("alembic_version")
-            assert connection.execute(
-                text("select payload from application_configuration where id = 1")
-            ).scalar_one() == '{"preserve": true}'
+            assert (
+                connection.execute(
+                    text("select payload from application_configuration where id = 1")
+                ).scalar_one()
+                == '{"preserve": true}'
+            )
     finally:
         engine.dispose()
+
 
 ###############################################################################
 def test_unknown_unversioned_schema_is_rejected_before_version_table_creation(
@@ -126,6 +147,7 @@ def test_unknown_unversioned_schema_is_rejected_before_version_table_creation(
             assert not inspect(connection).has_table("alembic_version")
     finally:
         engine.dispose()
+
 
 ###############################################################################
 def test_model_role_data_migration_populates_only_missing_roles(tmp_path: Path) -> None:
@@ -167,6 +189,7 @@ def test_model_role_data_migration_populates_only_missing_roles(tmp_path: Path) 
     finally:
         engine.dispose()
 
+
 ###############################################################################
 def test_unknown_versioned_schema_is_rejected_without_changing_revision(
     tmp_path: Path,
@@ -184,11 +207,15 @@ def test_unknown_versioned_schema_is_rejected_without_changing_revision(
             migrate_database(engine, database_was_empty=False)
 
         with engine.connect() as connection:
-            assert connection.execute(
-                text("select version_num from alembic_version")
-            ).scalar_one() == "unknown_revision"
+            assert (
+                connection.execute(
+                    text("select version_num from alembic_version")
+                ).scalar_one()
+                == "unknown_revision"
+            )
     finally:
         engine.dispose()
+
 
 ###############################################################################
 def test_failed_migration_rolls_back_schema_and_version_changes(
@@ -215,6 +242,7 @@ def test_failed_migration_rolls_back_schema_and_version_changes(
     finally:
         engine.dispose()
 
+
 ###############################################################################
 def test_drop_existing_resets_managed_database_through_alembic(tmp_path: Path) -> None:
     database_path = tmp_path / "reset.db"
@@ -227,19 +255,28 @@ def test_drop_existing_resets_managed_database_through_alembic(tmp_path: Path) -
                     "insert into application_configuration "
                     "(id, revision, payload) values (1, 0, :payload)"
                 ),
-                {"payload": "{\"reset\": true}"},
+                {"payload": '{"reset": true}'},
             )
 
         result = migrate_database(engine, database_was_empty=False, drop_existing=True)
 
         assert result.reset is True
         with engine.connect() as connection:
-            assert connection.execute(
-                text("select count(*) from application_configuration")
-            ).scalar_one() == 0
-            assert connection.execute(text("select version_num from alembic_version")).scalar_one() == HEAD_REVISION
+            assert (
+                connection.execute(
+                    text("select count(*) from application_configuration")
+                ).scalar_one()
+                == 0
+            )
+            assert (
+                connection.execute(
+                    text("select version_num from alembic_version")
+                ).scalar_one()
+                == HEAD_REVISION
+            )
     finally:
         engine.dispose()
+
 
 ###############################################################################
 def test_concurrent_sqlite_startup_attempts_serialize(tmp_path: Path) -> None:
@@ -250,7 +287,9 @@ def test_concurrent_sqlite_startup_attempts_serialize(tmp_path: Path) -> None:
         engine = _engine(database_path)
         try:
             barrier.wait(timeout=30)
-            return migrate_database(engine, database_was_empty=not database_path.exists()).target_heads
+            return migrate_database(
+                engine, database_was_empty=not database_path.exists()
+            ).target_heads
         finally:
             engine.dispose()
 

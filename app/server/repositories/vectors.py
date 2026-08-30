@@ -49,9 +49,9 @@ VECTOR_TABLE_SCHEMA = pa.schema(
 DistanceType = Literal["l2", "cosine", "dot"]
 IndexType = Literal["IVF_FLAT", "IVF_PQ", "IVF_HNSW_SQ", "IVF_HNSW_PQ"]
 
+
 ###############################################################################
 class LanceVectorDatabase:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -163,8 +163,13 @@ class LanceVectorDatabase:
                 "the index build was aborted before persistence."
             )
         for record in records:
-            if record.get("embedding_fingerprint") != CANONICAL_EMBEDDING_CONFIG.fingerprint:
-                raise ValueError("Embedding fingerprint does not match canonical configuration")
+            if (
+                record.get("embedding_fingerprint")
+                != CANONICAL_EMBEDDING_CONFIG.fingerprint
+            ):
+                raise ValueError(
+                    "Embedding fingerprint does not match canonical configuration"
+                )
         self.configure_embedding_size(CANONICAL_EMBEDDING_CONFIG.dimension)
         self.ensure_fixed_embedding_schema(CANONICAL_EMBEDDING_CONFIG.dimension)
         table = self.get_table()
@@ -471,8 +476,7 @@ class LanceVectorDatabase:
             raise ValueError("RAG vector collection is missing")
         records = self.load_embeddings()
         fingerprints = {
-            str(row.get("embedding_fingerprint") or "").strip()
-            for row in records
+            str(row.get("embedding_fingerprint") or "").strip() for row in records
         }
         fingerprints.discard("")
         if fingerprints != {expected_fingerprint}:

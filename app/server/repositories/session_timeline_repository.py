@@ -21,9 +21,9 @@ from repositories.serialization.session_timelines import (
 )
 from repositories.values import normalize_string
 
+
 ###############################################################################
 class SessionTimelineRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, context: RepositoryContext) -> None:
         self.context = context
@@ -188,8 +188,12 @@ class SessionTimelineRepository:
                 ),
                 "anamnesis": normalize_string(session_row.anamnesis),
                 "drugs": normalize_string(session_row.drugs_text),
-                "laboratory_analysis": normalize_string(session_row.laboratory_analysis),
-                "text_extraction_model": normalize_string(session_row.text_extraction_model),
+                "laboratory_analysis": normalize_string(
+                    session_row.laboratory_analysis
+                ),
+                "text_extraction_model": normalize_string(
+                    session_row.text_extraction_model
+                ),
                 "clinical_model": normalize_string(session_row.clinical_model),
                 "sections": sections,
                 "session_result_payload": session_payload,

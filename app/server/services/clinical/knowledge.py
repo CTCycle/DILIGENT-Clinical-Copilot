@@ -6,9 +6,9 @@ from repositories import values as repository_values
 
 from repositories.knowledge_repository import KnowledgeRepository
 
+
 ###############################################################################
 class ClinicalKnowledgeComposer:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, knowledge_repository: KnowledgeRepository) -> None:
         self.knowledge_repository = knowledge_repository

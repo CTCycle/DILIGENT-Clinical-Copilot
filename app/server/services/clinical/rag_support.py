@@ -19,11 +19,13 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RagRetrievalBundle:
     context_text: str | None
     references: tuple[RagDocumentReference, ...]
+
 
 ###############################################################################
 class RagSupportService:
@@ -220,8 +222,7 @@ class RagSupportService:
     # -------------------------------------------------------------------------
     def record_low_relevance_issue(self, excluded_count: int) -> None:
         if any(
-            issue.code == "rag_low_relevance_excluded"
-            for issue in self.pipeline_issues
+            issue.code == "rag_low_relevance_excluded" for issue in self.pipeline_issues
         ):
             return
         self.pipeline_issues.append(
@@ -245,7 +246,7 @@ class RagSupportService:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -318,7 +319,7 @@ class RagSupportService:
     def _coerce_page_number(value: Any) -> int | None:
         try:
             parsed = int(str(value).strip())
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return parsed if parsed >= 1 else None
 

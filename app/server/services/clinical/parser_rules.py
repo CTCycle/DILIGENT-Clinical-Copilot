@@ -25,9 +25,9 @@ from common.utils.text_utils import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
 from services.clinical.parser_host import ParserHost
 
+
 ###############################################################################
 class DrugRulesMixin(ParserHost):
-
     # -------------------------------------------------------------------------
     def extract_drugs_from_anamnesis_rule_based(
         self, anamnesis: str

@@ -13,6 +13,7 @@ from common.paths import RESOURCES_PATH, ROOT_DIR
 DEFAULT_KEY_PURPOSE = "provider_access_keys"
 EXTERNAL_KEY_FILE_ENV = "DILIGENT_ACCESS_KEY_MATERIAL_FILE"
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ExternalEncryptionMaterial:
@@ -24,6 +25,7 @@ class ExternalEncryptionMaterial:
     activated_at: datetime
     deactivated_at: datetime | None = None
     id: int | None = None
+
 
 ###############################################################################
 class AccessKeyEncryptionMaterialSerializer:
@@ -58,7 +60,9 @@ class AccessKeyEncryptionMaterialSerializer:
         except (OSError, json.JSONDecodeError) as exc:
             raise RuntimeError("External access-key material file is invalid") from exc
         if not isinstance(payload, dict):
-            raise RuntimeError("External access-key material file must contain an object")
+            raise RuntimeError(
+                "External access-key material file must contain an object"
+            )
         return payload
 
     # -------------------------------------------------------------------------
@@ -106,7 +110,9 @@ class AccessKeyEncryptionMaterialSerializer:
         return record if isinstance(record, dict) else None
 
     # -------------------------------------------------------------------------
-    def ensure_seeded(self, purpose: str = DEFAULT_KEY_PURPOSE) -> ExternalEncryptionMaterial:
+    def ensure_seeded(
+        self, purpose: str = DEFAULT_KEY_PURPOSE
+    ) -> ExternalEncryptionMaterial:
         path = self.external_path()
         payload = self._read_store(path)
         purpose_store = payload.get(purpose)
@@ -157,12 +163,16 @@ class AccessKeyEncryptionMaterialSerializer:
         payload = self._read_store(path)
         purpose_store = payload.get(purpose)
         if not isinstance(purpose_store, dict):
-            raise RuntimeError(f"No active encryption material configured for {purpose}")
+            raise RuntimeError(
+                f"No active encryption material configured for {purpose}"
+            )
         active_version = int(purpose_store.get("active_version", 0))
         active = self._get_version_record(payload, purpose, active_version)
         versions = purpose_store.get("versions")
         if not active_version or active is None or not isinstance(versions, dict):
-            raise RuntimeError(f"No active encryption material configured for {purpose}")
+            raise RuntimeError(
+                f"No active encryption material configured for {purpose}"
+            )
 
         now = datetime.now(UTC).replace(tzinfo=None)
         active["is_active"] = False

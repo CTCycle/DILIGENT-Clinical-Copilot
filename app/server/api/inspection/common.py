@@ -3,12 +3,17 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Response, status
 
 from common.utils.logger import logger
-from domain.jobs import JobCancelResponse, JobListResponse, JobStartResponse, JobStatusResponse
+from domain.jobs import (
+    JobCancelResponse,
+    JobListResponse,
+    JobStartResponse,
+    JobStatusResponse,
+)
 from services.inspection.service import DataInspectionService
+
 
 ###############################################################################
 class InspectionEndpointBase:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -19,14 +24,17 @@ class InspectionEndpointBase:
         self.router = router
         self.service = service
 
+
 ###############################################################################
 class InspectionJobEndpointMixin(InspectionEndpointBase):
-
     # -------------------------------------------------------------------------
     def list_update_jobs(self, response: Response) -> JobListResponse:
         response.headers["Cache-Control"] = "no-store"
         return JobListResponse(
-            jobs=[JobStatusResponse(**payload) for payload in self.service.list_update_jobs()]
+            jobs=[
+                JobStatusResponse(**payload)
+                for payload in self.service.list_update_jobs()
+            ]
         )
 
     # -------------------------------------------------------------------------

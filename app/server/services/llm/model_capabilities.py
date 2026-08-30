@@ -10,8 +10,11 @@ from domain.llm.providers import CloudModelDescriptor
 from domain.model_configs import ReasoningLevel
 from services.llm.generation_policy import GenerationPolicy
 
-CapabilitySource = Literal["exact_model", "model_family", "provider", "live", "fallback"]
+CapabilitySource = Literal[
+    "exact_model", "model_family", "provider", "live", "fallback"
+]
 ReasoningParameter = Literal["none", "boolean", "level", "effort", "budget_tokens"]
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -23,6 +26,7 @@ class ModelCapabilities:
     supports_temperature: bool
     supports_json_mode: bool
     source: CapabilitySource
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -52,6 +56,7 @@ class EffectiveInferenceConfig:
 
 _CATALOG_PATH = CATALOGS_PATH / "llm_model_capabilities.json"
 
+
 ###############################################################################
 def _load_catalog() -> dict[str, object]:
     with _CATALOG_PATH.open(encoding="utf-8") as handle:
@@ -65,13 +70,17 @@ def _load_catalog() -> dict[str, object]:
 
 _CATALOG = _load_catalog()
 
+
 ###############################################################################
 def _fallback_rule() -> dict[str, object]:
     fallback = _CATALOG.get("fallback")
     return fallback if isinstance(fallback, dict) else {}
 
+
 ###############################################################################
-def _find_catalog_rule(provider: str, model: str) -> tuple[dict[str, object], CapabilitySource]:
+def _find_catalog_rule(
+    provider: str, model: str
+) -> tuple[dict[str, object], CapabilitySource]:
     normalized_provider = provider.strip().lower()
     normalized_model = model.strip()
     exact_models = _CATALOG.get("exact_models")
@@ -90,7 +99,11 @@ def _find_catalog_rule(provider: str, model: str) -> tuple[dict[str, object], Ca
             if not key.startswith(prefix):
                 continue
             family = key.removeprefix(prefix)
-            if normalized_model == family or normalized_model.startswith(f"{family}:") or normalized_model.startswith(family):
+            if (
+                normalized_model == family
+                or normalized_model.startswith(f"{family}:")
+                or normalized_model.startswith(family)
+            ):
                 matching.append((len(family), raw_rule))
         if matching:
             return max(matching, key=lambda item: item[0])[1], "model_family"
@@ -102,15 +115,17 @@ def _find_catalog_rule(provider: str, model: str) -> tuple[dict[str, object], Ca
             return provider_rule, "provider"
     return _fallback_rule(), "fallback"
 
+
 ###############################################################################
 def _coerce_optional_positive_int(value: object) -> int | None:
     if value is None:
         return None
     try:
         parsed = int(str(value))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return parsed if parsed > 0 else None
+
 
 ###############################################################################
 def _coerce_reasoning_levels(value: object) -> tuple[ReasoningLevel, ...]:
@@ -119,12 +134,15 @@ def _coerce_reasoning_levels(value: object) -> tuple[ReasoningLevel, ...]:
     levels: list[ReasoningLevel] = []
     for item in value:
         try:
-            level = item if isinstance(item, ReasoningLevel) else ReasoningLevel(str(item))
+            level = (
+                item if isinstance(item, ReasoningLevel) else ReasoningLevel(str(item))
+            )
         except ValueError:
             continue
         if level not in levels:
             levels.append(level)
     return tuple(levels) or (ReasoningLevel.OFF,)
+
 
 ###############################################################################
 def _coerce_reasoning_parameter(value: object) -> ReasoningParameter:
@@ -137,6 +155,7 @@ def _coerce_reasoning_parameter(value: object) -> ReasoningParameter:
     )
     normalized = str(value or "none")
     return normalized if normalized in allowed else "none"  # type: ignore[return-value]
+
 
 ###############################################################################
 def resolve_model_capabilities(
@@ -159,23 +178,37 @@ def resolve_model_capabilities(
 
     input_token_limit = _coerce_optional_positive_int(
         descriptor.input_token_limit
-        if descriptor_has_metadata and descriptor is not None and descriptor.input_token_limit is not None
+        if descriptor_has_metadata
+        and descriptor is not None
+        and descriptor.input_token_limit is not None
         else rule.get("input_token_limit", fallback.get("input_token_limit"))
     )
     output_token_limit = _coerce_optional_positive_int(
         descriptor.output_token_limit
-        if descriptor_has_metadata and descriptor is not None and descriptor.output_token_limit is not None
+        if descriptor_has_metadata
+        and descriptor is not None
+        and descriptor.output_token_limit is not None
         else rule.get("output_token_limit", fallback.get("output_token_limit"))
     )
     levels = _coerce_reasoning_levels(
-        rule.get("supported_reasoning_levels", fallback.get("supported_reasoning_levels"))
+        rule.get(
+            "supported_reasoning_levels", fallback.get("supported_reasoning_levels")
+        )
     )
-    if descriptor_has_metadata and descriptor is not None and descriptor.supports_thinking is not None:
+    if (
+        descriptor_has_metadata
+        and descriptor is not None
+        and descriptor.supports_thinking is not None
+    ):
         levels = levels if descriptor.supports_thinking else (ReasoningLevel.OFF,)
     supports_temperature = bool(
         descriptor.supports_temperature
-        if descriptor_has_metadata and descriptor is not None and descriptor.supports_temperature is not None
-        else rule.get("supports_temperature", fallback.get("supports_temperature", False))
+        if descriptor_has_metadata
+        and descriptor is not None
+        and descriptor.supports_temperature is not None
+        else rule.get(
+            "supports_temperature", fallback.get("supports_temperature", False)
+        )
     )
     supports_json_mode = bool(
         rule.get("supports_json_mode", fallback.get("supports_json_mode", False))
@@ -192,6 +225,7 @@ def resolve_model_capabilities(
         source="live" if descriptor_has_metadata else source,
     )
 
+
 ###############################################################################
 def _select_supported_reasoning_level(
     requested: ReasoningLevel, supported: tuple[ReasoningLevel, ...]
@@ -204,7 +238,10 @@ def _select_supported_reasoning_level(
         ReasoningLevel.MEDIUM: 2,
         ReasoningLevel.HIGH: 3,
     }
-    return min(supported, key=lambda level: (abs(rank[level] - rank[requested]), rank[level]))
+    return min(
+        supported, key=lambda level: (abs(rank[level] - rank[requested]), rank[level])
+    )
+
 
 ###############################################################################
 def resolve_effective_inference_config(

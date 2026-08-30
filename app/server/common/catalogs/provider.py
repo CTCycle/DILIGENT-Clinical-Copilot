@@ -5,9 +5,9 @@ from functools import lru_cache
 
 from domain.catalogs import ReferenceCatalogSnapshot
 
+
 ###############################################################################
 class _CatalogProvider:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._impl: Callable[[], ReferenceCatalogSnapshot] | None = None
@@ -39,6 +39,7 @@ class _CatalogProvider:
     def invalidate(self) -> None:
         if self._invalidate is not None:
             self._invalidate()
+
 
 ###############################################################################
 @lru_cache(maxsize=1)

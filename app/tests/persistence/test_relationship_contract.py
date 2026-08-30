@@ -13,6 +13,7 @@ from repositories.schemas.knowledge import (
     DrugIdentifier,
 )
 
+
 ###############################################################################
 def test_session_children_cascade_and_drug_mentions_set_null(
     persistence_session,

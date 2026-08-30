@@ -39,13 +39,14 @@ from services.llm.model_capabilities import EffectiveInferenceConfig
 
 ProviderName = CloudProviderId
 
+
 ###############################################################################
 def _list_gemini_models_sync(client: genai.Client) -> list[Any]:
     return list(client.models.list())
 
+
 ###############################################################################
 class LLMError(RuntimeError):
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -57,6 +58,7 @@ class LLMError(RuntimeError):
         super().__init__(message)
         self.error_code = error_code
         self.retryable = bool(retryable)
+
 
 ###############################################################################
 class LLMTimeout(LLMError):
@@ -72,9 +74,11 @@ class LLMTimeout(LLMError):
     ) -> None:
         super().__init__(message, error_code=error_code, retryable=retryable)
 
+
 ###############################################################################
 def short_output_hash(output_text: str) -> str:
     return hashlib.sha256((output_text or "").encode("utf-8")).hexdigest()[:12]
+
 
 ###############################################################################
 class CloudLLMClient:
@@ -245,7 +249,9 @@ class CloudLLMClient:
             raise LLMError("Gemini client is not configured")
 
         try:
-            raw_models = await asyncio.to_thread(_list_gemini_models_sync, self.gemini_client)
+            raw_models = await asyncio.to_thread(
+                _list_gemini_models_sync, self.gemini_client
+            )
         except Exception as exc:  # noqa: BLE001
             raise self._map_provider_exception(exc) from exc
 
@@ -283,9 +289,7 @@ class CloudLLMClient:
             models.append(
                 CloudModelDescriptor(
                     id=model_id,
-                    display_name=str(
-                        getattr(item, "display_name", None) or model_id
-                    ),
+                    display_name=str(getattr(item, "display_name", None) or model_id),
                     input_token_limit=input_token_limit,
                     output_token_limit=output_token_limit,
                     supports_thinking=supports_thinking,
@@ -305,7 +309,7 @@ class CloudLLMClient:
             return None
         try:
             parsed = int(str(value))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return parsed if parsed > 0 else None
 
@@ -422,10 +426,14 @@ class CloudLLMClient:
             kwargs["top_p"] = float(options["top_p"])
         if effective.output_token_limit > 0:
             kwargs["max_output_tokens"] = effective.output_token_limit
-        if effective.effective_reasoning_level.value != "off" and effective.reasoning_parameter in {
-            "effort",
-            "level",
-        }:
+        if (
+            effective.effective_reasoning_level.value != "off"
+            and effective.reasoning_parameter
+            in {
+                "effort",
+                "level",
+            }
+        ):
             kwargs["reasoning"] = {"effort": effective.effective_reasoning_level.value}
         if format == "json":
             json_instruction = "Return the response as one valid JSON object."
@@ -477,7 +485,8 @@ class CloudLLMClient:
                 else:
                     sdk_level = (
                         genai_types.ThinkingLevel.LOW
-                        if effective.effective_reasoning_level.value in {"low", "medium"}
+                        if effective.effective_reasoning_level.value
+                        in {"low", "medium"}
                         else genai_types.ThinkingLevel.HIGH
                     )
                     config_kwargs["thinking_config"] = genai_types.ThinkingConfig(
@@ -641,7 +650,9 @@ class CloudLLMClient:
                 response = getattr(exc, "response", None)
                 status_code = getattr(response, "status_code", None)
             if isinstance(status_code, int):
-                error_code, retryable = CloudLLMClient._http_status_error_code(status_code)
+                error_code, retryable = CloudLLMClient._http_status_error_code(
+                    status_code
+                )
                 return LLMError(
                     f"Cloud provider returned HTTP {status_code}",
                     error_code=error_code,
@@ -869,10 +880,14 @@ class CloudLLMClient:
         if effective.temperature is not None:
             kwargs["temperature"] = effective.temperature
         kwargs["max_output_tokens"] = effective.output_token_limit
-        if effective.effective_reasoning_level.value != "off" and effective.reasoning_parameter in {
-            "effort",
-            "level",
-        }:
+        if (
+            effective.effective_reasoning_level.value != "off"
+            and effective.reasoning_parameter
+            in {
+                "effort",
+                "level",
+            }
+        ):
             kwargs["reasoning"] = {"effort": effective.effective_reasoning_level.value}
         try:
             response = await self.openai_client.responses.parse(**kwargs)

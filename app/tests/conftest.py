@@ -28,6 +28,7 @@ TEST_CACHE_ROOT = Path(__file__).resolve().parent / "cache"
 RUNTIME_CACHE_ROOT = REPO_ROOT / "runtimes" / "cache"
 PYTEST_CACHE_ROOT = TEST_CACHE_ROOT / "pytest"
 
+
 ###############################################################################
 def _configure_test_embedded_database_path() -> None:
     temp_root = PYTEST_CACHE_ROOT / "databases"
@@ -43,6 +44,7 @@ def _configure_test_embedded_database_path() -> None:
         }
     )
     initialize_sqlite_database(settings)
+
 
 ###############################################################################
 def _configure_playwright_node_runtime() -> None:
@@ -65,9 +67,9 @@ _configure_playwright_node_runtime()
 _configure_test_embedded_database_path()
 initialize_reference_catalog_provider()
 
+
 ###############################################################################
 class WorkspaceTempPathFactory:
-
     # -------------------------------------------------------------------------
     def __init__(self, root: Path) -> None:
         self.root = root
@@ -85,6 +87,7 @@ class WorkspaceTempPathFactory:
         path.mkdir(parents=True, exist_ok=False)
         return path
 
+
 ###############################################################################
 @pytest.fixture(scope="session")
 def tmp_path_factory() -> WorkspaceTempPathFactory:
@@ -92,6 +95,7 @@ def tmp_path_factory() -> WorkspaceTempPathFactory:
     factory = WorkspaceTempPathFactory(root)
     yield factory
     shutil.rmtree(root, ignore_errors=True)
+
 
 ###############################################################################
 @pytest.fixture
@@ -103,9 +107,9 @@ def tmp_path(
     yield path
     shutil.rmtree(path, ignore_errors=True)
 
+
 ###############################################################################
 class CoroutineThreadRunner:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -131,11 +135,13 @@ class CoroutineThreadRunner:
         except BaseException as exc:
             self.box["error"] = exc
 
+
 ###############################################################################
 def _normalize_host_for_url(host: str) -> str:
     if host in {"0.0.0.0", "::", "[::]"}:
         return "127.0.0.1"
     return host
+
 
 ###############################################################################
 def _build_base_url(
@@ -147,6 +153,7 @@ def _build_base_url(
     host = _normalize_host_for_url(os.getenv(host_env, default_host))
     port = os.getenv(port_env, default_port)
     return f"http://{host}:{port}"
+
 
 ###############################################################################
 def run_coroutine_in_thread(
@@ -163,9 +170,9 @@ def run_coroutine_in_thread(
         raise runner.box["error"]
     return runner.box.get("result")
 
+
 ###############################################################################
 class AsyncioRunPatch:
-
     # -------------------------------------------------------------------------
     def __init__(self, original_run: Any) -> None:
         self.original_run = original_run
@@ -196,17 +203,20 @@ API_BASE_URL = (
     or _build_base_url("FASTAPI_HOST", "FASTAPI_PORT", "127.0.0.1", "8000")
 )
 
+
 ###############################################################################
 @pytest.fixture(scope="session")
 def base_url() -> str:
     """Returns the base URL of the UI."""
     return UI_BASE_URL
 
+
 ###############################################################################
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
     """Returns the base URL of the backend API."""
     return API_BASE_URL
+
 
 ###############################################################################
 @pytest.fixture
@@ -222,6 +232,7 @@ def api_context(playwright):
     context = playwright.request.new_context(base_url=API_BASE_URL, timeout=60000)
     yield context
     context.dispose()
+
 
 ###############################################################################
 @pytest.fixture(autouse=True)

@@ -29,6 +29,7 @@ from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
 from services.text.vocabulary import get_text_normalization_snapshot
 
+
 ###############################################################################
 def _sanitize_optional_text(
     value: str | float | int | None,
@@ -72,14 +73,15 @@ RUCAM_SCORE_TEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
     normalized = (marker_name or "").strip().casefold()
     return aliases.get(normalized, marker_name)
 
+
 ###############################################################################
 class ClinicalLabExtractor:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -628,7 +630,7 @@ class ClinicalLabExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -696,7 +698,9 @@ class ClinicalLabExtractor:
             entries=[
                 ClinicalLabEntry(
                     marker_name=entry.marker_name,
-                    value_text=_sanitize_optional_text(entry.value_text, max_length=100),
+                    value_text=_sanitize_optional_text(
+                        entry.value_text, max_length=100
+                    ),
                     unit=_sanitize_optional_text(entry.unit, max_length=50),
                     sample_date=_sanitize_optional_text(
                         entry.sample_date, max_length=120

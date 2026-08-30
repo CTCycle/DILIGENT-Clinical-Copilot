@@ -26,6 +26,7 @@ from services.clinical.matches_core import (
 )
 from services.text.normalization import normalize_drug_query_name
 
+
 ###############################################################################
 class ClinicalKnowledgePreparation:
     IDENTITY_FALLBACK_SYSTEM_PROMPT = """
@@ -88,9 +89,11 @@ RxNav and LiverTox evidence before accepting it.
                         nbk_id=nbk_id,
                     )
                 if drug_id is None:
-                    drug_id = self.knowledge_repository.resolve_drug_id_from_match_cache(
-                        db_session,
-                        normalized_drug_key=normalize_drug_query_name(raw_name),
+                    drug_id = (
+                        self.knowledge_repository.resolve_drug_id_from_match_cache(
+                            db_session,
+                            normalized_drug_key=normalize_drug_query_name(raw_name),
+                        )
                     )
                 item["drug_id"] = drug_id
                 resolved.append(item)
@@ -113,8 +116,12 @@ RxNav and LiverTox evidence before accepting it.
                     continue
                 raw_name_norm = normalize_drug_query_name(raw_name)
                 drug_id = repository_values.to_int(item.get("drug_id"))
-                match_reason = repository_values.normalize_string(item.get("match_reason"))
-                match_confidence = repository_values.to_float(item.get("match_confidence"))
+                match_reason = repository_values.normalize_string(
+                    item.get("match_reason")
+                )
+                match_confidence = repository_values.to_float(
+                    item.get("match_confidence")
+                )
                 matched_drug_name = repository_values.normalize_string(
                     item.get("matched_drug_name") or item.get("accepted_livertox_name")
                 )
@@ -191,8 +198,10 @@ RxNav and LiverTox evidence before accepting it.
             return None
         resolver = DrugResolutionService(
             self.livertox_matcher,
-            cache_lookup=lambda key: self.knowledge_repository.load_livertox_match_from_db_cache(
-                normalized_drug_key=key,
+            cache_lookup=lambda key: (
+                self.knowledge_repository.load_livertox_match_from_db_cache(
+                    normalized_drug_key=key,
+                )
             ),
         )
         resolved_drugs = await asyncio.to_thread(resolver.resolve, drugs)
@@ -608,7 +617,9 @@ RxNav and LiverTox evidence before accepting it.
         if self.livertox_matcher is not None:
             return True
         try:
-            dataset = await asyncio.to_thread(self.knowledge_repository.get_livertox_records)
+            dataset = await asyncio.to_thread(
+                self.knowledge_repository.get_livertox_records
+            )
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed loading LiverTox monographs from database: %s", exc)
             self.livertox_matcher = None

@@ -15,6 +15,7 @@ from repositories.serialization.application_configuration import (
 
 UNSET = object()
 
+
 ###############################################################################
 class ModelConfigSerializer:
     """Persist the validated model configuration as one singleton document."""
@@ -72,7 +73,9 @@ class ModelConfigSerializer:
                     "must seed the canonical configuration before the service starts."
                 )
             if not isinstance(row.payload, dict):
-                raise ValueError("Persisted model configuration payload must be an object.")
+                raise ValueError(
+                    "Persisted model configuration payload must be an object."
+                )
             payload = dict(row.payload)
             return self.snapshot_from_payload(payload, updated_at=row.updated_at)
 
@@ -130,7 +133,9 @@ class ModelConfigSerializer:
         current["ollama_seed"] = self.normalize_optional_seed(
             current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
         )
-        current["rag_settings"] = self.normalize_rag_settings(current.get("rag_settings"))
+        current["rag_settings"] = self.normalize_rag_settings(
+            current.get("rag_settings")
+        )
         saved_payload, updated_at = self.application_configuration.save(
             current,
             return_metadata=True,
@@ -209,5 +214,5 @@ class ModelConfigSerializer:
             return None
         try:
             return max(0, int(str(value).strip()))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None

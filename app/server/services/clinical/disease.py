@@ -30,9 +30,9 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 class DiseaseExtractor:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -273,7 +273,7 @@ class DiseaseExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None

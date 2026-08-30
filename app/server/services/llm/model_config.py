@@ -51,9 +51,9 @@ from services.retrieval.settings import (
     rag_settings_payload,
 )
 
+
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
-
     # -------------------------------------------------------------------------
     def load_snapshot(self) -> ModelConfigSnapshot: ...
 
@@ -73,6 +73,7 @@ class ModelConfigSnapshotStore(Protocol):
         ollama_seed: int | None | object = ...,
         rag_settings: dict[str, object] | object = ...,
     ) -> ModelConfigSnapshot: ...
+
 
 ###############################################################################
 class ModelConfigService:
@@ -130,15 +131,9 @@ class ModelConfigService:
             if "use_cloud_services" in fields_set
             else bool(snapshot.use_cloud_models)
         )
-        requires_local_model_availability = (
-            not target_use_cloud_models
-            and (
-                local_roles_updated
-                or (
-                    "use_cloud_services" in fields_set
-                    and not target_use_cloud_models
-                )
-            )
+        requires_local_model_availability = not target_use_cloud_models and (
+            local_roles_updated
+            or ("use_cloud_services" in fields_set and not target_use_cloud_models)
         )
         available_local_model_names = (
             await self.list_available_ollama_models()
@@ -218,7 +213,15 @@ class ModelConfigService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _local_roles_updated(fields_set: set[str]) -> bool:
-        return bool(fields_set & {"clinical_model", "text_extraction_model", "revision_model", "timeline_model"})
+        return bool(
+            fields_set
+            & {
+                "clinical_model",
+                "text_extraction_model",
+                "revision_model",
+                "timeline_model",
+            }
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -235,7 +238,12 @@ class ModelConfigService:
         refresh_from_ollama: bool,
     ) -> set[str]:
         local_model_names = self.known_local_model_names()
-        for model_name in (snapshot.clinical_model, snapshot.text_extraction_model, snapshot.revision_model, snapshot.timeline_model):
+        for model_name in (
+            snapshot.clinical_model,
+            snapshot.text_extraction_model,
+            snapshot.revision_model,
+            snapshot.timeline_model,
+        ):
             if model_name:
                 local_model_names.add(model_name)
         if not refresh_from_ollama:
@@ -310,7 +318,12 @@ class ModelConfigService:
         active_cloud_model: str | None,
         updates: dict[str, Any],
     ) -> None:
-        for field_name, role_name in (("clinical_model", "clinical"), ("text_extraction_model", "text_extraction"), ("revision_model", "revision"), ("timeline_model", "timeline")):
+        for field_name, role_name in (
+            ("clinical_model", "clinical"),
+            ("text_extraction_model", "text_extraction"),
+            ("revision_model", "revision"),
+            ("timeline_model", "timeline"),
+        ):
             if field_name not in fields_set:
                 continue
             updates[field_name] = self.resolve_role_model_selection(
@@ -636,7 +649,9 @@ class ModelConfigService:
     ) -> ModelConfigPersistResponse:
         return ModelConfigPersistResponse(
             use_cloud_services=bool(snapshot.use_cloud_models),
-            llm_provider=cast(CloudProviderId, self.resolve_provider(snapshot.cloud_provider)),
+            llm_provider=cast(
+                CloudProviderId, self.resolve_provider(snapshot.cloud_provider)
+            ),
             cloud_model=self.normalize_optional_text(snapshot.cloud_model),
             clinical_model=snapshot.clinical_model,
             text_extraction_model=snapshot.text_extraction_model,
@@ -709,7 +724,7 @@ class ModelConfigService:
             return EmbeddingIndexStatus(status="reindex_required")
         try:
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             return EmbeddingIndexStatus(status="corrupt")
         if not isinstance(payload, dict):
             return EmbeddingIndexStatus(status="corrupt")
@@ -800,8 +815,12 @@ class ModelConfigService:
                         else "unavailable"
                     )
                     catalog_updated_at = None
-                    message = record.last_error or self._configured_catalog_message(models)
-                    models = self._configured_provider_models(snapshot, item.provider_id)
+                    message = record.last_error or self._configured_catalog_message(
+                        models
+                    )
+                    models = self._configured_provider_models(
+                        snapshot, item.provider_id
+                    )
             descriptors.append(
                 CloudProviderDescriptor(
                     id=item.provider_id,
@@ -898,7 +917,9 @@ class ModelConfigService:
                 state=await self.get_state(),
             )
         except Exception:
-            logger.exception("Unexpected error while refreshing %s model catalog", provider)
+            logger.exception(
+                "Unexpected error while refreshing %s model catalog", provider
+            )
             message = "The provider model catalog could not be refreshed."
             self.catalog_cache.save_failure(
                 provider_id=provider,

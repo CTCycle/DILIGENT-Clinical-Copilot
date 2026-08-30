@@ -17,9 +17,9 @@ from services.retrieval.embedding_runtime import (
     REQUIRED_SNAPSHOT_FILES,
 )
 
+
 ###############################################################################
 class FakeTokenizer:
-
     # -------------------------------------------------------------------------
     def encode(self, text: str, *, add_special_tokens: bool = True):
         return SimpleNamespace(ids=[len(text) + 1, 2, 3])
@@ -28,9 +28,9 @@ class FakeTokenizer:
     def decode(self, ids, *, skip_special_tokens: bool = True) -> str:
         return "decoded " + " ".join(map(str, ids))
 
+
 ###############################################################################
 class FakeSession:
-
     # -------------------------------------------------------------------------
     def __init__(self, output=None, *, token_type_ids: bool = False):
         self.output = (
@@ -67,6 +67,7 @@ class FakeSession:
         batch = inputs["input_ids"].shape[0]
         return [np.tile(self.output, (batch, 1, 1))]
 
+
 ###############################################################################
 def _runtime(tmp_path: Path, *, session=None, batch_size=2, config=None):
     config = config or CANONICAL_EMBEDDING_CONFIG
@@ -89,6 +90,7 @@ def _runtime(tmp_path: Path, *, session=None, batch_size=2, config=None):
         session_factory=lambda path, **kwargs: session,
     ), session
 
+
 ###############################################################################
 def test_runtime_is_lazy_reuses_session_and_exposes_chunking_adapter(
     tmp_path: Path,
@@ -103,11 +105,13 @@ def test_runtime_is_lazy_reuses_session_and_exposes_chunking_adapter(
     assert runtime.get_tokenizer().decode([1, 2]) == "decoded 1 2"
     assert len(session.calls) == 2
 
+
 ###############################################################################
 def test_offline_runtime_rejects_incomplete_cache(tmp_path: Path) -> None:
     runtime = EmbeddingRuntime(cache_directory=tmp_path, offline_mode=True)
     with pytest.raises(EmbeddingRuntimeUnavailable, match="incomplete"):
         runtime.embed_documents(["document"])
+
 
 ###############################################################################
 def test_runtime_rejects_corrupted_artifact(tmp_path: Path) -> None:
@@ -121,12 +125,14 @@ def test_runtime_rejects_corrupted_artifact(tmp_path: Path) -> None:
     with pytest.raises(EmbeddingRuntimeUnavailable, match="SHA-256"):
         runtime.embed_documents(["document"])
 
+
 ###############################################################################
 def test_runtime_rejects_wrong_dimension(tmp_path: Path) -> None:
     output = np.zeros((1, 3, 12), dtype=np.float32)
     runtime, _ = _runtime(tmp_path, session=FakeSession(output))
     with pytest.raises(EmbeddingVectorValidationError, match="dimension"):
         runtime.embed_documents(["document"])
+
 
 ###############################################################################
 def test_runtime_close_releases_session_and_can_be_recreated(tmp_path: Path) -> None:
@@ -137,13 +143,13 @@ def test_runtime_close_releases_session_and_can_be_recreated(tmp_path: Path) -> 
     with pytest.raises(Exception, match="shutting down"):
         runtime.embed_queries(["query"])
 
+
 ###############################################################################
 def test_cached_accessor_reuses_and_close_clears_runtime(monkeypatch) -> None:
     created = []
 
     ###############################################################################
     class FakeRuntime:
-
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs):
             created.append(self)
@@ -176,6 +182,7 @@ def test_cached_accessor_reuses_and_close_clears_runtime(monkeypatch) -> None:
         assert len(created) == 2
     finally:
         embedding_runtime_module.get_embedding_runtime.cache_clear()
+
 
 ###############################################################################
 def test_close_before_first_accessor_use_is_noop(monkeypatch) -> None:

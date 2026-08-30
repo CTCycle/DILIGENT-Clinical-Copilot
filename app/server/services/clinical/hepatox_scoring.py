@@ -4,6 +4,7 @@ import re
 
 from services.catalogs.runtime import get_reference_catalog_snapshot
 
+
 ###############################################################################
 def is_materially_in_report_language(text: str, report_language: str) -> bool:
     normalized = (text or "").strip()

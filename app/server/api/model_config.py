@@ -18,9 +18,9 @@ from services.llm.model_config import ModelConfigService
 
 router = APIRouter(prefix="/model-config", tags=["model-config"])
 
+
 ###############################################################################
 class ModelConfigEndpoint:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

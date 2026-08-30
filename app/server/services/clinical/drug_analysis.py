@@ -29,6 +29,7 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 class DrugAnalysisService:
     """Handles per-drug LLM consultation — building prompts, calling the LLM, parsing responses."""
@@ -95,16 +96,12 @@ class DrugAnalysisService:
         user_prompt = user_template.format(
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
             report_language=self.escape_braces(report_language),
-            canonical_name=self.escape_braces(
-                canonical_name.strip() or canonical_name
-            ),
+            canonical_name=self.escape_braces(canonical_name.strip() or canonical_name),
             origins=self.escape_braces(origin_block),
             extraction_metadata=self.escape_braces(extraction_block),
             livertox_status=self.escape_braces(livertox_status),
             excerpt=self.escape_braces(excerpt),
-            retrieved_documents_block=self.escape_braces(
-                retrieved_documents_block
-            ),
+            retrieved_documents_block=self.escape_braces(retrieved_documents_block),
             clinical_context=self.escape_braces(clinical_context),
             visit_date_anchor=self.escape_braces(visit_date_anchor),
             therapy_start_details=self.escape_braces(start_details),
@@ -145,9 +142,7 @@ class DrugAnalysisService:
                 )
                 await asyncio.sleep(delay)
         response_text = self.coerce_chat_text(raw_response).strip()
-        if not self.is_materially_in_report_language(
-            response_text, report_language
-        ):
+        if not self.is_materially_in_report_language(response_text, report_language):
             logger.warning(
                 "Language mismatch detected for drug analysis '%s' (target=%s); applying one repair pass",
                 drug_name,
@@ -260,7 +255,9 @@ class DrugAnalysisService:
         return score.upper() if score and score.isalpha() else score or "Not available"
 
     # -------------------------------------------------------------------------
-    def prepare_metadata_prompt(self, metadata: dict[str, Any] | None) -> tuple[str, str]:
+    def prepare_metadata_prompt(
+        self, metadata: dict[str, Any] | None
+    ) -> tuple[str, str]:
         score = self.resolve_livertox_score(metadata)
         details = [f"- Likelihood score: {score}"]
         if metadata:
@@ -291,18 +288,29 @@ class DrugAnalysisService:
         )
 
     # -------------------------------------------------------------------------
-    async def _run_conclusion(self, *, clinical_context: str, multi_drug_report: str, report_language: str, system_template: str, user_template: str) -> str | None:
+    async def _run_conclusion(
+        self,
+        *,
+        clinical_context: str,
+        multi_drug_report: str,
+        report_language: str,
+        system_template: str,
+        user_template: str,
+    ) -> str | None:
         report_body = multi_drug_report.strip()
         if not report_body:
             return None
         context_body = clinical_context.strip() or "No clinical context was provided."
         messages = [
             {"role": "system", "content": system_template.strip()},
-            {"role": "user", "content": user_template.format(
-                report_language=self.escape_braces(report_language),
-                clinical_context=self.escape_braces(context_body),
-                multi_drug_report=self.escape_braces(report_body),
-            )},
+            {
+                "role": "user",
+                "content": user_template.format(
+                    report_language=self.escape_braces(report_language),
+                    clinical_context=self.escape_braces(context_body),
+                    multi_drug_report=self.escape_braces(report_body),
+                ),
+            },
         ]
         raw_response: Any = None
         for attempt in range(1, self.retry_attempts + 1):
@@ -319,7 +327,9 @@ class DrugAnalysisService:
                     return None
                 await asyncio.sleep(self.retry_backoff_seconds(attempt, exc=exc))
         conclusion = self.coerce_chat_text(raw_response).strip()
-        if conclusion and not self.is_materially_in_report_language(conclusion, report_language):
+        if conclusion and not self.is_materially_in_report_language(
+            conclusion, report_language
+        ):
             repaired = await self.repair_language_once(
                 source_text=conclusion, report_language=report_language
             )
@@ -400,7 +410,7 @@ class DrugAnalysisService:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return min(parsed + 0.25, 30.0) if parsed > 0 else None
 

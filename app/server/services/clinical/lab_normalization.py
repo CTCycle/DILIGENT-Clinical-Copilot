@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from services.catalogs.runtime import get_reference_catalog_snapshot
 
+
 ###############################################################################
 def get_marker_aliases() -> dict[str, tuple[str, ...]]:
     snapshot = get_reference_catalog_snapshot()

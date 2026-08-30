@@ -14,6 +14,7 @@ from services.llm.model_capabilities import (
     resolve_model_capabilities,
 )
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("model", "reasoning_level", "expected"),
@@ -38,9 +39,14 @@ def test_local_policy_matrix(
     )
     assert policy.temperature == expected
 
+
 ###############################################################################
 def test_known_provider_defaults_use_base_temperature() -> None:
-    for provider, model in (("anthropic", "claude-opus-4-6"), ("gemini", "gemini-3-pro"), ("ollama", "new-model:1b")):
+    for provider, model in (
+        ("anthropic", "claude-opus-4-6"),
+        ("gemini", "gemini-3-pro"),
+        ("ollama", "new-model:1b"),
+    ):
         policy = resolve_generation_policy(
             purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
             provider=provider,
@@ -49,32 +55,50 @@ def test_known_provider_defaults_use_base_temperature() -> None:
         assert policy.temperature == 0.0
         assert not policy.uses_model_default
 
+
 ###############################################################################
 def test_openai_and_deepseek_are_purpose_specific() -> None:
-    assert resolve_generation_policy(
-        purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
-        provider="openai",
-        model="gpt-4.1-mini",
-    ).temperature == 0.0
-    assert resolve_generation_policy(
-        purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
-        provider="openai",
-        model="gpt-4.1-mini",
-    ).temperature == 0.2
-    assert resolve_generation_policy(
-        purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
-        provider="deepseek",
-        model="deepseek-chat",
-    ).temperature == 0.2
-    assert resolve_generation_policy(
-        purpose=GenerationPurpose.CONNECTIVITY_CHECK,
-        provider="openai",
-        model="gpt-4.1-mini",
-    ).temperature is None
+    assert (
+        resolve_generation_policy(
+            purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
+            provider="openai",
+            model="gpt-4.1-mini",
+        ).temperature
+        == 0.0
+    )
+    assert (
+        resolve_generation_policy(
+            purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
+            provider="openai",
+            model="gpt-4.1-mini",
+        ).temperature
+        == 0.2
+    )
+    assert (
+        resolve_generation_policy(
+            purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
+            provider="deepseek",
+            model="deepseek-chat",
+        ).temperature
+        == 0.2
+    )
+    assert (
+        resolve_generation_policy(
+            purpose=GenerationPurpose.CONNECTIVITY_CHECK,
+            provider="openai",
+            model="gpt-4.1-mini",
+        ).temperature
+        is None
+    )
+
 
 ###############################################################################
 def test_gpt5_and_gpt_oss_omit_temperature() -> None:
-    for provider, model in (("openai", "gpt-5"), ("openai", "gpt-5.1"), ("ollama", "gpt-oss:20b")):
+    for provider, model in (
+        ("openai", "gpt-5"),
+        ("openai", "gpt-5.1"),
+        ("ollama", "gpt-oss:20b"),
+    ):
         policy = resolve_generation_policy(
             purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
             provider=provider,
@@ -86,6 +110,7 @@ def test_gpt5_and_gpt_oss_omit_temperature() -> None:
             capabilities=resolve_model_capabilities(provider=provider, model=model),
         )
         assert effective.temperature is None
+
 
 ###############################################################################
 def test_policy_is_immutable_and_catalog_validates() -> None:
@@ -100,20 +125,45 @@ def test_policy_is_immutable_and_catalog_validates() -> None:
     with pytest.raises(AttributeError):
         policy.temperature = 0.9  # type: ignore[misc]
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("purpose", "complexity", "expected"),
     [
-        (GenerationPurpose.CLINICAL_SYNTHESIS, "moderate", ["off", "low", "medium", "high"]),
-        (GenerationPurpose.STRUCTURED_EXTRACTION, "moderate", ["off", "low", "low", "low"]),
+        (
+            GenerationPurpose.CLINICAL_SYNTHESIS,
+            "moderate",
+            ["off", "low", "medium", "high"],
+        ),
+        (
+            GenerationPurpose.STRUCTURED_EXTRACTION,
+            "moderate",
+            ["off", "low", "low", "low"],
+        ),
         (GenerationPurpose.FAITHFUL_REWRITE, "moderate", ["off", "low", "low", "low"]),
         (GenerationPurpose.REVISION_SCAN, "moderate", ["off", "low", "low", "medium"]),
-        (GenerationPurpose.REVISION_EDITING, "moderate", ["off", "low", "low", "medium"]),
+        (
+            GenerationPurpose.REVISION_EDITING,
+            "moderate",
+            ["off", "low", "low", "medium"],
+        ),
         (GenerationPurpose.JSON_REPAIR, "moderate", ["off", "off", "off", "off"]),
-        (GenerationPurpose.CONNECTIVITY_CHECK, "moderate", ["off", "off", "off", "off"]),
+        (
+            GenerationPurpose.CONNECTIVITY_CHECK,
+            "moderate",
+            ["off", "off", "off", "off"],
+        ),
         (GenerationPurpose.TIMELINE_EXTRACTION, "simple", ["off", "low", "low", "low"]),
-        (GenerationPurpose.TIMELINE_EXTRACTION, "moderate", ["off", "low", "medium", "medium"]),
-        (GenerationPurpose.TIMELINE_EXTRACTION, "complex", ["off", "low", "medium", "high"]),
+        (
+            GenerationPurpose.TIMELINE_EXTRACTION,
+            "moderate",
+            ["off", "low", "medium", "medium"],
+        ),
+        (
+            GenerationPurpose.TIMELINE_EXTRACTION,
+            "complex",
+            ["off", "low", "medium", "high"],
+        ),
     ],
 )
 def test_responsibility_reasoning_matrix(
@@ -121,7 +171,12 @@ def test_responsibility_reasoning_matrix(
     complexity: str,
     expected: list[str],
 ) -> None:
-    levels = [ReasoningLevel.OFF, ReasoningLevel.LOW, ReasoningLevel.MEDIUM, ReasoningLevel.HIGH]
+    levels = [
+        ReasoningLevel.OFF,
+        ReasoningLevel.LOW,
+        ReasoningLevel.MEDIUM,
+        ReasoningLevel.HIGH,
+    ]
 
     actual = [
         resolve_generation_policy(
@@ -136,9 +191,15 @@ def test_responsibility_reasoning_matrix(
 
     assert actual == expected
 
+
 ###############################################################################
 def test_reasoning_target_is_monotonic_for_each_responsibility() -> None:
-    levels = [ReasoningLevel.OFF, ReasoningLevel.LOW, ReasoningLevel.MEDIUM, ReasoningLevel.HIGH]
+    levels = [
+        ReasoningLevel.OFF,
+        ReasoningLevel.LOW,
+        ReasoningLevel.MEDIUM,
+        ReasoningLevel.HIGH,
+    ]
     rank = {level.value: index for index, level in enumerate(levels)}
     for purpose in GenerationPurpose:
         values = [

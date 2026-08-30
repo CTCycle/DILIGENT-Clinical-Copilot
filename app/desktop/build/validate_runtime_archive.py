@@ -69,14 +69,18 @@ def validate_archive(archive_path: str, version: str) -> dict[str, Any]:
         for info in infos:
             path = _safe_path(info.filename)
             if info.is_dir():
-                raise RuntimeError(f"runtime archive contains a directory member: {info.filename}")
+                raise RuntimeError(
+                    f"runtime archive contains a directory member: {info.filename}"
+                )
             if path.suffix.casefold() in FORBIDDEN_SUFFIXES or any(
                 part.casefold() in FORBIDDEN_PARTS for part in path.parts
             ):
                 raise RuntimeError(f"forbidden runtime archive member: {info.filename}")
             mode = (info.external_attr >> 16) & 0o170000
             if mode == 0o120000:
-                raise RuntimeError(f"runtime archive contains a symlink: {info.filename}")
+                raise RuntimeError(
+                    f"runtime archive contains a symlink: {info.filename}"
+                )
 
         manifest = _load_manifest(archive, version)
         manifest_files = manifest["files"]
@@ -107,7 +111,9 @@ def validate_archive(archive_path: str, version: str) -> dict[str, Any]:
             )
         missing_required = sorted(REQUIRED_FILES - manifest_names)
         if missing_required:
-            raise RuntimeError(f"required runtime files are missing: {missing_required}")
+            raise RuntimeError(
+                f"required runtime files are missing: {missing_required}"
+            )
         if manifest.get("architecture") != "windows-x64":
             raise RuntimeError("runtime archive architecture is not windows-x64")
         return {
@@ -123,7 +129,11 @@ def main() -> None:
     parser.add_argument("--archive", required=True)
     parser.add_argument("--version", required=True)
     arguments = parser.parse_args()
-    print(json.dumps(validate_archive(arguments.archive, arguments.version), sort_keys=True))
+    print(
+        json.dumps(
+            validate_archive(arguments.archive, arguments.version), sort_keys=True
+        )
+    )
 
 
 if __name__ == "__main__":

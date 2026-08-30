@@ -5,6 +5,7 @@ import asyncio
 from pytest import MonkeyPatch
 import services.retrieval.embeddings as embeddings_module
 
+
 ###############################################################################
 def test_openai_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
@@ -19,6 +20,7 @@ def test_openai_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     )
     assert isinstance(provider, embeddings_module.CloudEmbeddingGenerator)
     assert provider.provider == "openai"
+
 
 ###############################################################################
 def test_gemini_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
@@ -35,6 +37,7 @@ def test_gemini_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     assert isinstance(provider, embeddings_module.CloudEmbeddingGenerator)
     assert provider.provider == "gemini"
 
+
 ###############################################################################
 def test_ollama_embedding_provider_selection() -> None:
     provider = embeddings_module.select_embedding_provider(
@@ -42,6 +45,7 @@ def test_ollama_embedding_provider_selection() -> None:
         ollama_model="nomic-embed-text",
     )
     assert isinstance(provider, embeddings_module.OllamaEmbeddingGenerator)
+
 
 ###############################################################################
 def test_single_query_embedding_return_shape(monkeypatch) -> None:
@@ -53,7 +57,6 @@ def test_single_query_embedding_return_shape(monkeypatch) -> None:
 
     ###############################################################################
     class FakeClient:
-
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs):
             self.kwargs = kwargs
@@ -82,12 +85,12 @@ def test_single_query_embedding_return_shape(monkeypatch) -> None:
     assert isinstance(vector, list)
     assert vector == [1.0, 2.0]
 
+
 ###############################################################################
 def test_batch_embedding_return_shape_and_order_preserved(monkeypatch) -> None:
 
     ###############################################################################
     class FakeClient:
-
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs):
             self.kwargs = kwargs
@@ -112,6 +115,7 @@ def test_batch_embedding_return_shape_and_order_preserved(monkeypatch) -> None:
     vectors = asyncio.run(generator.embed_texts(["first", "second", "third"]))
     assert vectors == [[0.0], [1.0], [2.0]]
 
+
 ###############################################################################
 def test_provider_validation_and_exception_mapping(monkeypatch) -> None:
     try:
@@ -132,7 +136,6 @@ def test_provider_validation_and_exception_mapping(monkeypatch) -> None:
 
     ###############################################################################
     class FailingClient:
-
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs):
             self.kwargs = kwargs

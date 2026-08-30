@@ -12,9 +12,11 @@ from domain.settings.environment import (
     EnvironmentSnapshot,
 )
 
+
 ###############################################################################
 def _write_config(path, payload) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
+
 
 ###############################################################################
 def _base_payload() -> dict:
@@ -35,6 +37,7 @@ def _base_payload() -> dict:
             "select_page_size": 2000,
         }
     }
+
 
 ###############################################################################
 def test_database_settings_ignore_json_values_and_use_environment_snapshot(
@@ -81,6 +84,7 @@ def test_database_settings_ignore_json_values_and_use_environment_snapshot(
         "select_page_size": 2400,
     }
 
+
 ###############################################################################
 def test_canonical_sqlite_database_environment_contract(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setenv("DATABASE_BACKEND", "sqlite")
@@ -97,6 +101,7 @@ def test_canonical_sqlite_database_environment_contract(monkeypatch) -> None:  #
     assert payload["database"]["sqlite_path"] == "C:/data/diligent.db"
     assert payload["database"]["write_batch_size"] == 250
     assert payload["database"]["read_page_size"] == 500
+
 
 ###############################################################################
 def test_environment_snapshot_from_os_env_uses_domain_models(monkeypatch) -> None:
@@ -140,6 +145,7 @@ def test_environment_snapshot_from_os_env_uses_domain_models(monkeypatch) -> Non
     assert snapshot.database.connect_timeout is None
     assert snapshot.database.write_batch_size is None
     assert snapshot.database.read_page_size is None
+
 
 ###############################################################################
 def test_explicit_postgres_environment_fields_override_database_url(

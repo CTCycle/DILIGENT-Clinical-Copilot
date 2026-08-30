@@ -16,9 +16,11 @@ from services.session.factory import build_clinical_session_service
 from services.session.session_service import ClinicalSessionService
 from services.session.session_workflow import start_clinical_job_workflow
 
+
 ###############################################################################
 def _build_service() -> ClinicalSessionService:
     return build_clinical_session_service(get_job_manager())
+
 
 ###############################################################################
 def test_preprocess_unified_input_accepts_fragment_aggregated_sections() -> None:
@@ -37,6 +39,7 @@ def test_preprocess_unified_input_accepts_fragment_aggregated_sections() -> None
     assert preprocessed.laboratory_analysis == "L"
     assert returned_extraction is not None
 
+
 ###############################################################################
 def test_preprocess_unified_input_rejects_invalid_sections() -> None:
     service = _build_service()
@@ -47,6 +50,7 @@ def test_preprocess_unified_input_rejects_invalid_sections() -> None:
     ):
         asyncio.run(service.preprocess_unified_input(request))
 
+
 ###############################################################################
 def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
     monkeypatch,
@@ -54,10 +58,14 @@ def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
-        service.knowledge_repository, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.knowledge_repository,
+        "list_livertox_catalog",
+        lambda **kwargs: ([{"id": 1}], 1),
     )
     monkeypatch.setattr(
-        service.drug_catalog_repository, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+        service.drug_catalog_repository,
+        "list_rxnav_catalog",
+        lambda **kwargs: ([{"id": 1}], 1),
     )
     request = ClinicalSessionRequest(
         clinical_input=(
@@ -78,6 +86,7 @@ def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
     assert prepared["patient_payload"].drugs == "Drug 10 mg 1-0-0-0"
     assert prepared["patient_payload"].laboratory_analysis == "ALT 120 U/L"
 
+
 ###############################################################################
 def test_start_clinical_job_requires_active_cloud_key_before_extraction(
     monkeypatch,
@@ -86,7 +95,6 @@ def test_start_clinical_job_requires_active_cloud_key_before_extraction(
 
     ###############################################################################
     class FakeExtractor:
-
         # -------------------------------------------------------------------------
         async def extract(
             self, *, clinical_input: str
@@ -95,7 +103,6 @@ def test_start_clinical_job_requires_active_cloud_key_before_extraction(
 
     ###############################################################################
     class FakeAccessKeyService:
-
         # -------------------------------------------------------------------------
         def list_access_keys(self, provider: str):
             assert provider == "gemini"
@@ -123,6 +130,7 @@ def test_start_clinical_job_requires_active_cloud_key_before_extraction(
     ):
         start_clinical_job_workflow(service, request)
 
+
 ###############################################################################
 def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -133,6 +141,7 @@ def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) ->
     resolved = ClinicalSessionService._resolve_runtime_timeout(base_timeout_s=7200.0)
 
     assert resolved == 7200.0
+
 
 ###############################################################################
 def test_resolve_runtime_timeout_does_not_apply_local_cap(monkeypatch) -> None:
@@ -158,6 +167,7 @@ def test_resolve_runtime_timeout_does_not_apply_local_cap(monkeypatch) -> None:
 
     assert resolved == 3600.0
 
+
 ###############################################################################
 def test_job_error_sanitizer_reports_local_model_oom_safely() -> None:
     error = RuntimeError(
@@ -169,6 +179,7 @@ def test_job_error_sanitizer_reports_local_model_oom_safely() -> None:
 
     assert message == JobErrorSanitizer.LOCAL_MODEL_MEMORY_MESSAGE
 
+
 ###############################################################################
 def test_extraction_failure_classification_reports_schema_error() -> None:
     code, message = ClinicalSessionService.classify_extraction_failure(
@@ -179,6 +190,7 @@ def test_extraction_failure_classification_reports_schema_error() -> None:
 
     assert code == "structured_extraction_schema_invalid"
     assert "required schema" in message
+
 
 ###############################################################################
 def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) -> None:
@@ -206,6 +218,7 @@ def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) ->
 
     assert resolved == 30.0
 
+
 ###############################################################################
 def test_run_revision_consultation_uses_revision_analysis_entrypoint(
     monkeypatch,
@@ -221,7 +234,6 @@ def test_run_revision_consultation_uses_revision_analysis_entrypoint(
 
     ###############################################################################
     class FakeConsultation:
-
         # -------------------------------------------------------------------------
         def __init__(self, drugs, *, patient_name=None):
             self.drugs = drugs
@@ -240,7 +252,7 @@ def test_run_revision_consultation_uses_revision_analysis_entrypoint(
                 "final_report": "Revision synthesis report",
                 "revision_consultation_metadata": {
                     "drug_analysis_entrypoint": "request_revision_drug_analysis",
-"report_finalization_entrypoint": "finalize_report",
+                    "report_finalization_entrypoint": "finalize_report",
                     "conclusion_entrypoint": "generate_revision_conclusion",
                     "synthesis_mode": "revision_comparison_aware",
                 },
@@ -275,10 +287,7 @@ def test_run_revision_consultation_uses_revision_analysis_entrypoint(
     assert (
         payload_metadata["drug_analysis_entrypoint"] == "request_revision_drug_analysis"
     )
-    assert (
-        payload_metadata["report_finalization_entrypoint"]
-== "finalize_report"
-    )
+    assert payload_metadata["report_finalization_entrypoint"] == "finalize_report"
     assert payload_metadata["conclusion_entrypoint"] == "generate_revision_conclusion"
     assert payload_metadata["synthesis_mode"] == "revision_comparison_aware"
     assert payload_metadata["pipeline_run_id"] == "pipe-123"

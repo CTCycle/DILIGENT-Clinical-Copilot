@@ -11,17 +11,21 @@ REVISION_JOB_MISSING_STATUS_MESSAGE = (
     "and retry if needed."
 )
 
+
 ###############################################################################
 class SessionRevisionNotFoundError(ValueError):
     pass
+
 
 ###############################################################################
 class SessionRevisionConflictError(ValueError):
     pass
 
+
 ###############################################################################
 class SessionRevisionValidationError(ValueError):
     pass
+
 
 ###############################################################################
 class InspectionRevisionScaffoldMixin:
@@ -43,11 +47,15 @@ class InspectionRevisionScaffoldMixin:
         except Exception:
             self.session_revision_repository.fail_revision_run(
                 pipeline_run_id=pipeline_run_id,
-                error={"message": "Revision processing failed. Retry the revision if needed."},
+                error={
+                    "message": "Revision processing failed. Retry the revision if needed."
+                },
             )
             raise
         if self.jobs.should_stop(job_id):
-            self.session_revision_repository.cancel_revision_run(pipeline_run_id=pipeline_run_id)
+            self.session_revision_repository.cancel_revision_run(
+                pipeline_run_id=pipeline_run_id
+            )
         return result
 
     # -------------------------------------------------------------------------
@@ -86,7 +94,9 @@ class InspectionRevisionScaffoldMixin:
             raise SessionRevisionValidationError(
                 "Session has no clinical text available for revision."
             )
-        source_version = self.session_revision_repository.get_version_record_for_session(session_id)
+        source_version = (
+            self.session_revision_repository.get_version_record_for_session(session_id)
+        )
         if source_version is None:
             raise SessionRevisionValidationError(
                 "Session version could not be prepared for revision."
@@ -230,7 +240,9 @@ class InspectionRevisionScaffoldMixin:
             return False
         run = self.session_revision_repository.get_revision_run_by_job_id(job_id)
         if run is not None:
-            self.session_revision_repository.cancel_revision_run(pipeline_run_id=run["pipeline_run_id"])
+            self.session_revision_repository.cancel_revision_run(
+                pipeline_run_id=run["pipeline_run_id"]
+            )
         return True
 
     # -------------------------------------------------------------------------

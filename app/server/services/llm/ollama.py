@@ -35,6 +35,7 @@ from services.runtime.jobs import (
 
 SAFE_OLLAMA_MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$")
 
+
 ###############################################################################
 def sanitize_model_name(name: str) -> str:
     normalized = str(name or "").strip()
@@ -44,9 +45,11 @@ def sanitize_model_name(name: str) -> str:
         raise ServiceValidationError("Invalid model name.")
     return normalized
 
+
 ###############################################################################
 def clamp_progress(value: float) -> float:
     return max(0.0, min(100.0, value))
+
 
 ###############################################################################
 def coerce_positive_float(value: Any) -> float | None:
@@ -64,6 +67,7 @@ def coerce_positive_float(value: Any) -> float | None:
     if number <= 0:
         return None
     return number
+
 
 ###############################################################################
 def resolve_pull_progress(current_progress: float, event: dict[str, Any]) -> float:
@@ -90,6 +94,7 @@ def resolve_pull_progress(current_progress: float, event: dict[str, Any]) -> flo
         return max(current_progress, 8.0)
     return current_progress
 
+
 ###############################################################################
 def resolve_pull_progress_message(name: str, event: dict[str, Any]) -> str:
     total = coerce_positive_float(event.get("total"))
@@ -102,9 +107,9 @@ def resolve_pull_progress_message(name: str, event: dict[str, Any]) -> str:
         return status_text
     return f"Pulling '{name}' from Ollama."
 
+
 ###############################################################################
 class PullProgressUpdater:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -139,6 +144,7 @@ class PullProgressUpdater:
         if completed is not None:
             progress_patch["completed_bytes"] = int(completed)
         self.jobs.update_result(self.job_id, progress_patch)
+
 
 ###############################################################################
 async def pull_model_async(
@@ -210,6 +216,7 @@ async def pull_model_async(
             "progress_message": f"Model '{name}' is available locally.",
         }
 
+
 ###############################################################################
 def run_model_pull_job(
     *,
@@ -239,6 +246,7 @@ def run_model_pull_job(
             job_id=job_id,
         )
     )
+
 
 ###############################################################################
 class OllamaService:

@@ -8,9 +8,9 @@ import pandas as pd
 
 from common.utils.text_utils import coerce_text
 
+
 ###############################################################################
 class LiverToxData:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -433,7 +433,7 @@ class LiverToxData:
             return -1
         try:
             return int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return -1
 
     # -------------------------------------------------------------------------

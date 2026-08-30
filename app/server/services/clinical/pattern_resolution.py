@@ -6,12 +6,14 @@ from domain.clinical.extractor_contracts import (
     HepaticPatternResolutionResult,
 )
 
+
 ###############################################################################
 def _normalize_pattern(value: str | None) -> str | None:
     normalized = (value or "").strip().lower().replace(" ", "_")
     if normalized in {"hepatocellular", "cholestatic", "mixed", "indeterminate"}:
         return normalized
     return None
+
 
 ###############################################################################
 def resolve_hepatic_pattern(
@@ -51,6 +53,7 @@ def resolve_hepatic_pattern(
         r_score=resolution_input.r_score,
         warnings=warnings,
     )
+
 
 ###############################################################################
 def copy_pattern_score_with_resolution(

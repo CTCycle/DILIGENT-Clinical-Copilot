@@ -19,9 +19,9 @@ from services.clinical.deterministic_extraction import extract_deterministic_dis
 from services.clinical.disease import DiseaseExtractor
 from services.session.session_service import ClinicalSessionService
 
+
 ###############################################################################
 class FakeDiseaseClient:
-
     # -------------------------------------------------------------------------
     def __init__(self, responses: list[PatientDiseaseContext]) -> None:
         self.responses = list(responses)
@@ -37,9 +37,9 @@ class FakeDiseaseClient:
             return self.responses.pop(0)
         return schema(entries=[])
 
+
 ###############################################################################
 class FlakyDiseaseClient:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, failures_before_success: int) -> None:
         self.failures_before_success = max(failures_before_success, 0)
@@ -61,6 +61,7 @@ class FlakyDiseaseClient:
                 )
             ]
         )
+
 
 ###############################################################################
 def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry(
@@ -118,6 +119,7 @@ def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry(
     assert steatosis.chronic is True
     assert steatosis.hepatic_related is True
 
+
 ###############################################################################
 def test_extract_diseases_from_anamnesis_retries_transient_failures(
     monkeypatch,
@@ -139,6 +141,7 @@ def test_extract_diseases_from_anamnesis_retries_transient_failures(
 
     assert client.call_count == 2
     assert [entry.name for entry in parsed.entries] == ["Steatosi epatica"]
+
 
 ###############################################################################
 def test_case_style_anamnesis_merges_missed_grounded_disease_candidates() -> None:
@@ -188,6 +191,7 @@ def test_case_style_anamnesis_merges_missed_grounded_disease_candidates() -> Non
     assert "Colecistolitiasi" in names
     assert len(names) >= 14
 
+
 ###############################################################################
 def test_build_structured_clinical_context_includes_disease_timeline() -> None:
     payload = PatientData(
@@ -235,6 +239,7 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
     assert "2025-04-14" in context
     assert "class=mixed | R=1.67" in context
 
+
 ###############################################################################
 def test_disease_evidence_validation_sets_span_and_attribution() -> None:
     extractor = DiseaseExtractor()
@@ -248,6 +253,7 @@ def test_disease_evidence_validation_sets_span_and_attribution() -> None:
     assert result.source_span == [11, 28]
     assert result.confidence == "high"
     assert result.attribution == "patient"
+
 
 ###############################################################################
 def test_deterministic_disease_extraction_captures_hepatic_and_oncologic_context() -> (

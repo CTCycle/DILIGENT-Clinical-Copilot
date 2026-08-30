@@ -6,16 +6,20 @@ from typing import Any, Literal, overload
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from repositories.database.session import resolve_engine, resolve_session_factory, unit_of_work
+from repositories.database.session import (
+    resolve_engine,
+    resolve_session_factory,
+    unit_of_work,
+)
 from repositories.database.upsert import (
     insert_application_configuration_if_missing,
     upsert_application_configuration,
 )
 from repositories.schemas.configuration import ApplicationConfiguration
 
+
 ###############################################################################
 class ApplicationConfigurationSerializer:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

@@ -12,6 +12,7 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Any
 
+
 ###############################################################################
 @dataclass(frozen=True, slots=True)
 class CanonicalEmbeddingConfig:
@@ -83,6 +84,7 @@ CANONICAL_EMBEDDING_CONFIG = CanonicalEmbeddingConfig(
     output_dtype="float32",
     trust_remote_code=False,
 )
+
 
 ###############################################################################
 def canonical_embedding_fingerprint(

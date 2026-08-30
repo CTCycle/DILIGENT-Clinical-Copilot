@@ -12,9 +12,9 @@ from domain.llm.transports import (
     StructuredRequest,
 )
 
+
 ###############################################################################
 class CloudTransport(Protocol):
-
     # -------------------------------------------------------------------------
     async def chat(self, request: ChatRequest) -> ChatResult: ...
 
@@ -32,15 +32,15 @@ class CloudTransport(Protocol):
     # -------------------------------------------------------------------------
     async def close(self) -> None: ...
 
+
 ###############################################################################
 class EmbeddingTransport(Protocol):
-
     # -------------------------------------------------------------------------
     async def embed(self, request: EmbeddingRequest) -> list[list[float]]: ...
 
+
 ###############################################################################
 class StructuredTransportMixin:
-
     # -------------------------------------------------------------------------
     async def chat(self, request: ChatRequest) -> ChatResult:
         raise NotImplementedError

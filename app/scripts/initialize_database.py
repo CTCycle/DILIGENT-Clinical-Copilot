@@ -6,11 +6,14 @@ import time
 from common.utils.logger import logger
 from repositories.database.initializer import initialize_database
 
+
 ###############################################################################
 def main() -> None:
     parser = argparse.ArgumentParser(description="Initialize the DILIGENT database.")
     parser.add_argument("--drop-existing", action="store_true")
-    parser.add_argument("--seed-catalogs", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--seed-catalogs", action=argparse.BooleanOptionalAction, default=True
+    )
     parser.add_argument("--force-reseed-catalogs", action="store_true")
     args = parser.parse_args()
     start = time.perf_counter()

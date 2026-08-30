@@ -13,6 +13,7 @@ from common.utils.error_filters import get_sensitive_error_tokens
 from common.utils.logger import logger
 from services.runtime.state import JobState
 
+
 ###############################################################################
 class JobErrorSanitizer:
     LOCAL_MODEL_MEMORY_MESSAGE = (
@@ -97,9 +98,9 @@ class JobErrorSanitizer:
             return candidate
         return "Operation failed unexpectedly. Please retry."
 
+
 ###############################################################################
 class JobManager:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.jobs: dict[str, JobState] = {}
@@ -374,9 +375,11 @@ class JobManager:
         if overflow <= 0:
             return
         terminal.sort(
-            key=lambda state: state.completed_at
-            if state.completed_at is not None
-            else state.created_at
+            key=lambda state: (
+                state.completed_at
+                if state.completed_at is not None
+                else state.created_at
+            )
         )
         for state in terminal[:overflow]:
             if state.job_id not in self.threads:
@@ -386,13 +389,14 @@ class JobManager:
     def runner_accepts_job_id(self, runner: Callable[..., dict[str, Any]]) -> bool:
         try:
             signature = inspect.signature(runner)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
         parameters = list(signature.parameters.values())
         for param in parameters:
             if param.kind == inspect.Parameter.VAR_KEYWORD:
                 return True
         return any(param.name == "job_id" for param in parameters)
+
 
 ###############################################################################
 @lru_cache(maxsize=1)

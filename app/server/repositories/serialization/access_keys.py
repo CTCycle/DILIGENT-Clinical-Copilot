@@ -28,9 +28,9 @@ from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
 
+
 ###############################################################################
 class AccessKeySerializer:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -174,11 +174,15 @@ class AccessKeySerializer:
                 raise ValueError("Access key not found")
             table = self.resolve_table_from_row(target)
 
-            provider_rows = db_session.execute(
-                select(table)
-                .where(table.provider == target.provider)
-                .with_for_update()
-            ).scalars().all()
+            provider_rows = (
+                db_session.execute(
+                    select(table)
+                    .where(table.provider == target.provider)
+                    .with_for_update()
+                )
+                .scalars()
+                .all()
+            )
             for row in provider_rows:
                 row.is_active = int(row.id) == int(target.id)
                 row.updated_at = now

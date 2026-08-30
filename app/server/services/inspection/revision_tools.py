@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+
 ###############################################################################
 class RevisionToolRegistry:
     names = frozenset(
@@ -19,8 +20,13 @@ class RevisionToolRegistry:
 
     # -------------------------------------------------------------------------
     def __init__(
-        self, *, clinical_session_repository: Any, session_revision_repository: Any,
-        knowledge_repository: Any, session: dict[str, Any], context: dict[str, Any]
+        self,
+        *,
+        clinical_session_repository: Any,
+        session_revision_repository: Any,
+        knowledge_repository: Any,
+        session: dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         self.clinical_session_repository = clinical_session_repository
         self.session_revision_repository = session_revision_repository
@@ -99,7 +105,7 @@ class RevisionToolRegistry:
     def _positive_int(value: Any) -> int:
         try:
             number = int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise ValueError("Tool ids must be positive integers.") from None
         if number < 1:
             raise ValueError("Tool ids must be positive.")

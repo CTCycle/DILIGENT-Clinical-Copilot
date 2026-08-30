@@ -6,6 +6,7 @@ import services.llm.cloud as cloud_module
 from services.llm.ollama_chat import normalize_embedding_payload
 from services.llm.ollama_client import OllamaClient, OllamaError
 
+
 ###############################################################################
 def test_ollama_embedding_payload_returns_normalized_float_vectors(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
@@ -17,7 +18,6 @@ def test_ollama_embedding_payload_returns_normalized_float_vectors(monkeypatch) 
 
     ###############################################################################
     class FakeResponse:
-
         # -------------------------------------------------------------------------
         def json(self) -> dict[str, object]:
             return {"embeddings": [[1, 2], ["3.5", 4]]}
@@ -39,6 +39,7 @@ def test_ollama_embedding_payload_returns_normalized_float_vectors(monkeypatch) 
     assert captured["json"] == {"model": "nomic-embed-text", "input": ["a", "bb"]}
     asyncio.run(client.close())
 
+
 ###############################################################################
 def test_ollama_embedding_payload_validation_errors() -> None:
     try:
@@ -59,12 +60,12 @@ def test_ollama_embedding_payload_validation_errors() -> None:
     except OllamaError:
         pass
 
+
 ###############################################################################
 def test_openai_embedding_response_sorting_by_index_is_preserved(monkeypatch) -> None:
 
     ###############################################################################
     class FakeAsyncOpenAI:
-
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs) -> None:
             self.kwargs = kwargs
@@ -86,7 +87,6 @@ def test_openai_embedding_response_sorting_by_index_is_preserved(monkeypatch) ->
 
     ###############################################################################
     class FakeResponse:
-
         # -------------------------------------------------------------------------
         def raise_for_status(self) -> None:
             return None
@@ -115,19 +115,18 @@ def test_openai_embedding_response_sorting_by_index_is_preserved(monkeypatch) ->
     assert vectors == [[1.0, 2.0], [3.0, 4.0]]
     asyncio.run(client.close())
 
+
 ###############################################################################
 def test_gemini_embedding_response_count_mismatch_raises(monkeypatch) -> None:
 
     ###############################################################################
     class FakeGenerateContentConfig:
-
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs) -> None:
             self.kwargs = kwargs
 
     ###############################################################################
     class FakeGeminiClient:
-
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs) -> None:
             self.kwargs = kwargs
@@ -154,7 +153,6 @@ def test_gemini_embedding_response_count_mismatch_raises(monkeypatch) -> None:
 
     ###############################################################################
     class FakeResponse:
-
         # -------------------------------------------------------------------------
         def raise_for_status(self) -> None:
             return None

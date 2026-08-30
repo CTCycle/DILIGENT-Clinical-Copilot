@@ -26,6 +26,7 @@ from services.runtime.jobs import JobManager
 NOT_AVAILABLE = "Not available"
 PATIENT_LINE_TEMPLATE = "- **Patient:** {value}"
 
+
 ###############################################################################
 def build_failed_session_payload(
     *,
@@ -105,6 +106,7 @@ def build_failed_session_payload(
             "runtime_settings": runtime_settings,
         },
     }
+
 
 ###############################################################################
 class NarrativeBuilder:
@@ -382,6 +384,7 @@ class NarrativeBuilder:
 
         return NarrativeBuilder.compact_spacing("\n\n".join(sections))
 
+
 ###############################################################################
 async def execute_clinical_job(
     service: Any,
@@ -478,10 +481,12 @@ async def execute_clinical_job(
     report_progress(stage="completed", progress=100.0)
     return result
 
+
 ###############################################################################
 def ensure_clinical_job_not_cancelled(*, job_manager: JobManager, job_id: str) -> None:
     if job_manager.should_stop(job_id):
         raise ClinicalJobCancelled("Clinical job stop requested.")
+
 
 ###############################################################################
 def report_clinical_job_progress(
@@ -520,6 +525,7 @@ def report_clinical_job_progress(
         bounded,
         message,
     )
+
 
 ###############################################################################
 def run_clinical_job(

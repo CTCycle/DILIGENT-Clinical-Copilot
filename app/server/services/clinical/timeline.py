@@ -28,9 +28,9 @@ DATE_YEAR_RE = re.compile(r"^\d{4}$")
 ISO_DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 ISO_PARTIAL_DATE_RE = re.compile(r"\b\d{4}(?:-\d{2}(?:-\d{2})?)?\b")
 
+
 ###############################################################################
 class PatientTimelineExtractor:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -107,11 +107,13 @@ class PatientTimelineExtractor:
             signature=signature,
             track_revision=runtime_settings is None,
             track_signature=runtime_settings is not None,
-            client_factory=lambda selected_provider, selected_model: select_llm_provider(
-                provider=selected_provider,
-                timeout_s=self.timeout_s,
-                default_model=selected_model,
-                max_retries=0,
+            client_factory=lambda selected_provider, selected_model: (
+                select_llm_provider(
+                    provider=selected_provider,
+                    timeout_s=self.timeout_s,
+                    default_model=selected_model,
+                    max_retries=0,
+                )
             ),
         )
 
@@ -126,7 +128,12 @@ class PatientTimelineExtractor:
     def event_sort_key(cls, event: PatientTimelineEvent) -> tuple[int, str, int, str]:
         normalized_date = cls.normalize_date_token(event.event_date)
         if normalized_date:
-            return (0, str(timeline_date_sort_key(normalized_date)[0]), event.sort_order, event.title.casefold())
+            return (
+                0,
+                str(timeline_date_sort_key(normalized_date)[0]),
+                event.sort_order,
+                event.title.casefold(),
+            )
         relative = (event.relative_time or "").casefold()
         return (1, relative, event.sort_order, event.title.casefold())
 
@@ -164,7 +171,9 @@ class PatientTimelineExtractor:
             if not item.source_evidence or not item.source_evidence.strip():
                 continue
             payload = item.model_dump()
-            evidence_dates = list(dict.fromkeys(ISO_PARTIAL_DATE_RE.findall(item.source_evidence or "")))
+            evidence_dates = list(
+                dict.fromkeys(ISO_PARTIAL_DATE_RE.findall(item.source_evidence or ""))
+            )
             # An explicit source span is authoritative for a single dated event.
             # This prevents a model from carrying a nearby lab date onto a different
             # observation while retaining ambiguous multi-date evidence unchanged.
@@ -183,18 +192,30 @@ class PatientTimelineExtractor:
                 evidence_date = normalized_model_date
             payload["event_date"] = evidence_date or normalized_model_date
             payload["event_date_end"] = normalized_model_end
-            interval = normalize_timeline_interval(payload["event_date"], normalized_model_end)
+            interval = normalize_timeline_interval(
+                payload["event_date"], normalized_model_end
+            )
             if interval is not None:
                 payload["event_date"] = interval.value
                 payload["event_date_end"] = interval.end_value
             elif payload["event_date_end"]:
                 payload["event_date_end"] = None
                 payload["date_certainty"] = "uncertain"
-                payload["uncertainty_reason"] = "The extracted date range was reversed or invalid."
+                payload["uncertainty_reason"] = (
+                    "The extracted date range was reversed or invalid."
+                )
             if payload["event_date"] and payload.get("date_precision") is None:
-                payload["date_precision"] = "day" if DATE_PREFIX_RE.fullmatch(payload["event_date"]) else "month" if DATE_SHORT_RE.fullmatch(payload["event_date"]) else "year"
+                payload["date_precision"] = (
+                    "day"
+                    if DATE_PREFIX_RE.fullmatch(payload["event_date"])
+                    else "month"
+                    if DATE_SHORT_RE.fullmatch(payload["event_date"])
+                    else "year"
+                )
             if payload["event_date"] and payload.get("date_certainty") == "uncertain":
-                payload["date_certainty"] = "explicit" if len(evidence_dates) == 1 else "inferred"
+                payload["date_certainty"] = (
+                    "explicit" if len(evidence_dates) == 1 else "inferred"
+                )
             event = PatientTimelineEvent(
                 **payload,
             )

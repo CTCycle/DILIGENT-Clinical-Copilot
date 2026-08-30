@@ -10,9 +10,11 @@ from pydantic import BaseModel
 from services.llm.cloud import CloudLLMClient
 from services.llm.structured import StructuredOutputParser
 
+
 ###############################################################################
 class FakeClinicalSchema(BaseModel):
     status: str
+
 
 ###############################################################################
 def test_structured_parse_failure_logs_hash_not_raw_output(caplog) -> None:

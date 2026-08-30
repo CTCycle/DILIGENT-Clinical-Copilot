@@ -9,9 +9,9 @@ from domain.llm.providers import CloudModelDescriptor
 from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
 from services.llm.transports.base import StructuredTransportMixin
 
+
 ###############################################################################
 class AnthropicMessagesTransport(StructuredTransportMixin):
-
     # -------------------------------------------------------------------------
     def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
         self.client = AsyncAnthropic(
@@ -36,7 +36,9 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
         }
         if request.reasoning_level and request.reasoning_level != "off":
             budget_tokens = max(1024, int(request.reasoning_reserve or 0))
-            max_tokens = max(max_tokens, int(request.output_token_limit or 0) + budget_tokens)
+            max_tokens = max(
+                max_tokens, int(request.output_token_limit or 0) + budget_tokens
+            )
             kwargs["thinking"] = {
                 "type": "enabled",
                 "budget_tokens": budget_tokens,
@@ -44,7 +46,10 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
         if max_tokens <= 0:
             raise ValueError("Anthropic requests require an output token limit")
         kwargs["max_tokens"] = max_tokens
-        if "temperature" in request.options and request.reasoning_level in {None, "off"}:
+        if "temperature" in request.options and request.reasoning_level in {
+            None,
+            "off",
+        }:
             kwargs["temperature"] = request.options["temperature"]
         response = await cast(Any, self.client.messages).create(
             **kwargs,

@@ -16,9 +16,9 @@ from repositories.serialization.session_timelines import build_timeline_preview_
 from services.clinical import timeline as timeline_service
 from services.clinical.timeline import PatientTimelineExtractor
 
+
 ###############################################################################
 class FakeTimelineClient:
-
     # -------------------------------------------------------------------------
     def __init__(self, payload: PatientTimelineExtraction) -> None:
         self.payload = payload
@@ -30,6 +30,7 @@ class FakeTimelineClient:
         self.last_kwargs = kwargs
         self.call_count += 1
         return self.payload
+
 
 ###############################################################################
 def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
@@ -82,6 +83,7 @@ def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
     assert result.events[1].title == "ALT peak"
     assert result.events[1].confidence == 0.9
 
+
 ###############################################################################
 def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
     extractor = PatientTimelineExtractor(
@@ -115,28 +117,60 @@ def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
 
     assert [event.event_id for event in result.events] == ["grounded"]
 
+
 ###############################################################################
 def test_normalize_date_token_keeps_month_precision_without_promoting_day() -> None:
     assert PatientTimelineExtractor.normalize_date_token("2025-02") == "2025-02"
 
+
 ###############################################################################
-def test_timeline_sort_orders_year_month_and_day_without_changing_display_values() -> None:
-    extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
+def test_timeline_sort_orders_year_month_and_day_without_changing_display_values() -> (
+    None
+):
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(PatientTimelineExtraction())
+    )
     events = [
-        PatientTimelineEvent(event_id="relative", title="Later", relative_time="after discharge", source_evidence="Later."),
-        PatientTimelineEvent(event_id="day", title="Day", event_date="2025-02-03", source_evidence="Day."),
-        PatientTimelineEvent(event_id="month", title="Month", event_date="2025-02", source_evidence="Month."),
-        PatientTimelineEvent(event_id="year", title="Year", event_date="2025", source_evidence="Year."),
+        PatientTimelineEvent(
+            event_id="relative",
+            title="Later",
+            relative_time="after discharge",
+            source_evidence="Later.",
+        ),
+        PatientTimelineEvent(
+            event_id="day", title="Day", event_date="2025-02-03", source_evidence="Day."
+        ),
+        PatientTimelineEvent(
+            event_id="month",
+            title="Month",
+            event_date="2025-02",
+            source_evidence="Month.",
+        ),
+        PatientTimelineEvent(
+            event_id="year", title="Year", event_date="2025", source_evidence="Year."
+        ),
     ]
 
     normalized = extractor.normalize_events(events)
 
-    assert [event.event_id for event in normalized] == ["year", "month", "day", "relative"]
-    assert [event.event_date for event in normalized[:3]] == ["2025", "2025-02", "2025-02-03"]
+    assert [event.event_id for event in normalized] == [
+        "year",
+        "month",
+        "day",
+        "relative",
+    ]
+    assert [event.event_date for event in normalized[:3]] == [
+        "2025",
+        "2025-02",
+        "2025-02-03",
+    ]
+
 
 ###############################################################################
 def test_timeline_uses_the_single_explicit_date_in_source_evidence() -> None:
-    extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(PatientTimelineExtraction())
+    )
     event = PatientTimelineEvent(
         event_id="alt",
         title="ALT 300 U/L",
@@ -149,9 +183,14 @@ def test_timeline_uses_the_single_explicit_date_in_source_evidence() -> None:
 
     assert normalized[0].event_date == "2026-07-21"
 
+
 ###############################################################################
-def test_timeline_preserves_precise_model_date_when_evidence_only_matches_year() -> None:
-    extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
+def test_timeline_preserves_precise_model_date_when_evidence_only_matches_year() -> (
+    None
+):
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(PatientTimelineExtraction())
+    )
     event = PatientTimelineEvent(
         event_id="natural-date",
         title="Symptoms began",
@@ -167,9 +206,14 @@ def test_timeline_preserves_precise_model_date_when_evidence_only_matches_year()
     assert normalized[0].event_date == "2026-07-18"
     assert normalized[0].date_precision == "day"
 
+
 ###############################################################################
-def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens() -> None:
-    extractor = PatientTimelineExtractor(client=FakeTimelineClient(PatientTimelineExtraction()))
+def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens() -> (
+    None
+):
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(PatientTimelineExtraction())
+    )
     events = [
         PatientTimelineEvent(
             event_id="range",
@@ -195,6 +239,7 @@ def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens(
     assert normalized[0].date_precision == "month"
     assert normalized[1].event_date is None
 
+
 ###############################################################################
 def test_timeline_date_interval_validates_calendar_days_and_reversed_ranges() -> None:
     assert normalize_timeline_interval("2024-02-29") is not None
@@ -203,12 +248,15 @@ def test_timeline_date_interval_validates_calendar_days_and_reversed_ranges() ->
     assert reversed_range is not None
     assert reversed_range.end_value is None
 
+
 ###############################################################################
 def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
     client = FakeTimelineClient(PatientTimelineExtraction())
     extractor = PatientTimelineExtractor(client=client)
 
-    asyncio.run(extractor.extract_timeline(session_id=5, source_payload={"b": 2, "a": "x"}))
+    asyncio.run(
+        extractor.extract_timeline(session_id=5, source_payload={"b": 2, "a": "x"})
+    )
 
     prompt = client.last_kwargs["user_prompt"]
     assert '{"a":"x","b":2}' in prompt
@@ -217,16 +265,22 @@ def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
     assert client.last_kwargs["purpose"].value == "timeline_extraction"
     assert client.last_kwargs["timeline_complexity"] == "simple"
 
+
 ###############################################################################
-def test_timeline_complexity_is_deterministic_and_escalates_for_large_payloads() -> None:
+def test_timeline_complexity_is_deterministic_and_escalates_for_large_payloads() -> (
+    None
+):
     assert PatientTimelineExtractor.classify_complexity({"note": "short"}) == "simple"
     moderate_payload = {"note": "2026-01-01 " * 10}
     assert PatientTimelineExtractor.classify_complexity(moderate_payload) == "moderate"
     complex_payload = {"note": "2026-01-01 " * 30, "details": "x" * 60000}
     assert PatientTimelineExtractor.classify_complexity(complex_payload) == "complex"
 
+
 ###############################################################################
-def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_fields() -> None:
+def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_fields() -> (
+    None
+):
     assert PatientTimelineExtractor._resolve_provider_model_from_runtime_settings(
         {
             "use_cloud_services": True,
@@ -237,12 +291,14 @@ def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_field
         }
     ) == ("opencode_go", "deepseek-v4-flash")
 
+
 ###############################################################################
 def test_timeline_request_rejects_active_model_overrides() -> None:
     with pytest.raises(ValueError):
         SessionTimelineRegenerateRequest.model_validate(
             {"model_overrides": {"cloud_model": "gpt-4.1-mini"}}
         )
+
 
 ###############################################################################
 def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
@@ -262,8 +318,12 @@ def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
         owner.client_provider = "opencode_go"
         owner.model = "deepseek-v4-flash"
 
-    monkeypatch.setattr(timeline_service, "select_llm_provider", fake_select_llm_provider)
-    monkeypatch.setattr(timeline_service, "ensure_runtime_client", fake_ensure_runtime_client)
+    monkeypatch.setattr(
+        timeline_service, "select_llm_provider", fake_select_llm_provider
+    )
+    monkeypatch.setattr(
+        timeline_service, "ensure_runtime_client", fake_ensure_runtime_client
+    )
 
     extractor = PatientTimelineExtractor()
     asyncio.run(
@@ -288,6 +348,7 @@ def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
     assert extractor.client_provider == "opencode_go"
     assert extractor.model == "deepseek-v4-flash"
 
+
 ###############################################################################
 def test_timeline_preview_includes_evidence_and_timing_quality_counts() -> None:
     preview = build_timeline_preview_payload(
@@ -296,7 +357,13 @@ def test_timeline_preview_includes_evidence_and_timing_quality_counts() -> None:
             session_id=2,
             generated_at=datetime.now(UTC),
             events=[
-                    PatientTimelineEvent(event_id="a", title="A", timing_type="explicit_date", event_date="2025-01", source_evidence="source"),
+                PatientTimelineEvent(
+                    event_id="a",
+                    title="A",
+                    timing_type="explicit_date",
+                    event_date="2025-01",
+                    source_evidence="source",
+                ),
                 PatientTimelineEvent(event_id="b", title="B", timing_type="uncertain"),
                 PatientTimelineEvent(event_id="c", title="C", timing_type="ordering"),
             ],

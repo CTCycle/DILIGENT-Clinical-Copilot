@@ -30,6 +30,7 @@ from services.runtime.jobs import JobManager
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
 
+
 ###############################################################################
 class DataInspectionService(
     InspectionUpdateConfigMixin,
@@ -598,11 +599,20 @@ class DataInspectionService(
         force_regenerate: bool = False,
     ) -> dict[str, Any]:
         safe_session_id = int(session_id)
-        if self.session_timeline_repository.get_session_timeline_source(safe_session_id) is None:
+        if (
+            self.session_timeline_repository.get_session_timeline_source(
+                safe_session_id
+            )
+            is None
+        ):
             raise KeyError(safe_session_id)
         scope_key = f"session_timeline:{safe_session_id}"
-        if self.jobs.is_job_running(self.SESSION_TIMELINE_JOB_TYPE, scope_key=scope_key):
-            raise ValueError("Timeline regeneration is already in progress for this session.")
+        if self.jobs.is_job_running(
+            self.SESSION_TIMELINE_JOB_TYPE, scope_key=scope_key
+        ):
+            raise ValueError(
+                "Timeline regeneration is already in progress for this session."
+            )
         runner = partial(
             self.run_session_timeline_job,
             safe_session_id,
@@ -623,7 +633,9 @@ class DataInspectionService(
     def get_session_timeline_job_status(
         self, session_id: int, job_id: str
     ) -> dict[str, Any] | None:
-        payload = self.get_job_status(job_id, expected_type=self.SESSION_TIMELINE_JOB_TYPE)
+        payload = self.get_job_status(
+            job_id, expected_type=self.SESSION_TIMELINE_JOB_TYPE
+        )
         if payload is None:
             return None
         result = payload.get("result")
@@ -668,9 +680,13 @@ class DataInspectionService(
                 int(payload.get("version") or 0),
             )
             current_key = (
-                float(current.get("created_at") or 0),
-                int(current.get("version") or 0),
-            ) if current else (-1.0, -1)
+                (
+                    float(current.get("created_at") or 0),
+                    int(current.get("version") or 0),
+                )
+                if current
+                else (-1.0, -1)
+            )
             if incoming_key > current_key:
                 latest_by_type[job_type] = payload
         return list(latest_by_type.values())

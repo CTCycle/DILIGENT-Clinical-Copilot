@@ -24,6 +24,7 @@ from services.session.robust_pipeline import (
     validate_fact_graph,
 )
 
+
 ###############################################################################
 def test_document_normalizer_keeps_raw_text_and_labels_bibliography() -> None:
     raw_text = (
@@ -36,6 +37,7 @@ def test_document_normalizer_keeps_raw_text_and_labels_bibliography() -> None:
     assert "Clinical note text" in normalized.clean_text
     assert any(block.block_type == "bibliography" for block in normalized.blocks)
     assert normalized.span_mappings[0].raw_end == len(raw_text)
+
 
 ###############################################################################
 def test_extraction_artifact_uses_ui_metadata_outside_document_sections() -> None:
@@ -64,6 +66,7 @@ def test_extraction_artifact_uses_ui_metadata_outside_document_sections() -> Non
     assert artifact.sections["therapy"].text == "Zetamycin 10 mg 1-0-0-0"
     assert artifact.timed_drugs[0].drug == "Zetamycin 10 mg 1-0-0-0"
 
+
 ###############################################################################
 def test_fact_graph_validation_blocks_source_verbatim_nodes_without_spans() -> None:
     graph = FactGraph(
@@ -82,6 +85,7 @@ def test_fact_graph_validation_blocks_source_verbatim_nodes_without_spans() -> N
     validation = validate_fact_graph(graph)
 
     assert validation.hard_issues[0]["code"] == "source_span_missing"
+
 
 ###############################################################################
 def test_report_metadata_links_claims_to_fact_nodes() -> None:
@@ -126,6 +130,7 @@ def test_report_metadata_links_claims_to_fact_nodes() -> None:
         build_run_bundle_index(run_id="1", session_id=1).storage
         == "database_session_result_payload"
     )
+
 
 ###############################################################################
 def test_fact_graph_report_localizes_italian_audit_labels() -> None:
@@ -175,6 +180,7 @@ def test_fact_graph_report_localizes_italian_audit_labels() -> None:
     assert "Clinical Report" not in report
     assert metadata.claim_references
 
+
 ###############################################################################
 def test_audit_blocks_report_without_claim_references() -> None:
     audit = audit_report(
@@ -204,6 +210,7 @@ def test_audit_blocks_report_without_claim_references() -> None:
     )
     assert audit.outcome == "partially_faithful_with_major_issues"
 
+
 ###############################################################################
 def test_revision_routes_report_missing_resources_without_501() -> None:
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
@@ -217,9 +224,7 @@ def test_revision_routes_report_missing_resources_without_501() -> None:
                 f"/api/inspection/sessions/{session_id}/revision/jobs", json={}
             ),
             "status": client.get(f"/api/inspection/sessions/revision/jobs/{job_id}"),
-            "cancel": client.delete(
-                f"/api/inspection/sessions/revision/jobs/{job_id}"
-            ),
+            "cancel": client.delete(f"/api/inspection/sessions/revision/jobs/{job_id}"),
             "run": client.get(
                 f"/api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}"
             ),

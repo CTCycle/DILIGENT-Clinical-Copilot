@@ -24,7 +24,9 @@ RXNAV_CURATED_ALIASES_PATH = SOURCES_PATH / "rxnav_curated_aliases.json"
 ENV_FILE_PATH = SETTINGS_PATH / ".env"
 ENV_EXAMPLE_PATH = RUNTIME_LAYOUT.settings_template_root / ".env.example"
 CONFIGURATIONS_FILE = SETTINGS_PATH / "configurations.json"
-DATABASE_FILE_PATH = Path(os.getenv("DILIGENT_SQLITE_PATH") or str(RESOURCES_PATH / "database.db"))
+DATABASE_FILE_PATH = Path(
+    os.getenv("DILIGENT_SQLITE_PATH") or str(RESOURCES_PATH / "database.db")
+)
 CLIENT_DIST_PATH = APP_DIR / "client" / "dist" / "browser"
 CLIENT_ASSETS_PATH = CLIENT_DIST_PATH / "assets"
 CLIENT_INDEX_FILE_PATH = CLIENT_DIST_PATH / "index.html"

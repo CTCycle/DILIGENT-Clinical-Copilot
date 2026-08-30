@@ -17,9 +17,9 @@ from repositories.schemas.configuration import (
     ReferenceCatalogManifest,
 )
 
+
 ###############################################################################
 class ReferenceCatalogSerializer:
-
     # -------------------------------------------------------------------------
     def __init__(self, session_factory: sessionmaker) -> None:
         self.session_factory = session_factory

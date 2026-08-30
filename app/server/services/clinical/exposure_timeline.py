@@ -4,12 +4,16 @@ from datetime import date, datetime
 
 from domain.clinical.entities import DrugEntry, DrugSuspensionContext
 
+
 ###############################################################################
 class ExposureTimelineService:
-
     # -------------------------------------------------------------------------
-    def evaluate_suspension(self, entry: DrugEntry, visit_date: date | None) -> DrugSuspensionContext:
-        start_reported = bool(entry.therapy_start_status) or bool(entry.therapy_start_date)
+    def evaluate_suspension(
+        self, entry: DrugEntry, visit_date: date | None
+    ) -> DrugSuspensionContext:
+        start_reported = bool(entry.therapy_start_status) or bool(
+            entry.therapy_start_date
+        )
         start_date = self.parse_start_date(entry.therapy_start_date, visit_date)
         start_interval_days = (
             (visit_date - start_date).days
@@ -33,7 +37,8 @@ class ExposureTimelineService:
             return DrugSuspensionContext(
                 suspended=False,
                 excluded=False,
-                note=" ".join(part for part in (start_note, exposure_note) if part) or None,
+                note=" ".join(part for part in (start_note, exposure_note) if part)
+                or None,
                 start_reported=start_reported,
                 start_date=start_date,
                 start_interval_days=start_interval_days,
@@ -41,7 +46,9 @@ class ExposureTimelineService:
             )
         interval_days: int | None = None
         if parsed_date is None:
-            suspension_note = "Suspension reported without a reliable date; drug kept in analysis."
+            suspension_note = (
+                "Suspension reported without a reliable date; drug kept in analysis."
+            )
         elif visit_date is None:
             suspension_note = f"Suspended on {parsed_date.isoformat()}, but visit date missing; drug kept in analysis."
         else:
@@ -56,7 +63,8 @@ class ExposureTimelineService:
             suspended=suspended,
             excluded=False,
             suspension_date=parsed_date,
-            note=" ".join(part for part in (start_note, suspension_note) if part) or None,
+            note=" ".join(part for part in (start_note, suspension_note) if part)
+            or None,
             interval_days=interval_days,
             start_reported=start_reported,
             start_date=start_date,
@@ -65,7 +73,9 @@ class ExposureTimelineService:
         )
 
     # -------------------------------------------------------------------------
-    def parse_timeline_date(self, raw_date: str | None, visit_date: date | None) -> date | None:
+    def parse_timeline_date(
+        self, raw_date: str | None, visit_date: date | None
+    ) -> date | None:
         if raw_date is None:
             return None
         text = str(raw_date).strip()
@@ -76,11 +86,13 @@ class ExposureTimelineService:
         candidates: list[str] = []
         if visit_date is not None and len(tokens) == 2:
             day, month = tokens
-            candidates.extend([
-                f"{day.zfill(2)}-{month.zfill(2)}-{visit_date.year}",
-                f"{month.zfill(2)}-{day.zfill(2)}-{visit_date.year}",
-                f"{visit_date.year}-{month.zfill(2)}-{day.zfill(2)}",
-            ])
+            candidates.extend(
+                [
+                    f"{day.zfill(2)}-{month.zfill(2)}-{visit_date.year}",
+                    f"{month.zfill(2)}-{day.zfill(2)}-{visit_date.year}",
+                    f"{visit_date.year}-{month.zfill(2)}-{day.zfill(2)}",
+                ]
+            )
         candidates.extend(["-".join(tokens), text, normalized])
         checked: set[str] = set()
         for candidate in candidates:
@@ -92,15 +104,26 @@ class ExposureTimelineService:
         return None
 
     # -------------------------------------------------------------------------
-    def parse_suspension_date(self, raw_date: str | None, visit_date: date | None) -> date | None:
+    def parse_suspension_date(
+        self, raw_date: str | None, visit_date: date | None
+    ) -> date | None:
         return self.parse_timeline_date(raw_date, visit_date)
 
     # -------------------------------------------------------------------------
-    def parse_start_date(self, raw_date: str | None, visit_date: date | None) -> date | None:
+    def parse_start_date(
+        self, raw_date: str | None, visit_date: date | None
+    ) -> date | None:
         return self.parse_timeline_date(raw_date, visit_date)
 
     # -------------------------------------------------------------------------
-    def format_start_note(self, *, start_reported: bool, start_date: date | None, start_interval_days: int | None, visit_date: date | None) -> str:
+    def format_start_note(
+        self,
+        *,
+        start_reported: bool,
+        start_date: date | None,
+        start_interval_days: int | None,
+        visit_date: date | None,
+    ) -> str:
         if not start_reported:
             return "Therapy start was not documented; assume chronic exposure unless another source clarifies the onset."
         if start_date is None:

@@ -20,6 +20,7 @@ TransportStrategy = Literal[
     "model_metadata_routed",
 ]
 
+
 ###############################################################################
 class ProviderCapabilities(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -29,6 +30,7 @@ class ProviderCapabilities(BaseModel):
     model_listing: bool
     embeddings: bool
     vision: bool
+
 
 ###############################################################################
 class CloudProviderDefinition(BaseModel):
@@ -56,6 +58,7 @@ class CloudProviderDefinition(BaseModel):
             raise ValueError("default_model must exist in the provider model catalog")
         return self
 
+
 ###############################################################################
 class CloudModelDescriptor(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -67,6 +70,7 @@ class CloudModelDescriptor(BaseModel):
     output_token_limit: int | None = Field(default=None, ge=1)
     supports_thinking: bool | None = None
     supports_temperature: bool | None = None
+
 
 ###############################################################################
 class CloudProviderDescriptor(BaseModel):

@@ -7,7 +7,9 @@ from fastapi.testclient import TestClient
 
 
 ###############################################################################
-def test_packaged_desktop_api_requires_bootstrap_cookie_and_exact_origin(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_packaged_desktop_api_requires_bootstrap_cookie_and_exact_origin(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setenv("DILIGENT_DESKTOP", "true")
     monkeypatch.setenv("DILIGENT_DESKTOP_SESSION_SECRET", "session-secret")
     monkeypatch.setenv("DILIGENT_DESKTOP_PORT", "48123")

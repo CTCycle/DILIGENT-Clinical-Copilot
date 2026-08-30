@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from repositories.database.migrations import migrate_database
 
+
 ###############################################################################
 @pytest.fixture(params=["sqlite", "postgresql"])
 def persistence_engine(request: pytest.FixtureRequest, tmp_path: Path) -> Engine:
@@ -46,6 +47,7 @@ def persistence_engine(request: pytest.FixtureRequest, tmp_path: Path) -> Engine
     finally:
         migrate_database(engine, database_was_empty=False, drop_existing=True)
         engine.dispose()
+
 
 ###############################################################################
 @pytest.fixture

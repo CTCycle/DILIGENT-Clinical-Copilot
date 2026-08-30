@@ -34,9 +34,9 @@ DechallengeStatus = Literal[
     "insufficient_interval",
 ]
 
+
 ###############################################################################
 class DiliTimelineEngine:
-
     # -------------------------------------------------------------------------
     def build(self, drugs: list[DrugEntry], labs: PatientLabTimeline) -> DiliTimeline:
         events: list[DiliTimelineEvent] = []

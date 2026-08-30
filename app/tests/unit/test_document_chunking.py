@@ -12,11 +12,13 @@ from repositories.serialization.document_serializer import DocumentSerializer
 
 TEST_TMP_ROOT = Path("assets/QA/tmp/test-document-chunking")
 
+
 ###############################################################################
 def make_workspace_temp_dir() -> Path:
     temp_dir = TEST_TMP_ROOT / uuid.uuid4().hex
     temp_dir.mkdir(parents=True, exist_ok=False)
     return temp_dir
+
 
 ###############################################################################
 def test_textual_document_metadata_uses_heading_title_fallback() -> None:
@@ -36,6 +38,7 @@ def test_textual_document_metadata_uses_heading_title_fallback() -> None:
     finally:
         shutil.rmtree(tmp_path, ignore_errors=True)
 
+
 ###############################################################################
 def test_document_serializer_accepts_path_objects_and_collects_relative_ids() -> None:
     tmp_path = make_workspace_temp_dir()
@@ -53,6 +56,7 @@ def test_document_serializer_accepts_path_objects_and_collects_relative_ids() ->
         assert serializer.compute_document_id(file_path) == expected_id
     finally:
         shutil.rmtree(tmp_path, ignore_errors=True)
+
 
 ###############################################################################
 def test_structure_aware_chunking_preserves_heading_metadata() -> None:
