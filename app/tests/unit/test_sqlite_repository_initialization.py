@@ -107,17 +107,18 @@ def test_sqlite_repository_exposes_orm_session_factory(
     repository = SQLiteRepository(settings)
 
     with repository.session_factory() as db_session:
-        db_session.add(
-            ApplicationConfiguration(
-                payload={
-                    "clinical_model": "llama3.1:8b",
-                    "text_extraction_model": "llama3.1:8b",
-                    "use_cloud_models": True,
-                    "cloud_provider": "openai",
-                    "cloud_model": "gpt-4.1-mini",
-                }
-            )
-        )
+        configuration = db_session.get(ApplicationConfiguration, 1)
+        assert configuration is not None
+        configuration.payload = {
+            "clinical_model": "llama3.1:8b",
+            "text_extraction_model": "llama3.1:8b",
+            "revision_model": "llama3.1:8b",
+            "timeline_model": "llama3.1:8b",
+            "use_cloud_models": True,
+            "cloud_provider": "openai",
+            "cloud_model": "gpt-4.1-mini",
+        }
+        db_session.add(configuration)
         db_session.commit()
 
     with repository.session_factory() as db_session:
