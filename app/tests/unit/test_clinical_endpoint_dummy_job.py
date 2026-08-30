@@ -11,6 +11,7 @@ from domain.clinical.robustness import ClinicalInputPreflightResult
 from services.runtime.jobs import JobManager
 from services.session.session_service import ClinicalSessionService
 
+
 ###############################################################################
 def get_route_service(route_path: str) -> Any:
     for route in server_app_module.app.routes:
@@ -19,6 +20,7 @@ def get_route_service(route_path: str) -> Any:
             if endpoint_owner is not None:
                 return endpoint_owner.service
     raise AssertionError(f"Route not found: {route_path}")
+
 
 ###############################################################################
 def dummy_clinical_payload() -> dict[str, Any]:
@@ -47,6 +49,7 @@ def dummy_clinical_payload() -> dict[str, Any]:
         "selected_model_providers": ["ollama"],
     }
 
+
 ###############################################################################
 def wait_for_terminal_status(client: TestClient, job_id: str) -> dict[str, Any]:
     deadline = time.monotonic() + 3.0
@@ -59,6 +62,7 @@ def wait_for_terminal_status(client: TestClient, job_id: str) -> dict[str, Any]:
             return last_payload
         time.sleep(0.05)
     raise AssertionError(f"Clinical job did not finish: {last_payload}")
+
 
 ###############################################################################
 def test_clinical_jobs_endpoint_completes_dummy_three_drug_assessment(

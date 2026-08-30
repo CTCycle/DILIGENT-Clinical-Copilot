@@ -9,6 +9,7 @@ from domain.clinical.entities import PipelineIssue, RagDocumentReference
 from services.retrieval.embeddings import EmbeddingModelMismatchError
 from services.clinical.rag_support import RagSupportService
 
+
 ###############################################################################
 def test_line_metadata_is_propagated() -> None:
     reference = RagSupportService.build_document_reference(
@@ -26,6 +27,7 @@ def test_line_metadata_is_propagated() -> None:
         file_name="alpha.pdf", page_start=2, page_end=3, line_start=18, line_end=54
     )
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     "kwargs",
@@ -38,6 +40,7 @@ def test_line_metadata_is_propagated() -> None:
 def test_invalid_location_ranges_are_rejected(kwargs: dict[str, int]) -> None:
     with pytest.raises(ValidationError):
         RagDocumentReference(file_name="alpha.pdf", **kwargs)
+
 
 ###############################################################################
 def test_embedding_mismatch_degrades_to_a_recorded_rag_warning() -> None:

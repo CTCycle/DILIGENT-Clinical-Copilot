@@ -13,6 +13,7 @@ from services.clinical.drug_resolution.normalizer import DrugMentionNormalizer
 from services.clinical.parser import DrugsParser
 from services.session.preflight import LocalModelBatchPreflightResult
 
+
 ###############################################################################
 def test_anamnesis_and_therapy_source_fields_are_preserved() -> None:
     parser = DrugsParser(client=None)
@@ -33,6 +34,7 @@ def test_anamnesis_and_therapy_source_fields_are_preserved() -> None:
     assert therapy_entry.source == "therapy"
     assert therapy_entry.historical_flag is False
 
+
 ###############################################################################
 def test_conservative_preparation_keeps_bullets_and_multiline_entries() -> None:
     parser = DrugsParser(client=None)
@@ -43,6 +45,7 @@ def test_conservative_preparation_keeps_bullets_and_multiline_entries() -> None:
     assert "Prednisone 25 mg/day" in prepared
     assert "\n" in prepared
 
+
 ###############################################################################
 def test_drug_without_temporal_information_is_filtered() -> None:
     parser = DrugsParser(client=None)
@@ -50,6 +53,7 @@ def test_drug_without_temporal_information_is_filtered() -> None:
     with_temporal = DrugEntry(name="Drug B", therapy_start_date="2026-03-10")
     assert parser.drug_entry_has_temporal_information(no_temporal) is False
     assert parser.drug_entry_has_temporal_information(with_temporal) is True
+
 
 ###############################################################################
 def test_batch_preflight_flags_cover_concurrent_and_sequential_paths() -> None:
@@ -67,6 +71,7 @@ def test_batch_preflight_flags_cover_concurrent_and_sequential_paths() -> None:
     assert allow.concurrency_allowed is True
     assert deny.concurrency_allowed is False
     assert deny.reason
+
 
 ###############################################################################
 def test_source_differences_prevent_cross_section_collapse() -> None:
@@ -89,6 +94,7 @@ def test_source_differences_prevent_cross_section_collapse() -> None:
     # Current pipeline keeps section-specific origin and must not collapse these two.
     assert len(deduped) == 2
 
+
 ###############################################################################
 def test_structural_gate_does_not_require_catalog_recognition() -> None:
     normalizer = DrugMentionNormalizer()
@@ -107,6 +113,7 @@ def test_structural_gate_does_not_require_catalog_recognition() -> None:
         is None
     )
 
+
 ###############################################################################
 def test_demographic_case_opening_is_not_normalized_as_drug() -> None:
     normalizer = DrugMentionNormalizer()
@@ -117,6 +124,7 @@ def test_demographic_case_opening_is_not_normalized_as_drug() -> None:
     ):
         assert normalizer._normalize_entry(DrugEntry(name=value)) is None
 
+
 ###############################################################################
 def test_novel_inn_suffix_candidate_remains_for_missing_livertox_resolution() -> None:
     normalizer = DrugMentionNormalizer()
@@ -124,12 +132,12 @@ def test_novel_inn_suffix_candidate_remains_for_missing_livertox_resolution() ->
     assert mention is not None
     assert mention.normalized_name == "trialzumab"
 
+
 ###############################################################################
 def test_therapy_hybrid_fallback_uses_complete_block_context(monkeypatch) -> None:
 
     ###############################################################################
     class StructuredClientStub:
-
         # -------------------------------------------------------------------------
         async def llm_structured_call(self, **kwargs: object) -> object:
             raise AssertionError("Patched section extractor should be used")
@@ -168,6 +176,7 @@ def test_therapy_hybrid_fallback_uses_complete_block_context(monkeypatch) -> Non
 
     assert captured["source_text"] == source
     assert [entry.name for entry in entries] == ["Amoxicillin/clavulanate"]
+
 
 ###############################################################################
 def test_cross_source_duplicates_keep_best_entry_and_merge_provenance() -> None:

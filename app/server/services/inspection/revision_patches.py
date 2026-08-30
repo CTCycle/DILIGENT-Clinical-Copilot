@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from domain.inspection import RevisionReportPatch
 
+
 ###############################################################################
 def apply_report_patches(report: str, patches: list[RevisionReportPatch]) -> str:
     resolved: list[tuple[int, int, RevisionReportPatch]] = []
@@ -40,6 +41,7 @@ def apply_report_patches(report: str, patches: list[RevisionReportPatch]) -> str
         updated = updated[:start] + patch.replacement + updated[end:]
         previous_start = start
     return updated
+
 
 ###############################################################################
 def validate_draft_report(report: str, patches: list[RevisionReportPatch]) -> str:

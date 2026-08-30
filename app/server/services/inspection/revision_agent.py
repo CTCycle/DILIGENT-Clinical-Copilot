@@ -44,11 +44,13 @@ MAX_JSON_CHARS = 30000
 
 StructuredCall = Callable[..., Any]
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RevisionAgentRuntime:
     provider: str
     model: str
+
 
 ###############################################################################
 def _clip_text(value: Any, limit: int) -> str:
@@ -56,6 +58,7 @@ def _clip_text(value: Any, limit: int) -> str:
     if len(text) <= limit:
         return text
     return f"{text[:limit]}\n\n[TRUNCATED: {len(text) - limit} characters omitted]"
+
 
 ###############################################################################
 def _safe_json(value: Any, limit: int = MAX_JSON_CHARS) -> str:
@@ -65,14 +68,15 @@ def _safe_json(value: Any, limit: int = MAX_JSON_CHARS) -> str:
         serialized = json.dumps(str(value), ensure_ascii=False)
     return _clip_text(serialized, limit)
 
+
 ###############################################################################
-def resolve_revision_agent_runtime(
-) -> RevisionAgentRuntime:
+def resolve_revision_agent_runtime() -> RevisionAgentRuntime:
     provider, model = LLMRuntimeConfig.resolve_provider_and_model("revision")
     return RevisionAgentRuntime(
         provider=provider,
         model=model,
     )
+
 
 ###############################################################################
 def build_revision_agent_user_prompt(
@@ -134,9 +138,9 @@ def build_revision_agent_user_prompt(
         f"{_safe_json(packet, MAX_TEXT_CHARS + MAX_REPORT_CHARS + MAX_JSON_CHARS)}"
     )
 
+
 ###############################################################################
 class RevisionAgentRunner:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -292,7 +296,9 @@ class RevisionAgentRunner:
     ) -> dict[str, Any]:
         del job_id
         runtime = resolve_revision_agent_runtime()
-        lineage = self.session_revision_repository.list_session_versions(int(session["session_id"]))
+        lineage = self.session_revision_repository.list_session_versions(
+            int(session["session_id"])
+        )
         context_effective = LLMRuntimeConfig.resolve_effective_inference_config(
             purpose=GenerationPurpose.REVISION_PLANNING,
             provider=runtime.provider,

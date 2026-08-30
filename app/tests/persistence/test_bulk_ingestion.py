@@ -5,8 +5,14 @@ from collections import Counter
 import pandas as pd
 from sqlalchemy import event, select
 
-from repositories.schemas.knowledge import Drug, DrugAlias, DrugRxnormCode, LiverToxMonograph
+from repositories.schemas.knowledge import (
+    Drug,
+    DrugAlias,
+    DrugRxnormCode,
+    LiverToxMonograph,
+)
 from repository_fixtures import build_repository_graph
+
 
 ###############################################################################
 def test_rxnav_ingestion_uses_set_based_writes(persistence_engine) -> None:  # type: ignore[no-untyped-def]
@@ -33,7 +39,9 @@ def test_rxnav_ingestion_uses_set_based_writes(persistence_engine) -> None:  # t
     event.listen(persistence_engine, "before_cursor_execute", before_cursor_execute)
     event.listen(persistence_engine, "commit", after_commit)
     try:
-        repository = build_repository_graph(engine=persistence_engine).drug_catalog_repository
+        repository = build_repository_graph(
+            engine=persistence_engine
+        ).drug_catalog_repository
         repository.upsert_drugs_catalog_records(
             [
                 {
@@ -55,9 +63,7 @@ def test_rxnav_ingestion_uses_set_based_writes(persistence_engine) -> None:  # t
             ]
         )
     finally:
-        event.remove(
-            persistence_engine, "before_cursor_execute", before_cursor_execute
-        )
+        event.remove(persistence_engine, "before_cursor_execute", before_cursor_execute)
         event.remove(persistence_engine, "commit", after_commit)
 
     with persistence_engine.connect() as connection:
@@ -69,6 +75,7 @@ def test_rxnav_ingestion_uses_set_based_writes(persistence_engine) -> None:  # t
         {"DRUGS": 1, "DRUG_RXNORM_CODES": 1, "DRUG_ALIASES": 1}
     )
     assert commits == 1
+
 
 ###############################################################################
 def test_livertox_ingestion_uses_set_based_writes(persistence_engine) -> None:  # type: ignore[no-untyped-def]
@@ -95,7 +102,9 @@ def test_livertox_ingestion_uses_set_based_writes(persistence_engine) -> None:  
     event.listen(persistence_engine, "before_cursor_execute", before_cursor_execute)
     event.listen(persistence_engine, "commit", after_commit)
     try:
-        repository = build_repository_graph(engine=persistence_engine).knowledge_repository
+        repository = build_repository_graph(
+            engine=persistence_engine
+        ).knowledge_repository
         repository.save_livertox_records(
             pd.DataFrame(
                 [
@@ -121,9 +130,7 @@ def test_livertox_ingestion_uses_set_based_writes(persistence_engine) -> None:  
             )
         )
     finally:
-        event.remove(
-            persistence_engine, "before_cursor_execute", before_cursor_execute
-        )
+        event.remove(persistence_engine, "before_cursor_execute", before_cursor_execute)
         event.remove(persistence_engine, "commit", after_commit)
 
     with persistence_engine.connect() as connection:

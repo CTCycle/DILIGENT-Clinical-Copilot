@@ -10,9 +10,9 @@ from domain.llm.providers import CloudModelDescriptor
 from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
 from services.llm.transports.base import StructuredTransportMixin
 
+
 ###############################################################################
 class GeminiTransport(StructuredTransportMixin):
-
     # -------------------------------------------------------------------------
     def __init__(self, *, api_key: str, timeout: float) -> None:
         self.client = genai.Client(api_key=api_key)

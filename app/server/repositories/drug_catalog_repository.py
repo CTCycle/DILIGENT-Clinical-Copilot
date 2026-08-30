@@ -35,6 +35,7 @@ from repositories.schemas.knowledge import (
     LiverToxMonograph,
 )
 
+
 ###############################################################################
 def _build_search_pattern(search: str | None) -> str | None:
     normalized = repository_values.normalize_string(search)
@@ -43,9 +44,9 @@ def _build_search_pattern(search: str | None) -> str | None:
     escaped = re.sub(r"([%_\\])", r"\\\1", normalized.casefold())
     return f"%{escaped}%"
 
+
 ###############################################################################
 class DrugCatalogRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, context: RepositoryContext) -> None:
         self.context = context
@@ -77,7 +78,9 @@ class DrugCatalogRepository:
             )
         db_session = self.session_factory()
         try:
-            drug_insert = dialect_insert(db_session, Drug).values(list(values_by_norm.values()))
+            drug_insert = dialect_insert(db_session, Drug).values(
+                list(values_by_norm.values())
+            )
             drug_insert = drug_insert.on_conflict_do_update(
                 index_elements=[Drug.canonical_name_norm],
                 set_={
@@ -148,7 +151,9 @@ class DrugCatalogRepository:
                     )
                 for alias, alias_kind, source in candidates:
                     clean_alias = repository_values.normalize_string(alias)
-                    alias_norm = normalize_drug_name(clean_alias) if clean_alias else None
+                    alias_norm = (
+                        normalize_drug_name(clean_alias) if clean_alias else None
+                    )
                     if not alias_norm or clean_alias is None:
                         continue
                     key = (drug_id, alias_norm, alias_kind, source)
@@ -212,7 +217,9 @@ class DrugCatalogRepository:
             rows = db_session.execute(
                 select(Drug.id, Drug.canonical_name, Drug.rxnav_last_update)
                 .where(filtered)
-                .order_by(func.lower(func.coalesce(Drug.canonical_name, "")), Drug.id.asc())
+                .order_by(
+                    func.lower(func.coalesce(Drug.canonical_name, "")), Drug.id.asc()
+                )
                 .offset(safe_offset)
                 .limit(safe_limit)
             ).all()
@@ -220,7 +227,9 @@ class DrugCatalogRepository:
                 {
                     "drug_id": int(row.id),
                     "drug_name": row.canonical_name,
-                    "last_update": repository_values.normalize_date(row.rxnav_last_update),
+                    "last_update": repository_values.normalize_date(
+                        row.rxnav_last_update
+                    ),
                 }
                 for row in rows
             ], total_rows
@@ -233,7 +242,9 @@ class DrugCatalogRepository:
             drugs = (
                 db_session.execute(
                     select(Drug)
-                    .options(selectinload(Drug.rxnorm_codes), selectinload(Drug.aliases))
+                    .options(
+                        selectinload(Drug.rxnorm_codes), selectinload(Drug.aliases)
+                    )
                     .order_by(Drug.id.asc())
                     .offset(max(int(offset), 0))
                     .limit(None if limit is None else max(int(limit), 1))
@@ -261,19 +272,25 @@ class DrugCatalogRepository:
             if not rxnorm_aliases or not rxcui_values:
                 continue
             raw_name = self._first_alias_model_value(rxnorm_aliases, "raw_name")
-            standard_name = self._first_alias_model_value(rxnorm_aliases, "standard_name")
+            standard_name = self._first_alias_model_value(
+                rxnorm_aliases, "standard_name"
+            )
             term_type = self._first_alias_model_term_type(rxnorm_aliases)
             brand_names = repository_values.join_values(
                 self._alias_model_values_for_kind(rxnorm_aliases, "brand")
             )
-            synonyms = sorted(self._alias_model_values_for_kind(rxnorm_aliases, "synonym"))
+            synonyms = sorted(
+                self._alias_model_values_for_kind(rxnorm_aliases, "synonym")
+            )
             for rxcui in sorted(rxcui_values):
                 records.append(
                     {
                         "rxcui": rxcui,
-                        "raw_name": raw_name or repository_values.normalize_string(drug.canonical_name),
+                        "raw_name": raw_name
+                        or repository_values.normalize_string(drug.canonical_name),
                         "term_type": term_type,
-                        "name": standard_name or repository_values.normalize_string(drug.canonical_name),
+                        "name": standard_name
+                        or repository_values.normalize_string(drug.canonical_name),
                         "brand_names": brand_names,
                         "synonyms": json.dumps(synonyms, ensure_ascii=False),
                     }
@@ -286,7 +303,9 @@ class DrugCatalogRepository:
         )
 
     # -------------------------------------------------------------------------
-    def stream_drugs_catalog(self, page_size: int | None = None) -> Iterator[pd.DataFrame]:
+    def stream_drugs_catalog(
+        self, page_size: int | None = None
+    ) -> Iterator[pd.DataFrame]:
         configured_size = get_server_settings().database.select_page_size
         chunk_size = configured_size if page_size is None else max(int(page_size), 1)
         offset = 0
@@ -315,7 +334,9 @@ class DrugCatalogRepository:
             ).all():
                 source = repository_values.normalize_string(source_value) or "unknown"
                 alias = repository_values.normalize_string(alias_value)
-                alias_kind = repository_values.normalize_string(alias_kind_value) or "unknown"
+                alias_kind = (
+                    repository_values.normalize_string(alias_kind_value) or "unknown"
+                )
                 if alias is None:
                     continue
                 key = f"{alias.casefold()}::{alias_kind.casefold()}"
@@ -351,7 +372,9 @@ class DrugCatalogRepository:
                 return None
             conflicting = db_session.scalar(
                 select(Drug)
-                .where(Drug.canonical_name_norm == normalized_name, Drug.id != safe_drug_id)
+                .where(
+                    Drug.canonical_name_norm == normalized_name, Drug.id != safe_drug_id
+                )
                 .limit(1)
             )
             if conflicting is not None:
@@ -380,7 +403,9 @@ class DrugCatalogRepository:
             return {
                 "drug_id": safe_drug_id,
                 "drug_name": existing.canonical_name,
-                "last_update": repository_values.normalize_date(existing.rxnav_last_update),
+                "last_update": repository_values.normalize_date(
+                    existing.rxnav_last_update
+                ),
             }
 
     # -------------------------------------------------------------------------
@@ -423,7 +448,9 @@ class DrugCatalogRepository:
             return int(drug.id)
         aliases = self.get_drug_alias_by_norm(db_session, normalized_name)
         if len(aliases) > 1:
-            raise ValueError(f"Drug alias is ambiguous for normalized value '{normalized_name}'")
+            raise ValueError(
+                f"Drug alias is ambiguous for normalized value '{normalized_name}'"
+            )
         return int(aliases[0].drug_id) if aliases else None
 
     # -------------------------------------------------------------------------
@@ -439,7 +466,9 @@ class DrugCatalogRepository:
         use_livertox_nbk_lookup: bool = True,
     ) -> Drug:
         candidate_by_rxcui = self.get_drug_by_rxcui(db_session, rxnorm_rxcui)
-        candidate_by_name = self.get_drug_by_canonical_name_norm(db_session, canonical_name_norm)
+        candidate_by_name = self.get_drug_by_canonical_name_norm(
+            db_session, canonical_name_norm
+        )
         resolved_ids = {
             int(candidate.id)
             for candidate in (candidate_by_rxcui, candidate_by_name)
@@ -460,7 +489,9 @@ class DrugCatalogRepository:
             )
             db_session.add(candidate)
             db_session.flush()
-        self.upsert_drug_rxcui(db_session, drug_id=int(candidate.id), rxcui=rxnorm_rxcui)
+        self.upsert_drug_rxcui(
+            db_session, drug_id=int(candidate.id), rxcui=rxnorm_rxcui
+        )
         if use_livertox_nbk_lookup:
             self.try_assign_livertox_nbk_id(
                 db_session, drug=candidate, livertox_nbk_id=livertox_nbk_id or ""
@@ -498,13 +529,19 @@ class DrugCatalogRepository:
                 drug.canonical_name_norm = incoming_value
 
     # -------------------------------------------------------------------------
-    def upsert_drug_rxcui(self, db_session: Session, *, drug_id: int, rxcui: str | None) -> None:
+    def upsert_drug_rxcui(
+        self, db_session: Session, *, drug_id: int, rxcui: str | None
+    ) -> None:
         normalized_rxcui = repository_values.normalize_string(rxcui)
         if normalized_rxcui is None:
             return
-        existing = db_session.execute(
-            DrugRepositoryQueries.drug_rxcui_mapping(normalized_rxcui)
-        ).scalars().first()
+        existing = (
+            db_session.execute(
+                DrugRepositoryQueries.drug_rxcui_mapping(normalized_rxcui)
+            )
+            .scalars()
+            .first()
+        )
         if existing is None:
             db_session.add(DrugRxnormCode(drug_id=drug_id, rxcui=normalized_rxcui))
         elif int(existing.drug_id) != int(drug_id):
@@ -518,9 +555,13 @@ class DrugCatalogRepository:
         normalized_rxcui = repository_values.normalize_string(rxcui)
         if normalized_rxcui is None:
             return None
-        return db_session.execute(
-            DrugRepositoryQueries.drug_by_joined_rxcui(normalized_rxcui)
-        ).scalars().first()
+        return (
+            db_session.execute(
+                DrugRepositoryQueries.drug_by_joined_rxcui(normalized_rxcui)
+            )
+            .scalars()
+            .first()
+        )
 
     # -------------------------------------------------------------------------
     def get_drug_by_canonical_name_norm(
@@ -528,15 +569,23 @@ class DrugCatalogRepository:
     ) -> Drug | None:
         if name is None:
             return None
-        return db_session.execute(
-            DrugRepositoryQueries.drug_by_canonical_name_norm(name)
-        ).scalars().first()
+        return (
+            db_session.execute(DrugRepositoryQueries.drug_by_canonical_name_norm(name))
+            .scalars()
+            .first()
+        )
 
     # -------------------------------------------------------------------------
-    def get_drug_alias_by_norm(self, db_session: Session, alias_norm: str | None) -> list[DrugAlias]:
+    def get_drug_alias_by_norm(
+        self, db_session: Session, alias_norm: str | None
+    ) -> list[DrugAlias]:
         if alias_norm is None:
             return []
-        return list(db_session.execute(DrugRepositoryQueries.alias_by_norm(alias_norm)).scalars().all())
+        return list(
+            db_session.execute(DrugRepositoryQueries.alias_by_norm(alias_norm))
+            .scalars()
+            .all()
+        )
 
     # -------------------------------------------------------------------------
     def upsert_drug_alias(
@@ -568,11 +617,32 @@ class DrugCatalogRepository:
         self, db_session: Session, drug_id: int, row: dict[str, Any]
     ) -> None:
         for alias in self.extract_text_candidates(row.get("ingredient")):
-            self.upsert_drug_alias(db_session, drug_id=drug_id, alias=alias, alias_kind="ingredient", source="livertox", term_type=None)
+            self.upsert_drug_alias(
+                db_session,
+                drug_id=drug_id,
+                alias=alias,
+                alias_kind="ingredient",
+                source="livertox",
+                term_type=None,
+            )
         for alias in self.extract_text_candidates(row.get("brand_name")):
-            self.upsert_drug_alias(db_session, drug_id=drug_id, alias=alias, alias_kind="brand", source="livertox", term_type=None)
+            self.upsert_drug_alias(
+                db_session,
+                drug_id=drug_id,
+                alias=alias,
+                alias_kind="brand",
+                source="livertox",
+                term_type=None,
+            )
         for alias in self.extract_synonym_candidates(row.get("synonyms")):
-            self.upsert_drug_alias(db_session, drug_id=drug_id, alias=alias, alias_kind="synonym", source="livertox", term_type=None)
+            self.upsert_drug_alias(
+                db_session,
+                drug_id=drug_id,
+                alias=alias,
+                alias_kind="synonym",
+                source="livertox",
+                term_type=None,
+            )
 
     # -------------------------------------------------------------------------
     def extract_text_candidates(self, value: Any) -> list[str]:
@@ -619,14 +689,19 @@ class DrugCatalogRepository:
         elif current != normalized:
             logger.warning(
                 "Skipping livertox_nbk_id update for drug_id=%d (existing='%s', incoming='%s')",
-                int(drug.id), current, normalized
+                int(drug.id),
+                current,
+                normalized,
             )
 
     # -------------------------------------------------------------------------
     def is_valid_drug_name(self, value: str) -> bool:
         normalized = value.strip()
         ingestion = get_server_settings().ingestion
-        if len(normalized) < ingestion.drug_name_min_length or len(normalized) > ingestion.drug_name_max_length:
+        if (
+            len(normalized) < ingestion.drug_name_min_length
+            or len(normalized) > ingestion.drug_name_max_length
+        ):
             return False
         if len(normalized.split()) > ingestion.drug_name_max_tokens:
             return False
@@ -638,7 +713,9 @@ class DrugCatalogRepository:
         raw_name = repository_values.normalize_string(row.get("raw_name"))
         standard_name = repository_values.normalize_string(row.get("name"))
         canonical_name = standard_name or raw_name
-        canonical_name_norm = normalize_drug_name(canonical_name) if canonical_name else None
+        canonical_name_norm = (
+            normalize_drug_name(canonical_name) if canonical_name else None
+        )
         if rxcui is None or canonical_name is None or not canonical_name_norm:
             return None
         return {
@@ -655,13 +732,19 @@ class DrugCatalogRepository:
     def prepare_rxnav_rows(
         self, records: pd.DataFrame | list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        frame = records.copy() if isinstance(records, pd.DataFrame) else pd.DataFrame(records)
+        frame = (
+            records.copy()
+            if isinstance(records, pd.DataFrame)
+            else pd.DataFrame(records)
+        )
         frame = frame.reindex(columns=RXNORM_CATALOG_COLUMNS)
         if frame.empty:
             return []
         prepared_rows: list[dict[str, Any]] = []
         rxcui_to_name_norm: dict[str, str] = {}
-        for row in frame.where(pd.notnull(frame), cast(Any, None)).to_dict(orient="records"):
+        for row in frame.where(pd.notnull(frame), cast(Any, None)).to_dict(
+            orient="records"
+        ):
             prepared = self.prepare_rxnav_row(row)
             if prepared is None:
                 continue
@@ -710,7 +793,9 @@ class DrugCatalogRepository:
     def _first_alias_model_value(
         self, aliases: list[DrugAlias], alias_kind: str
     ) -> str | None:
-        values = sorted(self._alias_model_values_for_kind(aliases, alias_kind), key=str.casefold)
+        values = sorted(
+            self._alias_model_values_for_kind(aliases, alias_kind), key=str.casefold
+        )
         return values[0] if values else None
 
     # -------------------------------------------------------------------------

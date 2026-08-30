@@ -8,6 +8,7 @@ from services.llm.context_budget import ContextSegment, build_context_plan
 
 UNKNOWN_CAPACITY_INPUT_BUDGET = 8192
 
+
 ###############################################################################
 def _bounded(value: Any, limit: int) -> dict[str, Any]:
     text = str(value or "")
@@ -17,9 +18,11 @@ def _bounded(value: Any, limit: int) -> dict[str, Any]:
         "sha256": hashlib.sha256(text.encode()).hexdigest(),
     }
 
+
 ###############################################################################
 def _json_text(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+
 
 ###############################################################################
 def _selected_context_value(
@@ -29,6 +32,7 @@ def _selected_context_value(
     default: Any = None,
 ) -> Any:
     return values[key] if key in selected_keys else default
+
 
 ###############################################################################
 def build_revision_context(
@@ -160,7 +164,9 @@ def build_revision_context(
         if f"clinical.section.{name}" in selected_keys
     }
     structured_fields = {
-        name: _selected_context_value(values, selected_keys, f"clinical.structured.{name}")
+        name: _selected_context_value(
+            values, selected_keys, f"clinical.structured.{name}"
+        )
         for name in (
             "structured_case",
             "lab_timeline",
@@ -197,9 +203,7 @@ def build_revision_context(
         "clinical_evidence": clinical_evidence,
         "review_target": {
             "official_report": _selected_context_value(
-                values,
-                selected_keys,
-                "review.official_report", {"omitted": True}
+                values, selected_keys, "review.official_report", {"omitted": True}
             ),
             "final_report": _selected_context_value(
                 values, selected_keys, "review.final_report", {"omitted": True}
@@ -212,7 +216,9 @@ def build_revision_context(
             "version_lineage": _selected_context_value(
                 values, selected_keys, "audit.version_lineage", []
             ),
-            "metadata": _selected_context_value(values, selected_keys, "audit.metadata", {}),
+            "metadata": _selected_context_value(
+                values, selected_keys, "audit.metadata", {}
+            ),
         },
         "user_steering": {
             "selected_text": _selected_context_value(

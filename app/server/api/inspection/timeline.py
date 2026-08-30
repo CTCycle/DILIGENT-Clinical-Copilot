@@ -13,9 +13,9 @@ from domain.patient_timeline import (
 from domain.inspection import DeleteEntityResponse
 from services.inspection.service import DataInspectionService
 
+
 ###############################################################################
 class InspectionTimelineEndpoint(InspectionJobEndpointMixin):
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -59,9 +59,13 @@ class InspectionTimelineEndpoint(InspectionJobEndpointMixin):
                 force_regenerate=bool(request.force_regenerate),
             )
         except KeyError as exc:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.") from exc
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Session not found."
+            ) from exc
         except ValueError as exc:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+            ) from exc
         return self.build_job_start_response(
             payload=payload,
             message="Timeline generation started.",
@@ -73,20 +77,35 @@ class InspectionTimelineEndpoint(InspectionJobEndpointMixin):
     ) -> JobStatusResponse:
         payload = self.service.get_session_timeline_job_status(session_id, job_id)
         if payload is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Job not found."
+            )
         return JobStatusResponse(**payload)
 
     # -------------------------------------------------------------------------
-    def cancel_session_timeline_job(self, session_id: int, job_id: str) -> JobCancelResponse:
+    def cancel_session_timeline_job(
+        self, session_id: int, job_id: str
+    ) -> JobCancelResponse:
         payload = self.service.get_session_timeline_job_status(session_id, job_id)
-        if payload is None or not self.service.cancel_job(job_id, expected_type=self.service.SESSION_TIMELINE_JOB_TYPE):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
-        return JobCancelResponse(job_id=job_id, success=True, message="Cancellation requested")
+        if payload is None or not self.service.cancel_job(
+            job_id, expected_type=self.service.SESSION_TIMELINE_JOB_TYPE
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Job not found."
+            )
+        return JobCancelResponse(
+            job_id=job_id, success=True, message="Cancellation requested"
+        )
 
     # -------------------------------------------------------------------------
-    def delete_session_timeline(self, session_id: int, timeline_id: int) -> DeleteEntityResponse:
+    def delete_session_timeline(
+        self, session_id: int, timeline_id: int
+    ) -> DeleteEntityResponse:
         if not self.service.delete_session_timeline(session_id, timeline_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session timeline not found.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session timeline not found.",
+            )
         return DeleteEntityResponse(deleted=True)
 
     # -------------------------------------------------------------------------

@@ -11,6 +11,7 @@ from services.llm.model_capabilities import (
     resolve_model_capabilities,
 )
 
+
 ###############################################################################
 def test_capability_resolution_prefers_exact_then_family_then_provider() -> None:
     exact = resolve_model_capabilities(provider="ollama", model="gpt-oss:20b")
@@ -26,6 +27,7 @@ def test_capability_resolution_prefers_exact_then_family_then_provider() -> None
     assert family.source == "model_family"
     assert provider.source == "provider"
 
+
 ###############################################################################
 def test_unknown_model_uses_conservative_fallback_without_assumed_capacity() -> None:
     capabilities = resolve_model_capabilities(
@@ -38,6 +40,7 @@ def test_unknown_model_uses_conservative_fallback_without_assumed_capacity() -> 
     assert capabilities.output_token_limit is None
     assert capabilities.supported_reasoning_levels == (ReasoningLevel.OFF,)
     assert capabilities.supports_temperature is False
+
 
 ###############################################################################
 def test_live_descriptor_metadata_overrides_catalog_limits() -> None:
@@ -59,6 +62,7 @@ def test_live_descriptor_metadata_overrides_catalog_limits() -> None:
     assert capabilities.output_token_limit == 4096
     assert capabilities.supported_reasoning_levels == (ReasoningLevel.OFF,)
     assert capabilities.supports_temperature is False
+
 
 ###############################################################################
 def test_effective_config_preserves_request_and_reports_provider_coercion() -> None:
@@ -85,6 +89,7 @@ def test_effective_config_preserves_request_and_reports_provider_coercion() -> N
     assert effective.effective_runtime_context_limit == 8192
     assert effective.input_budget is not None
     assert effective.context_selection_report["selected_input_tokens"] == 1000
+
 
 ###############################################################################
 def test_effective_config_never_steals_reserved_generation_capacity() -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+
 ###############################################################################
 class DatabaseEnvironmentSnapshot(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -21,6 +22,7 @@ class DatabaseEnvironmentSnapshot(BaseModel):
     connect_timeout: str | None = None
     write_batch_size: str | None = None
     read_page_size: str | None = None
+
 
 ###############################################################################
 class EnvironmentSnapshot(BaseModel):

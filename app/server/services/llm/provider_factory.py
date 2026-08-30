@@ -12,6 +12,7 @@ from domain.llm.providers import CloudProviderId
 
 RuntimePurpose = Literal["clinical", "parser"]
 
+
 ###############################################################################
 def select_llm_provider(
     provider: str = "ollama",
@@ -45,6 +46,7 @@ def select_llm_provider(
             max_retries=kwargs.get("max_retries", 2),
         )
     raise LLMError(f"Unknown or unsupported provider: {p}")
+
 
 ###############################################################################
 def initialize_llm_client(

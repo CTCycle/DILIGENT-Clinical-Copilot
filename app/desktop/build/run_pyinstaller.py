@@ -25,12 +25,17 @@ def _is_hosted_python_path(entry):
     return "/hostedtoolcache/windows/python/" in normalized
 
 
-sys.path[:] = [entry for entry in sys.path if not entry or not _is_hosted_python_path(entry)]
+sys.path[:] = [
+    entry for entry in sys.path if not entry or not _is_hosted_python_path(entry)
+]
 _native_dll_dirs = []
 for _candidate in (_venv_bin, _embedded_runtime):
     if not _candidate.is_dir() or _candidate in _native_dll_dirs:
         continue
-    if any((_candidate / _name).is_file() for _name in ("libffi-8.dll", "python314.dll", "python3.dll", "_ctypes.pyd")):
+    if any(
+        (_candidate / _name).is_file()
+        for _name in ("libffi-8.dll", "python314.dll", "python3.dll", "_ctypes.pyd")
+    ):
         _native_dll_dirs.append(_candidate)
 
 if _native_dll_dirs:
@@ -73,18 +78,28 @@ def _loaded_module_path(name):
 
 
 _libffi_path = next(
-    (_directory / "libffi-8.dll" for _directory in _native_dll_dirs if (_directory / "libffi-8.dll").is_file()),
+    (
+        _directory / "libffi-8.dll"
+        for _directory in _native_dll_dirs
+        if (_directory / "libffi-8.dll").is_file()
+    ),
     None,
 )
 if _libffi_path is None:
     raise OSError("unable to locate the embedded release libffi-8.dll")
 print(f"[INFO] PyInstaller native DLL directories: {_native_dll_dirs}", flush=True)
 print(f"[INFO] PyInstaller embedded libffi candidate: {_libffi_path}", flush=True)
-print(f"[INFO] PyInstaller preloaded libffi: {_loaded_module_path('libffi-8.dll')}", flush=True)
+print(
+    f"[INFO] PyInstaller preloaded libffi: {_loaded_module_path('libffi-8.dll')}",
+    flush=True,
+)
 _libffi_handle = _kernel32.LoadLibraryW(_ffi.new("wchar_t[]", str(_libffi_path)))
 if _libffi_handle == _ffi.NULL:
     raise OSError(f"unable to load release libffi: {_libffi_path}")
-print(f"[INFO] PyInstaller loaded libffi: {_loaded_module_path('libffi-8.dll')}", flush=True)
+print(
+    f"[INFO] PyInstaller loaded libffi: {_loaded_module_path('libffi-8.dll')}",
+    flush=True,
+)
 
 # Load ctypes while the matching embedded Python DLL directory is explicitly
 # active. This prevents a hosted runner's other Python installation from
@@ -133,7 +148,9 @@ def _check_release_builder_context():
     except Exception:
         windows_dir = None
     windows_dir = None if windows_dir is None else Path(windows_dir).resolve()
-    inside_windows_dir = windows_dir is not None and (cwd == windows_dir or windows_dir in cwd.parents)
+    inside_windows_dir = windows_dir is not None and (
+        cwd == windows_dir or windows_dir in cwd.parents
+    )
     if inside_windows_dir:
         home_dir = Path.home().resolve()
         if cwd == home_dir or home_dir in cwd.parents:

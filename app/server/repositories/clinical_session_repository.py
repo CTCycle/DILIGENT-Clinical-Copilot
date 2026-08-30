@@ -23,6 +23,7 @@ from repositories.schemas.clinical import (
 )
 from repositories.serialization import session_result_data
 
+
 ###############################################################################
 def _build_search_pattern(value: str | None) -> str | None:
     normalized = repository_values.normalize_string(value)
@@ -31,9 +32,9 @@ def _build_search_pattern(value: str | None) -> str | None:
     escaped = re.sub(r"([%_\\])", r"\\\1", normalized.casefold())
     return f"%{escaped}%"
 
+
 ###############################################################################
 class ClinicalSessionRepository:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -57,8 +58,12 @@ class ClinicalSessionRepository:
                 visit_date=repository_values.normalize_date_value(
                     session_data.get("patient_visit_date")
                 ),
-                anamnesis=repository_values.normalize_string(session_data.get("anamnesis")),
-                drugs_text=repository_values.normalize_string(session_data.get("drugs")),
+                anamnesis=repository_values.normalize_string(
+                    session_data.get("anamnesis")
+                ),
+                drugs_text=repository_values.normalize_string(
+                    session_data.get("drugs")
+                ),
                 laboratory_analysis=repository_values.normalize_string(
                     session_data.get("laboratory_analysis")
                 ),
@@ -77,11 +82,15 @@ class ClinicalSessionRepository:
                 clinical_model=repository_values.normalize_string(
                     session_data.get("clinical_model")
                 ),
-                total_duration=repository_values.to_float(session_data.get("total_duration")),
+                total_duration=repository_values.to_float(
+                    session_data.get("total_duration")
+                ),
                 session_status=repository_values.normalize_session_status(
                     session_data.get("session_status")
                 ),
-                session_kind=repository_values.normalize_string(session_data.get("session_kind")),
+                session_kind=repository_values.normalize_string(
+                    session_data.get("session_kind")
+                ),
                 metadata_json=session_result_data.serialize_json_payload(
                     session_data.get("metadata")
                 ),
@@ -149,9 +158,9 @@ class ClinicalSessionRepository:
             result_payload_match = exists(
                 select(1).where(
                     ClinicalSessionResult.session_id == ClinicalSession.id,
-                    func.lower(func.coalesce(ClinicalSessionResult.payload_json, "")).like(
-                        search_pattern, escape="\\"
-                    ),
+                    func.lower(
+                        func.coalesce(ClinicalSessionResult.payload_json, "")
+                    ).like(search_pattern, escape="\\"),
                 )
             )
             conditions.append(
@@ -194,7 +203,9 @@ class ClinicalSessionRepository:
                 )
             )
             timeline_exists = exists(
-                select(1).where(ClinicalSessionTimeline.session_id == ClinicalSession.id)
+                select(1).where(
+                    ClinicalSessionTimeline.session_id == ClinicalSession.id
+                )
             )
             version_number = (
                 select(func.max(ClinicalSessionVersion.version_number))
@@ -223,19 +234,25 @@ class ClinicalSessionRepository:
             items = [
                 {
                     "session_id": int(session_row.id),
-                    "patient_name": repository_values.normalize_string(session_row.patient_name),
+                    "patient_name": repository_values.normalize_string(
+                        session_row.patient_name
+                    ),
                     "session_timestamp": session_row.session_timestamp,
                     "version": int(version_value or 1),
                     "status": repository_values.normalize_session_status(
                         session_row.session_status
                     ),
-                    "total_duration": repository_values.to_float(session_row.total_duration),
+                    "total_duration": repository_values.to_float(
+                        session_row.total_duration
+                    ),
                     "has_report": bool(has_report),
                     "has_timeline": bool(has_timeline),
                     "can_generate_timeline": bool(
                         repository_values.normalize_string(session_row.anamnesis)
                         or repository_values.normalize_string(session_row.drugs_text)
-                        or repository_values.normalize_string(session_row.laboratory_analysis)
+                        or repository_values.normalize_string(
+                            session_row.laboratory_analysis
+                        )
                     ),
                 }
                 for session_row, version_value, has_report, has_timeline in rows
@@ -260,33 +277,45 @@ class ClinicalSessionRepository:
                 )
             ).scalar_one_or_none()
             section_rows = db_session.execute(
-                select(ClinicalSessionSection.section_kind, ClinicalSessionSection.content).where(
-                    ClinicalSessionSection.session_id == safe_session_id
-                )
+                select(
+                    ClinicalSessionSection.section_kind, ClinicalSessionSection.content
+                ).where(ClinicalSessionSection.session_id == safe_session_id)
             ).all()
             sections = {
                 str(kind): repository_values.normalize_string(content) or ""
                 for kind, content in section_rows
             }
             payload = self.get_session_result_payload(safe_session_id) or {}
-            metadata = session_result_data.parse_session_result_payload(
-                session_row.metadata_json
-            ) or {}
-            session_text = repository_values.normalize_string(
-                payload.get("original_session_text")
-            ) or ""
-            official_report_text = repository_values.normalize_string(payload.get("report"))
+            metadata = (
+                session_result_data.parse_session_result_payload(
+                    session_row.metadata_json
+                )
+                or {}
+            )
+            session_text = (
+                repository_values.normalize_string(payload.get("original_session_text"))
+                or ""
+            )
+            official_report_text = repository_values.normalize_string(
+                payload.get("report")
+            )
             return {
                 "session_id": safe_session_id,
-                "patient_name": repository_values.normalize_string(session_row.patient_name),
+                "patient_name": repository_values.normalize_string(
+                    session_row.patient_name
+                ),
                 "visit_date": session_row.visit_date,
                 "session_timestamp": session_row.session_timestamp,
                 "version": int(version_number or 1),
-                "status": repository_values.normalize_session_status(session_row.session_status),
+                "status": repository_values.normalize_session_status(
+                    session_row.session_status
+                ),
                 "text_extraction_model": repository_values.normalize_string(
                     session_row.text_extraction_model
                 ),
-                "clinical_model": repository_values.normalize_string(session_row.clinical_model),
+                "clinical_model": repository_values.normalize_string(
+                    session_row.clinical_model
+                ),
                 "metadata": metadata,
                 "sections": sections,
                 "session_text": session_text,
@@ -355,12 +384,16 @@ class ClinicalSessionRepository:
                     )
                 ).scalar_one_or_none()
                 payload = (
-                    session_result_data.parse_session_result_payload(result_row.payload_json)
+                    session_result_data.parse_session_result_payload(
+                        result_row.payload_json
+                    )
                     if result_row is not None
                     else {}
                 ) or {}
                 payload["original_session_text"] = str(session_text).strip()
-                serialized_payload = session_result_data.serialize_json_payload(payload) or "{}"
+                serialized_payload = (
+                    session_result_data.serialize_json_payload(payload) or "{}"
+                )
                 if result_row is None:
                     db_session.add(
                         ClinicalSessionResult(
@@ -370,7 +403,9 @@ class ClinicalSessionRepository:
                 else:
                     result_row.payload_json = serialized_payload
             if metadata is not None:
-                existing.metadata_json = session_result_data.serialize_json_payload(metadata or {})
+                existing.metadata_json = session_result_data.serialize_json_payload(
+                    metadata or {}
+                )
             db_session.commit()
         return self.get_session_detail(safe_session_id)
 
@@ -384,7 +419,9 @@ class ClinicalSessionRepository:
             if existing is None:
                 return None
             if metadata is not None:
-                existing.metadata_json = session_result_data.serialize_json_payload(metadata or {})
+                existing.metadata_json = session_result_data.serialize_json_payload(
+                    metadata or {}
+                )
             db_session.commit()
         return self.get_session_detail(safe_session_id)
 
@@ -420,7 +457,9 @@ class ClinicalSessionRepository:
             if content is not None:
                 db_session.add(
                     ClinicalSessionSection(
-                        session_id=session_id, section_kind=section_kind, content=content
+                        session_id=session_id,
+                        section_kind=section_kind,
+                        content=content,
                     )
                 )
 
@@ -429,7 +468,11 @@ class ClinicalSessionRepository:
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
         result_payload = session_data.get("session_result_payload")
-        timeline_raw = result_payload.get("lab_timeline") if isinstance(result_payload, dict) else None
+        timeline_raw = (
+            result_payload.get("lab_timeline")
+            if isinstance(result_payload, dict)
+            else None
+        )
         if not isinstance(timeline_raw, list):
             return
         persisted_codes = {
@@ -449,8 +492,12 @@ class ClinicalSessionRepository:
             lab_code = persisted_codes.get(marker_name.upper()) if marker_name else None
             if lab_code is None:
                 continue
-            value_raw = repository_values.normalize_string(item.get("value")) or repository_values.normalize_string(item.get("value_text"))
-            upper_limit_raw = repository_values.normalize_string(item.get("upper_limit_normal")) or repository_values.normalize_string(item.get("upper_limit_text"))
+            value_raw = repository_values.normalize_string(
+                item.get("value")
+            ) or repository_values.normalize_string(item.get("value_text"))
+            upper_limit_raw = repository_values.normalize_string(
+                item.get("upper_limit_normal")
+            ) or repository_values.normalize_string(item.get("upper_limit_text"))
             if value_raw is None and upper_limit_raw is None:
                 continue
             db_session.add(
@@ -468,7 +515,13 @@ class ClinicalSessionRepository:
                     metadata_json={
                         key: value
                         for key, value in item.items()
-                        if key not in {"value", "value_text", "upper_limit_normal", "upper_limit_text"}
+                        if key
+                        not in {
+                            "value",
+                            "value_text",
+                            "upper_limit_normal",
+                            "upper_limit_text",
+                        }
                     },
                 )
             )
@@ -501,7 +554,9 @@ class ClinicalSessionRepository:
             raw_drug_name_norm = normalize_drug_name(raw_drug_name)
             duplicate_mention = not raw_drug_name_norm or raw_drug_name_norm in seen
             seen.add(raw_drug_name_norm)
-            matched_drug_name = repository_values.normalize_string(item.get("matched_drug_name"))
+            matched_drug_name = repository_values.normalize_string(
+                item.get("matched_drug_name")
+            )
             rxcui = repository_values.normalize_string(
                 item.get("rxcui") or item.get("rxnorm_rxcui")
             )
@@ -519,7 +574,9 @@ class ClinicalSessionRepository:
                     match_status=(
                         "ambiguous"
                         if bool(item.get("ambiguous_match"))
-                        else "matched" if resolved_drug_id is not None else "unresolved"
+                        else "matched"
+                        if resolved_drug_id is not None
+                        else "unresolved"
                     ),
                     confidence=match_confidence,
                     match_reason=match_reason,
@@ -541,15 +598,29 @@ class ClinicalSessionRepository:
         if serialized_payload is None:
             return
         db_session.add(
-            ClinicalSessionResult(session_id=session_id, payload_json=serialized_payload)
+            ClinicalSessionResult(
+                session_id=session_id, payload_json=serialized_payload
+            )
         )
-        current_version = db_session.execute(
-            select(ClinicalSessionVersion)
-            .where(ClinicalSessionVersion.session_id == int(session_id))
-            .order_by(ClinicalSessionVersion.version_number.desc())
-        ).scalars().first()
+        current_version = (
+            db_session.execute(
+                select(ClinicalSessionVersion)
+                .where(ClinicalSessionVersion.session_id == int(session_id))
+                .order_by(ClinicalSessionVersion.version_number.desc())
+            )
+            .scalars()
+            .first()
+        )
         if current_version is not None and isinstance(payload, dict):
-            current_version.report_text = repository_values.normalize_string(payload.get("report"))
-            current_version.hepatic_pattern = repository_values.normalize_string(payload.get("hepatic_pattern"))
-            current_version.total_duration = repository_values.to_float(payload.get("total_duration"))
-            current_version.metadata_json = session_result_data.serialize_json_payload(payload.get("metadata"))
+            current_version.report_text = repository_values.normalize_string(
+                payload.get("report")
+            )
+            current_version.hepatic_pattern = repository_values.normalize_string(
+                payload.get("hepatic_pattern")
+            )
+            current_version.total_duration = repository_values.to_float(
+                payload.get("total_duration")
+            )
+            current_version.metadata_json = session_result_data.serialize_json_payload(
+                payload.get("metadata")
+            )

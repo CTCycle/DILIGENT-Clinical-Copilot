@@ -9,6 +9,7 @@ from dotenv import dotenv_values
 
 RESOURCE_PATH_ENV = "DILIGENT_RESOURCES_PATH"
 
+
 ###############################################################################
 @dataclass(frozen=True, slots=True)
 class RuntimeLayout:
@@ -23,6 +24,7 @@ class RuntimeLayout:
     mutable_resources_root: Path
     client_dist_root: Path
 
+
 ###############################################################################
 def _resolve_required_absolute_environment_path(name: str) -> Path:
     value = os.getenv(name, "").strip()
@@ -33,15 +35,16 @@ def _resolve_required_absolute_environment_path(name: str) -> Path:
         raise RuntimeError(f"{name} must be an absolute path")
     return path.resolve()
 
+
 ###############################################################################
-def _resolve_source_resources_root(
-    repository_root: Path, default_root: Path
-) -> Path:
+def _resolve_source_resources_root(repository_root: Path, default_root: Path) -> Path:
     configured = os.getenv(RESOURCE_PATH_ENV, "").strip()
     if not configured:
         env_path = repository_root / "settings" / ".env"
         if env_path.is_file():
-            configured = str(dotenv_values(env_path).get(RESOURCE_PATH_ENV) or "").strip()
+            configured = str(
+                dotenv_values(env_path).get(RESOURCE_PATH_ENV) or ""
+            ).strip()
     if not configured:
         return default_root
 
@@ -49,6 +52,7 @@ def _resolve_source_resources_root(
     if not path.is_absolute():
         path = repository_root / path
     return path.resolve()
+
 
 ###############################################################################
 def _resolve_source_layout() -> RuntimeLayout:
@@ -68,11 +72,10 @@ def _resolve_source_layout() -> RuntimeLayout:
         client_dist_root=application_root / "client" / "dist" / "browser",
     )
 
+
 ###############################################################################
 def _resolve_packaged_layout() -> RuntimeLayout:
-    runtime_root = _resolve_required_absolute_environment_path(
-        "DILIGENT_RUNTIME_ROOT"
-    )
+    runtime_root = _resolve_required_absolute_environment_path("DILIGENT_RUNTIME_ROOT")
     data_root = _resolve_required_absolute_environment_path("DILIGENT_DATA_ROOT")
     application_root = runtime_root / "app"
     return RuntimeLayout(
@@ -85,6 +88,7 @@ def _resolve_packaged_layout() -> RuntimeLayout:
         mutable_resources_root=data_root / "resources",
         client_dist_root=application_root / "client" / "dist" / "browser",
     )
+
 
 ###############################################################################
 @lru_cache(maxsize=1)

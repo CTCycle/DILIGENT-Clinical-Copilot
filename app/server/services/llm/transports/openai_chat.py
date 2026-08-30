@@ -6,9 +6,9 @@ from domain.llm.providers import CloudModelDescriptor
 from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
 from services.llm.transports.base import StructuredTransportMixin
 
+
 ###############################################################################
 class OpenAIChatTransport(StructuredTransportMixin):
-
     # -------------------------------------------------------------------------
     def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
         self.client = httpx.AsyncClient(

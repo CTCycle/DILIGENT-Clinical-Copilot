@@ -29,6 +29,7 @@ from services.runtime.jobs import JobManager
 from services.llm.generation_policy import GenerationPurpose
 from sqlalchemy import create_engine
 
+
 ###############################################################################
 def build_file_serializer(tmp_path: Path) -> Any:
     engine = create_engine(
@@ -36,6 +37,7 @@ def build_file_serializer(tmp_path: Path) -> Any:
     )
     Base.metadata.create_all(engine)
     return build_repository_graph(engine=engine)
+
 
 ###############################################################################
 def save_revision_source_session(serializer: Any) -> int:
@@ -61,10 +63,12 @@ def save_revision_source_session(serializer: Any) -> int:
     assert session_id is not None
     return int(session_id)
 
+
 ###############################################################################
 def build_service(serializer: Any, jobs: JobManager) -> DataInspectionService:
     graph = build_repository_graph(
-        engine=serializer.context.engine, session_factory=serializer.context.session_factory
+        engine=serializer.context.engine,
+        session_factory=serializer.context.session_factory,
     )
     return DataInspectionService(
         clinical_session_repository=graph.clinical_session_repository,
@@ -75,10 +79,12 @@ def build_service(serializer: Any, jobs: JobManager) -> DataInspectionService:
         jobs=jobs,
     )
 
+
 ###############################################################################
 def build_runner(serializer: Any, **kwargs: Any) -> RevisionAgentRunner:
     graph = build_repository_graph(
-        engine=serializer.context.engine, session_factory=serializer.context.session_factory
+        engine=serializer.context.engine,
+        session_factory=serializer.context.session_factory,
     )
     return RevisionAgentRunner(
         clinical_session_repository=graph.clinical_session_repository,
@@ -86,6 +92,7 @@ def build_runner(serializer: Any, **kwargs: Any) -> RevisionAgentRunner:
         knowledge_repository=graph.knowledge_repository,
         **kwargs,
     )
+
 
 ###############################################################################
 def fake_issue_scan_call(**kwargs: Any) -> dict[str, Any]:
@@ -134,6 +141,7 @@ def fake_issue_scan_call(**kwargs: Any) -> dict[str, Any]:
         return {"summary": "No issues detected."}
     raise AssertionError(f"Unexpected schema: {schema_name}")
 
+
 ###############################################################################
 def test_revision_issue_scan_schema_rejects_unknown_category() -> None:
     with pytest.raises(ValidationError):
@@ -153,6 +161,7 @@ def test_revision_issue_scan_schema_rejects_unknown_category() -> None:
             }
         )
 
+
 ###############################################################################
 def test_revision_agent_tool_call_accepts_provider_rationale_within_budget() -> None:
     decision = RevisionAgentToolCall.model_validate(
@@ -166,10 +175,14 @@ def test_revision_agent_tool_call_accepts_provider_rationale_within_budget() -> 
 
     assert len(decision.rationale) > 1000
 
+
 ###############################################################################
 def test_revision_request_rejects_active_model_overrides() -> None:
     with pytest.raises(ValidationError):
-        SessionRevisionRequest.model_validate({"model_overrides": {"clinical_model": "x"}})
+        SessionRevisionRequest.model_validate(
+            {"model_overrides": {"clinical_model": "x"}}
+        )
+
 
 ###############################################################################
 def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
@@ -196,6 +209,7 @@ def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
     assert "may steer focus but is not clinical evidence" in prompt
     assert "No tools are available" in prompt
 
+
 ###############################################################################
 def test_revision_editor_prompt_requires_exact_source_patches() -> None:
     prompt = editor_prompt(
@@ -207,8 +221,11 @@ def test_revision_editor_prompt_requires_exact_source_patches() -> None:
     assert "expected_text must equal the exact source substring" in prompt
     assert "return patches as an empty list" in prompt
 
+
 ###############################################################################
-def test_revision_agent_assigns_stage_specific_generation_purposes(tmp_path: Path) -> None:
+def test_revision_agent_assigns_stage_specific_generation_purposes(
+    tmp_path: Path,
+) -> None:
     serializer = build_file_serializer(tmp_path)
     calls: list[GenerationPurpose] = []
 
@@ -235,6 +252,7 @@ def test_revision_agent_assigns_stage_specific_generation_purposes(tmp_path: Pat
         GenerationPurpose.REVISION_QA,
         GenerationPurpose.REVISION_SCAN,
     ]
+
 
 ###############################################################################
 def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> None:
@@ -289,6 +307,7 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
         "revision_agent_qa",
     }
 
+
 ###############################################################################
 def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -336,6 +355,7 @@ def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> 
         "invalid_tool_input": True,
     }
 
+
 ###############################################################################
 def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -350,7 +370,9 @@ def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
         metadata={},
     )
 
-    version = serializer.session_revision_repository.get_version_record_for_session(session_id)
+    version = serializer.session_revision_repository.get_version_record_for_session(
+        session_id
+    )
 
     assert version is not None
     assert version["version_number"] == 2
@@ -365,6 +387,7 @@ def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
     started = service.start_revision_job(session_id, SessionRevisionRequest())
 
     assert started["job_type"] == service.REVISION_JOB_TYPE
+
 
 ###############################################################################
 def test_manual_edit_skips_orphaned_revision_version_numbers(tmp_path: Path) -> None:
@@ -393,25 +416,28 @@ def test_manual_edit_skips_orphaned_revision_version_numbers(tmp_path: Path) -> 
         metadata={},
     )
 
-    version = serializer.session_revision_repository.get_version_record_for_session(session_id)
+    version = serializer.session_revision_repository.get_version_record_for_session(
+        session_id
+    )
     assert version is not None
     assert version["version_number"] == 4
     assert version["revision_kind"] == "manual_edit"
 
+
 ###############################################################################
 class SlowRevisionRunner:
-
     # -------------------------------------------------------------------------
     def run_agentic(self, **_kwargs: Any) -> dict[str, Any]:
         time.sleep(0.4)
         return {}
 
+
 ###############################################################################
 class FailingRevisionRunner:
-
     # -------------------------------------------------------------------------
     def run_agentic(self, **_kwargs: Any) -> dict[str, Any]:
         raise RuntimeError("Synthetic revision failure")
+
 
 ###############################################################################
 def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
@@ -433,13 +459,20 @@ def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
     run = service.get_revision_run(pipeline_run_id)
     assert run is not None
     assert run["status"] == "failed"
-    assert run["error"] == {"message": "Revision processing failed. Retry the revision if needed."}
+    assert run["error"] == {
+        "message": "Revision processing failed. Retry the revision if needed."
+    }
+
 
 ###############################################################################
 def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
-    source_version = serializer.session_revision_repository.get_version_record_for_session(session_id)
+    source_version = (
+        serializer.session_revision_repository.get_version_record_for_session(
+            session_id
+        )
+    )
     assert source_version is not None
     pipeline_run_id = "synthetic-delete-run"
     shell = serializer.session_revision_repository.create_revision_version_shell(
@@ -465,10 +498,15 @@ def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
     inspection_service = build_service(serializer, JobManager())
     assert inspection_service.delete_session(session_id) is True
     assert serializer.clinical_session_repository.get_session_detail(session_id) is None
-    assert serializer.session_revision_repository.get_revision_run(pipeline_run_id) is None
+    assert (
+        serializer.session_revision_repository.get_revision_run(pipeline_run_id) is None
+    )
+
 
 ###############################################################################
-def test_incomplete_revision_shell_cannot_be_clinically_reviewed(tmp_path: Path) -> None:
+def test_incomplete_revision_shell_cannot_be_clinically_reviewed(
+    tmp_path: Path,
+) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
     shell = serializer.session_revision_repository.create_revision_version_shell(
@@ -486,6 +524,7 @@ def test_incomplete_revision_shell_cannot_be_clinically_reviewed(tmp_path: Path)
             reviewer_note=None,
             reviewed_by="QA",
         )
+
 
 ###############################################################################
 def test_revision_job_rejects_same_root_concurrent_start(tmp_path: Path) -> None:

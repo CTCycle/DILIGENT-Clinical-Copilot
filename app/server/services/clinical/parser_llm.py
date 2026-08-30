@@ -31,9 +31,9 @@ from domain.clinical.extractor_contracts import (
     LocalPatientDrugs,
 )
 
+
 ###############################################################################
 class DrugLlmExtractionMixin(ParserHost):
-
     # -------------------------------------------------------------------------
     def active_provider_name(self) -> str | None:
         provider = self.forced_provider or self.client_provider

@@ -13,6 +13,7 @@ from domain.clinical.entities import (
 from domain.clinical.extras import LabExtractionPayload
 from services.clinical.extraction_strategy import decide_extraction_strategy
 
+
 ###############################################################################
 async def extract_from_payload(
     extractor: Any,
@@ -59,7 +60,9 @@ async def extract_from_payload(
                 )
                 parsed = LabExtractionPayload(entries=[], onset_context=None)
                 llm_unavailable = True
-            if not parsed.entries and extractor.has_explicit_lab_signal(merged_source_text):
+            if not parsed.entries and extractor.has_explicit_lab_signal(
+                merged_source_text
+            ):
                 try:
                     reinforced = await extractor.llm_extract_full_text(
                         text=merged_source_text,
@@ -71,8 +74,10 @@ async def extract_from_payload(
                 else:
                     if reinforced.entries:
                         parsed = reinforced
-            feedback, missing_candidates = extractor.validate_lab_entries_against_candidates(
-                list(parsed.entries), deterministic_entries
+            feedback, missing_candidates = (
+                extractor.validate_lab_entries_against_candidates(
+                    list(parsed.entries), deterministic_entries
+                )
             )
             if feedback and deterministic_entries:
                 try:
@@ -87,12 +92,18 @@ async def extract_from_payload(
                     logger.warning("Feedback clinical lab extraction failed: %s", exc)
                 else:
                     parsed = reinforced
-                    feedback, missing_candidates = extractor.validate_lab_entries_against_candidates(
-                        list(parsed.entries), deterministic_entries
+                    feedback, missing_candidates = (
+                        extractor.validate_lab_entries_against_candidates(
+                            list(parsed.entries), deterministic_entries
+                        )
                     )
             timeline_entries.extend(parsed.entries)
             extractor.emit_progress(progress_callback, 0.7)
-            if llm_unavailable or (not parsed.entries and deterministic_entries) or missing_candidates:
+            if (
+                llm_unavailable
+                or (not parsed.entries and deterministic_entries)
+                or missing_candidates
+            ):
                 if not parsed.entries and deterministic_entries:
                     logger.warning(
                         "LLM lab extraction returned no entries despite detectable lab markers; using deterministic lab parser output."
@@ -129,6 +140,7 @@ async def extract_from_payload(
     normalized.sort(key=extractor.lab_entry_sort_key)
     extractor.emit_progress(progress_callback, 1.0)
     return PatientLabTimeline(entries=normalized), onset_context
+
 
 ###############################################################################
 async def extract_from_payload_with_audit(

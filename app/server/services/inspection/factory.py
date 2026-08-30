@@ -9,6 +9,7 @@ from repositories.session_timeline_repository import SessionTimelineRepository
 from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
 
+
 ###############################################################################
 def build_data_inspection_service(job_manager: JobManager) -> DataInspectionService:
     context = RepositoryContext.create()

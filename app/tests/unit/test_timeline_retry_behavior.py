@@ -9,9 +9,9 @@ from domain.patient_timeline import PatientTimelineEvent, PatientTimelineExtract
 from services.clinical.timeline import PatientTimelineExtractor
 from services.llm.cloud import LLMError
 
+
 ###############################################################################
 class RetryThenSuccessClient:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.call_count = 0
@@ -37,9 +37,9 @@ class RetryThenSuccessClient:
             ]
         )
 
+
 ###############################################################################
 class NonRetryableClient:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.call_count = 0
@@ -49,6 +49,7 @@ class NonRetryableClient:
         del kwargs
         self.call_count += 1
         raise LLMError("invalid structured response", error_code="invalid_response")
+
 
 ###############################################################################
 def test_timeline_extractor_retries_transient_provider_failures() -> None:
@@ -64,6 +65,7 @@ def test_timeline_extractor_retries_transient_provider_failures() -> None:
 
     assert client.call_count == 2
     assert result.events[0].title == "Symptoms started"
+
 
 ###############################################################################
 def test_timeline_extractor_does_not_retry_non_transient_provider_failures() -> None:

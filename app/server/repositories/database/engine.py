@@ -7,7 +7,11 @@ import sqlalchemy
 from sqlalchemy.engine import Engine
 
 from domain.settings.configuration import DatabaseSettings
-from repositories.database.utils import normalize_postgres_engine, validate_postgres_database_name
+from repositories.database.utils import (
+    normalize_postgres_engine,
+    validate_postgres_database_name,
+)
+
 
 ###############################################################################
 def build_sqlite_engine(database_path: str, *, timeout: float = 30.0) -> Engine:
@@ -17,6 +21,7 @@ def build_sqlite_engine(database_path: str, *, timeout: float = 30.0) -> Engine:
         future=True,
         connect_args={"timeout": timeout, "autocommit": False},
     )
+
 
 ###############################################################################
 def build_postgres_engine(settings: DatabaseSettings) -> Engine:

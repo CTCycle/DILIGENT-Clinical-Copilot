@@ -24,9 +24,9 @@ from services.clinical.dili_severity import DiliSeverityGrader
 from services.clinical.dili_timeline import DiliTimelineEngine
 from services.text.normalization import normalize_drug_query_name
 
+
 ###############################################################################
 class DiliEvidenceBuilder:
-
     _COMPETING_CAUSES_EXCLUDED_PHRASES = (
         "no competing causes",
         "competing causes have been excluded",
@@ -70,9 +70,8 @@ class DiliEvidenceBuilder:
             return []
 
         issues: list[dict[str, str]] = []
-        if (
-            not bundle.differential.all_major_causes_excluded
-            and cls._contains_any(text, cls._COMPETING_CAUSES_EXCLUDED_PHRASES)
+        if not bundle.differential.all_major_causes_excluded and cls._contains_any(
+            text, cls._COMPETING_CAUSES_EXCLUDED_PHRASES
         ):
             issues.append(
                 {
@@ -84,9 +83,8 @@ class DiliEvidenceBuilder:
                 }
             )
 
-        if (
-            bundle.hys_law.status != "meets_criteria"
-            and cls._contains_any(text, cls._HYS_LAW_ASSERTION_PHRASES)
+        if bundle.hys_law.status != "meets_criteria" and cls._contains_any(
+            text, cls._HYS_LAW_ASSERTION_PHRASES
         ):
             issues.append(
                 {
@@ -116,9 +114,8 @@ class DiliEvidenceBuilder:
                 }
             )
 
-        if (
-            causality_is_limited
-            and re.search(r"\bthis patient\b.{0,100}\blikelihood score\s+[a-e]\b", text)
+        if causality_is_limited and re.search(
+            r"\bthis patient\b.{0,100}\blikelihood score\s+[a-e]\b", text
         ):
             issues.append(
                 {

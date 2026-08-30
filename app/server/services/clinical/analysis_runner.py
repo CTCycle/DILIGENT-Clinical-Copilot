@@ -29,6 +29,7 @@ CLAIM_EVIDENCE_TRUNCATION_MARKER = " [truncated]"
 MATCH_REASON_MAX_LENGTH = 100
 DrugAssessmentBase: TypeAlias = tuple[DrugClinicalAssessment, str, list[str]]
 
+
 ###############################################################################
 def emit_progress(
     progress_callback: Callable[[str, float], None] | None,
@@ -40,6 +41,7 @@ def emit_progress(
         return
     bounded_fraction = min(1.0, max(0.0, float(fraction)))
     progress_callback(stage, bounded_fraction)
+
 
 ###############################################################################
 def livertox_payload_rank(payload: dict[str, Any]) -> int:
@@ -67,6 +69,7 @@ def livertox_payload_rank(payload: dict[str, Any]) -> int:
     } or payload.get("missing_livertox"):
         return 1
     return 0
+
 
 ###############################################################################
 def resolve_livertox_data_for_entry(
@@ -98,9 +101,12 @@ def resolve_livertox_data_for_entry(
         ),
         reverse=True,
     )
-    if exact is not None and livertox_payload_rank(exact) >= livertox_payload_rank(grouped[0]):
+    if exact is not None and livertox_payload_rank(exact) >= livertox_payload_rank(
+        grouped[0]
+    ):
         return exact
     return grouped[0]
+
 
 ###############################################################################
 def claim_safe_evidence_quote(value: str | None) -> str | None:
@@ -124,6 +130,7 @@ def claim_safe_evidence_quote(value: str | None) -> str | None:
         truncated = truncated[:boundary].rstrip(" .,;\n")
     return f"{truncated}{marker}"
 
+
 ###############################################################################
 def normalize_match_reason(
     value: Any,
@@ -143,6 +150,7 @@ def normalize_match_reason(
     if len(primary_reason) > MATCH_REASON_MAX_LENGTH:
         primary_reason = primary_reason[:MATCH_REASON_MAX_LENGTH].rstrip()
     return primary_reason or None, normalized_notes
+
 
 ###############################################################################
 class AnalysisRunner:
@@ -340,9 +348,7 @@ class AnalysisRunner:
             if job:
                 llm_jobs.append(job)
 
-        self.emit_progress(
-            progress_callback, stage="llm_analysis", fraction=0.0
-        )
+        self.emit_progress(progress_callback, stage="llm_analysis", fraction=0.0)
         if llm_jobs:
             semaphore = asyncio.Semaphore(self.max_parallel_analyses)
             pending_tasks = [
@@ -367,8 +373,10 @@ class AnalysisRunner:
                         if isinstance(outcome, str)
                         else str(outcome).strip()
                     )
-                    normalized_outcome = self.report_finalizer.remove_redundant_report_sentence(
-                        normalized_outcome
+                    normalized_outcome = (
+                        self.report_finalizer.remove_redundant_report_sentence(
+                            normalized_outcome
+                        )
                     )
                     entry.paragraph = (
                         normalized_outcome
@@ -382,23 +390,17 @@ class AnalysisRunner:
                     fraction=completed / total if total else 1.0,
                 )
         else:
-            self.emit_progress(
-                progress_callback, stage="llm_analysis", fraction=1.0
-            )
+            self.emit_progress(progress_callback, stage="llm_analysis", fraction=1.0)
 
         logger.info("Composing final clinical report for current patient")
-        self.emit_progress(
-            progress_callback, stage="report_composition", fraction=0.0
-        )
+        self.emit_progress(progress_callback, stage="report_composition", fraction=0.0)
         final_report = await finalize_fn(
             entries,
             clinical_context=normalized_context,
             report_language=report_language,
             generate_conclusion=generate_conclusion,
         )
-        self.emit_progress(
-            progress_callback, stage="report_composition", fraction=1.0
-        )
+        self.emit_progress(progress_callback, stage="report_composition", fraction=1.0)
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
 
     # -------------------------------------------------------------------------
@@ -479,7 +481,7 @@ class AnalysisRunner:
         if match_confidence is not None:
             try:
                 match_confidence = float(match_confidence)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 match_confidence = None
         match_reason, match_notes = normalize_match_reason(
             livertox_data.get("match_reason"),
@@ -571,7 +573,9 @@ class AnalysisRunner:
         excerpt = self.rag_support.select_excerpt(excerpts_list)
         if excerpt is None or entry.missing_livertox:
             entry.missing_livertox = True
-            entry.paragraph = self.report_finalizer.build_missing_excerpt_paragraph(entry)
+            entry.paragraph = self.report_finalizer.build_missing_excerpt_paragraph(
+                entry
+            )
             return entry, None
         rag_bundle = await self.rag_support.fetch_rag_documents(
             rag_query, drug_entry.name or ""
@@ -628,7 +632,9 @@ class AnalysisRunner:
         excerpt = self.rag_support.select_excerpt(excerpts_list)
         if excerpt is None or entry.missing_livertox:
             entry.missing_livertox = True
-            entry.paragraph = self.report_finalizer.build_missing_excerpt_paragraph(entry)
+            entry.paragraph = self.report_finalizer.build_missing_excerpt_paragraph(
+                entry
+            )
             return entry, None
         rag_bundle = await self.rag_support.fetch_rag_documents(
             rag_query, drug_entry.name or ""
@@ -656,6 +662,7 @@ class AnalysisRunner:
         )
         return entry, (idx, job)
 
+
 ###############################################################################
 def summarize_drug_source_context(entry: DrugEntry) -> str:
     source = (
@@ -668,6 +675,7 @@ def summarize_drug_source_context(entry: DrugEntry) -> str:
     if source == "anamnesis":
         return "Historical anamnesis section entry."
     return "Source section unavailable."
+
 
 ###############################################################################
 def assess_temporal_plausibility(
@@ -682,6 +690,7 @@ def assess_temporal_plausibility(
     if entry.therapy_start_date:
         return "Therapy start is available; temporal assessment is partially supported."
     return "Temporal evidence is limited."
+
 
 ###############################################################################
 def assess_pattern_compatibility(

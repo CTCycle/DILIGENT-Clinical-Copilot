@@ -8,9 +8,9 @@ from repositories.schemas.security import AccessKey
 
 AccessKeyTable = type[AccessKey]
 
+
 ###############################################################################
 class AccessKeyRepositoryQueries:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def list_for_provider(

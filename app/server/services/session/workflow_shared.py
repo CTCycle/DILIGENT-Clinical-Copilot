@@ -29,12 +29,14 @@ PROGRESS_SEQUENCE: list[tuple[str, float]] = [
     ("completed", 100.0),
 ]
 
+
 ###############################################################################
 class ClinicalPersistenceError(ServiceDependencyError):
     default_detail = (
         "Clinical analysis completed, but the result could not be saved. "
         "No clinical report was finalized."
     )
+
 
 ###############################################################################
 def emit_progress(
@@ -43,6 +45,7 @@ def emit_progress(
     if progress_callback is None:
         return
     progress_callback(stage, progress, detail)
+
 
 ###############################################################################
 def resolve_rucam_source(entries: list[DrugRucamAssessment]) -> str:
@@ -57,6 +60,7 @@ def resolve_rucam_source(entries: list[DrugRucamAssessment]) -> str:
     if any(entry.total_score is not None for entry in entries):
         return "calculated"
     return "not_calculated_insufficient_data"
+
 
 ###############################################################################
 def build_single_matched_drug_row(
@@ -73,7 +77,7 @@ def build_single_matched_drug_row(
     if match_confidence is not None:
         try:
             match_confidence = float(match_confidence)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             match_confidence = None
     match_quality = classify_match_evidence(
         match_status=resolved.get("match_status"),
@@ -116,6 +120,7 @@ def build_single_matched_drug_row(
         "rucam": rucam_entry.model_dump() if rucam_entry is not None else None,
     }
 
+
 ###############################################################################
 def _normalized_resolved_drug_map(prepared_inputs: Any) -> dict[str, dict[str, Any]]:
     if prepared_inputs is None:
@@ -127,6 +132,7 @@ def _normalized_resolved_drug_map(prepared_inputs: Any) -> dict[str, dict[str, A
             resolved_drug_map[normalized_key] = value
     return resolved_drug_map
 
+
 ###############################################################################
 def _normalized_rucam_map(
     rucam_bundle: PatientRucamAssessmentBundle,
@@ -137,6 +143,7 @@ def _normalized_rucam_map(
         if normalized_key:
             rucam_by_name[normalized_key] = item
     return rucam_by_name
+
 
 ###############################################################################
 def build_matched_drugs_payload(

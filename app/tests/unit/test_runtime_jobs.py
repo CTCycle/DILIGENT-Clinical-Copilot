@@ -7,21 +7,24 @@ import pytest
 from services.runtime.jobs import JobManager
 from services.session.session_service import ClinicalSessionService
 
+
 ###############################################################################
 def accepts_named_job_id(job_id: str) -> dict[str, object]:
     return {"job_id": job_id}
+
 
 ###############################################################################
 def accepts_kwargs(**kwargs: object) -> dict[str, object]:
     return dict(kwargs)
 
+
 ###############################################################################
 def accepts_no_job_id() -> dict[str, object]:
     return {}
 
+
 ###############################################################################
 class _SnapshotCancelManager:
-
     # -------------------------------------------------------------------------
     def get_job_status(self, job_id: str) -> dict[str, object]:
         return {
@@ -40,6 +43,7 @@ class _SnapshotCancelManager:
             "progress": 0.5,
         }
 
+
 ###############################################################################
 def test_clinical_cancel_response_converts_job_snapshot_to_success_bool() -> None:
     service = ClinicalSessionService.__new__(ClinicalSessionService)
@@ -49,6 +53,7 @@ def test_clinical_cancel_response_converts_job_snapshot_to_success_bool() -> Non
 
     assert response.success is True
     assert response.job_id == "job-123"
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -64,6 +69,7 @@ def test_runner_job_id_detection_covers_supported_and_rejected_callables(
     runner, expected: bool
 ) -> None:  # type: ignore[no-untyped-def]
     assert JobManager().runner_accepts_job_id(runner) is expected
+
 
 ###############################################################################
 def test_running_cancel_remains_active_until_worker_exits() -> None:
@@ -96,6 +102,7 @@ def test_running_cancel_remains_active_until_worker_exits() -> None:
     assert terminal["status"] == "cancelled"
     assert manager.is_job_running("runtime_test") is False
 
+
 ###############################################################################
 def test_running_cancel_blocks_duplicate_scope_until_worker_exits() -> None:
     manager = JobManager()
@@ -118,6 +125,7 @@ def test_running_cancel_blocks_duplicate_scope_until_worker_exits() -> None:
         time.sleep(0.05)
     assert manager.is_job_running("runtime_test") is False
 
+
 ###############################################################################
 def test_job_result_merge_is_single_source_of_truth() -> None:
     manager = JobManager()
@@ -133,6 +141,7 @@ def test_job_result_merge_is_single_source_of_truth() -> None:
     release.set()
     assert snapshot is not None
     assert snapshot["result"] == {"a": 1, "b": 2}
+
 
 ###############################################################################
 def test_job_running_checks_can_be_scoped() -> None:
@@ -159,6 +168,7 @@ def test_job_running_checks_can_be_scoped() -> None:
         manager.cancel_job(job_id)
         release.set()
 
+
 ###############################################################################
 def test_shutdown_stops_new_work_and_waits_for_cooperative_worker() -> None:
     manager = JobManager()
@@ -183,6 +193,7 @@ def test_shutdown_stops_new_work_and_waits_for_cooperative_worker() -> None:
     assert manager.get_job_status(job_id)["status"] == "cancelled"
     assert manager.shutdown(timeout=1) is True
 
+
 ###############################################################################
 def test_terminal_job_records_are_bounded() -> None:
     manager = JobManager()
@@ -190,7 +201,9 @@ def test_terminal_job_records_are_bounded() -> None:
     job_ids = [manager.start_job("bounded_test", dict) for _ in range(3)]
     for job_id in job_ids:
         for _ in range(20):
-            if manager.get_job_status(job_id) is None or manager.get_job_status(job_id)["status"] in {
+            if manager.get_job_status(job_id) is None or manager.get_job_status(job_id)[
+                "status"
+            ] in {
                 "completed",
                 "failed",
                 "cancelled",

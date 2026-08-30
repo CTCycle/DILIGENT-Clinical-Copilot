@@ -10,9 +10,9 @@ from domain.clinical.drug_resolution import (
 from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.text.normalization import normalize_drug_query_name
 
+
 ###############################################################################
 class RxNavCandidateResolver:
-
     # -------------------------------------------------------------------------
     def __init__(self, matcher: Any | None) -> None:
         self.matcher = matcher

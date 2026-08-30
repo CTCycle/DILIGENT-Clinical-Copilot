@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from repositories.database.session import resolve_engine, resolve_session_factory
 from repositories.schemas.configuration import ProviderModelCatalogCache
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ProviderModelCatalogCacheRecord:
@@ -21,6 +22,7 @@ class ProviderModelCatalogCacheRecord:
     last_attempt_at: datetime
     last_attempt_status: str
     last_error: str | None
+
 
 ###############################################################################
 class ProviderModelCatalogCacheSerializer:
@@ -91,7 +93,10 @@ class ProviderModelCatalogCacheSerializer:
         now = datetime.now(UTC)
         with self.session_factory() as db_session:
             row = db_session.get(ProviderModelCatalogCache, provider_id)
-            if row is None or row.configuration_fingerprint != configuration_fingerprint:
+            if (
+                row is None
+                or row.configuration_fingerprint != configuration_fingerprint
+            ):
                 if row is not None:
                     db_session.delete(row)
                 row = ProviderModelCatalogCache(

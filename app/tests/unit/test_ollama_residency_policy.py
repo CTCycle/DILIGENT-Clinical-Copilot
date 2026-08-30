@@ -8,6 +8,7 @@ from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.ollama_client import OllamaClient
 from services.llm.ollama_runtime import OllamaError
 
+
 ###############################################################################
 def test_evaluate_dual_residency_plan_checks_ram_and_vram(monkeypatch) -> None:
     gib = 1_073_741_824
@@ -46,6 +47,7 @@ def test_evaluate_dual_residency_plan_checks_ram_and_vram(monkeypatch) -> None:
     assert plan["required_ram"] == 9 * gib
     assert plan["required_vram"] == 7 * gib
 
+
 ###############################################################################
 def test_predict_next_target_model_prefers_frequent_transition() -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
@@ -69,6 +71,7 @@ def test_predict_next_target_model_prefers_frequent_transition() -> None:
     asyncio.run(client.close())
 
     assert predicted == "text-model"
+
 
 ###############################################################################
 def test_resolve_policy_keep_alive_uses_dual_setting(monkeypatch) -> None:
@@ -94,6 +97,7 @@ def test_resolve_policy_keep_alive_uses_dual_setting(monkeypatch) -> None:
     asyncio.run(client.close())
 
     assert keep_alive == "8h"
+
 
 ###############################################################################
 def test_maybe_prefetch_target_model_prefetches_only_when_dual_safe(
@@ -130,6 +134,7 @@ def test_maybe_prefetch_target_model_prefetches_only_when_dual_safe(
 
     assert started == [("text-model", client.residency_dual_keep_alive)]
 
+
 ###############################################################################
 def test_maybe_prefetch_target_model_skips_when_dual_unsafe(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
@@ -161,6 +166,7 @@ def test_maybe_prefetch_target_model_skips_when_dual_unsafe(monkeypatch) -> None
     assert started == []
     assert client.residency_usage_history[-1][1] == "clinical-model"
 
+
 ###############################################################################
 def test_prefetch_model_oom_is_non_fatal(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
@@ -168,7 +174,6 @@ def test_prefetch_model_oom_is_non_fatal(monkeypatch) -> None:
 
     ###############################################################################
     class FakeHttpClient:
-
         # -------------------------------------------------------------------------
         async def post(self, path: str, json: dict) -> object:
             assert path == "/api/chat"
