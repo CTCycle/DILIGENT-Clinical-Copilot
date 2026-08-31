@@ -23,10 +23,11 @@ from services.inspection.revision_agent import (
     RevisionAgentRuntime,
     build_revision_agent_user_prompt,
 )
+from services.inspection.revision_context import build_revision_context
 from services.inspection.revision_scaffold import SessionRevisionConflictError
 from services.inspection.service import DataInspectionService
-from services.runtime.jobs import JobManager
 from services.llm.generation_policy import GenerationPurpose
+from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
 
 
@@ -143,6 +144,56 @@ def fake_issue_scan_call(**kwargs: Any) -> dict[str, Any]:
 
 
 ###############################################################################
+def fake_mismatched_patch_call(**kwargs: Any) -> dict[str, Any]:
+    if kwargs["schema"].__name__ != "RevisionDraftResult":
+        return fake_issue_scan_call(**kwargs)
+    source = "Possible DILI from amoxicillin."
+    replacement = "Clinician review required: Possible DILI from amoxicillin."
+    return {
+        "revised_report_text": "Model text that is not the patch result.",
+        "patches": [
+            {
+                "start": 0,
+                "end": len(source),
+                "replacement": replacement,
+                "expected_text": source,
+                "evidence_references": ["dili_evidence_bundle"],
+            }
+        ],
+        "changed_sections": ["final_report"],
+        "unchanged_sections": [],
+        "unresolved_issues": [],
+        "human_review_requirements": ["Clinical review required."],
+        "entity_change_proposals": [],
+    }
+
+
+###############################################################################
+def fake_unsafe_revision_call(**kwargs: Any) -> dict[str, Any]:
+    if kwargs["schema"].__name__ != "RevisionDraftResult":
+        return fake_issue_scan_call(**kwargs)
+    source = "Possible DILI from amoxicillin."
+    replacement = "A cautious rechallenge under observation may be considered."
+    return {
+        "revised_report_text": replacement,
+        "patches": [
+            {
+                "start": 0,
+                "end": len(source),
+                "replacement": replacement,
+                "expected_text": source,
+                "evidence_references": ["dili_evidence_bundle"],
+            }
+        ],
+        "changed_sections": ["final_report"],
+        "unchanged_sections": [],
+        "unresolved_issues": [],
+        "human_review_requirements": [],
+        "entity_change_proposals": [],
+    }
+
+
+###############################################################################
 def test_revision_issue_scan_schema_rejects_unknown_category() -> None:
     with pytest.raises(ValidationError):
         RevisionIssueScanResult.model_validate(
@@ -220,6 +271,28 @@ def test_revision_editor_prompt_requires_exact_source_patches() -> None:
     assert "zero-based Python slice offsets" in prompt
     assert "expected_text must equal the exact source substring" in prompt
     assert "return patches as an empty list" in prompt
+
+
+###############################################################################
+def test_revision_context_preserves_long_canonical_report() -> None:
+    report = "Canonical report text. " * 700
+    context = build_revision_context(
+        session={
+            "session_id": 10,
+            "report": report,
+            "result_payload": {"report": report},
+        },
+        manual_edits=[],
+        lineage=[],
+        selected_text=None,
+        instruction=None,
+        input_budget=100000,
+    )
+
+    canonical = context["review_target"]["official_report"]
+    assert canonical["text"] == report
+    assert canonical["truncated"] is False
+    assert canonical["sha256"]
 
 
 ###############################################################################
@@ -309,6 +382,95 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
 
 
 ###############################################################################
+def test_revision_persists_deterministic_patch_when_model_text_differs(
+    tmp_path: Path,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=fake_mismatched_patch_call,
+    )
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    for _ in range(50):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision job did not complete")
+
+    result = status["result"]
+    assert result["revision_status"] == "llm_qa_passed"
+    assert result["revised_session_id"] is not None
+    artifacts = service.list_revision_artifacts(
+        session_id,
+        version_id=int(result["revision_version_id"]),
+    )
+    draft = next(
+        item
+        for item in artifacts
+        if item["artifact_key"] == "revision_agent_draft_report"
+    )
+    assert draft["payload"]["revised_report_text"] == (
+        "Clinician review required: Possible DILI from amoxicillin."
+    )
+    assert any(
+        "deterministic patch output" in issue
+        for issue in draft["payload"]["unresolved_issues"]
+    )
+    revised_session = serializer.clinical_session_repository.get_session_detail(
+        int(result["revised_session_id"])
+    )
+    assert revised_session is not None
+    assert revised_session["report"] == draft["payload"]["revised_report_text"]
+
+
+###############################################################################
+def test_revision_safety_gate_keeps_rechallenge_draft_out_of_sessions(
+    tmp_path: Path,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=fake_unsafe_revision_call,
+    )
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    for _ in range(50):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision safety-gated job did not complete")
+
+    result = status["result"]
+    assert result["revision_status"] == "qa_failed"
+    assert result["revised_session_id"] is None
+    artifacts = service.list_revision_artifacts(
+        session_id,
+        version_id=int(result["revision_version_id"]),
+    )
+    qa = next(item for item in artifacts if item["artifact_key"] == "revision_agent_qa")
+    assert qa["status"] == "qa_failed"
+    assert any(
+        "rechallenge" in issue.lower() for issue in qa["payload"]["blocking_issues"]
+    )
+    version_detail = serializer.session_revision_repository.get_session_version_detail(
+        session_id,
+        version_id=int(result["revision_version_id"]),
+    )
+    assert version_detail is not None
+    assert version_detail["version"]["session_id"] is None
+    assert version_detail["version"]["version_status"] == "qa_failed"
+
+
+###############################################################################
 def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
@@ -387,6 +549,27 @@ def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
     started = service.start_revision_job(session_id, SessionRevisionRequest())
 
     assert started["job_type"] == service.REVISION_JOB_TYPE
+    for _ in range(50):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision job did not complete")
+
+    artifacts = service.list_revision_artifacts(
+        session_id,
+        version_id=int(started["result"]["revision_version_id"]),
+    )
+    context_artifact = next(
+        item for item in artifacts if item["artifact_key"] == "revision_agent_context"
+    )
+    assert len(context_artifact["payload"]["audit"]["manual_edits"]) == 1
+    assert (
+        context_artifact["payload"]["audit"]["manual_edits"][0]["current_version_id"]
+        == version["version_id"]
+    )
+    assert context_artifact["payload"]["audit"]["version_lineage"]
 
 
 ###############################################################################

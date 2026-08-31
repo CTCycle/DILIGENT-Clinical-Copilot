@@ -24,6 +24,9 @@ Assessment rules:
 - Treat unresolved competing causes, non-assessable Hy's Law, and incomplete RUCAM
   as hard limits on certainty. Never state that competing causes were excluded unless
   the supplied structured evidence explicitly says so.
+- Never recommend, permit, suggest, or propose rechallenge, re-exposure, restart, or
+  reintroduction of a suspected drug. State only documented historical evidence and
+  that rechallenge is not recommended.
 - LiverTox likelihood is a drug-level prior, not patient-level causality. Do not turn
   it into a definitive diagnosis, absolute contraindication, or lifelong recommendation.
 
@@ -95,6 +98,8 @@ Guidelines:
 - Do not recommend absolute or lifelong avoidance; recommend clinician review and
   evidence-based follow-up instead.
 - If rechallenge/restart evidence exists, state whether it strengthens or weakens causality.
+- Do not turn that historical evidence into a recommendation or permission to rechallenge,
+  re-expose, restart, or reintroduce the drug.
 - If management language is needed, defer it: "See final synthesis section for integrated recommendations."
 - Use retrieved documents only as supplemental context.
 - Do not print raw retrieved text.
@@ -123,6 +128,9 @@ Revision rules:
 - Treat unresolved competing causes, non-assessable Hy's Law, and incomplete RUCAM
   as hard limits on certainty. Never state that competing causes were excluded unless
   the supplied structured evidence explicitly says so.
+- Never recommend, permit, suggest, or propose rechallenge, re-exposure, restart, or
+  reintroduction of a suspected drug. State only documented historical evidence and
+  that rechallenge is not recommended.
 - LiverTox likelihood is a drug-level prior, not patient-level causality. Do not turn
   it into a definitive diagnosis, absolute contraindication, or lifelong recommendation.
 
@@ -187,6 +195,8 @@ Revision guidance:
 - Prefer revised structured evidence and current source chronology over legacy phrasing.
 - Make corrections explicit when prior causality framing appears unsupported.
 - Do not provide drug-level monitoring or management recommendations here.
+- Do not recommend, permit, suggest, or propose rechallenge, re-exposure, restart, or
+  reintroduction; describe any such event only as historical evidence or a safety signal.
 - Use retrieved documents only as supplemental context.
 - Do not print raw retrieved text.
 - Do not create bibliography entries or source lists; document references are appended by the application renderer.
@@ -209,6 +219,8 @@ discontinuation language. Do not mention drugs absent from the supplied report.
 - If competing causes or patient-level causality remain unresolved, state that plainly
   and keep recommendations conditional on clinician review. Do not use absolute,
   lifelong, or definitive language.
+- Never recommend or permit rechallenge, re-exposure, restart, or reintroduction of a
+  suspected drug, including under observation or with monitoring.
 
 Language:
 - Language map: en=English, it=Italian, de=German, fr=French, es=Spanish.
@@ -236,6 +248,8 @@ injury pattern, competing baseline causes, match uncertainty, and contradictions
 without repeating every drug paragraph. Treat prior report wording as comparison-only
 context and highlight where the revised evidence changes the interpretation.
 Provide clinician-facing management/follow-up recommendations only here.
+- If a suspected drug is discussed, never recommend or permit rechallenge, re-exposure,
+  restart, or reintroduction, including under observation or with monitoring.
 
 Language:
 - Language map: en=English, it=Italian, de=German, fr=French, es=Spanish.

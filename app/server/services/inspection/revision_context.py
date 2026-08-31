@@ -7,6 +7,7 @@ from typing import Any
 from services.llm.context_budget import ContextSegment, build_context_plan
 
 UNKNOWN_CAPACITY_INPUT_BUDGET = 8192
+REVISION_REPORT_CONTEXT_LIMIT = 20000
 
 
 ###############################################################################
@@ -61,11 +62,11 @@ def build_revision_context(
     }
     official_report = _bounded(
         session.get("official_report_text") or session.get("report"),
-        12000,
+        REVISION_REPORT_CONTEXT_LIMIT,
     )
     final_report = _bounded(
         payload.get("final_report") or payload.get("report"),
-        12000,
+        REVISION_REPORT_CONTEXT_LIMIT,
     )
     selected = _bounded(selected_text, 6000)
     user_instruction = _bounded(instruction, 4000)
@@ -86,8 +87,8 @@ def build_revision_context(
         "review.final_report": (90, False, "final_report"),
         "user.selected_text": (90, True, "user_steering"),
         "user.instruction": (110, True, "user_steering"),
-        "audit.manual_edits": (50, False, "audit"),
-        "audit.version_lineage": (40, False, "audit"),
+        "audit.manual_edits": (95, True, "audit"),
+        "audit.version_lineage": (90, True, "audit"),
         "audit.metadata": (30, False, "audit"),
     }
 

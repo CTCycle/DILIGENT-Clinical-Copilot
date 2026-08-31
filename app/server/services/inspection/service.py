@@ -137,7 +137,20 @@ class DataInspectionService(
 
     # -------------------------------------------------------------------------
     def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
-        return self.clinical_session_repository.get_session_detail(session_id)
+        return self._session_detail_with_manual_edit_history(session_id)
+
+    # -------------------------------------------------------------------------
+    def _session_detail_with_manual_edit_history(
+        self, session_id: int
+    ) -> dict[str, Any] | None:
+        detail = self.clinical_session_repository.get_session_detail(session_id)
+        if detail is None:
+            return None
+        enriched = dict(detail)
+        enriched["manual_edit_history"] = (
+            self.session_revision_repository.list_manual_report_edits(session_id)
+        )
+        return enriched
 
     # -------------------------------------------------------------------------
     def list_session_versions(self, session_id: int) -> list[dict[str, Any]]:
@@ -156,9 +169,7 @@ class DataInspectionService(
         )
         if detail is None:
             return None
-        detail["session"] = self.clinical_session_repository.get_session_detail(
-            session_id
-        )
+        detail["session"] = self._session_detail_with_manual_edit_history(session_id)
         return detail
 
     # -------------------------------------------------------------------------
@@ -188,11 +199,14 @@ class DataInspectionService(
             )
             if updated is None:
                 return None
-            return self.clinical_session_repository.get_session_detail(session_id)
-        return self.clinical_session_repository.update_session_metadata(
+            return self._session_detail_with_manual_edit_history(session_id)
+        updated = self.clinical_session_repository.update_session_metadata(
             session_id,
             metadata=metadata,
         )
+        if updated is None:
+            return None
+        return self._session_detail_with_manual_edit_history(session_id)
 
     # -------------------------------------------------------------------------
     def manual_edit_report(
@@ -215,7 +229,7 @@ class DataInspectionService(
         )
         if updated is None:
             return None
-        session = self.clinical_session_repository.get_session_detail(session_id)
+        session = self._session_detail_with_manual_edit_history(session_id)
         if session is None:
             return None
         return {"session": session, "audit": updated["audit"]}
