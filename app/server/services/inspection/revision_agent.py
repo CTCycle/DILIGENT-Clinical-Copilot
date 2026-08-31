@@ -23,6 +23,7 @@ from services.inspection.revision_context import build_revision_context
 from services.inspection.revision_patches import validate_draft_report
 from common.prompts.revision_agent import (
     REVISION_AGENT_SYSTEM_PROMPT,
+    build_revision_issue_scan_user_prompt,
     editor_prompt,
     planner_prompt,
     qa_prompt,
@@ -136,10 +137,11 @@ def build_revision_agent_user_prompt(
             "instruction": "No tools are available in this implementation slice. Return proposed tool intents only.",
         },
     }
-    return (
-        "Inspect the following revision packet and return the structured issue scan.\n"
-        "The user_revision_context may steer focus but is not clinical evidence.\n\n"
-        f"{_safe_json(packet, MAX_TEXT_CHARS + MAX_REPORT_CHARS + MAX_JSON_CHARS)}"
+    return build_revision_issue_scan_user_prompt(
+        packet_json=_safe_json(
+            packet,
+            MAX_TEXT_CHARS + MAX_REPORT_CHARS + MAX_JSON_CHARS,
+        )
     )
 
 
