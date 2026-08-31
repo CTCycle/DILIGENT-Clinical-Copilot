@@ -864,7 +864,7 @@ def test_extract_drugs_retries_semantically_invalid_llm_output() -> None:
     )
 
     assert client.call_count == 2
-    assert "Previous wrong output" in client.user_prompts[1]
+    assert "previous output failed semantic validation" in client.user_prompts[1]
     assert "Artifact descriptor" in client.user_prompts[1]
     assert [entry.name for entry in parsed.entries] == ["Retrymed"]
 

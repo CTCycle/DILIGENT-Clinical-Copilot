@@ -84,7 +84,7 @@ def test_parse_with_repairs_uses_compact_repair_messages_for_schema_echo() -> No
 
     assert result == {"ok": '{"entries":[]}'}
     assert client.captured_messages is not None
-    assert "schema or wrapper instead of data" in client.captured_messages[1]["content"]
+    assert "schema or wrapper instead of the requested data" in client.captured_messages[1]["content"]
 
 
 ###############################################################################
