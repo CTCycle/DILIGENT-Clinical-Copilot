@@ -26,6 +26,7 @@ class OpenAIChatTransport(StructuredTransportMixin):
         payload = {
             "model": request.model,
             "messages": request.messages,
+            "stream": False,
             **{
                 key: value
                 for key, value in request.options.items()
