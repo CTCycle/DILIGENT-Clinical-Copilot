@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-08-21
+Last updated: 2026-08-31
 
 ## Recommended Local Startup
 On Windows, use:
@@ -44,7 +44,7 @@ Database startup behavior is migration-driven:
   and frontend dependencies are ready. Launch performs the check again so
   startup remains safe when installation was skipped.
 
-Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. On a fresh checkout, execute option 4 first to install dependencies, synchronize the database, and build the frontend, then execute option 1 to launch the application. Use option 5, or `.\start_on_windows.ps1 -Action RebuildFrontend`, to rebuild only the frontend after frontend changes or when its production output needs refreshing; this does not synchronize Python dependencies or the database. Option 2 checks `origin/main` with `git ls-remote` and does not download or apply changes. Option 3 runs `git pull origin main` against the current checkout. Option 10 removes local user data, including the SQLite database and generated/user-created resource files, while preserving tracked application files; use `.\start_on_windows.ps1 -Action RemoveAllData -Force` for a non-interactive invocation. Option 1 also recovers missing or unusable environments and frontend output. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
+Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. On a fresh checkout, execute option 4 first to install dependencies, synchronize the database, and build the frontend, then execute option 1 to launch the application. Use option 5, or `.\start_on_windows.ps1 -Action RebuildFrontend`, to rebuild only the frontend after frontend changes or when its production output needs refreshing; this does not synchronize Python dependencies or the database. Option 2 checks `origin/main` with `git ls-remote` and does not download or apply changes. Option 3 updates source only from a non-detached, clean `main` checkout with `git pull --ff-only origin main`; it does not switch branches or modify local changes. Option 10 removes local user data, including the SQLite database and generated/user-created resource files, while preserving tracked application files; use `.\start_on_windows.ps1 -Action RemoveAllData -Force` for a non-interactive invocation. Option 1 also recovers missing or unusable environments and frontend output. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
 
 ## Packaged desktop startup
 

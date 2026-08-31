@@ -1,5 +1,5 @@
 # DILIGENT Clinical Copilot
-Last updated: 2026-08-21
+Last updated: 2026-08-31
 
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-GNU%20GPL%20v3-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
@@ -94,7 +94,7 @@ For source/development operation, open PowerShell in the extracted repository fo
 
 The launcher prepares the project runtimes and dependencies, starts the backend and frontend, and offers grouped source-control, setup, data-cleanup, and desktop-release actions. On the first launch it creates `settings/.env` from `settings/.env.example` when necessary.
 
-On a fresh checkout, select option 4 first to install dependencies and build the frontend, then select option 1 to launch the application. Use option 5 when the frontend needs to be rebuilt without synchronizing the backend environment. Option 2 checks `origin/main` without changing the checkout; option 3 pulls `origin/main` into the current checkout. Option 10 permanently removes local user data while preserving tracked application files. If option 1 detects missing or unusable dependencies or frontend output, it performs the same recovery build before launching.
+On a fresh checkout, select option 4 first to install dependencies and build the frontend, then select option 1 to launch the application. Use option 5 when the frontend needs to be rebuilt without synchronizing the backend environment. Option 2 checks `origin/main` without changing the checkout; option 3 updates source only when the checkout is non-detached, clean, and already on `main`, using `git pull --ff-only origin main`. It never switches branches or overwrites local changes. Option 10 permanently removes local user data while preserving tracked application files. If option 1 detects missing or unusable dependencies or frontend output, it performs the same recovery build before launching.
 
 When startup finishes, open the local UI at `http://127.0.0.1:9847`. If the page reports that the backend is unavailable, check `http://127.0.0.1:7690/api/health` first.
 
