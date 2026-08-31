@@ -1205,8 +1205,8 @@ function Confirm-RemoveAllData {
 
     Write-Host 'This permanently deletes local user data, including the database, settings, logs, RAG data, exports, and state.' -ForegroundColor Yellow
     Write-Host 'Tracked application files are preserved.' -ForegroundColor Yellow
-    $confirmation = Read-Host 'Type REMOVE ALL DATA to continue'
-    if ($confirmation -cne 'REMOVE ALL DATA') {
+    $confirmation = ([string](Read-Host 'Continue removing all local user data? [y/N]')).Trim()
+    if ($confirmation -notmatch '^(?i:y|yes)$') {
         throw 'Remove All Data cancelled.'
     }
 }
