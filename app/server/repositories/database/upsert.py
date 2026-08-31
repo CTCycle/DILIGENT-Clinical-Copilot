@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import func
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -56,7 +57,7 @@ def insert_application_configuration_if_missing(
     statement = statement.on_conflict_do_nothing(
         index_elements=[ApplicationConfiguration.id]
     )
-    result = db_session.execute(statement)
+    result = cast(CursorResult[Any], db_session.execute(statement))
     return bool(result.rowcount)
 
 

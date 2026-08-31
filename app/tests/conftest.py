@@ -24,7 +24,10 @@ from services.catalogs.runtime import initialize_reference_catalog_provider
 
 ###############################################################################
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TEST_CACHE_ROOT = Path(__file__).resolve().parent / "cache"
+DEFAULT_TEST_CACHE_ROOT = Path(__file__).resolve().parent / "cache"
+TEST_CACHE_ROOT = Path(
+    os.getenv("DILIGENT_TEST_CACHE_ROOT", str(DEFAULT_TEST_CACHE_ROOT))
+)
 RUNTIME_CACHE_ROOT = REPO_ROOT / "runtimes" / "cache"
 PYTEST_CACHE_ROOT = TEST_CACHE_ROOT / "pytest"
 

@@ -1,10 +1,14 @@
 # DILI Assessment Workflow
-Last updated: 2026-08-21
+Last updated: 2026-08-31
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
 
 This is the main assessment page. It collects clinical context and submits a structured request to the backend analysis endpoint.
+
+![DILI Agent with a structured fictional case ready for review](../../QA/release-v3.3.0-screenshots/01-dili-agent-synthetic-input.png)
+
+_DILI Agent with synthetic input prepared for a review._
 
 Typical input areas include:
 - patient identifier or case identifier
@@ -19,7 +23,7 @@ Typical input areas include:
 - run or submit action
 - generated assessment output
 
-On a first empty assessment, the page may show a small optional **Get started with DILI Agent** callout. Use **Show me** for the four-step tour of clinical input, patient name/date, RAG evidence, and review/run, or use **Open Configurations** to choose a runtime and model. The tour can be closed with its X button and reopened from header **Help**.
+On a first empty assessment, the page may show a small optional **Get started with DILI Agent** callout. Use **Show me** for the four-step tour of clinical input, patient name/date, RAG evidence, and review/run, or use **Open Configurations** to choose a runtime and the four role models. The tour can be closed with its X button and reopened from header **Help**.
 
 ## Enter Clinical Context
 Use clear, specific, structured text. Prefer input like:
@@ -51,9 +55,12 @@ Patient has liver issue. Check DILI.
 8. Wait for the progress indicator to finish. DILI runs can take a long time;
    the browser request timeout is one hour and does not cancel the background
    job.
-9. You may navigate away, refresh, or close and reopen the browser. The DILI
-   page reattaches to the saved job id and retrieves the latest progress when
-   the backend is still running.
+9. You may navigate to another page and return to the DILI Agent during the
+   same browser session; the in-memory page state remains available. A full
+   refresh or closing and reopening the browser intentionally resets unsaved
+   clinical input and does not reattach the DILI page to an active job. The
+   backend job may continue independently, but use **Clinical Sessions** to
+   review work after it has been persisted.
 
 Expected result:
 - the application submits structured clinical input to the backend
@@ -62,7 +69,7 @@ Expected result:
 
 Choosing **Run without RAG** affects only the pending assessment. It does not disable the saved RAG configuration for future sessions.
 
-The **Use RAG evidence** checkbox is deliberately per-assessment. Model Configurations controls the retrieval and reranking setup; the checkbox decides whether this run requests indexed evidence. If the pre-flight check reports that RAG is unavailable, continuing applies the fallback only to that pending assessment.
+The **Use RAG evidence** checkbox is deliberately per-assessment. **Configurations** controls the retrieval and reranking setup; the checkbox decides whether this run requests indexed evidence. If the pre-flight check reports that RAG is unavailable, continuing applies the fallback only to that pending assessment.
 
 During Step 12, the progress message identifies whether vector retrieval is
 enabled. If evidence preparation exceeds its bounded runtime, the assessment

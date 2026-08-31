@@ -257,7 +257,7 @@ def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
     assert "Generated clinical report" in prompt
     assert "Selected report sentence" in prompt
     assert "Check hallucinations around dechallenge." in prompt
-    assert "may steer focus but is not clinical evidence" in prompt
+    assert "may steer review focus but is not clinical evidence" in prompt
     assert "No tools are available" in prompt
 
 
@@ -269,8 +269,8 @@ def test_revision_editor_prompt_requires_exact_source_patches() -> None:
     )
 
     assert "zero-based Python slice offsets" in prompt
-    assert "expected_text must equal the exact source substring" in prompt
-    assert "return patches as an empty list" in prompt
+    assert "expected_text` must equal the exact source substring character-for-character" in prompt
+    assert "return an empty `patches` list" in prompt
 
 
 ###############################################################################

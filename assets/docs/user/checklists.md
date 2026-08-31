@@ -1,5 +1,5 @@
 # User Checklists
-Last updated: 2026-08-02
+Last updated: 2026-08-31
 
 ## Windows desktop launch checklist
 
@@ -13,7 +13,7 @@ Last updated: 2026-08-02
 1. Start DILIGENT with the packaged desktop app, or run `start_on_windows.ps1` for source/development mode.
 2. Confirm the UI opens.
 3. In source mode, confirm backend health at `http://127.0.0.1:7690/api/health`; in packaged mode, use the port recorded in `desktop-backend-ready.json`.
-4. Open **Model Configurations**.
+4. Open **Configurations**.
 5. Select provider and model.
 6. Add and activate any required access key.
 7. Open **DILI Agent**.
@@ -24,7 +24,7 @@ Last updated: 2026-08-02
 12. Re-run if needed.
 13. Copy the final reviewed output.
 14. Open **Clinical Sessions** to confirm the session was saved.
-15. Use **Patient Timeline** or **Data Inspection** for supporting review when needed.
+15. Open the selected session's **Timeline** tab, or use **Data Inspection**, for supporting review when needed.
 
 ## Good Input Checklist
 - patient age or relevant demographic context

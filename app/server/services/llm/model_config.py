@@ -534,6 +534,15 @@ class ModelConfigService:
         return normalized or None
 
     # -------------------------------------------------------------------------
+    def _required_role_model(self, model_name: str | None, role_name: str) -> str:
+        normalized = self.normalize_optional_text(model_name)
+        if normalized is None:
+            raise ServiceValidationError(
+                f"An explicit model is required for the '{role_name}' role."
+            )
+        return normalized
+
+    # -------------------------------------------------------------------------
     def known_local_model_names(self) -> set[str]:
         names = set(self.local_model_names)
         record = model_catalog.load_catalog_record(self.catalog_cache, "ollama")
@@ -647,16 +656,22 @@ class ModelConfigService:
         self,
         snapshot: ModelConfigSnapshot,
     ) -> ModelConfigPersistResponse:
+        clinical_model = self._required_role_model(snapshot.clinical_model, "clinical")
+        text_extraction_model = self._required_role_model(
+            snapshot.text_extraction_model, "text_extraction"
+        )
+        revision_model = self._required_role_model(snapshot.revision_model, "revision")
+        timeline_model = self._required_role_model(snapshot.timeline_model, "timeline")
         return ModelConfigPersistResponse(
             use_cloud_services=bool(snapshot.use_cloud_models),
             llm_provider=cast(
                 CloudProviderId, self.resolve_provider(snapshot.cloud_provider)
             ),
             cloud_model=self.normalize_optional_text(snapshot.cloud_model),
-            clinical_model=snapshot.clinical_model,
-            text_extraction_model=snapshot.text_extraction_model,
-            revision_model=snapshot.revision_model,
-            timeline_model=snapshot.timeline_model,
+            clinical_model=clinical_model,
+            text_extraction_model=text_extraction_model,
+            revision_model=revision_model,
+            timeline_model=timeline_model,
             reasoning_level=snapshot.reasoning_level,
             ollama_seed=snapshot.ollama_seed,
             rag_settings=rag_settings_payload(
@@ -678,6 +693,12 @@ class ModelConfigService:
     ) -> ModelConfigStateResponse:
         provider = self.resolve_provider(snapshot.cloud_provider)
         cloud_model = self.normalize_optional_text(snapshot.cloud_model)
+        clinical_model = self._required_role_model(snapshot.clinical_model, "clinical")
+        text_extraction_model = self._required_role_model(
+            snapshot.text_extraction_model, "text_extraction"
+        )
+        revision_model = self._required_role_model(snapshot.revision_model, "revision")
+        timeline_model = self._required_role_model(snapshot.timeline_model, "timeline")
         return ModelConfigStateResponse(
             local_models=local_models,
             cloud_providers=(
@@ -690,10 +711,10 @@ class ModelConfigService:
             use_cloud_services=bool(snapshot.use_cloud_models),
             llm_provider=cast(CloudProviderId, provider),
             cloud_model=cloud_model,
-            clinical_model=snapshot.clinical_model,
-            text_extraction_model=snapshot.text_extraction_model,
-            revision_model=snapshot.revision_model,
-            timeline_model=snapshot.timeline_model,
+            clinical_model=clinical_model,
+            text_extraction_model=text_extraction_model,
+            revision_model=revision_model,
+            timeline_model=timeline_model,
             reasoning_level=snapshot.reasoning_level,
             ollama_seed=snapshot.ollama_seed,
             rag_settings=rag_settings_payload(
