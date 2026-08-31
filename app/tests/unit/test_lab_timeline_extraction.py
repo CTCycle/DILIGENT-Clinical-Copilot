@@ -256,7 +256,7 @@ def test_lab_llm_receives_full_text_without_chunk_markers() -> None:
     asyncio.run(extractor.extract_from_payload(payload))
 
     assert client.call_count >= 1
-    assert all("full clinical laboratory text" in prompt for prompt in client.prompts)
+    assert all("complete clinical source" in prompt for prompt in client.prompts)
     assert all("[Chunk" not in prompt for prompt in client.prompts)
 
 

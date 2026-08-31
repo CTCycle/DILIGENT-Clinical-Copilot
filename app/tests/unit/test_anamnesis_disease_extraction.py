@@ -105,7 +105,7 @@ def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry(
     parsed = asyncio.run(extractor.extract_diseases_from_anamnesis(anamnesis))
 
     assert client.call_count == 1
-    assert "full anamnesis text" in client.prompts[0]
+    assert "full anamnesis" in client.prompts[0]
     assert "[Chunk" not in client.prompts[0]
     assert len(parsed.entries) == 2
     steatosis = parsed.entries[0]

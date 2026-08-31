@@ -20,11 +20,7 @@ DILIGENT follows a clear review flow:
 
 The application deliberately separates model-generated suggestions from saved evidence and human decisions. A polished paragraph is still a draft until a clinician has checked it against the source record.
 
-![DILIGENT assessment flow (v3.3.0)](assets/figures/diligent-flow-v3.2.0.png)
-_The assessment flow moves from structured input through pre-flight checks, optional evidence support, a generated draft, and human review._
-
-![DILIGENT Clinical Copilot system overview (v3.3.0)](assets/figures/clinical-copilot-overview-v3.2.0.png)
-_The application brings the user interface, local data, configured model services, and saved review sessions into one local workspace._
+The four primary workspaces are **DILI Agent**, **Clinical Sessions**, **Data Inspection**, and **Configurations**. Patient Timeline is a contextual workspace opened from the **Timeline** tab of a selected clinical session, rather than a separate top-level page.
 
 ### Principles behind the assessment
 
@@ -47,7 +43,36 @@ At a high level, DILIGENT combines an Angular user interface, a Python/FastAPI l
 - Review the reasoning alongside exposure and laboratory timelines, liver-pattern information, competing-cause states, and drug-match review flags.
 - Save completed work as clinical sessions, edit report text directly, compare official revisions, and record human clinical-review status.
 - Inspect locally available datasets and resource status through **Data Inspection**.
-- Review patient chronology in **Patient Timeline** and use it to refine later assessments.
+- Review patient chronology from a selected session's **Timeline** tab and use it to refine later assessments.
+
+## Screenshots
+
+These release views use a fictional DILI case and public catalog records. They
+contain no real patient information, credentials, private files, or provider
+secrets.
+
+<table>
+  <tr>
+    <td>
+      <img src="assets/QA/release-v3.3.0-screenshots/01-dili-agent-synthetic-input.png" alt="DILI Agent with a structured fictional case ready for review" width="620">
+      <br><sub><strong>DILI Agent.</strong> Enter a structured case and prepare an assessment.</sub>
+    </td>
+    <td>
+      <img src="assets/QA/release-v3.3.0-screenshots/02-clinical-sessions-synthetic-report.png" alt="Clinical Sessions showing a saved synthetic report" width="620">
+      <br><sub><strong>Clinical Sessions.</strong> Review a saved report and its structured findings.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <img src="assets/QA/release-v3.3.0-screenshots/03-patient-timeline-overview.png" alt="Patient Timeline showing review controls and a clinical chronology" width="620">
+      <br><sub><strong>Patient Timeline.</strong> Focus chronology controls and compare dated events.</sub>
+    </td>
+    <td>
+      <img src="assets/QA/release-v3.3.0-screenshots/05-data-inspection-drug-catalog.png" alt="Data Inspection showing public amoxicillin catalog records" width="620">
+      <br><sub><strong>Data Inspection.</strong> Inspect public catalog records and update status.</sub>
+    </td>
+  </tr>
+</table>
 
 ## v3.3.0 release highlights
 
@@ -57,6 +82,8 @@ The v3.3.0 release provides Windows x64 desktop packages in two forms:
 - an MSI installer for an installed application and shortcut
 
 The packaged application contains the runtime it needs, starts its local services automatically, and keeps user data separate from the downloaded package. A matching SHA-256 file is published so a downloaded package can be checked before use or distribution.
+
+This release also makes the four model roles explicit in **Configurations**, keeps saved session and timeline review together, and uses the native Windows directory picker for desktop RAG folder selection. The standard release workflow builds and publishes the packages from the synchronized main branch.
 
 ## Before you use it
 
@@ -143,8 +170,10 @@ Open the interface at [http://127.0.0.1:9847](http://127.0.0.1:9847). The local 
 
 Open **Configurations** from the sidebar before starting an assessment. This is where you choose how DILIGENT should use models.
 
+The page presents four independent role assignments: **Clinical**, **Text extraction**, **Revision**, and **Timeline**. One compatible model may be used for more than one role.
+
 1. Choose a **local** or **cloud** provider.
-2. Choose compatible models for the four roles used by the application: clinical analysis, text extraction, report revision, and timeline generation. One model may be used for more than one role.
+2. Choose compatible models for the four roles.
 3. Save the configuration.
 4. If the provider needs credentials, add the appropriate access key and explicitly activate the key you want to use.
 5. Confirm that the selected setup is shown as valid before returning to **DILI Agent**.
@@ -152,9 +181,6 @@ Open **Configurations** from the sidebar before starting an assessment. This is 
 For local use, Ollama must be running with a compatible chat-capable model installed. For cloud use, the active provider key is used when the model list is refreshed. After a key is saved, the interface shows a fingerprint and metadata rather than the full secret. Do not paste access keys into screenshots, chat messages, issue reports, or shared logs.
 
 Opening **Configurations** uses the last saved model list. Use **Refresh** when you explicitly want a new provider listing. If a refresh fails, the last valid list may remain visible so that you can understand the previous setup. Changing between local and cloud modes requires compatible role selections; incompatible choices are cleared rather than silently reused.
-
-![Configurations](assets/figures/models-configuration.png)
-_Configurations brings provider selection, model roles, retrieval settings, and access-key management into one workspace._
 
 ## Run a DILI assessment
 
@@ -183,7 +209,7 @@ Then:
 1. Select the configured provider or providers and choose whether to use retrieval-supported evidence for this assessment.
 2. Start the run.
 3. Read the pre-flight feedback. Correct blocking items before proceeding. Continue past warnings only when you understand the limitation they describe.
-4. Wait for the progress indicator. Some assessments take time. You may navigate away, refresh, or return to the DILI Agent while a run is still active.
+4. Wait for the progress indicator. Some assessments take time. You may navigate away and return to the DILI Agent during the same browser session. A full refresh or reopening the browser resets unsaved clinical input and does not restore the active-job view; the backend job may continue independently and can be reviewed from **Clinical Sessions** after persistence.
 5. Review the completed report and its structured evidence before copying or exporting anything.
 
 **Run without RAG** (retrieval-augmented evidence) affects only the current assessment. It does not change the saved retrieval preference for later work. If evidence preparation is unavailable or takes too long, DILIGENT may continue without that prepared evidence and will report the limitation for review.
@@ -208,13 +234,11 @@ If the report is incomplete or incorrect:
 3. Compare the new result with the previous saved work.
 4. Record the human review and attribution required by local policy before formal use.
 
-![Dashboard view](assets/figures/dashboard.png)
-![Dashboard view](assets/figures/dashboard-dark-theme.png)
-_The DILI Agent workspace combines structured case input with assessment actions and report output._
-
 ## Work with saved sessions
 
 Open **Clinical Sessions** to find persisted work by identifier, date, or available metadata. Select a session to review its content, evidence, and revision history.
+
+The selected session also contains the **Timeline** tab. Use it to reopen a saved chronology, generate a new one when needed, filter events, change reading density, or inspect the source and confidence details for an event.
 
 - **Text Editor** lets you make direct manual changes to report text. **Rendered** shows a read-only preview of the same draft.
 - **LLM Revision** creates a new draft revision and leaves the previous official version unchanged.
@@ -224,23 +248,17 @@ Open **Clinical Sessions** to find persisted work by identifier, date, or availa
 
 Manual report edits do not create a new official version. Before approving or reusing a model-assisted revision, review its evidence, revision history, and provenance.
 
-![Session dashboard](assets/figures/session-inspection.png)
-_Clinical Sessions provides a saved review workspace for reports, evidence, revisions, and human review._
-
 ## Use the timeline and data inspection views
 
 ### Patient Timeline
 
-Open **Patient Timeline** to review event order and clinical chronology. Generate a timeline when needed, or reopen a previously saved timeline instead of regenerating it. Compare medication exposure dates with symptoms and laboratory changes before refining the DILI Agent input.
+From **Clinical Sessions**, select a saved session and open its **Timeline** tab to review event order and clinical chronology. Generate a timeline when needed, or reopen a previously saved timeline instead of regenerating it. Compare medication exposure dates with symptoms and laboratory changes before refining the DILI Agent input.
 
 Timeline generation uses the model assigned to the Timeline role in **Configurations**. If model extraction is unavailable, DILIGENT may build a deterministic fallback from saved session fields. Approximate dates, missing source evidence, and fallback chronology are labeled warnings and navigation aids, not clinically established facts.
 
 ### Data Inspection
 
 Open **Data Inspection** to view available local resources, records, metadata, and update status. Use the available search, filtering, refresh, or pagination controls to confirm that expected data is present. Do not edit local database files while the application is running.
-
-![Data inspection](assets/figures/data-inspection.png)
-_Data Inspection presents curated resource records, status, and maintenance information for local review._
 
 ## Important limitations and expected behaviour
 

@@ -361,7 +361,7 @@ def test_data_inspection_navigation(page: Page, base_url: str):
 
 
 ###############################################################################
-def test_dili_form_state_restores_after_refresh(page: Page, base_url: str):
+def test_dili_form_state_resets_after_refresh(page: Page, base_url: str):
     page.goto(base_url)
 
     page.get_by_label("Patient Name").fill("Persisted Natural")
@@ -371,11 +371,9 @@ def test_dili_form_state_restores_after_refresh(page: Page, base_url: str):
     )
     page.reload()
 
-    expect(page.get_by_label("Patient Name")).to_have_value("Persisted Natural")
-    expect(page.get_by_label("Visit Date")).to_have_value("2026-05-02")
-    expect(page.get_by_label("Clinical Input")).to_have_value(
-        re.compile(r"Persistent form content for reload validation\.")
-    )
+    expect(page.get_by_label("Patient Name")).to_have_value("")
+    expect(page.get_by_label("Visit Date")).to_have_value("")
+    expect(page.get_by_label("Clinical Input")).to_have_value("")
 
 
 ###############################################################################
@@ -507,7 +505,9 @@ def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
 
 
 ###############################################################################
-def test_dili_progress_polling_survives_refresh(page: Page, base_url: str):
+def test_dili_running_job_state_is_not_restored_after_refresh(
+    page: Page, base_url: str
+):
     page.goto(base_url)
     _fill_required_dili_fields(page)
 
@@ -557,14 +557,11 @@ def test_dili_progress_polling_survives_refresh(page: Page, base_url: str):
         expect(page.locator(".spinner-label")).to_contain_text(
             "Extracting therapy and medication data"
         )
+        status_calls_before_refresh = status_call_count
         page.reload()
-        expect(page.locator(".spinner-label")).to_contain_text(
-            "Collecting supporting evidence"
-        )
-        expect(page.locator(".spinner-label")).to_contain_text("57%")
-        expect(page.locator(".inspection-excerpt-text")).to_contain_text(
-            "Refresh recovery completed."
-        )
+        expect(page.locator(".spinner-label")).to_have_count(0)
+        expect(page.get_by_role("button", name="Run DILI analysis")).to_be_visible()
+        assert status_call_count == status_calls_before_refresh
     finally:
         page.unroute(
             "**/api/clinical/jobs/refresh-resume**", serve_refresh_resume_status

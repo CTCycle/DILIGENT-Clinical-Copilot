@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-08-20
+Last updated: 2026-08-31
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -19,6 +19,7 @@ branch-status record.
 - Running job cancellation is cooperative: pending jobs can become terminal immediately, while a running stop-requested worker remains active and occupies its concurrency scope until it exits.
 - The standard CI workflow runs the existing Angular/Vitest suite with `npm run test -- --no-watch` in addition to the frontend build.
 - Angular page and component state uses signals/computed state in current model-configuration, access-key, and clinical-session preview surfaces.
+- The primary UI navigation has four workspaces: DILI Agent, Clinical Sessions, Data Inspection, and Configurations; Patient Timeline is opened from a selected session's Timeline tab.
 
 ## How To Navigate
 1. Start with this file only.

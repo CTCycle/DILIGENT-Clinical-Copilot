@@ -1,10 +1,10 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-08-18
+Last updated: 2026-08-31
 
 ## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
 
-The section tabs have contextual help that changes with the selected page:
+The selected session's tabs have contextual help that changes with the selected page:
 **Preview** is read-only, **Text Editor** saves manual edits, **Metadata** stores
 attached evidence and JSON, **Revision** creates a new draft, and **Timeline**
 manages generated chronologies.
@@ -37,22 +37,27 @@ Important distinctions:
 - Backend-provided matched drugs, structured case fields, revision entities, RxNav identifiers, and LiverTox matches are treated as authoritative persisted evidence.
 - Frontend-derived display fallbacks are labeled as **Display fallback** or **Not backend-confirmed**. These values are navigation aids only and must not be interpreted as RxNav, LiverTox, RUCAM, or backend-confirmed clinical evidence.
 
-## Use Patient Timeline
-Open **Patient Timeline** from the sidebar. Saved timeline previews open at `/sessions/:sessionId/timetable/:timelineId`; the route without `:timelineId` starts from the session workspace.
+## Use Patient Timeline from a session
+Select a session in **Clinical Sessions**, then open its **Timeline** tab. Saved timeline previews open at `/sessions/:sessionId/timetable/:timelineId`; the route without `:timelineId` starts from the session workspace. There is no separate Patient Timeline item in the primary sidebar.
 
 Use it to review event order, clinical sequence, and patient chronology where data is available.
 
+![Patient Timeline showing review controls and a clinical chronology](../../QA/release-v3.3.0-screenshots/03-patient-timeline-overview.png)
+
+_Patient Timeline review controls and the first complete chronology event._
+
 Recommended workflow:
-1. Open **Patient Timeline**.
-2. Locate the relevant patient or case.
-3. Generate a new timeline when needed from the session timeline workspace.
-4. Reopen any previously generated timeline from the saved timeline preview list instead of regenerating it.
-5. Review timeline entries in chronological order.
-6. Compare exposure dates against lab abnormalities and symptoms.
-7. Use the timeline to refine DILI Agent input if needed.
+1. Open **Clinical Sessions**.
+2. Locate and select the relevant patient or case.
+3. Open the session's **Timeline** tab.
+4. Generate a new timeline when needed from the session timeline workspace.
+5. Reopen any previously generated timeline from the saved timeline preview list instead of regenerating it.
+6. Review timeline entries in chronological order.
+7. Compare exposure dates against lab abnormalities and symptoms.
+8. Use the timeline to refine DILI Agent input if needed.
 
 In the **Timeline** tab, the generation action uses the model assigned to the
-Timeline role in Model Configurations. Use **Manage model roles** when that
+Timeline role in **Configurations**. Use **Manage model roles** when that
 assignment needs to change. Saved timelines appear as compact rows that record
 the run's provider, model, date range, event count, and evidence-quality
 warnings. Use **Open** to reopen a specific saved timeline or **Delete** to
@@ -66,6 +71,10 @@ dense/compact/comfortable density, and previous/next navigation to focus review.
 Selecting an event opens the desktop Event inspector. Approximate placement, a **Fallback chronology**, and **Missing
 source evidence** are visible warnings, not clinical confirmation.
 
+![Timeline event inspector showing supporting detail for a laboratory event](../../QA/release-v3.3.0-screenshots/04-patient-timeline-event-inspector.png)
+
+_Event inspector with timing, confidence, and source evidence for a synthetic laboratory event._
+
 Use the help popover beside **Review controls** when the filter names need context. Evidence filters describe source support, density changes reading comfort, uncertain timing keeps approximate events visible, and **Inspect details** opens the event's source and confidence rationale. These controls do not alter the saved timeline.
 
 Timeline generation may show a fallback notice when model extraction does not complete. For an explicitly selected OpenCode Go model, a temporary model-catalog outage does not prevent the known routed request from being attempted. The notice now identifies the failure class, such as provider network unavailable, provider timeout, authentication rejected, rate limited, upstream error, invalid structured response, or incomplete configuration. Transient network, timeout, rate-limit, and upstream failures are retried with bounded backoff before fallback. In that case, the timetable is built deterministically from persisted session fields with uncertain timing and no invented exact dates. Treat fallback events as navigation aids rather than model-extracted chronology, then retry after correcting the reported condition.
@@ -74,6 +83,10 @@ For LLM-generated timelines, events without preserved source evidence are not pa
 
 ## Inspect Local Data
 Open **Data Inspection** from the sidebar.
+
+![Data Inspection showing public amoxicillin catalog records](../../QA/release-v3.3.0-screenshots/05-data-inspection-drug-catalog.png)
+
+_Data Inspection filtered to public catalog records._
 
 Expected capabilities:
 - resource or table selection
