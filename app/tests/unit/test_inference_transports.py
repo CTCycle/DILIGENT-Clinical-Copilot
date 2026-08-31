@@ -60,6 +60,7 @@ def test_openai_chat_transport_normalizes_reasoning_and_output_options() -> None
     payload = captured["json"]
     assert payload["custom"] == "kept"
     assert payload["max_tokens"] == 128
+    assert payload["stream"] is False
     assert payload["thinking"] == {"type": "enabled"}
     assert "temperature" not in payload
     assert "max_output_tokens" not in payload
