@@ -17,8 +17,8 @@ permissions:
   contents: read
 
 env:
-  CARGO_TARGET_DIR: ${{ runner.temp }}/diligent-cargo
-  PYTEST_ADDOPTS: "--basetemp=${{ runner.temp }}/diligent-pytest -o cache_dir=${{ runner.temp }}/diligent-pytest-cache"
+  CARGO_TARGET_DIR: ${{ github.workspace }}/runtimes/cache/cargo
+  PYTEST_ADDOPTS: "--basetemp=${{ github.workspace }}/app/tests/cache/pytest/basetemp -o cache_dir=${{ github.workspace }}/app/tests/cache/pytest"
 
 jobs:
   backend-quality:
