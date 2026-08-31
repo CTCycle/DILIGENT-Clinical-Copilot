@@ -4,103 +4,123 @@ Last updated: 2026-08-31
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-GNU%20GPL%20v3-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
 
-DILIGENT Clinical Copilot is a local, single-user decision-support application for structured Drug-Induced Liver Injury (DILI) evaluation. It combines a FastAPI backend with an Angular interface to collect clinical context, validate it before analysis, coordinate configured language-model services, and preserve sessions for subsequent review.
+DILIGENT Clinical Copilot is a local, single-user decision-support application for structured Drug-Induced Liver Injury (DILI) review. It helps you bring clinical history, medication exposure, symptoms, laboratory results, and timing information together, then use a configured local or cloud model to create a reviewable assessment draft.
 
-It is a clinical-support tool, not a diagnostic device. A qualified clinician remains responsible for checking every input, output, conclusion, and use of any generated text.
+The application is designed to make a complex review more organized and easier to inspect. It is not a diagnostic device and does not replace clinical judgment, institutional review, or clinician responsibility. A qualified clinician must check every input, generated statement, conclusion, and use of exported text.
 
-## Architecture and maintenance documentation
+## How DILIGENT works
 
-The [documentation index](assets/docs/project_index.md) is the entry point for
-the maintained architecture and runtime notes. The most relevant architecture
-documents are the [system overview](assets/docs/architecture/system_overview.md),
-[backend layers](assets/docs/architecture/backend_layers.md),
-[persistence model](assets/docs/architecture/persistence.md),
-[background jobs](assets/docs/architecture/background_jobs.md), and
-[DILI pipeline](assets/docs/architecture/dili_assessment_pipeline.md).
+DILIGENT follows a clear review flow:
+
+1. You enter the clinical context, exposure history, symptoms, laboratory values, and timing information.
+2. The application performs rule-based pre-flight checks so missing or inconsistent information can be addressed before analysis begins.
+3. The configured local or cloud model organizes the supplied information and produces a DILI-oriented draft. Optional retrieval support can add prepared reference evidence when it is available.
+4. The application keeps the narrative report alongside structured details such as timelines, laboratory-pattern information, competing-cause states, and review warnings.
+5. You verify the result, refine the case when needed, and save, compare, copy, or export the reviewed work.
+
+The application deliberately separates model-generated suggestions from saved evidence and human decisions. A polished paragraph is still a draft until a clinician has checked it against the source record.
 
 ![DILIGENT assessment flow (v3.3.0)](assets/figures/diligent-flow-v3.2.0.png)
-_The 3.3.0 flow runs deterministic preflight and a polled background job, persists an evidence-bounded session, and ends with human review._
+_The assessment flow moves from structured input through pre-flight checks, optional evidence support, a generated draft, and human review._
 
 ![DILIGENT Clinical Copilot system overview (v3.3.0)](assets/figures/clinical-copilot-overview-v3.2.0.png)
-_The current system keeps the Angular workspace, FastAPI contracts, local persistence, configured model runtime, and human-review boundary explicit._
+_The application brings the user interface, local data, configured model services, and saved review sessions into one local workspace._
+
+### Principles behind the assessment
+
+DILI review depends on several kinds of evidence rather than one isolated value:
+
+- **Timing and exposure:** The order of medication starts, dose changes, symptoms, laboratory abnormalities, stopping a medicine, and any later restart can support or weaken a possible relationship.
+- **Liver-chemistry pattern:** ALT and ALP are considered relative to their laboratory-specific upper limits of normal. In other words, each result is first expressed as a multiple of its own upper limit, and those normalized elevations can be compared using the commonly used R ratio. This helps describe a predominantly hepatocellular, cholestatic, or mixed pattern; it does not identify the cause by itself.
+- **Causality frameworks:** Structured evidence inspired by RUCAM, Hy's Law, and DILIN-style reasoning helps organize timing, severity, alternative causes, and supporting or missing evidence. RUCAM is a structured causality aid, while Hy's Law is a warning pattern involving liver-cell injury and jaundice when another likely cause has not been established. These frameworks support review; they are not automatic proof that a drug caused liver injury.
+- **Uncertainty:** Approximate dates, incomplete source evidence, ambiguous drug matches, and unavailable retrieval are shown as limitations or review signals instead of being silently converted into facts.
+
+### Technology at a glance
+
+At a high level, DILIGENT combines an Angular user interface, a Python/FastAPI local application service, local persistence, optional evidence resources, and either a local Ollama model or a supported cloud provider. The Windows desktop build is packaged with Tauri. These components are coordinated for you when you use the packaged desktop application or the official Windows launcher.
 
 ## What DILIGENT helps with
 
 - Capture a DILI-focused clinical narrative, medication exposure, laboratory data, symptoms, and timing information in one structured request.
-- Run pre-flight validation before starting an assessment, so incomplete sections and blocking input issues can be corrected early.
-- Produce a DILI-oriented decision-support draft through the selected local or cloud model configuration, with optional retrieval-augmented evidence when available.
-- Review clinical reasoning alongside structured output such as exposure and laboratory timelines, liver-pattern information, competing-cause states, and drug-match review flags.
-- Save completed work as clinical sessions, edit report text directly, compare official revisions, and record human-review status.
-- Inspect locally available datasets and resource status through Data Inspection.
-- Review patient chronology in Patient Timeline and use it to refine later assessments.
-
-The application deliberately distinguishes model-generated suggestions from persisted, backend-confirmed evidence. Treat all generated clinical text as a draft requiring clinical review.
+- Check the request before analysis so incomplete sections and blocking input issues can be corrected early.
+- Produce a DILI-oriented decision-support draft through the selected model configuration, with optional retrieval-supported evidence when available.
+- Review the reasoning alongside exposure and laboratory timelines, liver-pattern information, competing-cause states, and drug-match review flags.
+- Save completed work as clinical sessions, edit report text directly, compare official revisions, and record human clinical-review status.
+- Inspect locally available datasets and resource status through **Data Inspection**.
+- Review patient chronology in **Patient Timeline** and use it to refine later assessments.
 
 ## v3.3.0 release highlights
 
-The v3.3.0 release hardens the Windows desktop package with deterministic runtime assembly, authenticated loopback access, single-instance behavior, graceful shutdown, and reproducible toolchain/version gates.
+The v3.3.0 release provides Windows x64 desktop packages in two forms:
+
+- a portable executable for no-install use
+- an MSI installer for an installed application and shortcut
+
+The packaged application contains the runtime it needs, starts its local services automatically, and keeps user data separate from the downloaded package. A matching SHA-256 file is published so a downloaded package can be checked before use or distribution.
 
 ## Before you use it
 
-Use DILIGENT only in a locally approved environment. In particular:
+Use DILIGENT only in an environment approved for the information you plan to enter. In particular:
 
 - Confirm your organisation's policy before entering protected health information.
-- Cloud-backed runs can send clinical text to an external provider. Do not use real patient information with a cloud provider unless that transfer is explicitly authorised.
-- Check the selected provider, model, active access key, and retrieval setting before each assessment.
+- A cloud-backed run may send clinical text to an external provider. Do not use real patient information with a cloud provider unless that transfer is explicitly authorised.
+- Check the selected provider, model roles, active access key, and retrieval choice before each assessment.
 - Verify drug names, dates, doses, laboratory values, units, alternative causes, and conclusions before relying on a report.
+- Use a desktop-width window. The interface is information-dense and is designed for a window about 1100 pixels wide or wider; it does not provide a mobile-phone layout.
 
-The supported deployment profile is local, single-user operation. Network deployment without access control is not supported.
+DILIGENT is intended for local, single-user operation. Unauthenticated network deployment is not supported.
 
 ## Get the source release
 
-Download `DILIGENT-Clinical-Copilot-3.3.0.zip` from the [v3.3.0 GitHub release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.3.0), extract it, and follow the source-startup instructions below.
+For source-based use, download `DILIGENT-Clinical-Copilot-3.3.0.zip` from the [v3.3.0 GitHub release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.3.0), extract it, and follow the source-startup instructions below.
 
-The source archive contains the verified repository at the release commit. It is intended for development and local launcher-based operation; it is separate from the Windows desktop packages.
+The source archive is intended for local launcher-based operation. It is separate from the Windows desktop packages described next.
 
 ## Windows desktop release
 
-The v3.3.0 release also publishes these Windows x64 desktop artifacts:
+Download the package you need from the [GitHub Releases page](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases):
 
-```text
-release/DILIGENT-v3.3.0-windows-x64-portable.exe
-release/DILIGENT-v3.3.0-windows-x64.msi
-```
+- **Portable EXE:** run it directly without an installation step.
+- **MSI installer:** install the application and use the resulting shortcut.
 
-The portable executable is a single-file Tauri application. It does not require a separate Python, Node.js, Rust, npm, uv, or source checkout on the target machine. On first launch it verifies and extracts the embedded PyInstaller backend and Angular assets under `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>`, starts the backend on a random localhost port, and opens the desktop window. User settings, database, logs, models, source documents, vectors, exports, state, and access-key material remain under `%LOCALAPPDATA%\DILIGENT\data`.
+The portable executable and MSI do not require a separate Python, Node.js, Rust, npm, uv, or source checkout on the target machine. On first launch, the application may take a little longer while it prepares its local runtime. Windows WebView2 is also required; an MSI may need network access to obtain it on a system where it is not already installed.
 
-The MSI installs the same Tauri shell and packaged runtime. It may use the configured WebView2 bootstrapper; an offline WebView2 installer is available only when the maintainer builds with `-OfflineWebView2`. The build also generates `release/DILIGENT-v3.3.0-windows-x64.sha256`, which is published with the portable EXE and MSI.
-
-To use the published desktop build, download the portable EXE for no-install use or the MSI for an installed shortcut. Desktop startup does not use the development ports `7690` and `9847`.
-
-For maintainers building a release on Windows x64:
-
-```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.3.0 -DesktopTarget All -Force
-```
-
-Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a Windows x64 host and a clean worktree unless `-AllowDirtyTree` is supplied explicitly. Add `-OfflineWebView2` only when building an MSI that must install WebView2 without network access. Pushing a `vX.Y.Z` tag runs the Windows packaging workflow in `.github/workflows/release.yml`, which attaches the portable EXE and MSI to the matching GitHub Release. See [desktop release documentation](assets/docs/runtime/desktop_release.md) for the build pipeline, artifact validation, runtime layout, and cleanup.
+Windows desktop startup does not use the source-mode development addresses shown below. User settings, sessions, logs, models, source documents, evidence resources, exports, and access-key material are kept in DILIGENT's local application-data area.
 
 ## Start the application
 
 ### Windows
 
-For the packaged desktop release, open the downloaded portable EXE or launch the installed MSI application. The Tauri shell performs runtime extraction and backend health checks before showing the window; no PowerShell launcher or development server is required.
+#### Packaged desktop mode
 
-For source/development operation, open PowerShell in the extracted repository folder and run:
+Open the downloaded portable EXE, or launch the application installed by the MSI. The desktop window appears after the package has prepared its local services and completed its health check. No PowerShell launcher or development server is needed.
+
+#### Source/launcher mode
+
+Open PowerShell in the extracted repository folder and run:
 
 ```powershell
 .\start_on_windows.ps1
 ```
 
-The launcher prepares the project runtimes and dependencies, starts the backend and frontend, and offers grouped source-control, setup, data-cleanup, and desktop-release actions. On the first launch it creates `settings/.env` from `settings/.env.example` when necessary.
+On a fresh checkout:
 
-On a fresh checkout, select option 4 first to install dependencies and build the frontend, then select option 1 to launch the application. Use option 5 when the frontend needs to be rebuilt without synchronizing the backend environment. Option 2 checks `origin/main` without changing the checkout; option 3 updates source only when the checkout is non-detached, clean, and already on `main`, using `git pull --ff-only origin main`. It never switches branches or overwrites local changes. Option 10 permanently removes local user data while preserving tracked application files. If option 1 detects missing or unusable dependencies or frontend output, it performs the same recovery build before launching.
+1. Choose **Install dependencies** from the launcher menu (option 4). This prepares the local runtimes, dependencies, database, and frontend output.
+2. Choose **Launch application** (option 1).
 
-When startup finishes, open the local UI at `http://127.0.0.1:9847`. If the page reports that the backend is unavailable, check `http://127.0.0.1:7690/api/health` first.
+For later launches, you can run the launcher directly with its launch action:
+
+```powershell
+.\start_on_windows.ps1 -Action Launch
+```
+
+The launcher can recover missing or unusable setup during launch. When source mode starts successfully, the interface is normally available at [http://127.0.0.1:9847](http://127.0.0.1:9847). If the page says that the local service is unavailable, check [http://127.0.0.1:7690/api/health](http://127.0.0.1:7690/api/health), then restart the launcher if necessary.
 
 ### macOS and Linux
 
-Manual startup requires Python 3.14, Node.js, npm, and uv. From the repository root:
+There is no packaged desktop build or one-step launcher for macOS and Linux in the current release. Source use requires Python 3.14, Node.js, npm, and uv. Keep the two terminals open while using the application.
+
+In the first terminal, from the repository root:
 
 ```bash
 cd app/server
@@ -117,118 +137,141 @@ npm run build
 npm run preview -- --host 127.0.0.1 --port 9847 --strictPort
 ```
 
-The default endpoints are:
-
-- UI: `http://127.0.0.1:9847`
-- API health check: `http://127.0.0.1:7690/api/health`
-
-If you change ports or related runtime settings, update `settings/.env` and restart both processes so they use the same configuration.
+Open the interface at [http://127.0.0.1:9847](http://127.0.0.1:9847). The local service health check is available at [http://127.0.0.1:7690/api/health](http://127.0.0.1:7690/api/health). If you use different local ports, use the same values consistently for both parts of the application and restart them after changing the setup.
 
 ## Configure models and access keys
 
-Open **Configurations** from the sidebar before starting an assessment.
+Open **Configurations** from the sidebar before starting an assessment. This is where you choose how DILIGENT should use models.
 
-1. Choose whether the assessment will use a local or cloud provider.
-2. Choose compatible models for the clinical and text-extraction roles.
+1. Choose a **local** or **cloud** provider.
+2. Choose compatible models for the four roles used by the application: clinical analysis, text extraction, report revision, and timeline generation. One model may be used for more than one role.
 3. Save the configuration.
-4. If the provider needs credentials, add and activate the appropriate access key.
-5. Confirm the selected runtime is shown as valid before returning to the DILI Agent.
+4. If the provider needs credentials, add the appropriate access key and explicitly activate the key you want to use.
+5. Confirm that the selected setup is shown as valid before returning to **DILI Agent**.
 
-For local use, DILIGENT works with chat-capable Ollama models. Ollama must expose `/api/chat`; older `/api/generate` fallback behaviour is not supported. For cloud use, the active provider key is used to load its model catalog. The interface displays key fingerprints and metadata rather than the secret after it is saved.
+For local use, Ollama must be running with a compatible chat-capable model installed. For cloud use, the active provider key is used when the model list is refreshed. After a key is saved, the interface shows a fingerprint and metadata rather than the full secret. Do not paste access keys into screenshots, chat messages, issue reports, or shared logs.
 
-Changing between local and cloud modes requires compatible model roles. The application rejects a configuration that persists cloud-only models under local mode, preventing the model-role mismatch that would otherwise fail later during report generation.
+Opening **Configurations** uses the last saved model list. Use **Refresh** when you explicitly want a new provider listing. If a refresh fails, the last valid list may remain visible so that you can understand the previous setup. Changing between local and cloud modes requires compatible role selections; incompatible choices are cleared rather than silently reused.
 
 ![Configurations](assets/figures/models-configuration.png)
-_Configurations brings runtime selection, RAG settings, model catalogs, and provider keys into one workspace._
+_Configurations brings provider selection, model roles, retrieval settings, and access-key management into one workspace._
 
 ## Run a DILI assessment
 
-Open **DILI Agent** and enter a concise but complete case description. Useful input normally includes:
+Open **DILI Agent** and enter a concise but complete case description. Useful information normally includes:
 
-- case or patient identifier appropriate to your local policy
+- a case or patient identifier appropriate to your local policy
+- age or relevant demographic context
 - suspected drug or exposure, dose, and timing
 - symptom onset and relevant history
 - liver laboratory values with units and reference limits when available
 - concomitant medication and relevant competing causes
+- dechallenge or rechallenge information when available
 - the clinical question you want the assessment to address
 
-For example:
+Use clear, specific wording. For example, a useful fictional case summary could include:
 
-```text
-Suspected medication: ExampleDrug, started 21 days before enzyme rise
-Symptoms: fatigue and jaundice
-Labs: ALT 820 U/L (ULN 50), AST 610 U/L, ALP 160 U/L (ULN 120), bilirubin 3.2 mg/dL
-Relevant context: no known viral hepatitis in the available record
-Clinical question: assess whether the pattern is compatible with DILI
-```
+> **Suspected medication:** ExampleDrug<br>
+> **Exposure timing:** Started 21 days before the enzyme rise<br>
+> **Symptoms:** Fatigue and jaundice<br>
+> **Laboratory values:** ALT 820 U/L (upper limit 50), AST 610 U/L, ALP 160 U/L (upper limit 120), bilirubin 3.2 mg/dL<br>
+> **Relevant context:** No known viral hepatitis in the available record<br>
+> **Clinical question:** Is this pattern compatible with DILI?
 
 Then:
 
-1. Select the configured provider or providers and choose whether to use retrieval support.
+1. Select the configured provider or providers and choose whether to use retrieval-supported evidence for this assessment.
 2. Start the run.
-3. Read the pre-flight feedback. Correct blocking items before proceeding; warnings can be acknowledged only when their limitations are understood.
-4. Wait for the progress indicator. You may navigate away and return while a process-local job is still running.
+3. Read the pre-flight feedback. Correct blocking items before proceeding. Continue past warnings only when you understand the limitation they describe.
+4. Wait for the progress indicator. Some assessments take time. You may navigate away, refresh, or return to the DILI Agent while a run is still active.
 5. Review the completed report and its structured evidence before copying or exporting anything.
 
-**Run without RAG** applies only to the current assessment. It does not alter the saved retrieval preference for later work. If evidence preparation is unavailable or exceeds its limit, DILIGENT continues without that prepared evidence and reports the limitation for review.
+**Run without RAG** (retrieval-augmented evidence) affects only the current assessment. It does not change the saved retrieval preference for later work. If evidence preparation is unavailable or takes too long, DILIGENT may continue without that prepared evidence and will report the limitation for review.
 
 ## Review the result
 
-The generated report is a starting point for clinical review. Check it against the source record, especially:
+The generated report is a decision-support draft, not a final diagnosis. Compare it with the source record, especially:
 
-- exposure chronology, dose changes, dechallenge, and rechallenge details
-- laboratory values, units, and the liver-chemistry pattern
+- exposure chronology, dose changes, stopping or restarting medication, and timing of symptoms
+- laboratory values, units, reference limits, and the described liver-chemistry pattern
 - alternative and competing causes
-- causal statements that need supporting evidence
-- matched-drug identity and any ambiguity flags
+- causal statements and the evidence supporting them
+- matched-drug identity and any ambiguous, missing, or unvalidated match warnings
 - missing data, assumptions, placeholders, and unsupported claims
 
-The structured assessment retains details such as longitudinal events, Hy's Law state, RUCAM-supporting evidence, DILIN-like causality reasoning, and competing-cause states. Drug-match statuses, including ambiguous or missing matches, are review signals rather than proof of clinical identity or causality.
+The report is accompanied by structured information that can help you check the narrative, including longitudinal exposure and laboratory events, Hy's Law status and rationale, competing-cause states, supportive RUCAM evidence, and DILIN-style causality reasoning. A drug reference or monograph excerpt indicates that reference text was available; it is not automatic proof that the drug identity or clinical conclusion is correct.
 
-Use the copy or export actions only after a human reviewer has verified the result and added any required local attribution.
+If the report is incomplete or incorrect:
+
+1. Add the missing clinical details or correct the input.
+2. Run the assessment again.
+3. Compare the new result with the previous saved work.
+4. Record the human review and attribution required by local policy before formal use.
 
 ![Dashboard view](assets/figures/dashboard.png)
 ![Dashboard view](assets/figures/dashboard-dark-theme.png)
 _The DILI Agent workspace combines structured case input with assessment actions and report output._
 
-
 ## Work with saved sessions
 
-Open **Clinical Sessions** to find persisted work by identifier, date, or available metadata. Select a session to review its content, metadata, and revision history.
+Open **Clinical Sessions** to find persisted work by identifier, date, or available metadata. Select a session to review its content, evidence, and revision history.
 
-- **Text Editor** preserves Markdown source, whitespace, blank lines, and unsaved drafts. Use it for direct manual edits.
-- **Rendered** shows a read-only rendering of the same draft.
-- **LLM Revision** creates a new draft revision; it does not overwrite the previous official version.
-- **Official Version History** and **Manual Edit History** are separate views.
-- **Version Comparison** compares persisted versions using backend-computed entity and report differences.
-- **Human Clinical Review** records `under_review`, `approved_by_human`, or `rejected_by_human` independently of LLM quality checks.
+- **Text Editor** lets you make direct manual changes to report text. **Rendered** shows a read-only preview of the same draft.
+- **LLM Revision** creates a new draft revision and leaves the previous official version unchanged.
+- **Official Version History** and **Manual Edit History** show different kinds of change and should be read separately.
+- **Version Comparison** helps compare persisted official versions and the changes they contain.
+- **Human Clinical Review** records whether a revision is under review, approved by a human, or rejected. This status is separate from automated or model-quality checks.
 
-Manual report edits do not create a new official version. Review provenance and persisted evidence before approving an LLM-assisted revision.
+Manual report edits do not create a new official version. Before approving or reusing a model-assisted revision, review its evidence, revision history, and provenance.
 
 ![Session dashboard](assets/figures/session-inspection.png)
-_Clinical Sessions shows a persisted review workspace._
+_Clinical Sessions provides a saved review workspace for reports, evidence, revisions, and human review._
 
 ## Use the timeline and data inspection views
 
-**Patient Timeline** helps review event order and clinical chronology. Generate a timeline when needed, then compare exposure, symptoms, and laboratory changes before refining the assessment input. When local model extraction is unavailable, the interface can show a deterministic fallback built from persisted fields; treat uncertain dates in that fallback as navigation aids, not clinically established chronology.
+### Patient Timeline
 
-**Data Inspection** provides a local view of available resources, records, metadata, and update state. Use it to confirm that expected data is present and to inspect records through the available filtering or pagination controls. Do not edit database files directly while the application is running.
+Open **Patient Timeline** to review event order and clinical chronology. Generate a timeline when needed, or reopen a previously saved timeline instead of regenerating it. Compare medication exposure dates with symptoms and laboratory changes before refining the DILI Agent input.
+
+Timeline generation uses the model assigned to the Timeline role in **Configurations**. If model extraction is unavailable, DILIGENT may build a deterministic fallback from saved session fields. Approximate dates, missing source evidence, and fallback chronology are labeled warnings and navigation aids, not clinically established facts.
+
+### Data Inspection
+
+Open **Data Inspection** to view available local resources, records, metadata, and update status. Use the available search, filtering, refresh, or pagination controls to confirm that expected data is present. Do not edit local database files while the application is running.
 
 ![Data inspection](assets/figures/data-inspection.png)
 _Data Inspection presents curated resource records, status, and maintenance information for local review._
 
+## Important limitations and expected behaviour
+
+- DILIGENT is designed for local, single-user use on a desktop-width screen. It is not an authenticated shared web service or a mobile application.
+- Cloud providers may receive the clinical text needed for a run. Confirm that this is allowed before using protected information.
+- Local providers and optional evidence resources can be unavailable. The application reports the limitation or shows a fallback rather than treating missing evidence as certainty.
+- A completed session remains available for later review, but an assessment that is still running may need to be started again if the local service is restarted.
+- Generated text, timelines, drug matches, and causality signals always require human verification before clinical or formal use.
+
 ## Troubleshooting
 
-| Symptom | What to check |
-| --- | --- |
-| The UI cannot reach the backend | Open the health endpoint, confirm the backend is running, and check that `settings/.env` uses matching local ports. |
-| A model cannot be selected or saved | Confirm the runtime mode matches the selected provider and that the chosen role models belong to that mode. |
-| A cloud catalog is unavailable | Confirm that an active provider key is present and that the provider can be reached. A previously loaded catalog may be marked cached. |
-| A local run fails | Confirm Ollama is running and the selected chat-capable model is installed locally. |
-| A report is incomplete | Review the pre-flight feedback, add missing history, timing, medications, and laboratory details, then run again. |
-| A session is missing | Confirm the assessment completed and that local persistence was initialized. |
+| Symptom | Likely cause | Try this |
+| --- | --- | --- |
+| The Windows desktop app does not open | The download may be incomplete, WebView2 may be unavailable, or packaged startup may have failed. | Verify the matching SHA-256 file, download the package again if needed, and make sure WebView2 is available. See the [desktop troubleshooting guide](assets/docs/runtime/troubleshooting.md) for the packaged log location. |
+| The source-mode page is blank or does not load | The launcher has not finished preparing the local services or frontend. | Run `.\start_on_windows.ps1` again. On a fresh checkout, complete **Install dependencies** before **Launch application**, then open [http://127.0.0.1:9847](http://127.0.0.1:9847). |
+| The UI says that the local service is unavailable | The service is still starting, stopped, or another local application is using its port. | Open [http://127.0.0.1:7690/api/health](http://127.0.0.1:7690/api/health), then restart the launcher. |
+| A model cannot be selected or saved | The provider mode and model are incompatible, or the saved catalog is out of date. | In **Configurations**, choose the correct local or cloud mode, use **Refresh**, assign compatible roles, and save again. |
+| A cloud model catalog is unavailable | The active key, network connection, provider quota, or provider service may be unavailable. | Confirm that the correct key is active, check network access and provider status, then use **Refresh** again. A previously valid catalog may remain visible. |
+| A local run fails | Ollama is not running or the selected model is not installed or chat-capable. | Start Ollama, confirm that the selected model is installed, and retry the run. |
+| The assessment is blocked before it starts | Pre-flight checks found missing or inconsistent input. | Follow the feedback, add or correct the requested history, timing, medication, or laboratory details, and retry. |
+| The report is incomplete, uncertain, or appears wrong | The input may be missing important evidence, or the model may have returned a fallback or ambiguous match. | Check the warnings and source record, enrich the case, run it again, and obtain human review before reuse. |
+| No saved sessions appear | The assessment may not have completed, or first-time local setup may be incomplete. | Complete the launcher's dependency and database setup options, restart the application, and confirm that a later assessment finishes successfully. |
+| A timeline shows fallback chronology | Model extraction did not complete or the available dates are uncertain. | Use it only as a navigation aid, review the warning, and retry after correcting the provider or model condition. |
+| Data Inspection is empty | Local resources have not been initialized or refreshed. | Use the launcher's setup or maintenance options, wait for them to finish, and restart DILIGENT. |
+| A source-mode port is already in use | Another local application is using one of the default development ports. | Close the conflicting application or use the local port arrangement already approved for your environment, then restart both source-mode services. |
 
-Clinical jobs are process-local. Saved sessions remain durable, but an active job identifier cannot be recovered after a backend restart.
+For source mode, the default interface address is `http://127.0.0.1:9847` and the default health-check address is `http://127.0.0.1:7690/api/health`. Packaged Windows desktop startup uses its own local address, so these source-mode addresses are not a packaged-app health check.
+
+## Further documentation
+
+For deeper technical and maintenance reference, start with the [documentation index](assets/docs/project_index.md). It links to the [system overview](assets/docs/architecture/system_overview.md), [backend layers](assets/docs/architecture/backend_layers.md), [persistence model](assets/docs/architecture/persistence.md), [background jobs](assets/docs/architecture/background_jobs.md), [DILI pipeline](assets/docs/architecture/dili_assessment_pipeline.md), and the detailed [desktop release documentation](assets/docs/runtime/desktop_release.md).
 
 ## Project status and license
 
