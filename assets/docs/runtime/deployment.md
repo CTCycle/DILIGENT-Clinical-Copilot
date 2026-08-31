@@ -1,9 +1,9 @@
 # Local Deployment
-Last updated: 2026-08-21
+Last updated: 2026-08-31
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
-- On Windows, `start_on_windows.ps1` prepares portable runtimes and dependencies before launching the local services; the frontend build is normally produced by install option 4, can be rebuilt independently with option 5 or `-Action RebuildFrontend`, and is rebuilt by option 1 when recovery detects missing or unusable environments or frontend output. Option 2 checks `origin/main` without changing the checkout, while option 3 pulls `origin/main` into the current checkout.
+- On Windows, `start_on_windows.ps1` prepares portable runtimes and dependencies before launching the local services; the frontend build is normally produced by install option 4, can be rebuilt independently with option 5 or `-Action RebuildFrontend`, and is rebuilt by option 1 when recovery detects missing or unusable environments or frontend output. Option 2 checks `origin/main` without changing the checkout, while option 3 updates source only from a non-detached, clean `main` checkout with `git pull --ff-only origin main`; it does not switch branches or modify local changes.
 - The release frontend runtime is Node.js 22.13.0, matching the launcher and CI.
 - Desktop release builds use Rust 1.95.0 with the `x86_64-pc-windows-msvc` target, Python 3.14.2, uv 0.11.30, and PyInstaller 6.21.0.
 - RAG requires `numpy`, `onnxruntime`, and `tokenizers`; the canonical artifact is a pinned AVX2 `uint8` ONNX model. PyTorch and Sentence Transformers are not required.
