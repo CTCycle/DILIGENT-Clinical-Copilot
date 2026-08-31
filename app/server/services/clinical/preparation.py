@@ -4,6 +4,11 @@ import asyncio
 from collections.abc import Callable
 from typing import Any
 
+from common.prompts.clinical_context import build_hepatotoxicity_pattern_context
+from common.prompts.identity import (
+    MEDICATION_IDENTITY_SYSTEM_PROMPT,
+    build_medication_identity_user_prompt,
+)
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.clinical.drug_resolution import DrugIdentityProposalBatch
@@ -29,16 +34,6 @@ from services.text.normalization import normalize_drug_query_name
 
 ###############################################################################
 class ClinicalKnowledgePreparation:
-    IDENTITY_FALLBACK_SYSTEM_PROMPT = """
-You normalize medication product labels to generic drug identities.
-Return one proposal per input mention. Use only pharmacologic identity knowledge.
-Do not assess hepatotoxicity, causality, dosing, or the patient.
-For combination products, list each active ingredient separately.
-If the identity is uncertain, keep confidence low and do not invent an ingredient.
-The application will independently validate every proposed name against local
-RxNav and LiverTox evidence before accepting it.
-"""
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -250,16 +245,12 @@ RxNav and LiverTox evidence before accepting it.
             return resolved_drugs
 
         mention_list = [entry.name.strip() for entry, _payload in unresolved.values()]
-        user_prompt = (
-            "Normalize these unresolved medication labels. Return exactly one proposal "
-            "for each label, preserving `original_mention` exactly:\n"
-            + "\n".join(f"- {name}" for name in mention_list)
-        )
+        user_prompt = build_medication_identity_user_prompt(mention_list)
         try:
             parsed = await asyncio.wait_for(
                 llm_client.llm_structured_call(
                     model=str(model).strip(),
-                    system_prompt=self.IDENTITY_FALLBACK_SYSTEM_PROMPT,
+                    system_prompt=MEDICATION_IDENTITY_SYSTEM_PROMPT,
                     user_prompt=user_prompt,
                     schema=DrugIdentityProposalBatch,
                     purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
@@ -649,22 +640,15 @@ RxNav and LiverTox evidence before accepting it.
         pattern_score: HepatotoxicityPatternScore | None,
     ) -> str:
         if pattern_score is None:
-            return "Hepatotoxicity pattern classification was unavailable; weigh pattern matches qualitatively."
-        classification = pattern_score.classification.replace("_", " ")
-        segments: list[str] = [
-            f"Observed liver injury pattern: {classification.capitalize()}.",
-        ]
-        if pattern_score.r_score is not None:
-            segments.append(f"R ratio ≈ {pattern_score.r_score:.2f}.")
-        if pattern_score.alt_multiple is not None:
-            segments.append(
-                f"ALT is about {pattern_score.alt_multiple:.2f} × the upper reference limit."
+            return build_hepatotoxicity_pattern_context(
+                classification=None,
+                r_score=None,
+                alt_multiple=None,
+                alp_multiple=None,
             )
-        if pattern_score.alp_multiple is not None:
-            segments.append(
-                f"ALP is about {pattern_score.alp_multiple:.2f} × the upper reference limit."
-            )
-        segments.append(
-            "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
+        return build_hepatotoxicity_pattern_context(
+            classification=pattern_score.classification,
+            r_score=pattern_score.r_score,
+            alt_multiple=pattern_score.alt_multiple,
+            alp_multiple=pattern_score.alp_multiple,
         )
-        return " ".join(segments)

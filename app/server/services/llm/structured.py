@@ -7,6 +7,8 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from common.prompts.structured_output import build_schema_format_instructions
+
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -23,11 +25,7 @@ class StructuredOutputParser(Generic[T]):
             separators=(",", ":"),
             ensure_ascii=True,
         )
-        return (
-            "Return ONLY a valid JSON object that conforms to this JSON schema.\n"
-            "Do not include markdown, comments, or additional keys.\n"
-            f"JSON schema:\n{schema_json}"
-        )
+        return build_schema_format_instructions(schema_json=schema_json)
 
     # -------------------------------------------------------------------------
     def parse(self, text: str) -> T:

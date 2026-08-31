@@ -8,7 +8,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from common.catalogs.model_choices import get_cloud_model_choices
-from common.prompts.timeline import PATIENT_TIMELINE_EXTRACTION_PROMPT
+from common.prompts.timeline import (
+    PATIENT_TIMELINE_EXTRACTION_SYSTEM_PROMPT,
+    build_patient_timeline_user_prompt,
+)
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.generation_policy import GenerationPurpose
@@ -261,18 +264,16 @@ class PatientTimelineExtractor:
             source_payload_json.encode("utf-8")
         ).hexdigest()
         timeline_complexity = self.classify_complexity(source_payload)
-        user_prompt = (
-            "Build a structured clinical timeline from this patient session payload.\n"
-            "Focus on therapy start/stop, disease manifestation, lab milestones, and other dated events.\n\n"
-            f"Source payload SHA-256: {source_payload_hash}\n"
-            f"Canonical JSON payload:\n{source_payload_json}"
+        user_prompt = build_patient_timeline_user_prompt(
+            source_payload_json=source_payload_json,
+            source_payload_hash=source_payload_hash,
         )
         parsed: PatientTimelineExtraction | None = None
         for attempt in range(1, self.extraction_retry_attempts + 1):
             try:
                 parsed = await self.client.llm_structured_call(
                     model=self.model,
-                    system_prompt=PATIENT_TIMELINE_EXTRACTION_PROMPT.strip(),
+                    system_prompt=PATIENT_TIMELINE_EXTRACTION_SYSTEM_PROMPT,
                     user_prompt=user_prompt,
                     schema=PatientTimelineExtraction,
                     purpose=GenerationPurpose.TIMELINE_EXTRACTION,

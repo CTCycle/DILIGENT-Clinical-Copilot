@@ -16,6 +16,14 @@ from common.prompts.clinical_assessment import (
     LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT,
     LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
 )
+from common.prompts.clinical_assessment_builders import (
+    build_livertox_conclusion_user_prompt,
+    build_livertox_drug_assessment_user_prompt,
+)
+from common.prompts.language import (
+    CLINICAL_LANGUAGE_REWRITE_SYSTEM_PROMPT,
+    build_clinical_language_rewrite_user_prompt,
+)
 from common.utils.logger import logger
 from domain.clinical.entities import DrugRucamAssessment, DrugSuspensionContext
 from services.clinical import hepatox_scoring
@@ -32,7 +40,7 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
 
 ###############################################################################
 class DrugAnalysisService:
-    """Handles per-drug LLM consultation — building prompts, calling the LLM, parsing responses."""
+    """Handles per-drug LLM orchestration, invocation, and response processing."""
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -93,7 +101,8 @@ class DrugAnalysisService:
             "\n".join(metadata_items) if metadata_items else "- Not available"
         )
         rucam_block = self.format_rucam_prompt_block(rucam)
-        user_prompt = user_template.format(
+        user_prompt = build_livertox_drug_assessment_user_prompt(
+            revision=user_template == LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
             report_language=self.escape_braces(report_language),
             canonical_name=self.escape_braces(canonical_name.strip() or canonical_name),
@@ -114,7 +123,7 @@ class DrugAnalysisService:
             livertox_score=self.escape_braces(score),
         )
         messages = [
-            {"role": "system", "content": system_template.strip()},
+            {"role": "system", "content": system_template},
             {"role": "user", "content": user_prompt},
         ]
         raw_response: Any = None
@@ -301,16 +310,15 @@ class DrugAnalysisService:
         if not report_body:
             return None
         context_body = clinical_context.strip() or "No clinical context was provided."
+        user_prompt = build_livertox_conclusion_user_prompt(
+            revision=user_template == LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
+            report_language=self.escape_braces(report_language),
+            clinical_context=self.escape_braces(context_body),
+            multi_drug_report=self.escape_braces(report_body),
+        )
         messages = [
-            {"role": "system", "content": system_template.strip()},
-            {
-                "role": "user",
-                "content": user_template.format(
-                    report_language=self.escape_braces(report_language),
-                    clinical_context=self.escape_braces(context_body),
-                    multi_drug_report=self.escape_braces(report_body),
-                ),
-            },
+            {"role": "system", "content": system_template},
+            {"role": "user", "content": user_prompt},
         ]
         raw_response: Any = None
         for attempt in range(1, self.retry_attempts + 1):
@@ -360,23 +368,20 @@ class DrugAnalysisService:
         source_text: str,
         report_language: str,
     ) -> str:
-        language_map = "en=English, it=Italian, de=German, fr=French, es=Spanish"
-        repair_system = (
-            "You rewrite clinical text into the requested language only. "
-            "Do not add new clinical facts."
-        )
-        repair_user = (
-            f"Target language code: {report_language}\n"
-            f"Language map: {language_map}\n"
-            "Rewrite the text entirely in the target language. "
-            "Do not produce bilingual output. Keep drug names and direct quotes unchanged.\n\n"
-            f"Text:\n{source_text}"
-        )
         repaired = await self._chat(
             model=self.llm_model,
             messages=[
-                {"role": "system", "content": repair_system},
-                {"role": "user", "content": repair_user},
+                {
+                    "role": "system",
+                    "content": CLINICAL_LANGUAGE_REWRITE_SYSTEM_PROMPT,
+                },
+                {
+                    "role": "user",
+                    "content": build_clinical_language_rewrite_user_prompt(
+                        source_text=source_text,
+                        report_language=report_language,
+                    ),
+                },
             ],
             purpose=GenerationPurpose.FAITHFUL_REWRITE,
         )
@@ -410,7 +415,7 @@ class DrugAnalysisService:
             return None
         try:
             parsed = float(match.group(1))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         return min(parsed + 0.25, 30.0) if parsed > 0 else None
 
