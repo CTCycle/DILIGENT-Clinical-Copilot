@@ -7,7 +7,7 @@ from common.constants import (
     NO_CLINICAL_CONTEXT_FALLBACK,
     UNKNOWN_R_SCORE_TOKEN,
 )
-from common.prompts.retrieval import DILI_RAG_QUERY_PROMPT
+from common.prompts.retrieval import build_dili_rag_query
 from domain.clinical.entities import PatientDrugs
 
 
@@ -30,11 +30,11 @@ class DILIQueryBuilder:
         r_part = f"R={r_score:.2f}" if r_score is not None else UNKNOWN_R_SCORE_TOKEN
         clinical = clinical_context.strip() or NO_CLINICAL_CONTEXT_FALLBACK
         for name in self.drug_names:
-            queries[name] = DILI_RAG_QUERY_PROMPT.format(
-                name=name,
-                classification=classification,
-                r_part=r_part,
-                clinical=clinical,
+            queries[name] = build_dili_rag_query(
+                drug_name=name,
+                pattern_classification=classification,
+                r_score_summary=r_part,
+                clinical_context=clinical,
             )
 
         return queries

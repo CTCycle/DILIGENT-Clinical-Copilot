@@ -6,6 +6,12 @@ import unicodedata
 from collections.abc import Callable
 from typing import Any
 
+from common.prompts.disease_extraction import (
+    ANAMNESIS_DISEASE_EXTRACTION_SYSTEM_PROMPT,
+    LOCAL_DISEASE_EXTRACTION_SYSTEM_PROMPT,
+    build_disease_extraction_retry_prompt,
+    build_disease_extraction_user_prompt,
+)
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.generation_policy import GenerationPurpose
@@ -18,7 +24,6 @@ from domain.clinical.extractor_contracts import (
     LocalDiseaseContextEntry,
     LocalPatientDiseaseContext,
 )
-from common.prompts.extraction import ANAMNESIS_DISEASE_EXTRACTION_PROMPT
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
@@ -273,7 +278,7 @@ class DiseaseExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         if parsed <= 0:
             return None
@@ -294,14 +299,6 @@ class DiseaseExtractor:
     @staticmethod
     def is_local_runtime(provider: str | None) -> bool:
         return (provider or "").strip().lower() == "ollama"
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def local_system_prompt() -> str:
-        return (
-            "Extract only clinically relevant diseases or conditions explicitly supported "
-            "by the source. Return compact JSON data only."
-        )
 
     # -------------------------------------------------------------------------
     def normalize_local_entries(
@@ -359,29 +356,20 @@ class DiseaseExtractor:
             active_provider = self.forced_provider or self.client_provider or "ollama"
             use_local_schema = self.is_local_runtime(active_provider)
             candidate_text = self.format_expected_candidates(deterministic_candidates)
-            user_prompt = (
-                "Extract diseases from this full anamnesis text, with temporal and hepatic metadata.\n"
-                f"{cleaned}"
+            user_prompt = build_disease_extraction_user_prompt(
+                source_text=cleaned,
+                candidate_checklist=candidate_text,
             )
-            if candidate_text:
-                user_prompt = (
-                    f"{user_prompt}\n\n"
-                    "Grounded candidate checklist from source text. Use it to avoid omissions, but still "
-                    "return only clinically relevant diseases/conditions supported by the source:\n"
-                    f"{candidate_text}"
-                )
             last_wrong_output = ""
             last_errors: list[str] = []
             max_attempts = max(1, self.extraction_retry_attempts + 1)
             for attempt in range(1, max_attempts + 1):
                 if attempt > 1:
-                    user_prompt = (
-                        "Retry the disease extraction. The previous output was rejected by semantic validation.\n"
-                        "Return only clinically relevant diseases/conditions explicitly supported by the source.\n\n"
-                        f"Validation errors:\n- {'; '.join(last_errors)}\n\n"
-                        f"Grounded candidate checklist:\n{candidate_text}\n\n"
-                        f"Previous wrong output:\n{last_wrong_output}\n\n"
-                        f"Source text:\n{cleaned}"
+                    user_prompt = build_disease_extraction_retry_prompt(
+                        source_text=cleaned,
+                        candidate_checklist=candidate_text,
+                        validation_errors=last_errors,
+                        previous_output=last_wrong_output,
                     )
                 try:
                     schema = (
@@ -390,9 +378,9 @@ class DiseaseExtractor:
                         else PatientDiseaseContext
                     )
                     system_prompt = (
-                        self.local_system_prompt()
+                        LOCAL_DISEASE_EXTRACTION_SYSTEM_PROMPT
                         if use_local_schema
-                        else ANAMNESIS_DISEASE_EXTRACTION_PROMPT.strip()
+                        else ANAMNESIS_DISEASE_EXTRACTION_SYSTEM_PROMPT
                     )
                     parsed = await asyncio.wait_for(
                         self.client.llm_structured_call(

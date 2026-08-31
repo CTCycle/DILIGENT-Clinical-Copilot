@@ -7,6 +7,12 @@ from common.catalogs.model_choices import (
     get_all_cloud_model_names,
     get_text_extraction_model_choices,
 )
+from common.prompts.structured_output import (
+    COMPACT_JSON_REPAIR_SYSTEM_PROMPT,
+    build_compact_json_repair_user_prompt,
+    build_json_repair_user_prompt,
+    build_structured_system_prompt,
+)
 from common.utils.logger import logger
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.ollama_runtime import OllamaError
@@ -99,7 +105,10 @@ def build_structured_messages(
     return [
         {
             "role": "system",
-            "content": f"{system_prompt.strip()}\n\n{format_instructions}",
+            "content": build_structured_system_prompt(
+                system_prompt=system_prompt,
+                format_instructions=format_instructions,
+            ),
         },
         {"role": "user", "content": user_prompt},
     ]
@@ -218,14 +227,12 @@ def build_repair_messages(
     text: str,
 ) -> list[dict[str, str]]:
     return [
-        {"role": "system", "content": system_prompt.strip()},
+        {"role": "system", "content": system_prompt},
         {
             "role": "user",
-            "content": (
-                "The previous reply did not match the required JSON schema.\n"
-                "Follow these format instructions exactly and return ONLY a valid JSON object:\n"
-                f"{format_instructions}\n\n"
-                f"Previous reply:\n{text}"
+            "content": build_json_repair_user_prompt(
+                format_instructions=format_instructions,
+                previous_reply=text,
             ),
         },
     ]
@@ -239,18 +246,11 @@ def build_compact_repair_messages(
     return [
         {
             "role": "system",
-            "content": (
-                "Return only valid JSON data. Do not return JSON schema, explanations, "
-                "keys like $defs, title, type, properties, required, or $ref."
-            ),
+            "content": COMPACT_JSON_REPAIR_SYSTEM_PROMPT,
         },
         {
             "role": "user",
-            "content": (
-                "The previous reply looked like a schema or wrapper instead of data.\n"
-                "Return only the final JSON data object for the extraction.\n\n"
-                f"Previous reply:\n{text}"
-            ),
+            "content": build_compact_json_repair_user_prompt(previous_reply=text),
         },
     ]
 
