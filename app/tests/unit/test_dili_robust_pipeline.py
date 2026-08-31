@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi.testclient import TestClient
-
+from common.utils.clinical_safety import (
+    RECHALLENGE_RECOMMENDATION_CODE,
+    RECHALLENGE_RECOMMENDATION_MESSAGE,
+)
 from domain.clinical.entities import (
     ClinicalLabEntry,
     DrugEntry,
@@ -12,8 +14,8 @@ from domain.clinical.entities import (
     PatientLabTimeline,
     PatientRucamAssessmentBundle,
 )
-import app as server_app_module
 from domain.clinical.robustness import FactGraph, FactGraphNode, ReportMetadata
+from fastapi.testclient import TestClient
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.robust_pipeline import (
     audit_report,
@@ -23,6 +25,8 @@ from services.session.robust_pipeline import (
     render_fact_graph_report,
     validate_fact_graph,
 )
+
+import app as server_app_module
 
 
 ###############################################################################
@@ -209,6 +213,43 @@ def test_audit_blocks_report_without_claim_references() -> None:
         for decision in audit.gate_decisions
     )
     assert audit.outcome == "partially_faithful_with_major_issues"
+
+
+###############################################################################
+def test_audit_exposes_failed_no_rechallenge_gate() -> None:
+    payload = PatientData(
+        name="Safety Patient",
+        anamnesis="Jaundice.",
+        drugs="Drug A",
+        laboratory_analysis="ALT 100 U/L.",
+    )
+    audit = audit_report(
+        extraction_artifact=build_extraction_artifact(
+            normalized_document=DocumentNormalizer().normalize(
+                "Patient reports jaundice."
+            ),
+            section_extraction=None,
+            payload=payload,
+        ),
+        fact_graph_validation=validate_fact_graph(FactGraph(nodes=[])),
+        report_metadata=ReportMetadata(
+            report_mode="faithful_only", claim_references={"report": ["source"]}
+        ),
+        additional_blocking_issues=[
+            {
+                "code": RECHALLENGE_RECOMMENDATION_CODE,
+                "message": RECHALLENGE_RECOMMENDATION_MESSAGE,
+            }
+        ],
+    )
+
+    gate = next(
+        decision
+        for decision in audit.gate_decisions
+        if decision.get("gate") == "no_rechallenge_recommendation"
+    )
+    assert gate["passed"] is False
+    assert audit.manual_review_required is True
 
 
 ###############################################################################

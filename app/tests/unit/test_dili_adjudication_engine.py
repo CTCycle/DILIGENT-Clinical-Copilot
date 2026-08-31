@@ -206,6 +206,137 @@ def test_generated_narrative_safety_gate_blocks_unsupported_certainty() -> None:
 
 
 ###############################################################################
+def test_generated_narrative_safety_gate_blocks_rechallenge_permission() -> None:
+    bundle = DiliEvidenceBuilder().build(
+        payload=PatientData(anamnesis="Jaundice."),
+        drugs=PatientDrugs(entries=[DrugEntry(name="Drug A")]),
+        labs=PatientLabTimeline(entries=[]),
+        resolved_drugs=None,
+        rucam_bundle=PatientRucamAssessmentBundle(entries=[]),
+    )
+
+    unsafe_issues = DiliEvidenceBuilder.audit_generated_narrative(
+        clinical_narrative=(
+            "No rechallenge occurred, but a cautious trial of temporary interruption "
+            "then rechallenge under observation may be considered."
+        ),
+        bundle=bundle,
+    )
+    assert "clinical_narrative_recommends_rechallenge" in {
+        issue["code"] for issue in unsafe_issues
+    }
+
+    safe_issues = DiliEvidenceBuilder.audit_generated_narrative(
+        clinical_narrative=(
+            "No rechallenge occurred. Rechallenge is not recommended; clinical review "
+            "is required."
+        ),
+        bundle=bundle,
+    )
+    assert "clinical_narrative_recommends_rechallenge" not in {
+        issue["code"] for issue in safe_issues
+    }
+
+
+###############################################################################
+def test_timeline_preserves_explicit_symptom_and_jaundice_dates() -> None:
+    bundle = DiliEvidenceBuilder().build(
+        payload=PatientData(
+            anamnesis=(
+                "Fatigue and pruritus began on 2026-02-05. "
+                "Jaundice developed on 2026-02-06."
+            )
+        ),
+        drugs=PatientDrugs(entries=[]),
+        labs=PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="BILIRUBIN",
+                    value=3,
+                    sample_date="2026-02-06",
+                    source="laboratory_analysis",
+                )
+            ]
+        ),
+        resolved_drugs=None,
+        rucam_bundle=PatientRucamAssessmentBundle(entries=[]),
+    )
+
+    assert bundle.timeline.first_symptom_date == "2026-02-05"
+    assert bundle.timeline.jaundice_or_bilirubin_rise_date == "2026-02-06"
+    assert "first_symptom_date" not in bundle.timeline.missing_fields
+    assert "jaundice_or_bilirubin_timing" not in bundle.timeline.missing_fields
+
+
+###############################################################################
+def test_causality_does_not_upgrade_stable_current_drug_from_global_dechallenge() -> (
+    None
+):
+    bundle = DiliEvidenceBuilder().build(
+        payload=PatientData(
+            anamnesis="Mandatory alternative-cause workup is pending.",
+            drugs="Rosuvastatin stable for approximately two years and continued without dose change.",
+            laboratory_analysis="ALT 240 U/L and ALP 100 U/L.",
+        ),
+        drugs=PatientDrugs(
+            entries=[
+                DrugEntry(
+                    name="Rosuvastatin",
+                    source="therapy",
+                    current_status="current",
+                    evidence=(
+                        "Rosuvastatin stable for approximately two years and continued "
+                        "without dose change."
+                    ),
+                )
+            ]
+        ),
+        labs=PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=240,
+                    upper_limit_normal=40,
+                    sample_date="2026-02-10",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALP",
+                    value=100,
+                    upper_limit_normal=100,
+                    sample_date="2026-02-10",
+                    source="laboratory_analysis",
+                ),
+            ]
+        ),
+        resolved_drugs={
+            "rosuvastatin": {
+                "decision_status": "accepted_exact_livertox",
+                "accepted_livertox_name": "Rosuvastatin",
+                "matched_livertox_row": {"likelihood_score": "A"},
+            }
+        },
+        rucam_bundle=PatientRucamAssessmentBundle(
+            entries=[
+                DrugRucamAssessment(
+                    drug_name="Rosuvastatin",
+                    total_score=0,
+                    causality_category="excluded",
+                )
+            ]
+        ),
+    )
+
+    exposure = bundle.exposures[0]
+    assert exposure.causality is not None
+    assert exposure.causality.category == "unlikely"
+    assert exposure.causality.temporal_compatibility == "incompatible"
+    assert exposure.causality.dechallenge_rechallenge.startswith("not_assessable;")
+    assert exposure.rucam is not None
+    assert exposure.rucam.category == "excluded"
+
+
+###############################################################################
 def test_report_has_required_fda_style_sections() -> None:
     bundle = DiliEvidenceBuilder().build(
         payload=PatientData(drugs="Drug A"),

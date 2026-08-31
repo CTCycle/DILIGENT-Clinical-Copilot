@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from typing import Literal
 
+from common.utils.clinical_safety import contains_explicitly_negative_rechallenge
 from domain.clinical.dili import (
     DiliDifferentialAssessment,
     DiliRucamAssessment,
@@ -69,6 +71,9 @@ class DiliCausalityEngine:
         temporal = self._temporal_compatibility(drug, first_injury_date)
         rechallenge_status = self._rechallenge_status(drug)
         signature = self._signature_match(primary_pattern, likelihood)
+        drug_dechallenge_status = (
+            dechallenge_status if drug.suspension_date else "not_assessable"
+        )
         competing = (
             "complete" if differential.all_major_causes_excluded else "incomplete"
         )
@@ -79,7 +84,10 @@ class DiliCausalityEngine:
             total += 1
         if temporal == "compatible":
             total += 1
-        if dechallenge_status in {"improving_after_stop", "resolved_to_baseline"}:
+        if drug_dechallenge_status in {
+            "improving_after_stop",
+            "resolved_to_baseline",
+        }:
             total += 1
         if rechallenge_status == "positive":
             total += 2
@@ -105,15 +113,44 @@ class DiliCausalityEngine:
         else:
             category = "unassessable"
 
+        rucam_excludes_exposure = rucam is not None and (
+            rucam.total_score == 0 or rucam.causality_category == "excluded"
+        )
+        if temporal == "incompatible" and rechallenge_status != "positive":
+            category = "unlikely" if accepted else "unassessable"
+        elif (
+            rucam_excludes_exposure
+            and rechallenge_status != "positive"
+            and category in {"very_likely", "probable"}
+        ):
+            category = "possible" if accepted else "unassessable"
+
+        rationale = [
+            "DILIN-like category integrates temporal fit, drug identity, phenotype fit, dechallenge/rechallenge, and competing causes.",
+            "Absence of an alternative cause alone does not justify upgrading causality.",
+        ]
+        if drug_dechallenge_status == "not_assessable":
+            rationale.append(
+                "Global laboratory dechallenge evidence was not assigned to this drug without a documented stop date."
+            )
+        if temporal == "incompatible":
+            rationale.append(
+                "The documented exposure chronology is incompatible with the first injury signal."
+            )
+        if rucam_excludes_exposure:
+            rationale.append(
+                "A zero or excluded RUCAM result prevents a probable or very-likely patient-level category without stronger contradictory evidence."
+            )
+
         return DrugExposureAssessment(
             drug_name=drug.name,
             identity=identity,
             start_date=drug.therapy_start_date,
             dose_changes=[],
             stop_date=drug.suspension_date,
-            rechallenge_date=drug.suspension_date
-            if rechallenge_status != "unknown"
-            else None,
+            rechallenge_date=(
+                drug.suspension_date if rechallenge_status == "positive" else None
+            ),
             rechallenge_status=rechallenge_status,
             livertox_likelihood=likelihood or None,
             direct_toxin_or_dose_dependent=likelihood in DIRECT_TOXIN_LIVERTOX,
@@ -121,16 +158,13 @@ class DiliCausalityEngine:
                 drug_name=drug.name,
                 category=category,
                 temporal_compatibility=temporal,
-                dechallenge_rechallenge=f"{dechallenge_status}; rechallenge={rechallenge_status}",
+                dechallenge_rechallenge=f"{drug_dechallenge_status}; rechallenge={rechallenge_status}",
                 phenotype_match=signature,
                 known_drug_signature=likelihood or "unknown",
                 competing_cause_exclusion=competing,
                 drug_identity_quality="accepted" if accepted else "unresolved",
                 source_evidence_quality=source_quality,
-                rationale=[
-                    "DILIN-like category integrates temporal fit, drug identity, phenotype fit, dechallenge/rechallenge, and competing causes.",
-                    "Absence of an alternative cause alone does not justify upgrading causality.",
-                ],
+                rationale=rationale,
             ),
             rucam=self.rucam(rucam, drug.name),
         )
@@ -167,6 +201,8 @@ class DiliCausalityEngine:
     # -------------------------------------------------------------------------
     @staticmethod
     def _temporal_compatibility(drug: DrugEntry, first_injury_date: str | None) -> str:
+        if DiliCausalityEngine._has_long_term_stable_exposure(drug):
+            return "incompatible"
         if not drug.therapy_start_date or not first_injury_date:
             return "unknown"
         start = DiliTimelineEngine.parse_date(drug.therapy_start_date)
@@ -180,15 +216,32 @@ class DiliCausalityEngine:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _has_long_term_stable_exposure(drug: DrugEntry) -> bool:
+        evidence = (drug.evidence or "").lower()
+        return bool(
+            re.search(
+                r"\b(?:stable|continued|ongoing|unchanged)\b.{0,80}\b(?:\d+|one|two|three|several|many)?\s*(?:years?|months?)\b",
+                evidence,
+            )
+            or re.search(
+                r"\b(?:\d+|one|two|three|several|many)?\s*(?:years?|months?)\b.{0,40}\b(?:stable|continued|ongoing|unchanged)\b",
+                evidence,
+            )
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _rechallenge_status(
         drug: DrugEntry,
-    ) -> Literal["positive", "present_unclear", "unknown"]:
+    ) -> Literal["positive", "present_unclear", "absent", "unknown"]:
         evidence = (drug.evidence or "").lower()
         if (
             "rechallenge positive" in evidence
             or "re-exposure with recurrence" in evidence
         ):
             return "positive"
+        if contains_explicitly_negative_rechallenge(evidence):
+            return "absent"
         if (
             "rechallenge" in evidence
             or "restarted" in evidence

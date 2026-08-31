@@ -554,7 +554,9 @@ async def process_single_patient_workflow(
         fact_graph_validation=fact_graph_validation,
         report_metadata=report_metadata,
         additional_blocking_issues=DiliEvidenceBuilder.audit_generated_narrative(
-            clinical_narrative=llm_clinical_summary,
+            clinical_narrative="\n".join(
+                text for text in (llm_clinical_summary, generated_report) if text
+            ),
             bundle=dili_evidence_bundle,
         ),
     )

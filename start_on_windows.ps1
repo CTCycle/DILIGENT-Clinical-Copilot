@@ -74,23 +74,27 @@ $script:ActiveProgressIds = [Collections.Generic.HashSet[int]]::new()
 # Shared output and process helpers
 # ============================================================
 function Write-Step([string]$Message) {
+    Clear-LauncherProgress
     Write-Host "[STEP] $Message" -ForegroundColor Cyan
 }
 
 function Write-Ok([string]$Message) {
+    Clear-LauncherProgress
     Write-Host "[OK] $Message" -ForegroundColor Green
 }
 
 function Write-Info([string]$Message) {
+    Clear-LauncherProgress
     Write-Host "[INFO] $Message" -ForegroundColor DarkCyan
 }
 
 function Write-Fatal([string]$Message) {
+    Clear-LauncherProgress
     Write-Host "[FATAL] $Message" -ForegroundColor Red
 }
 
 function Start-LauncherProgress {
-    param([Parameter(Mandatory = $true)][string]$Activity, [string]$Status = 'Starting')
+    param([Parameter(Mandatory = $true)][string]$Activity, [Parameter(Mandatory = $true)][string]$Status)
     $id = $script:NextProgressId++
     [void]$script:ActiveProgressIds.Add($id)
     Write-Progress -Id $id -Activity $Activity -Status $Status
@@ -129,20 +133,14 @@ function Invoke-TrackedLauncherAction {
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][scriptblock]$Operation
     )
-    $activity = "DILIGENT: $Name"
-    $progressId = Start-LauncherProgress -Activity $activity -Status 'Starting'
     Write-Step "Starting $Name"
     try {
-        Update-LauncherProgress -Id $progressId -Activity $activity -Status 'Running'
         & $Operation
         Write-Ok "$Name completed"
     }
     catch {
         Write-Fatal "$Name failed: $($_.Exception.Message)"
         throw
-    }
-    finally {
-        Complete-LauncherProgress $progressId
     }
 }
 
@@ -155,20 +153,13 @@ function Invoke-Checked {
     )
 
     $display = "$FilePath " + ($ArgumentList -join ' ')
-    $activity = "DILIGENT: $display"
-    $progressId = Start-LauncherProgress -Activity $activity -Status 'Running external command'
     Write-Step "Running $display"
+    Push-Location $WorkingDirectory
     try {
-        Push-Location $WorkingDirectory
-        try {
-            & $FilePath @ArgumentList
-        }
-        finally {
-            Pop-Location
-        }
+        & $FilePath @ArgumentList
     }
     finally {
-        Complete-LauncherProgress $progressId
+        Pop-Location
     }
     $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
     if ($exitCode -ne 0) {
@@ -842,23 +833,27 @@ function Remove-ApplicationLogs {
         Write-Info "Log directory does not exist: $logDir"
         return
     }
-    $logs = @(Get-ChildItem -LiteralPath $logDir -Filter '*.log' -File -ErrorAction SilentlyContinue)
+    $logs = @(Get-ChildItem -LiteralPath $logDir -Filter '*.log' -File -ErrorAction SilentlyContinue |
+        Sort-Object @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
     if ($logs.Count -eq 0) {
         Write-Info 'No application log files found'
         return
     }
+    $skipped = 0
     $progressId = Start-LauncherProgress -Activity 'DILIGENT: remove application logs' -Status "0 of $($logs.Count) files"
     try {
         for ($index = 0; $index -lt $logs.Count; $index++) {
             $log = $logs[$index]
             Update-LauncherProgress -Id $progressId -Activity 'DILIGENT: remove application logs' -Status "$($index + 1) of $($logs.Count): $($log.Name)" -PercentComplete ([int](($index + 1) * 100 / $logs.Count))
-            Remove-Item -LiteralPath $log.FullName -Force
+            if (-not (Remove-PathSafely -Path $log.FullName)) {
+                $skipped++
+            }
         }
     }
     finally {
         Complete-LauncherProgress $progressId
     }
-    Write-Ok "Removed $($logs.Count) application log file(s)"
+    Write-Ok "Removed $($logs.Count - $skipped) application log file(s); skipped $skipped locked or inaccessible file(s)"
 }
 
 function Remove-PathSafely {
@@ -867,16 +862,57 @@ function Remove-PathSafely {
         [switch]$Recurse
     )
 
-    if (-not (Test-Path -LiteralPath $Path -ErrorAction SilentlyContinue)) {
-        return $true
+    try {
+        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    } catch {
+        if ($_.CategoryInfo.Category -eq [System.Management.Automation.ErrorCategory]::ObjectNotFound) {
+            return $true
+        }
+        Clear-LauncherProgress
+        Write-Warning "Skipped locked or inaccessible cache item: $Path ($($_.Exception.Message))"
+        return $false
     }
     try {
-        Remove-Item -LiteralPath $Path -Force -Recurse:$Recurse -ErrorAction Stop
+        Remove-Item -LiteralPath $item.FullName -Force -Recurse:$Recurse -Confirm:$false -ErrorAction Stop
         return $true
     }
     catch {
-        Write-Warning "Skipped locked or inaccessible cache item: $Path ($($_.Exception.Message))"
-        return $false
+        if (-not $Recurse -or -not $item.PSIsContainer) {
+            Clear-LauncherProgress
+            Write-Warning "Skipped locked or inaccessible cache item: $Path ($($_.Exception.Message))"
+            return $false
+        }
+
+        $enumerationErrors = @()
+        $entries = @(Get-ChildItem -LiteralPath $item.FullName -Force -Recurse -ErrorAction SilentlyContinue -ErrorVariable enumerationErrors |
+            Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
+        $allRemoved = $enumerationErrors.Count -eq 0
+        foreach ($enumerationError in $enumerationErrors) {
+            $allRemoved = $false
+            Clear-LauncherProgress
+            Write-Warning "Skipped inaccessible cache item below $Path ($($enumerationError.Exception.Message))"
+        }
+
+        foreach ($entry in $entries) {
+            try {
+                Remove-Item -LiteralPath $entry.FullName -Force -Confirm:$false -ErrorAction Stop
+            } catch {
+                $allRemoved = $false
+                Clear-LauncherProgress
+                Write-Warning "Skipped locked or inaccessible cache item: $($entry.FullName) ($($_.Exception.Message))"
+            }
+        }
+
+        if (Test-Path -LiteralPath $item.FullName -ErrorAction SilentlyContinue) {
+            try {
+                Remove-Item -LiteralPath $item.FullName -Force -Confirm:$false -ErrorAction Stop
+            } catch {
+                $allRemoved = $false
+                Clear-LauncherProgress
+                Write-Warning "Skipped locked or inaccessible cache item: $($item.FullName) ($($_.Exception.Message))"
+            }
+        }
+        return $allRemoved -and -not (Test-Path -LiteralPath $item.FullName -ErrorAction SilentlyContinue)
     }
 }
 
@@ -888,23 +924,21 @@ function Remove-CacheContents {
     }
 
     $skipped = 0
-    $items = @(Get-ChildItem -LiteralPath $RootPath -Force -Recurse -ErrorAction SilentlyContinue |
-        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true })
-    $progressId = Start-LauncherProgress -Activity "DILIGENT: clear $RootPath" -Status "0 of $($items.Count) items"
-    try {
-        for ($index = 0; $index -lt $items.Count; $index++) {
-            $item = $items[$index]
-            if ($item.Name -eq '.gitkeep') {
-                continue
-            }
-            Update-LauncherProgress -Id $progressId -Activity "DILIGENT: clear $RootPath" -Status "$($index + 1) of $($items.Count): $($item.Name)" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $items.Count)))
-            if (-not (Remove-PathSafely -Path $item.FullName -Recurse:$item.PSIsContainer)) {
-                $skipped++
-            }
-        }
+    $enumerationErrors = @()
+    $items = @(Get-ChildItem -LiteralPath $RootPath -Force -ErrorAction SilentlyContinue -ErrorVariable enumerationErrors |
+        Sort-Object @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
+    $skipped += $enumerationErrors.Count
+    foreach ($enumerationError in $enumerationErrors) {
+        Write-Warning "Skipped inaccessible cache item below $RootPath ($($enumerationError.Exception.Message))"
     }
-    finally {
-        Complete-LauncherProgress $progressId
+    for ($index = 0; $index -lt $items.Count; $index++) {
+        $item = $items[$index]
+        if ($item.Name -eq '.gitkeep') {
+            continue
+        }
+        if (-not (Remove-PathSafely -Path $item.FullName -Recurse:$item.PSIsContainer)) {
+            $skipped++
+        }
     }
     return $skipped
 }
@@ -913,12 +947,9 @@ function Remove-PythonCaches {
     $skipped = 0
     $cacheDirectories = @(Get-ChildItem -LiteralPath $RepoRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
         Where-Object Name -eq '__pycache__' |
-        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true })
+        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
     foreach ($directory in $cacheDirectories) {
-        $skipped += Remove-CacheContents -RootPath $directory.FullName
-        if (-not (Remove-PathSafely -Path $directory.FullName -Recurse)) {
-            $skipped++
-        }
+        if (-not (Remove-PathSafely -Path $directory.FullName -Recurse)) { $skipped++ }
     }
     return $skipped
 }
@@ -927,11 +958,14 @@ function Remove-ToolCacheDirectories {
     $skipped = 0
     $cacheDirectories = @(Get-ChildItem -LiteralPath $RepoRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -in @('.mypy_cache', '.ruff_cache') -or $_.Name -like '.pytest_cache*' } |
-        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true })
+        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
     foreach ($directory in $cacheDirectories) {
         $skipped += Remove-CacheContents -RootPath $directory.FullName
-        if (-not (Remove-PathSafely -Path $directory.FullName -Recurse)) {
-            $skipped++
+        if (Test-Path -LiteralPath $directory.FullName -PathType Container -ErrorAction SilentlyContinue) {
+            $remaining = @(Get-ChildItem -LiteralPath $directory.FullName -Force -ErrorAction SilentlyContinue)
+            if ($remaining.Count -eq 0 -and -not (Remove-PathSafely -Path $directory.FullName -Recurse)) {
+                $skipped++
+            }
         }
     }
     return $skipped
@@ -959,13 +993,16 @@ function Uninstall-Application {
         (Join-Path $ClientDir '.angular'),
         (Join-Path $ClientDir 'dist')
     )
+    $skipped = 0
     $progressId = Start-LauncherProgress -Activity 'DILIGENT: uninstall application' -Status "0 of $($targets.Count) paths"
     try {
         for ($index = 0; $index -lt $targets.Count; $index++) {
             $target = $targets[$index]
             if (Test-Path -LiteralPath $target) {
                 Update-LauncherProgress -Id $progressId -Activity 'DILIGENT: uninstall application' -Status "$($index + 1) of $($targets.Count): $target" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $targets.Count)))
-                Remove-Item -LiteralPath $target -Recurse -Force
+                if (-not (Remove-PathSafely -Path $target -Recurse)) {
+                    $skipped++
+                }
             }
         }
     }
@@ -974,7 +1011,10 @@ function Uninstall-Application {
     }
 
     Remove-PythonCaches
-    Write-Ok 'Application runtimes, dependencies, and build outputs removed. Dependency lockfiles and user data were preserved.'
+    if ($skipped -gt 0) {
+        Write-Warning "$skipped uninstall target(s) could not be removed."
+    }
+    Write-Ok 'Application runtimes, dependencies, and build outputs removed where permitted. Dependency lockfiles and user data were preserved.'
 }
 
 function Resolve-LauncherPath {
@@ -987,27 +1027,36 @@ function Resolve-LauncherPath {
     return [IO.Path]::GetFullPath((Join-Path $RepoRoot $expandedPath))
 }
 
-function Test-TrackedApplicationFile {
+function Get-TrackedApplicationFilesUnderPath {
     param([Parameter(Mandatory = $true)][string]$Path)
-
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf -ErrorAction SilentlyContinue)) {
-        return $false
-    }
-
-    $repositoryRoot = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
-    $candidate = [IO.Path]::GetFullPath((Get-Item -LiteralPath $Path).FullName)
-    $repositoryPrefix = "$repositoryRoot\"
-    if (-not $candidate.StartsWith($repositoryPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-        return $false
-    }
 
     $gitCommand = Get-Command git.exe -ErrorAction SilentlyContinue
     if ($null -eq $gitCommand) {
-        return $true
+        return [pscustomobject]@{ Available = $false; Files = @() }
     }
+
+    $repositoryRoot = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
+    $candidate = [IO.Path]::GetFullPath($Path)
+    $repositoryPrefix = "$repositoryRoot\"
+    if (-not $candidate.StartsWith($repositoryPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        return [pscustomobject]@{ Available = $true; Files = @() }
+    }
+
     $relativePath = $candidate.Substring($repositoryPrefix.Length).Replace('\', '/')
-    $null = & $gitCommand.Source -C $RepoRoot ls-files --error-unmatch -- $relativePath 2>$null
-    return $LASTEXITCODE -eq 0
+    if ([string]::IsNullOrWhiteSpace($relativePath)) {
+        return [pscustomobject]@{ Available = $false; Files = @() }
+    }
+    $tracked = @(& $gitCommand.Source -C $RepoRoot ls-files -- $relativePath "$relativePath/**" 2>$null)
+    if ($LASTEXITCODE -ne 0) {
+        return [pscustomobject]@{ Available = $false; Files = @() }
+    }
+    $trackedFiles = @($tracked | ForEach-Object {
+        $relativeFile = ([string]$_).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($relativeFile)) {
+            [IO.Path]::GetFullPath((Join-Path $RepoRoot ($relativeFile -replace '/', '\')))
+        }
+    })
+    return [pscustomobject]@{ Available = $true; Files = $trackedFiles }
 }
 
 function Remove-UserDataPath {
@@ -1016,15 +1065,32 @@ function Remove-UserDataPath {
         [Parameter(Mandatory = $true)][string]$Label
     )
 
-    if (-not (Test-Path -LiteralPath $Path -ErrorAction SilentlyContinue)) {
-        return [pscustomobject]@{ Removed = 0; Skipped = 0 }
+    try {
+        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    } catch {
+        if ($_.CategoryInfo.Category -eq [System.Management.Automation.ErrorCategory]::ObjectNotFound) {
+            return [pscustomobject]@{ Removed = 0; Skipped = 0 }
+        }
+        Write-Info "${Label}: path was inaccessible; nothing was removed ($($_.Exception.Message))"
+        return [pscustomobject]@{ Removed = 0; Skipped = 1 }
+    }
+
+    $trackedFiles = @()
+    $repositoryRoot = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
+    if ($item.FullName.Equals($repositoryRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        $item.FullName.StartsWith("$repositoryRoot\", [StringComparison]::OrdinalIgnoreCase)) {
+        $tracking = Get-TrackedApplicationFilesUnderPath -Path $item.FullName
+        if (-not $tracking.Available) {
+            Write-Info "${Label}: tracked-file verification was unavailable; nothing was removed."
+            return [pscustomobject]@{ Removed = 0; Skipped = 1 }
+        }
+        $trackedFiles = @($tracking.Files)
     }
 
     $removed = 0
     $skipped = 0
-    $item = Get-Item -LiteralPath $Path -Force
     if (-not $item.PSIsContainer) {
-        if (Test-TrackedApplicationFile -Path $item.FullName) {
+        if ($trackedFiles -contains $item.FullName) {
             Write-Info "Preserved tracked application file: $($item.FullName)"
             return [pscustomobject]@{ Removed = 0; Skipped = 1 }
         }
@@ -1034,28 +1100,91 @@ function Remove-UserDataPath {
         return [pscustomobject]@{ Removed = 0; Skipped = 1 }
     }
 
-    $children = @(Get-ChildItem -LiteralPath $item.FullName -Force -Recurse -ErrorAction SilentlyContinue |
-        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true })
-    foreach ($child in $children) {
-        if ($child.PSIsContainer) {
-            $remaining = @(Get-ChildItem -LiteralPath $child.FullName -Force -ErrorAction SilentlyContinue)
-            if ($remaining.Count -eq 0 -and (Remove-PathSafely -Path $child.FullName -Recurse)) {
-                $removed++
-            }
-            continue
+    $trackedSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($trackedFile in $trackedFiles) {
+        [void]$trackedSet.Add([IO.Path]::GetFullPath($trackedFile))
+    }
+    $protectedDirectories = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $rootFullPath = $item.FullName.TrimEnd('\')
+    $rootPrefix = "$rootFullPath\"
+    foreach ($trackedFile in $trackedSet) {
+        $ancestor = [IO.Path]::GetDirectoryName($trackedFile)
+        while (-not [string]::IsNullOrWhiteSpace($ancestor) -and
+            -not $ancestor.Equals($rootFullPath, [StringComparison]::OrdinalIgnoreCase) -and
+            $ancestor.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            [void]$protectedDirectories.Add($ancestor)
+            $ancestor = [IO.Path]::GetDirectoryName($ancestor)
         }
+    }
 
-        if (Test-TrackedApplicationFile -Path $child.FullName) {
-            Write-Info "Preserved tracked application file: $($child.FullName)"
-            $skipped++
+    $enumerationErrors = @()
+    $children = @(Get-ChildItem -LiteralPath $item.FullName -Force -Recurse -ErrorAction SilentlyContinue -ErrorVariable enumerationErrors |
+        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
+    $failureMessages = [Collections.Generic.List[string]]::new()
+    $skipped = $enumerationErrors.Count
+    foreach ($enumerationError in $enumerationErrors) {
+        [void]$failureMessages.Add("Skipped inaccessible path below ${Label}: $($enumerationError.Exception.Message)")
+    }
+
+    $removalGroups = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($child in $children) {
+        $isTrackedFile = -not $child.PSIsContainer -and $trackedSet.Contains($child.FullName)
+        $isProtectedDirectory = $child.PSIsContainer -and $protectedDirectories.Contains($child.FullName)
+        if ($isTrackedFile -or $isProtectedDirectory) {
             continue
         }
-        if (Remove-PathSafely -Path $child.FullName) {
-            $removed++
+        $candidatePath = $child.FullName
+        while ($true) {
+            $parent = [IO.Path]::GetDirectoryName($candidatePath)
+            if ($parent.Equals($rootFullPath, [StringComparison]::OrdinalIgnoreCase) -or
+                $protectedDirectories.Contains($parent)) {
+                break
+            }
+            $candidatePath = $parent
         }
-        else {
+        if (-not $removalGroups.ContainsKey($candidatePath)) {
+            $removalGroups[$candidatePath] = [Collections.Generic.List[object]]::new()
+        }
+        [void]$removalGroups[$candidatePath].Add($child)
+    }
+
+    foreach ($candidatePath in @($removalGroups.Keys |
+            Sort-Object @{ Expression = { $_.ToUpperInvariant() }; Descending = $false })) {
+        $candidateEntries = @($removalGroups[$candidatePath])
+        try {
+            $removeParameters = @{
+                LiteralPath = $candidatePath
+                Force = $true
+                Confirm = $false
+                ErrorAction = 'Stop'
+            }
+            if ($candidateEntries | Where-Object { $_.FullName.Equals($candidatePath, [StringComparison]::OrdinalIgnoreCase) -and $_.PSIsContainer }) {
+                $removeParameters.Recurse = $true
+            }
+            Remove-Item @removeParameters
+            $removed += $candidateEntries.Count
+        } catch {
+            foreach ($entry in @($candidateEntries |
+                    Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })) {
+                try {
+                    Remove-Item -LiteralPath $entry.FullName -Force -Confirm:$false -ErrorAction Stop
+                    $removed++
+                } catch {
+                    $skipped++
+                    [void]$failureMessages.Add("Skipped locked or inaccessible user-data path: $($entry.FullName) ($($_.Exception.Message))")
+                }
+            }
+        }
+    }
+
+    foreach ($trackedFile in $trackedSet) {
+        if (Test-Path -LiteralPath $trackedFile -PathType Leaf -ErrorAction SilentlyContinue) {
             $skipped++
+            [void]$failureMessages.Add("Preserved tracked application file: $trackedFile")
         }
+    }
+    foreach ($failureMessage in @($failureMessages | Sort-Object -Unique)) {
+        Write-Info $failureMessage
     }
 
     if ($removed -gt 0 -or $skipped -gt 0) {

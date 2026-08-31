@@ -4,6 +4,7 @@ import re
 from datetime import date, datetime
 from typing import Literal
 
+from common.utils.clinical_safety import contains_explicitly_negative_rechallenge
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliTimeline, DiliTimelineEvent
 from domain.clinical.entities import ClinicalLabEntry, DrugEntry, PatientLabTimeline
 
@@ -38,12 +39,18 @@ DechallengeStatus = Literal[
 ###############################################################################
 class DiliTimelineEngine:
     # -------------------------------------------------------------------------
-    def build(self, drugs: list[DrugEntry], labs: PatientLabTimeline) -> DiliTimeline:
+    def build(
+        self,
+        drugs: list[DrugEntry],
+        labs: PatientLabTimeline,
+        source_text: str | None = None,
+    ) -> DiliTimeline:
         events: list[DiliTimelineEvent] = []
         missing: list[str] = []
 
         for drug in drugs:
             events.extend(self._drug_events(drug, missing))
+        events.extend(self._source_events(source_text))
 
         dated_labs = self._dated_labs(labs)
         events.extend(self._lab_events(dated_labs))
@@ -55,10 +62,11 @@ class DiliTimelineEngine:
             drugs,
             dated_labs,
         )
+        jaundice_date = bilirubin_event or peak_dates.get("BILIRUBIN")
 
         if first_symptom is None:
             missing.append("first_symptom_date")
-        if bilirubin_event is None:
+        if jaundice_date is None:
             missing.append("jaundice_or_bilirubin_timing")
         if first_abnormal is None:
             missing.append("first_abnormal_liver_test_date")
@@ -68,8 +76,7 @@ class DiliTimelineEngine:
             events=events,
             first_abnormal_liver_test_date=first_abnormal,
             first_symptom_date=first_symptom,
-            jaundice_or_bilirubin_rise_date=bilirubin_event
-            or peak_dates.get("BILIRUBIN"),
+            jaundice_or_bilirubin_rise_date=jaundice_date,
             peak_dates=peak_dates,
             dechallenge_status=dechallenge_status,
             recovery_date=recovery_date,
@@ -152,7 +159,11 @@ class DiliTimelineEngine:
                     ),
                 )
             )
-        if evidence and RECHALLENGE_RE.search(evidence):
+        if (
+            evidence
+            and RECHALLENGE_RE.search(evidence)
+            and not contains_explicitly_negative_rechallenge(evidence)
+        ):
             events.append(
                 DiliTimelineEvent(
                     event_type="drug_rechallenge",
@@ -166,34 +177,78 @@ class DiliTimelineEngine:
                     ),
                 )
             )
-        if evidence and SYMPTOM_RE.search(evidence):
+        symptom_match = SYMPTOM_RE.search(evidence)
+        if symptom_match:
+            symptom_date = self._date_near_position(evidence, symptom_match.start())
             events.append(
                 DiliTimelineEvent(
                     event_type="symptom_onset",
-                    event_date=derived_date,
+                    event_date=symptom_date,
                     drug_name=drug.name,
                     evidence=self._quote(
                         claim="symptom onset",
                         quote=evidence,
                         source_section=drug.source,
-                        event_date=derived_date,
+                        event_date=symptom_date,
                     ),
                 )
             )
-        if evidence and JAUNDICE_RE.search(evidence):
+        jaundice_match = JAUNDICE_RE.search(evidence)
+        if jaundice_match:
+            jaundice_date = self._date_near_position(evidence, jaundice_match.start())
             events.append(
                 DiliTimelineEvent(
                     event_type="jaundice_or_bilirubin_rise",
-                    event_date=derived_date,
+                    event_date=jaundice_date,
                     drug_name=drug.name,
                     evidence=self._quote(
                         claim="jaundice or bilirubin rise",
                         quote=evidence,
                         source_section=drug.source,
-                        event_date=derived_date,
+                        event_date=jaundice_date,
                     ),
                 )
             )
+        return events
+
+    # -------------------------------------------------------------------------
+    def _source_events(self, source_text: str | None) -> list[DiliTimelineEvent]:
+        events: list[DiliTimelineEvent] = []
+        fragments = re.split(r"(?<=[.!?;])\s+|\r?\n+", str(source_text or ""))
+        for fragment in fragments:
+            fragment = fragment.strip()
+            if not fragment:
+                continue
+            symptom_match = SYMPTOM_RE.search(fragment)
+            if symptom_match:
+                event_date = self._date_near_position(fragment, symptom_match.start())
+                events.append(
+                    DiliTimelineEvent(
+                        event_type="symptom_onset",
+                        event_date=event_date,
+                        evidence=self._quote(
+                            claim="symptom onset",
+                            quote=fragment,
+                            source_section="anamnesis",
+                            event_date=event_date,
+                        ),
+                    )
+                )
+            jaundice_match = JAUNDICE_RE.search(fragment)
+            if jaundice_match:
+                event_date = self._date_near_position(fragment, jaundice_match.start())
+                events.append(
+                    DiliTimelineEvent(
+                        event_type="jaundice_or_bilirubin_rise",
+                        event_date=event_date,
+                        evidence=self._quote(
+                            claim="jaundice or bilirubin rise",
+                            quote=fragment,
+                            source_section="anamnesis",
+                            event_date=event_date,
+                        ),
+                    )
+                )
         return events
 
     # -------------------------------------------------------------------------
@@ -353,6 +408,15 @@ class DiliTimelineEngine:
     def _extract_date_from_text(text: str) -> str | None:
         match = DATE_RE.search(text or "")
         return match.group(1).replace("/", "-").replace(".", "-") if match else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _date_near_position(text: str, position: int) -> str | None:
+        matches = list(DATE_RE.finditer(text))
+        if not matches:
+            return None
+        match = min(matches, key=lambda item: abs(item.start() - position))
+        return match.group(1).replace("/", "-").replace(".", "-")
 
     # -------------------------------------------------------------------------
     @staticmethod

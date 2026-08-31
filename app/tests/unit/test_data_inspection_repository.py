@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from inspect import signature
 from typing import Any
 
@@ -263,6 +263,52 @@ def test_session_report_and_text_use_result_payload_only() -> None:
     assert missing_text_detail["report"] is None
     assert missing_text_detail["session_text"] == ""
     assert missing_text_detail["sections"]["anamnesis"] == "Section anamnesis"
+
+
+###############################################################################
+def test_inspection_detail_exposes_persisted_manual_edit_history() -> None:
+    repository_graph, _ = build_repository_graph_for_test()
+    session_id = repository_graph.clinical_session_repository.save_clinical_session(
+        {
+            "patient_name": "Audit Patient",
+            "session_timestamp": datetime(2025, 1, 4, 8, 30, tzinfo=timezone.utc),
+            "session_status": "successful",
+            "anamnesis": "Original anamnesis",
+            "drugs": "acetaminophen",
+            "final_report": "Original report",
+            "session_result_payload": {"report": "Original report"},
+        }
+    )
+    assert session_id is not None
+    session_id = int(session_id)
+    updated = repository_graph.session_revision_repository.update_current_report_text_with_manual_audit(
+        session_id,
+        report_text="Corrected report",
+        edited_fields=["report_text"],
+        reviewer_note="Corrected chronology.",
+        edited_by="Reviewer",
+        metadata={"source": "unit-test"},
+    )
+    assert updated is not None
+
+    service = build_service(repository_graph, jobs=JobManager())
+    detail = service.get_session_detail(session_id)
+    assert detail is not None
+    assert len(detail["manual_edit_history"]) == 1
+    audit = detail["manual_edit_history"][0]
+    assert audit["edited_by"] == "Reviewer"
+    assert audit["reviewer_note"] == "Corrected chronology."
+    assert audit["current_version_id"] == updated["audit"]["current_version_id"]
+
+    version_detail = service.get_session_version_detail(
+        session_id,
+        version_id=int(audit["current_version_id"]),
+    )
+    assert version_detail is not None
+    assert (
+        version_detail["session"]["manual_edit_history"]
+        == detail["manual_edit_history"]
+    )
 
 
 ###############################################################################
