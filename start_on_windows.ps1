@@ -67,6 +67,8 @@ $script:DesktopTauriCli = Join-Path $DesktopDir 'node_modules/.bin/tauri.cmd'
 $script:DesktopFrontendOutputDir = $null
 $script:PyInstallerVersion = '6.21.0'
 $script:DesktopTargetTriple = 'x86_64-pc-windows-msvc'
+$script:NextProgressId = 1
+$script:ActiveProgressIds = [Collections.Generic.HashSet[int]]::new()
 
 # ============================================================
 # Shared output and process helpers
@@ -87,6 +89,63 @@ function Write-Fatal([string]$Message) {
     Write-Host "[FATAL] $Message" -ForegroundColor Red
 }
 
+function Start-LauncherProgress {
+    param([Parameter(Mandatory = $true)][string]$Activity, [string]$Status = 'Starting')
+    $id = $script:NextProgressId++
+    [void]$script:ActiveProgressIds.Add($id)
+    Write-Progress -Id $id -Activity $Activity -Status $Status
+    return $id
+}
+
+function Update-LauncherProgress {
+    param(
+        [Parameter(Mandatory = $true)][int]$Id,
+        [Parameter(Mandatory = $true)][string]$Activity,
+        [Parameter(Mandatory = $true)][string]$Status,
+        [Nullable[int]]$PercentComplete
+    )
+    if (-not $script:ActiveProgressIds.Contains($Id)) { return }
+    $progress = @{ Id = $Id; Activity = $Activity; Status = $Status }
+    if ($null -ne $PercentComplete) { $progress.PercentComplete = $PercentComplete }
+    Write-Progress @progress
+}
+
+function Complete-LauncherProgress([int]$Id) {
+    if ($script:ActiveProgressIds.Contains($Id)) {
+        Write-Progress -Id $Id -Activity 'DILIGENT launcher' -Completed
+        [void]$script:ActiveProgressIds.Remove($Id)
+    }
+}
+
+function Clear-LauncherProgress {
+    foreach ($id in @($script:ActiveProgressIds)) {
+        Write-Progress -Id $id -Activity 'DILIGENT launcher' -Completed
+        [void]$script:ActiveProgressIds.Remove($id)
+    }
+}
+
+function Invoke-TrackedLauncherAction {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][scriptblock]$Operation
+    )
+    $activity = "DILIGENT: $Name"
+    $progressId = Start-LauncherProgress -Activity $activity -Status 'Starting'
+    Write-Step "Starting $Name"
+    try {
+        Update-LauncherProgress -Id $progressId -Activity $activity -Status 'Running'
+        & $Operation
+        Write-Ok "$Name completed"
+    }
+    catch {
+        Write-Fatal "$Name failed: $($_.Exception.Message)"
+        throw
+    }
+    finally {
+        Complete-LauncherProgress $progressId
+    }
+}
+
 function Invoke-Checked {
     param(
         [Parameter(Mandatory = $true)]
@@ -95,16 +154,27 @@ function Invoke-Checked {
         [string]$WorkingDirectory = $RepoRoot
     )
 
-    Push-Location $WorkingDirectory
+    $display = "$FilePath " + ($ArgumentList -join ' ')
+    $activity = "DILIGENT: $display"
+    $progressId = Start-LauncherProgress -Activity $activity -Status 'Running external command'
+    Write-Step "Running $display"
     try {
-        & $FilePath @ArgumentList
-        if ($LASTEXITCODE -ne 0) {
-            throw "Command failed with exit code $LASTEXITCODE`: $FilePath $($ArgumentList -join ' ')"
+        Push-Location $WorkingDirectory
+        try {
+            & $FilePath @ArgumentList
+        }
+        finally {
+            Pop-Location
         }
     }
     finally {
-        Pop-Location
+        Complete-LauncherProgress $progressId
     }
+    $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+    if ($exitCode -ne 0) {
+        throw "Command failed with exit code $exitCode`: $display"
+    }
+    Write-Ok "Completed $display"
 }
 
 function Invoke-DownloadAndExtract {
@@ -115,22 +185,28 @@ function Invoke-DownloadAndExtract {
         [string]$ExpectedSha256
     )
     $prevProgress = $ProgressPreference
-    $ProgressPreference = 'SilentlyContinue'
+    $activity = "DILIGENT: download and extract $([IO.Path]::GetFileName($ArchivePath))"
+    $progressId = Start-LauncherProgress -Activity $activity -Status "Downloading $Uri"
     try {
+        $ProgressPreference = 'SilentlyContinue'
         New-Item -ItemType Directory -Path (Split-Path -Parent $ArchivePath) -Force | Out-Null
         New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
         Invoke-WebRequest -Uri $Uri -OutFile $ArchivePath
+        $ProgressPreference = $prevProgress
         if ($ExpectedSha256) {
+            Update-LauncherProgress -Id $progressId -Activity $activity -Status 'Verifying archive checksum'
             $actualSha256 = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
             if ($actualSha256 -ne $ExpectedSha256.ToLowerInvariant()) {
                 throw "Downloaded archive checksum mismatch for $Uri"
             }
         }
+        Update-LauncherProgress -Id $progressId -Activity $activity -Status 'Extracting archive'
         Expand-Archive -LiteralPath $ArchivePath -DestinationPath $DestinationPath -Force
         Remove-Item -LiteralPath $ArchivePath -Force
     }
     finally {
         $ProgressPreference = $prevProgress
+        Complete-LauncherProgress $progressId
     }
 }
 
@@ -167,8 +243,11 @@ function Invoke-HealthCheck {
     )
     $prevEA = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
+    $activity = "DILIGENT: wait for health $Url"
+    $progressId = Start-LauncherProgress -Activity $activity -Status "Waiting up to $Attempts attempts"
     try {
         for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+            Update-LauncherProgress -Id $progressId -Activity $activity -Status "Attempt $attempt of $Attempts"
             try {
                 $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 2
                 if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) {
@@ -185,6 +264,7 @@ function Invoke-HealthCheck {
     }
     finally {
         $ErrorActionPreference = $prevEA
+        Complete-LauncherProgress $progressId
     }
 }
 
@@ -682,11 +762,19 @@ function Check-ForUpdates {
 
 function Update-Application {
     $currentBranch = Get-GitRevision -ArgumentList @('branch', '--show-current')
-    if (-not $currentBranch) {
-        $currentBranch = 'detached HEAD'
+    if (-not $currentBranch) { throw 'Update requires a non-detached Git checkout.' }
+    if ($currentBranch -ne 'main') {
+        throw "Update requires the main branch to be checked out; current branch is '$currentBranch'. No files were changed."
     }
-    Write-Step "Pulling origin/main into the current checkout ($currentBranch)"
-    Invoke-Checked -FilePath 'git.exe' -WorkingDirectory $RepoRoot -ArgumentList @('pull', 'origin', 'main')
+    $statusOutput = @(& git.exe -C $RepoRoot status --porcelain 2>$null)
+    $statusExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+    if ($statusExitCode -ne 0) { throw 'Unable to inspect the Git working tree before updating.' }
+    $changes = @($statusOutput | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+    if ($changes.Count -gt 0) {
+        throw 'Update requires a clean Git working tree. Commit or safely preserve local changes before retrying.'
+    }
+    Write-Step 'Pulling origin/main (fast-forward only)'
+    Invoke-Checked -FilePath 'git.exe' -WorkingDirectory $RepoRoot -ArgumentList @('pull', '--ff-only', 'origin', 'main')
     Write-Ok 'Application update from origin/main completed'
 }
 
@@ -754,8 +842,23 @@ function Remove-ApplicationLogs {
         Write-Info "Log directory does not exist: $logDir"
         return
     }
-    Get-ChildItem -LiteralPath $logDir -Filter '*.log' -File | Remove-Item -Force
-    Write-Ok 'Application logs removed'
+    $logs = @(Get-ChildItem -LiteralPath $logDir -Filter '*.log' -File -ErrorAction SilentlyContinue)
+    if ($logs.Count -eq 0) {
+        Write-Info 'No application log files found'
+        return
+    }
+    $progressId = Start-LauncherProgress -Activity 'DILIGENT: remove application logs' -Status "0 of $($logs.Count) files"
+    try {
+        for ($index = 0; $index -lt $logs.Count; $index++) {
+            $log = $logs[$index]
+            Update-LauncherProgress -Id $progressId -Activity 'DILIGENT: remove application logs' -Status "$($index + 1) of $($logs.Count): $($log.Name)" -PercentComplete ([int](($index + 1) * 100 / $logs.Count))
+            Remove-Item -LiteralPath $log.FullName -Force
+        }
+    }
+    finally {
+        Complete-LauncherProgress $progressId
+    }
+    Write-Ok "Removed $($logs.Count) application log file(s)"
 }
 
 function Remove-PathSafely {
@@ -787,13 +890,21 @@ function Remove-CacheContents {
     $skipped = 0
     $items = @(Get-ChildItem -LiteralPath $RootPath -Force -Recurse -ErrorAction SilentlyContinue |
         Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true })
-    foreach ($item in $items) {
-        if ($item.Name -eq '.gitkeep') {
-            continue
+    $progressId = Start-LauncherProgress -Activity "DILIGENT: clear $RootPath" -Status "0 of $($items.Count) items"
+    try {
+        for ($index = 0; $index -lt $items.Count; $index++) {
+            $item = $items[$index]
+            if ($item.Name -eq '.gitkeep') {
+                continue
+            }
+            Update-LauncherProgress -Id $progressId -Activity "DILIGENT: clear $RootPath" -Status "$($index + 1) of $($items.Count): $($item.Name)" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $items.Count)))
+            if (-not (Remove-PathSafely -Path $item.FullName -Recurse:$item.PSIsContainer)) {
+                $skipped++
+            }
         }
-        if (-not (Remove-PathSafely -Path $item.FullName -Recurse:$item.PSIsContainer)) {
-            $skipped++
-        }
+    }
+    finally {
+        Complete-LauncherProgress $progressId
     }
     return $skipped
 }
@@ -848,10 +959,18 @@ function Uninstall-Application {
         (Join-Path $ClientDir '.angular'),
         (Join-Path $ClientDir 'dist')
     )
-    foreach ($target in $targets) {
-        if (Test-Path -LiteralPath $target) {
-            Remove-Item -LiteralPath $target -Recurse -Force
+    $progressId = Start-LauncherProgress -Activity 'DILIGENT: uninstall application' -Status "0 of $($targets.Count) paths"
+    try {
+        for ($index = 0; $index -lt $targets.Count; $index++) {
+            $target = $targets[$index]
+            if (Test-Path -LiteralPath $target) {
+                Update-LauncherProgress -Id $progressId -Activity 'DILIGENT: uninstall application' -Status "$($index + 1) of $($targets.Count): $target" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $targets.Count)))
+                Remove-Item -LiteralPath $target -Recurse -Force
+            }
         }
+    }
+    finally {
+        Complete-LauncherProgress $progressId
     }
 
     Remove-PythonCaches
@@ -1677,18 +1796,20 @@ function Invoke-RemoveDesktopReleaseMenu {
 }
 
 if ($Action) {
-    switch ($Action) {
-        'Launch' { Start-Application }
-        'Install' { Install-OrUpdateApplication }
-        'RebuildFrontend' { Rebuild-Frontend }
-        'InitializeDatabase' { Initialize-Database }
-        'Test' { Invoke-TestSuite }
-        'Uninstall' { Uninstall-Application }
-        'Update' { Update-Application }
-        'CheckForUpdates' { Check-ForUpdates }
-        'RemoveAllData' { Remove-AllData }
-        'BuildDesktopRelease' { Build-DesktopRelease }
-        'RemoveDesktopRelease' { Remove-DesktopRelease }
+    Invoke-TrackedLauncherAction -Name "action $Action" -Operation {
+        switch ($Action) {
+            'Launch' { Start-Application }
+            'Install' { Install-OrUpdateApplication }
+            'RebuildFrontend' { Rebuild-Frontend }
+            'InitializeDatabase' { Initialize-Database }
+            'Test' { Invoke-TestSuite }
+            'Uninstall' { Uninstall-Application }
+            'Update' { Update-Application }
+            'CheckForUpdates' { Check-ForUpdates }
+            'RemoveAllData' { Remove-AllData }
+            'BuildDesktopRelease' { Build-DesktopRelease }
+            'RemoveDesktopRelease' { Remove-DesktopRelease }
+        }
     }
     exit 0
 }
@@ -1705,34 +1826,38 @@ while ($true) {
     $selection = $rawSelection.Trim()
 
     try {
-        switch -Regex ($selection) {
-            '^1$' {
-                Start-Application
-                exit 0
-            }
-            '^2$' { Check-ForUpdates }
-            '^3$' { Update-Application }
-            '^4$' { Install-OrUpdateApplication }
-            '^5$' { Rebuild-Frontend }
-            '^6$' { Initialize-Database }
-            '^7$' { Invoke-TestSuite }
-            '^8$' { Remove-ApplicationLogs }
-            '^9$' { Clear-ApplicationCache }
-            '^10$' { Remove-AllData }
-            '^11$' { Uninstall-Application }
-            '^12$' { Invoke-CreateDesktopReleaseMenu }
-            '^13$' { Invoke-RemoveDesktopReleaseMenu }
-            '^14$' { exit 0 }
-            default {
-                Write-Host '[ERROR] Select a number from 1 through 14.' -ForegroundColor Red
-                Wait-ForMenu
-                continue
+    Invoke-TrackedLauncherAction -Name "menu option $selection" -Operation {
+            switch -Regex ($selection) {
+                '^1$' {
+                    Start-Application
+                    exit 0
+                }
+                '^2$' { Check-ForUpdates }
+                '^3$' { Update-Application }
+                '^4$' { Install-OrUpdateApplication }
+                '^5$' { Rebuild-Frontend }
+                '^6$' { Initialize-Database }
+                '^7$' { Invoke-TestSuite }
+                '^8$' { Remove-ApplicationLogs }
+                '^9$' { Clear-ApplicationCache }
+                '^10$' { Remove-AllData }
+                '^11$' { Uninstall-Application }
+                '^12$' { Invoke-CreateDesktopReleaseMenu }
+                '^13$' { Invoke-RemoveDesktopReleaseMenu }
+                '^14$' { exit 0 }
+                default {
+                    Write-Host '[ERROR] Select a number from 1 through 14.' -ForegroundColor Red
+                    Wait-ForMenu
+                    continue
+                }
             }
         }
     }
     catch {
         Write-Fatal $_.Exception.Message
+        Clear-LauncherProgress
     }
 
     Wait-ForMenu
 }
+Clear-LauncherProgress
