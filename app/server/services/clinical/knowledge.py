@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from common.prompts.clinical_context import build_livertox_knowledge_fragment
 from repositories import values as repository_values
-
 from repositories.knowledge_repository import KnowledgeRepository
 
 
@@ -53,6 +53,6 @@ class ClinicalKnowledgeComposer:
         *,
         livertox_excerpt: str,
     ) -> str:
-        return "LiverTox excerpt:\n" + (
-            livertox_excerpt.strip() or "No local LiverTox excerpt available."
+        return build_livertox_knowledge_fragment(
+            livertox_excerpt=livertox_excerpt.strip(),
         )
