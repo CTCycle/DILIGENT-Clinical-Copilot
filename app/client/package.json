@@ -12,6 +12,8 @@
     "test": "ng test"
   },
   "dependencies": {
+    "@tauri-apps/api": "2.8.0",
+    "@tauri-apps/plugin-dialog": "2.4.0",
     "@angular/common": "21.2.14",
     "@angular/compiler": "21.2.14",
     "@angular/core": "21.2.14",

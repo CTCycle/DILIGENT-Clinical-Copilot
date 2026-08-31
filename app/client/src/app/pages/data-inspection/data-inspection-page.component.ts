@@ -32,6 +32,7 @@ import {
   startInspectionRxNavUpdateJob,
 } from '../../core/services/inspection-jobs-api';
 import { JobPollingService } from '../../core/services/job-polling.service';
+import { DesktopDialogService } from '../../core/services/desktop-dialog.service';
 import {
   InspectionDrugAliasesResponse,
   InspectionLiverToxExcerptResponse,
@@ -113,7 +114,9 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   @ViewChild('ragFolderInput') private ragFolderInput?: ElementRef<HTMLInputElement>;
 
   private readonly jobPolling = inject(JobPollingService);
+  private readonly desktopDialog = inject(DesktopDialogService);
   private readonly inspectionUpdateTracker = inject(InspectionUpdateJobTrackerService);
+  readonly isTauriSurface = this.desktopDialog.isTauriSurface();
   readonly inspectionViews = INSPECTION_VIEWS;
   readonly activeView = signal<InspectionViewId>('rxnav');
 
@@ -464,7 +467,20 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     this.ragCatalog.handleScrollEvent(event);
   }
 
-  openRagFolderPicker(): void {
+  async openRagFolderPicker(): Promise<void> {
+    if (this.isTauriSurface) {
+      try {
+        const selectedPath = await this.desktopDialog.openDirectory('Select RAG documents folder');
+        if (selectedPath) {
+          this.ragSelectedFolderPath.set(selectedPath);
+          this.ragError.set(null);
+        }
+      } catch {
+        this.ragError.set('Unable to open the native RAG folder picker.');
+      }
+      return;
+    }
+
     const input = this.ragFolderInput?.nativeElement;
     if (!input) {
       this.ragError.set('Folder picker is unavailable in this browser runtime.');

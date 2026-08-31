@@ -58,6 +58,21 @@ Mutable user data is kept outside the extracted runtime:
 
 Artifact cleanup and MSI uninstall do not remove this user data. The extracted runtime is versioned and hash-addressed, so a new payload can coexist during an upgrade.
 
+## Native Windows dialogs
+
+The Tauri desktop surface uses the native operating-system directory picker for
+path-only RAG document folder selection. The dialog integration is centralized
+in the Angular desktop-dialog service and is limited to the `dialog:allow-open`
+capability for the authenticated localhost backend origin; it does not grant
+filesystem or shell access.
+
+Normal HTML file inputs remain in use for clinical-session image/document
+metadata and patient profile images because those workflows require browser
+`File` objects rather than filesystem paths. They open the native WebView2 file
+picker on Windows. Non-Tauri web development retains the browser directory
+fallback for RAG folder selection. No embedded filesystem browser or manual
+path-entry flow is part of the desktop surface.
+
 ## Build
 
 Run on a Windows x64 host with Rust 1.95.0/Cargo, the Windows build toolchain, the pinned portable runtimes, and network access for dependencies and the default WebView2 bootstrapper. The launcher pins Python 3.14.2, Node.js 22.13.0, uv 0.11.30, and PyInstaller 6.21.0; downloaded Python, Node, and uv archives are SHA-256 checked before extraction:
