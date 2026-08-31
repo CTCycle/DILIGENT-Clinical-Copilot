@@ -5,6 +5,7 @@ import re
 from datetime import date
 from typing import Any
 
+from common.utils.clinical_safety import RECHALLENGE_RECOMMENDATION_CODE
 from common.utils.languages import resolve_supported_language_code
 from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
@@ -434,6 +435,11 @@ def audit_report(
         non_blocking_issues=non_blocking_issues,
         manual_review_required=manual_review_required,
     )
+    rechallenge_issue = any(
+        issue.get("code") == RECHALLENGE_RECOMMENDATION_CODE
+        for issue in blocking_issues
+        if isinstance(issue, dict)
+    )
     return FaithfulnessAudit(
         outcome=outcome,
         manual_review_required=manual_review_required,
@@ -443,6 +449,10 @@ def audit_report(
             {
                 "gate": "hard_safety_gates",
                 "passed": not blocking_issues,
+            },
+            {
+                "gate": "no_rechallenge_recommendation",
+                "passed": not rechallenge_issue,
             },
             {
                 "gate": "manual_review",

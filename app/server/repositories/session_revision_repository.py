@@ -970,7 +970,7 @@ class SessionRevisionRepository:
         self,
         *,
         pipeline_run_id: str,
-        persisted_session_id: int,
+        persisted_session_id: int | None,
         model_configuration: dict[str, Any] | None = None,
         version_status: str = "requires_human_review",
         llm_qa_status: str = "not_run",
@@ -984,7 +984,9 @@ class SessionRevisionRepository:
             ).scalar_one_or_none()
             if row is None:
                 return None
-            row.session_id = int(persisted_session_id)
+            row.session_id = (
+                int(persisted_session_id) if persisted_session_id is not None else None
+            )
             row.version_status = version_status
             row.llm_qa_status = llm_qa_status
             row.clinical_review_status = clinical_review_status

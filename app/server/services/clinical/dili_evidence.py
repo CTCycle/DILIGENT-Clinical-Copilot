@@ -15,6 +15,11 @@ from domain.clinical.entities import (
     PatientLabTimeline,
     PatientRucamAssessmentBundle,
 )
+from common.utils.clinical_safety import (
+    RECHALLENGE_RECOMMENDATION_CODE,
+    RECHALLENGE_RECOMMENDATION_MESSAGE,
+    contains_rechallenge_recommendation,
+)
 from services.clinical.dili_causality import DiliCausalityEngine
 from services.clinical.dili_differential import DiliDifferentialEngine
 from services.clinical.dili_hys_law import HysLawDetector
@@ -36,6 +41,11 @@ class DiliEvidenceBuilder:
         "all competing causes were excluded",
         "alternative causes have been excluded",
         "alternative causes were excluded",
+        "no identified competing cause",
+        "no competing cause identified",
+        "no competing cause was identified",
+        "no alternative cause identified",
+        "no alternative cause was identified",
         "viral hepatitis ruled out",
         "viral hepatitis was ruled out",
     )
@@ -70,6 +80,13 @@ class DiliEvidenceBuilder:
             return []
 
         issues: list[dict[str, str]] = []
+        if contains_rechallenge_recommendation(text):
+            issues.append(
+                {
+                    "code": RECHALLENGE_RECOMMENDATION_CODE,
+                    "message": RECHALLENGE_RECOMMENDATION_MESSAGE,
+                }
+            )
         if not bundle.differential.all_major_causes_excluded and cls._contains_any(
             text, cls._COMPETING_CAUSES_EXCLUDED_PHRASES
         ):
@@ -165,7 +182,11 @@ class DiliEvidenceBuilder:
             for item in (payload.anamnesis, payload.drugs, payload.laboratory_analysis)
             if item
         )
-        timeline = DiliTimelineEngine().build(drugs.entries, labs)
+        timeline = DiliTimelineEngine().build(
+            drugs.entries,
+            labs,
+            source_text=payload.anamnesis,
+        )
         patterns = DiliPatternEngine().assess(labs)
         primary_pattern = patterns[0].pattern if patterns else "indeterminate"
         differential = DiliDifferentialEngine().assess(source_text)

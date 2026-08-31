@@ -7,6 +7,10 @@ from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any, Callable
 
+from common.utils.clinical_safety import (
+    RECHALLENGE_RECOMMENDATION_MESSAGE,
+    contains_rechallenge_recommendation,
+)
 from domain.inspection import (
     RevisionAgentPlan,
     RevisionAgentQaResult,
@@ -421,8 +425,18 @@ class RevisionAgentRunner:
         )
         applied_report = validate_draft_report(source_report, draft.patches)
         if applied_report != draft.revised_report_text:
-            raise ValueError(
-                "Revision draft text must equal deterministic patch output."
+            draft = draft.model_copy(
+                update={
+                    "revised_report_text": applied_report,
+                    "unresolved_issues": [
+                        *draft.unresolved_issues,
+                        "Model-provided revised report text differed from the deterministic patch output; the deterministic result is authoritative.",
+                    ],
+                    "human_review_requirements": [
+                        *draft.human_review_requirements,
+                        "Verify the deterministic patch result during clinical review.",
+                    ],
+                }
             )
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
@@ -436,6 +450,16 @@ class RevisionAgentRunner:
             RevisionAgentQaResult,
             purpose=GenerationPurpose.REVISION_QA,
         )
+        if contains_rechallenge_recommendation(applied_report):
+            qa = qa.model_copy(
+                update={
+                    "blocking_issues": [
+                        *qa.blocking_issues,
+                        RECHALLENGE_RECOMMENDATION_MESSAGE,
+                    ],
+                    "manual_review_required": True,
+                }
+            )
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
@@ -445,7 +469,7 @@ class RevisionAgentRunner:
         )
         revised_session_id: int | None = None
         version_status = "qa_failed" if qa.blocking_issues else "llm_qa_passed"
-        if not request.dry_run:
+        if not request.dry_run and not qa.blocking_issues:
             root_session_id = int(model_configuration["root_session_id"])
             revised_session_id = self.clinical_session_repository.save_clinical_session(
                 {
@@ -480,6 +504,7 @@ class RevisionAgentRunner:
             )
             if revised_session_id is None:
                 raise RuntimeError("Revision draft could not be persisted.")
+        if not request.dry_run:
             self.session_revision_repository.finalize_revision_version(
                 pipeline_run_id=pipeline_run_id,
                 persisted_session_id=revised_session_id,

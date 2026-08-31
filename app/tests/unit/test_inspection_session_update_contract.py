@@ -16,6 +16,11 @@ class FakeSerializer:
         return {"session_id": session_id, "path": "clinical"}
 
     # -------------------------------------------------------------------------
+    def list_manual_report_edits(self, session_id: int) -> list[dict[str, object]]:
+        _ = session_id
+        return []
+
+    # -------------------------------------------------------------------------
     def update_current_report_text_with_manual_audit(
         self,
         session_id: int,
@@ -135,7 +140,11 @@ def test_update_session_without_report_text_updates_metadata_only() -> None:
         metadata={"source": "manual"},
     )
 
-    assert payload == {"session_id": 7, "path": "clinical"}
+    assert payload == {
+        "session_id": 7,
+        "path": "clinical",
+        "manual_edit_history": [],
+    }
     assert serializer.report_calls == []
     assert serializer.metadata_calls == [
         {"session_id": 7, "metadata": {"source": "manual"}}
@@ -153,7 +162,11 @@ def test_update_session_with_report_text_updates_report_only() -> None:
         metadata={"source": "manual"},
     )
 
-    assert payload == {"session_id": 9, "path": "clinical"}
+    assert payload == {
+        "session_id": 9,
+        "path": "clinical",
+        "manual_edit_history": [],
+    }
     assert serializer.report_calls == [
         {
             "session_id": 9,
