@@ -269,23 +269,23 @@ def test_timeline_preserves_explicit_symptom_and_jaundice_dates() -> None:
 
 
 ###############################################################################
-def test_causality_does_not_upgrade_stable_current_drug_from_global_dechallenge() -> (
+def test_causality_does_not_upgrade_continuing_exposure_from_global_dechallenge() -> (
     None
 ):
     bundle = DiliEvidenceBuilder().build(
         payload=PatientData(
             anamnesis="Mandatory alternative-cause workup is pending.",
-            drugs="Rosuvastatin stable for approximately two years and continued without dose change.",
+            drugs="Drug A stable for approximately two years and continued without dose change.",
             laboratory_analysis="ALT 240 U/L and ALP 100 U/L.",
         ),
         drugs=PatientDrugs(
             entries=[
                 DrugEntry(
-                    name="Rosuvastatin",
+                    name="Drug A",
                     source="therapy",
                     current_status="current",
                     evidence=(
-                        "Rosuvastatin stable for approximately two years and continued "
+                        "Drug A stable for approximately two years and continued "
                         "without dose change."
                     ),
                 )
@@ -310,16 +310,16 @@ def test_causality_does_not_upgrade_stable_current_drug_from_global_dechallenge(
             ]
         ),
         resolved_drugs={
-            "rosuvastatin": {
+            "drug a": {
                 "decision_status": "accepted_exact_livertox",
-                "accepted_livertox_name": "Rosuvastatin",
+                "accepted_livertox_name": "Drug A",
                 "matched_livertox_row": {"likelihood_score": "A"},
             }
         },
         rucam_bundle=PatientRucamAssessmentBundle(
             entries=[
                 DrugRucamAssessment(
-                    drug_name="Rosuvastatin",
+                    drug_name="Drug A",
                     total_score=0,
                     causality_category="excluded",
                 )

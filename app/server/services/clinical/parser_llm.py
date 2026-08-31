@@ -5,6 +5,13 @@ import unicodedata
 from collections.abc import Callable
 from typing import Any, Literal, cast
 
+from common.prompts.medication_extraction import (
+    ANAMNESIS_DRUG_EXTRACTION_SYSTEM_PROMPT,
+    DRUG_EXTRACTION_SYSTEM_PROMPT,
+    LOCAL_DRUG_EXTRACTION_SYSTEM_PROMPT,
+    build_medication_extraction_retry_prompt,
+    build_medication_extraction_user_prompt,
+)
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.generation_policy import GenerationPurpose
@@ -12,10 +19,6 @@ from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     DrugEntry,
     PatientDrugs,
-)
-from common.prompts.extraction import (
-    ANAMNESIS_DRUG_EXTRACTION_PROMPT,
-    DRUG_EXTRACTION_PROMPT,
 )
 from services.clinical.deterministic_extraction import (
     DeterministicDrugExtractionResult,
@@ -45,15 +48,6 @@ class DrugLlmExtractionMixin(ParserHost):
     @staticmethod
     def is_local_runtime(provider: str | None) -> bool:
         return (provider or "").strip().casefold() == "ollama"
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def local_system_prompt() -> str:
-        return (
-            "Return JSON only. Extract explicit medication mentions only. "
-            "Do not return diseases, lab values, imaging findings, staging, or generic prose. "
-            "Keep fields short and copy evidence verbatim from the source text when possible."
-        )
 
     # -------------------------------------------------------------------------
     def normalize_local_drug_entry(self, entry: LocalDrugEntryDraft) -> DrugEntry:
@@ -438,20 +432,19 @@ class DrugLlmExtractionMixin(ParserHost):
         source_text = self.clean_text(text)
         use_local_schema = self.is_local_runtime(self.active_provider_name())
         schema_model = LocalPatientDrugs if use_local_schema else PatientDrugs
-        prompt = (
-            self.local_system_prompt()
+        system_prompt = (
+            LOCAL_DRUG_EXTRACTION_SYSTEM_PROMPT
             if use_local_schema
             else (
-                ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip()
+                ANAMNESIS_DRUG_EXTRACTION_SYSTEM_PROMPT
                 if source == "anamnesis"
-                else DRUG_EXTRACTION_PROMPT.strip()
+                else DRUG_EXTRACTION_SYSTEM_PROMPT
             )
         )
-        user_prompt = (
-            "Extract all drugs mentioned in the following patient anamnesis:\n\n"
-            if source == "anamnesis"
-            else "Extract all structured medication entries from this therapy section:\n\n"
-        ) + source_text
+        user_prompt = build_medication_extraction_user_prompt(
+            source_text=source_text,
+            source=source,
+        )
         last_wrong_output = ""
         last_errors: list[str] = []
         max_attempts = 2
@@ -462,18 +455,15 @@ class DrugLlmExtractionMixin(ParserHost):
         )
         for attempt in range(1, max_attempts + 1):
             if attempt > 1:
-                user_prompt = (
-                    "Retry the extraction. The previous output was rejected by semantic validation.\n"
-                    "Return every explicit medication exposure in the source text, with exact evidence for each entry. "
-                    "Do not extract lab values, biopsy/pathology prose, diagnoses, staging, dates, or units as drugs.\n\n"
-                    f"Validation errors:\n- {'; '.join(last_errors)}\n\n"
-                    f"Previous wrong output:\n{last_wrong_output}\n\n"
-                    f"Source text:\n{source_text}"
+                user_prompt = build_medication_extraction_retry_prompt(
+                    source_text=source_text,
+                    validation_errors=last_errors,
+                    previous_output=last_wrong_output,
                 )
             raw_parsed = await asyncio.wait_for(
                 self.client.llm_structured_call(
                     model=self.model,
-                    system_prompt=prompt,
+                    system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     schema=schema_model,
                     purpose=GenerationPurpose.STRUCTURED_EXTRACTION,

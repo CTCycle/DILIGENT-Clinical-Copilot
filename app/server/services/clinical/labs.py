@@ -7,7 +7,11 @@ from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any, Literal
 
-from common.prompts.extraction import CLINICAL_LAB_EXTRACTION_PROMPT
+from common.prompts.lab_extraction import (
+    CLINICAL_LAB_EXTRACTION_SYSTEM_PROMPT,
+    LOCAL_LAB_EXTRACTION_SYSTEM_PROMPT,
+    build_lab_extraction_user_prompt,
+)
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.generation_policy import GenerationPurpose
@@ -523,7 +527,13 @@ class ClinicalLabExtractor:
             return date.fromisoformat(iso_candidate)
         except ValueError:
             pass
-        for fmt in ("%d-%m-%Y", "%m-%d-%Y", "%Y-%m-%d", "%d.%m.%Y", "%Y.%m.%d"):
+        for fmt in (
+            "%d-%m-%Y",
+            "%m-%d-%Y",
+            "%Y-%m-%d",
+            "%d.%m.%Y",
+            "%Y.%m.%d",
+        ):
             try:
                 return datetime.strptime(cleaned, fmt).date()
             except ValueError:
@@ -630,7 +640,7 @@ class ClinicalLabExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         if parsed <= 0:
             return None
@@ -651,14 +661,6 @@ class ClinicalLabExtractor:
     @staticmethod
     def is_local_runtime(provider: str | None) -> bool:
         return (provider or "").strip().lower() == "ollama"
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def local_system_prompt() -> str:
-        return (
-            "Extract only grounded liver-related lab entries from the source. Return "
-            "compact JSON data only with marker names, values, units, dates, and evidence."
-        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -756,34 +758,13 @@ class ClinicalLabExtractor:
         previous_wrong_output: str | None = None,
     ) -> LabExtractionPayload:
         candidates_text = self.format_expected_candidates(expected_candidates or [])
-        user_prompt = (
-            "Extract longitudinal liver-related labs and onset clues from this full clinical laboratory text.\n"
-            f"{text}"
+        user_prompt = build_lab_extraction_user_prompt(
+            source_text=text,
+            reinforced=reinforced,
+            candidate_checklist=candidates_text,
+            validation_feedback=validation_feedback,
+            previous_output=previous_wrong_output,
         )
-        if reinforced:
-            user_prompt = (
-                f"{user_prompt}\n\n"
-                "Important: this text contains explicit lab values. Extract every marker/value pair found, "
-                "including multiple values for the same marker such as current, first abnormal, and peak values. "
-                "Preserve unit text and available dates."
-            )
-        if candidates_text:
-            user_prompt = (
-                f"{user_prompt}\n\n"
-                "Grounded candidate checklist from source text. Use it to avoid omissions, but still return "
-                "only values supported by the source:\n"
-                f"{candidates_text}"
-            )
-        if validation_feedback:
-            user_prompt = (
-                f"{user_prompt}\n\n"
-                "Validation feedback from the previous attempt:\n"
-                + "\n".join(f"- {item}" for item in validation_feedback)
-            )
-        if previous_wrong_output:
-            user_prompt = (
-                f"{user_prompt}\n\nPrevious wrong output:\n{previous_wrong_output}"
-            )
         parsed: LabExtractionPayload | None = None
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for lab extraction")
@@ -793,9 +774,9 @@ class ClinicalLabExtractor:
             LocalLabExtractionPayload if use_local_schema else LabExtractionPayload
         )
         system_prompt = (
-            self.local_system_prompt()
+            LOCAL_LAB_EXTRACTION_SYSTEM_PROMPT
             if use_local_schema
-            else CLINICAL_LAB_EXTRACTION_PROMPT.strip()
+            else CLINICAL_LAB_EXTRACTION_SYSTEM_PROMPT
         )
         request_timeout_s = self.resolve_request_timeout_s()
         for attempt in range(1, self.extraction_retry_attempts + 1):
