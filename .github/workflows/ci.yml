@@ -164,6 +164,8 @@ jobs:
 
       - name: Install Playwright browser
         working-directory: app/server
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/runtimes/cache/playwright
         run: python -m playwright install chromium
 
       - name: Run model-config regression slice
