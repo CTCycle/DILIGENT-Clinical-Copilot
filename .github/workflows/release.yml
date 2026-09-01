@@ -120,7 +120,7 @@ jobs:
           $jsonPaths = @("app/client/package.json", "app/desktop/package.json")
           foreach ($path in $jsonPaths) {
             $actual = (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).version
-            if ($actual -ne $version) { throw "Version mismatch in $path: $actual != $version" }
+            if ($actual -ne $version) { throw "Version mismatch in ${path}: $actual != $version" }
           }
           $textChecks = @(
             @("app/server/pyproject.toml", '(?m)^version\s*=\s*"([^"]+)"'),
