@@ -3,12 +3,12 @@
     <div class="timeline-model-header" data-guidance-target="timeline-generation-controls">
       <div>
         <h4>Generate a patient timeline</h4>
-        <p>Timeline uses the model assigned to the Timeline role in Configuration.</p>
+        <p>Uses the model assigned to the Timeline role in Configurations.</p>
       </div>
       <app-help-popover
         ariaLabel="Explain timeline generation"
-        title="Generate a separate chronology"
-        body="Timeline generation builds a dated chronology from the current session. The configured Timeline model extracts events and evidence; saved timelines remain available for later review."
+        title="About timeline generation"
+        body="Creates a dated event history from the current session using the configured Timeline model. Generated timelines are saved and can be reopened from the history list."
       ></app-help-popover>
     </div>
 
@@ -32,7 +32,7 @@
 
   <section class="timeline-history" aria-label="Generated timelines">
     <header>
-      <div><h4>Generated timelines</h4><p>Each run remains available for later review.</p></div>
+      <div><h4>Generated timelines</h4><p>Saved timelines are listed with their generation date, model, and evidence count.</p></div>
       @if (timelineListLoading() && timelinePreviews().length) { <span aria-live="polite">Refreshing…</span> }
     </header>
     @if (timelineListLoading() && !timelinePreviews().length && !generationJobId()) { <p>Loading timeline history…</p> }
@@ -75,7 +75,7 @@
       @else if (!generationJobId()) {
         <div class="timeline-empty-guidance" role="note">
           <strong>No generated timelines yet.</strong>
-          <p>Review the configured Timeline model above, then select <strong>Generate Timeline</strong> to create a saved chronology. You can reopen it here later.</p>
+          <p>Select <strong>Generate Timeline</strong> to create and save a timeline with the configured model.</p>
         </div>
       }
     }
