@@ -32,30 +32,30 @@
           <div class="generation-summary-heading">
             <span class="status-indicator" aria-hidden="true"></span>
             <div>
-              <span class="section-kicker">Timeline source</span>
+              <span class="section-kicker">Timeline provenance</span>
               <h2 id="timeline-summary-title">{{ generationStatusLabel() }}</h2>
             </div>
           </div>
-          <p>{{ generationNote() }}</p>
+          <p>{{ generationNote() }} This provenance is retained with the saved chronology so the events below can be reviewed in the context of their generation source.</p>
           @if (generationErrorLabel(); as errorLabel) {
             <p class="generation-diagnostic"><strong>Failure class:</strong> {{ errorLabel }}</p>
           }
         </div>
         <dl class="summary-metadata">
           <div>
-            <dt>Events</dt>
+            <dt>Clinical events</dt>
             <dd>{{ currentTimeline.events.length }}</dd>
           </div>
           <div>
-            <dt>Date range</dt>
+            <dt>Date coverage</dt>
             <dd>{{ rangeLabel() }}</dd>
           </div>
           <div>
-            <dt>Model</dt>
+            <dt>Generation model</dt>
             <dd>{{ currentTimeline.source_model || 'Not reported' }}</dd>
           </div>
           <div>
-            <dt>Generated</dt>
+            <dt>Generated on</dt>
             <dd>{{ currentTimeline.generated_at | date: 'mediumDate' }}</dd>
           </div>
         </dl>
