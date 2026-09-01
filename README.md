@@ -1,5 +1,5 @@
 # DILIGENT Clinical Copilot
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-GNU%20GPL%20v3-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
@@ -132,7 +132,7 @@ Open PowerShell in the extracted repository folder and run:
 
 On a fresh checkout:
 
-1. Choose **Install dependencies** from the launcher menu (option 4). This prepares the local runtimes, dependencies, database, and frontend output.
+1. Choose **Install dependencies** from the launcher menu (option 2). This prepares the local runtimes, dependencies, database, and frontend output.
 2. Choose **Launch application** (option 1).
 
 For later launches, you can run the launcher directly with its launch action:

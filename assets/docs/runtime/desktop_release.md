@@ -1,5 +1,5 @@
 # DILIGENT Desktop Release
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 
 ## Packaging architecture
 
@@ -87,9 +87,9 @@ Final desktop artifacts are written directly to `release/`. Intermediate desktop
 
 ### Interactive artifact menu
 
-Run `.\start_on_windows.ps1` and choose `12. Create release artifacts` to open the artifact submenu. It can build the portable executable, build the MSI installer, refresh the SHA-256 manifest from existing artifacts, or build all distribution artifacts. The portable and MSI choices run the same full desktop validation pipeline as the corresponding `-DesktopTarget Portable` or `-DesktopTarget Msi` command-line actions.
+Run `.\start_on_windows.ps1` and choose `8. Create release artifacts` to open the artifact submenu. It can build the portable executable, build the MSI installer, refresh the SHA-256 manifest from existing artifacts, or build all distribution artifacts. The portable and MSI choices run the same full desktop validation pipeline as the corresponding `-DesktopTarget Portable` or `-DesktopTarget Msi` command-line actions.
 
-Choose `13. Remove release artifacts` to open the cleanup submenu. It can remove the portable executable, MSI installer, or checksum manifest for a selected version; remove all three artifacts for one version; or remove all versions. Removing one binary synchronizes the remaining checksum manifest. Removing all artifacts also clears generated desktop build state while preserving the tracked `app/desktop/src-tauri/generated/.gitkeep` placeholder.
+Choose `9. Remove release artifacts` to open the cleanup submenu. It can remove the portable executable, MSI installer, or checksum manifest for a selected version; remove all three artifacts for one version; or remove all versions. Removing one binary synchronizes the remaining checksum manifest. Removing all artifacts also clears generated desktop build state while preserving the tracked `app/desktop/src-tauri/generated/.gitkeep` placeholder.
 
 The build refuses to complete if the frozen backend, runtime manifest, artifact size, or MSI metadata checks fail. The portable artifact is the raw Tauri release executable copied to `release/` after those checks; remote publication is a separate maintainer action.
 
