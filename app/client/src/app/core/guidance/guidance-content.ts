@@ -13,7 +13,7 @@ export const DILI_ASSESSMENT_TOUR: GuidedTourDefinition = {
     {
       target: '[data-guidance-target="dili-clinical-input"]',
       title: 'Start with the clinical input',
-      body: 'Keep Anamnesis, Therapy, and Laboratory history clearly separated. Short, dated details give the assessment a stronger starting point.',
+      body: 'Keep Anamnesis, Therapy, and Laboratory history separate. Use short, dated entries where possible.',
       preferredPlacement: 'right',
     },
     {
@@ -60,13 +60,13 @@ export const GUIDANCE_DEFINITIONS = {
     id: 'clinical-session-sections',
     version: GUIDANCE_CONTENT_VERSION,
     title: 'Session sections',
-    description: 'Preview is read-only, Text Editor saves manual edits, Revision creates a new draft, and Timeline keeps generated chronologies separate.',
+    description: 'Preview is read-only, Text Editor saves manual edits, Revision creates a new draft, and Timeline stores generated event histories.',
   },
   timelineReviewControls: {
     id: 'timeline-review-controls',
     version: GUIDANCE_CONTENT_VERSION,
-    title: 'Review controls',
-    description: 'Filter evidence, choose a readable density, and keep uncertain timing visible until you have reviewed it. Inspect an event for source evidence and confidence.',
+    title: 'Timeline filters',
+    description: 'Filter by source evidence, adjust density, and inspect any event for its source, timing, and confidence.',
   },
 } as const;
 
@@ -80,27 +80,27 @@ export const TIPS_AND_TRICKS: readonly TipDefinition[] = [
   },
   {
     id: 'model-roles',
-    title: 'Choose model roles deliberately',
+    title: 'Choose model roles',
     body: 'The clinical role and text-extraction role can use different models. Choose each role in the catalog, then save the configuration.',
     actionLabel: 'Open Configurations',
     action: 'configurations',
   },
   {
     id: 'rag-boundary',
-    title: 'Keep RAG deliberate',
-    body: 'RAG settings define retrieval quality; the DILI Agent checkbox decides whether the current assessment uses indexed evidence.',
+    title: 'Control RAG per assessment',
+    body: 'RAG settings define retrieval behaviour; the DILI Agent checkbox decides whether the current assessment uses indexed evidence.',
   },
   {
     id: 'session-review',
     title: 'Know the session sections',
-    body: 'Preview the saved report, edit its source, inspect metadata, create a revision draft, or generate a separate timeline.',
+    body: 'Preview the saved report, edit its source, inspect metadata, create a revision draft, or generate a timeline.',
     actionLabel: 'Open Clinical Sessions',
     action: 'sessions',
   },
   {
     id: 'timeline-review',
-    title: 'Read a timeline with confidence in mind',
-    body: 'Use evidence and uncertain-timing filters, then inspect an event to review its source, placement, and confidence rationale.',
+    title: 'Review timeline evidence and confidence',
+    body: 'Filter by evidence or timing, then inspect an event to see its source, placement, and confidence rationale.',
     actionLabel: 'Open Clinical Sessions',
     action: 'sessions',
   },
