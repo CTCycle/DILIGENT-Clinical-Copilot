@@ -1441,6 +1441,7 @@ function Test-FrozenBackend {
     $qaRoot = Join-Path $RepoRoot 'assets/QA/release-audit-20260826'
     $stdoutPath = Join-Path $qaRoot 'launcher-frozen-backend.stdout.log'
     $stderrPath = Join-Path $qaRoot 'launcher-frozen-backend.stderr.log'
+    New-Item -ItemType Directory -Path $qaRoot -Force | Out-Null
     New-Item -ItemType Directory -Path (Split-Path -Parent $readyFile), (Join-Path $dataRoot 'resources') -Force | Out-Null
     $psi = [Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $backend
