@@ -7,11 +7,11 @@ import { ModelConfigPageComponent } from './pages/model-config/model-config-page
 import { PatientTimetablePageComponent } from './pages/patient-timetable/patient-timetable-page.component';
 
 export const routes: Routes = [
-  { path: '', component: DiliAgentPageComponent },
-  { path: 'clinical-sessions', component: ClinicalSessionsPageComponent },
-  { path: 'data', component: DataInspectionPageComponent },
-  { path: 'sessions/:sessionId/timetable/:timelineId', component: PatientTimetablePageComponent },
-  { path: 'sessions/:sessionId/timetable', component: PatientTimetablePageComponent },
-  { path: 'model-config', component: ModelConfigPageComponent },
+  { path: '', component: DiliAgentPageComponent, title: 'DILI Agent | DILIGENT' },
+  { path: 'clinical-sessions', component: ClinicalSessionsPageComponent, title: 'Clinical Sessions | DILIGENT' },
+  { path: 'data', component: DataInspectionPageComponent, title: 'Data Inspection | DILIGENT' },
+  { path: 'sessions/:sessionId/timetable/:timelineId', component: PatientTimetablePageComponent, title: 'Patient Timeline | DILIGENT' },
+  { path: 'sessions/:sessionId/timetable', component: PatientTimetablePageComponent, title: 'Patient Timeline | DILIGENT' },
+  { path: 'model-config', component: ModelConfigPageComponent, title: 'Configurations | DILIGENT' },
   { path: '**', redirectTo: '' },
 ];
