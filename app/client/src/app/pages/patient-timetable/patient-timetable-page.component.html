@@ -6,7 +6,7 @@
         <a class="back-link" routerLink="/clinical-sessions"><svg lucideArrowLeft size="15" aria-hidden="true"></svg> Clinical sessions</a>
         <p class="eyebrow">Session {{ sessionId() ?? '' }}</p>
         <h1>Patient timeline</h1>
-        <p class="page-intro">A chronological review of clinically relevant events, supporting evidence, and timing certainty.</p>
+        <p class="page-intro">Review clinically relevant events in date order, with source evidence and timing confidence.</p>
       </div>
       <div class="timetable-actions">
         <button type="button" class="btn-secondary" routerLink="/clinical-sessions">Back</button>
@@ -19,7 +19,7 @@
     @if (loading()) {
       <div class="status-note is-loading" role="status">
         <span class="status-spinner" aria-hidden="true"></span>
-        <span>Loading the saved chronology…</span>
+        <span>Loading the saved timeline…</span>
       </div>
     }
     @if (error()) {
@@ -36,7 +36,7 @@
               <h2 id="timeline-summary-title">{{ generationStatusLabel() }}</h2>
             </div>
           </div>
-          <p>{{ generationNote() }} This provenance is retained with the saved chronology so the events below can be reviewed in the context of their generation source.</p>
+          <p>{{ generationNote() }} Model and generation details are stored with this timeline.</p>
           @if (generationErrorLabel(); as errorLabel) {
             <p class="generation-diagnostic"><strong>Failure class:</strong> {{ errorLabel }}</p>
           }
@@ -65,15 +65,15 @@
         <div class="toolbar-heading">
           <div>
             <span class="section-kicker">Review controls</span>
-            <h2 id="review-toolbar-title">Focus the chronology</h2>
+            <h2 id="review-toolbar-title">Filter the timeline</h2>
           </div>
           <app-help-popover
             ariaLabel="Explain timeline review controls"
             placement="right"
-            title="Review the chronology deliberately"
-            body="Evidence filters reveal which events have source support. Density changes reading comfort, while uncertain timing and categories keep review signals visible. Inspect an event for its source and confidence rationale."
+            title="Timeline review controls"
+            body="Filter events by source evidence, adjust density, or hide uncertain and empty categories. Inspect any event for its source, timing, and confidence."
           ></app-help-popover>
-          <p>Filter evidence and timing signals without losing the original event order.</p>
+          <p>Filters change what is shown, not the saved event order.</p>
         </div>
         <div class="toolbar-controls">
           <app-timetable-filter-select label="Evidence" [value]="evidenceFilter()" [options]="evidenceFilterOptions" (valueChange)="setEvidenceFilter($event)"></app-timetable-filter-select>
@@ -103,7 +103,7 @@
               <div>
                 <span class="section-kicker">{{ rangeLabel() }}</span>
                 <h2 id="chronology-title">Clinical chronology</h2>
-                <p>Events are grouped by date so same-day findings can be compared without overlapping cards or hidden labels.</p>
+                <p>Events are grouped by date, with same-day findings shown together.</p>
               </div>
               <div class="chronology-legend" aria-label="Event category legend">
                 <span><i class="legend-swatch is-clinical" aria-hidden="true"></i>Clinical</span>
@@ -207,7 +207,7 @@
         <aside class="evidence-panel" [class.is-open]="selectedEvent()" role="complementary" aria-label="Event inspector" aria-live="polite">
           <div class="evidence-panel-header">
             <div>
-              <span class="section-kicker">Supporting detail</span>
+              <span class="section-kicker">Event details</span>
               <h2>Event inspector</h2>
             </div>
             <button type="button" class="icon-button" aria-label="Close event inspector" (click)="closeInspector()"><svg lucideX size="16" aria-hidden="true"></svg></button>
@@ -263,7 +263,7 @@
               <div>
                 <dt>Source evidence</dt>
                 <dd class="source-evidence" [class.is-warning]="!selectedEventHasSourceEvidence()">
-                  {{ event.source_evidence || 'Missing source evidence. Do not treat this event as clinically grounded chronology.' }}
+                  {{ event.source_evidence || 'Source evidence is missing. Verify this event before using it for clinical review.' }}
                 </dd>
               </div>
             </dl>
@@ -281,7 +281,7 @@
             <div class="inspector-placeholder">
               <span aria-hidden="true"><svg lucideCircleHelp size="28"></svg></span>
               <h3>Select an event</h3>
-              <p>Choose Inspect details on any event to review its description, timing, confidence, and source evidence.</p>
+              <p>Select an event to review its description, timing, confidence, and source evidence.</p>
             </div>
           }
         </aside>
