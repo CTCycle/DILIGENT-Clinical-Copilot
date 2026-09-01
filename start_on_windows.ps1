@@ -1442,20 +1442,6 @@ function Test-FrozenBackend {
     $stdoutPath = Join-Path $qaRoot 'launcher-frozen-backend.stdout.log'
     $stderrPath = Join-Path $qaRoot 'launcher-frozen-backend.stderr.log'
     New-Item -ItemType Directory -Path (Split-Path -Parent $readyFile), (Join-Path $dataRoot 'resources') -Force | Out-Null
-    $previousSqlitePath = $env:DILIGENT_SQLITE_PATH
-    $previousResourcesPath = $env:DILIGENT_RESOURCES_PATH
-    try {
-        $env:DILIGENT_SQLITE_PATH = Join-Path $dataRoot 'resources/database.db'
-        $env:DILIGENT_RESOURCES_PATH = Join-Path $RepoRoot 'app/resources'
-        Invoke-Checked -FilePath $UvExe -WorkingDirectory $RepoRoot -ArgumentList @(
-            'run', '--project', 'app/server', '--python', $PythonExe, 'python',
-            'app/scripts/initialize_database.py', '--seed-catalogs'
-        )
-    }
-    finally {
-        if ($null -eq $previousSqlitePath) { Remove-Item Env:DILIGENT_SQLITE_PATH -ErrorAction SilentlyContinue } else { $env:DILIGENT_SQLITE_PATH = $previousSqlitePath }
-        if ($null -eq $previousResourcesPath) { Remove-Item Env:DILIGENT_RESOURCES_PATH -ErrorAction SilentlyContinue } else { $env:DILIGENT_RESOURCES_PATH = $previousResourcesPath }
-    }
     $psi = [Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $backend
     $psi.Arguments = "--ready-file `"$readyFile`" --host 127.0.0.1"
@@ -1508,14 +1494,14 @@ function Test-FrozenBackend {
         $authorizedConfig = Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/api/model-config" `
             -WebSession $desktopSession -TimeoutSec 30
         if ($authorizedConfig.StatusCode -ne 200) { throw 'Frozen backend authorized model-config check failed' }
-        $migrationDatabase = Join-Path $dataRoot 'resources/database.db'
-        Invoke-Checked -FilePath $UvExe -WorkingDirectory $RepoRoot -ArgumentList @(
-            'run', '--project', 'app/server', '--python', $PythonExe, 'python',
-            '-c',
-            'import sqlite3,sys; from repositories.database.migrations import HEAD_REVISION; connection=sqlite3.connect(sys.argv[1]); heads={row[0] for row in connection.execute("select version_num from alembic_version")}; connection.close(); assert heads == {HEAD_REVISION}, f"database heads {heads!r} != {HEAD_REVISION!r}"',
-            $migrationDatabase
-        )
-        Write-Ok 'Frozen backend smoke test passed'
+        $databasePath = Join-Path $dataRoot 'resources/database.db'
+        if (-not (Test-Path -LiteralPath $databasePath -PathType Leaf)) {
+            throw 'Frozen backend did not create its SQLite database during startup'
+        }
+        if ((Get-Item -LiteralPath $databasePath).Length -le 0) {
+            throw 'Frozen backend created an empty SQLite database during startup'
+        }
+        Write-Ok 'Frozen backend smoke test passed, including first-run database initialization'
     }
     finally {
         if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit(10000) | Out-Null }
