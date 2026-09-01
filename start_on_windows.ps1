@@ -887,11 +887,12 @@ function Remove-LauncherPath {
         Path = $fullPath
         Planned = 0
         PlannedCount = 0
-        Removed = $removed
+        Removed = 0
         RemovedCount = 0
-        Preserved = $preserved
+        RemovedPaths = $removed
+        Preserved = 0
         PreservedEntries = $preserved
-        Skipped = $skipped
+        Skipped = 0
         SkippedPaths = $skipped
         EnumerationErrors = $enumerationErrors
         WhatIf = [bool]$WhatIf
@@ -946,6 +947,7 @@ function Remove-LauncherPath {
         Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
     $result.Planned = $candidates.Count
     $result.PlannedCount = $candidates.Count
+    $result.Preserved = $preserved.Count
     $progressId = $null
     try {
         if ($candidates.Count -gt 0) {
@@ -970,7 +972,9 @@ function Remove-LauncherPath {
     finally {
         if ($null -ne $progressId) { Complete-LauncherProgress -Id $progressId }
     }
+    $result.Removed = $removed.Count
     $result.RemovedCount = $removed.Count
+    $result.Skipped = $skipped.Count
     if ($Strict -and ($skipped.Count -gt 0 -or $enumerationErrors.Count -gt 0)) {
         throw "Removal of '$fullPath' was incomplete. Skipped $($skipped.Count) item(s) and encountered $($enumerationErrors.Count) enumeration error(s)."
     }
@@ -983,7 +987,7 @@ function Remove-PathSafely {
         [switch]$Recurse
     )
     $result = Remove-LauncherPath -Path $Path -Activity "DILIGENT: remove $([IO.Path]::GetFileName($Path))"
-    return $result.Skipped.Count -eq 0 -and $result.EnumerationErrors.Count -eq 0
+    return $result.Skipped -eq 0 -and $result.EnumerationErrors.Count -eq 0
 }
 
 function Remove-CacheContents {
@@ -1159,15 +1163,15 @@ function Remove-UserDataPath {
 
     $result = Remove-LauncherPath -Path $item.FullName -KeepRoot:$item.PSIsContainer `
         -PreserveNames @('.gitkeep') -PreservePaths $trackedFiles -Activity "DILIGENT: remove $Label"
-    foreach ($preservedPath in @($result.Preserved)) {
+    foreach ($preservedPath in @($result.PreservedEntries)) {
         Write-Info "Preserved application file: $preservedPath"
     }
-    if ($result.Skipped.Count -gt 0 -or $result.EnumerationErrors.Count -gt 0) {
-        Write-Info "${Label}: removed $($result.Removed.Count) item(s); skipped or preserved $($result.Skipped.Count + $result.EnumerationErrors.Count) item(s)"
+    if ($result.Skipped -gt 0 -or $result.EnumerationErrors.Count -gt 0) {
+        Write-Info "${Label}: removed $($result.Removed) item(s); skipped or preserved $($result.Skipped + $result.EnumerationErrors.Count) item(s)"
     }
     return [pscustomobject]@{
-        Removed = $result.Removed.Count
-        Skipped = $result.Skipped.Count + $result.EnumerationErrors.Count
+        Removed = $result.Removed
+        Skipped = $result.Skipped + $result.EnumerationErrors.Count
     }
 }
 
