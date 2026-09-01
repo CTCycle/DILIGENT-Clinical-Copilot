@@ -1447,8 +1447,9 @@ function Test-FrozenBackend {
     try {
         $env:DILIGENT_SQLITE_PATH = Join-Path $dataRoot 'resources/database.db'
         $env:DILIGENT_RESOURCES_PATH = Join-Path $RepoRoot 'app/resources'
-        Invoke-Checked -FilePath $VenvPython -WorkingDirectory $ServerDir -ArgumentList @(
-            (Join-Path $RepoRoot 'app/scripts/initialize_database.py'), '--seed-catalogs'
+        Invoke-Checked -FilePath $UvExe -WorkingDirectory $RepoRoot -ArgumentList @(
+            'run', '--project', 'app/server', '--python', $PythonExe, 'python',
+            'app/scripts/initialize_database.py', '--seed-catalogs'
         )
     }
     finally {
@@ -1508,7 +1509,8 @@ function Test-FrozenBackend {
             -WebSession $desktopSession -TimeoutSec 30
         if ($authorizedConfig.StatusCode -ne 200) { throw 'Frozen backend authorized model-config check failed' }
         $migrationDatabase = Join-Path $dataRoot 'resources/database.db'
-        Invoke-Checked -FilePath $VenvPython -WorkingDirectory $ServerDir -ArgumentList @(
+        Invoke-Checked -FilePath $UvExe -WorkingDirectory $RepoRoot -ArgumentList @(
+            'run', '--project', 'app/server', '--python', $PythonExe, 'python',
             '-c',
             'import sqlite3,sys; from repositories.database.migrations import HEAD_REVISION; connection=sqlite3.connect(sys.argv[1]); heads={row[0] for row in connection.execute("select version_num from alembic_version")}; connection.close(); assert heads == {HEAD_REVISION}, f"database heads {heads!r} != {HEAD_REVISION!r}"',
             $migrationDatabase
