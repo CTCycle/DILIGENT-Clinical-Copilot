@@ -7,9 +7,12 @@ import re
 import socket
 from importlib import import_module
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import uvicorn
+from fastapi import FastAPI
+
+from services.runtime.desktop import DesktopRuntimeService
 
 _VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
 
@@ -73,9 +76,9 @@ def run_desktop_backend(*, ready_file: Path, host: str = "127.0.0.1") -> None:
             {"port": port, "pid": os.getpid(), "release_version": release_version},
         )
 
-        # Import the application only after the packaged roots and bound port
-        # have been checked. The port is needed by host validation middleware.
-        application = import_module("app").app
+        # The application is imported only after the random packaged port has
+        # been bound because DesktopSessionSecurity captures that port at app creation.
+        application = cast(FastAPI, import_module("app").app)
         config = uvicorn.Config(
             application,
             host=host,
@@ -86,7 +89,8 @@ def run_desktop_backend(*, ready_file: Path, host: str = "127.0.0.1") -> None:
             access_log=False,
         )
         server = uvicorn.Server(config)
-        application.state.desktop_server = server
+        runtime = cast(DesktopRuntimeService, application.state.desktop_runtime)
+        runtime.attach_server(server)
         server.run(sockets=[server_socket])
     finally:
         ready_file.unlink(missing_ok=True)
