@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path
 from threading import RLock
 from typing import Any
 
@@ -27,11 +26,6 @@ class _ConfigurationRuntimeState:
 @lru_cache(maxsize=1)
 def _runtime_state() -> _ConfigurationRuntimeState:
     return _ConfigurationRuntimeState()
-
-
-###############################################################################
-def initialize_environment() -> Path | None:
-    return ensure_environment_loaded()
 
 
 ###############################################################################
@@ -96,7 +90,6 @@ __all__ = [
     "get_configuration_block",
     "get_configuration_value",
     "get_server_settings",
-    "initialize_environment",
     "initialize_settings",
     "reload_settings_for_tests",
     "reset_app_settings_cache",
