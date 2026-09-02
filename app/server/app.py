@@ -41,7 +41,7 @@ from configurations.startup import (
 from repositories.database.initializer import ensure_database_ready
 from services.catalogs.runtime import initialize_reference_catalog_provider
 from services.retrieval.embedding_runtime import close_embedding_runtime
-from services.runtime.desktop import DesktopRuntimeService
+from services.runtime.desktop import get_desktop_runtime_service
 from services.runtime.jobs import get_job_manager
 from services.startup_validation import run_startup_validations
 
@@ -114,7 +114,7 @@ def create_app() -> FastAPI:
         openapi_url=FASTAPI_OPENAPI_URL,
         lifespan=app_lifespan,
     )
-    desktop_runtime = DesktopRuntimeService()
+    desktop_runtime = get_desktop_runtime_service()
     application.state.desktop_runtime = desktop_runtime
     register_error_handling(application)
     application.add_middleware(
