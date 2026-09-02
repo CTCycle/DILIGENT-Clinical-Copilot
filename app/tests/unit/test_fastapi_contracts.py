@@ -55,6 +55,14 @@ def test_stable_json_routes_declare_response_models() -> None:
 
 
 ###############################################################################
+def test_desktop_shutdown_route_uses_domain_response_model() -> None:
+    schema = app.openapi()
+    response = schema["paths"]["/api/desktop/shutdown"]["post"]["responses"]["202"]
+    content = response["content"]["application/json"]
+    assert content["schema"]["$ref"].endswith("/DesktopShutdownResponse")
+
+
+###############################################################################
 def test_inspection_revision_routes_are_present_in_openapi() -> None:
     schema = app.openapi()
     expected_paths = [
