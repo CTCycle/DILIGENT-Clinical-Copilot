@@ -5,11 +5,12 @@ import json
 import os
 import re
 import socket
-from importlib import import_module
 from pathlib import Path
 from typing import Any
 
 import uvicorn
+
+from services.runtime.desktop import get_desktop_runtime_service
 
 _VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
 
@@ -73,11 +74,8 @@ def run_desktop_backend(*, ready_file: Path, host: str = "127.0.0.1") -> None:
             {"port": port, "pid": os.getpid(), "release_version": release_version},
         )
 
-        # Import the application only after the packaged roots and bound port
-        # have been checked. The port is needed by host validation middleware.
-        application = import_module("app").app
         config = uvicorn.Config(
-            application,
+            "app:app",
             host=host,
             port=port,
             reload=False,
@@ -86,7 +84,7 @@ def run_desktop_backend(*, ready_file: Path, host: str = "127.0.0.1") -> None:
             access_log=False,
         )
         server = uvicorn.Server(config)
-        application.state.desktop_server = server
+        get_desktop_runtime_service().attach_server(server)
         server.run(sockets=[server_socket])
     finally:
         ready_file.unlink(missing_ok=True)
