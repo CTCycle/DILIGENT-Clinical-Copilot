@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Protocol
 
 from common.security.desktop import DesktopSessionSecurity
@@ -27,3 +28,9 @@ class DesktopRuntimeService:
             return False
         self._server.should_exit = True
         return True
+
+
+###############################################################################
+@lru_cache(maxsize=1)
+def get_desktop_runtime_service() -> DesktopRuntimeService:
+    return DesktopRuntimeService()
