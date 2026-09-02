@@ -23,6 +23,11 @@ class DesktopRuntimeService:
         self._server = server
 
     # -------------------------------------------------------------------------
+    def authorize_bootstrap(self, token: str) -> None:
+        if not self.security.consume_bootstrap_token(token):
+            raise PermissionError("Desktop bootstrap token was rejected")
+
+    # -------------------------------------------------------------------------
     def request_shutdown(self) -> bool:
         if self._server is None:
             return False

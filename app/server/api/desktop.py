@@ -25,11 +25,13 @@ def bootstrap_desktop_session(
     response: Response,
 ) -> None:
     runtime = _runtime(request)
-    if not runtime.security.consume_bootstrap_token(payload.token):
+    try:
+        runtime.authorize_bootstrap(payload.token)
+    except PermissionError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Desktop request is not authorized.",
-        )
+        ) from exc
     response.set_cookie(
         DESKTOP_SESSION_COOKIE,
         payload.token,
