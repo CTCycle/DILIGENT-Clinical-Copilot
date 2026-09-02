@@ -59,11 +59,3 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
 ###############################################################################
 def get_dotenv_injected_keys() -> set[str]:
     return set(_runtime_state().dotenv_injected_keys)
-
-
-###############################################################################
-def reset_environment_bootstrap_for_tests() -> None:
-    state = _runtime_state()
-    with state.bootstrap.lock:
-        state.bootstrap.bootstrapped = False
-    state.dotenv_injected_keys.clear()
