@@ -6,10 +6,7 @@ from typing import Any
 
 from common import paths
 from common.utils.logger import configure_logging
-from configurations.environment import (
-    ensure_environment_loaded,
-    reset_environment_bootstrap_for_tests,
-)
+from configurations.environment import ensure_environment_loaded
 from configurations.management import ConfigurationManager
 from domain.settings.configuration import ServerSettings
 
@@ -93,5 +90,4 @@ __all__ = [
     "initialize_settings",
     "reload_settings_for_tests",
     "reset_app_settings_cache",
-    "reset_environment_bootstrap_for_tests",
 ]
