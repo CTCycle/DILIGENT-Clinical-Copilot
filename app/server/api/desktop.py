@@ -1,26 +1,20 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
-from pydantic import BaseModel, ConfigDict
 
-from common.security.desktop import DESKTOP_SESSION_COOKIE, DesktopSessionSecurity
+from common.security.desktop import DESKTOP_SESSION_COOKIE
+from domain.desktop import DesktopBootstrapRequest, DesktopShutdownResponse
+from services.runtime.desktop import DesktopRuntimeService
 
 router = APIRouter(prefix="/desktop", tags=["desktop"])
 
 
 ###############################################################################
-class DesktopBootstrapRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    token: str
-
-
-###############################################################################
-def _security(request: Request) -> DesktopSessionSecurity:
-    security = getattr(request.app.state, "desktop_security", None)
-    if not isinstance(security, DesktopSessionSecurity):
+def _runtime(request: Request) -> DesktopRuntimeService:
+    runtime = getattr(request.app.state, "desktop_runtime", None)
+    if not isinstance(runtime, DesktopRuntimeService):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    return security
+    return runtime
 
 
 ###############################################################################
@@ -30,8 +24,8 @@ def bootstrap_desktop_session(
     request: Request,
     response: Response,
 ) -> None:
-    security = _security(request)
-    if not security.consume_bootstrap_token(payload.token):
+    runtime = _runtime(request)
+    if not runtime.security.consume_bootstrap_token(payload.token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Desktop request is not authorized.",
@@ -47,17 +41,19 @@ def bootstrap_desktop_session(
 
 
 ###############################################################################
-@router.post("/shutdown", status_code=status.HTTP_202_ACCEPTED)
-def request_desktop_shutdown(request: Request) -> dict[str, str]:
-    _security(request)
-    server = getattr(request.app.state, "desktop_server", None)
-    if server is None:
+@router.post(
+    "/shutdown",
+    response_model=DesktopShutdownResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def request_desktop_shutdown(request: Request) -> DesktopShutdownResponse:
+    runtime = _runtime(request)
+    if not runtime.request_shutdown():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Desktop server is not ready.",
         )
-    server.should_exit = True
-    return {"status": "shutting-down"}
+    return DesktopShutdownResponse(status="shutting-down")
 
 
 __all__ = ["router"]

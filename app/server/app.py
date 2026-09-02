@@ -32,17 +32,18 @@ from common.paths import (
     CLIENT_DIST_PATH,
     CLIENT_INDEX_FILE_PATH,
 )
-from common.security.desktop import DesktopSecurityMiddleware, DesktopSessionSecurity
+from common.security.desktop import DesktopSecurityMiddleware
 from common.version import resolve_application_version
 from configurations.startup import (
     get_server_settings,
     initialize_settings,
 )
 from repositories.database.initializer import ensure_database_ready
-from services.startup_validation import run_startup_validations
 from services.catalogs.runtime import initialize_reference_catalog_provider
 from services.retrieval.embedding_runtime import close_embedding_runtime
+from services.runtime.desktop import DesktopRuntimeService
 from services.runtime.jobs import get_job_manager
+from services.startup_validation import run_startup_validations
 
 
 ###############################################################################
@@ -113,10 +114,13 @@ def create_app() -> FastAPI:
         openapi_url=FASTAPI_OPENAPI_URL,
         lifespan=app_lifespan,
     )
-    desktop_security = DesktopSessionSecurity()
-    application.state.desktop_security = desktop_security
+    desktop_runtime = DesktopRuntimeService()
+    application.state.desktop_runtime = desktop_runtime
     register_error_handling(application)
-    application.add_middleware(DesktopSecurityMiddleware, security=desktop_security)
+    application.add_middleware(
+        DesktopSecurityMiddleware,
+        security=desktop_runtime.security,
+    )
 
     for router in (
         session_router,

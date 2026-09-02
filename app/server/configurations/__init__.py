@@ -8,7 +8,6 @@ from configurations.management import ConfigurationManager
 from configurations.startup import (
     get_configuration_manager,
     get_server_settings,
-    initialize_environment,
     reload_settings_for_tests,
 )
 
@@ -17,7 +16,6 @@ __all__ = [
     "ensure_environment_loaded",
     "get_configuration_manager",
     "get_server_settings",
-    "initialize_environment",
     "reload_settings_for_tests",
     "reset_environment_bootstrap_for_tests",
 ]
