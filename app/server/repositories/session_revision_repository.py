@@ -341,16 +341,22 @@ class SessionRevisionRepository:
         configuration: dict[str, Any],
         pipeline_run_id: str | None = None,
         initiated_by: str | None = None,
+        source_version_id: int | None = None,
     ) -> dict[str, Any] | None:
         del reviewer_note, initiated_by
         safe_session_id = int(session_id)
         with self.session_factory() as db_session:
-            source = db_session.execute(
-                select(ClinicalSessionVersion)
-                .where(ClinicalSessionVersion.session_id == safe_session_id)
-                .order_by(ClinicalSessionVersion.version_number.desc())
-                .limit(1)
-            ).scalar_one_or_none()
+            if source_version_id is None:
+                source = db_session.execute(
+                    select(ClinicalSessionVersion)
+                    .where(ClinicalSessionVersion.session_id == safe_session_id)
+                    .order_by(ClinicalSessionVersion.version_number.desc())
+                    .limit(1)
+                ).scalar_one_or_none()
+            else:
+                source = db_session.get(ClinicalSessionVersion, int(source_version_id))
+                if source is not None and int(source.session_id or 0) != safe_session_id:
+                    return None
             if source is None:
                 return None
             run_id = pipeline_run_id or uuid4().hex

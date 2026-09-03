@@ -92,7 +92,7 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
     monkeypatch.setattr(
         endpoint.service,
         "prepare_structured_clinical_input",
-        lambda request_payload: {
+        lambda request_payload, *, parse_result: {
             "normalized_document": object(),
             "section_extraction": object(),
             "patient_payload": object(),

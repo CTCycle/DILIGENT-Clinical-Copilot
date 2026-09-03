@@ -426,6 +426,7 @@ def test_revision_persists_deterministic_patch_when_model_text_differs(
     )
     assert revised_session is not None
     assert revised_session["report"] == draft["payload"]["revised_report_text"]
+    assert revised_session["sections"]["drugs"] == "Amoxicillin started 2026-01-01."
 
 
 ###############################################################################
@@ -727,3 +728,31 @@ def test_revision_job_rejects_same_root_concurrent_start(tmp_path: Path) -> None
         if status and status["status"] in {"completed", "failed", "cancelled"}:
             break
         time.sleep(0.05)
+
+
+###############################################################################
+def test_revision_shell_uses_explicit_source_version(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    original = serializer.session_revision_repository.get_version_record_for_session(session_id)
+    assert original is not None
+    serializer.session_revision_repository.update_current_report_text_with_manual_audit(
+        session_id,
+        report_text="Manually corrected DILI report.",
+        edited_fields=["report_text"],
+        reviewer_note="Create a newer source version.",
+        edited_by="Unit test",
+        metadata={},
+    )
+    latest = serializer.session_revision_repository.get_version_record_for_session(session_id)
+    assert latest is not None
+    assert latest["version_id"] != original["version_id"]
+    shell = serializer.session_revision_repository.create_revision_version_shell(
+        session_id,
+        reviewer_note=None,
+        configuration={},
+        pipeline_run_id="explicit-source-version",
+        source_version_id=int(original["version_id"]),
+    )
+    assert shell is not None
+    assert shell["source_version_id"] == original["version_id"]

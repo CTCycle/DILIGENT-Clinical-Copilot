@@ -76,7 +76,18 @@ def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
         visit_date=date(2025, 1, 15),
     )
 
-    prepared = service.prepare_structured_clinical_input(request)
+    parse_result = service.validate_assessment_prerequisites_without_llm(request)
+    monkeypatch.setattr(
+        service,
+        "validate_assessment_prerequisites_without_llm",
+        lambda _: (_ for _ in ()).throw(
+            AssertionError("structured preparation must reuse the validated parse result")
+        ),
+    )
+    prepared = service.prepare_structured_clinical_input(
+        request,
+        parse_result=parse_result,
+    )
 
     assert (
         prepared["section_extraction"].metadata["parser"]

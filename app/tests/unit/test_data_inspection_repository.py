@@ -26,6 +26,7 @@ from services.llm.cloud import LLMError
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 
 ###############################################################################
@@ -800,3 +801,52 @@ def test_session_payload_timeline_is_not_read_as_history_record() -> None:
         session_id
     )
     assert previews == []
+
+
+###############################################################################
+def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
+    engine = create_engine(
+        "sqlite+pysqlite://",
+        future=True,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    repository_graph = build_repository_graph(engine=engine)
+    save_session(
+        repository_graph,
+        patient_name="Timeline Snapshot Patient",
+        timestamp=datetime(2025, 1, 1, 8, 30),
+        status="successful",
+        report="Timeline snapshot report",
+        anamnesis="Symptoms started in January 2025.",
+    )
+    rows, _ = repository_graph.clinical_session_repository.list_sessions(
+        search="Timeline Snapshot Patient", status_filter=None, date_mode=None,
+        filter_date=None, offset=0, limit=10,
+    )
+    session_id = int(rows[0]["session_id"])
+    service = build_service(
+        repository_graph, timeline_extractor=FakeTimelineExtractor(), jobs=JobManager()
+    )
+    source_reads = 0
+    original_get_source = service.session_timeline_repository.get_session_timeline_source
+    def tracked_get_source(value: int) -> dict[str, Any] | None:
+        nonlocal source_reads
+        source_reads += 1
+        return original_get_source(value)
+    monkeypatch.setattr(
+        service.session_timeline_repository, "get_session_timeline_source", tracked_get_source
+    )
+    started = service.start_session_timeline_job(session_id, force_regenerate=True)
+    job_id = str(started["job_id"])
+    for _ in range(100):
+        status = service.get_session_timeline_job_status(session_id, job_id)
+        if status and status["status"] in {"completed", "failed", "cancelled"}:
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("Timeline job did not finish")
+    assert status is not None
+    assert status["status"] == "completed"
+    assert source_reads == 1
