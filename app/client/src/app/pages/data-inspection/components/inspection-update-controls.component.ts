@@ -2,7 +2,11 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { InspectionUpdateTarget } from '../../../core/models/inspection-types';
-import { isRecord } from '../../../core/utils';
+
+export type InspectionUpdateFieldChange = {
+  key: string;
+  value: unknown;
+};
 
 @Component({
   selector: 'app-inspection-update-controls',
@@ -81,27 +85,10 @@ import { isRecord } from '../../../core/utils';
               <option value="reuse">Reuse local archive</option>
               <option value="fresh">Download fresh archive</option>
             </select>
-            <small>Use a fresh source only when required.</small>
+            <small>Download a fresh source only when required.</small>
           </label>
         </div>
       }
-
-      <details class="inspection-update-advanced">
-        <summary>Advanced JSON</summary>
-        <p>Edit the same request payload directly when needed.</p>
-        <label class="inspection-update-json-label" for="update-overrides">JSON overrides</label>
-        <textarea
-          id="update-overrides"
-          class="field-textarea inspection-update-overrides"
-          [ngModel]="configText"
-          (ngModelChange)="setJsonText($event)"
-          [disabled]="disabled"
-          spellcheck="false"
-        ></textarea>
-        @if (jsonError(); as error) {
-          <p class="inspection-update-json-error" role="alert">{{ error }}</p>
-        }
-      </details>
     </section>
   `,
   styles: `
@@ -131,8 +118,7 @@ import { isRecord } from '../../../core/utils';
       grid-column: 1 / -1;
     }
 
-    .inspection-update-field > span,
-    .inspection-update-json-label {
+    .inspection-update-field > span {
       color: var(--color-text-primary);
       font-size: var(--font-sm);
       font-weight: 700;
@@ -150,48 +136,11 @@ import { isRecord } from '../../../core/utils';
       font: inherit;
     }
 
-    .inspection-update-field small,
-    .inspection-update-advanced > p {
+    .inspection-update-field small {
       margin: 0;
       color: var(--color-text-muted);
       font-size: var(--font-xs);
       line-height: 1.4;
-    }
-
-    .inspection-update-advanced {
-      padding-top: var(--space-md);
-      border-top: 1px solid var(--color-divider);
-    }
-
-    .inspection-update-advanced summary {
-      width: fit-content;
-      color: var(--color-text-secondary);
-      font-size: var(--font-sm);
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    .inspection-update-advanced > p {
-      margin: var(--space-xs) 0 var(--space-sm);
-    }
-
-    .inspection-update-json-label {
-      display: block;
-      margin-bottom: var(--space-xs);
-    }
-
-    .inspection-update-overrides {
-      width: 100%;
-      min-height: 180px;
-      font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
-      font-size: var(--font-sm);
-    }
-
-    .inspection-update-json-error {
-      margin: var(--space-xs) 0 0;
-      color: var(--color-status-error-text);
-      font-size: var(--font-xs);
-      font-weight: 650;
     }
 
     @media (max-width: 760px) {
@@ -208,22 +157,21 @@ import { isRecord } from '../../../core/utils';
 export class InspectionUpdateControlsComponent {
   @Input() target: InspectionUpdateTarget | null = null;
   @Input() config: Record<string, unknown> | null = null;
-  @Input() configText = '{}';
   @Input() disabled = false;
-  @Output() readonly configTextChange = new EventEmitter<string>();
+  @Output() readonly configChange = new EventEmitter<InspectionUpdateFieldChange>();
 
   numberValue(key: string, fallback: number): number {
-    const value = this.currentValue(key);
+    const value = this.config?.[key];
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
   }
 
   stringValue(key: string): string {
-    const value = this.currentValue(key);
+    const value = this.config?.[key];
     return typeof value === 'string' ? value : '';
   }
 
   booleanValue(key: string, fallback: boolean): boolean {
-    const value = this.currentValue(key);
+    const value = this.config?.[key];
     return typeof value === 'boolean' ? value : fallback;
   }
 
@@ -233,60 +181,14 @@ export class InspectionUpdateControlsComponent {
       return;
     }
     const bounded = Math.min(max, Math.max(min, numeric));
-    this.updateField(key, integer ? Math.round(bounded) : bounded);
+    this.configChange.emit({ key, value: integer ? Math.round(bounded) : bounded });
   }
 
   updateString(key: string, value: string): void {
-    this.updateField(key, value);
+    this.configChange.emit({ key, value });
   }
 
   updateBoolean(key: string, value: boolean): void {
-    this.updateField(key, value);
-  }
-
-  setJsonText(value: string): void {
-    this.configTextChange.emit(value);
-  }
-
-  jsonError(): string | null {
-    const normalized = this.configText.trim();
-    if (!normalized) {
-      return null;
-    }
-    try {
-      const parsed: unknown = JSON.parse(normalized);
-      return isRecord(parsed) ? null : 'Overrides must be a JSON object.';
-    } catch {
-      return 'Invalid JSON overrides.';
-    }
-  }
-
-  private currentValue(key: string): unknown {
-    const parsed = this.parseConfigText();
-    if (parsed && key in parsed) {
-      return parsed[key];
-    }
-    return this.config?.[key];
-  }
-
-  private updateField(key: string, value: unknown): void {
-    const next = {
-      ...(this.parseConfigText() ?? this.config ?? {}),
-      [key]: value,
-    };
-    this.configTextChange.emit(JSON.stringify(next, null, 2));
-  }
-
-  private parseConfigText(): Record<string, unknown> | null {
-    const normalized = this.configText.trim();
-    if (!normalized) {
-      return {};
-    }
-    try {
-      const parsed: unknown = JSON.parse(normalized);
-      return isRecord(parsed) ? parsed : null;
-    } catch {
-      return null;
-    }
+    this.configChange.emit({ key, value });
   }
 }
