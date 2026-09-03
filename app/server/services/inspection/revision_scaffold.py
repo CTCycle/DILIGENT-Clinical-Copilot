@@ -128,6 +128,7 @@ class InspectionRevisionScaffoldMixin:
             configuration=model_configuration,
             pipeline_run_id=pipeline_run_id,
             initiated_by="revision_agent",
+            source_version_id=int(source_version["version_id"]),
         )
         if shell is None:
             raise SessionRevisionValidationError(

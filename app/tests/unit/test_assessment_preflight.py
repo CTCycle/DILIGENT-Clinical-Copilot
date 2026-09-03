@@ -166,7 +166,7 @@ def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
     monkeypatch.setattr(
         service,
         "prepare_structured_clinical_input",
-        lambda req: {
+        lambda req, *, parse_result: {
             "normalized_document": object(),
             "section_extraction": object(),
             "patient_payload": object(),

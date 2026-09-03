@@ -327,6 +327,7 @@ class InspectionTimelineMixin:
         session_id: int,
         *,
         force_regenerate: bool = False,
+        source: dict[str, Any] | None = None,
         progress_callback: Callable[[float, str], None] | None = None,
     ) -> PatientTimeline | None:
         safe_session_id = int(session_id)
@@ -352,11 +353,12 @@ class InspectionTimelineMixin:
                 return cached
         try:
             _report_progress(progress_callback, 5, "Preparing session timeline source")
-            source = self.session_timeline_repository.get_session_timeline_source(
-                session_id
-            )
             if source is None:
-                return None
+                source = self.session_timeline_repository.get_session_timeline_source(
+                    session_id
+                )
+                if source is None:
+                    return None
             timeline_timeout_s = max(
                 20.0,
                 min(
@@ -389,9 +391,8 @@ class InspectionTimelineMixin:
                             timeout=timeline_timeout_s,
                         )
                     )
-                timeline = PatientTimeline(
-                    **{
-                        **timeline.model_dump(),
+                timeline = timeline.model_copy(
+                    update={
                         "generation_status": "llm_generated",
                         "generation_note": None,
                         "source_model": source_model,
@@ -426,9 +427,8 @@ class InspectionTimelineMixin:
                     ),
                     generation_error_code=error_code,
                 )
-                timeline = PatientTimeline(
-                    **{
-                        **timeline.model_dump(),
+                timeline = timeline.model_copy(
+                    update={
                         "source_model": source_model,
                         "source_kind": (
                             "cloud"

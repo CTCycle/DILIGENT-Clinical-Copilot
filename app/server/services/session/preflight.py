@@ -232,7 +232,10 @@ def validate_clinical_input_preflight(
             )
         )
     try:
-        prepared = service.prepare_structured_clinical_input(request_payload)
+        prepared = service.prepare_structured_clinical_input(
+            request_payload,
+            parse_result=parse_result,
+        )
         section_extraction = prepared["section_extraction"]
         patient_payload = prepared["patient_payload"]
         normalized_document = prepared["normalized_document"]

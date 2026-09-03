@@ -30,7 +30,6 @@ from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
 from services.clinical.disease import DiseaseExtractor
-from services.clinical.drug_blocks import isolate_drug_blocks
 from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.job_progress import (
     StageProgressFractionCallback,
@@ -44,7 +43,6 @@ from services.clinical.rucam import RucamScoreEstimator
 from services.clinical.validation import (
     build_validation_bundle,
     ensure_required_sections,
-    has_timing_information,
 )
 from services.llm.model_config import ModelConfigService
 from services.runtime.jobs import (
@@ -432,14 +430,12 @@ class ClinicalSessionService(
     def prepare_structured_clinical_input(
         self,
         request_payload: ClinicalSessionRequest,
+        *,
+        parse_result: InitialTextSectionParseResult,
     ) -> dict[str, Any]:
         clinical_input = (request_payload.clinical_input or "").strip()
         if not clinical_input:
             raise ServiceValidationError("Clinical input is required.")
-
-        parse_result = self.validate_assessment_prerequisites_without_llm(
-            request_payload
-        )
         section_extraction = build_section_extraction_from_initial_text(
             parse_result,
             clinical_input,
@@ -501,27 +497,6 @@ class ClinicalSessionService(
     def ensure_submission_requirements(self, payload: PatientData) -> None:
         validation_bundle = self.build_validation_bundle_for_payload(payload)
         ensure_required_sections(payload, bundle=validation_bundle)
-
-        cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")
-        if not cleaned_therapy_text:
-            # Keep submission permissive when therapy content cannot provide timing.
-            return
-
-        lines = [
-            block.text.strip()
-            for block in isolate_drug_blocks(cleaned_therapy_text)
-            if block.text.strip()
-        ]
-        parsed_entries = [
-            parsed
-            for parsed in (self.drugs_parser.parse_line(line) for line in lines)
-            if parsed is not None
-        ]
-        if any(has_timing_information(entry) for entry in parsed_entries):
-            return
-        # Do not block session start when therapy timing is not explicitly available.
-        # Downstream stages can still assess DILI with uncertainty notes.
-        return
 
     # -------------------------------------------------------------------------
     @staticmethod
