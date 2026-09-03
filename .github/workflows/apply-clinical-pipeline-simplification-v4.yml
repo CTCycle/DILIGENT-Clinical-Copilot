@@ -1,0 +1,96 @@
+name: Apply clinical pipeline simplification v4
+
+on:
+  push:
+    branches: [clinical-pipeline-simplification]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Apply focused changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/apply-clinical-pipeline-simplification-v2.yml')
+          text = workflow.read_text(encoding='utf-8')
+          marker = "          python - <<'PY'\n"
+          start = text.index(marker) + len(marker)
+          end = text.index("\n          PY\n", start)
+          body = text[start:end]
+          script = "\n".join(
+              line[10:] if line.startswith("          ") else line
+              for line in body.splitlines()
+          )
+          exec(compile(script, str(workflow), 'exec'))
+
+          path = Path('app/server/services/inspection/revision_agent.py')
+          source = path.read_text(encoding='utf-8')
+          old = '''            sections = (\n                session.get("sections")\n                if isinstance(session.get("sections"), dict)\n                else {}\n            )'''
+          new = '''            session_sections = session.get("sections")\n            sections: dict[str, Any] = (\n                session_sections if isinstance(session_sections, dict) else {}\n            )'''
+          if source.count(old) != 1:
+              raise RuntimeError('Expected the revision section-normalization block exactly once')
+          path.write_text(source.replace(old, new, 1), encoding='utf-8')
+
+          test_path = Path('app/tests/unit/test_data_inspection_repository.py')
+          test_source = test_path.read_text(encoding='utf-8')
+          import_old = 'from sqlalchemy.orm import sessionmaker\n'
+          import_new = 'from sqlalchemy.orm import sessionmaker\nfrom sqlalchemy.pool import StaticPool\n'
+          if test_source.count(import_old) != 1:
+              raise RuntimeError('Expected the SQLAlchemy sessionmaker import exactly once')
+          test_source = test_source.replace(import_old, import_new, 1)
+          fixture_old = '''def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:\n    repository_graph, _ = build_repository_graph_for_test()'''
+          fixture_new = '''def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:\n    engine = create_engine(\n        "sqlite+pysqlite://",\n        future=True,\n        connect_args={"check_same_thread": False},\n        poolclass=StaticPool,\n    )\n    Base.metadata.create_all(engine)\n    repository_graph = build_repository_graph(engine=engine)'''
+          if test_source.count(fixture_old) != 1:
+              raise RuntimeError('Expected the timeline source-reuse regression fixture exactly once')
+          test_path.write_text(test_source.replace(fixture_old, fixture_new, 1), encoding='utf-8')
+          PY
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.14.2"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.30"
+          enable-cache: true
+          cache-dependency-glob: app/server/uv.lock
+
+      - name: Install backend dependencies
+        working-directory: app/server
+        run: |
+          uv sync --locked --all-extras
+          echo "$GITHUB_WORKSPACE/app/server/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Validate focused pipelines
+        working-directory: app/server
+        run: |
+          python -m compileall -q . ../tests
+          python -m ruff check . ../tests
+          python -m pyright .
+          python -m pytest ../tests/unit/test_session_service.py ../tests/unit/test_assessment_preflight.py ../tests/unit/test_polling_interval_centralization.py ../tests/unit/test_revision_agent_skeleton.py ../tests/unit/test_data_inspection_repository.py -q
+
+      - name: Commit validated code
+        shell: bash
+        run: |
+          git rm \
+            .github/workflows/apply-clinical-pipeline-simplification.yml \
+            .github/workflows/apply-clinical-pipeline-simplification-v2.yml \
+            .github/workflows/apply-clinical-pipeline-simplification-v3.yml \
+            .github/workflows/apply-clinical-pipeline-simplification-v4.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/server app/tests
+          git commit -m "refactor: simplify clinical processing pipelines"
+          git push origin HEAD:clinical-pipeline-simplification
