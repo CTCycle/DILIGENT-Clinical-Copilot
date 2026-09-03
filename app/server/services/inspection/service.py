@@ -588,11 +588,13 @@ class DataInspectionService(
         session_id: int,
         *,
         force_regenerate: bool,
+        source: dict[str, Any],
         job_id: str,
     ) -> dict[str, Any]:
         timeline = self.generate_session_timeline(
             session_id,
             force_regenerate=force_regenerate,
+            source=source,
             progress_callback=lambda p, m: self._report_timeline_progress(
                 job_id, session_id, p, m
             ),
@@ -613,12 +615,10 @@ class DataInspectionService(
         force_regenerate: bool = False,
     ) -> dict[str, Any]:
         safe_session_id = int(session_id)
-        if (
-            self.session_timeline_repository.get_session_timeline_source(
-                safe_session_id
-            )
-            is None
-        ):
+        source = self.session_timeline_repository.get_session_timeline_source(
+            safe_session_id
+        )
+        if source is None:
             raise KeyError(safe_session_id)
         scope_key = f"session_timeline:{safe_session_id}"
         if self.jobs.is_job_running(
@@ -631,6 +631,7 @@ class DataInspectionService(
             self.run_session_timeline_job,
             safe_session_id,
             force_regenerate=force_regenerate,
+            source=source,
         )
         job_id = self.jobs.start_job(
             job_type=self.SESSION_TIMELINE_JOB_TYPE,

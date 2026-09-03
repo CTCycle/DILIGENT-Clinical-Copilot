@@ -473,6 +473,10 @@ class RevisionAgentRunner:
         version_status = "qa_failed" if qa.blocking_issues else "llm_qa_passed"
         if not request.dry_run and not qa.blocking_issues:
             root_session_id = int(model_configuration["root_session_id"])
+            session_sections = session.get("sections")
+            sections: dict[str, Any] = (
+                session_sections if isinstance(session_sections, dict) else {}
+            )
             revised_session_id = self.clinical_session_repository.save_clinical_session(
                 {
                     "patient_name": session.get("patient_name"),
@@ -483,11 +487,9 @@ class RevisionAgentRunner:
                     "root_session_id": root_session_id,
                     "session_kind": "agentic_revision",
                     "session_status": "successful",
-                    "anamnesis": (session.get("sections") or {}).get("anamnesis"),
-                    "drugs": (session.get("sections") or {}).get("therapy"),
-                    "laboratory_analysis": (session.get("sections") or {}).get(
-                        "laboratory_analysis"
-                    ),
+                    "anamnesis": sections.get("anamnesis"),
+                    "drugs": sections.get("drugs") or sections.get("therapy"),
+                    "laboratory_analysis": sections.get("laboratory_analysis"),
                     "final_report": applied_report,
                     "session_result_payload": {
                         **(session.get("result_payload") or {}),

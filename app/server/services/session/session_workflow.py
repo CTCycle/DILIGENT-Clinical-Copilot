@@ -924,7 +924,9 @@ def start_clinical_job_workflow(
                 f"Configure an active {provider.title()} access key before running cloud analysis."
             )
 
-    service.validate_assessment_prerequisites_without_llm(request_payload)
+    parse_result = service.validate_assessment_prerequisites_without_llm(
+        request_payload
+    )
     rag_readiness = check_rag_readiness(requested=request_payload.use_rag)
     if request_payload.use_rag and not rag_readiness.available:
         raise ServiceValidationError(
@@ -939,7 +941,10 @@ def start_clinical_job_workflow(
         )
 
     try:
-        prepared = service.prepare_structured_clinical_input(request_payload)
+        prepared = service.prepare_structured_clinical_input(
+            request_payload,
+            parse_result=parse_result,
+        )
         normalized_document = prepared["normalized_document"]
         section_extraction = prepared["section_extraction"]
         patient_payload = prepared["patient_payload"]
