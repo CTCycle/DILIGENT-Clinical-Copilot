@@ -1,0 +1,65 @@
+<div class="notification-center">
+  <button
+    type="button"
+    class="app-header-icon-btn notification-center-button"
+    (click)="toggleHistory()"
+    [attr.aria-expanded]="historyOpen()"
+    aria-haspopup="dialog"
+    aria-label="Notifications"
+    title="Notifications"
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M10 21h4" />
+    </svg>
+    @if (notifications.unreadCount() > 0) {
+      <span class="notification-center-badge" aria-hidden="true">{{ unreadBadge() }}</span>
+    }
+  </button>
+
+  @if (historyOpen()) {
+    <section class="notification-history" role="dialog" aria-label="Notification history">
+      <header class="notification-history-header">
+        <div>
+          <strong>Notifications</strong>
+          <span>{{ notifications.history().length }} recent</span>
+        </div>
+        @if (notifications.history().length > 0) {
+          <button type="button" class="notification-history-clear" (click)="clearHistory()">Clear</button>
+        }
+      </header>
+
+      <div class="notification-history-list">
+        @for (item of notifications.history(); track item.id) {
+          <article
+            class="notification-history-item"
+            [class.is-success]="item.tone === 'success'"
+            [class.is-error]="item.tone === 'error'"
+          >
+            <span class="notification-history-indicator" aria-hidden="true"></span>
+            <div>
+              <p>{{ item.message }}</p>
+              <time [attr.datetime]="isoDate(item)">{{ formatTime(item) }}</time>
+            </div>
+          </article>
+        } @empty {
+          <p class="notification-history-empty">No notifications yet.</p>
+        }
+      </div>
+    </section>
+  }
+</div>
+
+@if (notifications.active(); as item) {
+  <aside
+    class="notification-toast"
+    [class.is-success]="item.tone === 'success'"
+    [class.is-error]="item.tone === 'error'"
+    [attr.role]="item.tone === 'error' ? 'alert' : 'status'"
+    [attr.aria-live]="item.tone === 'error' ? 'assertive' : 'polite'"
+  >
+    <span class="notification-toast-indicator" aria-hidden="true"></span>
+    <p>{{ item.message }}</p>
+    <button type="button" (click)="notifications.dismiss(item.id)" aria-label="Dismiss notification">Close</button>
+  </aside>
+}
