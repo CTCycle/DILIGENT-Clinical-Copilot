@@ -3,54 +3,40 @@ import { describe, expect, it } from 'vitest';
 import { InspectionUpdateControlsComponent } from './inspection-update-controls.component';
 
 describe('InspectionUpdateControlsComponent', () => {
-  it('updates a numeric field while preserving the other JSON overrides', () => {
+  it('emits a bounded integer concurrency value', () => {
     const component = new InspectionUpdateControlsComponent();
-    component.configText = JSON.stringify({
-      rxnav_request_timeout: 30,
-      rxnav_max_concurrency: 4,
-    });
-    let emitted = '';
-    component.configTextChange.subscribe((value) => {
+    let emitted: { key: string; value: unknown } | null = null;
+    component.configChange.subscribe((value) => {
       emitted = value;
     });
 
-    component.updateNumber('rxnav_max_concurrency', 8, 1, 64, true);
+    component.updateNumber('rxnav_max_concurrency', 80, 1, 64, true);
 
-    expect(JSON.parse(emitted)).toEqual({
-      rxnav_request_timeout: 30,
-      rxnav_max_concurrency: 8,
-    });
+    expect(emitted).toEqual({ key: 'rxnav_max_concurrency', value: 64 });
   });
 
-  it('uses loaded defaults to recover from invalid advanced JSON', () => {
+  it('emits the selected archive handling mode', () => {
     const component = new InspectionUpdateControlsComponent();
-    component.config = {
-      livertox_monograph_max_workers: 4,
-      livertox_archive: 'livertox_NBK547852.tar.gz',
-      redownload: false,
-    };
-    component.configText = '{ invalid';
-    let emitted = '';
-    component.configTextChange.subscribe((value) => {
+    let emitted: { key: string; value: unknown } | null = null;
+    component.configChange.subscribe((value) => {
       emitted = value;
     });
 
     component.updateBoolean('redownload', true);
 
-    expect(JSON.parse(emitted)).toEqual({
-      livertox_monograph_max_workers: 4,
-      livertox_archive: 'livertox_NBK547852.tar.gz',
-      redownload: true,
-    });
+    expect(emitted).toEqual({ key: 'redownload', value: true });
   });
 
-  it('reports malformed or non-object JSON', () => {
+  it('reads displayed values from the loaded configuration', () => {
     const component = new InspectionUpdateControlsComponent();
+    component.config = {
+      livertox_monograph_max_workers: 6,
+      livertox_archive: 'livertox_NBK547852.tar.gz',
+      redownload: false,
+    };
 
-    component.configText = '[]';
-    expect(component.jsonError()).toBe('Overrides must be a JSON object.');
-
-    component.configText = '{ invalid';
-    expect(component.jsonError()).toBe('Invalid JSON overrides.');
+    expect(component.numberValue('livertox_monograph_max_workers', 4)).toBe(6);
+    expect(component.stringValue('livertox_archive')).toBe('livertox_NBK547852.tar.gz');
+    expect(component.booleanValue('redownload', true)).toBe(false);
   });
 });
