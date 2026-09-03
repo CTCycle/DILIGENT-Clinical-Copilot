@@ -1,0 +1,209 @@
+name: Apply clinical pipeline simplification
+
+on:
+  push:
+    branches:
+      - clinical-pipeline-simplification
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Apply focused pipeline changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file_path = Path(path)
+              text = file_path.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"Expected exactly one match in {path}, found {count}")
+              file_path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # Session creation: establish one validated parse result and propagate it.
+          replace_once(
+              "app/server/services/session/session_service.py",
+              "from services.clinical.drug_blocks import isolate_drug_blocks\n",
+              "",
+          )
+          replace_once(
+              "app/server/services/session/session_service.py",
+              '''from services.clinical.validation import (\n    build_validation_bundle,\n    ensure_required_sections,\n    has_timing_information,\n)''',
+              '''from services.clinical.validation import (\n    build_validation_bundle,\n    ensure_required_sections,\n)''',
+          )
+          replace_once(
+              "app/server/services/session/session_service.py",
+              '''    def prepare_structured_clinical_input(\n        self,\n        request_payload: ClinicalSessionRequest,\n    ) -> dict[str, Any]:\n        clinical_input = (request_payload.clinical_input or "").strip()\n        if not clinical_input:\n            raise ServiceValidationError("Clinical input is required.")\n\n        parse_result = self.validate_assessment_prerequisites_without_llm(\n            request_payload\n        )''',
+              '''    def prepare_structured_clinical_input(\n        self,\n        request_payload: ClinicalSessionRequest,\n        *,\n        parse_result: InitialTextSectionParseResult,\n    ) -> dict[str, Any]:\n        clinical_input = (request_payload.clinical_input or "").strip()\n        if not clinical_input:\n            raise ServiceValidationError("Clinical input is required.")''',
+          )
+          replace_once(
+              "app/server/services/session/session_service.py",
+              '''    def ensure_submission_requirements(self, payload: PatientData) -> None:\n        validation_bundle = self.build_validation_bundle_for_payload(payload)\n        ensure_required_sections(payload, bundle=validation_bundle)\n\n        cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")\n        if not cleaned_therapy_text:\n            # Keep submission permissive when therapy content cannot provide timing.\n            return\n\n        lines = [\n            block.text.strip()\n            for block in isolate_drug_blocks(cleaned_therapy_text)\n            if block.text.strip()\n        ]\n        parsed_entries = [\n            parsed\n            for parsed in (self.drugs_parser.parse_line(line) for line in lines)\n            if parsed is not None\n        ]\n        if any(has_timing_information(entry) for entry in parsed_entries):\n            return\n        # Do not block session start when therapy timing is not explicitly available.\n        # Downstream stages can still assess DILI with uncertainty notes.\n        return''',
+              '''    def ensure_submission_requirements(self, payload: PatientData) -> None:\n        validation_bundle = self.build_validation_bundle_for_payload(payload)\n        ensure_required_sections(payload, bundle=validation_bundle)''',
+          )
+          replace_once(
+              "app/server/services/session/session_workflow.py",
+              '''    service.validate_assessment_prerequisites_without_llm(request_payload)''',
+              '''    parse_result = service.validate_assessment_prerequisites_without_llm(\n        request_payload\n    )''',
+          )
+          replace_once(
+              "app/server/services/session/session_workflow.py",
+              '''        prepared = service.prepare_structured_clinical_input(request_payload)''',
+              '''        prepared = service.prepare_structured_clinical_input(\n            request_payload,\n            parse_result=parse_result,\n        )''',
+          )
+          replace_once(
+              "app/server/services/session/preflight.py",
+              '''        prepared = service.prepare_structured_clinical_input(request_payload)''',
+              '''        prepared = service.prepare_structured_clinical_input(\n            request_payload,\n            parse_result=parse_result,\n        )''',
+          )
+
+          # Revision: keep the selected source version stable and preserve canonical therapy.
+          replace_once(
+              "app/server/repositories/session_revision_repository.py",
+              '''        pipeline_run_id: str | None = None,\n        initiated_by: str | None = None,\n    ) -> dict[str, Any] | None:\n        del reviewer_note, initiated_by\n        safe_session_id = int(session_id)\n        with self.session_factory() as db_session:\n            source = db_session.execute(\n                select(ClinicalSessionVersion)\n                .where(ClinicalSessionVersion.session_id == safe_session_id)\n                .order_by(ClinicalSessionVersion.version_number.desc())\n                .limit(1)\n            ).scalar_one_or_none()''',
+              '''        pipeline_run_id: str | None = None,\n        initiated_by: str | None = None,\n        source_version_id: int | None = None,\n    ) -> dict[str, Any] | None:\n        del reviewer_note, initiated_by\n        safe_session_id = int(session_id)\n        with self.session_factory() as db_session:\n            if source_version_id is None:\n                source = db_session.execute(\n                    select(ClinicalSessionVersion)\n                    .where(ClinicalSessionVersion.session_id == safe_session_id)\n                    .order_by(ClinicalSessionVersion.version_number.desc())\n                    .limit(1)\n                ).scalar_one_or_none()\n            else:\n                source = db_session.get(\n                    ClinicalSessionVersion, int(source_version_id)\n                )\n                if (\n                    source is not None\n                    and int(source.session_id or 0) != safe_session_id\n                ):\n                    return None''',
+          )
+          replace_once(
+              "app/server/services/inspection/revision_scaffold.py",
+              '''            configuration=model_configuration,\n            pipeline_run_id=pipeline_run_id,\n        )''',
+              '''            configuration=model_configuration,\n            pipeline_run_id=pipeline_run_id,\n            source_version_id=int(source_version["version_id"]),\n        )''',
+          )
+          replace_once(
+              "app/server/services/inspection/revision_agent.py",
+              '''        if not request.dry_run and not qa.blocking_issues:\n            root_session_id = int(model_configuration["root_session_id"])\n            revised_session_id = self.clinical_session_repository.save_clinical_session(\n                {''',
+              '''        if not request.dry_run and not qa.blocking_issues:\n            root_session_id = int(model_configuration["root_session_id"])\n            sections = (\n                session.get("sections")\n                if isinstance(session.get("sections"), dict)\n                else {}\n            )\n            revised_session_id = self.clinical_session_repository.save_clinical_session(\n                {''',
+          )
+          replace_once(
+              "app/server/services/inspection/revision_agent.py",
+              '''                    "anamnesis": (session.get("sections") or {}).get("anamnesis"),\n                    "drugs": (session.get("sections") or {}).get("therapy"),\n                    "laboratory_analysis": (session.get("sections") or {}).get(\n                        "laboratory_analysis"\n                    ),''',
+              '''                    "anamnesis": sections.get("anamnesis"),\n                    "drugs": sections.get("drugs") or sections.get("therapy"),\n                    "laboratory_analysis": sections.get("laboratory_analysis"),''',
+          )
+
+          # Timeline: fetch one canonical source snapshot at job start and reuse it.
+          replace_once(
+              "app/server/services/inspection/service.py",
+              '''        force_regenerate: bool,\n        job_id: str,\n    ) -> dict[str, Any]:\n        timeline = self.generate_session_timeline(\n            session_id,\n            force_regenerate=force_regenerate,''',
+              '''        force_regenerate: bool,\n        source: dict[str, Any],\n        job_id: str,\n    ) -> dict[str, Any]:\n        timeline = self.generate_session_timeline(\n            session_id,\n            force_regenerate=force_regenerate,\n            source=source,''',
+          )
+          replace_once(
+              "app/server/services/inspection/service.py",
+              '''        safe_session_id = int(session_id)\n        if (\n            self.session_timeline_repository.get_session_timeline_source(\n                safe_session_id\n            )\n            is None\n        ):\n            raise KeyError(safe_session_id)''',
+              '''        safe_session_id = int(session_id)\n        source = self.session_timeline_repository.get_session_timeline_source(\n            safe_session_id\n        )\n        if source is None:\n            raise KeyError(safe_session_id)''',
+          )
+          replace_once(
+              "app/server/services/inspection/service.py",
+              '''            safe_session_id,\n            force_regenerate=force_regenerate,\n        )''',
+              '''            safe_session_id,\n            force_regenerate=force_regenerate,\n            source=source,\n        )''',
+          )
+          replace_once(
+              "app/server/services/inspection/timeline.py",
+              '''        force_regenerate: bool = False,\n        progress_callback: Callable[[float, str], None] | None = None,\n    ) -> PatientTimeline | None:''',
+              '''        force_regenerate: bool = False,\n        source: dict[str, Any] | None = None,\n        progress_callback: Callable[[float, str], None] | None = None,\n    ) -> PatientTimeline | None:''',
+          )
+          replace_once(
+              "app/server/services/inspection/timeline.py",
+              '''            source = self.session_timeline_repository.get_session_timeline_source(\n                session_id\n            )\n            if source is None:\n                return None''',
+              '''            if source is None:\n                source = self.session_timeline_repository.get_session_timeline_source(\n                    session_id\n                )\n                if source is None:\n                    return None''',
+          )
+          replace_once(
+              "app/server/services/inspection/timeline.py",
+              '''                timeline = PatientTimeline(\n                    **{\n                        **timeline.model_dump(),\n                        "generation_status": "llm_generated",\n                        "generation_note": None,\n                        "source_model": source_model,\n                        "source_kind": (\n                            "cloud"\n                            if requested_runtime_settings["use_cloud_services"]\n                            else "local"\n                        ),\n                        "model_provider": requested_runtime_settings["llm_provider"],\n                    }\n                )''',
+              '''                timeline = timeline.model_copy(\n                    update={\n                        "generation_status": "llm_generated",\n                        "generation_note": None,\n                        "source_model": source_model,\n                        "source_kind": (\n                            "cloud"\n                            if requested_runtime_settings["use_cloud_services"]\n                            else "local"\n                        ),\n                        "model_provider": requested_runtime_settings["llm_provider"],\n                    }\n                )''',
+          )
+          replace_once(
+              "app/server/services/inspection/timeline.py",
+              '''                timeline = PatientTimeline(\n                    **{\n                        **timeline.model_dump(),\n                        "source_model": source_model,\n                        "source_kind": (\n                            "cloud"\n                            if requested_runtime_settings["use_cloud_services"]\n                            else "local"\n                        ),\n                        "model_provider": requested_runtime_settings["llm_provider"],\n                    }\n                )''',
+              '''                timeline = timeline.model_copy(\n                    update={\n                        "source_model": source_model,\n                        "source_kind": (\n                            "cloud"\n                            if requested_runtime_settings["use_cloud_services"]\n                            else "local"\n                        ),\n                        "model_provider": requested_runtime_settings["llm_provider"],\n                    }\n                )''',
+          )
+
+          # Focused regressions and updated mocks for the explicit parse-result contract.
+          replace_once(
+              "app/tests/unit/test_session_service.py",
+              '''    prepared = service.prepare_structured_clinical_input(request)''',
+              '''    parse_result = service.validate_assessment_prerequisites_without_llm(request)\n    monkeypatch.setattr(\n        service,\n        "validate_assessment_prerequisites_without_llm",\n        lambda _: (_ for _ in ()).throw(\n            AssertionError("structured preparation must reuse the validated parse result")\n        ),\n    )\n    prepared = service.prepare_structured_clinical_input(\n        request,\n        parse_result=parse_result,\n    )''',
+          )
+          replace_once(
+              "app/tests/unit/test_assessment_preflight.py",
+              '''        lambda req: {\n            "normalized_document": object(),''',
+              '''        lambda req, *, parse_result: {\n            "normalized_document": object(),''',
+          )
+          replace_once(
+              "app/tests/unit/test_polling_interval_centralization.py",
+              '''        lambda request_payload: {\n            "normalized_document": object(),''',
+              '''        lambda request_payload, *, parse_result: {\n            "normalized_document": object(),''',
+          )
+          replace_once(
+              "app/tests/unit/test_revision_agent_skeleton.py",
+              '''    assert revised_session is not None\n    assert revised_session["report"] == draft["payload"]["revised_report_text"]''',
+              '''    assert revised_session is not None\n    assert revised_session["report"] == draft["payload"]["revised_report_text"]\n    assert (\n        revised_session["sections"]["drugs"]\n        == "Amoxicillin started 2026-01-01."\n    )''',
+          )
+
+          revision_test = '''\n\n###############################################################################\ndef test_revision_shell_uses_explicit_source_version(tmp_path: Path) -> None:\n    serializer = build_file_serializer(tmp_path)\n    session_id = save_revision_source_session(serializer)\n    original = serializer.session_revision_repository.get_version_record_for_session(\n        session_id\n    )\n    assert original is not None\n\n    serializer.session_revision_repository.update_current_report_text_with_manual_audit(\n        session_id,\n        report_text="Manually corrected DILI report.",\n        edited_fields=["report_text"],\n        reviewer_note="Create a newer source version.",\n        edited_by="Unit test",\n        metadata={},\n    )\n    latest = serializer.session_revision_repository.get_version_record_for_session(\n        session_id\n    )\n    assert latest is not None\n    assert latest["version_id"] != original["version_id"]\n\n    shell = serializer.session_revision_repository.create_revision_version_shell(\n        session_id,\n        reviewer_note=None,\n        configuration={},\n        pipeline_run_id="explicit-source-version",\n        source_version_id=int(original["version_id"]),\n    )\n\n    assert shell is not None\n    assert shell["source_version_id"] == original["version_id"]\n'''
+          revision_path = Path("app/tests/unit/test_revision_agent_skeleton.py")
+          revision_text = revision_path.read_text(encoding="utf-8")
+          if "def test_revision_shell_uses_explicit_source_version" in revision_text:
+              raise RuntimeError("Revision source-version test already exists")
+          revision_path.write_text(revision_text + revision_test, encoding="utf-8")
+
+          timeline_test = '''\n\n###############################################################################\ndef test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:\n    repository_graph, _ = build_repository_graph_for_test()\n    save_session(\n        repository_graph,\n        patient_name="Timeline Snapshot Patient",\n        timestamp=datetime(2025, 1, 1, 8, 30),\n        status="successful",\n        report="Timeline snapshot report",\n        anamnesis="Symptoms started in January 2025.",\n    )\n    session_rows, _ = repository_graph.clinical_session_repository.list_sessions(\n        search="Timeline Snapshot Patient",\n        status_filter=None,\n        date_mode=None,\n        filter_date=None,\n        offset=0,\n        limit=10,\n    )\n    session_id = int(session_rows[0]["session_id"])\n    jobs = JobManager()\n    service = build_service(\n        repository_graph,\n        timeline_extractor=FakeTimelineExtractor(),\n        jobs=jobs,\n    )\n    source_reads = 0\n    original_get_source = service.session_timeline_repository.get_session_timeline_source\n\n    def tracked_get_source(value: int) -> dict[str, Any] | None:\n        nonlocal source_reads\n        source_reads += 1\n        return original_get_source(value)\n\n    monkeypatch.setattr(\n        service.session_timeline_repository,\n        "get_session_timeline_source",\n        tracked_get_source,\n    )\n\n    started = service.start_session_timeline_job(session_id, force_regenerate=True)\n    job_id = str(started["job_id"])\n    for _ in range(100):\n        status = service.get_session_timeline_job_status(session_id, job_id)\n        if status and status["status"] in {"completed", "failed", "cancelled"}:\n            break\n        time.sleep(0.01)\n    else:\n        raise AssertionError("Timeline job did not finish")\n\n    assert status is not None\n    assert status["status"] == "completed"\n    assert source_reads == 1\n'''
+          timeline_path = Path("app/tests/unit/test_data_inspection_repository.py")
+          timeline_text = timeline_path.read_text(encoding="utf-8")
+          if "def test_timeline_job_reuses_source_loaded_at_start" in timeline_text:
+              raise RuntimeError("Timeline source-reuse test already exists")
+          timeline_path.write_text(timeline_text + timeline_test, encoding="utf-8")
+          PY
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.14.2"
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.30"
+          enable-cache: true
+          cache-dependency-glob: app/server/uv.lock
+
+      - name: Install backend test dependencies
+        working-directory: app/server
+        run: |
+          uv sync --locked --all-extras
+          echo "$GITHUB_WORKSPACE/app/server/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Validate focused changes
+        working-directory: app/server
+        run: |
+          python -m compileall -q . ../tests
+          python -m ruff check . ../tests
+          python -m pyright .
+          python -m pytest \
+            ../tests/unit/test_session_service.py \
+            ../tests/unit/test_assessment_preflight.py \
+            ../tests/unit/test_polling_interval_centralization.py \
+            ../tests/unit/test_revision_agent_skeleton.py \
+            ../tests/unit/test_data_inspection_repository.py \
+            -q
+
+      - name: Commit validated changes
+        shell: bash
+        run: |
+          git rm .github/workflows/apply-clinical-pipeline-simplification.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/server app/tests
+          git commit -m "refactor: simplify clinical processing pipelines"
+          git push origin HEAD:clinical-pipeline-simplification
