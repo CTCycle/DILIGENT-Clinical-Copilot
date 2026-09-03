@@ -2,10 +2,11 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Output, inject } from '@angular/core';
 
 import { AppStateService, PageId } from '../../core/state/app-state.service';
+import { NotificationCenterComponent } from '../notification-center/notification-center.component';
 
 @Component({
   selector: 'app-nav-sidebar',
-  imports: [CommonModule],
+  imports: [CommonModule, NotificationCenterComponent],
   templateUrl: './nav-sidebar.component.html',
   styleUrl: './nav-sidebar.component.scss',
 })
