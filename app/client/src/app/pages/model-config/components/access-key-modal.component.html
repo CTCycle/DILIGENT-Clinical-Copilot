@@ -103,6 +103,10 @@
     }
   </section>
 
-  <app-status-message [message]="errorMessage() ? '[ERROR] ' + errorMessage() : ''" tone="is-error"></app-status-message>
+  <app-status-message
+    [message]="errorMessage() ? '[ERROR] ' + errorMessage() : ''"
+    tone="is-error"
+    presentation="inline"
+  ></app-status-message>
 </app-modal-shell>
 
