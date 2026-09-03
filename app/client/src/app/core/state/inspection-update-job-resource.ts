@@ -1,10 +1,7 @@
 import { effect, signal } from '@angular/core';
 
 import {
-  InspectionLiverToxOverrideRequest,
   InspectionUpdateOverridesByTarget,
-  InspectionRagUpdateRequest,
-  InspectionRxNavOverrideRequest,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobStatusResponse,
   InspectionUpdateStartRequest,
@@ -26,7 +23,6 @@ type InspectionUpdateTargetActions<TTarget extends InspectionUpdateTarget> = {
 
 type InspectionUpdateTargetState = {
   config: Record<string, unknown> | null;
-  configText: string;
   loading: boolean;
   running: boolean;
   jobId: string | null;
@@ -105,15 +101,15 @@ function resolveUpdateProgressMessage(status: InspectionUpdateJobStatusResponse)
   }
   const resultPayload = readRecordKey(payload, 'result');
   const statusValue = readStringKey(payload, 'status') || 'unknown';
-  if (resultPayload && statusValue === "completed") {
-    const summary = readRecordKey(resultPayload, "summary");
-    const documents = summary ? readNumberKey(summary, "documents") : null;
-    const chunks = summary ? readNumberKey(summary, "chunks") : null;
-    const supportedFiles = summary ? readNumberKey(summary, "supported_files") : null;
-    if (typeof documents === "number" && typeof chunks === "number") {
-      const supportedSuffix = typeof supportedFiles === "number"
+  if (resultPayload && statusValue === 'completed') {
+    const summary = readRecordKey(resultPayload, 'summary');
+    const documents = summary ? readNumberKey(summary, 'documents') : null;
+    const chunks = summary ? readNumberKey(summary, 'chunks') : null;
+    const supportedFiles = summary ? readNumberKey(summary, 'supported_files') : null;
+    if (typeof documents === 'number' && typeof chunks === 'number') {
+      const supportedSuffix = typeof supportedFiles === 'number'
         ? ` from ${supportedFiles} supported files`
-        : "";
+        : '';
       return `RAG embeddings update completed: ${documents} documents, ${chunks} chunks${supportedSuffix}.`;
     }
   }
@@ -175,7 +171,6 @@ export class InspectionUpdateJobResource {
   });
   readonly activeTarget = signal<InspectionUpdateTarget | null>(null);
   readonly updateConfig = signal<Record<string, unknown> | null>(null);
-  readonly updateConfigText = signal('{}');
   readonly updateLoading = signal(false);
   readonly updateRunning = signal(false);
   readonly updateJobId = signal<string | null>(null);
@@ -235,15 +230,12 @@ export class InspectionUpdateJobResource {
       const payload = await this.actions[target].fetchConfig();
       const defaults = { ...(payload.defaults ?? undefined) };
       const summary = isRecord(payload.summary) ? { ...payload.summary } : {};
-      const config = payload.read_only ? summary : defaults;
       this.patchTargetState(target, {
-        config,
-        configText: payload.read_only ? '' : JSON.stringify(defaults, null, 2),
+        config: payload.read_only ? summary : defaults,
       });
     } catch (error) {
       this.patchTargetState(target, {
         config: {},
-        configText: '{}',
         error: error instanceof Error ? error.message : 'Failed to load update configuration.',
       });
     } finally {
@@ -255,12 +247,18 @@ export class InspectionUpdateJobResource {
     this.activeTarget.set(null);
   }
 
-  setConfigText(value: string): void {
+  setConfigValue(key: string, value: unknown): void {
     const target = this.activeTarget();
     if (!target) {
       return;
     }
-    this.patchTargetState(target, { configText: value });
+    this.patchTargetState(target, {
+      config: {
+        ...(this.getTargetState(target).config ?? {}),
+        [key]: value,
+      },
+      error: null,
+    });
   }
 
   async start(): Promise<void> {
@@ -338,20 +336,9 @@ export class InspectionUpdateJobResource {
         documents_path: requestedPath || undefined,
       } as InspectionUpdateOverridesByTarget[TTarget];
     }
-    const normalized = this.updateConfigText().trim();
-    if (!normalized) {
-      return {} as InspectionUpdateOverridesByTarget[TTarget];
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(normalized);
-    } catch {
-      throw new Error('Invalid JSON overrides.');
-    }
-    if (!isRecord(parsed)) {
-      throw new Error('Overrides must be a JSON object.');
-    }
-    return parsed as InspectionUpdateOverridesByTarget[TTarget];
+    return {
+      ...(this.getTargetState(target).config ?? {}),
+    } as InspectionUpdateOverridesByTarget[TTarget];
   }
 
   private buildStartRequest(target: InspectionUpdateTarget): InspectionUpdateStartRequest {
@@ -448,7 +435,6 @@ export class InspectionUpdateJobResource {
     }
     const initial: InspectionUpdateTargetState = {
       config: null,
-      configText: '{}',
       loading: false,
       running: false,
       jobId: null,
@@ -487,7 +473,6 @@ export class InspectionUpdateJobResource {
 
   private applyStateToSignals(state: InspectionUpdateTargetState): void {
     this.updateConfig.set(state.config);
-    this.updateConfigText.set(state.configText);
     this.updateLoading.set(state.loading);
     this.updateRunning.set(state.running);
     this.updateJobId.set(state.jobId);
