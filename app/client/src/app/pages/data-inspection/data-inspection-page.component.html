@@ -1,6 +1,6 @@
 <main class="page-container inspection-page inspection-page-workbench">
   <header class="page-header inspection-page-intro">
-    <p class="lede">Review curated drug knowledge sources, inspect aliases and extraction details, update catalog entries directly, and monitor RAG indexing status from one workspace designed for transparent clinical evidence maintenance.</p>
+    <p class="lede">Inspect and update RxNav, LiverTox, and RAG knowledge sources.</p>
   </header>
 
   <section class="inspection-layout">
@@ -349,13 +349,13 @@
             }
           </dl>
         } @else {
-          <label class="field-label" for="update-overrides">JSON overrides</label>
-          <textarea
-            id="update-overrides"
-            class="field-textarea inspection-update-overrides"
-            [ngModel]="updateConfigText()"
-            (ngModelChange)="setUpdateConfigText($event)"
-          ></textarea>
+          <app-inspection-update-controls
+            [target]="activeUpdateTarget()"
+            [config]="updateConfig()"
+            [configText]="updateConfigText()"
+            [disabled]="updateRunning()"
+            (configTextChange)="setUpdateConfigText($event)"
+          />
         }
         <div class="inspection-job-panel">
           <p class="inspection-job-message">Job ID: {{ updateJobId() || 'Not started' }}</p>
