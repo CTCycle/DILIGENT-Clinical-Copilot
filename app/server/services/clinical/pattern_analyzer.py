@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date, datetime
 
 from common.constants import (
     DEFAULT_DILI_CLASSIFICATION,
@@ -55,9 +56,7 @@ class HepatotoxicityPatternCalculator:
     # -------------------------------------------------------------------------
     @staticmethod
     def safe_ratio(value: float | None, reference: float | None) -> float | None:
-        if value is None or reference is None:
-            return None
-        if reference == 0:
+        if value is None or reference is None or reference <= 0:
             return None
         return value / reference
 
@@ -103,9 +102,9 @@ class HepatotoxicityPatternAnalyzer:
                 severity="warning",
                 code="missing_hepatotoxicity_inputs",
                 message=(
-                    "Laboratory data are insufficient for a numeric R ratio "
-                    "(ideally ALT/AST, ALP, and bilirubin). Continuing with "
-                    "indeterminate pattern and reduced confidence."
+                    "Laboratory data are insufficient for a guideline-faithful R ratio. "
+                    "A paired ALT and ALP measurement with documented laboratory-specific "
+                    "ULN values is required. Continuing with an indeterminate pattern."
                 ),
                 field="laboratory_analysis",
             )
@@ -127,22 +126,23 @@ class HepatotoxicityPatternAnalyzer:
         self, lab_timeline: PatientLabTimeline
     ) -> dict[str, float] | None:
         dated_candidates = self.group_entries_by_date(lab_timeline.entries)
-        dated_pairs = [
-            pair
-            for sample_date in sorted(dated_candidates)
-            if (pair := self.build_anchor_from_bucket(dated_candidates[sample_date]))
-            is not None
-        ]
-        if dated_pairs:
-            # The clinical injury anchor is the paired ALT/ALP sample at the
-            # peak ALT multiple, not an earlier normal baseline or a later
-            # recovering sample.
-            return max(
-                dated_pairs,
-                key=lambda pair: pair["alt_value"] / pair["alt_uln"],
-            )
-        undated = self.build_anchor_from_bucket(lab_timeline.entries)
-        return undated
+        for sample_date in sorted(dated_candidates, key=self._date_sort_key):
+            pair = self.build_anchor_from_bucket(dated_candidates[sample_date])
+            if pair is None:
+                continue
+            alt_multiple = pair["alt_value"] / pair["alt_uln"]
+            alp_multiple = pair["alp_value"] / pair["alp_uln"]
+            if alt_multiple > 1.0 or alp_multiple > 1.0:
+                return pair
+
+        undated = self.build_anchor_from_bucket(
+            [entry for entry in lab_timeline.entries if not entry.sample_date]
+        )
+        if undated is None:
+            return None
+        alt_multiple = undated["alt_value"] / undated["alt_uln"]
+        alp_multiple = undated["alp_value"] / undated["alp_uln"]
+        return undated if alt_multiple > 1.0 or alp_multiple > 1.0 else None
 
     # -------------------------------------------------------------------------
     def group_entries_by_date(
@@ -161,17 +161,22 @@ class HepatotoxicityPatternAnalyzer:
         self,
         entries: list[ClinicalLabEntry],
     ) -> dict[str, float] | None:
-        alt_like = self.pick_best_entry(entries, {"ALT", "AST"})
+        alt = self.pick_best_entry(entries, {"ALT"})
         alp = self.pick_best_entry(entries, {"ALP"})
-        if alt_like is None or alp is None:
+        if alt is None or alp is None:
             return None
-        alt_value = self.parse_entry_value(alt_like)
+        alt_value = self.parse_entry_value(alt)
         alp_value = self.parse_entry_value(alp)
-        if alt_value is None or alp_value is None:
-            return None
-        alt_uln = self.resolve_uln(alt_like, fallback=40.0)
-        alp_uln = self.resolve_uln(alp, fallback=120.0)
-        if alt_uln <= 0 or alp_uln <= 0:
+        alt_uln = self.resolve_uln(alt)
+        alp_uln = self.resolve_uln(alp)
+        if (
+            alt_value is None
+            or alp_value is None
+            or alt_uln is None
+            or alp_uln is None
+            or alt_uln <= 0
+            or alp_uln <= 0
+        ):
             return None
         return {
             "alt_value": alt_value,
@@ -187,22 +192,29 @@ class HepatotoxicityPatternAnalyzer:
         marker_names: set[str],
     ) -> ClinicalLabEntry | None:
         selected: ClinicalLabEntry | None = None
+        selected_multiple: float | None = None
         for entry in entries:
             if entry.marker_name.upper() not in marker_names:
                 continue
+            value = self.parse_entry_value(entry)
+            uln = self.resolve_uln(entry)
+            current_multiple = (
+                value / uln if value is not None and uln is not None and uln > 0 else None
+            )
             if selected is None:
                 selected = entry
+                selected_multiple = current_multiple
                 continue
-            selected_value = self.parse_entry_value(selected)
-            current_value = self.parse_entry_value(entry)
-            if selected_value is None and current_value is not None:
+            if selected_multiple is None and current_multiple is not None:
                 selected = entry
+                selected_multiple = current_multiple
             elif (
-                current_value is not None
-                and selected_value is not None
-                and current_value > selected_value
+                selected_multiple is not None
+                and current_multiple is not None
+                and current_multiple > selected_multiple
             ):
                 selected = entry
+                selected_multiple = current_multiple
         return selected
 
     # -------------------------------------------------------------------------
@@ -212,13 +224,11 @@ class HepatotoxicityPatternAnalyzer:
         return self.parse_marker_value(entry.value_text)
 
     # -------------------------------------------------------------------------
-    def resolve_uln(self, entry: ClinicalLabEntry, *, fallback: float) -> float:
+    def resolve_uln(self, entry: ClinicalLabEntry) -> float | None:
         if entry.upper_limit_normal is not None and entry.upper_limit_normal > 0:
             return float(entry.upper_limit_normal)
         parsed = self.parse_marker_value(entry.upper_limit_text)
-        if parsed is not None and parsed > 0:
-            return parsed
-        return fallback
+        return parsed if parsed is not None and parsed > 0 else None
 
     # -------------------------------------------------------------------------
     def parse_marker_value(self, raw: str | None) -> float | None:
@@ -232,6 +242,21 @@ class HepatotoxicityPatternAnalyzer:
             return float(match.group())
         except ValueError:
             return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _date_sort_key(value: str) -> date:
+        normalized = str(value).strip().replace("/", "-").replace(".", "-")
+        try:
+            return date.fromisoformat(normalized)
+        except ValueError:
+            pass
+        for fmt in ("%d-%m-%Y", "%m-%d-%Y", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(normalized, fmt).date()
+            except ValueError:
+                continue
+        return date.max
 
     # -------------------------------------------------------------------------
     def safe_ratio(self, value: float | None, reference: float | None) -> float | None:
