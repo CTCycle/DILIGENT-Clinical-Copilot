@@ -68,6 +68,7 @@ from domain.clinical.dili import (
     ClinicalDataCompleteness,
     DiliAcceptanceQuestion,
     ClinicalEvidenceQuote,
+    DiliCaseQualification,
     DiliCompetingCause,
     DiliDifferentialAssessment,
     DiliEvidenceBundle,
@@ -79,9 +80,9 @@ from domain.clinical.dili import (
     DiliSeverityAssessment,
     DiliTimeline,
     DiliTimelineEvent,
-    DilinLikeCausalityAssessment,
     DrugExposureAssessment,
     DrugIdentityResolution,
+    StructuredCausalityAssessment,
 )
 
 __all__ = [
@@ -143,6 +144,7 @@ __all__ = [
     "ClinicalDataCompleteness",
     "DiliAcceptanceQuestion",
     "ClinicalEvidenceQuote",
+    "DiliCaseQualification",
     "DiliCompetingCause",
     "DiliDifferentialAssessment",
     "DiliEvidenceBundle",
@@ -154,7 +156,7 @@ __all__ = [
     "DiliSeverityAssessment",
     "DiliTimeline",
     "DiliTimelineEvent",
-    "DilinLikeCausalityAssessment",
     "DrugExposureAssessment",
     "DrugIdentityResolution",
+    "StructuredCausalityAssessment",
 ]
