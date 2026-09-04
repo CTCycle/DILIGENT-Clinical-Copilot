@@ -26,6 +26,22 @@ class ClinicalDataCompleteness(BaseModel):
 
 
 ###############################################################################
+class DiliCaseQualification(BaseModel):
+    status: Literal[
+        "meets_typical_detection_criteria",
+        "below_typical_detection_criteria",
+        "insufficient_data",
+    ]
+    qualifying_criteria: list[str] = Field(default_factory=list)
+    pending_confirmation: list[str] = Field(default_factory=list)
+    baseline_date: str | None = None
+    baseline_abnormal: bool | None = None
+    baseline_multiples: dict[str, float | None] = Field(default_factory=dict)
+    rationale: list[str] = Field(default_factory=list)
+    evidence: list[ClinicalEvidenceQuote] = Field(default_factory=list)
+
+
+###############################################################################
 class DiliTimelineEvent(BaseModel):
     event_type: str
     event_date: str | None = None
@@ -152,15 +168,13 @@ class DiliRucamAssessment(BaseModel):
 
 
 ###############################################################################
-class DilinLikeCausalityAssessment(BaseModel):
+class StructuredCausalityAssessment(BaseModel):
     drug_name: str
-    category: Literal[
-        "definite", "very_likely", "probable", "possible", "unlikely", "unassessable"
-    ]
+    category: Literal["supportive", "limited", "argues_against", "unassessable"]
     temporal_compatibility: str
     dechallenge_rechallenge: str
-    phenotype_match: str
-    known_drug_signature: str
+    drug_signature_concordance: str
+    known_hepatotoxic_potential: str
     competing_cause_exclusion: str
     drug_identity_quality: str
     source_evidence_quality: str
@@ -206,13 +220,14 @@ class DrugExposureAssessment(BaseModel):
     )
     livertox_likelihood: str | None = None
     direct_toxin_or_dose_dependent: bool = False
-    causality: DilinLikeCausalityAssessment | None = None
+    causality: StructuredCausalityAssessment | None = None
     rucam: DiliRucamAssessment | None = None
 
 
 ###############################################################################
 class DiliEvidenceBundle(BaseModel):
     completeness: ClinicalDataCompleteness
+    case_qualification: DiliCaseQualification
     timeline: DiliTimeline
     patterns: list[DiliInjuryPattern] = Field(default_factory=list)
     phenotype: DiliPhenotypeAssessment
@@ -223,6 +238,6 @@ class DiliEvidenceBundle(BaseModel):
     evidence: list[ClinicalEvidenceQuote] = Field(default_factory=list)
     acceptance_questions: list[DiliAcceptanceQuestion] = Field(default_factory=list)
     source_hierarchy: list[str] = Field(
-        default_factory=lambda: ["AASLD", "LiverTox", "FDA", "DILIN/RUCAM"]
+        default_factory=lambda: ["AASLD", "LiverTox", "FDA", "DILIN expert method/RUCAM"]
     )
     manual_review_required: bool = True
