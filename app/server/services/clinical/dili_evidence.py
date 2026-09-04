@@ -60,6 +60,10 @@ class DiliEvidenceBuilder:
         "lifelong avoidance",
         "strict lifelong",
     )
+    _DEFINITIVE_LANGUAGE_NEGATION_RE = re.compile(
+        r"\b(?:not|never|no|without|cannot|can't|unable|uncertain|"
+        r"unassessable|avoid\w*|refrain\w*)\b"
+    )
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -147,16 +151,23 @@ class DiliEvidenceBuilder:
     # -------------------------------------------------------------------------
     @classmethod
     def _contains_unsupported_definitive_language(cls, text: str) -> bool:
-        if cls._contains_any(text, cls._DEFINITIVE_CAUSALITY_PHRASES):
-            return True
-        for match in re.finditer(r"\b(?:confident|definitive) diagnosis\b", text):
-            context = f"{text[max(0, match.start() - 80):match.start()]} {text[match.end():match.end() + 80]}"
-            if re.search(
-                r"\b(?:not|cannot|can't|no|without|unable|uncertain|unassessable)\b",
-                context,
-            ):
-                continue
-            return True
+        patterns = (
+            *cls._DEFINITIVE_CAUSALITY_PHRASES,
+            r"\b(?:confident|definitive) diagnosis\b",
+        )
+        pattern = re.compile("|".join(
+            phrase if phrase.startswith(r"\b") else re.escape(phrase)
+            for phrase in patterns
+        ))
+        for sentence in re.split(r"[.!?;]+", text):
+            for match in pattern.finditer(sentence):
+                context = (
+                    f"{sentence[max(0, match.start() - 100):match.start()]} "
+                    f"{sentence[match.end():match.end() + 100]}"
+                )
+                if cls._DEFINITIVE_LANGUAGE_NEGATION_RE.search(context):
+                    continue
+                return True
         return False
 
     # -------------------------------------------------------------------------
@@ -713,12 +724,24 @@ class DiliEvidenceBuilder:
             if item.rucam is None:
                 lines.append("- Not assessable")
                 continue
-            if item.rucam.total_score is None:
-                lines.append(f"- No automated total; category: {item.rucam.category}")
-            else:
+            if (
+                item.rucam.calculation_method == "source_reported"
+                and not item.rucam.estimated
+                and item.rucam.total_score is not None
+            ):
                 lines.append(
                     f"- Patient-record total: {item.rucam.total_score}; category: {item.rucam.category}"
                 )
+            elif (
+                item.rucam.calculation_method == "structured_rucam"
+                and not item.rucam.estimated
+                and item.rucam.total_score is not None
+            ):
+                lines.append(
+                    f"- Structured total: {item.rucam.total_score}; category: {item.rucam.category}"
+                )
+            else:
+                lines.append(f"- No automated total; category: {item.rucam.category}")
             lines.extend(
                 f"- {component.component}: {component.status}; score={component.score}; "
                 f"evidence={component.evidence_quote or 'missing'}; date={component.evidence_date or 'missing'}"

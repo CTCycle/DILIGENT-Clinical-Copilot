@@ -53,6 +53,16 @@ def _exclusion_re() -> re.Pattern[str]:
 RUCAM_SCORE_RE = re.compile(
     r"\brucam\b\s*(?:score)?\s*[:=]?\s*(-?\d{1,2})", re.IGNORECASE
 )
+NON_PATIENT_RUCAM_CONTEXT_TERMS = (
+    "livertox",
+    "monograph",
+    "representative case",
+    "literature",
+    "publication",
+    "paper",
+    "study",
+    "trial",
+)
 
 RucamInjuryType = Literal[
     "hepatocellular",
@@ -96,11 +106,13 @@ class RucamScoreEstimator:
             start = max(0, match.start() - 220)
             end = min(len(laboratory_history_text), match.end() + 220)
             window = laboratory_history_text[start:end]
+            lowered = window.casefold()
+            if any(term in lowered for term in NON_PATIENT_RUCAM_CONTEXT_TERMS):
+                continue
             if require_drug_attribution:
                 if not drug_name or drug_name.casefold() not in window.casefold():
                     continue
             score = max(-10, min(14, int(match.group(1))))
-            lowered = window.lower()
             category = None
             for candidate in (
                 "highly probable",

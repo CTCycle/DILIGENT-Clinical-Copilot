@@ -33,22 +33,39 @@ class DiliCausalityEngine:
     ) -> DiliRucamAssessment | None:
         if source is None:
             return None
+        score_available = (
+            source.calculation_method in {"source_reported", "structured_rucam"}
+            and not source.estimated
+            and source.total_score is not None
+        )
+        limitations = list(source.limitations)
+        if source.total_score is not None and not score_available:
+            limitations.append(
+                "A numerical RUCAM value was not retained because its provenance was not an explicit current patient-record report."
+            )
         return DiliRucamAssessment(
             drug_name=drug_name,
-            total_score=source.total_score,
-            category=source.causality_category,
+            total_score=source.total_score if score_available else None,
+            category=source.causality_category if score_available else "not assessable",
+            calculation_method=source.calculation_method,
+            score_source=source.score_source,
+            estimated=source.estimated,
             components=[
                 DiliRucamComponent(
                     component=item.component_key,
-                    score=item.score if item.status == "scored" else None,
-                    status=item.status,
+                    score=item.score if score_available and item.status == "scored" else None,
+                    status=(
+                        item.status
+                        if score_available or item.status != "scored"
+                        else "not_assessable"
+                    ),
                     evidence_quote=item.evidence,
                     evidence_date=item.evidence_date,
                     rationale=item.rationale,
                 )
                 for item in source.components
             ],
-            limitations=source.limitations,
+            limitations=limitations,
         )
 
     # -------------------------------------------------------------------------

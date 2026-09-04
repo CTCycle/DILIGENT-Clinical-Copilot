@@ -290,22 +290,37 @@ class DrugAnalysisService:
         if rucam is None:
             return "RUCAM evidence is not available."
         limitations = ", ".join((rucam.limitations or [])[:3]) or "not specified"
-        if rucam.total_score is None:
-            component_labels = ", ".join(
-                component.label for component in (rucam.components or [])[:5]
-            ) or "none captured"
+        if (
+            rucam.calculation_method == "source_reported"
+            and not rucam.estimated
+            and rucam.total_score is not None
+        ):
             return (
-                "- Numerical updated-RUCAM total: not calculated\n"
-                f"- Evidence checklist components: {component_labels}\n"
-                f"- Key limitations: {limitations}\n"
-                "- Interpretation: do not infer a RUCAM probability category from this checklist."
+                f"- Patient-record RUCAM score: {rucam.total_score}\n"
+                f"- Patient-record category: {rucam.causality_category}\n"
+                f"- Source: {rucam.score_source or 'current patient record'}\n"
+                "- Interpretation: this score was preserved from the patient record and was not independently recalculated by DILIGENT.\n"
+                f"- Key limitations: {limitations}"
             )
+        if (
+            rucam.calculation_method == "structured_rucam"
+            and not rucam.estimated
+            and rucam.total_score is not None
+        ):
+            return (
+                f"- Structured RUCAM score: {rucam.total_score}\n"
+                f"- Structured RUCAM category: {rucam.causality_category}\n"
+                "- Interpretation: treat this as supportive evidence, not a dispositive patient-level diagnosis.\n"
+                f"- Key limitations: {limitations}"
+            )
+        component_labels = ", ".join(
+            component.label for component in (rucam.components or [])[:5]
+        ) or "none captured"
         return (
-            f"- Patient-record RUCAM score: {rucam.total_score}\n"
-            f"- Patient-record category: {rucam.causality_category}\n"
-            f"- Source: {rucam.score_source or 'current patient record'}\n"
-            "- Interpretation: this score was preserved from the patient record and was not independently recalculated by DILIGENT.\n"
-            f"- Key limitations: {limitations}"
+            "- Numerical updated-RUCAM total: not calculated\n"
+            f"- Evidence checklist components: {component_labels}\n"
+            f"- Key limitations: {limitations}\n"
+            "- Interpretation: do not infer a RUCAM probability category from this checklist."
         )
 
     # -------------------------------------------------------------------------

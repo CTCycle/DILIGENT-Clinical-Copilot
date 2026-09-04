@@ -19,6 +19,7 @@ from domain.clinical import (
 )
 from domain.clinical.entities import DeterministicDrugExtractionResult
 from services.clinical.preparation import HepatoxPreparedInputs
+from services.session.workflow_shared import resolve_rucam_source
 
 
 ###############################################################################
@@ -29,6 +30,37 @@ def get_session_service() -> Any:
             if owner is not None:
                 return owner.service
     raise AssertionError("Clinical route not found")
+
+
+###############################################################################
+def test_rucam_source_metadata_requires_explicit_provenance() -> None:
+    assert (
+        resolve_rucam_source(
+            [
+                DrugRucamAssessment(
+                    drug_name="Drug A",
+                    total_score=6,
+                    causality_category="probable",
+                    calculation_method="source_reported",
+                    score_source="patient_laboratory_history",
+                    estimated=False,
+                )
+            ]
+        )
+        == "provided"
+    )
+    assert (
+        resolve_rucam_source(
+            [
+                DrugRucamAssessment(
+                    drug_name="Drug A",
+                    total_score=6,
+                    causality_category="probable",
+                )
+            ]
+        )
+        == "not_calculated_insufficient_data"
+    )
 
 
 ###############################################################################

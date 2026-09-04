@@ -81,6 +81,18 @@ def test_livertox_case_rucam_score_is_never_used_as_patient_score() -> None:
 
 
 ###############################################################################
+def test_livertox_context_in_laboratory_text_is_not_patient_rucam() -> None:
+    estimator = RucamScoreEstimator()
+
+    assert (
+        estimator.resolve_provided_rucam_score(
+            "LiverTox monograph: RUCAM score 8 in a representative case."
+        )
+        is None
+    )
+
+
+###############################################################################
 def test_laboratory_history_patient_rucam_score_has_priority() -> None:
     estimator = RucamScoreEstimator()
     payload, analysis, timeline = _base_inputs()
