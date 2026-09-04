@@ -55,6 +55,10 @@ import {
   resolveRagDocumentsPath,
 } from '../../core/utils/inspection-formatting';
 import { isRecord } from '../../core/utils';
+import {
+  InspectionUpdateControlsComponent,
+  InspectionUpdateFieldChange,
+} from './components/inspection-update-controls.component';
 
 const INSPECTION_VIEWS: InspectionViewOption[] = [
   {
@@ -106,6 +110,7 @@ function folderBasename(value: string): string {
     InspectionActionIconButtonComponent,
     InspectionCatalogStatusComponent,
     InspectionCatalogToolbarComponent,
+    InspectionUpdateControlsComponent,
   ],
   templateUrl: './data-inspection-page.component.html',
   styleUrl: './data-inspection-page.component.scss',
@@ -226,7 +231,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   );
   readonly activeUpdateTarget = this.updateJob.activeTarget;
   readonly updateConfig = this.updateJob.updateConfig;
-  readonly updateConfigText = this.updateJob.updateConfigText;
   readonly updateLoading = this.updateJob.updateLoading;
   readonly updateRunning = this.updateJob.updateRunning;
   readonly updateJobId = this.updateJob.updateJobId;
@@ -238,7 +242,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly updateModalSubtitle = computed(() =>
     this.isRagUpdateModal()
       ? 'Review current vectorization settings. Modify RAG settings only from Model Configurations.'
-      : 'Configure overrides, run, monitor progress, and cancel if needed.',
+      : 'Configure update parameters and monitor progress.',
   );
   readonly ragUpdateSummaryEntries = computed(() => {
     if (!this.isRagUpdateModal()) {
@@ -542,8 +546,8 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     this.updateJob.close();
   }
 
-  setUpdateConfigText(value: string): void {
-    this.updateJob.setConfigText(value);
+  updateUpdateConfig(change: InspectionUpdateFieldChange): void {
+    this.updateJob.setConfigValue(change.key, change.value);
   }
 
   async startUpdateJob(): Promise<void> {
@@ -568,4 +572,3 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     return 'Not set';
   }
 }
-
