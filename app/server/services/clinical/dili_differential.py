@@ -15,6 +15,8 @@ CAUSE_PATTERNS: dict[str, tuple[str, ...]] = {
         "hepatitis a",
         "hepatitis b",
         "hepatitis c",
+        "hepatitis d",
+        "hepatitis e",
         "hav",
         "hbv",
         "hcv",
@@ -64,9 +66,14 @@ CAUSE_PATTERNS: dict[str, tuple[str, ...]] = {
         "cirrhos",
         "chronic liver",
         "portal hypertension",
-        "hepatitis",
+        "chronic hepatitis",
         "fibrosis",
     ),
+}
+
+BASELINE_CONTEXT_CAUSES = {
+    "masld_mash_nash",
+    "pre_existing_chronic_liver_disease",
 }
 
 EXCLUDED_RE = re.compile(
@@ -102,13 +109,20 @@ class DiliDifferentialEngine:
                     evidence=evidence,
                 )
             )
-            if status != "excluded":
+            if self._blocks_exclusion(cause, status):
                 unresolved.append(cause)
         return DiliDifferentialAssessment(
             causes=causes,
             all_major_causes_excluded=not unresolved,
             unresolved_causes=unresolved,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _blocks_exclusion(cause: str, status: EvidenceStatus) -> bool:
+        if cause in BASELINE_CONTEXT_CAUSES:
+            return status in {"not_excluded", "unknown"}
+        return status != "excluded"
 
     # -------------------------------------------------------------------------
     def _assess_cause(
@@ -120,9 +134,15 @@ class DiliDifferentialEngine:
     ) -> tuple[EvidenceStatus, str, list[ClinicalEvidenceQuote]]:
         matched_phrase = next((phrase for phrase in phrases if phrase in lowered), None)
         if matched_phrase is None:
+            if cause in BASELINE_CONTEXT_CAUSES:
+                return (
+                    "missing_data",
+                    "No explicit baseline documentation for this chronic liver context was found; absence is not treated as exclusion.",
+                    [self._quote(cause, None)],
+                )
             return (
                 "missing_data",
-                "No explicit evaluation for this mandatory competing cause was found.",
+                "No explicit evaluation for this major competing cause was found.",
                 [self._quote(cause, None)],
             )
 
@@ -134,7 +154,11 @@ class DiliDifferentialEngine:
             rationale = "Explicit exclusion or negative workup is documented."
         elif PRESENT_RE.search(window_lower):
             status = "not_excluded"
-            rationale = "The cause is documented or clinically present, so it remains competing."
+            rationale = (
+                "The condition is documented or clinically present and must be interpreted as baseline context and/or a competing explanation."
+                if cause in BASELINE_CONTEXT_CAUSES
+                else "The cause is documented or clinically present, so it remains competing."
+            )
         elif UNKNOWN_RE.search(window_lower):
             status = "unknown"
             rationale = "The source mentions this cause but leaves the workup or result unresolved."
