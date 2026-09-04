@@ -20,20 +20,14 @@ Assessment rules:
 - Compare the observed injury pattern with LiverTox evidence.
 - Use the structured disease timeline to separate baseline hepatic disease from possible DILI.
 - Discuss dechallenge/rechallenge only when supplied evidence supports it.
-- Integrate estimated RUCAM into causality reasoning; do not invent RUCAM scores.
-- Treat unresolved competing causes, non-assessable Hy's Law, and incomplete RUCAM
-  as hard limits on certainty. Never state that competing causes were excluded unless
-  the supplied structured evidence explicitly says so.
-- Never recommend, permit, suggest, or propose rechallenge, re-exposure, restart, or
-  reintroduction of a suspected drug. State only documented historical evidence and
-  that rechallenge is not recommended.
-- LiverTox likelihood is a drug-level prior, not patient-level causality. Do not turn
-  it into a definitive diagnosis, absolute contraindication, or lifelong recommendation.
+- Treat a numerical RUCAM as patient-record evidence only when the supplied RUCAM block explicitly identifies a patient-record score. Otherwise treat the RUCAM block as a non-scoring evidence checklist and do not infer a RUCAM category.
+- Treat unresolved competing causes, non-assessable Hy's Law, and incomplete causality evidence as hard limits on certainty. Never state that competing causes were excluded unless the supplied structured evidence explicitly says so.
+- Never recommend, permit, suggest, or propose rechallenge, re-exposure, restart, or reintroduction of a suspected drug. State only documented historical evidence and that rechallenge is not recommended.
+- LiverTox likelihood is a drug-level prior, not patient-level causality. Do not turn it into a definitive diagnosis, absolute contraindication, or lifelong recommendation.
 
 Language:
 - Language map: en=English, it=Italian, de=German, fr=French, es=Spanish.
-- Output entirely in `{{report_language}}`; translate source content except drug names,
-  source titles, and necessary quoted terms.
+- Output entirely in `{{report_language}}`; translate source content except drug names, source titles, and necessary quoted terms.
 
 Output:
 - Return only the narrative clinical assessment body.
@@ -74,7 +68,7 @@ Patient clinical context:
 Observed liver injury pattern:
 {pattern_summary}
 
-Estimated RUCAM:
+RUCAM evidence:
 {rucam_block}
 
 Therapy timeline:
@@ -88,18 +82,14 @@ Return narrative clinical reasoning only.
 
 Guidelines:
 - Use quantitative excerpt data when available and describe supplied studies/reports if mentioned.
-- Compare related agents only when the excerpt mentions them; otherwise briefly reference
-  the agent/class listed in metadata.
+- Compare related agents only when the excerpt mentions them; otherwise briefly reference the agent/class listed in metadata.
 - Do not provide drug-level monitoring or management recommendations here.
 - Reason about temporal order using visit date, start/suspension timing, and disease timeline.
-- Treat estimated RUCAM as supportive, not definitive; state incompleteness/low confidence.
-- Preserve structured uncertainty in every conclusion: do not claim a confident or
-  definitive diagnosis when competing causes, Hy's Law, or RUCAM remain incomplete.
-- Do not recommend absolute or lifelong avoidance; recommend clinician review and
-  evidence-based follow-up instead.
+- If a patient-record RUCAM score is supplied, treat it as supportive and not independently verified by DILIGENT. If only a RUCAM evidence checklist is supplied, do not invent or infer a numerical score or probability category.
+- Preserve structured uncertainty in every conclusion: do not claim a confident or definitive diagnosis when competing causes, Hy's Law, chronology, or causality evidence remain incomplete.
+- Do not recommend absolute or lifelong avoidance; recommend clinician review and evidence-based follow-up instead.
 - If rechallenge/restart evidence exists, state whether it strengthens or weakens causality.
-- Do not turn that historical evidence into a recommendation or permission to rechallenge,
-  re-expose, restart, or reintroduce the drug.
+- Do not turn that historical evidence into a recommendation or permission to rechallenge, re-expose, restart, or reintroduce the drug.
 - If management language is needed, defer it: "See final synthesis section for integrated recommendations."
 - Use retrieved documents only as supplemental context.
 - Do not print raw retrieved text.
@@ -124,20 +114,14 @@ Revision rules:
 - Make corrections explicit when prior causality framing is unsupported by revised evidence.
 - Compare the observed injury pattern with LiverTox evidence using the revised context.
 - Use the structured disease timeline to separate baseline hepatic disease from possible DILI.
-- Integrate estimated RUCAM into causality reasoning; do not invent RUCAM scores.
-- Treat unresolved competing causes, non-assessable Hy's Law, and incomplete RUCAM
-  as hard limits on certainty. Never state that competing causes were excluded unless
-  the supplied structured evidence explicitly says so.
-- Never recommend, permit, suggest, or propose rechallenge, re-exposure, restart, or
-  reintroduction of a suspected drug. State only documented historical evidence and
-  that rechallenge is not recommended.
-- LiverTox likelihood is a drug-level prior, not patient-level causality. Do not turn
-  it into a definitive diagnosis, absolute contraindication, or lifelong recommendation.
+- Treat a numerical RUCAM as patient-record evidence only when the supplied RUCAM block explicitly identifies a patient-record score. Otherwise treat the RUCAM block as a non-scoring evidence checklist and do not infer a RUCAM category.
+- Treat unresolved competing causes, non-assessable Hy's Law, and incomplete causality evidence as hard limits on certainty. Never state that competing causes were excluded unless the supplied structured evidence explicitly says so.
+- Never recommend, permit, suggest, or propose rechallenge, re-exposure, restart, or reintroduction of a suspected drug. State only documented historical evidence and that rechallenge is not recommended.
+- LiverTox likelihood is a drug-level prior, not patient-level causality. Do not turn it into a definitive diagnosis, absolute contraindication, or lifelong recommendation.
 
 Language:
 - Language map: en=English, it=Italian, de=German, fr=French, es=Spanish.
-- Output entirely in `{{report_language}}`; translate source content except drug names,
-  source titles, and necessary quoted terms.
+- Output entirely in `{{report_language}}`; translate source content except drug names, source titles, and necessary quoted terms.
 
 Output:
 - Return only the narrative clinical assessment body.
@@ -178,7 +162,7 @@ Revised patient clinical context:
 Observed liver injury pattern:
 {pattern_summary}
 
-Estimated RUCAM:
+RUCAM evidence:
 {rucam_block}
 
 Therapy timeline:
@@ -194,9 +178,9 @@ Revision guidance:
 - Treat previous report wording as comparison-only context if present.
 - Prefer revised structured evidence and current source chronology over legacy phrasing.
 - Make corrections explicit when prior causality framing appears unsupported.
+- If a patient-record RUCAM score is supplied, treat it as supportive and not independently verified by DILIGENT. If only a RUCAM evidence checklist is supplied, do not invent or infer a numerical score or probability category.
 - Do not provide drug-level monitoring or management recommendations here.
-- Do not recommend, permit, suggest, or propose rechallenge, re-exposure, restart, or
-  reintroduction; describe any such event only as historical evidence or a safety signal.
+- Do not recommend, permit, suggest, or propose rechallenge, re-exposure, restart, or reintroduction; describe any such event only as historical evidence or a safety signal.
 - Use retrieved documents only as supplemental context.
 - Do not print raw retrieved text.
 - Do not create bibliography entries or source lists; document references are appended by the application renderer.
@@ -216,16 +200,12 @@ baseline causes, match uncertainty, and contradictions without repeating every
 drug paragraph. Provide clinician-facing management/follow-up recommendations
 only here. Address indispensable-therapy trade-offs and avoid blanket
 discontinuation language. Do not mention drugs absent from the supplied report.
-- If competing causes or patient-level causality remain unresolved, state that plainly
-  and keep recommendations conditional on clinician review. Do not use absolute,
-  lifelong, or definitive language.
-- Never recommend or permit rechallenge, re-exposure, restart, or reintroduction of a
-  suspected drug, including under observation or with monitoring.
+- If competing causes or patient-level causality remain unresolved, state that plainly and keep recommendations conditional on clinician review. Do not use absolute, lifelong, or definitive language.
+- Never recommend or permit rechallenge, re-exposure, restart, or reintroduction of a suspected drug, including under observation or with monitoring.
 
 Language:
 - Language map: en=English, it=Italian, de=German, fr=French, es=Spanish.
-- Output entirely in `{{report_language}}`; translate source content except drug names,
-  source titles, and direct quotes.
+- Output entirely in `{{report_language}}`; translate source content except drug names, source titles, and direct quotes.
 {NO_DOCUMENT_LOCATIONS}
 """
 
@@ -248,13 +228,11 @@ injury pattern, competing baseline causes, match uncertainty, and contradictions
 without repeating every drug paragraph. Treat prior report wording as comparison-only
 context and highlight where the revised evidence changes the interpretation.
 Provide clinician-facing management/follow-up recommendations only here.
-- If a suspected drug is discussed, never recommend or permit rechallenge, re-exposure,
-  restart, or reintroduction, including under observation or with monitoring.
+- If a suspected drug is discussed, never recommend or permit rechallenge, re-exposure, restart, or reintroduction, including under observation or with monitoring.
 
 Language:
 - Language map: en=English, it=Italian, de=German, fr=French, es=Spanish.
-- Output entirely in `{{report_language}}`; translate source content except drug names,
-  source titles, and direct quotes.
+- Output entirely in `{{report_language}}`; translate source content except drug names, source titles, and direct quotes.
 {NO_DOCUMENT_LOCATIONS}
 """
 
