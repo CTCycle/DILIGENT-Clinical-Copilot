@@ -120,7 +120,7 @@ def test_non_critical_missing_data_does_not_block() -> None:
 
 
 ###############################################################################
-def test_case_a_peak_pair_is_the_injury_anchor() -> None:
+def test_case_a_first_abnormal_pair_is_presentation_anchor_and_peak_is_retained() -> None:
     entries: list[ClinicalLabEntry] = []
     for sample_date, alt, alp in (
         ("2026-01-04", 22, 82),
@@ -150,21 +150,21 @@ def test_case_a_peak_pair_is_the_injury_anchor() -> None:
     assessment = HepatotoxicityPatternAnalyzer().assess_payload(
         PatientLabTimeline(entries=entries)
     )
-
     assert assessment.score.r_score == pytest.approx(15.0)
     assert assessment.score.classification == "hepatocellular"
 
     structured_patterns = DiliPatternEngine().assess(
         PatientLabTimeline(entries=entries)
     )
-    assert structured_patterns[0].assessment_point == "peak"
+    assert structured_patterns[0].assessment_point == "first_qualifying"
+    assert structured_patterns[0].sample_date == "2026-01-28"
     assert structured_patterns[0].r_ratio == pytest.approx(15.0)
     assert structured_patterns[0].pattern == "hepatocellular"
-    assert structured_patterns[1].assessment_point == "first_qualifying"
+    assert structured_patterns[1].assessment_point == "peak"
 
 
 ###############################################################################
-def test_primary_injury_anchor_uses_marker_multiples_across_varying_ulns() -> None:
+def test_primary_injury_anchor_uses_first_abnormal_pair_with_varying_ulns() -> None:
     timeline = PatientLabTimeline(
         entries=[
             ClinicalLabEntry(
@@ -199,8 +199,54 @@ def test_primary_injury_anchor_uses_marker_multiples_across_varying_ulns() -> No
     )
 
     score = HepatotoxicityPatternAnalyzer().assess_payload(timeline).score
-
-    # 180 is numerically lower than 280, but 180/30 is the higher ALT multiple.
     assert score.alt_multiple == pytest.approx(6.0)
     assert score.r_score == pytest.approx(3.0)
     assert score.classification == "mixed"
+
+
+###############################################################################
+def test_r_ratio_requires_alt_not_ast() -> None:
+    timeline = PatientLabTimeline(
+        entries=[
+            ClinicalLabEntry(
+                marker_name="AST",
+                value=400,
+                upper_limit_normal=40,
+                sample_date="2026-05-01",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALP",
+                value=120,
+                upper_limit_normal=120,
+                sample_date="2026-05-01",
+                source="laboratory_analysis",
+            ),
+        ]
+    )
+    assessment = HepatotoxicityPatternAnalyzer().assess_payload(timeline)
+    assert assessment.status == "undetermined_due_to_missing_labs"
+    assert assessment.score.r_score is None
+
+
+###############################################################################
+def test_r_ratio_does_not_invent_missing_uln() -> None:
+    timeline = PatientLabTimeline(
+        entries=[
+            ClinicalLabEntry(
+                marker_name="ALT",
+                value=400,
+                sample_date="2026-05-01",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALP",
+                value=120,
+                sample_date="2026-05-01",
+                source="laboratory_analysis",
+            ),
+        ]
+    )
+    assessment = HepatotoxicityPatternAnalyzer().assess_payload(timeline)
+    assert assessment.status == "undetermined_due_to_missing_labs"
+    assert assessment.score.r_score is None
