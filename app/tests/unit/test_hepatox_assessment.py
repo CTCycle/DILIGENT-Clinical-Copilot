@@ -188,9 +188,10 @@ def test_livertox_prompt_removes_per_drug_management_recommendation_directive() 
         "Do not invent data or output JSON, YAML, XML, tables, or fenced code"
         in LIVERTOX_CLINICAL_USER_PROMPT
     )
-    assert "Estimated RUCAM:" in LIVERTOX_CLINICAL_USER_PROMPT
+    assert "RUCAM evidence:" in LIVERTOX_CLINICAL_USER_PROMPT
+    assert "Estimated RUCAM:" not in LIVERTOX_CLINICAL_USER_PROMPT
     assert (
-        "Treat estimated RUCAM as supportive, not definitive"
+        "If a patient-record RUCAM score is supplied, treat it as supportive"
         in LIVERTOX_CLINICAL_USER_PROMPT
     )
     assert (
