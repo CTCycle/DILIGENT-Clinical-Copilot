@@ -22,24 +22,12 @@ def test_r_ratio_boundary_values_follow_livertox_definitions() -> None:
 
 
 ###############################################################################
-def test_undated_multi_timepoint_labs_use_peak_multiples() -> None:
+def test_undated_labs_without_uln_do_not_generate_r_ratio() -> None:
     patterns = DiliPatternEngine().assess(
         PatientLabTimeline(
             entries=[
                 ClinicalLabEntry(
-                    marker_name="ALT", value=32, source="laboratory_analysis"
-                ),
-                ClinicalLabEntry(
-                    marker_name="AST", value=28, source="laboratory_analysis"
-                ),
-                ClinicalLabEntry(
-                    marker_name="ALP", value=92, source="laboratory_analysis"
-                ),
-                ClinicalLabEntry(
                     marker_name="ALT", value=860, source="laboratory_analysis"
-                ),
-                ClinicalLabEntry(
-                    marker_name="AST", value=610, source="laboratory_analysis"
                 ),
                 ClinicalLabEntry(
                     marker_name="ALP", value=210, source="laboratory_analysis"
@@ -47,9 +35,8 @@ def test_undated_multi_timepoint_labs_use_peak_multiples() -> None:
             ]
         )
     )
-
-    assert patterns[0].pattern == "hepatocellular"
-    assert patterns[0].r_ratio == 12.285714285714286
+    assert patterns[0].pattern == "indeterminate"
+    assert patterns[0].r_ratio is None
 
 
 ###############################################################################
@@ -127,6 +114,7 @@ def test_structured_dossier_preserves_missing_competing_causes() -> None:
     assert bundle.hys_law.status == "possible"
     assert bundle.hys_law.same_episode is True
     assert bundle.exposures[0].livertox_likelihood == "A"
+    assert bundle.exposures[0].rucam is not None
     assert bundle.exposures[0].rucam.components[0].evidence_quote
     assert "ebv_cmv_hsv" in bundle.differential.unresolved_causes
     assert len(bundle.acceptance_questions) == 12
@@ -199,7 +187,6 @@ def test_generated_narrative_safety_gate_blocks_unsupported_certainty() -> None:
         ),
         bundle=bundle,
     )
-
     assert "clinical_narrative_overstates_causality" not in {
         issue["code"] for issue in safe_issues
     }
@@ -269,9 +256,7 @@ def test_timeline_preserves_explicit_symptom_and_jaundice_dates() -> None:
 
 
 ###############################################################################
-def test_causality_does_not_upgrade_continuing_exposure_from_global_dechallenge() -> (
-    None
-):
+def test_continuing_exposure_is_not_upgraded_from_case_global_dechallenge() -> None:
     bundle = DiliEvidenceBuilder().build(
         payload=PatientData(
             anamnesis="Mandatory alternative-cause workup is pending.",
@@ -329,8 +314,8 @@ def test_causality_does_not_upgrade_continuing_exposure_from_global_dechallenge(
 
     exposure = bundle.exposures[0]
     assert exposure.causality is not None
-    assert exposure.causality.category == "unlikely"
-    assert exposure.causality.temporal_compatibility == "incompatible"
+    assert exposure.causality.category == "unassessable"
+    assert exposure.causality.temporal_compatibility == "unknown"
     assert exposure.causality.dechallenge_rechallenge.startswith("not_assessable;")
     assert exposure.rucam is not None
     assert exposure.rucam.category == "excluded"
@@ -349,6 +334,8 @@ def test_report_has_required_fda_style_sections() -> None:
     for section_number in range(1, 15):
         assert f"## {section_number}." in report
     assert "Manual hepatology review required" in report
+    assert "DILIN-like" not in report
+    assert "Structured causality synthesis" in report
 
 
 ###############################################################################
