@@ -191,6 +191,17 @@ def test_generated_narrative_safety_gate_blocks_unsupported_certainty() -> None:
         issue["code"] for issue in safe_issues
     }
 
+    negated_safety_language_issues = DiliEvidenceBuilder.audit_generated_narrative(
+        clinical_narrative=(
+            "The drug is not absolutely contraindicated; lifelong avoidance is not "
+            "recommended."
+        ),
+        bundle=bundle,
+    )
+    assert "clinical_narrative_overstates_causality" not in {
+        issue["code"] for issue in negated_safety_language_issues
+    }
+
 
 ###############################################################################
 def test_generated_narrative_safety_gate_blocks_rechallenge_permission() -> None:
@@ -303,11 +314,13 @@ def test_continuing_exposure_is_not_upgraded_from_case_global_dechallenge() -> N
         },
         rucam_bundle=PatientRucamAssessmentBundle(
             entries=[
-                DrugRucamAssessment(
-                    drug_name="Drug A",
-                    total_score=0,
-                    causality_category="excluded",
-                )
+                    DrugRucamAssessment(
+                        drug_name="Drug A",
+                        total_score=0,
+                        causality_category="excluded",
+                        calculation_method="structured_rucam",
+                        estimated=False,
+                    )
             ]
         ),
     )

@@ -342,16 +342,24 @@ def limitation_label(value: str, language: str) -> str:
 ###############################################################################
 def rucam_summary_text(assessment: DrugRucamAssessment, language: str) -> str:
     lang = resolve_report_language(language)
-    if assessment.calculation_method == "source_reported":
+    if (
+        assessment.calculation_method == "source_reported"
+        and not assessment.estimated
+        and assessment.total_score is not None
+    ):
         return phrase("rucam_source_reported", lang)
-    if assessment.total_score is None:
-        return phrase("rucam_not_calculated", lang)
-    return phrase(
-        "rucam_structured_score",
-        lang,
-        score=assessment.total_score,
-        category=assessment.causality_category,
-    )
+    if (
+        assessment.calculation_method == "structured_rucam"
+        and not assessment.estimated
+        and assessment.total_score is not None
+    ):
+        return phrase(
+            "rucam_structured_score",
+            lang,
+            score=assessment.total_score,
+            category=assessment.causality_category,
+        )
+    return phrase("rucam_not_calculated", lang)
 
 
 ###############################################################################

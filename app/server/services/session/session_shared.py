@@ -125,8 +125,10 @@ class NarrativeBuilder:
             "detected_drugs": "**Detected drugs ({count}):** {value}",
             "historical_title": "## Historical Drug Mentions",
             "historical_mentions": "- **Historical mentions ({count}):** {value}",
-            "rucam_title": "## Estimated RUCAM",
-            "rucam_item": "- **{drug}**: score {score} ({category}, confidence {confidence})",
+            "rucam_title": "## RUCAM Evidence",
+            "rucam_scored_item": "- **{drug}**: patient-record score {score} ({category}); DILIGENT did not independently recalculate it.",
+            "rucam_structured_item": "- **{drug}**: structured RUCAM score {score} ({category}); treat it as supportive evidence, not a dispositive diagnosis.",
+            "rucam_evidence_item": "- **{drug}**: criterion-level RUCAM evidence captured; no numerical updated-RUCAM total was calculated (clinical review required).",
             "warnings_title": "## Warnings",
             "consistency_warning": "- Structured RUCAM classifies {drugs} as excluded despite their inclusion in the active analysis set. Review before clinical use.",
             "report_title": "## Clinical Report",
@@ -147,8 +149,10 @@ class NarrativeBuilder:
             "detected_drugs": "**Farmaci rilevati ({count}):** {value}",
             "historical_title": "## Menzioni Farmaci Anamnestiche",
             "historical_mentions": "- **Menzioni storiche ({count}):** {value}",
-            "rucam_title": "## RUCAM Stimato",
-            "rucam_item": "- **{drug}**: punteggio {score} ({category}, confidenza {confidence})",
+            "rucam_title": "## Evidenze RUCAM",
+            "rucam_scored_item": "- **{drug}**: punteggio riportato nel record del paziente {score} ({category}); DILIGENT non lo ha ricalcolato in modo indipendente.",
+            "rucam_structured_item": "- **{drug}**: punteggio RUCAM strutturato {score} ({category}); trattarlo come evidenza di supporto, non come diagnosi dispositiva.",
+            "rucam_evidence_item": "- **{drug}**: acquisite evidenze RUCAM a livello di criterio; nessun totale numerico RUCAM aggiornato è stato calcolato (richiede revisione clinica).",
             "warnings_title": "## Avvisi",
             "consistency_warning": "- Il RUCAM strutturato classifica {drugs} come esclusi nonostante siano inclusi nell'analisi attiva. Verificare prima dell'uso clinico.",
             "report_title": "## Report Clinico",
@@ -169,8 +173,10 @@ class NarrativeBuilder:
             "detected_drugs": "**Erkannte Medikamente ({count}):** {value}",
             "historical_title": "## Historische Medikamentenerwähnungen",
             "historical_mentions": "- **Historische Erwähnungen ({count}):** {value}",
-            "rucam_title": "## Geschätzter RUCAM",
-            "rucam_item": "- **{drug}**: Score {score} ({category}, Vertrauen {confidence})",
+            "rucam_title": "## RUCAM-Evidenz",
+            "rucam_scored_item": "- **{drug}**: im Patientenrecord dokumentierter Score {score} ({category}); DILIGENT hat ihn nicht unabhängig neu berechnet.",
+            "rucam_structured_item": "- **{drug}**: strukturierter RUCAM-Score {score} ({category}); als unterstützende Evidenz, nicht als dispositive Diagnose behandeln.",
+            "rucam_evidence_item": "- **{drug}**: RUCAM-Evidenz auf Kriterienebene erfasst; kein numerischer aktualisierter RUCAM-Gesamtwert berechnet (klinische Prüfung erforderlich).",
             "warnings_title": "## Warnhinweise",
             "consistency_warning": "- Der strukturierte RUCAM stuft {drugs} als ausgeschlossen ein, obwohl sie in der aktiven Analyse enthalten sind. Vor klinischer Verwendung prüfen.",
             "report_title": "## Klinischer Bericht",
@@ -191,8 +197,10 @@ class NarrativeBuilder:
             "detected_drugs": "**Médicaments détectés ({count}) :** {value}",
             "historical_title": "## Mentions Médicamenteuses Antérieures",
             "historical_mentions": "- **Mentions historiques ({count}) :** {value}",
-            "rucam_title": "## RUCAM Estimé",
-            "rucam_item": "- **{drug}** : score {score} ({category}, confiance {confidence})",
+            "rucam_title": "## Éléments probants RUCAM",
+            "rucam_scored_item": "- **{drug}** : score du dossier patient {score} ({category}) ; DILIGENT ne l’a pas recalculé indépendamment.",
+            "rucam_structured_item": "- **{drug}** : score RUCAM structuré {score} ({category}) ; le traiter comme un élément de soutien, et non comme un diagnostic décisif.",
+            "rucam_evidence_item": "- **{drug}** : éléments RUCAM au niveau des critères recueillis ; aucun total numérique RUCAM actualisé n’a été calculé (révision clinique requise).",
             "warnings_title": "## Avertissements",
             "consistency_warning": "- Le RUCAM structuré classe {drugs} comme exclus alors qu'ils figurent dans l'analyse active. Vérifier avant usage clinique.",
             "report_title": "## Rapport Clinique",
@@ -213,8 +221,10 @@ class NarrativeBuilder:
             "detected_drugs": "**Fármacos detectados ({count}):** {value}",
             "historical_title": "## Menciones Históricas de Fármacos",
             "historical_mentions": "- **Menciones históricas ({count}):** {value}",
-            "rucam_title": "## RUCAM Estimado",
-            "rucam_item": "- **{drug}**: puntuación {score} ({category}, confianza {confidence})",
+            "rucam_title": "## Evidencia RUCAM",
+            "rucam_scored_item": "- **{drug}**: puntuación registrada en el paciente {score} ({category}); DILIGENT no la recalculó de forma independiente.",
+            "rucam_structured_item": "- **{drug}**: puntuación RUCAM estructurada {score} ({category}); tratarla como evidencia de apoyo, no como diagnóstico dispositiva.",
+            "rucam_evidence_item": "- **{drug}**: evidencia RUCAM a nivel de criterios capturada; no se calculó un total numérico actualizado de RUCAM (requiere revisión clínica).",
             "warnings_title": "## Advertencias",
             "consistency_warning": "- El RUCAM estructurado clasifica {drugs} como excluidos aunque están incluidos en el análisis activo. Revisar antes del uso clínico.",
             "report_title": "## Informe Clínico",
@@ -348,8 +358,26 @@ class NarrativeBuilder:
         if rucam_assessments:
             rucam_section = [bundle["rucam_title"], ""]
             for assessment in rucam_assessments:
+                is_source_reported = (
+                    assessment.calculation_method == "source_reported"
+                    and not assessment.estimated
+                    and assessment.total_score is not None
+                )
+                is_structured = (
+                    assessment.calculation_method == "structured_rucam"
+                    and not assessment.estimated
+                    and assessment.total_score is not None
+                )
                 rucam_section.append(
-                    bundle["rucam_item"].format(
+                    bundle[
+                        "rucam_scored_item"
+                        if is_source_reported
+                        else (
+                            "rucam_structured_item"
+                            if is_structured
+                            else "rucam_evidence_item"
+                        )
+                    ].format(
                         drug=assessment.drug_name,
                         score=assessment.total_score,
                         category=assessment.causality_category,

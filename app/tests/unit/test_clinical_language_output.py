@@ -101,6 +101,10 @@ def test_narrative_builder_combines_pipeline_and_rucam_warnings() -> None:
     )
 
     assert report.count("## Warnings") == 1
+    assert "## RUCAM Evidence" in report
+    assert "criterion-level RUCAM evidence captured" in report
+    assert "## Estimated RUCAM" not in report
+    assert "score -3" not in report
     assert "RxNav alias was not validated" in report
     assert "Structured RUCAM classifies levothyroxine as excluded" in report
 
