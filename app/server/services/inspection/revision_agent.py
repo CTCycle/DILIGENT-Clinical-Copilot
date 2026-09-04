@@ -19,6 +19,7 @@ from domain.inspection import (
     RevisionIssueScanResult,
     SessionRevisionRequest,
 )
+from services.inspection.revision_clinical_safety import audit_revised_dili_report
 from services.inspection.revision_context import build_revision_context
 from services.inspection.revision_patches import validate_draft_report
 from common.prompts.revision_agent import (
@@ -452,13 +453,19 @@ class RevisionAgentRunner:
             RevisionAgentQaResult,
             purpose=GenerationPurpose.REVISION_QA,
         )
-        if contains_rechallenge_recommendation(applied_report):
+        clinical_safety_issues = audit_revised_dili_report(
+            session=session,
+            report_text=applied_report,
+        )
+        if contains_rechallenge_recommendation(applied_report) and (
+            RECHALLENGE_RECOMMENDATION_MESSAGE not in clinical_safety_issues
+        ):
+            clinical_safety_issues.append(RECHALLENGE_RECOMMENDATION_MESSAGE)
+        if clinical_safety_issues:
+            blocking_issues = list(dict.fromkeys([*qa.blocking_issues, *clinical_safety_issues]))
             qa = qa.model_copy(
                 update={
-                    "blocking_issues": [
-                        *qa.blocking_issues,
-                        RECHALLENGE_RECOMMENDATION_MESSAGE,
-                    ],
+                    "blocking_issues": blocking_issues,
                     "manual_review_required": True,
                 }
             )
