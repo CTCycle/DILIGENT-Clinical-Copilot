@@ -9,9 +9,9 @@ import { PatientTimetablePageComponent } from './pages/patient-timetable/patient
 export const routes: Routes = [
   { path: '', component: DiliAgentPageComponent, title: 'DILI Agent | DILIGENT' },
   { path: 'clinical-sessions', component: ClinicalSessionsPageComponent, title: 'Clinical Sessions | DILIGENT' },
-  { path: 'data', component: DataInspectionPageComponent, title: 'Data Inspection | DILIGENT' },
+  { path: 'data', component: DataInspectionPageComponent, title: 'Knowledge Base | DILIGENT' },
   { path: 'sessions/:sessionId/timetable/:timelineId', component: PatientTimetablePageComponent, title: 'Patient Timeline | DILIGENT' },
   { path: 'sessions/:sessionId/timetable', component: PatientTimetablePageComponent, title: 'Patient Timeline | DILIGENT' },
-  { path: 'model-config', component: ModelConfigPageComponent, title: 'Configurations | DILIGENT' },
+  { path: 'model-config', component: ModelConfigPageComponent, title: 'Configuration | DILIGENT' },
   { path: '**', redirectTo: '' },
 ];
