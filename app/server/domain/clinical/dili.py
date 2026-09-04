@@ -162,6 +162,13 @@ class DiliRucamAssessment(BaseModel):
     drug_name: str
     total_score: int | None = None
     category: str
+    calculation_method: Literal[
+        "source_reported",
+        "structured_rucam",
+        "not_calculated",
+    ] = "not_calculated"
+    score_source: str | None = None
+    estimated: bool = False
     components: list[DiliRucamComponent] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     is_supportive_not_dispositive: bool = True

@@ -212,13 +212,41 @@ class AnalysisRunner:
                     requires_review=True,
                 )
             )
-        if rucam is not None and rucam.total_score is not None:
+        if (
+            rucam is not None
+            and rucam.calculation_method == "source_reported"
+            and not rucam.estimated
+            and rucam.total_score is not None
+        ):
             claims.append(
                 ClinicalClaim(
                     claim=(
                         f"{drug_name} has a patient-record RUCAM score of "
                         f"{rucam.total_score} ({rucam.causality_category}); "
                         "DILIGENT did not independently recalculate it."
+                    ),
+                    source="rucam",
+                    evidence_quote=(
+                        rucam.components[0].evidence
+                        if rucam.components and rucam.components[0].evidence
+                        else None
+                    ),
+                    confidence="moderate",
+                    requires_review=True,
+                )
+            )
+        elif (
+            rucam is not None
+            and rucam.calculation_method == "structured_rucam"
+            and not rucam.estimated
+            and rucam.total_score is not None
+        ):
+            claims.append(
+                ClinicalClaim(
+                    claim=(
+                        f"{drug_name} has a structured RUCAM score of "
+                        f"{rucam.total_score} ({rucam.causality_category}); "
+                        "treat it as supportive evidence, not a dispositive patient-level diagnosis."
                     ),
                     source="rucam",
                     evidence_quote=(

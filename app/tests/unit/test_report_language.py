@@ -43,7 +43,11 @@ def test_required_phrase_keys_exist_for_supported_languages() -> None:
 ###############################################################################
 def test_rucam_summary_text_returns_localized_or_safe_text() -> None:
     assessment = DrugRucamAssessment(
-        drug_name="A", total_score=6, causality_category="probable"
+        drug_name="A",
+        total_score=6,
+        causality_category="probable",
+        calculation_method="structured_rucam",
+        estimated=False,
     )
     for lang in ("it", "es", "fr", "de", "pt"):
         text = rucam_summary_text(assessment, lang)

@@ -556,8 +556,8 @@ class ClinicalSessionExtractionPipelineMixin:
                 issues,
                 code="rucam_estimation_failed",
                 message=(
-                    "RUCAM estimation was unavailable; the analysis continued without "
-                    "per-drug estimated RUCAM."
+                    "RUCAM evidence was unavailable; the analysis continued without "
+                    "per-drug RUCAM evidence."
                 ),
             )
             rucam_bundle = PatientRucamAssessmentBundle(entries=[])

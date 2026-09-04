@@ -53,11 +53,17 @@ def resolve_rucam_source(entries: list[DrugRucamAssessment]) -> str:
         return "not_calculated_insufficient_data"
     if any(
         entry.calculation_method == "source_reported"
-        and (entry.score_source or "") == "laboratory_history"
+        and not entry.estimated
+        and entry.total_score is not None
         for entry in entries
     ):
         return "provided"
-    if any(entry.total_score is not None for entry in entries):
+    if any(
+        entry.calculation_method == "structured_rucam"
+        and not entry.estimated
+        and entry.total_score is not None
+        for entry in entries
+    ):
         return "calculated"
     return "not_calculated_insufficient_data"
 

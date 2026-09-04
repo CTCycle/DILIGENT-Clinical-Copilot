@@ -4,15 +4,44 @@ from domain.clinical.dili import DiliDifferentialAssessment
 from domain.clinical.entities import (
     ClinicalLabEntry,
     DrugEntry,
+    DrugRucamAssessment,
     PatientData,
     PatientDrugs,
     PatientLabTimeline,
     PatientRucamAssessmentBundle,
+    RucamComponentAssessment,
 )
 from services.clinical.dili_case_qualification import DiliCaseQualificationEngine
 from services.clinical.dili_causality import DiliCausalityEngine
 from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.inspection.revision_clinical_safety import audit_revised_dili_report
+
+
+###############################################################################
+def test_non_source_rucam_score_is_not_promoted_into_dili_bundle() -> None:
+    assessment = DiliCausalityEngine.rucam(
+        DrugRucamAssessment(
+            drug_name="Drug A",
+            total_score=6,
+            causality_category="probable",
+            components=[
+                RucamComponentAssessment(
+                    component_key="time_to_onset",
+                    label="Time to onset",
+                    score=2,
+                    status="scored",
+                )
+            ],
+        ),
+        "Drug A",
+    )
+
+    assert assessment is not None
+    assert assessment.total_score is None
+    assert assessment.category == "not assessable"
+    assert assessment.components[0].score is None
+    assert assessment.components[0].status == "not_assessable"
+    assert any("provenance" in item for item in assessment.limitations)
 
 
 ###############################################################################

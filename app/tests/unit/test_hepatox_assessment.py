@@ -162,7 +162,9 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
                     )
                 ],
                 limitations=["Sparse follow-up"],
-                summary="Estimated RUCAM summary.",
+                summary="Structured RUCAM summary.",
+                calculation_method="structured_rucam",
+                estimated=False,
             ),
             report_language="en",
         )
@@ -258,7 +260,9 @@ def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> N
                 )
             ],
             limitations=["No confirmed rechallenge"],
-            summary="Estimated RUCAM for Pantozol.",
+            summary="Structured RUCAM for Pantozol.",
+            calculation_method="structured_rucam",
+            estimated=False,
         ),
     )
 
@@ -563,7 +567,9 @@ def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
                     confidence="low",
                     components=[],
                     limitations=["Missing serial labs"],
-                    summary="Estimated RUCAM only.",
+                    summary="Structured RUCAM only.",
+                    calculation_method="structured_rucam",
+                    estimated=False,
                 ),
             )
         ]
