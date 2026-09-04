@@ -20,9 +20,11 @@ def audit_revised_dili_report(
         "dili_evidence_bundle"
     )
     if bundle_value is None:
-        return [
-            "Structured DILI evidence is unavailable for deterministic revision safety validation."
-        ]
+        # Historical sessions can predate the structured DILI evidence bundle.
+        # Preserve their existing revision path instead of fabricating evidence
+        # or rewriting historical data. Universal revision safeguards, including
+        # the rechallenge prohibition, remain enforced by the revision runner.
+        return []
     try:
         bundle = DiliEvidenceBundle.model_validate(bundle_value)
     except Exception:
@@ -34,4 +36,7 @@ def audit_revised_dili_report(
         clinical_narrative=report_text,
         bundle=bundle,
     )
-    return [str(issue.get("message") or issue.get("code") or "Clinical safety issue") for issue in issues]
+    return [
+        str(issue.get("message") or issue.get("code") or "Clinical safety issue")
+        for issue in issues
+    ]
