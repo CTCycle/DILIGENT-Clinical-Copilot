@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Literal
 
 from common.utils.clinical_safety import contains_explicitly_negative_rechallenge
@@ -8,15 +9,20 @@ from domain.clinical.dili import (
     DiliDifferentialAssessment,
     DiliRucamAssessment,
     DiliRucamComponent,
-    DilinLikeCausalityAssessment,
     DrugExposureAssessment,
     DrugIdentityResolution,
+    StructuredCausalityAssessment,
 )
-from domain.clinical.entities import DrugEntry, DrugRucamAssessment
+from domain.clinical.entities import (
+    DrugEntry,
+    DrugRucamAssessment,
+    PatientLabTimeline,
+)
 from services.clinical.dili_timeline import DiliTimelineEngine
 
 LOW_CONFIDENCE_LIVERTOX = {"", "U", "E", "E*", "X", "UNKNOWN"}
 DIRECT_TOXIN_LIVERTOX = {"T", "T*"}
+SUPPORTIVE_DECHALLENGE = {"improving_after_stop", "resolved_to_baseline"}
 
 
 ###############################################################################
@@ -53,7 +59,7 @@ class DiliCausalityEngine:
         resolved: dict,
         rucam: DrugRucamAssessment | None,
         differential: DiliDifferentialAssessment,
-        dechallenge_status: str,
+        labs: PatientLabTimeline,
         primary_pattern: str,
         first_injury_date: str | None,
     ) -> DrugExposureAssessment:
@@ -70,76 +76,52 @@ class DiliCausalityEngine:
         identity = self._identity(drug, resolved, accepted)
         temporal = self._temporal_compatibility(drug, first_injury_date)
         rechallenge_status = self._rechallenge_status(drug)
-        signature = self._signature_match(primary_pattern, likelihood)
-        drug_dechallenge_status = (
-            dechallenge_status if drug.suspension_date else "not_assessable"
+        drug_dechallenge_status = self._dechallenge_for_drug(
+            drug=drug,
+            labs=labs,
+            primary_pattern=primary_pattern,
         )
+        signature = self._signature_concordance(primary_pattern, likelihood)
         competing = (
             "complete" if differential.all_major_causes_excluded else "incomplete"
         )
         source_quality = "quoted" if drug.evidence else "limited"
-
-        total = 0
-        if accepted:
-            total += 1
-        if temporal == "compatible":
-            total += 1
-        if drug_dechallenge_status in {
-            "improving_after_stop",
-            "resolved_to_baseline",
-        }:
-            total += 1
-        if rechallenge_status == "positive":
-            total += 2
-        if signature == "compatible":
-            total += 1
-        if competing == "complete":
-            total += 1
-        if source_quality == "quoted":
-            total += 1
-        if not accepted or drug.attribution in {"negated", "allergy", "family_history"}:
-            total = 0
-        if likelihood in LOW_CONFIDENCE_LIVERTOX:
-            total = min(total, 2)
-
-        if total >= 6 and likelihood not in LOW_CONFIDENCE_LIVERTOX:
-            category = "very_likely"
-        elif total >= 4:
-            category = "probable"
-        elif total >= 2:
-            category = "possible"
-        elif accepted:
-            category = "unlikely"
-        else:
-            category = "unassessable"
-
-        rucam_excludes_exposure = rucam is not None and (
-            rucam.total_score == 0 or rucam.causality_category == "excluded"
+        category = self._synthesis_category(
+            accepted=accepted,
+            attribution=drug.attribution,
+            temporal=temporal,
+            dechallenge=drug_dechallenge_status,
+            rechallenge=rechallenge_status,
+            competing=competing,
         )
-        if temporal == "incompatible" and rechallenge_status != "positive":
-            category = "unlikely" if accepted else "unassessable"
-        elif (
-            rucam_excludes_exposure
-            and rechallenge_status != "positive"
-            and category in {"very_likely", "probable"}
-        ):
-            category = "possible" if accepted else "unassessable"
 
         rationale = [
-            "DILIN-like category integrates temporal fit, drug identity, phenotype fit, dechallenge/rechallenge, and competing causes.",
-            "Absence of an alternative cause alone does not justify upgrading causality.",
+            "Structured causality synthesis is an evidence summary, not a calibrated DILIN probability or autonomous diagnosis.",
+            "Drug-level LiverTox likelihood is retained as prior hepatotoxicity evidence and does not cap patient-specific causality.",
         ]
-        if drug_dechallenge_status == "not_assessable":
+        if drug_dechallenge_status in {"not_assessable", "insufficient_interval"}:
             rationale.append(
-                "Global laboratory dechallenge evidence was not assigned to this drug without a documented stop date."
+                "This drug lacks sufficient drug-specific post-discontinuation laboratory follow-up for dechallenge interpretation."
             )
-        if temporal == "incompatible":
+        if temporal == "incompatible_pre_exposure":
             rationale.append(
-                "The documented exposure chronology is incompatible with the first injury signal."
+                "The first documented injury signal predates the documented drug start."
             )
-        if rucam_excludes_exposure:
+        elif temporal == "long_latency_requires_drug_specific_review":
             rationale.append(
-                "A zero or excluded RUCAM result prevents a probable or very-likely patient-level category without stronger contradictory evidence."
+                "Long latency is not automatically excluded because some agents can cause delayed or prolonged-latency DILI."
+            )
+        if competing != "complete":
+            rationale.append(
+                "One or more major competing causes remain unresolved or not excluded."
+            )
+        if likelihood in LOW_CONFIDENCE_LIVERTOX:
+            rationale.append(
+                "Sparse or unknown LiverTox evidence reduces drug-level prior support but does not rule out a novel patient-specific DILI event."
+            )
+        if rucam is not None and not rucam.estimated and rucam.total_score is not None:
+            rationale.append(
+                "A patient-record RUCAM score is retained as supportive evidence but is not dispositive."
             )
 
         return DrugExposureAssessment(
@@ -148,19 +130,19 @@ class DiliCausalityEngine:
             start_date=drug.therapy_start_date,
             dose_changes=[],
             stop_date=drug.suspension_date,
-            rechallenge_date=(
-                drug.suspension_date if rechallenge_status == "positive" else None
-            ),
+            rechallenge_date=None,
             rechallenge_status=rechallenge_status,
             livertox_likelihood=likelihood or None,
             direct_toxin_or_dose_dependent=likelihood in DIRECT_TOXIN_LIVERTOX,
-            causality=DilinLikeCausalityAssessment(
+            causality=StructuredCausalityAssessment(
                 drug_name=drug.name,
                 category=category,
                 temporal_compatibility=temporal,
-                dechallenge_rechallenge=f"{drug_dechallenge_status}; rechallenge={rechallenge_status}",
-                phenotype_match=signature,
-                known_drug_signature=likelihood or "unknown",
+                dechallenge_rechallenge=(
+                    f"{drug_dechallenge_status}; rechallenge={rechallenge_status}"
+                ),
+                drug_signature_concordance=signature,
+                known_hepatotoxic_potential=likelihood or "unknown",
                 competing_cause_exclusion=competing,
                 drug_identity_quality="accepted" if accepted else "unresolved",
                 source_evidence_quality=source_quality,
@@ -168,6 +150,36 @@ class DiliCausalityEngine:
             ),
             rucam=self.rucam(rucam, drug.name),
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _synthesis_category(
+        *,
+        accepted: bool,
+        attribution: str | None,
+        temporal: str,
+        dechallenge: str,
+        rechallenge: str,
+        competing: str,
+    ) -> Literal["supportive", "limited", "argues_against", "unassessable"]:
+        if not accepted or attribution in {"negated", "allergy", "family_history"}:
+            return "unassessable"
+        if temporal == "incompatible_pre_exposure" and rechallenge != "positive":
+            return "argues_against"
+        if rechallenge == "positive":
+            return "supportive"
+        if (
+            temporal == "compatible"
+            and dechallenge in SUPPORTIVE_DECHALLENGE
+            and competing == "complete"
+        ):
+            return "supportive"
+        if temporal in {
+            "compatible",
+            "long_latency_requires_drug_specific_review",
+        } or dechallenge in SUPPORTIVE_DECHALLENGE:
+            return "limited"
+        return "unassessable"
 
     # -------------------------------------------------------------------------
     def _identity(
@@ -201,8 +213,6 @@ class DiliCausalityEngine:
     # -------------------------------------------------------------------------
     @staticmethod
     def _temporal_compatibility(drug: DrugEntry, first_injury_date: str | None) -> str:
-        if DiliCausalityEngine._has_long_term_stable_exposure(drug):
-            return "incompatible"
         if not drug.therapy_start_date or not first_injury_date:
             return "unknown"
         start = DiliTimelineEngine.parse_date(drug.therapy_start_date)
@@ -210,24 +220,59 @@ class DiliCausalityEngine:
         if start is None or injury is None:
             return "unknown"
         delta = (injury - start).days
-        if 1 <= delta <= 365:
+        if delta < 0:
+            return "incompatible_pre_exposure"
+        if delta <= 365:
             return "compatible"
-        return "incompatible"
+        return "long_latency_requires_drug_specific_review"
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _has_long_term_stable_exposure(drug: DrugEntry) -> bool:
-        evidence = (drug.evidence or "").lower()
-        return bool(
-            re.search(
-                r"\b(?:stable|continued|ongoing|unchanged)\b.{0,80}\b(?:\d+|one|two|three|several|many)?\s*(?:years?|months?)\b",
-                evidence,
-            )
-            or re.search(
-                r"\b(?:\d+|one|two|three|several|many)?\s*(?:years?|months?)\b.{0,40}\b(?:stable|continued|ongoing|unchanged)\b",
-                evidence,
-            )
+    def _dechallenge_for_drug(
+        self,
+        *,
+        drug: DrugEntry,
+        labs: PatientLabTimeline,
+        primary_pattern: str,
+    ) -> str:
+        stop_date = DiliTimelineEngine.parse_date(drug.suspension_date)
+        if stop_date is None:
+            return "not_assessable"
+        marker_names = {"ALT"} if primary_pattern == "hepatocellular" else {"ALP"}
+        dated = [
+            entry
+            for entry in labs.entries
+            if entry.marker_name.upper() in marker_names
+            and entry.value is not None
+            and entry.upper_limit_normal
+            and float(entry.upper_limit_normal) > 0
+            and DiliTimelineEngine.parse_date(entry.sample_date) is not None
+        ]
+        dated.sort(
+            key=lambda item: DiliTimelineEngine.parse_date(item.sample_date) or date.max
         )
+        after_stop = [
+            entry
+            for entry in dated
+            if (DiliTimelineEngine.parse_date(entry.sample_date) or date.min) >= stop_date
+        ]
+        if len(after_stop) < 2:
+            return "insufficient_interval"
+        first_multiple = float(after_stop[0].value or 0.0) / float(
+            after_stop[0].upper_limit_normal or 1.0
+        )
+        last_multiple = float(after_stop[-1].value or 0.0) / float(
+            after_stop[-1].upper_limit_normal or 1.0
+        )
+        last_date = DiliTimelineEngine.parse_date(after_stop[-1].sample_date) or stop_date
+        if last_multiple <= 1.0:
+            return "resolved_to_baseline"
+        if first_multiple > 0 and last_multiple <= first_multiple * 0.5:
+            return "improving_after_stop"
+        if first_multiple > 0 and last_multiple > first_multiple * 1.2:
+            return "worsening_after_stop"
+        if (last_date - stop_date).days >= 180 and last_multiple > 1.0:
+            return "chronic_or_persistent"
+        return "stable_abnormality"
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -238,6 +283,7 @@ class DiliCausalityEngine:
         if (
             "rechallenge positive" in evidence
             or "re-exposure with recurrence" in evidence
+            or "recurred after restart" in evidence
         ):
             return "positive"
         if contains_explicitly_negative_rechallenge(evidence):
@@ -246,15 +292,16 @@ class DiliCausalityEngine:
             "rechallenge" in evidence
             or "restarted" in evidence
             or "resumed" in evidence
+            or "re-exposure" in evidence
         ):
             return "present_unclear"
         return "unknown"
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _signature_match(primary_pattern: str, likelihood: str) -> str:
+    def _signature_concordance(primary_pattern: str, likelihood: str) -> str:
         if primary_pattern == "indeterminate":
-            return "unknown"
+            return "not_assessable"
         if likelihood in LOW_CONFIDENCE_LIVERTOX:
-            return "limited_reference_support"
-        return "compatible"
+            return "reference_evidence_sparse"
+        return "not_assessed_from_livertox_likelihood_grade"
