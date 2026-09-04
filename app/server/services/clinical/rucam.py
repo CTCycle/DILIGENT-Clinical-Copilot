@@ -73,35 +73,52 @@ RucamCausalityCategory = Literal[
 
 ###############################################################################
 class RucamScoreEstimator:
+    """Preserve patient-reported RUCAM and build a non-scoring evidence checklist.
+
+    DILIGENT does not synthesize a formal updated-RUCAM total from partially
+    structured data. A numerical RUCAM value is accepted only when it is
+    explicitly present in the current patient record and can be associated with
+    the assessed drug. Literature and LiverTox material are never patient-score
+    sources.
+    """
+
     # -------------------------------------------------------------------------
     def resolve_provided_rucam_score(
         self,
         laboratory_history_text: str,
+        *,
+        drug_name: str | None = None,
+        require_drug_attribution: bool = False,
     ) -> RucamSourceReportedScore | None:
         if not laboratory_history_text:
             return None
-        match = RUCAM_SCORE_RE.search(laboratory_history_text)
-        if not match:
-            return None
-        score = max(-10, min(14, int(match.group(1))))
-        lowered = laboratory_history_text.lower()
-        category = None
-        for candidate in (
-            "highly probable",
-            "probable",
-            "possible",
-            "unlikely",
-            "excluded",
-        ):
-            if candidate in lowered:
-                category = candidate
-                break
-        return RucamSourceReportedScore(
-            score=score,
-            causality_category=category,
-            source_name="laboratory_history",
-            evidence=match.group(0),
-        )
+        for match in RUCAM_SCORE_RE.finditer(laboratory_history_text):
+            start = max(0, match.start() - 220)
+            end = min(len(laboratory_history_text), match.end() + 220)
+            window = laboratory_history_text[start:end]
+            if require_drug_attribution:
+                if not drug_name or drug_name.casefold() not in window.casefold():
+                    continue
+            score = max(-10, min(14, int(match.group(1))))
+            lowered = window.lower()
+            category = None
+            for candidate in (
+                "highly probable",
+                "probable",
+                "possible",
+                "unlikely",
+                "excluded",
+            ):
+                if candidate in lowered:
+                    category = candidate
+                    break
+            return RucamSourceReportedScore(
+                score=score,
+                causality_category=category,
+                source_name="patient_laboratory_history",
+                evidence=window.strip(),
+            )
+        return None
 
     # -------------------------------------------------------------------------
     def has_sufficient_rucam_inputs(
@@ -142,9 +159,17 @@ class RucamScoreEstimator:
         all_drugs = [*analysis_drugs.entries, *anamnesis_drugs.entries]
         anchor = self.select_pattern_anchor(payload=payload, lab_timeline=lab_timeline)
         injury_type = self.resolve_injury_type(
-            pattern_score=pattern_score, anchor=anchor
+            pattern_score=pattern_score,
+            anchor=anchor,
         )
         language = resolve_report_language(report_language)
+        unique_names = {
+            normalize_drug_query_name(drug.name)
+            for drug in all_drugs
+            if normalize_drug_query_name(drug.name)
+        }
+        require_drug_attribution = len(unique_names) > 1
+
         entries: list[DrugRucamAssessment] = []
         seen: set[str] = set()
         for drug in all_drugs:
@@ -168,6 +193,7 @@ class RucamScoreEstimator:
                     anchor=anchor,
                     resolved_item=resolved if isinstance(resolved, dict) else {},
                     report_language=language,
+                    require_drug_attribution=require_drug_attribution,
                 )
             )
         return PatientRucamAssessmentBundle(entries=entries)
@@ -187,7 +213,7 @@ class RucamScoreEstimator:
             pass
         for fmt in ("%d-%m-%Y", "%m-%d-%Y", "%Y-%m-%d"):
             try:
-                return datetime.strptime(cleaned, fmt).date()
+                return datetime.strptime(normalized, fmt).date()
             except ValueError:
                 continue
         return None
@@ -202,109 +228,48 @@ class RucamScoreEstimator:
         return None
 
     # -------------------------------------------------------------------------
-    def collect_trusted_source_text(
-        self, resolved_item: dict[str, Any] | None
-    ) -> list[str]:
-        if not isinstance(resolved_item, dict):
-            return []
-        status = str(resolved_item.get("match_status") or "").strip().lower()
-        if status in {
-            "ambiguous",
-            "ambiguous_match",
-            "ambiguous_requires_review",
-            "missing",
-            "missing_match",
-            "missing_livertox",
-            "rejected_false_positive",
-        }:
-            return []
-        texts: list[str] = []
-        for key in ("matched_livertox_row", "extracted_excerpts", "match_notes"):
-            raw = resolved_item.get(key)
-            if isinstance(raw, dict):
-                texts.extend(str(v) for v in raw.values() if isinstance(v, str))
-            elif isinstance(raw, list):
-                texts.extend(str(v) for v in raw if isinstance(v, str))
-            elif isinstance(raw, str):
-                texts.append(raw)
-        return [item.strip() for item in texts if item and item.strip()]
-
-    # -------------------------------------------------------------------------
-    def extract_source_reported_rucam(
-        self, resolved_item: dict[str, Any] | None
-    ) -> RucamSourceReportedScore | None:
-        for text in self.collect_trusted_source_text(resolved_item):
-            match = RUCAM_SCORE_RE.search(text)
-            if not match:
-                continue
-            score = max(-10, min(14, int(match.group(1))))
-            category = None
-            lowered = text.lower()
-            for candidate in (
-                "highly probable",
-                "probable",
-                "possible",
-                "unlikely",
-                "excluded",
-            ):
-                if candidate in lowered:
-                    category = candidate
-                    break
-            return RucamSourceReportedScore(
-                score=score,
-                causality_category=category,
-                source_name="LiverTox",
-                evidence=text,
-            )
-        return None
-
-    # -------------------------------------------------------------------------
     def select_pattern_anchor(
         self, *, payload: PatientData, lab_timeline: PatientLabTimeline
     ) -> RucamAnchor:
         grouped: dict[date, dict[str, ClinicalLabEntry]] = {}
         for entry in lab_timeline.entries:
             marker = entry.marker_name.upper()
-            if marker not in {"ALT", "AST", "ALP", "TBIL"}:
+            if marker not in {"ALT", "ALP"}:
                 continue
             parsed_date = self.try_parse_date(entry.sample_date)
             if parsed_date is None:
                 continue
             bucket = grouped.setdefault(parsed_date, {})
             current = bucket.get(marker)
-            if current is None or (entry.value or float("-inf")) > (
-                current.value or float("-inf")
+            current_multiple = self.marker_multiple(current)
+            candidate_multiple = self.marker_multiple(entry)
+            if current is None or (
+                candidate_multiple is not None
+                and (current_multiple is None or candidate_multiple > current_multiple)
             ):
                 bucket[marker] = entry
 
         for sample_date in sorted(grouped.keys()):
             bucket = grouped[sample_date]
-            alt_like = bucket.get("ALT") or bucket.get("AST")
+            alt = bucket.get("ALT")
             alp = bucket.get("ALP")
-            tbil = bucket.get("TBIL")
-            alt_mult = self.marker_multiple(alt_like)
+            alt_mult = self.marker_multiple(alt)
             alp_mult = self.marker_multiple(alp)
-            tbil_mult = self.marker_multiple(tbil)
             qualifies = bool(
-                (alt_mult is not None and alt_mult >= 2.0)
+                (alt_mult is not None and alt_mult >= 5.0)
                 or (alp_mult is not None and alp_mult >= 2.0)
-                or (
-                    tbil is not None
-                    and (
-                        (tbil_mult is not None and tbil_mult > 1.0)
-                        or ((tbil.value or 0.0) >= 2.0)
-                    )
-                    and (alt_like is not None or alp is not None)
-                )
             )
             if qualifies:
                 return RucamAnchor(
                     onset_date=sample_date,
-                    used_alt=alt_like.value if alt_like else None,
-                    used_alt_uln=alt_like.upper_limit_normal if alt_like else None,
+                    used_alt=alt.value if alt else None,
+                    used_alt_uln=alt.upper_limit_normal if alt else None,
                     used_alp=alp.value if alp else None,
                     used_alp_uln=alp.upper_limit_normal if alp else None,
-                    rationale=f"Earliest qualifying timeline anchor selected on {sample_date.isoformat()}.",
+                    rationale=(
+                        "Earliest ALT >=5x ULN or ALP >=2x ULN laboratory anchor "
+                        f"selected on {sample_date.isoformat()}."
+                    ),
                     source="qualifying_lab",
                     is_score_eligible=True,
                 )
@@ -315,7 +280,7 @@ class RucamScoreEstimator:
             used_alt_uln=None,
             used_alp=None,
             used_alp_uln=None,
-            rationale="No qualifying timeline anchor; visit-date proxy used for context only.",
+            rationale="No qualifying RUCAM liver-injury anchor; visit-date proxy used for context only.",
             source="visit_proxy",
             is_score_eligible=False,
         )
@@ -324,11 +289,12 @@ class RucamScoreEstimator:
     def resolve_injury_type(
         self, *, pattern_score: HepatotoxicityPatternScore, anchor: RucamAnchor
     ) -> RucamInjuryType:
+        _ = anchor
         classification = (
             (pattern_score.classification or "indeterminate").strip().lower()
         )
         if classification == "mixed":
-            return "cholestatic"
+            return "mixed"
         if classification in {"hepatocellular", "cholestatic"}:
             return cast(RucamInjuryType, classification)
         return "indeterminate"
@@ -348,14 +314,16 @@ class RucamScoreEstimator:
         if injury_type == "indeterminate":
             reasons.append("injury pattern indeterminate")
         if not anchor.is_score_eligible:
-            reasons.append("onset anchor not score-eligible")
-        if len(lab_timeline.entries) < 1:
+            reasons.append("qualifying liver-injury anchor unavailable")
+        if drug.therapy_start_date is None:
+            reasons.append("drug start timing unavailable")
+        if not lab_timeline.entries:
             reasons.append("no laboratory timeline entries")
-        has_alt = bool((payload.anamnesis or "").strip()) and (
+        has_alternative_context = bool((payload.anamnesis or "").strip()) and (
             len(_exclusion_re().findall(payload.anamnesis or "")) > 0
             or len(disease_context.entries) > 0
         )
-        if not has_alt:
+        if not has_alternative_context:
             reasons.append("alternative-cause assessment evidence unavailable")
         return RucamDataSufficiency(sufficient=not reasons, blocking_reasons=reasons)
 
@@ -367,6 +335,7 @@ class RucamScoreEstimator:
         injury_type: str,
         reasons: list[str],
         report_language: str,
+        components: list[RucamComponentAssessment] | None = None,
     ) -> DrugRucamAssessment:
         limitations = reasons or [phrase("rucam_insufficient_data", report_language)]
         return DrugRucamAssessment(
@@ -376,17 +345,22 @@ class RucamScoreEstimator:
             causality_category="not assessable",
             confidence="low",
             estimated=False,
-            components=[
+            components=components
+            or [
                 RucamComponentAssessment(
                     component_key="rucam",
-                    label="RUCAM",
+                    label="Updated RUCAM evidence checklist",
                     score=0,
                     status="not_assessable",
                     rationale="; ".join(limitations),
                 )
             ],
             limitations=limitations,
-            summary=phrase("rucam_not_calculated", report_language),
+            summary=(
+                "Updated RUCAM numerical scoring is not automated from partially "
+                "structured evidence. Review the captured components and score the "
+                "validated instrument clinically if required."
+            ),
             calculation_method="not_calculated",
             score_source=None,
             data_sufficient=False,
@@ -414,7 +388,7 @@ class RucamScoreEstimator:
             components=[
                 RucamComponentAssessment(
                     component_key="source_reported",
-                    label="Source-reported RUCAM",
+                    label="Patient-record RUCAM",
                     score=source.score,
                     status="scored",
                     evidence=source.evidence,
@@ -422,7 +396,9 @@ class RucamScoreEstimator:
                     rationale=phrase("rucam_source_reported", report_language),
                 )
             ],
-            limitations=[],
+            limitations=[
+                "The score is preserved from the current patient record and was not independently recalculated by DILIGENT."
+            ],
             summary=phrase("rucam_source_reported", report_language),
             calculation_method="source_reported",
             score_source=source.source_name,
@@ -443,27 +419,32 @@ class RucamScoreEstimator:
         anchor: RucamAnchor,
         resolved_item: dict[str, Any],
         report_language: str = "en",
+        require_drug_attribution: bool = False,
     ) -> DrugRucamAssessment:
-        provided_from_labs = self.resolve_provided_rucam_score(
-            payload.laboratory_analysis or ""
+        provided = self.resolve_provided_rucam_score(
+            payload.laboratory_analysis or "",
+            drug_name=drug.name,
+            require_drug_attribution=require_drug_attribution,
         )
-        if provided_from_labs is not None:
+        if provided is not None:
             return self.build_source_reported_assessment(
                 drug=drug,
                 injury_type=injury_type,
-                source=provided_from_labs,
+                source=provided,
                 report_language=report_language,
             )
 
-        source_reported = self.extract_source_reported_rucam(resolved_item)
-        if source_reported is not None:
-            return self.build_source_reported_assessment(
-                drug=drug,
-                injury_type=injury_type,
-                source=source_reported,
-                report_language=report_language,
-            )
-
+        checklist = self._build_evidence_checklist(
+            payload=payload,
+            drug=drug,
+            all_drugs=all_drugs,
+            disease_context=disease_context,
+            lab_timeline=lab_timeline,
+            onset_context=onset_context,
+            injury_type=injury_type,
+            anchor=anchor,
+            resolved_item=resolved_item,
+        )
         sufficiency = self.evaluate_data_sufficiency(
             injury_type=injury_type,
             anchor=anchor,
@@ -472,16 +453,34 @@ class RucamScoreEstimator:
             payload=payload,
             disease_context=disease_context,
         )
-        if not sufficiency.sufficient:
-            return self.build_not_calculated_assessment(
-                drug=drug,
-                injury_type=injury_type,
-                reasons=sufficiency.blocking_reasons,
-                report_language=report_language,
-            )
+        limitations = [
+            "Automatic updated RUCAM total disabled because all validated criteria are not represented with sufficient structured precision.",
+            "LiverTox and RAG literature are never accepted as sources of the current patient's RUCAM score.",
+            *sufficiency.blocking_reasons,
+        ]
+        return self.build_not_calculated_assessment(
+            drug=drug,
+            injury_type=injury_type,
+            reasons=list(dict.fromkeys(limitations)),
+            report_language=report_language,
+            components=checklist,
+        )
 
-        components: list[RucamComponentAssessment] = []
-        onset_component, onset_date = self.score_time_to_onset(
+    # -------------------------------------------------------------------------
+    def _build_evidence_checklist(
+        self,
+        *,
+        payload: PatientData,
+        drug: DrugEntry,
+        all_drugs: list[DrugEntry],
+        disease_context: PatientDiseaseContext,
+        lab_timeline: PatientLabTimeline,
+        onset_context: LiverInjuryOnsetContext | None,
+        injury_type: str,
+        anchor: RucamAnchor,
+        resolved_item: dict[str, Any],
+    ) -> list[RucamComponentAssessment]:
+        onset_component, _ = self.score_time_to_onset(
             payload=payload,
             drug=drug,
             onset_context=onset_context,
@@ -489,65 +488,40 @@ class RucamScoreEstimator:
             injury_type=injury_type,
             resolved_item=resolved_item,
         )
-        components.append(onset_component)
-        components.append(
+        components = [
+            onset_component,
             self.score_course(
                 injury_type=injury_type,
                 lab_timeline=lab_timeline,
-                onset_date=onset_date,
+                onset_date=anchor.onset_date,
                 suspension_status=drug.suspension_status,
-            )
-        )
-        components.append(
-            self.score_risk_factors(payload=payload, injury_type=injury_type)
-        )
-        components.append(
-            self.score_concomitant_drugs(target_drug=drug, all_drugs=all_drugs)
-        )
-        components.append(
-            self.score_non_drug_causes(payload=payload, disease_context=disease_context)
-        )
-        components.append(
-            self.score_previous_hepatotoxicity(resolved_item=resolved_item)
-        )
-        components.append(self.score_rechallenge(payload=payload, drug=drug))
+            ),
+            self.score_risk_factors(payload=payload, injury_type=injury_type),
+            self.score_concomitant_drugs(target_drug=drug, all_drugs=all_drugs),
+            self.score_non_drug_causes(
+                payload=payload,
+                disease_context=disease_context,
+            ),
+            self.score_previous_hepatotoxicity(resolved_item=resolved_item),
+            self.score_rechallenge(payload=payload, drug=drug),
+        ]
+        return [self._as_checklist_component(component) for component in components]
 
-        total = int(
-            sum(
-                component.score
-                for component in components
-                if component.status == "scored"
-            )
-        )
-        limitations: list[str] = []
-        if drug.therapy_start_date is None and drug.therapy_start_status is None:
-            limitations.append("drug start timing unavailable")
-        if drug.suspension_status is None and not drug.suspension_date:
-            limitations.append("withdrawal status unavailable")
-        if len(lab_timeline.entries) < 2:
-            limitations.append("insufficient follow-up labs")
-        if any(component.status == "not_assessable" for component in components):
-            limitations.append("one or more RUCAM components are not assessable")
-        category = self.resolve_causality_bucket(total)
-        confidence: Literal["low", "moderate", "high"] = (
-            "low" if limitations else "moderate"
-        )
-        summary = phrase(
-            "rucam_structured_score", report_language, score=total, category=category
-        )
-        return DrugRucamAssessment(
-            drug_name=drug.name,
-            injury_type_for_rucam=cast(RucamInjuryType, injury_type),
-            total_score=total,
-            causality_category=cast(RucamCausalityCategory, category),
-            confidence=confidence,
-            estimated=True,
-            components=components,
-            limitations=limitations,
-            summary=summary,
-            calculation_method="structured_rucam",
-            score_source=None,
-            data_sufficient=not limitations,
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _as_checklist_component(
+        component: RucamComponentAssessment,
+    ) -> RucamComponentAssessment:
+        captured = component.rationale or "Criterion evidence captured for clinical review."
+        return component.model_copy(
+            update={
+                "score": 0,
+                "status": "not_assessable",
+                "rationale": (
+                    f"{captured} Numerical scoring is intentionally not automated; "
+                    "apply the validated updated RUCAM worksheet clinically if needed."
+                ),
+            }
         )
 
     # -------------------------------------------------------------------------
@@ -561,7 +535,7 @@ class RucamScoreEstimator:
         injury_type: str,
         resolved_item: dict[str, Any] | None = None,
     ) -> tuple[RucamComponentAssessment, date | None]:
-        _ = injury_type
+        _ = (payload, injury_type)
         start_date = self.try_parse_date(drug.therapy_start_date)
         onset_date = (
             self.try_parse_date(onset_context.onset_date) if onset_context else None
@@ -582,7 +556,7 @@ class RucamScoreEstimator:
             suspension_available = bool(
                 drug.suspension_date or drug.suspension_status is not None
             )
-            rationale = "Missing start and/or score-eligible onset date."
+            rationale = "Missing start and/or qualifying onset date."
             if start_date is None and suspension_available and likelihood in {"A", "B"}:
                 rationale = (
                     "Drug start timing unavailable; suspension timing and a "
@@ -593,27 +567,26 @@ class RucamScoreEstimator:
                 label="Time to onset",
                 score=0,
                 status="not_assessable",
-                evidence_date=drug.therapy_start_date or anchor.onset_date.isoformat()
-                if anchor.onset_date
-                else None,
+                evidence_date=(
+                    anchor.onset_date.isoformat() if anchor.onset_date else None
+                ),
                 rationale=rationale,
             ), onset_date
         delta_days = (onset_date - start_date).days
-        score = (
-            2
-            if 5 <= delta_days <= 90
-            else 1
-            if 1 <= delta_days < 5 or 91 <= delta_days <= 365
-            else 0
-        )
+        if delta_days < 0:
+            score = 0
+            status = "not_assessable"
+        else:
+            score = 2 if 5 <= delta_days <= 90 else 1
+            status = "scored"
         return RucamComponentAssessment(
             component_key="time_to_onset",
             label="Time to onset",
             score=score,
-            status="scored",
+            status=status,
             evidence_date=onset_date.isoformat(),
-            evidence=f"{drug.therapy_start_date or 'missing start'} -> {onset_date.isoformat()}",
-            rationale=f"Latency: {delta_days} days.",
+            evidence=f"{drug.therapy_start_date} -> {onset_date.isoformat()}",
+            rationale=f"Documented latency: {delta_days} days.",
         ), onset_date
 
     # -------------------------------------------------------------------------
@@ -625,6 +598,7 @@ class RucamScoreEstimator:
         onset_date: date | None,
         suspension_status: bool | None,
     ) -> RucamComponentAssessment:
+        marker_names = {"ALT"} if injury_type == "hepatocellular" else {"ALP"}
         if onset_date is None or suspension_status is None:
             return RucamComponentAssessment(
                 component_key="course",
@@ -632,30 +606,35 @@ class RucamScoreEstimator:
                 score=0,
                 status="not_assessable",
                 evidence_date=onset_date.isoformat() if onset_date else None,
-                rationale="No onset date or withdrawal status available.",
+                rationale="Withdrawal chronology is incomplete.",
             )
-        _ = injury_type
-        dated = []
-        for entry in lab_timeline.entries:
-            d = self.try_parse_date(entry.sample_date)
-            if d is not None and d > onset_date and entry.value is not None:
-                dated.append((d, entry.value))
-        if not dated:
+        dated = [
+            (
+                parsed,
+                entry,
+            )
+            for entry in lab_timeline.entries
+            if entry.marker_name.upper() in marker_names
+            and entry.value is not None
+            and (parsed := self.try_parse_date(entry.sample_date)) is not None
+            and parsed >= onset_date
+        ]
+        if len(dated) < 2:
             return RucamComponentAssessment(
                 component_key="course",
                 label="Course after withdrawal",
                 score=0,
                 status="not_assessable",
                 evidence_date=onset_date.isoformat(),
-                rationale="No follow-up labs after onset/withdrawal.",
+                rationale="Insufficient marker-specific follow-up for dechallenge scoring.",
             )
         return RucamComponentAssessment(
             component_key="course",
             label="Course after withdrawal",
-            score=1,
-            status="scored",
+            score=0,
+            status="not_assessable",
             evidence_date=dated[-1][0].isoformat(),
-            rationale="Follow-up labs available after withdrawal context.",
+            rationale="Marker-specific post-onset follow-up is available for clinical dechallenge review.",
         )
 
     # -------------------------------------------------------------------------
@@ -664,13 +643,15 @@ class RucamScoreEstimator:
     ) -> RucamComponentAssessment:
         _ = injury_type
         text = (payload.anamnesis or "").strip()
-        score = 1 if _alcohol_re().search(text) else 0
         return RucamComponentAssessment(
             component_key="risk_factors",
             label="Risk factors",
-            score=score,
-            status="scored",
+            score=0,
+            status="not_assessable",
             evidence=text[:300] or None,
+            rationale=(
+                "Age, quantified alcohol exposure, sex-specific thresholds, and pregnancy status are not all available as validated structured RUCAM fields."
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -679,16 +660,19 @@ class RucamScoreEstimator:
     ) -> RucamComponentAssessment:
         target_key = normalize_drug_query_name(target_drug.name or "")
         other = [
-            d
-            for d in all_drugs
-            if normalize_drug_query_name(d.name or "") != target_key
+            drug
+            for drug in all_drugs
+            if normalize_drug_query_name(drug.name or "") != target_key
         ]
         return RucamComponentAssessment(
             component_key="concomitant_drugs",
             label="Concomitant drugs",
-            score=-1 if other else 0,
-            status="scored",
-            evidence=", ".join(d.name for d in other[:5]) or None,
+            score=0,
+            status="not_assessable",
+            evidence=", ".join(drug.name for drug in other[:5]) or None,
+            rationale=(
+                "Concomitant drugs are recorded, but formal RUCAM penalties require drug-specific timing and hepatotoxicity evidence for each competing exposure."
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -701,30 +685,21 @@ class RucamScoreEstimator:
             for entry in disease_context.entries
             if bool(entry.hepatic_related) or "hepat" in (entry.name or "").lower()
         ]
-        if hepatic_entries:
-            return RucamComponentAssessment(
-                component_key="non_drug_causes",
-                label="Non-drug causes",
-                score=-3,
-                status="scored",
-                evidence=hepatic_entries[0].evidence or hepatic_entries[0].name,
-            )
+        evidence = (
+            hepatic_entries[0].evidence or hepatic_entries[0].name
+            if hepatic_entries
+            else text[:500] or None
+        )
         clues = len(_exclusion_re().findall(text))
-        if clues == 0:
-            return RucamComponentAssessment(
-                component_key="non_drug_causes",
-                label="Non-drug causes",
-                score=0,
-                status="not_assessable",
-                evidence=text[:300] or None,
-                rationale="No explicit exclusion workup evidence.",
-            )
         return RucamComponentAssessment(
             component_key="non_drug_causes",
             label="Non-drug causes",
-            score=2 if clues >= 2 else 1,
-            status="scored",
-            evidence=text[:300] or None,
+            score=0,
+            status="not_assessable",
+            evidence=evidence,
+            rationale=(
+                f"Alternative-cause evidence contains {clues} explicit exclusion clue(s); the validated RUCAM cause groups must be reviewed individually."
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -739,13 +714,15 @@ class RucamScoreEstimator:
         token = ""
         if isinstance(metadata, dict):
             token = str(metadata.get("likelihood_score") or "").strip().upper()
-        score = 2 if token in {"A", "B"} else 1 if token in {"C", "D", "E"} else 0
         return RucamComponentAssessment(
             component_key="previous_hepatotoxicity",
             label="Previous hepatotoxicity of the drug",
-            score=score,
-            status="scored",
+            score=0,
+            status="not_assessable",
             evidence=token or None,
+            rationale=(
+                "LiverTox likelihood is retained as drug-level evidence only and is not converted directly into a RUCAM previous-hepatotoxicity score."
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -769,8 +746,7 @@ class RucamScoreEstimator:
                 score=3,
                 status="scored",
                 evidence=text[:500],
-                evidence_date=drug.suspension_date or drug.therapy_start_date,
-                rationale="Intentional or inadvertent positive rechallenge language is present.",
+                rationale="Positive re-exposure language is present and requires biochemical verification; rechallenge is never recommended.",
             )
         if "rechallenge" in lowered or "restarted" in lowered or "resumed" in lowered:
             return RucamComponentAssessment(
@@ -779,7 +755,6 @@ class RucamScoreEstimator:
                 score=0,
                 status="not_assessable",
                 evidence=text[:500],
-                evidence_date=drug.suspension_date or drug.therapy_start_date,
                 rationale="Re-exposure language is present but the biochemical response is unclear.",
             )
         return RucamComponentAssessment(
@@ -787,22 +762,16 @@ class RucamScoreEstimator:
             label="Rechallenge",
             score=0,
             status="not_assessable",
-            rationale="No reliable rechallenge evidence.",
+            rationale="No reliable rechallenge evidence; absence is not treated as a negative rechallenge.",
         )
 
     # -------------------------------------------------------------------------
     @staticmethod
     def resolve_causality_bucket(total_score: int) -> str:
-        # When the structured estimate is data-limited (missing start/stop
-        # timing, insufficient follow-up, or non-assessable components), scores
-        # in the excluded/unlikely band (≤2) cannot honestly be classified as
-        # "ruled out" or "unlikely". Surface them as indeterminate instead so
-        # the clinician understands the data window is insufficient rather
-        # than contradictory.
         if total_score <= 0:
             return "excluded"
         if total_score <= 2:
-            return "indeterminate"
+            return "unlikely"
         if total_score <= 5:
             return "possible"
         if total_score <= 8:
