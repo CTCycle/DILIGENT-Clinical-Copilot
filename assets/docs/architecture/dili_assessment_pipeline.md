@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-08-20
+Last updated: 2026-09-04
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -37,7 +37,7 @@ sequenceDiagram
     W->>W: Normalize and extract sections
     W->>L: Structured drug, disease, and lab extraction
     W->>W: Deterministic validation and fallback
-    W->>W: Resolve pattern, candidates, and RUCAM
+    W->>W: Resolve presentation phenotype, case qualification, and RUCAM evidence
     W->>K: Resolve identities and evidence
     K->>R: Optional RAG retrieval
     K->>L: Bounded clinical consultation
@@ -80,30 +80,26 @@ If an explicit hepatic pattern is present in the laboratory source, it becomes t
 
 If no explicit pattern exists, the calculated value is used. If neither is available, the final value is `indeterminate` with source `undetermined`.
 
-The structured adjudication layer calculates R ratio at the first qualifying
-paired ALT/ALP date and at the peak ALT date. Boundary values follow LiverTox:
-`R >= 5` is hepatocellular, `R <= 2` is cholestatic, and values between 2 and
-5 are mixed.
+Calculated DILI phenotype uses paired ALT and ALP values from the presentation or first qualifying injury episode, not the later peak ALT as the primary phenotype anchor. The R ratio is calculated from the contemporaneous normalized multiples `ALT / ALT_ULN` and `ALP / ALP_ULN`. Boundary values follow the clinical definitions used by the application: `R >= 5` is hepatocellular, `R <= 2` is cholestatic, and values between 2 and 5 are mixed.
 
-The paired sample at the highest ALT/ULN is the primary clinical injury anchor.
-Earlier baseline and later recovery pairs remain available as longitudinal audit
-points but cannot replace the peak injury classification merely because they
-occur first. Candidate selection compares normalized multiples, not raw values,
-so changing laboratory ULNs are handled consistently.
+Peak and later recovery pairs remain longitudinal audit points when available, but they do not replace the presentation phenotype used for downstream causality reasoning. Candidate selection compares normalized multiples rather than raw laboratory values so laboratory-specific ULNs are respected. When the required ALT, ALP, or corresponding ULN evidence is not sufficient for a reliable R ratio, the pattern remains `indeterminate` rather than substituting AST or an unrelated laboratory reference.
 
 ## Structured DILI Adjudication
 The final report is generated from a persisted `DiliEvidenceBundle` before any
-LLM summary. The bundle contains case completeness, longitudinal exposure and
-laboratory events, first and peak R-ratio assessments, deterministic phenotype
-candidates, a mandatory competing-cause checklist, Hy's Law status, explicit
-severity grade, conservative drug identity resolution, per-drug componentized
-RUCAM, and a separate DILIN-like causality category.
+LLM summary. The bundle contains case completeness, explicit case qualification,
+longitudinal exposure and laboratory events, presentation and longitudinal
+R-ratio assessments, deterministic phenotype candidates, a mandatory
+competing-cause checklist, Hy's Law status, explicit severity grade,
+conservative drug identity resolution, per-drug RUCAM evidence, and a separate
+internal structured causality synthesis.
 
-The clinical source hierarchy is AASLD, LiverTox, FDA DILI guidance, then
-DILIN/RUCAM. RUCAM is supportive and never treated as dispositive. LiverTox
-likelihood describes the drug's prior hepatotoxic potential and is kept
-separate from patient-specific causality. Missing follow-up is represented as
-missing, not as a negative dechallenge or rechallenge.
+Case qualification is intentionally separate from drug attribution. It records whether available laboratory evidence meets the application's typical liver-injury detection criteria, whether threshold findings still need repeat confirmation, and whether an abnormal pretreatment baseline changes the reference used for interpretation. A qualifying episode does not itself establish DILI or implicate a specific drug.
+
+The clinical source hierarchy is AASLD, LiverTox, FDA DILI guidance, then DILIN expert methodology and RUCAM. RUCAM remains supportive and never dispositive. An explicitly documented RUCAM score from the current patient's clinical record is preserved as patient-specific evidence and mapped to its causality category. When no patient RUCAM score is supplied, DILIGENT does not synthesize a numeric pseudo-RUCAM score. It retains a non-scoring criterion-level evidence checklist and its limitations instead. RUCAM scores reported in LiverTox monographs, papers, or representative cases are never promoted to the current patient.
+
+LiverTox likelihood describes a drug-level prior hepatotoxicity classification and remains separate from patient-specific causality. A weak or sparse LiverTox prior can limit the available reference support, but it does not impose an artificial hard ceiling on patient-level causality when stronger patient evidence exists.
+
+The internal structured causality synthesis integrates auditable patient evidence such as drug identity, chronology, drug-specific dechallenge or rechallenge evidence, phenotype information, competing causes, and source quality. It is an internal deterministic synthesis for review, not a validated DILIN score and not a replacement for expert adjudication.
 
 The deterministic dossier provides the FDA-style fourteen-section report
 structure. The bundle also carries twelve acceptance-question answers with
@@ -123,7 +119,7 @@ generated artifacts for audit, but the persisted session status must not remain
 `successful` when blocking faithfulness issues exist. Such cases require human
 review before clinical reliance.
 
-Generated clinical narrative is also checked against the authoritative evidence
+Generated clinical narrative is checked against the authoritative evidence
 bundle before finalization. If the narrative claims that unresolved competing
 causes were excluded, asserts Hy's Law when the structured status is not
 `meets_criteria`, conflates LiverTox likelihood with patient-level causality, or
@@ -131,17 +127,21 @@ uses definitive/lifelong causality language while structured causality is limite
 the workflow records a blocking faithfulness issue and persists the session as
 requiring human review rather than `successful`.
 
+The same deterministic clinical safety audit is applied to agentic report revisions before a revised report can be persisted as a successful revision. LLM QA therefore cannot override contradictions with the structured competing-cause, Hy's Law, causality-certainty, LiverTox-provenance, or rechallenge safeguards.
+
 Longitudinal adjudication is clinically conservative by default: dose changes,
 restart or rechallenge mentions, first symptoms, bilirubin or jaundice timing,
 marker-specific peaks, dechallenge direction, recovery versus persistence, and
 worsening after discontinuation remain explicit timeline events or missing-data
-statements instead of being inferred as negatives.
+statements instead of being inferred as negatives. Dechallenge evidence is interpreted per drug and requires a documented discontinuation context for that exposure; a global laboratory improvement is not automatically attributed to every medication in a polypharmacy case.
 
 Mandatory competing causes use explicit four-state outputs:
 - `excluded`
 - `not_excluded`
 - `unknown`
 - `missing_data`
+
+Pre-existing or chronic liver disease is retained as baseline context and a potential competing explanation rather than being treated as automatically excluded merely because it predates the acute episode. The differential remains unresolved unless the available evidence supports exclusion of the relevant alternative explanation.
 
 Hy's Law evaluation is same-episode aware and records baseline multiples,
 initial cholestasis, alternative-cause exclusion, exposure compatibility, and
@@ -181,7 +181,7 @@ aliases, runtime observations, and match-cache evidence in its own repository
 transaction. This keeps clinical session persistence and catalog learning
 separately owned while retaining the same evidence trail.
 
-Per-drug clinical assessments carry claim envelopes and narrative limits. Claim review output distinguishes source-text claims, RUCAM-linked claims, unsupported or unknown-source claims, and generated limitations so report consumers can see which statements require review.
+Per-drug clinical assessments carry claim envelopes and narrative limits. Claim review output distinguishes source-text claims, patient-record RUCAM claims, non-scoring RUCAM evidence, unsupported or unknown-source claims, and generated limitations so report consumers can see which statements require review.
 
 The rendered per-drug report consolidates evidence-match status, the matched local record, evidence warnings, claim-review requirements, and RUCAM limitations into one localized clinical commentary. The structured claim and evidence fields remain unchanged in persisted audit data.
 
@@ -222,9 +222,11 @@ not reuse the patient visit date as an invented exact event date.
 - Ambiguous drug matches are included for review but are not used as authoritative LiverTox evidence.
 - Broad categories and rejected false-positive extracted text remain audit-only and do not become concrete drug matches.
 - LLM structured output failures fall back to direct deterministic parsing after bounded retries.
+- Missing patient-level RUCAM data never trigger a synthesized numeric RUCAM score; the pipeline retains a non-scoring evidence checklist instead.
 - Session persistence is mandatory for successful clinical jobs. Persistence write failures raise a service dependency error instead of returning an apparently successful unpersisted report.
 - Failed job payloads omit raw clinical input and patient image content; job-level errors expose generic failure text plus sanitized failure metadata.
 
 ## Testing Matrix
 Regression fixtures under `app/tests/fixtures/dili_pipeline_audit` cover clean, noisy, incomplete, and adversarial clinical documents, including duplicate headings, ambiguous headings, structured and unstructured therapy, structured and noisy laboratories, hepatic-pattern conflicts, family-history disease mentions, allergy-only drug mentions, negated diagnoses, combination therapy, brand/generic variants, and missing LiverTox matches.
 
+Focused clinical correctness unit coverage additionally checks presentation-versus-peak phenotype behavior, laboratory-specific ULN handling, missing-ULN and AST-substitution safeguards, patient-only RUCAM provenance, polypharmacy attribution, baseline-aware case qualification, drug-specific dechallenge, weak LiverTox prior handling, competing-cause semantics, and deterministic safety auditing of revised reports.
