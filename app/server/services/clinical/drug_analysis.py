@@ -288,11 +288,23 @@ class DrugAnalysisService:
     @staticmethod
     def format_rucam_prompt_block(rucam: DrugRucamAssessment | None) -> str:
         if rucam is None:
-            return "Estimated RUCAM not available."
+            return "RUCAM evidence is not available."
         limitations = ", ".join((rucam.limitations or [])[:3]) or "not specified"
+        if rucam.total_score is None:
+            component_labels = ", ".join(
+                component.label for component in (rucam.components or [])[:5]
+            ) or "none captured"
+            return (
+                "- Numerical updated-RUCAM total: not calculated\n"
+                f"- Evidence checklist components: {component_labels}\n"
+                f"- Key limitations: {limitations}\n"
+                "- Interpretation: do not infer a RUCAM probability category from this checklist."
+            )
         return (
-            f"- Score: {rucam.total_score}\n- Category: {rucam.causality_category}\n"
-            f"- Confidence: {rucam.confidence}\n- Estimated due to incomplete clinical data: yes\n"
+            f"- Patient-record RUCAM score: {rucam.total_score}\n"
+            f"- Patient-record category: {rucam.causality_category}\n"
+            f"- Source: {rucam.score_source or 'current patient record'}\n"
+            "- Interpretation: this score was preserved from the patient record and was not independently recalculated by DILIGENT.\n"
             f"- Key limitations: {limitations}"
         )
 
