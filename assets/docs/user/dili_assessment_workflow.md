@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-08-31
+Last updated: 2026-09-04
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -44,6 +44,8 @@ Avoid vague input like:
 Patient has liver issue. Check DILI.
 ```
 
+When available, include the laboratory-specific upper limits of normal, pretreatment or baseline liver chemistry, exact drug start and stop dates, follow-up liver chemistry after discontinuation, and explicit alternative-cause workup. These details materially affect case qualification, R-ratio interpretation, dechallenge, and causality review.
+
 ## Run The Assessment
 1. Review the entered information.
 2. Confirm the selected model configuration.
@@ -87,13 +89,16 @@ Treat the report as a decision-support draft, not a final diagnosis.
 
 Review for:
 - consistency between exposure timeline and reported interpretation
-- correct interpretation of liver chemistry pattern
+- correct interpretation of the presentation liver chemistry pattern
+- correct use of laboratory-specific ULNs in the R ratio
+- explicit handling of pretreatment or baseline abnormalities
 - mention of confounders and alternative causes
 - consistency between conclusion and supplied evidence
 - unsupported assumptions or invented facts
 - drug-resolution review flags for ambiguous, missing, or unvalidated RxNav/LiverTox matches
 - explicit missing-data statements rather than silent negatives
 - the twelve acceptance-question answers and their supporting quotes
+- drug-specific rather than global attribution of dechallenge evidence
 
 The main report is a readable clinical DILI evaluation with per-drug narrative
 commentary and a concise deterministic adjudication summary. The full structured
@@ -101,12 +106,18 @@ DILI dossier is retained as an audit artifact in the session result payload and
 should be used to verify the clinical narrative before reuse.
 
 The structured dossier explicitly reports:
+- liver-injury case qualification separately from drug causality
+- pretreatment baseline status when dated baseline chemistry is available
+- presentation R-ratio phenotype and longitudinal laboratory context
 - longitudinal exposure and lab timeline events
-- dose changes, restart or rechallenge mentions, and dechallenge direction
+- dose changes, restart or rechallenge mentions, and drug-specific dechallenge evidence
 - Hy's Law state and why it is or is not met
 - competing-cause states as `excluded`, `not_excluded`, `unknown`, or `missing_data`
-- supportive RUCAM component evidence
-- DILIN-like overall causality reasoning
+- a patient-record RUCAM score only when one is explicitly supplied for the current patient
+- otherwise a non-scoring RUCAM criterion-evidence checklist with limitations
+- an internal structured causality synthesis for review, not a validated DILIN score
+
+LiverTox likelihood is drug-level evidence about known hepatotoxic potential. It is not the current patient's causality probability and must not be interpreted as a patient-specific diagnosis or RUCAM score.
 
 Drug matching statuses can include:
 - `accepted_exact_livertox`
@@ -125,12 +136,15 @@ If the report is incomplete or wrong:
 3. Re-run the assessment.
 4. Compare the new output with the previous one.
 
+Agentic revisions are subject to the same deterministic clinical safety checks as the primary report before a revised report is persisted as successful. A revision cannot rely on LLM QA alone to override unresolved competing causes, unsupported Hy's Law assertions, overstated causality, LiverTox/RUCAM provenance conflicts, or rechallenge safeguards.
+
 ## Copy Or Export Output
 Use the available copy or export controls to move the report into the local workflow.
 
 Before reusing output:
 - verify dates
-- verify lab values and units
+- verify lab values, ULNs, and units
 - verify drug names and dosing
+- verify whether any RUCAM score was actually supplied for this patient
 - remove placeholders and unsupported statements
 - add human reviewer attribution according to local policy
