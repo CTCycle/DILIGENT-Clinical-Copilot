@@ -1,0 +1,186 @@
+:host {
+  display: inline-flex;
+}
+
+.notification-center {
+  position: relative;
+  display: inline-flex;
+}
+
+.notification-center-button {
+  position: relative;
+}
+
+.notification-center-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.notification-center-badge {
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border: 2px solid var(--color-surface);
+  border-radius: 999px;
+  background: var(--color-status-error-text);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 12px;
+  text-align: center;
+}
+
+.notification-history {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 1300;
+  width: min(360px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.notification-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.notification-history-header div {
+  display: grid;
+  gap: 1px;
+}
+
+.notification-history-header strong {
+  font-size: var(--font-base);
+}
+
+.notification-history-header span,
+.notification-history-item time {
+  color: var(--color-text-muted);
+  font-size: var(--font-xs);
+}
+
+.notification-history-clear {
+  border: 0;
+  background: transparent;
+  color: var(--color-brand);
+  font: inherit;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notification-history-list {
+  max-height: min(420px, 62vh);
+  overflow-y: auto;
+}
+
+.notification-history-item {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.notification-history-item:last-child {
+  border-bottom: 0;
+}
+
+.notification-history-item p,
+.notification-toast p {
+  margin: 0;
+}
+
+.notification-history-item p {
+  color: var(--color-text-primary);
+  font-size: var(--font-sm);
+  line-height: 1.45;
+}
+
+.notification-history-indicator,
+.notification-toast-indicator {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--color-status-info-text);
+}
+
+.notification-history-item.is-success .notification-history-indicator,
+.notification-toast.is-success .notification-toast-indicator {
+  background: var(--color-status-success-text);
+}
+
+.notification-history-item.is-error .notification-history-indicator,
+.notification-toast.is-error .notification-toast-indicator {
+  background: var(--color-status-error-text);
+}
+
+.notification-history-empty {
+  margin: 0;
+  padding: var(--space-xl);
+  color: var(--color-text-muted);
+  font-size: var(--font-sm);
+  text-align: center;
+}
+
+.notification-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 1400;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-md);
+  width: min(460px, calc(100vw - 32px));
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--color-status-info-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 94%, var(--color-status-info-bg));
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+}
+
+.notification-toast.is-success {
+  border-color: var(--color-status-success-border);
+  background: color-mix(in srgb, var(--color-surface) 94%, var(--color-status-success-bg));
+}
+
+.notification-toast.is-error {
+  border-color: var(--color-status-error-border);
+  background: color-mix(in srgb, var(--color-surface) 94%, var(--color-status-error-bg));
+}
+
+.notification-toast p {
+  font-size: var(--font-sm);
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.notification-toast button {
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
