@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from datetime import date, datetime
 from typing import Literal
 
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliInjuryPattern
@@ -8,12 +10,14 @@ from domain.clinical.entities import ClinicalLabEntry, PatientLabTimeline
 
 ###############################################################################
 class DiliPatternEngine:
-    DEFAULT_ULN = {"ALT": 40.0, "ALP": 120.0}
-
     # -------------------------------------------------------------------------
     @staticmethod
     def _value(entry: ClinicalLabEntry) -> float | None:
-        return float(entry.value) if entry.value is not None else None
+        if entry.value is not None:
+            return float(entry.value)
+        raw = str(entry.value_text or "").replace(",", ".")
+        match = re.search(r"[-+]?\d*\.?\d+", raw)
+        return float(match.group()) if match else None
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -29,10 +33,9 @@ class DiliPatternEngine:
                 continue
             value = cls._value(entry)
             uln = cls._uln(entry)
-            if value is None or uln is None or uln <= 0:
-                current_multiple = None
-            else:
-                current_multiple = value / uln
+            current_multiple = (
+                value / uln if value is not None and uln is not None and uln > 0 else None
+            )
             if selected is None:
                 selected = entry
                 selected_multiple = current_multiple
@@ -40,8 +43,7 @@ class DiliPatternEngine:
             if selected_multiple is None and current_multiple is not None:
                 selected = entry
                 selected_multiple = current_multiple
-                continue
-            if (
+            elif (
                 selected_multiple is not None
                 and current_multiple is not None
                 and current_multiple > selected_multiple
@@ -51,11 +53,16 @@ class DiliPatternEngine:
         return selected
 
     # -------------------------------------------------------------------------
-    @classmethod
-    def _uln(cls, entry: ClinicalLabEntry) -> float | None:
+    @staticmethod
+    def _uln(entry: ClinicalLabEntry) -> float | None:
         if entry.upper_limit_normal and entry.upper_limit_normal > 0:
             return float(entry.upper_limit_normal)
-        return cls.DEFAULT_ULN.get(entry.marker_name.upper())
+        raw = str(entry.upper_limit_text or "").replace(",", ".")
+        match = re.search(r"[-+]?\d*\.?\d+", raw)
+        if not match:
+            return None
+        parsed = float(match.group())
+        return parsed if parsed > 0 else None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -75,6 +82,7 @@ class DiliPatternEngine:
         buckets: dict[str, list[ClinicalLabEntry]] = {}
         for entry in timeline.entries:
             buckets.setdefault(entry.sample_date or "undated", []).append(entry)
+
         calculated: list[DiliInjuryPattern] = []
         for sample_date, entries in buckets.items():
             alt = self._best_entry(entries, {"ALT"})
@@ -89,6 +97,8 @@ class DiliPatternEngine:
                 and alp_value is not None
                 and alt_uln is not None
                 and alp_uln is not None
+                and alt_uln > 0
+                and alp_uln > 0
                 and alp_value != 0
             ):
                 ratio = (alt_value / alt_uln) / (alp_value / alp_uln)
@@ -108,15 +118,15 @@ class DiliPatternEngine:
                             claim="R-ratio input",
                             quote=alt.evidence or alp.evidence,
                             source_section="laboratory_analysis",
-                            event_date=None
-                            if sample_date == "undated"
-                            else sample_date,
+                            event_date=None if sample_date == "undated" else sample_date,
                             source_kind="calculated",
                         )
                     ],
                 )
             )
-        if not calculated:
+
+        assessable = [item for item in calculated if item.r_ratio is not None]
+        if not assessable:
             return [
                 DiliInjuryPattern(
                     assessment_point="first_qualifying",
@@ -124,14 +134,61 @@ class DiliPatternEngine:
                     pattern_source="unavailable",
                 )
             ]
-        calculated.sort(key=lambda item: item.sample_date or "9999")
-        first = calculated[0]
-        peak = max(calculated, key=lambda item: item.alt or -1)
-        first.assessment_point = "first_qualifying"
+
+        dated = [item for item in assessable if item.sample_date]
+        chronological = sorted(dated, key=lambda item: self._date_sort_key(item.sample_date))
+        abnormal = [
+            item
+            for item in chronological
+            if self._is_abnormal_pair(item)
+        ]
+        first = abnormal[0] if abnormal else (chronological[0] if chronological else assessable[0])
+        first_payload = first.model_copy(deep=True)
+        first_payload.assessment_point = "first_qualifying"
+
+        peak = max(
+            assessable,
+            key=lambda item: (
+                (item.alt / item.alt_uln)
+                if item.alt is not None and item.alt_uln is not None and item.alt_uln > 0
+                else -1.0
+            ),
+        )
         peak_payload = peak.model_copy(deep=True)
         peak_payload.assessment_point = "peak"
-        # Consumers treat the first pattern as the clinical injury phenotype.
-        # Put the peak ALT assessment first so a normal baseline cannot become
-        # the primary DILI classification; retain the chronological first pair
-        # as the secondary audit point.
-        return [peak_payload, first]
+        return [first_payload, peak_payload]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_abnormal_pair(pattern: DiliInjuryPattern) -> bool:
+        alt_multiple = (
+            pattern.alt / pattern.alt_uln
+            if pattern.alt is not None and pattern.alt_uln is not None and pattern.alt_uln > 0
+            else None
+        )
+        alp_multiple = (
+            pattern.alp / pattern.alp_uln
+            if pattern.alp is not None and pattern.alp_uln is not None and pattern.alp_uln > 0
+            else None
+        )
+        return bool(
+            (alt_multiple is not None and alt_multiple > 1.0)
+            or (alp_multiple is not None and alp_multiple > 1.0)
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _date_sort_key(value: str | None) -> date:
+        if not value:
+            return date.max
+        normalized = str(value).strip().replace("/", "-").replace(".", "-")
+        try:
+            return date.fromisoformat(normalized)
+        except ValueError:
+            pass
+        for fmt in ("%d-%m-%Y", "%m-%d-%Y", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(normalized, fmt).date()
+            except ValueError:
+                continue
+        return date.max
