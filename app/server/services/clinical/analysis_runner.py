@@ -154,7 +154,7 @@ def normalize_match_reason(
 
 ###############################################################################
 class AnalysisRunner:
-    """Orchestrates the top-level analysis workflow — runs the full drug assessment pipeline."""
+    """Orchestrates the top-level analysis workflow and full drug assessment pipeline."""
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -212,17 +212,35 @@ class AnalysisRunner:
                     requires_review=True,
                 )
             )
-        if rucam is not None:
-            confidence = "moderate" if rucam.data_sufficient else "low"
+        if rucam is not None and rucam.total_score is not None:
             claims.append(
                 ClinicalClaim(
                     claim=(
-                        f"{drug_name} RUCAM causality is {rucam.causality_category}."
+                        f"{drug_name} has a patient-record RUCAM score of "
+                        f"{rucam.total_score} ({rucam.causality_category}); "
+                        "DILIGENT did not independently recalculate it."
+                    ),
+                    source="rucam",
+                    evidence_quote=(
+                        rucam.components[0].evidence
+                        if rucam.components and rucam.components[0].evidence
+                        else None
+                    ),
+                    confidence="moderate",
+                    requires_review=True,
+                )
+            )
+        elif rucam is not None:
+            claims.append(
+                ClinicalClaim(
+                    claim=(
+                        f"{drug_name} has RUCAM criterion evidence captured, but no "
+                        "numerical updated-RUCAM total was calculated."
                     ),
                     source="rucam",
                     evidence_quote=None,
-                    confidence=confidence,
-                    requires_review=not rucam.data_sufficient,
+                    confidence="low",
+                    requires_review=True,
                 )
             )
         limitations = list(evidence_warnings)
