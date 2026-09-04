@@ -22,7 +22,9 @@ def _base_inputs() -> tuple[PatientData, PatientDrugs, PatientLabTimeline]:
     drugs = PatientDrugs(
         entries=[
             DrugEntry(
-                name="Drug A", therapy_start_date="2025-01-01", suspension_status=True
+                name="Drug A",
+                therapy_start_date="2025-01-01",
+                suspension_status=True,
             )
         ]
     )
@@ -48,7 +50,7 @@ def _base_inputs() -> tuple[PatientData, PatientDrugs, PatientLabTimeline]:
 
 
 ###############################################################################
-def test_source_reported_rucam_score_is_used_directly() -> None:
+def test_livertox_case_rucam_score_is_never_used_as_patient_score() -> None:
     estimator = RucamScoreEstimator()
     payload, analysis, timeline = _base_inputs()
     bundle = estimator.estimate(
@@ -63,24 +65,26 @@ def test_source_reported_rucam_score_is_used_directly() -> None:
         pattern_score=HepatotoxicityPatternScore(classification="hepatocellular"),
         resolved_drugs={
             "drug a": {
+                "match_status": "accepted_exact_livertox",
                 "extracted_excerpts": [
                     "LiverTox monograph: RUCAM score 8 in representative case."
-                ]
+                ],
             }
         },
         report_language="en",
     )
     item = bundle.entries[0]
-    assert item.total_score == 8
-    assert item.calculation_method == "source_reported"
-    assert item.data_sufficient is True
+    assert item.total_score is None
+    assert item.calculation_method == "not_calculated"
+    assert item.score_source is None
+    assert any("LiverTox" in limitation for limitation in item.limitations)
 
 
 ###############################################################################
-def test_laboratory_history_rucam_score_has_priority() -> None:
+def test_laboratory_history_patient_rucam_score_has_priority() -> None:
     estimator = RucamScoreEstimator()
     payload, analysis, timeline = _base_inputs()
-    payload.laboratory_analysis = "RUCAM score: 6"
+    payload.laboratory_analysis = "Drug A RUCAM score: 6"
     bundle = estimator.estimate(
         payload=payload,
         analysis_drugs=analysis,
@@ -103,7 +107,48 @@ def test_laboratory_history_rucam_score_has_priority() -> None:
     item = bundle.entries[0]
     assert item.total_score == 6
     assert item.calculation_method == "source_reported"
-    assert item.score_source == "laboratory_history"
+    assert item.score_source == "patient_laboratory_history"
+
+
+###############################################################################
+def test_unattributed_patient_rucam_is_not_copied_across_polypharmacy() -> None:
+    estimator = RucamScoreEstimator()
+    payload = PatientData(
+        anamnesis="Viral causes excluded by serology.",
+        drugs="Drug A and Drug B",
+        laboratory_analysis="RUCAM score: 7",
+    )
+    drugs = PatientDrugs(
+        entries=[
+            DrugEntry(name="Drug A", therapy_start_date="2025-01-01"),
+            DrugEntry(name="Drug B", therapy_start_date="2025-01-02"),
+        ]
+    )
+    timeline = PatientLabTimeline(
+        entries=[
+            ClinicalLabEntry(
+                marker_name="ALT",
+                value=320,
+                upper_limit_normal=40,
+                sample_date="2025-01-10",
+                source="laboratory_analysis",
+            )
+        ]
+    )
+    bundle = estimator.estimate(
+        payload=payload,
+        analysis_drugs=drugs,
+        anamnesis_drugs=PatientDrugs(entries=[]),
+        disease_context=PatientDiseaseContext(entries=[]),
+        lab_timeline=timeline,
+        onset_context=LiverInjuryOnsetContext(
+            onset_date="2025-01-10", onset_basis="first_abnormal_lab"
+        ),
+        pattern_score=HepatotoxicityPatternScore(classification="hepatocellular"),
+        resolved_drugs={},
+        report_language="en",
+    )
+    assert all(item.total_score is None for item in bundle.entries)
 
 
 ###############################################################################
@@ -125,6 +170,7 @@ def test_livertox_likelihood_score_is_not_treated_as_rucam() -> None:
     )
     item = bundle.entries[0]
     assert item.calculation_method != "source_reported"
+    assert item.total_score is None
 
 
 ###############################################################################
@@ -172,6 +218,27 @@ def test_select_pattern_anchor_returns_qualifying_lab() -> None:
 
 
 ###############################################################################
+def test_ast_alone_does_not_create_rucam_anchor() -> None:
+    estimator = RucamScoreEstimator()
+    anchor = estimator.select_pattern_anchor(
+        payload=PatientData(drugs="x", visit_date="2025-01-10"),
+        lab_timeline=PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="AST",
+                    value=400,
+                    upper_limit_normal=40,
+                    sample_date="2025-01-10",
+                    source="laboratory_analysis",
+                )
+            ]
+        ),
+    )
+    assert anchor.source == "visit_proxy"
+    assert anchor.is_score_eligible is False
+
+
+###############################################################################
 def test_visit_proxy_anchor_is_not_score_eligible() -> None:
     estimator = RucamScoreEstimator()
     anchor = estimator.select_pattern_anchor(
@@ -208,11 +275,13 @@ def test_suspension_only_high_likelihood_timing_is_not_scored_incompatible() -> 
 
 
 ###############################################################################
-def test_low_positive_rucam_scores_are_indeterminate() -> None:
+def test_standard_rucam_low_positive_scores_are_unlikely() -> None:
     estimator = RucamScoreEstimator()
-    assert estimator.resolve_causality_bucket(1) == "indeterminate"
-    assert estimator.resolve_causality_bucket(2) == "indeterminate"
+    assert estimator.resolve_causality_bucket(1) == "unlikely"
+    assert estimator.resolve_causality_bucket(2) == "unlikely"
     assert estimator.resolve_causality_bucket(0) == "excluded"
+    assert estimator.resolve_causality_bucket(6) == "probable"
+    assert estimator.resolve_causality_bucket(9) == "highly probable"
 
 
 ###############################################################################
@@ -231,13 +300,11 @@ def test_rechallenge_component_carries_supporting_text_when_present() -> None:
 ###############################################################################
 def test_rucam_component_accepts_relative_exposure_date_phrase() -> None:
     evidence_date = "21 days before synthetic laboratory elevation"
-
     component = RucamComponentAssessment(
         component_key="time_to_onset",
         label="Time to onset",
         evidence_date=evidence_date,
     )
-
     assert component.evidence_date == evidence_date
 
 
@@ -275,7 +342,7 @@ def _inputs():
 def test_provided_rucam_score_is_used_directly() -> None:
     estimator = RucamScoreEstimator()
     payload, analysis_drugs, timeline = _inputs()
-    payload.laboratory_analysis = "RUCAM score: 7"
+    payload.laboratory_analysis = "Drug A RUCAM score: 7"
     bundle = estimator.estimate(
         payload=payload,
         analysis_drugs=analysis_drugs,
@@ -289,6 +356,28 @@ def test_provided_rucam_score_is_used_directly() -> None:
     )
     assert bundle.entries[0].total_score == 7
     assert bundle.entries[0].calculation_method == "source_reported"
+
+
+###############################################################################
+def test_complete_evidence_without_patient_score_remains_non_scoring() -> None:
+    estimator = RucamScoreEstimator()
+    payload, analysis_drugs, timeline = _inputs()
+    bundle = estimator.estimate(
+        payload=payload,
+        analysis_drugs=analysis_drugs,
+        anamnesis_drugs=PatientDrugs(entries=[]),
+        disease_context=PatientDiseaseContext(entries=[]),
+        lab_timeline=timeline,
+        onset_context=LiverInjuryOnsetContext(
+            onset_date="2026-01-20", onset_basis="first_abnormal_lab"
+        ),
+        pattern_score=HepatotoxicityPatternScore(classification="hepatocellular"),
+        resolved_drugs={},
+        report_language="en",
+    )
+    assert bundle.entries[0].calculation_method == "not_calculated"
+    assert bundle.entries[0].total_score is None
+    assert bundle.entries[0].components
 
 
 ###############################################################################
