@@ -15,7 +15,6 @@ pytestmark = pytest.mark.skipif(
     reason="set DILIGENT_RUN_EMBEDDING_INTEGRATION=1 to run the pinned model integration",
 )
 
-
 ###############################################################################
 def test_pinned_multilingual_runtime_contract() -> None:
     assert importlib.util.find_spec("torch") is None

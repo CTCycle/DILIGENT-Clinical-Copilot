@@ -30,7 +30,6 @@ PatientTimelineTimingType = Literal[
 PatientTimelineDatePrecision = Literal["day", "month", "year"]
 PatientTimelineDateCertainty = Literal["explicit", "inferred", "uncertain"]
 
-
 ###############################################################################
 class PatientTimelineEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -104,7 +103,6 @@ class PatientTimelineEvent(BaseModel):
             normalized.append(text[:120])
         return normalized
 
-
 ###############################################################################
 class PatientTimeline(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -129,12 +127,10 @@ class PatientTimeline(BaseModel):
         normalized = " ".join(str(value).split()).strip()
         return normalized or None
 
-
 ###############################################################################
 class PatientTimelineExtraction(BaseModel):
     model_config = ConfigDict(extra="forbid")
     events: list[PatientTimelineEvent] = Field(default_factory=list)
-
 
 ###############################################################################
 class SessionTimelinePreview(BaseModel):
@@ -158,12 +154,10 @@ class SessionTimelinePreview(BaseModel):
     uncertain_event_count: int = Field(default=0, ge=0)
     undated_event_count: int = Field(default=0, ge=0)
 
-
 ###############################################################################
 class SessionTimelineListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[SessionTimelinePreview] = Field(default_factory=list)
-
 
 ###############################################################################
 class SessionTimelineRegenerateRequest(BaseModel):

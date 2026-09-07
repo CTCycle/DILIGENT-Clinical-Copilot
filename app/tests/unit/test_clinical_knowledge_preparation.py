@@ -10,9 +10,9 @@ from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.matches_core import LiverToxMatcher
 from services.clinical.preparation import ClinicalKnowledgePreparation
 
-
 ###############################################################################
 class SerializerStub:
+
     # -------------------------------------------------------------------------
     def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
         if drug_id == 101:
@@ -50,7 +50,6 @@ class SerializerStub:
         except TypeError, ValueError:
             return None
 
-
 ###############################################################################
 def build_matcher(*, excerpt: str = "LiverTox excerpt.") -> LiverToxMatcher:
     return LiverToxMatcher(
@@ -68,7 +67,6 @@ def build_matcher(*, excerpt: str = "LiverTox excerpt.") -> LiverToxMatcher:
             ]
         )
     )
-
 
 ###############################################################################
 def test_prepare_inputs_enriches_resolved_drugs_with_knowledge() -> None:
@@ -94,7 +92,6 @@ def test_prepare_inputs_enriches_resolved_drugs_with_knowledge() -> None:
     assert payload["drug_id"] == 101
     assert "LiverTox excerpt." in payload["knowledge_prompt"]
     assert payload["knowledge_prompt"]
-
 
 ###############################################################################
 def test_prepare_inputs_handles_missing_livertox_monographs() -> None:

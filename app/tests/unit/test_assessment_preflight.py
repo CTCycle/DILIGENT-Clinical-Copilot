@@ -12,11 +12,9 @@ from services.session.factory import build_clinical_session_service
 from services.session.preflight import validate_clinical_input_preflight
 from services.session.session_workflow import start_clinical_job_workflow
 
-
 ###############################################################################
 def _build_service():
     return build_clinical_session_service(get_job_manager())
-
 
 ###############################################################################
 def _valid_input() -> str:
@@ -25,7 +23,6 @@ def _valid_input() -> str:
         "DRUGS\nacetaminophen 500 mg\n"
         "LABORATORY ANALYSIS\nALT 240 U/L\n"
     )
-
 
 ###############################################################################
 def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch) -> None:
@@ -50,7 +47,6 @@ def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch) -> N
     request = ClinicalSessionRequest(clinical_input=_valid_input(), visit_date=None)
     with pytest.raises(ServiceValidationError, match="Visit date is required"):
         start_clinical_job_workflow(service, request)
-
 
 ###############################################################################
 def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch) -> None:
@@ -82,7 +78,6 @@ def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch) 
     with pytest.raises(ServiceValidationError, match="LiverTox catalog is empty"):
         start_clinical_job_workflow(service, request)
 
-
 ###############################################################################
 def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> None:
     service = _build_service()
@@ -110,7 +105,6 @@ def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> 
     )
     with pytest.raises(ServiceValidationError, match="RxNav catalog is empty"):
         start_clinical_job_workflow(service, request)
-
 
 ###############################################################################
 def test_malformed_sections_block_job_start(monkeypatch) -> None:
@@ -143,7 +137,6 @@ def test_malformed_sections_block_job_start(monkeypatch) -> None:
         ServiceValidationError, match="Clinical input sections are invalid"
     ):
         start_clinical_job_workflow(service, request)
-
 
 ###############################################################################
 def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
@@ -211,7 +204,6 @@ def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
     assert result.job_id == "job-123"
     assert result.status == "pending"
 
-
 ###############################################################################
 def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     monkeypatch,
@@ -265,7 +257,6 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     assert result.deterministic_diagnostics["diseases"]["disease_count"] >= 2
     assert result.extraction_quality["timed_drug_count"] >= 1
 
-
 ###############################################################################
 def test_preflight_does_not_warn_when_deterministic_disease_matching_is_empty(
     monkeypatch,
@@ -313,7 +304,6 @@ def test_preflight_does_not_warn_when_deterministic_disease_matching_is_empty(
         issue.code for issue in result.non_blocking_issues
     }
 
-
 ###############################################################################
 def test_job_start_uses_opencode_credential_scope_for_opencode_go(
     monkeypatch,
@@ -356,7 +346,6 @@ def test_job_start_uses_opencode_credential_scope_for_opencode_go(
         )
 
     assert requested_scopes == ["opencode"]
-
 
 ###############################################################################
 def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
@@ -415,7 +404,6 @@ def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
     )
     assert result.runtime_settings["llm_provider"] == "openai"
     assert result.runtime_settings["clinical_provider"] == "ollama"
-
 
 ###############################################################################
 def test_job_start_rechecks_rag_readiness_before_submission(monkeypatch) -> None:

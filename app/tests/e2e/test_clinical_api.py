@@ -7,11 +7,9 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import APIRequestContext
 
-
 ###############################################################################
 def repeated_words(count: int) -> str:
     return " ".join(f"clinicalword{i}" for i in range(count))
-
 
 ###############################################################################
 def build_minimal_payload() -> dict:
@@ -29,7 +27,6 @@ def build_minimal_payload() -> dict:
         "selected_model_providers": ["openai"],
     }
 
-
 ###############################################################################
 @pytest.fixture(autouse=True)
 def cancel_active_job(api_context: APIRequestContext) -> None:
@@ -41,13 +38,11 @@ def cancel_active_job(api_context: APIRequestContext) -> None:
         if job_id and status in {"pending", "running"}:
             api_context.delete(f"/api/clinical/jobs/{job_id}")
 
-
 ###############################################################################
 def test_clinical_requires_sections(api_context: APIRequestContext):
     response = api_context.post("/api/clinical/jobs", data={"name": "Test"})
     assert response.status == 422
     assert "Clinical input is required." in response.text()
-
 
 ###############################################################################
 def test_clinical_validate_input_returns_deterministic_diagnostics(
@@ -66,7 +61,6 @@ def test_clinical_validate_input_returns_deterministic_diagnostics(
         blocking_codes = {issue["code"] for issue in payload.get("blocking_issues", [])}
         assert {"livertox_catalog_empty", "rxnav_catalog_empty"} & blocking_codes
 
-
 ###############################################################################
 def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):
     payload = build_minimal_payload()
@@ -74,7 +68,6 @@ def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):
     response = api_context.post("/api/clinical/validate-input", data=payload)
     assert response.status == 200
     assert "deterministic_diagnostics" in response.json()
-
 
 ###############################################################################
 def test_clinical_rejects_empty_provider_selection(api_context: APIRequestContext):
@@ -84,7 +77,6 @@ def test_clinical_rejects_empty_provider_selection(api_context: APIRequestContex
     response = api_context.post("/api/clinical/jobs", data=payload)
     assert response.status == 422
     assert "At least one model provider must be selected." in response.text()
-
 
 ###############################################################################
 def test_clinical_requires_visit_date(api_context: APIRequestContext):

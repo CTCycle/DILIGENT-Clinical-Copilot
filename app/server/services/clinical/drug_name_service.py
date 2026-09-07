@@ -19,7 +19,6 @@ from services.text.vocabulary import get_text_normalization_snapshot
 
 from common.utils.bounded_cache import CACHE_MISS
 
-
 ###############################################################################
 class DrugNameService:
     """Drug name normalization, alias resolution, synonym parsing, and spelling correction."""

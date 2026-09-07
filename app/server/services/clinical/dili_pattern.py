@@ -7,9 +7,9 @@ from typing import Literal
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliInjuryPattern
 from domain.clinical.entities import ClinicalLabEntry, PatientLabTimeline
 
-
 ###############################################################################
 class DiliPatternEngine:
+
     # -------------------------------------------------------------------------
     @staticmethod
     def _value(entry: ClinicalLabEntry) -> float | None:

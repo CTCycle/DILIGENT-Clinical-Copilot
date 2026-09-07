@@ -26,9 +26,9 @@ from services.clinical.rag_support import RagSupportService
 from services.clinical.report_finalizer import ReportFinalizer
 from services.clinical.exposure_timeline import ExposureTimelineService
 
-
 ###############################################################################
 class HepatoxConsultation:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

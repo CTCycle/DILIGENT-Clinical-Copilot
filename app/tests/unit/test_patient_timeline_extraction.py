@@ -16,9 +16,9 @@ from repositories.serialization.session_timelines import build_timeline_preview_
 from services.clinical import timeline as timeline_service
 from services.clinical.timeline import PatientTimelineExtractor
 
-
 ###############################################################################
 class FakeTimelineClient:
+
     # -------------------------------------------------------------------------
     def __init__(self, payload: PatientTimelineExtraction) -> None:
         self.payload = payload
@@ -30,7 +30,6 @@ class FakeTimelineClient:
         self.last_kwargs = kwargs
         self.call_count += 1
         return self.payload
-
 
 ###############################################################################
 def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
@@ -83,7 +82,6 @@ def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
     assert result.events[1].title == "ALT peak"
     assert result.events[1].confidence == 0.9
 
-
 ###############################################################################
 def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
     extractor = PatientTimelineExtractor(
@@ -117,11 +115,9 @@ def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
 
     assert [event.event_id for event in result.events] == ["grounded"]
 
-
 ###############################################################################
 def test_normalize_date_token_keeps_month_precision_without_promoting_day() -> None:
     assert PatientTimelineExtractor.normalize_date_token("2025-02") == "2025-02"
-
 
 ###############################################################################
 def test_timeline_sort_orders_year_month_and_day_without_changing_display_values() -> (
@@ -165,7 +161,6 @@ def test_timeline_sort_orders_year_month_and_day_without_changing_display_values
         "2025-02-03",
     ]
 
-
 ###############################################################################
 def test_timeline_uses_the_single_explicit_date_in_source_evidence() -> None:
     extractor = PatientTimelineExtractor(
@@ -182,7 +177,6 @@ def test_timeline_uses_the_single_explicit_date_in_source_evidence() -> None:
     normalized = extractor.normalize_events([event])
 
     assert normalized[0].event_date == "2026-07-21"
-
 
 ###############################################################################
 def test_timeline_preserves_precise_model_date_when_evidence_only_matches_year() -> (
@@ -205,7 +199,6 @@ def test_timeline_preserves_precise_model_date_when_evidence_only_matches_year()
 
     assert normalized[0].event_date == "2026-07-18"
     assert normalized[0].date_precision == "day"
-
 
 ###############################################################################
 def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens() -> (
@@ -239,7 +232,6 @@ def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens(
     assert normalized[0].date_precision == "month"
     assert normalized[1].event_date is None
 
-
 ###############################################################################
 def test_timeline_date_interval_validates_calendar_days_and_reversed_ranges() -> None:
     assert normalize_timeline_interval("2024-02-29") is not None
@@ -247,7 +239,6 @@ def test_timeline_date_interval_validates_calendar_days_and_reversed_ranges() ->
     reversed_range = normalize_timeline_interval("2025-03", "2025-02")
     assert reversed_range is not None
     assert reversed_range.end_value is None
-
 
 ###############################################################################
 def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
@@ -265,7 +256,6 @@ def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
     assert client.last_kwargs["purpose"].value == "timeline_extraction"
     assert client.last_kwargs["timeline_complexity"] == "simple"
 
-
 ###############################################################################
 def test_timeline_complexity_is_deterministic_and_escalates_for_large_payloads() -> (
     None
@@ -275,7 +265,6 @@ def test_timeline_complexity_is_deterministic_and_escalates_for_large_payloads()
     assert PatientTimelineExtractor.classify_complexity(moderate_payload) == "moderate"
     complex_payload = {"note": "2026-01-01 " * 30, "details": "x" * 60000}
     assert PatientTimelineExtractor.classify_complexity(complex_payload) == "complex"
-
 
 ###############################################################################
 def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_fields() -> (
@@ -291,14 +280,12 @@ def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_field
         }
     ) == ("opencode_go", "deepseek-v4-flash")
 
-
 ###############################################################################
 def test_timeline_request_rejects_active_model_overrides() -> None:
     with pytest.raises(ValueError):
         SessionTimelineRegenerateRequest.model_validate(
             {"model_overrides": {"cloud_model": "gpt-4.1-mini"}}
         )
-
 
 ###############################################################################
 def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
@@ -347,7 +334,6 @@ def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
     assert factory_kwargs["default_model"] == "deepseek-v4-flash"
     assert extractor.client_provider == "opencode_go"
     assert extractor.model == "deepseek-v4-flash"
-
 
 ###############################################################################
 def test_timeline_preview_includes_evidence_and_timing_quality_counts() -> None:

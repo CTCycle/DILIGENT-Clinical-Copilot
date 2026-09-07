@@ -19,7 +19,6 @@ from services.clinical.validation import (
     ensure_timed_therapy_drug,
 )
 
-
 ###############################################################################
 def test_missing_anamnesis_raises_localized_error() -> None:
     payload = PatientData(visit_date=date(2025, 1, 1), drugs="Drug A")
@@ -27,7 +26,6 @@ def test_missing_anamnesis_raises_localized_error() -> None:
     with pytest.raises(ClinicalPipelineValidationError) as exc_info:
         ensure_required_sections(payload, bundle=bundle)
     assert any(issue.code == "missing_anamnesis" for issue in exc_info.value.issues)
-
 
 ###############################################################################
 def test_missing_visit_date_raises_localized_error() -> None:
@@ -37,7 +35,6 @@ def test_missing_visit_date_raises_localized_error() -> None:
         ensure_required_sections(payload, bundle=bundle)
     assert any(issue.code == "missing_visit_date" for issue in exc_info.value.issues)
 
-
 ###############################################################################
 def test_missing_timed_drug_raises_error() -> None:
     drugs = PatientDrugs(entries=[DrugEntry(name="Drug A", source="therapy")])
@@ -45,7 +42,6 @@ def test_missing_timed_drug_raises_error() -> None:
     with pytest.raises(ClinicalPipelineValidationError) as exc_info:
         ensure_timed_therapy_drug(drugs, bundle=bundle)
     assert any(issue.code == "missing_timed_drug" for issue in exc_info.value.issues)
-
 
 ###############################################################################
 def test_drug_schedule_counts_as_timing_information() -> None:
@@ -62,7 +58,6 @@ def test_drug_schedule_counts_as_timing_information() -> None:
     bundle = build_validation_bundle("en")
     ensure_timed_therapy_drug(drugs, bundle=bundle)
 
-
 ###############################################################################
 def test_insufficient_pattern_labs_raise_blocker() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
@@ -72,7 +67,6 @@ def test_insufficient_pattern_labs_raise_blocker() -> None:
     assert any(
         issue.code == "missing_hepatotoxicity_inputs" for issue in assessment.issues
     )
-
 
 ###############################################################################
 def test_non_critical_missing_data_does_not_block() -> None:
@@ -118,7 +112,6 @@ def test_non_critical_missing_data_does_not_block() -> None:
     )
     assert assessment.status == "ok"
 
-
 ###############################################################################
 def test_case_a_first_abnormal_pair_is_presentation_anchor_and_peak_is_retained() -> None:
     entries: list[ClinicalLabEntry] = []
@@ -162,7 +155,6 @@ def test_case_a_first_abnormal_pair_is_presentation_anchor_and_peak_is_retained(
     assert structured_patterns[0].pattern == "hepatocellular"
     assert structured_patterns[1].assessment_point == "peak"
 
-
 ###############################################################################
 def test_primary_injury_anchor_uses_first_abnormal_pair_with_varying_ulns() -> None:
     timeline = PatientLabTimeline(
@@ -203,7 +195,6 @@ def test_primary_injury_anchor_uses_first_abnormal_pair_with_varying_ulns() -> N
     assert score.r_score == pytest.approx(3.0)
     assert score.classification == "mixed"
 
-
 ###############################################################################
 def test_r_ratio_requires_alt_not_ast() -> None:
     timeline = PatientLabTimeline(
@@ -227,7 +218,6 @@ def test_r_ratio_requires_alt_not_ast() -> None:
     assessment = HepatotoxicityPatternAnalyzer().assess_payload(timeline)
     assert assessment.status == "undetermined_due_to_missing_labs"
     assert assessment.score.r_score is None
-
 
 ###############################################################################
 def test_r_ratio_does_not_invent_missing_uln() -> None:

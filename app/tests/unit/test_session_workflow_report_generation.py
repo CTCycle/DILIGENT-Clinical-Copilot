@@ -25,9 +25,9 @@ from services.session.session_shared import build_failed_session_payload
 from services.session.session_workflow import process_single_patient_workflow
 from services.session.workflow_shared import ClinicalPersistenceError
 
-
 ###############################################################################
 class FakePatternAnalyzer:
+
     # -------------------------------------------------------------------------
     def stringify_scores(
         self, pattern_score: HepatotoxicityPatternScore
@@ -37,7 +37,6 @@ class FakePatternAnalyzer:
             if pattern_score.r_score
             else "Not available"
         }
-
 
 ###############################################################################
 class FakeDrugsParser:
@@ -70,9 +69,9 @@ class FakeDrugsParser:
         _ = entry
         return True
 
-
 ###############################################################################
 class FakeInputPreparator:
+
     # -------------------------------------------------------------------------
     def resolve_session_drug_ids(
         self, matched_drugs: list[dict[str, Any]]
@@ -87,9 +86,9 @@ class FakeInputPreparator:
         _ = matched_drugs
         return False
 
-
 ###############################################################################
 class FakeSessionRepository:
+
     # -------------------------------------------------------------------------
     def save_clinical_session(self, payload: dict[str, Any]) -> int | None:
         self.saved_payload = payload
@@ -101,7 +100,6 @@ class FakeSessionRepository:
     ) -> None:
         self.upserted_session_id = session_id
         self.upserted_payload = payload
-
 
 ###############################################################################
 class FakeClinicalService:
@@ -263,7 +261,6 @@ class FakeClinicalService:
                 serialized.append(dict(issue))
         return serialized
 
-
 ###############################################################################
 def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
     payload = PatientData(
@@ -341,12 +338,12 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
         "final_report_has_bibliography": False,
     }
 
-
 ###############################################################################
 def test_workflow_does_not_recreate_bibliography_outside_report_finalizer() -> None:
 
     ###############################################################################
     class FakeRagClinicalService(FakeClinicalService):
+
         # -------------------------------------------------------------------------
         def build_rag_query(self, **kwargs: Any) -> dict[str, str]:
             _ = kwargs
@@ -424,7 +421,6 @@ def test_workflow_does_not_recreate_bibliography_outside_report_finalizer() -> N
         ]
     }
 
-
 ###############################################################################
 def test_workflow_fails_when_persistence_returns_no_session_id() -> None:
     payload = PatientData(
@@ -448,7 +444,6 @@ def test_workflow_fails_when_persistence_returns_no_session_id() -> None:
                 report_mode="faithful_only",
             ),
         )
-
 
 ###############################################################################
 def test_failed_session_payload_omits_raw_clinical_text_and_base64_image() -> None:
@@ -482,7 +477,6 @@ def test_failed_session_payload_omits_raw_clinical_text_and_base64_image() -> No
         "laboratory_analysis": len(payload.laboratory_analysis or ""),
     }
 
-
 ###############################################################################
 def test_runtime_timeout_respects_provider_cap(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -497,7 +491,6 @@ def test_runtime_timeout_respects_provider_cap(monkeypatch) -> None:
     )
 
     assert timeout == 30.0
-
 
 ###############################################################################
 def test_runtime_timeout_allows_thirty_minute_cloud_clinical_budget(
@@ -514,7 +507,6 @@ def test_runtime_timeout_allows_thirty_minute_cloud_clinical_budget(
     )
 
     assert timeout == 1800.0
-
 
 ###############################################################################
 def test_workflow_marks_blocking_faithfulness_result_as_failed(
@@ -561,7 +553,6 @@ def test_workflow_marks_blocking_faithfulness_result_as_failed(
         issue["code"] == "faithfulness_gate_blocked" for issue in result["issues"]
     )
     assert service.session_repository.saved_payload["session_status"] == "failed"
-
 
 ###############################################################################
 def test_failed_clinical_job_payload_omits_phi_by_default() -> None:

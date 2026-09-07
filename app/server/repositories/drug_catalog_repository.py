@@ -35,7 +35,6 @@ from repositories.schemas.knowledge import (
     LiverToxMonograph,
 )
 
-
 ###############################################################################
 def _build_search_pattern(search: str | None) -> str | None:
     normalized = repository_values.normalize_string(search)
@@ -44,9 +43,9 @@ def _build_search_pattern(search: str | None) -> str | None:
     escaped = re.sub(r"([%_\\])", r"\\\1", normalized.casefold())
     return f"%{escaped}%"
 
-
 ###############################################################################
 class DrugCatalogRepository:
+
     # -------------------------------------------------------------------------
     def __init__(self, context: RepositoryContext) -> None:
         self.context = context

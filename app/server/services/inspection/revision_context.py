@@ -9,7 +9,6 @@ from services.llm.context_budget import ContextSegment, build_context_plan
 UNKNOWN_CAPACITY_INPUT_BUDGET = 8192
 REVISION_REPORT_CONTEXT_LIMIT = 20000
 
-
 ###############################################################################
 def _bounded(value: Any, limit: int) -> dict[str, Any]:
     text = str(value or "")
@@ -19,11 +18,9 @@ def _bounded(value: Any, limit: int) -> dict[str, Any]:
         "sha256": hashlib.sha256(text.encode()).hexdigest(),
     }
 
-
 ###############################################################################
 def _json_text(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
-
 
 ###############################################################################
 def _selected_context_value(
@@ -33,7 +30,6 @@ def _selected_context_value(
     default: Any = None,
 ) -> Any:
     return values[key] if key in selected_keys else default
-
 
 ###############################################################################
 def build_revision_context(

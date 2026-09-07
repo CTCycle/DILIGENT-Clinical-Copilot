@@ -70,7 +70,6 @@ from services.session.workflow_shared import (
     resolve_rucam_source as _resolve_rucam_source,
 )
 
-
 ###############################################################################
 def _report_contains_rag_bibliography(
     report_text: str | None,
@@ -82,7 +81,6 @@ def _report_contains_rag_bibliography(
         return False
     heading = f"## {phrase('bibliography', report_language)}"
     return heading.casefold() in text.casefold()
-
 
 ###############################################################################
 def _clinical_report_entries_with_rag_references(
@@ -105,7 +103,6 @@ def _clinical_report_entries_with_rag_references(
         if entry.rag_references:
             entries.append(entry)
     return entries
-
 
 ###############################################################################
 def _build_rag_reference_audit(
@@ -179,7 +176,6 @@ def _build_rag_reference_audit(
         ),
     }
 
-
 ###############################################################################
 def _validate_requested_provider_matches_runtime(
     request_payload: ClinicalSessionRequest,
@@ -197,7 +193,6 @@ def _validate_requested_provider_matches_runtime(
         raise ServiceValidationError(
             "The active runtime provider must match the requested provider exactly."
         )
-
 
 ###############################################################################
 async def process_single_patient_workflow(
@@ -890,7 +885,6 @@ async def process_single_patient_workflow(
         logger.warning("Clinical assessment persistence returned no session id.")
         raise ClinicalPersistenceError()
     return result_payload
-
 
 ###############################################################################
 def start_clinical_job_workflow(

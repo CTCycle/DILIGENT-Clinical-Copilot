@@ -4,7 +4,6 @@ from pydantic import BaseModel, ConfigDict
 
 from domain.model_configs import ReasoningLevel
 
-
 ###############################################################################
 class LLMRuntimeState(BaseModel):
     model_config = ConfigDict(frozen=False)

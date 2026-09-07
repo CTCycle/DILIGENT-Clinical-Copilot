@@ -5,7 +5,6 @@ from typing import Any
 from domain.clinical.dili import DiliEvidenceBundle
 from services.clinical.dili_evidence import DiliEvidenceBuilder
 
-
 ###############################################################################
 def audit_revised_dili_report(
     *,

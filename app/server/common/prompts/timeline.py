@@ -23,6 +23,7 @@ Rules:
 """
 
 
+###############################################################################
 def build_patient_timeline_user_prompt(
     *,
     source_payload_json: str,

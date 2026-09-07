@@ -30,7 +30,6 @@ from services.clinical.dili_severity import DiliSeverityGrader
 from services.clinical.dili_timeline import DiliTimelineEngine
 from services.text.normalization import normalize_drug_query_name
 
-
 ###############################################################################
 class DiliEvidenceBuilder:
     _COMPETING_CAUSES_EXCLUDED_PHRASES = (

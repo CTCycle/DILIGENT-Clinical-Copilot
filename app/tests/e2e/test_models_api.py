@@ -10,7 +10,6 @@ from urllib.parse import quote
 import pytest
 from playwright.sync_api import APIRequestContext
 
-
 ###############################################################################
 def skip_if_ollama_unavailable(response) -> None:
     if response.status in (502, 504):
@@ -24,7 +23,6 @@ def skip_if_ollama_unavailable(response) -> None:
             reason = f"{reason}: {detail}"
         pytest.skip(reason)
 
-
 ###############################################################################
 def wait_for_pull_job(api_context: APIRequestContext, job_id: str) -> dict:
     for _ in range(120):
@@ -35,7 +33,6 @@ def wait_for_pull_job(api_context: APIRequestContext, job_id: str) -> dict:
             return payload
         time.sleep(0.25)
     raise AssertionError("Model pull job did not finish in time")
-
 
 ###############################################################################
 def test_models_list_returns_payload(api_context: APIRequestContext):
@@ -48,7 +45,6 @@ def test_models_list_returns_payload(api_context: APIRequestContext):
     assert "count" in payload
     assert isinstance(payload["models"], list)
     assert payload["count"] == len(payload["models"])
-
 
 ###############################################################################
 def test_models_pull_job_noop_when_model_available(api_context: APIRequestContext):

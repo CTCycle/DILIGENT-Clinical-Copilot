@@ -39,14 +39,13 @@ from services.llm.model_capabilities import EffectiveInferenceConfig
 
 ProviderName = CloudProviderId
 
-
 ###############################################################################
 def _list_gemini_models_sync(client: genai.Client) -> list[Any]:
     return list(client.models.list())
 
-
 ###############################################################################
 class LLMError(RuntimeError):
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -58,7 +57,6 @@ class LLMError(RuntimeError):
         super().__init__(message)
         self.error_code = error_code
         self.retryable = bool(retryable)
-
 
 ###############################################################################
 class LLMTimeout(LLMError):
@@ -74,11 +72,9 @@ class LLMTimeout(LLMError):
     ) -> None:
         super().__init__(message, error_code=error_code, retryable=retryable)
 
-
 ###############################################################################
 def short_output_hash(output_text: str) -> str:
     return hashlib.sha256((output_text or "").encode("utf-8")).hexdigest()[:12]
-
 
 ###############################################################################
 class CloudLLMClient:

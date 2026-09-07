@@ -19,7 +19,6 @@ down_revision: Union[str, Sequence[str], None] = "202608200002"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-
 ###############################################################################
 def _normalized_role(payload: dict[str, object], name: str) -> str | None:
     value = payload.get(name)
@@ -27,7 +26,6 @@ def _normalized_role(payload: dict[str, object], name: str) -> str | None:
         return None
     normalized = str(value).strip()
     return normalized or None
-
 
 ###############################################################################
 def upgrade() -> None:
@@ -77,7 +75,6 @@ def upgrade() -> None:
     connection.execute(
         configuration.update().where(configuration.c.id == 1).values(payload=payload)
     )
-
 
 ###############################################################################
 def downgrade() -> None:

@@ -23,7 +23,6 @@ CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
 ACTIVE_SQLITE_WHERE = "is_active = 1"
 ACTIVE_POSTGRESQL_WHERE = "is_active = true"
 
-
 ###############################################################################
 class ReferenceCatalogEntry(Base):
     __tablename__ = "reference_catalog_entries"
@@ -85,7 +84,6 @@ class ReferenceCatalogEntry(Base):
         Index("ix_reference_catalog_entries_active", "active"),
     )
 
-
 ###############################################################################
 class ApplicationConfiguration(Base):
     __tablename__ = "application_configuration"
@@ -104,7 +102,6 @@ class ApplicationConfiguration(Base):
         server_default=text("CURRENT_TIMESTAMP"),
         server_onupdate=text("CURRENT_TIMESTAMP"),
     )
-
 
 ###############################################################################
 class ProviderModelCatalogCache(Base):
@@ -125,7 +122,6 @@ class ProviderModelCatalogCache(Base):
         server_default=text("CURRENT_TIMESTAMP"),
         server_onupdate=text("CURRENT_TIMESTAMP"),
     )
-
 
 ###############################################################################
 class ReferenceCatalogManifest(Base):

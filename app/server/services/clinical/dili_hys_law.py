@@ -9,9 +9,9 @@ from domain.clinical.dili import (
 from domain.clinical.entities import DrugEntry, PatientLabTimeline
 from services.clinical.dili_timeline import DiliTimelineEngine
 
-
 ###############################################################################
 class HysLawDetector:
+
     # -------------------------------------------------------------------------
     def assess(
         self,

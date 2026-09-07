@@ -23,14 +23,13 @@ _SECURITY_HEADERS = {
     ),
 }
 
-
 ###############################################################################
 def _is_true(value: str) -> bool:
     return value.strip().casefold() in {"1", "true", "yes", "on"}
 
-
 ###############################################################################
 class DesktopSessionSecurity:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.enabled = _is_true(os.getenv("DILIGENT_DESKTOP", ""))
@@ -75,13 +74,11 @@ class DesktopSessionSecurity:
         cookie = request.cookies.get(DESKTOP_SESSION_COOKIE, "")
         return bool(self.secret) and hmac.compare_digest(cookie, self.secret)
 
-
 ###############################################################################
 def _secured(response: Response) -> Response:
     for name, value in _SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
     return response
-
 
 ###############################################################################
 def _rejected(status_code: int) -> Response:
@@ -91,9 +88,9 @@ def _rejected(status_code: int) -> Response:
         )
     )
 
-
 ###############################################################################
 class DesktopSecurityMiddleware(BaseHTTPMiddleware):
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

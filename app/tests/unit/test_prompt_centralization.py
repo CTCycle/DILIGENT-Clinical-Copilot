@@ -8,10 +8,12 @@ PROMPT_ROOT = APP_ROOT / "server" / "common" / "prompts"
 SERVICE_ROOT = APP_ROOT / "server" / "services"
 
 
+###############################################################################
 def _python_files(root: Path) -> list[Path]:
     return sorted(path for path in root.rglob("*.py") if "__pycache__" not in path.parts)
 
 
+###############################################################################
 def test_prompt_package_contains_python_modules_only() -> None:
     unexpected = [
         path
@@ -21,6 +23,7 @@ def test_prompt_package_contains_python_modules_only() -> None:
     assert unexpected == []
 
 
+###############################################################################
 def test_prompt_definitions_do_not_call_strip() -> None:
     violations: list[str] = []
     for path in _python_files(PROMPT_ROOT):
@@ -38,6 +41,7 @@ def test_prompt_definitions_do_not_call_strip() -> None:
     assert violations == []
 
 
+###############################################################################
 def test_services_do_not_define_prompt_constants() -> None:
     violations: list[str] = []
     for path in _python_files(SERVICE_ROOT):
@@ -61,6 +65,7 @@ def test_services_do_not_define_prompt_constants() -> None:
     assert violations == []
 
 
+###############################################################################
 def test_services_do_not_embed_substantial_llm_call_prompts() -> None:
     violations: list[str] = []
     for path in _python_files(SERVICE_ROOT):
@@ -82,6 +87,7 @@ def test_services_do_not_embed_substantial_llm_call_prompts() -> None:
     assert violations == []
 
 
+###############################################################################
 def test_legacy_extraction_prompt_module_is_removed() -> None:
     assert not (PROMPT_ROOT / "extraction.py").exists()
     for path in _python_files(SERVICE_ROOT):

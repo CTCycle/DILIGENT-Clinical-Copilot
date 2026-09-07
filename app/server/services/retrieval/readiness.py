@@ -4,7 +4,6 @@ from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 from domain.clinical.robustness import RagReadiness
 from services.retrieval.embedding_runtime import get_embedding_runtime
 
-
 ###############################################################################
 def check_rag_readiness(*, requested: bool) -> RagReadiness:
     """Check local embedding cache readiness without loading or downloading a model."""

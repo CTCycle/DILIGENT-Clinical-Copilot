@@ -10,26 +10,23 @@ from configurations.environment import ensure_environment_loaded
 from configurations.management import ConfigurationManager
 from domain.settings.configuration import ServerSettings
 
-
 ###############################################################################
 class _ConfigurationRuntimeState:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.lock = RLock()
         self.manager: ConfigurationManager | None = None
-
 
 ###############################################################################
 @lru_cache(maxsize=1)
 def _runtime_state() -> _ConfigurationRuntimeState:
     return _ConfigurationRuntimeState()
 
-
 ###############################################################################
 def _build_settings_manager(config_path: str | None = None) -> ConfigurationManager:
     ensure_environment_loaded()
     return ConfigurationManager(config_path=config_path)
-
 
 ###############################################################################
 def get_configuration_manager(config_path: str | None = None) -> ConfigurationManager:
@@ -43,22 +40,18 @@ def get_configuration_manager(config_path: str | None = None) -> ConfigurationMa
             state.manager = _build_settings_manager(config_path=str(default_path))
         return state.manager
 
-
 ###############################################################################
 def get_server_settings(config_path: str | None = None) -> ServerSettings:
     manager = get_configuration_manager(config_path=config_path)
     return manager.server_settings
 
-
 ###############################################################################
 def get_configuration_block(block_name: str) -> dict[str, Any]:
     return get_configuration_manager().get_block(block_name)
 
-
 ###############################################################################
 def get_configuration_value(block_name: str, key: str, default: Any = None) -> Any:
     return get_configuration_manager().get_value(block_name, key, default)
-
 
 ###############################################################################
 def reload_settings_for_tests(config_path: str | None = None) -> ServerSettings:
@@ -66,13 +59,11 @@ def reload_settings_for_tests(config_path: str | None = None) -> ServerSettings:
         reset_app_settings_cache()
     return get_server_settings(config_path=config_path)
 
-
 ###############################################################################
 def reset_app_settings_cache() -> None:
     state = _runtime_state()
     with state.lock:
         state.manager = None
-
 
 ###############################################################################
 def initialize_settings() -> None:

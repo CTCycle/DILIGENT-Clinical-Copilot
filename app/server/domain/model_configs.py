@@ -22,14 +22,12 @@ CatalogStatus = Literal[
     "available", "cached", "not_loaded", "unavailable", "authentication_required"
 ]
 
-
 ###############################################################################
 class ReasoningLevel(StrEnum):
     OFF = "off"
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -46,7 +44,6 @@ class ModelConfigSnapshot:
     rag_settings: dict[str, object] | None = None
     updated_at: datetime | None = None
 
-
 ###############################################################################
 class LocalModelCard(BaseModel):
     name: str
@@ -56,13 +53,11 @@ class LocalModelCard(BaseModel):
     recommended_for_local_extraction: bool = False
     recommended_rank: int | None = None
 
-
 ###############################################################################
 class LocalCatalogMetadata(BaseModel):
     status: CatalogStatus
     updated_at: datetime | None = None
     message: str | None = None
-
 
 ###############################################################################
 class ModelCatalogOperationResponse(BaseModel):
@@ -70,7 +65,6 @@ class ModelCatalogOperationResponse(BaseModel):
     outcome: Literal["cached", "refreshed", "failed"]
     error: str | None = None
     state: "ModelConfigStateResponse"
-
 
 ###############################################################################
 class RagSettingsUpdateRequest(BaseModel):
@@ -87,7 +81,6 @@ class RagSettingsUpdateRequest(BaseModel):
     hybrid_text_weight: float | None = None
     vector_stream_batch_size: int | None = None
     embedding_offline_mode: bool | None = None
-
 
 ###############################################################################
 class RagSettingsResponse(BaseModel):
@@ -106,7 +99,6 @@ class RagSettingsResponse(BaseModel):
     vector_stream_batch_size: int
     embedding_offline_mode: bool
 
-
 ###############################################################################
 class ModelConfigUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -121,7 +113,6 @@ class ModelConfigUpdateRequest(BaseModel):
     ollama_seed: int | None = Field(default=None, ge=0)
     rag_settings: RagSettingsUpdateRequest | None = None
 
-
 ###############################################################################
 class EmbeddingRuntimeStatus(BaseModel):
     model_display_name: str
@@ -130,7 +121,6 @@ class EmbeddingRuntimeStatus(BaseModel):
     cache_status: str
     loaded: bool
 
-
 ###############################################################################
 class EmbeddingIndexStatus(BaseModel):
     status: str
@@ -138,7 +128,6 @@ class EmbeddingIndexStatus(BaseModel):
     document_count: int = 0
     chunk_count: int = 0
     built_at: datetime | None = None
-
 
 ###############################################################################
 class ModelConfigStateResponse(BaseModel):
@@ -159,7 +148,6 @@ class ModelConfigStateResponse(BaseModel):
     embedding_index: EmbeddingIndexStatus
     updated_at: datetime | None = None
 
-
 ###############################################################################
 class ModelConfigPersistResponse(BaseModel):
     """Configuration values returned after a persistence-only update."""
@@ -176,7 +164,6 @@ class ModelConfigPersistResponse(BaseModel):
     rag_settings: RagSettingsResponse
     updated_at: datetime | None = None
 
-
 ###############################################################################
 class EmbeddingStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -184,13 +171,11 @@ class EmbeddingStatusResponse(BaseModel):
     embedding_runtime: EmbeddingRuntimeStatus
     embedding_index: EmbeddingIndexStatus
 
-
 ###############################################################################
 class ConnectivityCheckRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     provider: CloudProviderId
     model: str = Field(min_length=1)
-
 
 ###############################################################################
 class ConnectivityCheckResponse(BaseModel):
