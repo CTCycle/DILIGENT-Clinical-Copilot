@@ -21,9 +21,9 @@ from repositories.serialization.session_timelines import (
 )
 from repositories.values import normalize_string
 
-
 ###############################################################################
 class SessionTimelineRepository:
+
     # -------------------------------------------------------------------------
     def __init__(self, context: RepositoryContext) -> None:
         self.context = context

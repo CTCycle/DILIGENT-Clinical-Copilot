@@ -21,7 +21,6 @@ CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
 ACTIVE_SQLITE_WHERE = "is_active = 1"
 ACTIVE_POSTGRESQL_WHERE = "is_active = true"
 
-
 ###############################################################################
 class AccessKey(Base):
     __tablename__ = "access_keys"

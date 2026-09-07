@@ -50,13 +50,11 @@ MAX_JSON_CHARS = 30000
 
 StructuredCall = Callable[..., Any]
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class RevisionAgentRuntime:
     provider: str
     model: str
-
 
 ###############################################################################
 def _clip_text(value: Any, limit: int) -> str:
@@ -64,7 +62,6 @@ def _clip_text(value: Any, limit: int) -> str:
     if len(text) <= limit:
         return text
     return f"{text[:limit]}\n\n[TRUNCATED: {len(text) - limit} characters omitted]"
-
 
 ###############################################################################
 def _safe_json(value: Any, limit: int = MAX_JSON_CHARS) -> str:
@@ -74,7 +71,6 @@ def _safe_json(value: Any, limit: int = MAX_JSON_CHARS) -> str:
         serialized = json.dumps(str(value), ensure_ascii=False)
     return _clip_text(serialized, limit)
 
-
 ###############################################################################
 def resolve_revision_agent_runtime() -> RevisionAgentRuntime:
     provider, model = LLMRuntimeConfig.resolve_provider_and_model("revision")
@@ -82,7 +78,6 @@ def resolve_revision_agent_runtime() -> RevisionAgentRuntime:
         provider=provider,
         model=model,
     )
-
 
 ###############################################################################
 def build_revision_agent_user_prompt(
@@ -145,9 +140,9 @@ def build_revision_agent_user_prompt(
         )
     )
 
-
 ###############################################################################
 class RevisionAgentRunner:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

@@ -13,13 +13,11 @@ from domain.clinical.entities import (
 from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.clinical.dili_pattern import DiliPatternEngine
 
-
 ###############################################################################
 def test_r_ratio_boundary_values_follow_livertox_definitions() -> None:
     assert DiliPatternEngine.classify(5.0) == "hepatocellular"
     assert DiliPatternEngine.classify(2.0) == "cholestatic"
     assert DiliPatternEngine.classify(3.0) == "mixed"
-
 
 ###############################################################################
 def test_undated_labs_without_uln_do_not_generate_r_ratio() -> None:
@@ -37,7 +35,6 @@ def test_undated_labs_without_uln_do_not_generate_r_ratio() -> None:
     )
     assert patterns[0].pattern == "indeterminate"
     assert patterns[0].r_ratio is None
-
 
 ###############################################################################
 def test_structured_dossier_preserves_missing_competing_causes() -> None:
@@ -124,7 +121,6 @@ def test_structured_dossier_preserves_missing_competing_causes() -> None:
     )
     assert bundle.manual_review_required is True
 
-
 ###############################################################################
 def test_generated_narrative_safety_gate_blocks_unsupported_certainty() -> None:
     bundle = DiliEvidenceBuilder().build(
@@ -202,7 +198,6 @@ def test_generated_narrative_safety_gate_blocks_unsupported_certainty() -> None:
         issue["code"] for issue in negated_safety_language_issues
     }
 
-
 ###############################################################################
 def test_generated_narrative_safety_gate_blocks_rechallenge_permission() -> None:
     bundle = DiliEvidenceBuilder().build(
@@ -235,7 +230,6 @@ def test_generated_narrative_safety_gate_blocks_rechallenge_permission() -> None
         issue["code"] for issue in safe_issues
     }
 
-
 ###############################################################################
 def test_timeline_preserves_explicit_symptom_and_jaundice_dates() -> None:
     bundle = DiliEvidenceBuilder().build(
@@ -264,7 +258,6 @@ def test_timeline_preserves_explicit_symptom_and_jaundice_dates() -> None:
     assert bundle.timeline.jaundice_or_bilirubin_rise_date == "2026-02-06"
     assert "first_symptom_date" not in bundle.timeline.missing_fields
     assert "jaundice_or_bilirubin_timing" not in bundle.timeline.missing_fields
-
 
 ###############################################################################
 def test_continuing_exposure_is_not_upgraded_from_case_global_dechallenge() -> None:
@@ -333,7 +326,6 @@ def test_continuing_exposure_is_not_upgraded_from_case_global_dechallenge() -> N
     assert exposure.rucam is not None
     assert exposure.rucam.category == "excluded"
 
-
 ###############################################################################
 def test_report_has_required_fda_style_sections() -> None:
     bundle = DiliEvidenceBuilder().build(
@@ -349,7 +341,6 @@ def test_report_has_required_fda_style_sections() -> None:
     assert "Manual hepatology review required" in report
     assert "DILIN-like" not in report
     assert "Structured causality synthesis" in report
-
 
 ###############################################################################
 def test_user_summary_groups_missing_data_without_raw_field_keys() -> None:
@@ -381,7 +372,6 @@ def test_user_summary_groups_missing_data_without_raw_field_keys() -> None:
         "Exposure timing",
         "Aldactone: start date not documented",
     )
-
 
 ###############################################################################
 def test_dechallenge_tolerates_missing_pre_stop_labs() -> None:

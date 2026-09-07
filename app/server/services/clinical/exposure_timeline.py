@@ -4,9 +4,9 @@ from datetime import date, datetime
 
 from domain.clinical.entities import DrugEntry, DrugSuspensionContext
 
-
 ###############################################################################
 class ExposureTimelineService:
+
     # -------------------------------------------------------------------------
     def evaluate_suspension(
         self, entry: DrugEntry, visit_date: date | None

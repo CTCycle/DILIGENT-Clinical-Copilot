@@ -51,9 +51,9 @@ from services.retrieval.settings import (
     rag_settings_payload,
 )
 
-
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
+
     # -------------------------------------------------------------------------
     def load_snapshot(self) -> ModelConfigSnapshot: ...
 
@@ -73,7 +73,6 @@ class ModelConfigSnapshotStore(Protocol):
         ollama_seed: int | None | object = ...,
         rag_settings: dict[str, object] | object = ...,
     ) -> ModelConfigSnapshot: ...
-
 
 ###############################################################################
 class ModelConfigService:

@@ -6,6 +6,7 @@ CLINICAL_LANGUAGE_REWRITE_SYSTEM_PROMPT = """Rewrite clinical text faithfully in
 """
 
 
+###############################################################################
 def build_clinical_language_rewrite_user_prompt(
     *,
     source_text: str,

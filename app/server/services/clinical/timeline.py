@@ -31,9 +31,9 @@ DATE_YEAR_RE = re.compile(r"^\d{4}$")
 ISO_DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 ISO_PARTIAL_DATE_RE = re.compile(r"\b\d{4}(?:-\d{2}(?:-\d{2})?)?\b")
 
-
 ###############################################################################
 class PatientTimelineExtractor:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

@@ -15,7 +15,6 @@ from repositories.schemas.configuration import (
 )
 from sqlalchemy import create_engine, func, inspect, select
 
-
 ###############################################################################
 def _build_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -35,13 +34,11 @@ def _build_settings() -> DatabaseSettings:
         select_page_size=2000,
     )
 
-
 ###############################################################################
 def _make_temp_db_root(prefix: str) -> Path:
     temp_root = Path(tempfile.gettempdir()) / f"{prefix}-{uuid.uuid4().hex}"
     temp_root.mkdir(parents=True, exist_ok=True)
     return temp_root
-
 
 ###############################################################################
 def test_sqlite_initializer_creates_schema_when_db_file_missing(
@@ -65,7 +62,6 @@ def test_sqlite_initializer_creates_schema_when_db_file_missing(
         assert inspector.has_table("application_configuration")
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
-
 
 ###############################################################################
 def test_sqlite_repository_does_not_seed_catalogs_during_construction(
@@ -97,7 +93,6 @@ def test_sqlite_repository_does_not_seed_catalogs_during_construction(
     finally:
         engine.dispose()
         shutil.rmtree(temp_root, ignore_errors=True)
-
 
 ###############################################################################
 def test_sqlite_repository_exposes_orm_session_factory(

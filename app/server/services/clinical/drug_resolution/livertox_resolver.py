@@ -11,9 +11,9 @@ from services.text.normalization import (
     normalize_drug_query_name,
 )
 
-
 ###############################################################################
 class LiverToxCandidateResolver:
+
     # -------------------------------------------------------------------------
     def __init__(self, matcher: LiverToxMatcher) -> None:
         self.matcher = matcher

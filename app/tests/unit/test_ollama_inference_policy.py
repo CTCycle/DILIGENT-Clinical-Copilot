@@ -6,7 +6,6 @@ from services.llm import ollama_chat
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.runtime_config import LLMRuntimeConfig
 
-
 ###############################################################################
 def test_ollama_gpt_oss_preserves_level_reasoning_and_omits_temperature(
     monkeypatch,
@@ -30,12 +29,12 @@ def test_ollama_gpt_oss_preserves_level_reasoning_and_omits_temperature(
     assert think == "high"
     assert options is None
 
-
 ###############################################################################
 def test_ollama_context_window_is_task_sized_and_intersects_runtime_capacity() -> None:
 
     ###############################################################################
     class FakeOllama:
+
         # -------------------------------------------------------------------------
         @staticmethod
         def estimate_tokens(text: str) -> int:
@@ -64,12 +63,12 @@ def test_ollama_context_window_is_task_sized_and_intersects_runtime_capacity() -
     assert context_window is not None
     assert 2048 <= context_window <= 4096
 
-
 ###############################################################################
 def test_ollama_payload_omits_think_when_transport_does_not_support_reasoning() -> None:
 
     ###############################################################################
     class FakeOllama:
+
         # -------------------------------------------------------------------------
         @staticmethod
         def compose_payload(

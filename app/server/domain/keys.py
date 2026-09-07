@@ -16,14 +16,12 @@ PLACEHOLDER_ACCESS_KEY_RE = re.compile(
     r"(?:fake|test|example|placeholder|dummy|invalid)", re.IGNORECASE
 )
 
-
 ###############################################################################
 def normalize_provider_name(provider: str) -> ProviderName:
     normalized = str(provider or "").strip().lower()
     if normalized not in SUPPORTED_PROVIDERS:
         raise ValueError("Unsupported provider")
     return cast(ProviderName, normalized)
-
 
 ###############################################################################
 def normalize_access_key(value: str | None) -> str:
@@ -37,7 +35,6 @@ def normalize_access_key(value: str | None) -> str:
     if any(character.isspace() for character in normalized):
         raise ValueError("access_key must not contain whitespace")
     return normalized
-
 
 ###############################################################################
 def validate_provider_access_key(provider: ProviderName, value: str | None) -> str:
@@ -56,7 +53,6 @@ def validate_provider_access_key(provider: ProviderName, value: str | None) -> s
         raise ValueError(f"Invalid {provider.title()} access key format.")
     return normalized
 
-
 ###############################################################################
 class AccessKeyCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -69,7 +65,6 @@ class AccessKeyCreateRequest(BaseModel):
     def strip_access_key(cls, value: str | None) -> str:
         return normalize_access_key(value)
 
-
 ###############################################################################
 class AccessKeyResponse(BaseModel):
     id: int
@@ -80,7 +75,6 @@ class AccessKeyResponse(BaseModel):
     updated_at: datetime | None = None
     last_used_at: datetime | None = None
 
-
 ###############################################################################
 class AccessKeyRecord(BaseModel):
     id: int
@@ -90,7 +84,6 @@ class AccessKeyRecord(BaseModel):
     is_active: bool
     key_fingerprint: str
     last_used_at: datetime | None = None
-
 
 ###############################################################################
 class AccessKeyDeleteResponse(BaseModel):

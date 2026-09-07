@@ -12,20 +12,18 @@ from common.utils.logger import logger
 from domain.bootstrap import EnvironmentBootstrapState
 from configurations.runtime_bootstrap import ensure_runtime_data_layout
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def _runtime_state() -> "_EnvironmentRuntimeState":
     return _EnvironmentRuntimeState()
 
-
 ###############################################################################
 class _EnvironmentRuntimeState:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.bootstrap = EnvironmentBootstrapState()
         self.dotenv_injected_keys: set[str] = set()
-
 
 ###############################################################################
 def ensure_environment_loaded(*, force: bool = False) -> Path | None:
@@ -54,7 +52,6 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
         state.dotenv_injected_keys.update(set(os.environ.keys()) - previous_keys)
         state.bootstrap.bootstrapped = True
         return env_path if env_path.exists() else None
-
 
 ###############################################################################
 def get_dotenv_injected_keys() -> set[str]:

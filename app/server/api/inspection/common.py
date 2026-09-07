@@ -11,9 +11,9 @@ from domain.jobs import (
 )
 from services.inspection.service import DataInspectionService
 
-
 ###############################################################################
 class InspectionEndpointBase:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -24,9 +24,9 @@ class InspectionEndpointBase:
         self.router = router
         self.service = service
 
-
 ###############################################################################
 class InspectionJobEndpointMixin(InspectionEndpointBase):
+
     # -------------------------------------------------------------------------
     def list_update_jobs(self, response: Response) -> JobListResponse:
         response.headers["Cache-Control"] = "no-store"

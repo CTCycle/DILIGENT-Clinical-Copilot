@@ -18,9 +18,9 @@ from domain.clinical.entities import (
 
 NOT_AVAILABLE_TEXT = "N/A"
 
-
 ###############################################################################
 class HepatotoxicityPatternCalculator:
+
     # -------------------------------------------------------------------------
     def calculate(
         self,
@@ -60,9 +60,9 @@ class HepatotoxicityPatternCalculator:
             return None
         return value / reference
 
-
 ###############################################################################
 class HepatotoxicityPatternAnalyzer:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.r_score: float | None = None

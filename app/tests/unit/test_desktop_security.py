@@ -6,17 +6,16 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from services.runtime.desktop import DesktopRuntimeService
 
-
 ###############################################################################
 class _DesktopServerStub:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.should_exit = False
-
 
 ###############################################################################
 def _model_config() -> dict[str, str]:
     return {"status": "ok"}
-
 
 ###############################################################################
 def test_packaged_desktop_api_requires_bootstrap_cookie_and_exact_origin(

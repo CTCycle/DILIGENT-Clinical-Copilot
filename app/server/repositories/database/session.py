@@ -11,7 +11,6 @@ from configurations.startup import get_server_settings
 from repositories.database.postgres import PostgresRepository
 from repositories.database.sqlite import SQLiteRepository
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def get_default_repository():
@@ -21,13 +20,11 @@ def get_default_repository():
     )
     return repository_cls(settings)
 
-
 ###############################################################################
 def resolve_engine(engine: Engine | None = None) -> Engine:
     if engine is not None:
         return engine
     return get_default_repository().engine
-
 
 ###############################################################################
 def resolve_session_factory(
@@ -43,7 +40,6 @@ def resolve_session_factory(
         future=True,
         expire_on_commit=expire_on_commit,
     )
-
 
 ###############################################################################
 @contextmanager

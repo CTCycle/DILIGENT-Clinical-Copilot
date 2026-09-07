@@ -7,7 +7,6 @@ from fastapi import FastAPI
 
 import app as server_app_module
 
-
 ###############################################################################
 def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ignore[no-untyped-def]
     events: list[str] = []
@@ -41,7 +40,6 @@ def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ign
     asyncio.run(exercise())
     return events
 
-
 ###############################################################################
 def test_application_startup_synchronizes_sqlite_before_validation(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     assert _run_lifespan("sqlite", monkeypatch) == [
@@ -51,7 +49,6 @@ def test_application_startup_synchronizes_sqlite_before_validation(monkeypatch) 
         "running",
         "close",
     ]
-
 
 ###############################################################################
 def test_application_startup_synchronizes_postgresql_before_validation(

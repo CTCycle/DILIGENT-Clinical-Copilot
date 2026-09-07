@@ -5,7 +5,6 @@ from typing import Any
 
 from services.catalogs.runtime import get_reference_catalog_snapshot
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def get_parser_validation_data() -> dict[str, Any]:

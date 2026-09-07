@@ -23,9 +23,9 @@ LOW_CONFIDENCE_LIVERTOX = {"", "U", "E", "E*", "X", "UNKNOWN"}
 DIRECT_TOXIN_LIVERTOX = {"T", "T*"}
 SUPPORTIVE_DECHALLENGE = {"improving_after_stop", "resolved_to_baseline"}
 
-
 ###############################################################################
 class DiliCausalityEngine:
+
     # -------------------------------------------------------------------------
     @staticmethod
     def rucam(

@@ -21,11 +21,9 @@ from services.session.text_section_parser import (
     parse_initial_text_sections,
 )
 
-
 ###############################################################################
 class ClinicalInputExtractionError(RuntimeError):
     pass
-
 
 ###############################################################################
 def validate_extracted_sections_against_source(
@@ -39,9 +37,9 @@ def validate_extracted_sections_against_source(
         for section in (anamnesis, therapy, lab_analysis)
     )
 
-
 ###############################################################################
 class ClinicalInputExtractor:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

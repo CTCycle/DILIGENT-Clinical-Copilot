@@ -4,7 +4,6 @@ import json
 
 from playwright.sync_api import Page, Route, expect
 
-
 ###############################################################################
 def _fill_valid_fields(page: Page) -> None:
     page.get_by_label("Clinical Input").fill(
@@ -14,7 +13,6 @@ def _fill_valid_fields(page: Page) -> None:
         + "## Laboratory analysis\nALT 210 U/L, ALP 160 U/L, bilirubin 2.1 mg/dL."
     )
     page.get_by_label("Visit Date").fill("2026-07-17")
-
 
 ###############################################################################
 def _issue(severity: str, code: str, field: str) -> dict:
@@ -30,7 +28,6 @@ def _issue(severity: str, code: str, field: str) -> dict:
         "continuation_allowed": severity == "non_blocking",
     }
 
-
 ###############################################################################
 def _preflight_body(blocking: list[dict], warnings: list[dict]) -> str:
     return json.dumps(
@@ -44,7 +41,6 @@ def _preflight_body(blocking: list[dict], warnings: list[dict]) -> str:
             "rag_readiness": None,
         }
     )
-
 
 ###############################################################################
 def test_blocking_preflight_modal_prevents_job_submission(
@@ -88,7 +84,6 @@ def test_blocking_preflight_modal_prevents_job_submission(
     finally:
         page.unroute("**/api/clinical/validate-input")
         page.unroute("**/api/clinical/jobs", count_jobs)
-
 
 ###############################################################################
 def test_warning_acceptance_starts_one_job_and_preserves_form(
@@ -173,7 +168,6 @@ def test_warning_acceptance_starts_one_job_and_preserves_form(
         page.unroute("**/api/clinical/jobs")
         page.unroute("**/api/clinical/jobs/preflight-warning**")
 
-
 ###############################################################################
 def test_long_preflight_list_scrolls_without_hiding_header_or_actions(
     page: Page,
@@ -221,7 +215,6 @@ def test_long_preflight_list_scrolls_without_hiding_header_or_actions(
     finally:
         page.unroute("**/api/clinical/validate-input")
 
-
 ###############################################################################
 def test_focus_is_trapped_inside_warning_modal(
     page: Page,
@@ -255,7 +248,6 @@ def test_focus_is_trapped_inside_warning_modal(
         expect(close_button).to_be_focused()
     finally:
         page.unroute("**/api/clinical/validate-input")
-
 
 ###############################################################################
 def test_escape_does_not_close_blocking_modal(

@@ -10,9 +10,9 @@ from services.llm.transports.gemini import GeminiTransport
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
 
-
 ###############################################################################
 class FakeOpenAIChatResponse:
+
     # -------------------------------------------------------------------------
     def raise_for_status(self) -> None:
         return None
@@ -21,13 +21,13 @@ class FakeOpenAIChatResponse:
     def json(self) -> dict[str, Any]:
         return {"choices": [{"message": {"content": "ok"}}]}
 
-
 ###############################################################################
 def test_openai_chat_transport_normalizes_reasoning_and_output_options() -> None:
     captured: dict[str, Any] = {}
 
     ###############################################################################
     class FakeClient:
+
         # -------------------------------------------------------------------------
         async def post(
             self, path: str, *, json: dict[str, Any]
@@ -65,13 +65,13 @@ def test_openai_chat_transport_normalizes_reasoning_and_output_options() -> None
     assert "temperature" not in payload
     assert "max_output_tokens" not in payload
 
-
 ###############################################################################
 def test_openai_responses_transport_preserves_options_and_normalizes_limits() -> None:
     captured: dict[str, Any] = {}
 
     ###############################################################################
     class FakeResponses:
+
         # -------------------------------------------------------------------------
         async def create(self, **kwargs: Any) -> SimpleNamespace:
             captured.update(kwargs)
@@ -105,13 +105,13 @@ def test_openai_responses_transport_preserves_options_and_normalizes_limits() ->
     assert captured["reasoning"] == {"effort": "medium"}
     assert "temperature" not in captured
 
-
 ###############################################################################
 def test_anthropic_transport_reserves_reasoning_budget_without_fixed_default() -> None:
     captured: dict[str, Any] = {}
 
     ###############################################################################
     class FakeMessages:
+
         # -------------------------------------------------------------------------
         async def create(self, **kwargs: Any) -> SimpleNamespace:
             captured.update(kwargs)
@@ -137,7 +137,6 @@ def test_anthropic_transport_reserves_reasoning_budget_without_fixed_default() -
     assert captured["max_tokens"] == 1536
     assert captured["thinking"] == {"type": "enabled", "budget_tokens": 1024}
     assert "temperature" not in captured
-
 
 ###############################################################################
 def test_gemini_maps_medium_reasoning_to_low_sdk_level() -> None:

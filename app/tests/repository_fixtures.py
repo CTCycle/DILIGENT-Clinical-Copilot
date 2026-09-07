@@ -11,7 +11,6 @@ from repositories.session_timeline_repository import SessionTimelineRepository
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 @dataclass(frozen=True, slots=True)
 class RepositoryGraph:
@@ -21,7 +20,6 @@ class RepositoryGraph:
     clinical_session_repository: ClinicalSessionRepository
     session_timeline_repository: SessionTimelineRepository
     session_revision_repository: SessionRevisionRepository
-
 
 ###############################################################################
 def build_repository_graph(

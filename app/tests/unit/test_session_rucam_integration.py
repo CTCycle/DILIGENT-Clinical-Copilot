@@ -21,7 +21,6 @@ from domain.clinical.entities import DeterministicDrugExtractionResult
 from services.clinical.preparation import HepatoxPreparedInputs
 from services.session.workflow_shared import resolve_rucam_source
 
-
 ###############################################################################
 def get_session_service() -> Any:
     for route in session_module.router.routes:
@@ -30,7 +29,6 @@ def get_session_service() -> Any:
             if owner is not None:
                 return owner.service
     raise AssertionError("Clinical route not found")
-
 
 ###############################################################################
 def test_rucam_source_metadata_requires_explicit_provenance() -> None:
@@ -62,9 +60,9 @@ def test_rucam_source_metadata_requires_explicit_provenance() -> None:
         == "not_calculated_insufficient_data"
     )
 
-
 ###############################################################################
 class FakeSerializer:
+
     # -------------------------------------------------------------------------
     def save_clinical_session(self, payload: dict[str, Any]) -> int:
         _ = payload
@@ -77,9 +75,9 @@ class FakeSerializer:
         _ = session_id
         _ = payload
 
-
 ###############################################################################
 class FakeInputPreparator:
+
     # -------------------------------------------------------------------------
     def resolve_session_drug_ids(
         self, matched_drugs: list[dict[str, Any]]
@@ -115,9 +113,9 @@ class FakeInputPreparator:
         _ = detected_drug_names
         return []
 
-
 ###############################################################################
 class FakeHepatoxConsultation:
+
     # -------------------------------------------------------------------------
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         _ = args
@@ -128,7 +126,6 @@ class FakeHepatoxConsultation:
     async def run_analysis(self, **kwargs: Any) -> dict[str, Any]:
         _ = kwargs
         return {"final_report": "ok"}
-
 
 ###############################################################################
 class FakeDrugsParser:
@@ -196,7 +193,6 @@ class FakeDrugsParser:
         _ = kwargs
         return PatientDrugs(entries=[])
 
-
 ###############################################################################
 class FakeDiseaseExtractor:
     timeout_s = 1.0
@@ -209,9 +205,9 @@ class FakeDiseaseExtractor:
         _ = kwargs
         return PatientDiseaseContext(entries=[])
 
-
 ###############################################################################
 class FakeLabExtractor:
+
     # -------------------------------------------------------------------------
     def extract_explicit_hepatic_pattern(self, text: str) -> str | None:
         _ = text
@@ -244,7 +240,6 @@ class FakeLabExtractor:
             onset_date="2025-01-10", onset_basis="first_abnormal_lab"
         )
 
-
 ###############################################################################
 @dataclass
 class FakeRucamEstimator:
@@ -267,7 +262,6 @@ class FakeRucamEstimator:
             ]
         )
 
-
 ###############################################################################
 def _payload() -> PatientData:
     return PatientData(
@@ -277,7 +271,6 @@ def _payload() -> PatientData:
         drugs="Drug A 50 mg",
         laboratory_analysis="ALT 300 U/L",
     )
-
 
 ###############################################################################
 def test_session_passes_report_language_to_rucam_estimator(monkeypatch) -> None:

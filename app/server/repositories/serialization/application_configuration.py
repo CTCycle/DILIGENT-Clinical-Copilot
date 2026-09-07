@@ -17,9 +17,9 @@ from repositories.database.upsert import (
 )
 from repositories.schemas.configuration import ApplicationConfiguration
 
-
 ###############################################################################
 class ApplicationConfigurationSerializer:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 ###############################################################################
 class ServiceError(Exception):
     status_code = 500
@@ -24,13 +23,11 @@ class ServiceError(Exception):
             self.retryable = bool(retryable)
         super().__init__(str(self.detail))
 
-
 ###############################################################################
 class ServiceValidationError(ServiceError):
     status_code = 422
     retryable = False
     default_detail = "Request validation failed."
-
 
 ###############################################################################
 class ServiceNotFoundError(ServiceError):
@@ -38,13 +35,11 @@ class ServiceNotFoundError(ServiceError):
     retryable = False
     default_detail = "Required resource was not found."
 
-
 ###############################################################################
 class ServiceConflictError(ServiceError):
     status_code = 409
     retryable = False
     default_detail = "Operation conflicts with current resource state."
-
 
 ###############################################################################
 class ServiceDependencyError(ServiceError):

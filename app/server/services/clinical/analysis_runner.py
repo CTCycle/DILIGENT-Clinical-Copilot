@@ -29,7 +29,6 @@ CLAIM_EVIDENCE_TRUNCATION_MARKER = " [truncated]"
 MATCH_REASON_MAX_LENGTH = 100
 DrugAssessmentBase: TypeAlias = tuple[DrugClinicalAssessment, str, list[str]]
 
-
 ###############################################################################
 def emit_progress(
     progress_callback: Callable[[str, float], None] | None,
@@ -41,7 +40,6 @@ def emit_progress(
         return
     bounded_fraction = min(1.0, max(0.0, float(fraction)))
     progress_callback(stage, bounded_fraction)
-
 
 ###############################################################################
 def livertox_payload_rank(payload: dict[str, Any]) -> int:
@@ -69,7 +67,6 @@ def livertox_payload_rank(payload: dict[str, Any]) -> int:
     } or payload.get("missing_livertox"):
         return 1
     return 0
-
 
 ###############################################################################
 def resolve_livertox_data_for_entry(
@@ -107,7 +104,6 @@ def resolve_livertox_data_for_entry(
         return exact
     return grouped[0]
 
-
 ###############################################################################
 def claim_safe_evidence_quote(value: str | None) -> str | None:
     stripped = str(value).strip() if value is not None else ""
@@ -130,7 +126,6 @@ def claim_safe_evidence_quote(value: str | None) -> str | None:
         truncated = truncated[:boundary].rstrip(" .,;\n")
     return f"{truncated}{marker}"
 
-
 ###############################################################################
 def normalize_match_reason(
     value: Any,
@@ -150,7 +145,6 @@ def normalize_match_reason(
     if len(primary_reason) > MATCH_REASON_MAX_LENGTH:
         primary_reason = primary_reason[:MATCH_REASON_MAX_LENGTH].rstrip()
     return primary_reason or None, normalized_notes
-
 
 ###############################################################################
 class AnalysisRunner:
@@ -708,7 +702,6 @@ class AnalysisRunner:
         )
         return entry, (idx, job)
 
-
 ###############################################################################
 def summarize_drug_source_context(entry: DrugEntry) -> str:
     source = (
@@ -721,7 +714,6 @@ def summarize_drug_source_context(entry: DrugEntry) -> str:
     if source == "anamnesis":
         return "Historical anamnesis section entry."
     return "Source section unavailable."
-
 
 ###############################################################################
 def assess_temporal_plausibility(
@@ -736,7 +728,6 @@ def assess_temporal_plausibility(
     if entry.therapy_start_date:
         return "Therapy start is available; temporal assessment is partially supported."
     return "Temporal evidence is limited."
-
 
 ###############################################################################
 def assess_pattern_compatibility(
