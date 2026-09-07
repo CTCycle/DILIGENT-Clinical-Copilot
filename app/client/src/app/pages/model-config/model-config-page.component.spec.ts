@@ -192,6 +192,72 @@ describe('ModelConfigPageComponent', () => {
     expect(component.statusMessage()).toContain('Provider unavailable');
   });
 
+  it('persists only backend-supported RAG fields and preserves hybrid weights', async () => {
+    const persistSpy = vi
+      .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<void> }, 'persistConfigPatch')
+      .mockResolvedValue();
+
+    component.draftRagSettings.set({
+      chunk_size: 1024,
+      chunk_overlap: 128,
+      embedding_batch_size: 64,
+      use_hybrid_search: true,
+      use_reranking: true,
+      retrieval_candidate_count: 40,
+      retrieval_selected_count: 6,
+      reranker_model: 'lightweight-balanced-v1',
+      hybrid_vector_weight: 0.65,
+      hybrid_text_weight: 0.35,
+      vector_stream_batch_size: 250,
+      embedding_device: 'cuda',
+      embedding_offline_mode: false,
+    });
+    component.ragSettingsModalOpen.set(true);
+
+    await component.saveRagSettings();
+
+    expect(persistSpy).toHaveBeenCalledWith(
+      {
+        rag_settings: {
+          chunk_size: 1024,
+          chunk_overlap: 128,
+          embedding_batch_size: 64,
+          use_hybrid_search: true,
+          use_reranking: true,
+          retrieval_candidate_count: 40,
+          retrieval_selected_count: 6,
+          reranker_model: 'lightweight-balanced-v1',
+          hybrid_vector_weight: 0.65,
+          hybrid_text_weight: 0.35,
+          vector_stream_batch_size: 250,
+          embedding_offline_mode: false,
+        },
+      },
+      'RAG settings saved.',
+      false,
+      'rag',
+    );
+    expect(component.ragSettingsModalOpen()).toBe(false);
+  });
+
+  it('validates hybrid weights while hybrid search is enabled', () => {
+    component.draftRagSettings.update((previous) => ({
+      ...previous,
+      use_hybrid_search: true,
+      hybrid_vector_weight: 0,
+      hybrid_text_weight: 0,
+    }));
+
+    expect(component.ragSettingsValidationMessage()).toBe(
+      'At least one hybrid search weight must be greater than 0.',
+    );
+
+    component.setDraftRagFloat('hybrid_vector_weight', '0.65');
+
+    expect(component.draftRagSettings().hybrid_vector_weight).toBe(0.65);
+    expect(component.ragSettingsValidationMessage()).toBe('');
+  });
+
   it('cancels pending reasoning persistence when the page is destroyed', () => {
     vi.useFakeTimers();
     const persistSpy = vi
