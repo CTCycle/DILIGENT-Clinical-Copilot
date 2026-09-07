@@ -37,7 +37,6 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 ###############################################################################
 class DrugAnalysisService:
     """Handles per-drug LLM orchestration, invocation, and response processing."""

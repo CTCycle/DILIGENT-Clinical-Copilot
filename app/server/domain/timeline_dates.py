@@ -9,7 +9,6 @@ _DATE_TOKEN_RE = re.compile(
     r"^(?P<year>\d{4})(?:-(?P<month>\d{2})(?:-(?P<day>\d{2}))?)?$"
 )
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class TimelineDateInterval:
@@ -18,7 +17,6 @@ class TimelineDateInterval:
     start_day: int
     end_day: int
     precision: str
-
 
 ###############################################################################
 def normalize_timeline_interval(
@@ -74,7 +72,6 @@ def normalize_timeline_interval(
         end_day=end.toordinal(),
         precision=precision,
     )
-
 
 ###############################################################################
 def timeline_date_sort_key(value: str | None) -> tuple[int, str]:

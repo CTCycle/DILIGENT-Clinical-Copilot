@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 
 from domain.clinical.entities import PipelineIssue, RagDocumentReference
 
-
 ###############################################################################
 class LocalDiseaseContextEntry(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
@@ -15,11 +14,9 @@ class LocalDiseaseContextEntry(BaseModel):
     chronic: bool | None = Field(default=None)
     hepatic_related: bool | None = Field(default=None)
 
-
 ###############################################################################
 class LocalPatientDiseaseContext(BaseModel):
     entries: list[LocalDiseaseContextEntry] = Field(default_factory=list)
-
 
 ###############################################################################
 class LocalLabEntryDraft(BaseModel):
@@ -29,19 +26,16 @@ class LocalLabEntryDraft(BaseModel):
     sample_date: str | None = Field(default=None, max_length=120)
     evidence: str | None = Field(default=None, max_length=500)
 
-
 ###############################################################################
 class LocalOnsetContextDraft(BaseModel):
     onset_date: str | None = Field(default=None, max_length=120)
     onset_basis: str | None = Field(default=None, max_length=200)
     evidence: str | None = Field(default=None, max_length=500)
 
-
 ###############################################################################
 class LocalLabExtractionPayload(BaseModel):
     entries: list[LocalLabEntryDraft] = Field(default_factory=list)
     onset_context: LocalOnsetContextDraft | None = Field(default=None)
-
 
 ###############################################################################
 class LocalDrugEntryDraft(BaseModel):
@@ -57,18 +51,15 @@ class LocalDrugEntryDraft(BaseModel):
     evidence: str | None = Field(default=None, max_length=500)
     current_status: str | None = Field(default=None, max_length=40)
 
-
 ###############################################################################
 class LocalPatientDrugs(BaseModel):
     entries: list[LocalDrugEntryDraft] = Field(default_factory=list)
-
 
 ###############################################################################
 class HepaticPatternResolutionInput(BaseModel):
     explicit_pattern: str | None = None
     calculated_pattern: str | None = None
     r_score: float | None = None
-
 
 ###############################################################################
 class HepaticPatternResolutionResult(BaseModel):
@@ -79,7 +70,6 @@ class HepaticPatternResolutionResult(BaseModel):
     conflict: bool = False
     r_score: float | None = None
     warnings: list[PipelineIssue] = Field(default_factory=list)
-
 
 ###############################################################################
 @dataclass(frozen=True)

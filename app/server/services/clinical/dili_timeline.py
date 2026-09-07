@@ -35,9 +35,9 @@ DechallengeStatus = Literal[
     "insufficient_interval",
 ]
 
-
 ###############################################################################
 class DiliTimelineEngine:
+
     # -------------------------------------------------------------------------
     def build(
         self,

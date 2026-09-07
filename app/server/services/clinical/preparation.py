@@ -31,9 +31,9 @@ from services.clinical.matches_core import (
 )
 from services.text.normalization import normalize_drug_query_name
 
-
 ###############################################################################
 class ClinicalKnowledgePreparation:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

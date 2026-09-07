@@ -12,7 +12,6 @@ from services.clinical.dili_timeline import DiliTimelineEngine
 AMINOTRANSFERASE_MARKERS = {"ALT", "AST"}
 BILIRUBIN_MARKERS = {"BILIRUBIN", "TBIL"}
 
-
 ###############################################################################
 class DiliCaseQualificationEngine:
     """Qualify the liver-injury episode before patient-drug causality synthesis."""

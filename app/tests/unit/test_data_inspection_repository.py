@@ -28,13 +28,11 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-
 ###############################################################################
 def build_repository_graph_for_test() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     return build_repository_graph(engine=engine), engine
-
 
 ###############################################################################
 def build_service(
@@ -53,7 +51,6 @@ def build_service(
         timeline_extractor=timeline_extractor,
         jobs=jobs,
     )
-
 
 ###############################################################################
 def save_session(
@@ -83,7 +80,6 @@ def save_session(
         }
     )
 
-
 ###############################################################################
 def test_clinical_services_receive_only_their_repository_capabilities() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -108,7 +104,6 @@ def test_clinical_services_receive_only_their_repository_capabilities() -> None:
         "knowledge_repository",
         "drug_catalog_repository",
     }
-
 
 ###############################################################################
 def test_session_list_filters_and_search() -> None:
@@ -208,7 +203,6 @@ def test_session_list_filters_and_search() -> None:
     assert total == 1
     assert items[0]["patient_name"] == "Carol Archive"
 
-
 ###############################################################################
 def test_session_report_and_text_use_result_payload_only() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -265,7 +259,6 @@ def test_session_report_and_text_use_result_payload_only() -> None:
     assert missing_text_detail["session_text"] == ""
     assert missing_text_detail["sections"]["anamnesis"] == "Section anamnesis"
 
-
 ###############################################################################
 def test_inspection_detail_exposes_persisted_manual_edit_history() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -310,7 +303,6 @@ def test_inspection_detail_exposes_persisted_manual_edit_history() -> None:
         version_detail["session"]["manual_edit_history"]
         == detail["manual_edit_history"]
     )
-
 
 ###############################################################################
 def test_catalog_search_and_drug_delete_cleanup() -> None:
@@ -412,7 +404,6 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
         assert len(mentions) == 1
         assert mentions[0].drug_id is None
 
-
 ###############################################################################
 def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -477,9 +468,9 @@ def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     assert final_livertox is not None
     assert final_livertox["status"] == "cancelled"
 
-
 ###############################################################################
 class FakeTimelineExtractor:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.call_count = 0
@@ -510,9 +501,9 @@ class FakeTimelineExtractor:
             ],
         )
 
-
 ###############################################################################
 class FailingTimelineExtractor:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.timeout_s = 1.0
@@ -527,7 +518,6 @@ class FailingTimelineExtractor:
     ) -> PatientTimeline:
         _ = session_id, source_payload, runtime_settings
         raise LLMError("structured extraction failed", error_code="invalid_response")
-
 
 ###############################################################################
 def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced() -> (
@@ -604,7 +594,6 @@ def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced(
     assert history[0]["timeline_id"] == regenerated.timeline_id
     assert history[1]["timeline_id"] == generated.timeline_id
 
-
 ###############################################################################
 def test_timeline_generation_marks_fallback_payload() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -657,7 +646,6 @@ def test_timeline_generation_marks_fallback_payload() -> None:
     assert all(event.extracted_timing_text is None for event in generated.events)
     assert all(event.timing_type == "uncertain" for event in generated.events)
 
-
 ###############################################################################
 def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -706,7 +694,6 @@ def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> Non
         == original_runtime_settings
     )
 
-
 ###############################################################################
 def test_timeline_generation_passes_persisted_opencode_go_settings_to_extractor() -> (
     None
@@ -754,7 +741,6 @@ def test_timeline_generation_passes_persisted_opencode_go_settings_to_extractor(
     assert extractor.last_runtime_settings["llm_provider"] == "opencode_go"
     assert extractor.last_runtime_settings["cloud_model"] == "deepseek-v4-flash"
 
-
 ###############################################################################
 def test_session_payload_timeline_is_not_read_as_history_record() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -801,7 +787,6 @@ def test_session_payload_timeline_is_not_read_as_history_record() -> None:
         session_id
     )
     assert previews == []
-
 
 ###############################################################################
 def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:

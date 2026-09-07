@@ -173,7 +173,6 @@ CARCINOMA_PHRASE_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 ###############################################################################
 def _non_drug_tokens() -> frozenset[str]:
     return frozenset(
@@ -182,7 +181,6 @@ def _non_drug_tokens() -> frozenset[str]:
             "deterministic_non_drug_tokens",
         )
     )
-
 
 ###############################################################################
 def line_has_regimen_signal(line: str) -> bool:
@@ -196,7 +194,6 @@ def line_has_regimen_signal(line: str) -> bool:
     return bool(re.search(r"(?<!\d)\+(?!\d)", stripped)) and bool(
         CAPITALIZED_DRUG_TOKEN_RE.search(stripped)
     )
-
 
 ###############################################################################
 def extract_regimen_drug_candidates(
@@ -256,7 +253,6 @@ def extract_regimen_drug_candidates(
         seen.add(lowered)
         entries.append(normalized)
     return entries
-
 
 ###############################################################################
 def extract_deterministic_diseases(

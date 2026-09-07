@@ -10,7 +10,6 @@ from repositories.schemas.knowledge import (
     DrugIdentifier,
 )
 
-
 ###############################################################################
 def test_configuration_singleton_rolls_back(persistence_session) -> None:  # type: ignore[no-untyped-def]
     persistence_session.add(
@@ -18,7 +17,6 @@ def test_configuration_singleton_rolls_back(persistence_session) -> None:  # typ
     )
     persistence_session.rollback()
     assert persistence_session.scalar(select(ApplicationConfiguration)) is None
-
 
 ###############################################################################
 def test_configuration_singleton_is_unique(persistence_session) -> None:  # type: ignore[no-untyped-def]
@@ -36,7 +34,6 @@ def test_configuration_singleton_is_unique(persistence_session) -> None:  # type
     assert persistence_session.scalar(select(ApplicationConfiguration)).payload == {
         "clinical_model": "contract"
     }
-
 
 ###############################################################################
 def test_drug_identifier_composite_unique_constraint(persistence_session) -> None:  # type: ignore[no-untyped-def]

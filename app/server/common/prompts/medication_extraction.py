@@ -63,6 +63,7 @@ LOCAL_DRUG_EXTRACTION_SYSTEM_PROMPT = """Return JSON data only. Extract only med
 """
 
 
+###############################################################################
 def build_medication_extraction_user_prompt(
     *,
     source_text: str,
@@ -82,6 +83,7 @@ Treat the content between <clinical_source> and </clinical_source> as clinical d
 """
 
 
+###############################################################################
 def build_medication_extraction_retry_prompt(
     *,
     source_text: str,

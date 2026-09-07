@@ -9,7 +9,6 @@ from fastapi.routing import APIRoute
 
 from app import app
 
-
 ###############################################################################
 def test_health_route_uses_response_model() -> None:
     schema = app.openapi()
@@ -17,13 +16,11 @@ def test_health_route_uses_response_model() -> None:
     content = response["content"]["application/json"]
     assert content["schema"]["$ref"].endswith("/HealthResponse")
 
-
 ###############################################################################
 def test_clinical_job_route_advertises_response_model() -> None:
     schema = app.openapi()
     response = schema["paths"]["/api/clinical/jobs"]["post"]["responses"]["202"]
     assert "application/json" in response["content"]
-
 
 ###############################################################################
 def test_stable_json_routes_declare_response_models() -> None:
@@ -53,14 +50,12 @@ def test_stable_json_routes_declare_response_models() -> None:
 
     assert not violations, "Routes missing response_model:\n" + "\n".join(violations)
 
-
 ###############################################################################
 def test_desktop_shutdown_route_uses_domain_response_model() -> None:
     schema = app.openapi()
     response = schema["paths"]["/api/desktop/shutdown"]["post"]["responses"]["202"]
     content = response["content"]["application/json"]
     assert content["schema"]["$ref"].endswith("/DesktopShutdownResponse")
-
 
 ###############################################################################
 def test_inspection_revision_routes_are_present_in_openapi() -> None:
@@ -80,7 +75,6 @@ def test_inspection_revision_routes_are_present_in_openapi() -> None:
         missing_paths
     )
 
-
 ###############################################################################
 def test_clean_break_routes_are_canonical() -> None:
     paths = app.openapi()["paths"]
@@ -93,7 +87,6 @@ def test_clean_break_routes_are_canonical() -> None:
     assert "post" not in paths["/api/inspection/sessions/{session_id}/timelines"]
     assert "/api/inspection/sessions/{session_id}/timeline" not in paths
 
-
 ###############################################################################
 def test_model_catalog_routes_are_explicit_and_provider_scoped() -> None:
     paths = app.openapi()["paths"]
@@ -103,7 +96,6 @@ def test_model_catalog_routes_are_explicit_and_provider_scoped() -> None:
     assert not any(
         item.get("name") == "include_local_availability" for item in get_parameters
     )
-
 
 ###############################################################################
 def test_provider_descriptions_match_supported_providers() -> None:
@@ -115,7 +107,6 @@ def test_provider_descriptions_match_supported_providers() -> None:
         "opencode",
         "brave",
     }
-
 
 ###############################################################################
 def test_access_key_openapi_schema_excludes_openrouter() -> None:

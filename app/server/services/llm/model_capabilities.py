@@ -15,7 +15,6 @@ CapabilitySource = Literal[
 ]
 ReasoningParameter = Literal["none", "boolean", "level", "effort", "budget_tokens"]
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ModelCapabilities:
@@ -26,7 +25,6 @@ class ModelCapabilities:
     supports_temperature: bool
     supports_json_mode: bool
     source: CapabilitySource
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -56,7 +54,6 @@ class EffectiveInferenceConfig:
 
 _CATALOG_PATH = CATALOGS_PATH / "llm_model_capabilities.json"
 
-
 ###############################################################################
 def _load_catalog() -> dict[str, object]:
     with _CATALOG_PATH.open(encoding="utf-8") as handle:
@@ -70,12 +67,10 @@ def _load_catalog() -> dict[str, object]:
 
 _CATALOG = _load_catalog()
 
-
 ###############################################################################
 def _fallback_rule() -> dict[str, object]:
     fallback = _CATALOG.get("fallback")
     return fallback if isinstance(fallback, dict) else {}
-
 
 ###############################################################################
 def _find_catalog_rule(
@@ -115,7 +110,6 @@ def _find_catalog_rule(
             return provider_rule, "provider"
     return _fallback_rule(), "fallback"
 
-
 ###############################################################################
 def _coerce_optional_positive_int(value: object) -> int | None:
     if value is None:
@@ -125,7 +119,6 @@ def _coerce_optional_positive_int(value: object) -> int | None:
     except TypeError, ValueError:
         return None
     return parsed if parsed > 0 else None
-
 
 ###############################################################################
 def _coerce_reasoning_levels(value: object) -> tuple[ReasoningLevel, ...]:
@@ -143,7 +136,6 @@ def _coerce_reasoning_levels(value: object) -> tuple[ReasoningLevel, ...]:
             levels.append(level)
     return tuple(levels) or (ReasoningLevel.OFF,)
 
-
 ###############################################################################
 def _coerce_reasoning_parameter(value: object) -> ReasoningParameter:
     allowed: tuple[ReasoningParameter, ...] = (
@@ -155,7 +147,6 @@ def _coerce_reasoning_parameter(value: object) -> ReasoningParameter:
     )
     normalized = str(value or "none")
     return normalized if normalized in allowed else "none"  # type: ignore[return-value]
-
 
 ###############################################################################
 def resolve_model_capabilities(
@@ -225,7 +216,6 @@ def resolve_model_capabilities(
         source="live" if descriptor_has_metadata else source,
     )
 
-
 ###############################################################################
 def _select_supported_reasoning_level(
     requested: ReasoningLevel, supported: tuple[ReasoningLevel, ...]
@@ -241,7 +231,6 @@ def _select_supported_reasoning_level(
     return min(
         supported, key=lambda level: (abs(rank[level] - rank[requested]), rank[level])
     )
-
 
 ###############################################################################
 def resolve_effective_inference_config(

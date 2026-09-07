@@ -45,11 +45,9 @@ from services.runtime.desktop import get_desktop_runtime_service
 from services.runtime.jobs import get_job_manager
 from services.startup_validation import run_startup_validations
 
-
 ###############################################################################
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
-
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
@@ -64,11 +62,9 @@ def _resolve_client_file(full_path: str) -> Path | None:
 
     return None
 
-
 ###############################################################################
 def serve_client_root() -> FileResponse:
     return FileResponse(CLIENT_INDEX_FILE_PATH)
-
 
 ###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
@@ -77,11 +73,9 @@ def serve_client_path(full_path: str) -> FileResponse:
         return FileResponse(client_file)
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
-
 ###############################################################################
 def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_URL)
-
 
 ###############################################################################
 @asynccontextmanager
@@ -99,7 +93,6 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     finally:
         get_job_manager().shutdown(timeout=5.0)
         close_embedding_runtime()
-
 
 ###############################################################################
 def create_app() -> FastAPI:

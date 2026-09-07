@@ -26,7 +26,6 @@ from services.clinical.hepatox_constants import (
     STRUCTURED_DILI_SECTION_LINE_RE,
 )
 
-
 ###############################################################################
 class ReportFinalizer:
     """Builds the final patient report and conclusion from per-drug assessments."""

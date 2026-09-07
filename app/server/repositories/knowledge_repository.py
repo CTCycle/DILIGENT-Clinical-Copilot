@@ -39,9 +39,9 @@ from repositories.schemas.knowledge import (
     LiverToxMonograph,
 )
 
-
 ###############################################################################
 class KnowledgeRepository:
+
     # -------------------------------------------------------------------------
     def __init__(self, context: RepositoryContext) -> None:
         self.context = context

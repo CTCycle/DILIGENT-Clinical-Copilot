@@ -6,7 +6,6 @@ from services.llm import ollama_structured
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.ollama_client import OllamaClient
 
-
 ###############################################################################
 def test_resolve_text_extraction_models_prefers_live_installed_models() -> None:
 
@@ -24,7 +23,6 @@ def test_resolve_text_extraction_models_prefers_live_installed_models() -> None:
 
     assert models == ["qwen3.5:2b", "qwen3.5:9b"]
 
-
 ###############################################################################
 def test_looks_like_schema_echo_detects_schema_payload() -> None:
     schema_like = (
@@ -34,12 +32,12 @@ def test_looks_like_schema_echo_detects_schema_payload() -> None:
 
     assert ollama_structured.looks_like_schema_echo(schema_like) is True
 
-
 ###############################################################################
 def test_parse_with_repairs_uses_compact_repair_messages_for_schema_echo() -> None:
 
     ###############################################################################
     class FakeParser:
+
         # -------------------------------------------------------------------------
         def __init__(self) -> None:
             self.calls = 0
@@ -86,7 +84,6 @@ def test_parse_with_repairs_uses_compact_repair_messages_for_schema_echo() -> No
     assert client.captured_messages is not None
     assert "schema or wrapper instead of the requested data" in client.captured_messages[1]["content"]
 
-
 ###############################################################################
 def test_chat_structured_model_forwards_generation_purpose() -> None:
 
@@ -114,7 +111,6 @@ def test_chat_structured_model_forwards_generation_purpose() -> None:
 
     assert result == '{"ok": true}'
     assert client.captured_purpose is GenerationPurpose.STRUCTURED_EXTRACTION
-
 
 ###############################################################################
 def test_ollama_client_forwards_generation_purpose_to_structured_models(
@@ -149,7 +145,6 @@ def test_ollama_client_forwards_generation_purpose_to_structured_models(
 
     assert result == {"ok": True}
     assert captured["purpose"] is GenerationPurpose.STRUCTURED_EXTRACTION
-
 
 ###############################################################################
 def test_ollama_client_forwards_generation_purpose_to_structured_chat(

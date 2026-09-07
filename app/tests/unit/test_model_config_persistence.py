@@ -29,9 +29,9 @@ from services.llm.runtime_config import LLMRuntimeConfig
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 
-
 ###############################################################################
 class InMemorySerializer:
+
     # -------------------------------------------------------------------------
     def __init__(self, snapshot: ModelConfigSnapshot) -> None:
         self.snapshot = snapshot
@@ -48,11 +48,9 @@ class InMemorySerializer:
         self.snapshot = ModelConfigSnapshot(**data)
         return self.snapshot
 
-
 ###############################################################################
 def test_model_config_serializer_has_no_clean_break_migration() -> None:
     assert not hasattr(ModelConfigSerializer, "migrate_cloud_selection_clean_break")
-
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -76,7 +74,6 @@ def test_model_config_serializer_reads_only_reasoning_level(
     snapshot = ModelConfigSerializer.snapshot_from_payload(payload, updated_at=None)
 
     assert snapshot.reasoning_level.value == expected
-
 
 ###############################################################################
 def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
@@ -107,7 +104,6 @@ def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
 
     assert snapshot.updated_at is not None
     assert snapshot.updated_at.year > 2000
-
 
 ###############################################################################
 def test_model_config_serializer_persists_independent_revision_and_timeline_roles(
@@ -144,7 +140,6 @@ def test_model_config_serializer_persists_independent_revision_and_timeline_role
     assert reloaded.revision_model == "revision-model"
     assert reloaded.timeline_model == "timeline-model"
 
-
 ###############################################################################
 def test_model_config_service_rejects_missing_current_role_assignments() -> None:
     serializer = InMemorySerializer(
@@ -159,7 +154,6 @@ def test_model_config_service_rejects_missing_current_role_assignments() -> None
     )
     with pytest.raises(ServiceValidationError, match="required role assignments"):
         ModelConfigService(serializer=serializer).load_current_snapshot()
-
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -184,7 +178,6 @@ def test_model_config_service_rejects_invalid_persisted_cloud_selection(
     with pytest.raises(ServiceValidationError):
         ModelConfigService(serializer=serializer).load_current_snapshot()
 
-
 ###############################################################################
 def test_model_config_service_allows_persisted_deepseek_model_before_refresh() -> None:
     serializer = InMemorySerializer(
@@ -204,7 +197,6 @@ def test_model_config_service_allows_persisted_deepseek_model_before_refresh() -
 
     assert snapshot.cloud_provider == "deepseek"
     assert snapshot.cloud_model == "deepseek-v4-flash"
-
 
 ###############################################################################
 def test_model_config_state_survives_provider_catalog_drift(monkeypatch) -> None:
@@ -237,7 +229,6 @@ def test_model_config_state_survives_provider_catalog_drift(monkeypatch) -> None
 
     assert response.llm_provider == "deepseek"
     assert response.cloud_model == "gpt-4.1-mini"
-
 
 ###############################################################################
 def test_model_config_state_returns_persisted_rag_settings(monkeypatch) -> None:
@@ -281,7 +272,6 @@ def test_model_config_state_returns_persisted_rag_settings(monkeypatch) -> None:
     assert response.rag_settings.retrieval_selected_count == 4
     assert response.rag_settings.reranker_model == "persisted-reranker"
 
-
 ###############################################################################
 def test_get_state_does_not_write_persisted_configuration(
     monkeypatch, tmp_path
@@ -297,7 +287,9 @@ def test_get_state_does_not_write_persisted_configuration(
         updated_at=datetime.now(UTC),
     )
 
+    ###############################################################################
     class ReadOnlySerializer(InMemorySerializer):
+
         # -------------------------------------------------------------------------
         def save_snapshot(self, **_: Any) -> ModelConfigSnapshot:
             raise AssertionError("GET model configuration must not persist state")
@@ -324,7 +316,6 @@ def test_get_state_does_not_write_persisted_configuration(
     assert response.revision_model == "qwen3.5:2b"
     assert response.timeline_model == "qwen3.5:2b"
 
-
 ###############################################################################
 def test_malformed_cached_catalog_entry_is_skipped() -> None:
     record = ProviderModelCatalogCacheRecord(
@@ -343,7 +334,6 @@ def test_malformed_cached_catalog_entry_is_skipped() -> None:
     models = model_config_module.model_catalog.cloud_models_from_record(record)
 
     assert [model.id for model in models] == ["valid-model"]
-
 
 ###############################################################################
 def test_model_config_catalog_keeps_configured_model_when_refresh_fails(
@@ -364,6 +354,7 @@ def test_model_config_catalog_keeps_configured_model_when_refresh_fails(
 
     ###############################################################################
     class FailingCloudClient:
+
         # -------------------------------------------------------------------------
         def __init__(self, **_: Any) -> None:
             pass
@@ -396,7 +387,6 @@ def test_model_config_catalog_keeps_configured_model_when_refresh_fails(
     assert openai.catalog_status == "unavailable"
     assert [model.id for model in openai.models] == ["gpt-4.1-mini"]
     assert openai.catalog_message == "provider catalog unavailable"
-
 
 ###############################################################################
 def test_model_config_service_rejects_switching_cloud_model_roles_to_local_mode(
@@ -435,7 +425,6 @@ def test_model_config_service_rejects_switching_cloud_model_roles_to_local_mode(
         )
 
     assert serializer.snapshot.use_cloud_models is True
-
 
 ###############################################################################
 def test_model_config_service_allows_installed_dynamic_local_model(
@@ -497,7 +486,6 @@ def test_model_config_service_allows_installed_dynamic_local_model(
     assert serializer.snapshot.revision_model == dynamic_model
     assert serializer.snapshot.timeline_model == dynamic_model
 
-
 ###############################################################################
 def test_model_config_service_rejects_invalid_persisted_local_model() -> None:
     serializer = InMemorySerializer(
@@ -514,7 +502,6 @@ def test_model_config_service_rejects_invalid_persisted_local_model() -> None:
     )
     with pytest.raises(ServiceValidationError):
         ModelConfigService(serializer=serializer).load_current_snapshot()
-
 
 ###############################################################################
 def test_model_config_roundtrip_preserves_cloud_selection() -> None:
@@ -547,7 +534,6 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
     assert snapshot.clinical_model == "gpt-oss:20b"
     assert snapshot.text_extraction_model == "qwen3:1.7b"
 
-
 ###############################################################################
 def test_clinical_service_reads_runtime_from_persisted_config() -> None:
     clinical_service = build_clinical_session_service(get_job_manager())
@@ -557,7 +543,6 @@ def test_clinical_service_reads_runtime_from_persisted_config() -> None:
     )
     assert parser_provider
     assert parser_model
-
 
 ###############################################################################
 def test_model_config_service_accepts_cloud_models_for_role_assignments() -> None:
@@ -589,7 +574,6 @@ def test_model_config_service_accepts_cloud_models_for_role_assignments() -> Non
     assert response.text_extraction_model == "gpt-4.1-mini"
     assert serializer.snapshot.clinical_model == "gpt-4.1-mini"
     assert serializer.snapshot.text_extraction_model == "gpt-4.1-mini"
-
 
 ###############################################################################
 def test_model_config_cloud_save_does_not_refresh_remote_catalogs_or_ollama(
@@ -633,7 +617,6 @@ def test_model_config_cloud_save_does_not_refresh_remote_catalogs_or_ollama(
     assert response.cloud_model == "gpt-4.1-mini"
     assert not hasattr(response, "cloud_providers")
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     "patch",
@@ -671,7 +654,6 @@ def test_local_option_saves_do_not_probe_ollama(
 
     assert response.updated_at is not None
 
-
 ###############################################################################
 def test_local_model_save_reuses_cached_availability(monkeypatch) -> None:
     serializer = InMemorySerializer(
@@ -707,7 +689,6 @@ def test_local_model_save_reuses_cached_availability(monkeypatch) -> None:
     assert response.use_cloud_services is False
     assert serializer.snapshot.clinical_model == "qwen3.5:2b"
 
-
 ###############################################################################
 def test_cold_local_catalog_loads_ollama_once(monkeypatch) -> None:
     serializer = InMemorySerializer(
@@ -727,6 +708,7 @@ def test_cold_local_catalog_loads_ollama_once(monkeypatch) -> None:
 
     ###############################################################################
     class FakeOllamaClient:
+
         # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
@@ -754,7 +736,6 @@ def test_cold_local_catalog_loads_ollama_once(monkeypatch) -> None:
     assert second.outcome == "cached"
     assert calls == 1
 
-
 ###############################################################################
 def test_model_config_service_rejects_stale_local_roles_in_cloud_mode() -> None:
     serializer = InMemorySerializer(
@@ -781,7 +762,6 @@ def test_model_config_service_rejects_stale_local_roles_in_cloud_mode() -> None:
 
     with pytest.raises(ServiceValidationError, match="Select a model explicitly"):
         asyncio.run(service.update_state(payload))
-
 
 ###############################################################################
 def test_model_config_service_rejects_uninstalled_local_models(monkeypatch) -> None:
@@ -817,7 +797,6 @@ def test_model_config_service_rejects_uninstalled_local_models(monkeypatch) -> N
     with pytest.raises(ServiceValidationError, match="Install local Ollama model"):
         asyncio.run(service.update_state(payload))
 
-
 ###############################################################################
 def test_model_config_service_prioritizes_recommended_installed_local_models(
     monkeypatch,
@@ -851,7 +830,6 @@ def test_model_config_service_prioritizes_recommended_installed_local_models(
     assert response.local_models[0].recommended_for_local_extraction is True
     assert response.local_models[1].name == "qwen3.5:9b"
 
-
 ###############################################################################
 def test_failed_ollama_catalog_load_is_persisted_without_retry(monkeypatch) -> None:
     serializer = InMemorySerializer(
@@ -870,6 +848,7 @@ def test_failed_ollama_catalog_load_is_persisted_without_retry(monkeypatch) -> N
 
     ###############################################################################
     class FailingOllamaClient:
+
         # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
@@ -896,7 +875,6 @@ def test_failed_ollama_catalog_load_is_persisted_without_retry(monkeypatch) -> N
     assert first.outcome == "failed"
     assert second.outcome == "cached"
 
-
 ###############################################################################
 def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> None:
     serializer = InMemorySerializer(
@@ -915,6 +893,7 @@ def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> No
 
     ###############################################################################
     class FakeCloudLLMClient:
+
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             calls.append({"init": kwargs})
@@ -947,7 +926,6 @@ def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> No
     assert calls[0]["init"]["provider"] == "openai"
     assert calls[1]["chat"]["model"] == "gpt-4.1-mini"
 
-
 ###############################################################################
 def test_connectivity_check_reports_llm_error(monkeypatch) -> None:
     serializer = InMemorySerializer(
@@ -965,6 +943,7 @@ def test_connectivity_check_reports_llm_error(monkeypatch) -> None:
 
     ###############################################################################
     class FailingCloudLLMClient:
+
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs: Any) -> None:
             raise LLMError("No active OpenAI access key configured")
@@ -982,7 +961,6 @@ def test_connectivity_check_reports_llm_error(monkeypatch) -> None:
     assert response.model == "gpt-4.1"
     assert response.error == "No active OpenAI access key configured"
 
-
 ###############################################################################
 def test_provider_catalog_uses_last_successful_models_when_refresh_fails(
     monkeypatch,
@@ -991,6 +969,7 @@ def test_provider_catalog_uses_last_successful_models_when_refresh_fails(
 
     ###############################################################################
     class FakeCloudLLMClient:
+
         # -------------------------------------------------------------------------
         def __init__(self, *, provider: str, **kwargs: Any) -> None:
             _ = kwargs
@@ -1035,7 +1014,6 @@ def test_provider_catalog_uses_last_successful_models_when_refresh_fails(
     assert [item.id for item in deepseek.models] == ["deepseek-model"]
     assert "Latest refresh failed" in (deepseek.catalog_message or "")
 
-
 ###############################################################################
 def test_empty_ollama_catalog_is_saved_as_a_valid_empty_result(
     monkeypatch, tmp_path
@@ -1056,6 +1034,7 @@ def test_empty_ollama_catalog_is_saved_as_a_valid_empty_result(
 
     ###############################################################################
     class EmptyOllamaClient:
+
         # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
@@ -1085,7 +1064,6 @@ def test_empty_ollama_catalog_is_saved_as_a_valid_empty_result(
         model.name for model in cached.state.local_models if model.available_in_ollama
     }
 
-
 ###############################################################################
 def _catalog_test_service(
     tmp_path, snapshot: ModelConfigSnapshot
@@ -1096,7 +1074,6 @@ def _catalog_test_service(
         serializer=InMemorySerializer(snapshot),
         catalog_cache=ProviderModelCatalogCacheSerializer(engine=engine),
     )
-
 
 ###############################################################################
 def test_catalog_provider_switching_keeps_provider_specific_lists(
@@ -1118,6 +1095,7 @@ def test_catalog_provider_switching_keeps_provider_specific_lists(
 
     ###############################################################################
     class FakeCloudClient:
+
         # -------------------------------------------------------------------------
         def __init__(self, *, provider: str, **_: Any) -> None:
             self.provider = provider
@@ -1154,7 +1132,6 @@ def test_catalog_provider_switching_keeps_provider_specific_lists(
     assert [item.id for item in openai.models] == ["openai-model"]
     assert [item.id for item in deepseek.models] == ["deepseek-model"]
 
-
 ###############################################################################
 def test_concurrent_catalog_loads_share_one_provider_fetch(
     monkeypatch, tmp_path
@@ -1176,6 +1153,7 @@ def test_concurrent_catalog_loads_share_one_provider_fetch(
 
     ###############################################################################
     class FakeCloudClient:
+
         # -------------------------------------------------------------------------
         def __init__(self, **_: Any) -> None:
             pass
@@ -1214,7 +1192,6 @@ def test_concurrent_catalog_loads_share_one_provider_fetch(
     assert second.outcome == "refreshed"
     assert calls == 1
 
-
 ###############################################################################
 def test_catalog_fingerprint_change_invalidates_saved_models(
     tmp_path, monkeypatch
@@ -1249,7 +1226,6 @@ def test_catalog_fingerprint_change_invalidates_saved_models(
     assert openai.catalog_status == "not_loaded"
     assert openai.models == []
 
-
 ###############################################################################
 def test_cloud_runtime_uses_each_configured_role_model() -> None:
     with LLMRuntimeConfig.override_for_run(
@@ -1271,7 +1247,6 @@ def test_cloud_runtime_uses_each_configured_role_model() -> None:
             "openai",
             "qwen3:8b",
         )
-
 
 ###############################################################################
 def test_local_runtime_accepts_cached_dynamic_ollama_model(monkeypatch) -> None:
@@ -1310,7 +1285,6 @@ def test_local_runtime_accepts_cached_dynamic_ollama_model(monkeypatch) -> None:
         dynamic_model,
     )
 
-
 ###############################################################################
 def test_cloud_runtime_preserves_valid_cloud_role_override() -> None:
     with LLMRuntimeConfig.override_for_run(
@@ -1332,7 +1306,6 @@ def test_cloud_runtime_preserves_valid_cloud_role_override() -> None:
             "openai",
             "gpt-4.1-mini",
         )
-
 
 ###############################################################################
 def test_cloud_runtime_accepts_persisted_cloud_role_models(monkeypatch) -> None:

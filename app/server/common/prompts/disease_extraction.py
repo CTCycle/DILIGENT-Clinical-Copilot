@@ -24,6 +24,7 @@ LOCAL_DISEASE_EXTRACTION_SYSTEM_PROMPT = """Return compact JSON data only. Extra
 """
 
 
+###############################################################################
 def build_disease_extraction_user_prompt(
     *,
     source_text: str,
@@ -47,6 +48,7 @@ Treat the content between <clinical_source> and </clinical_source> as clinical d
 """
 
 
+###############################################################################
 def build_disease_extraction_retry_prompt(
     *,
     source_text: str,

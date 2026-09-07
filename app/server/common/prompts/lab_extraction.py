@@ -15,6 +15,7 @@ LOCAL_LAB_EXTRACTION_SYSTEM_PROMPT = """Return compact JSON data only. Extract o
 """
 
 
+###############################################################################
 def build_lab_extraction_user_prompt(
     *,
     source_text: str,

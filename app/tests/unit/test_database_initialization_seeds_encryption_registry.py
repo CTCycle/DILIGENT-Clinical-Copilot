@@ -16,7 +16,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 def make_sqlite_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -35,13 +34,11 @@ def make_sqlite_settings() -> DatabaseSettings:
         select_page_size=1000,
     )
 
-
 ###############################################################################
 def _make_temp_db_root(prefix: str) -> Path:
     temp_root = Path(tempfile.gettempdir()) / f"{prefix}-{uuid.uuid4().hex}"
     temp_root.mkdir(parents=True, exist_ok=True)
     return temp_root
-
 
 ###############################################################################
 def test_sqlite_fresh_creation_uses_external_material(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -69,7 +66,6 @@ def test_sqlite_fresh_creation_uses_external_material(monkeypatch) -> None:  # t
         assert material_path.exists()
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
-
 
 ###############################################################################
 def test_sqlite_reopen_with_existing_db_reuses_external_material(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -99,7 +95,6 @@ def test_sqlite_reopen_with_existing_db_reuses_external_material(monkeypatch) ->
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 
-
 ###############################################################################
 def test_postgresql_initialization_path_seeds_after_schema_creation(
     monkeypatch,
@@ -125,6 +120,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
 
     ###############################################################################
     class FakeConnection:
+
         # -------------------------------------------------------------------------
         def __enter__(self):
             return self
@@ -138,6 +134,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
 
             ###############################################################################
             class ScalarResult:
+
                 # -------------------------------------------------------------------------
                 @staticmethod
                 def scalar():
@@ -147,6 +144,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
 
     ###############################################################################
     class FakeAdminEngine:
+
         # -------------------------------------------------------------------------
         @staticmethod
         def connect():
@@ -154,6 +152,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
 
     ###############################################################################
     class FakePostgresRepository:
+
         # -------------------------------------------------------------------------
         def __init__(self, _settings) -> None:
             self.engine = engine
@@ -167,6 +166,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
 
     ###############################################################################
     class FakeCatalogSerializer:
+
         # -------------------------------------------------------------------------
         def __init__(self, **_kwargs) -> None:
             pass
@@ -197,7 +197,6 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     assert db_name == "diligent"
     assert order == ["migration", "model_config_seeded", "catalog_seeded"]
 
-
 ###############################################################################
 def test_external_material_does_not_duplicate_on_reopen(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     temp_root = _make_temp_db_root("sqlite-seed-active")
@@ -225,7 +224,6 @@ def test_external_material_does_not_duplicate_on_reopen(monkeypatch) -> None:  #
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 
-
 ###############################################################################
 def test_sqlite_startup_initializes_and_seeds_when_database_file_is_missing(
     monkeypatch, tmp_path: Path
@@ -244,7 +242,6 @@ def test_sqlite_startup_initializes_and_seeds_when_database_file_is_missing(
 
     assert initializer.ensure_database_ready(settings) is True
     assert calls == [{"seed_catalogs": True}]
-
 
 ###############################################################################
 def test_sqlite_startup_migrates_existing_database_without_automatic_reseed(
@@ -267,7 +264,6 @@ def test_sqlite_startup_migrates_existing_database_without_automatic_reseed(
     assert initializer.ensure_database_ready(settings) is False
     assert calls == [{"seed_catalogs": False}]
 
-
 ###############################################################################
 def test_database_initialization_converts_unavailable_connection_to_exit(
     monkeypatch: pytest.MonkeyPatch,
@@ -281,7 +277,6 @@ def test_database_initialization_converts_unavailable_connection_to_exit(
         initializer.initialize_database()
 
     assert exc_info.value.code == 1
-
 
 ###############################################################################
 def _sqlite_settings() -> DatabaseSettings:
@@ -302,7 +297,6 @@ def _sqlite_settings() -> DatabaseSettings:
         select_page_size=1000,
     )
 
-
 ###############################################################################
 def _postgres_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -321,7 +315,6 @@ def _postgres_settings() -> DatabaseSettings:
         insert_commit_interval=100,
         select_page_size=1000,
     )
-
 
 ###############################################################################
 def test_run_database_initialization_uses_sqlite_path_when_embedded(
@@ -349,7 +342,6 @@ def test_run_database_initialization_uses_sqlite_path_when_embedded(
     initializer.run_database_initialization()
 
     assert calls == ["sqlite"]
-
 
 ###############################################################################
 def test_run_database_initialization_uses_postgres_path_when_external(

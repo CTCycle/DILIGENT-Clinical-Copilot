@@ -8,6 +8,7 @@ from common.prompts.clinical_assessment import (
 )
 
 
+###############################################################################
 def build_livertox_drug_assessment_user_prompt(
     *,
     revision: bool,
@@ -57,6 +58,7 @@ def build_livertox_drug_assessment_user_prompt(
     )
 
 
+###############################################################################
 def build_livertox_conclusion_user_prompt(
     *,
     revision: bool,

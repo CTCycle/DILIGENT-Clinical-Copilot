@@ -3,9 +3,9 @@ from __future__ import annotations
 import pytest
 from services.updater.embeddings import RagEmbeddingUpdater
 
-
 ###############################################################################
 class _FakeVectorDatabase:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.clear_calls = 0
@@ -24,14 +24,12 @@ class _FakeVectorDatabase:
     def get_table(self) -> None:
         self.get_table_calls += 1
 
-
 ###############################################################################
 def _build_updater() -> tuple[RagEmbeddingUpdater, _FakeVectorDatabase]:
     updater = object.__new__(RagEmbeddingUpdater)
     fake_db = _FakeVectorDatabase()
     updater.vector_database = fake_db
     return updater, fake_db
-
 
 ###############################################################################
 def test_prepare_vector_database_skips_clear_when_preflight_fails() -> None:
@@ -48,7 +46,6 @@ def test_prepare_vector_database_skips_clear_when_preflight_fails() -> None:
     assert fake_db.clear_calls == 0
     assert fake_db.initialize_calls == 0
     assert fake_db.get_table_calls == 0
-
 
 ###############################################################################
 def test_prepare_vector_database_preserves_existing_collection_after_preflight_success() -> (

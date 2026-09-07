@@ -8,7 +8,6 @@ import re
 import pytest
 from playwright.sync_api import Page, Route, expect
 
-
 ###############################################################################
 def _fill_required_dili_fields(page: Page) -> None:
     page.get_by_label("Clinical Input").fill(
@@ -21,7 +20,6 @@ def _fill_required_dili_fields(page: Page) -> None:
     )
     page.get_by_label("Patient Name").fill("Marco Rossi")
     page.get_by_label("Visit Date").fill("2026-04-20")
-
 
 ###############################################################################
 def _build_clinical_job_payload() -> dict:
@@ -42,7 +40,6 @@ def _build_clinical_job_payload() -> dict:
         "use_rag": False,
     }
 
-
 ###############################################################################
 def _build_variant_heading_payload() -> dict:
     return {
@@ -62,7 +59,6 @@ def _build_variant_heading_payload() -> dict:
         "use_rag": False,
     }
 
-
 ###############################################################################
 def _mock_ready_preflight(page: Page) -> None:
     page.route(
@@ -80,7 +76,6 @@ def _mock_ready_preflight(page: Page) -> None:
         ),
     )
 
-
 ###############################################################################
 def test_dilu_agent_page_loads(page: Page, base_url: str):
     page.goto(base_url)
@@ -89,7 +84,6 @@ def test_dilu_agent_page_loads(page: Page, base_url: str):
     expect(page.get_by_label("Clinical Input")).to_be_visible()
     expect(page.get_by_label("Patient Name")).to_be_visible()
     expect(page.get_by_role("button", name="Run DILI analysis")).to_be_visible()
-
 
 ###############################################################################
 def test_home_initial_load_has_no_console_errors_or_failed_requests(
@@ -117,7 +111,6 @@ def test_home_initial_load_has_no_console_errors_or_failed_requests(
     assert console_errors == []
     assert failed_requests == []
 
-
 ###############################################################################
 def test_model_config_initial_load_has_no_console_errors_or_failed_requests(
     page: Page, base_url: str
@@ -143,7 +136,6 @@ def test_model_config_initial_load_has_no_console_errors_or_failed_requests(
 
     assert console_errors == []
     assert failed_requests == []
-
 
 ###############################################################################
 def test_data_inspection_initial_load_has_no_console_errors_or_failed_requests(
@@ -171,7 +163,6 @@ def test_data_inspection_initial_load_has_no_console_errors_or_failed_requests(
     assert console_errors == []
     assert failed_requests == []
 
-
 ###############################################################################
 def test_clinical_sessions_initial_load_has_no_console_errors_or_failed_requests(
     page: Page, base_url: str
@@ -197,7 +188,6 @@ def test_clinical_sessions_initial_load_has_no_console_errors_or_failed_requests
 
     assert console_errors == []
     assert failed_requests == []
-
 
 ###############################################################################
 def test_timetable_initial_load_has_no_console_errors_or_failed_requests(
@@ -271,7 +261,6 @@ def test_timetable_initial_load_has_no_console_errors_or_failed_requests(
     assert console_errors == []
     assert failed_requests == []
 
-
 ###############################################################################
 def test_keyboard_navigation_reaches_primary_tabs(page: Page, base_url: str):
     page.goto(base_url)
@@ -296,7 +285,6 @@ def test_keyboard_navigation_reaches_primary_tabs(page: Page, base_url: str):
         "Keyboard tab traversal did not reach a primary navigation tab."
     )
 
-
 ###############################################################################
 def test_home_form_labels_are_associated_with_inputs(page: Page, base_url: str):
     page.goto(base_url)
@@ -315,7 +303,6 @@ def test_home_form_labels_are_associated_with_inputs(page: Page, base_url: str):
 
     visit_date.click()
     expect(visit_date).to_be_focused()
-
 
 ###############################################################################
 def test_keyboard_tab_traversal_reaches_home_form_controls(page: Page, base_url: str):
@@ -337,7 +324,6 @@ def test_keyboard_tab_traversal_reaches_home_form_controls(page: Page, base_url:
     page.keyboard.press("Shift+Tab")
     expect(patient_name).to_be_focused()
 
-
 ###############################################################################
 def test_model_config_navigation(page: Page, base_url: str):
     page.goto(base_url)
@@ -349,7 +335,6 @@ def test_model_config_navigation(page: Page, base_url: str):
     expect(page).to_have_url(re.compile(r"/model-config/?$"))
     expect(page.get_by_role("heading", name="Runtime Source")).to_be_visible()
 
-
 ###############################################################################
 def test_data_inspection_navigation(page: Page, base_url: str):
     page.goto(base_url)
@@ -358,7 +343,6 @@ def test_data_inspection_navigation(page: Page, base_url: str):
     expect(data_button).to_be_visible()
     data_button.click()
     expect(page).to_have_url(re.compile(r"/data/?$"))
-
 
 ###############################################################################
 def test_dili_form_state_resets_after_refresh(page: Page, base_url: str):
@@ -374,7 +358,6 @@ def test_dili_form_state_resets_after_refresh(page: Page, base_url: str):
     expect(page.get_by_label("Patient Name")).to_have_value("")
     expect(page.get_by_label("Visit Date")).to_have_value("")
     expect(page.get_by_label("Clinical Input")).to_have_value("")
-
 
 ###############################################################################
 def test_dili_run_burst_click_submits_single_job(
@@ -431,7 +414,6 @@ def test_dili_run_burst_click_submits_single_job(
     page.unroute("**/api/clinical/jobs", count_submissions)
 
     assert submission_count == 1
-
 
 ###############################################################################
 def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
@@ -503,7 +485,6 @@ def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
         page.unroute("**/api/clinical/validate-input")
         page.unroute("**/api/clinical/jobs", start_navigation_resume_job)
 
-
 ###############################################################################
 def test_dili_running_job_state_is_not_restored_after_refresh(
     page: Page, base_url: str
@@ -569,7 +550,6 @@ def test_dili_running_job_state_is_not_restored_after_refresh(
         page.unroute("**/api/clinical/validate-input")
         page.unroute("**/api/clinical/jobs", start_refresh_resume_job)
 
-
 ###############################################################################
 def test_dili_submit_accepts_variant_section_headings(
     page: Page, base_url: str
@@ -621,7 +601,6 @@ def test_dili_submit_accepts_variant_section_headings(
 
     assert submission_count == 1
 
-
 ###############################################################################
 def test_dili_run_conflict_surfaces_clear_error_message(page: Page, base_url: str):
     def mock_conflict(route: Route) -> None:
@@ -646,7 +625,6 @@ def test_dili_run_conflict_surfaces_clear_error_message(page: Page, base_url: st
     finally:
         page.unroute("**/api/clinical/validate-input")
         page.unroute("**/api/clinical/jobs", mock_conflict)
-
 
 ###############################################################################
 def test_timetable_route_load_does_not_autogenerate_timeline(
@@ -686,12 +664,10 @@ def test_timetable_route_load_does_not_autogenerate_timeline(
 
     assert timeline_post_count == 0
 
-
 ###############################################################################
 def test_timetable_invalid_session_id_shows_validation_error(page: Page, base_url: str):
     page.goto(f"{base_url}/sessions/0/timetable")
     expect(page.locator(".error-note")).to_contain_text("Invalid session id.")
-
 
 ###############################################################################
 def test_timetable_deterministic_chronology_inspector_and_cluster_layout(
@@ -821,7 +797,6 @@ def test_timetable_deterministic_chronology_inspector_and_cluster_layout(
     page.keyboard.press("Escape")
     expect(inspector).to_contain_text("Select an event")
 
-
 ###############################################################################
 def test_home_form_state_persists_across_back_forward_navigation(
     page: Page, base_url: str
@@ -846,7 +821,6 @@ def test_home_form_state_persists_across_back_forward_navigation(
 
     page.go_forward()
     expect(page).to_have_url(re.compile(r"/model-config/?$"))
-
 
 ###############################################################################
 def test_clinical_sessions_row_selection_loads_matching_detail(

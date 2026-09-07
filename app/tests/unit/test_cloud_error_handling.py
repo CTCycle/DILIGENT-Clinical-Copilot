@@ -5,7 +5,6 @@ from openai import APIStatusError
 
 from services.llm.cloud import CloudLLMClient, LLMError, LLMTimeout
 
-
 ###############################################################################
 def _http_error(status_code: int) -> httpx.HTTPStatusError:
     request = httpx.Request("GET", "https://opencode.ai/zen/go/v1/models")
@@ -13,7 +12,6 @@ def _http_error(status_code: int) -> httpx.HTTPStatusError:
     return httpx.HTTPStatusError(
         "provider response", request=request, response=response
     )
-
 
 ###############################################################################
 def test_provider_error_mapping_distinguishes_connection_failure() -> None:
@@ -27,7 +25,6 @@ def test_provider_error_mapping_distinguishes_connection_failure() -> None:
     assert mapped.retryable is True
     assert str(mapped) == "Cloud provider connection failed"
 
-
 ###############################################################################
 def test_provider_error_mapping_distinguishes_timeout() -> None:
     mapped = CloudLLMClient._map_provider_exception(httpx.ReadTimeout("read timed out"))
@@ -35,7 +32,6 @@ def test_provider_error_mapping_distinguishes_timeout() -> None:
     assert isinstance(mapped, LLMTimeout)
     assert mapped.error_code == "timeout"
     assert mapped.retryable is True
-
 
 ###############################################################################
 def test_provider_error_mapping_classifies_http_statuses() -> None:
@@ -52,7 +48,6 @@ def test_provider_error_mapping_classifies_http_statuses() -> None:
     assert upstream.retryable is True
     assert missing_endpoint.error_code == "configuration"
     assert missing_endpoint.retryable is False
-
 
 ###############################################################################
 def test_provider_error_mapping_classifies_openai_sdk_status_errors() -> None:

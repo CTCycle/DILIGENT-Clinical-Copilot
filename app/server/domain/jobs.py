@@ -4,7 +4,6 @@ from typing import Any
 
 from pydantic import BaseModel
 
-
 ###############################################################################
 class JobStartResponse(BaseModel):
     job_id: str
@@ -12,7 +11,6 @@ class JobStartResponse(BaseModel):
     status: str
     message: str
     poll_interval: float
-
 
 ###############################################################################
 class JobStatusResponse(BaseModel):
@@ -27,11 +25,9 @@ class JobStatusResponse(BaseModel):
     version: int | None = None
     stop_requested: bool = False
 
-
 ###############################################################################
 class JobListResponse(BaseModel):
     jobs: list[JobStatusResponse]
-
 
 ###############################################################################
 class JobCancelResponse(BaseModel):

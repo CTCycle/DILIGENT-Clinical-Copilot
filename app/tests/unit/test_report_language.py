@@ -14,7 +14,6 @@ from services.clinical.report_language import (
     rucam_summary_text,
 )
 
-
 ###############################################################################
 def test_required_phrase_keys_exist_for_supported_languages() -> None:
     keys = {
@@ -39,7 +38,6 @@ def test_required_phrase_keys_exist_for_supported_languages() -> None:
             else:
                 assert phrase(key, lang)
 
-
 ###############################################################################
 def test_rucam_summary_text_returns_localized_or_safe_text() -> None:
     assessment = DrugRucamAssessment(
@@ -53,11 +51,9 @@ def test_rucam_summary_text_returns_localized_or_safe_text() -> None:
         text = rucam_summary_text(assessment, lang)
         assert "6" in text
 
-
 ###############################################################################
 def test_unsupported_language_code_resolves_to_english() -> None:
     assert resolve_report_language("xx") == "en"
-
 
 ###############################################################################
 def test_portuguese_is_renderable_but_not_deterministically_detectable() -> None:
@@ -65,12 +61,10 @@ def test_portuguese_is_renderable_but_not_deterministically_detectable() -> None
     assert "pt" in SUPPORTED_REPORT_LANGUAGES
     assert "pt" not in DETECTABLE_REPORT_LANGUAGES
 
-
 ###############################################################################
 def test_missing_phrase_key_raises_deterministic_error() -> None:
     with pytest.raises(KeyError):
         phrase("missing_key", "en")
-
 
 ###############################################################################
 def test_material_report_language_detection_executes_for_non_english() -> None:

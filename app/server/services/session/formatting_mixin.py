@@ -19,7 +19,6 @@ from domain.clinical.entities import (
 )
 from services.text.normalization import normalize_drug_query_name
 
-
 ###############################################################################
 class ClinicalSessionFormattingMixin:
     NOT_AVAILABLE_TOKEN = "n/a"

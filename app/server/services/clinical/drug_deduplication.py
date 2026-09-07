@@ -6,7 +6,6 @@ from typing import Any
 from domain.clinical.entities import DrugEntry, PatientDrugs
 from services.text.normalization import normalize_drug_query_name
 
-
 ###############################################################################
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -17,7 +16,6 @@ def _parse_date(value: str | None) -> date | None:
         except ValueError:
             continue
     return None
-
 
 ###############################################################################
 def _entry_score(entry: DrugEntry, visit_date: date | None) -> int:
@@ -39,7 +37,6 @@ def _entry_score(entry: DrugEntry, visit_date: date | None) -> int:
         score -= 8
     return score
 
-
 ###############################################################################
 def _merge_evidence(entries: list[DrugEntry]) -> str | None:
     snippets = list(
@@ -52,7 +49,6 @@ def _merge_evidence(entries: list[DrugEntry]) -> str | None:
     if not snippets:
         return None
     return " | ".join(snippets)[:500]
-
 
 ###############################################################################
 def deduplicate_detected_drugs(
@@ -80,7 +76,6 @@ def deduplicate_detected_drugs(
             primary.model_copy(update={"evidence": merged_evidence or primary.evidence})
         )
     return PatientDrugs(entries=selected)
-
 
 ###############################################################################
 def build_deduplication_audit(

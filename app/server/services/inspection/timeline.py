@@ -19,7 +19,6 @@ from services.inspection.normalization import (
 )
 from services.inspection.runtime import coerce_optional_str
 
-
 ###############################################################################
 def _report_progress(
     callback: Callable[[float, str], None] | None,
@@ -43,7 +42,6 @@ _TIMELINE_ERROR_CODES: frozenset[PatientTimelineGenerationErrorCode] = frozenset
         "unknown",
     }
 )
-
 
 ###############################################################################
 def _timeline_error_code(exc: BaseException) -> PatientTimelineGenerationErrorCode:
@@ -96,7 +94,6 @@ def _timeline_error_code(exc: BaseException) -> PatientTimelineGenerationErrorCo
         current = current.__cause__ or current.__context__
     return "provider_error" if provider_error_seen else "unknown"
 
-
 ###############################################################################
 def _timeline_fallback_note(
     *,
@@ -140,7 +137,6 @@ def _timeline_fallback_note(
         "Check the configured local model runtime and backend logs for details.",
     )
     return f"Local timeline extraction did not complete. {message} Retry when ready."
-
 
 ###############################################################################
 class InspectionTimelineMixin:

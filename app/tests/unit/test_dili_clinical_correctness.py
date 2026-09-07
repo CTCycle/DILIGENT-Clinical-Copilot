@@ -16,7 +16,6 @@ from services.clinical.dili_causality import DiliCausalityEngine
 from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.inspection.revision_clinical_safety import audit_revised_dili_report
 
-
 ###############################################################################
 def test_non_source_rucam_score_is_not_promoted_into_dili_bundle() -> None:
     assessment = DiliCausalityEngine.rucam(
@@ -43,7 +42,6 @@ def test_non_source_rucam_score_is_not_promoted_into_dili_bundle() -> None:
     assert assessment.components[0].status == "not_assessable"
     assert any("provenance" in item for item in assessment.limitations)
 
-
 ###############################################################################
 def test_case_qualification_requires_repeat_confirmation_for_enzyme_threshold() -> None:
     labs = PatientLabTimeline(
@@ -61,7 +59,6 @@ def test_case_qualification_requires_repeat_confirmation_for_enzyme_threshold() 
     assert result.status == "insufficient_data"
     assert result.pending_confirmation
     assert not result.qualifying_criteria
-
 
 ###############################################################################
 def test_case_qualification_accepts_repeated_aminotransferase_threshold() -> None:
@@ -86,7 +83,6 @@ def test_case_qualification_accepts_repeated_aminotransferase_threshold() -> Non
     result = DiliCaseQualificationEngine().assess(labs=labs, drugs=[])
     assert result.status == "meets_typical_detection_criteria"
     assert any("ALT/AST" in criterion for criterion in result.qualifying_criteria)
-
 
 ###############################################################################
 def test_case_qualification_uses_abnormal_pretreatment_value_as_reference() -> None:
@@ -120,7 +116,6 @@ def test_case_qualification_uses_abnormal_pretreatment_value_as_reference() -> N
     assert result.baseline_abnormal is True
     assert result.baseline_date == "2026-01-01"
     assert result.status == "below_typical_detection_criteria"
-
 
 ###############################################################################
 def test_dechallenge_is_calculated_for_each_drug_stop_date() -> None:
@@ -164,7 +159,6 @@ def test_dechallenge_is_calculated_for_each_drug_stop_date() -> None:
     )
     assert early == "improving_after_stop"
     assert late == "improving_after_stop"
-
 
 ###############################################################################
 def test_weak_livertox_prior_does_not_cap_patient_specific_support() -> None:
@@ -212,7 +206,6 @@ def test_weak_livertox_prior_does_not_cap_patient_specific_support() -> None:
     assert exposure.causality.known_hepatotoxic_potential == "E"
     assert exposure.causality.drug_signature_concordance == "reference_evidence_sparse"
 
-
 ###############################################################################
 def test_injury_before_exposure_argues_against_causality() -> None:
     engine = DiliCausalityEngine()
@@ -231,7 +224,6 @@ def test_injury_before_exposure_argues_against_causality() -> None:
     assert exposure.causality is not None
     assert exposure.causality.temporal_compatibility == "incompatible_pre_exposure"
     assert exposure.causality.category == "argues_against"
-
 
 ###############################################################################
 def test_long_latency_requires_review_instead_of_automatic_exclusion() -> None:
@@ -254,7 +246,6 @@ def test_long_latency_requires_review_instead_of_automatic_exclusion() -> None:
         == "long_latency_requires_drug_specific_review"
     )
     assert exposure.causality.category == "limited"
-
 
 ###############################################################################
 def test_revision_safety_reuses_structured_dili_evidence_gate() -> None:

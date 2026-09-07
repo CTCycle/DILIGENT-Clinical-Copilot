@@ -30,7 +30,6 @@ from services.llm.generation_policy import GenerationPurpose
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
 
-
 ###############################################################################
 def build_file_serializer(tmp_path: Path) -> Any:
     engine = create_engine(
@@ -38,7 +37,6 @@ def build_file_serializer(tmp_path: Path) -> Any:
     )
     Base.metadata.create_all(engine)
     return build_repository_graph(engine=engine)
-
 
 ###############################################################################
 def save_revision_source_session(serializer: Any) -> int:
@@ -64,7 +62,6 @@ def save_revision_source_session(serializer: Any) -> int:
     assert session_id is not None
     return int(session_id)
 
-
 ###############################################################################
 def build_service(serializer: Any, jobs: JobManager) -> DataInspectionService:
     graph = build_repository_graph(
@@ -80,7 +77,6 @@ def build_service(serializer: Any, jobs: JobManager) -> DataInspectionService:
         jobs=jobs,
     )
 
-
 ###############################################################################
 def build_runner(serializer: Any, **kwargs: Any) -> RevisionAgentRunner:
     graph = build_repository_graph(
@@ -93,7 +89,6 @@ def build_runner(serializer: Any, **kwargs: Any) -> RevisionAgentRunner:
         knowledge_repository=graph.knowledge_repository,
         **kwargs,
     )
-
 
 ###############################################################################
 def fake_issue_scan_call(**kwargs: Any) -> dict[str, Any]:
@@ -142,7 +137,6 @@ def fake_issue_scan_call(**kwargs: Any) -> dict[str, Any]:
         return {"summary": "No issues detected."}
     raise AssertionError(f"Unexpected schema: {schema_name}")
 
-
 ###############################################################################
 def fake_mismatched_patch_call(**kwargs: Any) -> dict[str, Any]:
     if kwargs["schema"].__name__ != "RevisionDraftResult":
@@ -166,7 +160,6 @@ def fake_mismatched_patch_call(**kwargs: Any) -> dict[str, Any]:
         "human_review_requirements": ["Clinical review required."],
         "entity_change_proposals": [],
     }
-
 
 ###############################################################################
 def fake_unsafe_revision_call(**kwargs: Any) -> dict[str, Any]:
@@ -192,7 +185,6 @@ def fake_unsafe_revision_call(**kwargs: Any) -> dict[str, Any]:
         "entity_change_proposals": [],
     }
 
-
 ###############################################################################
 def test_revision_issue_scan_schema_rejects_unknown_category() -> None:
     with pytest.raises(ValidationError):
@@ -212,7 +204,6 @@ def test_revision_issue_scan_schema_rejects_unknown_category() -> None:
             }
         )
 
-
 ###############################################################################
 def test_revision_agent_tool_call_accepts_provider_rationale_within_budget() -> None:
     decision = RevisionAgentToolCall.model_validate(
@@ -226,14 +217,12 @@ def test_revision_agent_tool_call_accepts_provider_rationale_within_budget() -> 
 
     assert len(decision.rationale) > 1000
 
-
 ###############################################################################
 def test_revision_request_rejects_active_model_overrides() -> None:
     with pytest.raises(ValidationError):
         SessionRevisionRequest.model_validate(
             {"model_overrides": {"clinical_model": "x"}}
         )
-
 
 ###############################################################################
 def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
@@ -260,7 +249,6 @@ def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
     assert "may steer review focus but is not clinical evidence" in prompt
     assert "No tools are available" in prompt
 
-
 ###############################################################################
 def test_revision_editor_prompt_requires_exact_source_patches() -> None:
     prompt = editor_prompt(
@@ -271,7 +259,6 @@ def test_revision_editor_prompt_requires_exact_source_patches() -> None:
     assert "zero-based Python slice offsets" in prompt
     assert "expected_text` must equal the exact source substring character-for-character" in prompt
     assert "return an empty `patches` list" in prompt
-
 
 ###############################################################################
 def test_revision_context_preserves_long_canonical_report() -> None:
@@ -293,7 +280,6 @@ def test_revision_context_preserves_long_canonical_report() -> None:
     assert canonical["text"] == report
     assert canonical["truncated"] is False
     assert canonical["sha256"]
-
 
 ###############################################################################
 def test_revision_agent_assigns_stage_specific_generation_purposes(
@@ -325,7 +311,6 @@ def test_revision_agent_assigns_stage_specific_generation_purposes(
         GenerationPurpose.REVISION_QA,
         GenerationPurpose.REVISION_SCAN,
     ]
-
 
 ###############################################################################
 def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> None:
@@ -380,7 +365,6 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
         "revision_agent_qa",
     }
 
-
 ###############################################################################
 def test_revision_persists_deterministic_patch_when_model_text_differs(
     tmp_path: Path,
@@ -428,7 +412,6 @@ def test_revision_persists_deterministic_patch_when_model_text_differs(
     assert revised_session["report"] == draft["payload"]["revised_report_text"]
     assert revised_session["sections"]["drugs"] == "Amoxicillin started 2026-01-01."
 
-
 ###############################################################################
 def test_revision_safety_gate_keeps_rechallenge_draft_out_of_sessions(
     tmp_path: Path,
@@ -469,7 +452,6 @@ def test_revision_safety_gate_keeps_rechallenge_draft_out_of_sessions(
     assert version_detail is not None
     assert version_detail["version"]["session_id"] is None
     assert version_detail["version"]["version_status"] == "qa_failed"
-
 
 ###############################################################################
 def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> None:
@@ -517,7 +499,6 @@ def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> 
         "error": "Tool ids must be positive integers.",
         "invalid_tool_input": True,
     }
-
 
 ###############################################################################
 def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
@@ -572,7 +553,6 @@ def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
     )
     assert context_artifact["payload"]["audit"]["version_lineage"]
 
-
 ###############################################################################
 def test_manual_edit_skips_orphaned_revision_version_numbers(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -607,21 +587,20 @@ def test_manual_edit_skips_orphaned_revision_version_numbers(tmp_path: Path) -> 
     assert version["version_number"] == 4
     assert version["revision_kind"] == "manual_edit"
 
-
 ###############################################################################
 class SlowRevisionRunner:
+
     # -------------------------------------------------------------------------
     def run_agentic(self, **_kwargs: Any) -> dict[str, Any]:
         time.sleep(0.4)
         return {}
 
-
 ###############################################################################
 class FailingRevisionRunner:
+
     # -------------------------------------------------------------------------
     def run_agentic(self, **_kwargs: Any) -> dict[str, Any]:
         raise RuntimeError("Synthetic revision failure")
-
 
 ###############################################################################
 def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
@@ -646,7 +625,6 @@ def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
     assert run["error"] == {
         "message": "Revision processing failed. Retry the revision if needed."
     }
-
 
 ###############################################################################
 def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
@@ -686,7 +664,6 @@ def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
         serializer.session_revision_repository.get_revision_run(pipeline_run_id) is None
     )
 
-
 ###############################################################################
 def test_incomplete_revision_shell_cannot_be_clinically_reviewed(
     tmp_path: Path,
@@ -709,7 +686,6 @@ def test_incomplete_revision_shell_cannot_be_clinically_reviewed(
             reviewed_by="QA",
         )
 
-
 ###############################################################################
 def test_revision_job_rejects_same_root_concurrent_start(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -728,7 +704,6 @@ def test_revision_job_rejects_same_root_concurrent_start(tmp_path: Path) -> None
         if status and status["status"] in {"completed", "failed", "cancelled"}:
             break
         time.sleep(0.05)
-
 
 ###############################################################################
 def test_revision_shell_uses_explicit_source_version(tmp_path: Path) -> None:

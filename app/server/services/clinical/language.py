@@ -18,7 +18,6 @@ from common.utils.languages import (
 from domain.clinical.entities import PatientData
 from domain.clinical.language import LanguageDetectionResult
 
-
 ###############################################################################
 class ClinicalLanguageDetector:
     DEFAULT_THRESHOLDS: dict[str, float] = {
