@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import {
   StatusMessageComponent,
   resolveStatusTone,
@@ -109,6 +110,7 @@ function resolveProviderLabel(provider: string, cloudProviders: ModelConfigState
   imports: [
     CommonModule,
     FormsModule,
+    ModalShellComponent,
     StatusMessageComponent,
     AccessKeyModalComponent,
     ModelConfigToggleCardComponent,
@@ -271,6 +273,12 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     }
     if (draft.chunk_overlap >= draft.chunk_size) {
       return 'Chunk overlap must be smaller than chunk size.';
+    }
+    if (draft.hybrid_vector_weight < 0 || draft.hybrid_text_weight < 0) {
+      return 'Hybrid search weights cannot be negative.';
+    }
+    if (draft.use_hybrid_search && draft.hybrid_vector_weight + draft.hybrid_text_weight <= 0) {
+      return 'At least one hybrid search weight must be greater than 0.';
     }
     return '';
   });
@@ -695,12 +703,19 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     }));
   }
 
+  setDraftRagFloat(
+    key: keyof Pick<DraftRagSettings, 'hybrid_vector_weight' | 'hybrid_text_weight'>,
+    value: string,
+  ): void {
+    const parsed = Number.parseFloat(value);
+    this.draftRagSettings.update((previous) => ({
+      ...previous,
+      [key]: Number.isFinite(parsed) ? Math.max(0, parsed) : 0,
+    }));
+  }
+
   setDraftRagText(
-    key: keyof Pick<
-      DraftRagSettings,
-      | 'reranker_model'
-      | 'embedding_device'
-    >,
+    key: keyof Pick<DraftRagSettings, 'reranker_model'>,
     value: string,
   ): void {
     this.draftRagSettings.update((previous) => ({
@@ -724,8 +739,10 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
 
   async saveRagSettings(): Promise<void> {
     if (this.ragSettingsValidationMessage()) return;
+    const { embedding_device: runtimeOnlyDevice, ...persistedRagSettings } = this.draftRagSettings();
+    void runtimeOnlyDevice;
     await this.persistConfigPatch(
-      { rag_settings: { ...this.draftRagSettings() } },
+      { rag_settings: persistedRagSettings },
       'RAG settings saved.',
       false,
       'rag',
@@ -938,4 +955,3 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     return this.activeFilters()[key];
   }
 }
-
