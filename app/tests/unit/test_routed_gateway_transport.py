@@ -8,6 +8,7 @@ from domain.llm.transports import ChatRequest, ChatResult
 from services.llm.transports import routed_gateway
 from services.llm.transports.routed_gateway import RoutedGatewayTransport
 
+
 ###############################################################################
 def _transport(models_path: str = "/zen/go/v1/models") -> RoutedGatewayTransport:
     return RoutedGatewayTransport(
@@ -56,11 +57,19 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
     class FakeChatTransport:
 
         # -------------------------------------------------------------------------
-        def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
+        def __init__(
+            self,
+            *,
+            api_key: str,
+            base_url: str,
+            timeout: float,
+            default_headers: dict[str, str],
+        ) -> None:
             captured.update(
                 api_key=api_key,
                 base_url=base_url,
                 timeout=timeout,
+                default_headers=default_headers,
             )
 
         # -------------------------------------------------------------------------
@@ -96,8 +105,12 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
     request = captured["request"]
     assert isinstance(request, ChatRequest)
     assert request.model == "deepseek-v4-flash"
+    headers = captured["default_headers"]
+    assert isinstance(headers, dict)
+    assert headers["x-opencode-session"]
+    assert headers["User-Agent"] == "diligent-clinical-copilot/3.3"
     assert "clinical prompt" not in caplog.text
-    assert "route_source=known_opencode_go_route" in caplog.text
+    assert "route_source=documented_opencode_go_route@2026-09-07" in caplog.text
     assert "Cloud chat request attempted" in caplog.text
 
 ###############################################################################
@@ -115,7 +128,14 @@ def test_opencode_go_missing_catalog_model_uses_direct_route(
     class FakeChatTransport:
 
         # -------------------------------------------------------------------------
-        def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
+        def __init__(
+            self,
+            *,
+            api_key: str,
+            base_url: str,
+            timeout: float,
+            default_headers: dict[str, str],
+        ) -> None:
             captured["base_url"] = base_url
 
         # -------------------------------------------------------------------------
@@ -158,7 +178,14 @@ def test_opencode_go_connectivity_check_uses_direct_route(
     class FakeChatTransport:
 
         # -------------------------------------------------------------------------
-        def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
+        def __init__(
+            self,
+            *,
+            api_key: str,
+            base_url: str,
+            timeout: float,
+            default_headers: dict[str, str],
+        ) -> None:
             captured["base_url"] = base_url
 
         # -------------------------------------------------------------------------
@@ -194,7 +221,9 @@ def test_other_routed_gateways_keep_strict_catalog_requirement(
 
     monkeypatch.setattr(transport, "list_models", catalog_failure)
 
-    with pytest.raises(RuntimeError, match="catalog unavailable"):
+    with pytest.raises(
+        ValueError, match="Provider model metadata is unavailable for unknown"
+    ):
         asyncio.run(
             transport.chat(
                 ChatRequest(
@@ -203,3 +232,37 @@ def test_other_routed_gateways_keep_strict_catalog_requirement(
                 )
             )
         )
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("model", "expected_endpoint"),
+    [
+        ("deepseek-v4-flash", "chat/completions"),
+        ("qwen3.8-flash", "messages"),
+        ("minimax-m3", "messages"),
+        ("gpt-5.6-luna", "responses"),
+        ("grok-4.6", "responses"),
+        ("muse-spark-1.3-contributor", "responses"),
+        ("kimi-k2.7-code", "chat/completions"),
+        ("longcat-2.0", "chat/completions"),
+        ("mimo-v2.5-pro", "chat/completions"),
+        ("hy4-preview", "chat/completions"),
+        ("hy3", "chat/completions"),
+    ],
+)
+def test_opencode_go_documented_route_matrix(
+    model: str, expected_endpoint: str
+) -> None:
+    endpoint = _transport()._resolve_transport_endpoint(
+        CloudModelDescriptor(id=model, display_name=model)
+    )
+
+    assert endpoint == expected_endpoint
+
+###############################################################################
+def test_opencode_go_unknown_model_does_not_guess_chat_route() -> None:
+    endpoint = _transport()._resolve_transport_endpoint(
+        CloudModelDescriptor(id="unlisted-model", display_name="Unlisted")
+    )
+
+    assert endpoint == ""

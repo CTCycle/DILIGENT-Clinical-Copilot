@@ -1,5 +1,5 @@
 # Model Setup
-Last updated: 2026-08-31
+Last updated: 2026-09-07
 
 Sampling settings are selected automatically according to the provider, model
 family, and operation. They are not user-configurable.
@@ -48,6 +48,11 @@ Recommended workflow:
 8. Return to **Configurations** and use **Refresh** for the selected provider when its catalog needs updating.
 
 Do not paste keys into screenshots, chat messages, issue reports, or shared logs.
+
+For OpenCode Go, refresh the provider catalog after provider model changes. The
+application preserves the selected model and reports the provider's sanitized
+HTTP detail if structured extraction is rejected; it does not silently switch
+to another model or provider.
 
 ## Local Model Notes
 - Local runtime saves only installed Ollama models for clinical, extraction,

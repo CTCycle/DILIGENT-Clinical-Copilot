@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, cast
 
 from anthropic import AsyncAnthropic
@@ -13,9 +14,19 @@ from services.llm.transports.base import StructuredTransportMixin
 class AnthropicMessagesTransport(StructuredTransportMixin):
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str,
+        timeout: float,
+        default_headers: Mapping[str, str] | None = None,
+    ) -> None:
         self.client = AsyncAnthropic(
-            api_key=api_key, base_url=base_url, timeout=timeout
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+            default_headers=default_headers,
         )
 
     # -------------------------------------------------------------------------
@@ -34,22 +45,37 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
             "system": system,
             "messages": messages,
         }
+        output_config: dict[str, object] = {}
+        if request.json_schema is not None:
+            output_config["format"] = {
+                "type": "json_schema",
+                "schema": request.json_schema,
+            }
         if request.reasoning_level and request.reasoning_level != "off":
             budget_tokens = max(1024, int(request.reasoning_reserve or 0))
             max_tokens = max(
                 max_tokens, int(request.output_token_limit or 0) + budget_tokens
             )
-            kwargs["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": budget_tokens,
-            }
+            if request.reasoning_parameter == "adaptive":
+                kwargs["thinking"] = {"type": "adaptive"}
+                output_config["effort"] = request.reasoning_level
+            else:
+                kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": budget_tokens,
+                }
+        elif request.reasoning_parameter == "adaptive":
+            kwargs["thinking"] = {"type": "disabled"}
         if max_tokens <= 0:
             raise ValueError("Anthropic requests require an output token limit")
         kwargs["max_tokens"] = max_tokens
-        if "temperature" in request.options and request.reasoning_level in {
-            None,
-            "off",
-        }:
+        if output_config:
+            kwargs["output_config"] = output_config
+        if (
+            "temperature" in request.options
+            and request.reasoning_level in {None, "off"}
+            and request.reasoning_parameter != "adaptive"
+        ):
             kwargs["temperature"] = request.options["temperature"]
         response = await cast(Any, self.client.messages).create(
             **kwargs,
@@ -69,13 +95,44 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
                 page = await self.client.models.list(limit=100)
             else:
                 page = await self.client.models.list(limit=100, after_id=after_id)
-            models.extend(
-                CloudModelDescriptor(id=item.id, display_name=item.display_name)
-                for item in page.data
-            )
+            for item in page.data:
+                metadata = self._model_metadata(item)
+                capabilities = metadata.get("capabilities")
+                if not isinstance(capabilities, dict):
+                    capabilities = {}
+                thinking = capabilities.get("thinking")
+                structured = capabilities.get("structured_outputs")
+                if structured is None:
+                    structured = capabilities.get("structured_output")
+                models.append(
+                    CloudModelDescriptor(
+                        id=item.id,
+                        display_name=item.display_name,
+                        supports_thinking=(
+                            bool(thinking) if thinking is not None else None
+                        ),
+                        supports_json_mode=(
+                            bool(structured) if structured is not None else None
+                        ),
+                        supports_native_json_schema=(
+                            bool(structured) if structured is not None else None
+                        ),
+                    )
+                )
             if not getattr(page, "has_more", False) or not page.data:
                 return models
             after_id = page.data[-1].id
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _model_metadata(item: object) -> dict[str, object]:
+        if hasattr(item, "model_dump"):
+            dumped = item.model_dump(mode="json")  # type: ignore[attr-defined]
+            return dumped if isinstance(dumped, dict) else {}
+        if hasattr(item, "dict"):
+            dumped = item.dict()  # type: ignore[attr-defined]
+            return dumped if isinstance(dumped, dict) else {}
+        return {}
 
     # -------------------------------------------------------------------------
     async def check_connectivity(self, model: str) -> ConnectivityResult:
@@ -85,6 +142,7 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
                     model=model,
                     messages=[{"role": "user", "content": "Reply with exactly: OK"}],
                     options={"max_tokens": 16},
+                    operation="connectivity",
                 )
             )
             return ConnectivityResult(ok=True, response_preview=result.content[:200])

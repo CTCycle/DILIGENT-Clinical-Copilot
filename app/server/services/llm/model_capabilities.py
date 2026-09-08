@@ -13,7 +13,9 @@ from services.llm.generation_policy import GenerationPolicy
 CapabilitySource = Literal[
     "exact_model", "model_family", "provider", "live", "fallback"
 ]
-ReasoningParameter = Literal["none", "boolean", "level", "effort", "budget_tokens"]
+ReasoningParameter = Literal[
+    "none", "boolean", "level", "effort", "budget_tokens", "adaptive"
+]
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -24,6 +26,7 @@ class ModelCapabilities:
     reasoning_parameter: ReasoningParameter
     supports_temperature: bool
     supports_json_mode: bool
+    supports_native_json_schema: bool
     source: CapabilitySource
 
 ###############################################################################
@@ -144,6 +147,7 @@ def _coerce_reasoning_parameter(value: object) -> ReasoningParameter:
         "level",
         "effort",
         "budget_tokens",
+        "adaptive",
     )
     normalized = str(value or "none")
     return normalized if normalized in allowed else "none"  # type: ignore[return-value]
@@ -157,13 +161,21 @@ def resolve_model_capabilities(
 ) -> ModelCapabilities:
     rule, source = _find_catalog_rule(provider, model)
     fallback = _fallback_rule()
-    descriptor_has_metadata = descriptor is not None and any(
-        value is not None
-        for value in (
-            descriptor.input_token_limit,
-            descriptor.output_token_limit,
-            descriptor.supports_thinking,
-            descriptor.supports_temperature,
+    descriptor_has_metadata = (
+        descriptor is not None
+        and (
+            any(
+                value is not None
+                for value in (
+                    descriptor.input_token_limit,
+                    descriptor.output_token_limit,
+                    descriptor.supports_thinking,
+                    descriptor.supports_temperature,
+                    descriptor.supports_json_mode,
+                    descriptor.supports_native_json_schema,
+                )
+            )
+            or descriptor.capabilities is not None
         )
     )
 
@@ -201,9 +213,23 @@ def resolve_model_capabilities(
             "supports_temperature", fallback.get("supports_temperature", False)
         )
     )
-    supports_json_mode = bool(
-        rule.get("supports_json_mode", fallback.get("supports_json_mode", False))
-    )
+    if descriptor is not None and descriptor.supports_json_mode is not None:
+        supports_json_mode = bool(descriptor.supports_json_mode)
+    elif descriptor is not None and descriptor.capabilities is not None:
+        supports_json_mode = bool(descriptor.capabilities.structured_output)
+    else:
+        supports_json_mode = bool(
+            rule.get("supports_json_mode", fallback.get("supports_json_mode", False))
+        )
+    if descriptor is not None and descriptor.supports_native_json_schema is not None:
+        supports_native_json_schema = bool(descriptor.supports_native_json_schema)
+    else:
+        supports_native_json_schema = bool(
+            rule.get(
+                "supports_native_json_schema",
+                fallback.get("supports_native_json_schema", False),
+            )
+        )
     return ModelCapabilities(
         input_token_limit=input_token_limit,
         output_token_limit=output_token_limit,
@@ -213,6 +239,7 @@ def resolve_model_capabilities(
         ),
         supports_temperature=supports_temperature,
         supports_json_mode=supports_json_mode,
+        supports_native_json_schema=supports_native_json_schema,
         source="live" if descriptor_has_metadata else source,
     )
 

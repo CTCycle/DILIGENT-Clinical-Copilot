@@ -67,6 +67,8 @@ class CloudModelDescriptor(BaseModel):
     output_token_limit: int | None = Field(default=None, ge=1)
     supports_thinking: bool | None = None
     supports_temperature: bool | None = None
+    supports_json_mode: bool | None = None
+    supports_native_json_schema: bool | None = None
 
 ###############################################################################
 class CloudProviderDescriptor(BaseModel):

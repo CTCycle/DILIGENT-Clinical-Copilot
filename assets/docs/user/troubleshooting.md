@@ -1,5 +1,5 @@
 # User Troubleshooting
-Last updated: 2026-08-31
+Last updated: 2026-09-07
 
 ## Windows desktop app does not open
 
@@ -41,6 +41,17 @@ Check that:
 - local Ollama is running for local models
 - network access is available for cloud providers
 - provider quota or billing is available where applicable
+
+For a structured-output HTTP 400, read the complete warning. It identifies the
+provider, model, operation, status, and a redacted upstream detail. For example:
+
+```text
+Check the provider connection, credentials, rate limits, or transient service status. Detail: opencode-go rejected deepseek-v4-flash during structured_output (HTTP 400): Model is unavailable.
+```
+
+This indicates a provider/model contract or availability response, not an
+automatic model substitution. Confirm the provider catalog, credentials, quota,
+and service status before retrying.
 
 ## Catalog Refresh Or Timeline Fallback
 

@@ -1,6 +1,6 @@
 # Effective LLM inference policy
 
-Last updated: 2026-08-21
+Last updated: 2026-09-07
 
 DILIGENT resolves an effective inference configuration immediately before each
 LLM request. Operators choose the provider, model, and one global reasoning
@@ -48,11 +48,21 @@ deduplicated, prioritized, and reported when omitted or overflowing.
 ## Provider normalization
 
 OpenAI Responses preserves normalized options and uses `max_output_tokens`;
-OpenAI Chat Completions uses `max_tokens`; Anthropic reserves a separate
-thinking budget; Gemini maps the four levels to its supported thinking levels;
-and Ollama sends `think=false`, `think=true`, or the GPT-OSS level string as
-supported by the selected model. Unknown or unsupported reasoning is visible
-in the effective configuration rather than silently treated as enabled.
+OpenAI Chat Completions uses `max_tokens`; Anthropic uses adaptive thinking when
+the selected Claude model requires it and sends native JSON schemas through
+`output_config.format`; Gemini never sends a zero thinking budget to models
+whose reasoning cannot be disabled; and local Ollama sends `think=false`,
+`think=true`, or the GPT-OSS level string as supported by the selected model.
+The local Ollama contract is specifically `/api/chat`; an Ollama Cloud endpoint
+is not registered as structured-output capable.
+OpenCode route selection is driven by model metadata with a documented route
+map only for known Go models. Unknown or unsupported reasoning is visible in
+the effective configuration rather than silently treated as enabled.
+
+Provider failures preserve the selected provider and model. HTTP failures from
+structured extraction include the operation, status, request identifier when
+available, and a bounded redacted provider detail in the timeline fallback
+warning; no alternate model or provider is selected automatically.
 
 The policy version, purpose, provider, model, requested/effective levels,
 temperature, capability source, reserves, input budget, and compact context

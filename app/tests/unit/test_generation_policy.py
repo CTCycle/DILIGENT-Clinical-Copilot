@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import pytest
-
+from domain.model_configs import ReasoningLevel
 from services.llm.generation_policy import (
     GenerationPolicy,
     GenerationPurpose,
     resolve_generation_policy,
     validate_catalog,
 )
-from domain.model_configs import ReasoningLevel
 from services.llm.model_capabilities import (
     resolve_effective_inference_config,
     resolve_model_capabilities,
 )
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -75,7 +75,7 @@ def test_openai_and_deepseek_are_purpose_specific() -> None:
         resolve_generation_policy(
             purpose=GenerationPurpose.CLINICAL_SYNTHESIS,
             provider="deepseek",
-            model="deepseek-chat",
+            model="deepseek-v4-flash",
         ).temperature
         == 0.2
     )
