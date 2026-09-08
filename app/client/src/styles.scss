@@ -5901,25 +5901,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 /* Model Configuration RAG settings dialog */
-.model-config-rag-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  align-content: start;
-  justify-items: center;
-  overflow: auto;
-  padding: 84px 28px 28px;
-  background: var(--color-overlay);
-  backdrop-filter: blur(3px);
-}
-
 .model-config-rag-modal {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  width: min(1090px, calc(100vw - 56px));
-  height: min(760px, calc(100vh - 56px));
-  overflow: hidden;
+  width: min(1090px, calc(100dvw - (2 * var(--space-md))));
+  height: min(760px, calc(100dvh - (2 * var(--space-md))));
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
@@ -5927,38 +5911,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: var(--color-text-primary);
 }
 
-.model-config-rag-modal-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-lg);
-  min-height: 74px;
-  padding: var(--space-xl) var(--space-2xl) var(--space-lg);
-  border-bottom: 1px solid var(--color-divider);
-}
-
-.model-config-rag-modal-header h2 {
-  margin: 0;
-  color: var(--color-text-primary);
-  font-size: var(--font-lg);
-  font-weight: 780;
-  line-height: 1.2;
-}
-
-.model-config-rag-modal-header p {
-  margin: 7px 0 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-xs);
-  line-height: 1.35;
-}
-
-.model-config-rag-modal-close {
-  border: 0;
-  background: transparent;
-  color: var(--color-text-secondary);
-  padding: 1px 0;
-  font-size: var(--font-sm);
-  cursor: pointer;
+@media (max-height: 640px) {
+  .model-config-rag-modal {
+    height: min(760px, calc(100dvh - (2 * var(--space-sm))));
+  }
 }
 
 .model-config-rag-modal-body {
