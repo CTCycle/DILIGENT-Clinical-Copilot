@@ -1,5 +1,5 @@
 # DILIGENT Desktop Release
-Last updated: 2026-09-01
+Last updated: 2026-09-08
 
 ## Packaging architecture
 
@@ -34,6 +34,23 @@ release/DILIGENT-v3.3.0-windows-x64.sha256
 The portable executable is a single distribution file for no-install use. The MSI installs the same Tauri shell and packaged runtime. The `.sha256` file contains one SHA-256 entry per built artifact and must be checked before distribution. Publication requires separate tag, remote-release, and download/hash evidence.
 
 The GitHub release attaches the portable EXE, MSI, and `.sha256` manifest. Existing remote assets are never replaced unless the local and remote bytes are identical.
+
+### 2026-09-08 release audit
+
+The latest published release is `v3.3.0`, published on 2026-09-01 from the
+main-line release commit. Its GitHub release contains the portable EXE, MSI,
+and SHA-256 manifest named above. The current workspace is post-release
+development and has substantial functional, visual, and behavioral divergence;
+it is not a byte-for-byte or behaviorally equivalent v3.3.0 build. The local
+`release/` directory does not contain the published binaries, so this audit
+used the live release metadata, tag ancestry, and the committed Tauri staging
+manifest rather than claiming a local packaged-binary launch test.
+
+The synthetic live-flow evidence and the remaining release risks are recorded
+in [`assets/QA/e2e-validation-20260908.md`](../../QA/e2e-validation-20260908.md).
+Before the next minor release, repeat the portable-EXE and MSI host smoke tests
+against the final tagged commit after the revision structured-output failure
+and DILI pattern-classification inconsistency have been resolved.
 
 ## Runtime and data layout
 

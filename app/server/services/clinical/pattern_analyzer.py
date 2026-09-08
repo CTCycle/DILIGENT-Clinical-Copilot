@@ -4,6 +4,8 @@ import re
 from datetime import date, datetime
 
 from common.constants import (
+    DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE,
+    DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE,
     DEFAULT_DILI_CLASSIFICATION,
     R_SCORE_CHOLESTATIC_THRESHOLD,
     R_SCORE_HEPATOCELLULAR_THRESHOLD,
@@ -132,7 +134,7 @@ class HepatotoxicityPatternAnalyzer:
                 continue
             alt_multiple = pair["alt_value"] / pair["alt_uln"]
             alp_multiple = pair["alp_value"] / pair["alp_uln"]
-            if alt_multiple > 1.0 or alp_multiple > 1.0:
+            if self.is_qualifying_pair(alt_multiple, alp_multiple):
                 return pair
 
         undated = self.build_anchor_from_bucket(
@@ -142,7 +144,15 @@ class HepatotoxicityPatternAnalyzer:
             return None
         alt_multiple = undated["alt_value"] / undated["alt_uln"]
         alp_multiple = undated["alp_value"] / undated["alp_uln"]
-        return undated if alt_multiple > 1.0 or alp_multiple > 1.0 else None
+        return undated if self.is_qualifying_pair(alt_multiple, alp_multiple) else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def is_qualifying_pair(alt_multiple: float, alp_multiple: float) -> bool:
+        return (
+            alt_multiple >= DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE
+            or alp_multiple >= DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE
+        )
 
     # -------------------------------------------------------------------------
     def group_entries_by_date(

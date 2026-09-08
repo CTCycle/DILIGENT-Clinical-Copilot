@@ -5,8 +5,10 @@ import asyncio
 import httpx
 import pytest
 from openai import APIStatusError
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from services.llm.cloud import CloudLLMClient, LLMError, LLMTimeout
+from services.llm.generation_policy import GenerationPurpose
+from services.llm.transports.openai_chat import OpenAIChatTransport
 
 
 ###############################################################################
@@ -28,6 +30,55 @@ def test_provider_error_mapping_distinguishes_connection_failure() -> None:
     assert mapped.error_code == "network_unavailable"
     assert mapped.retryable is True
     assert str(mapped) == "Cloud provider connection failed"
+
+###############################################################################
+def test_deepseek_structured_repair_handles_schema_echo_before_valid_json() -> None:
+    class Payload(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        ok: bool
+
+    client = CloudLLMClient.__new__(CloudLLMClient)
+    client.provider = "opencode_go"
+    client.default_model = "deepseek-v4-flash"
+    responses = iter(
+        [
+            '{"$defs":{"Payload":{"properties":{"ok":{"type":"boolean"}}}},"title":"Payload","type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"]}',
+            "not json",
+            '{"ok":true}',
+        ]
+    )
+    calls: list[dict[str, object]] = []
+
+    async def fake_chat(**kwargs: object) -> str:
+        calls.append(kwargs)
+        return next(responses)
+
+    client.chat = fake_chat  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.llm_structured_call(
+            model="deepseek-v4-flash",
+            system_prompt="Return the requested review object.",
+            user_prompt="Review this synthetic revision.",
+            schema=Payload,
+            purpose=GenerationPurpose.REVISION_SCAN,
+            max_repair_attempts=3,
+        )
+    )
+
+    assert result.ok is True
+    assert len(calls) == 3
+    assert calls[1]["purpose"] is GenerationPurpose.JSON_REPAIR
+    assert "schema or wrapper instead of the requested data" in calls[1]["messages"][1]["content"]  # type: ignore[index]
+    assert "<format_instructions>" in calls[2]["messages"][1]["content"]  # type: ignore[index]
+    assert calls[1]["json_schema"] == Payload.model_json_schema()
+
+###############################################################################
+def test_openai_chat_transport_extracts_json_from_content_parts() -> None:
+    assert OpenAIChatTransport._content_to_text(
+        [{"type": "text", "text": '{"ok":true}'}, {"type": "text", "text": "\n"}]
+    ) == '{"ok":true}\n'
 
 ###############################################################################
 def test_provider_error_mapping_distinguishes_timeout() -> None:
