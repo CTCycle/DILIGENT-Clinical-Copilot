@@ -83,7 +83,6 @@ const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
   hybrid_vector_weight: 0.7,
   hybrid_text_weight: 0.3,
   vector_stream_batch_size: 250,
-  embedding_device: 'auto',
   embedding_offline_mode: false,
 };
 
@@ -739,7 +738,8 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
 
   async saveRagSettings(): Promise<void> {
     if (this.ragSettingsValidationMessage()) return;
-    const { embedding_device: runtimeOnlyDevice, ...persistedRagSettings } = this.draftRagSettings();
+    const draft = this.draftRagSettings() as DraftRagSettings & { embedding_device?: unknown };
+    const { embedding_device: runtimeOnlyDevice, ...persistedRagSettings } = draft;
     void runtimeOnlyDevice;
     await this.persistConfigPatch(
       { rag_settings: persistedRagSettings },

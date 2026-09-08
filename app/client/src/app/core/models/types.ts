@@ -47,7 +47,6 @@ export type RagSettings = {
   hybrid_vector_weight: number;
   hybrid_text_weight: number;
   vector_stream_batch_size: number;
-  embedding_device: string;
   embedding_offline_mode: boolean;
 };
 
