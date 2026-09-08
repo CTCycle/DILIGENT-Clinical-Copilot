@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from datetime import date
 
+from common.constants import (
+    DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE,
+    DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE,
+)
 from domain.clinical.dili import (
     ClinicalEvidenceQuote,
     DiliCaseQualification,
@@ -54,7 +58,7 @@ class DiliCaseQualificationEngine:
             self._repeated_threshold(
                 dated,
                 markers=AMINOTRANSFERASE_MARKERS,
-                threshold=5.0,
+                threshold=DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE,
                 baseline_entries=baseline_entries,
                 criterion_label="ALT/AST >=5x reference on measurements at least 24 hours apart",
             )
@@ -72,7 +76,7 @@ class DiliCaseQualificationEngine:
         alp_qualified, alp_pending, alp_evidence = self._repeated_threshold(
             dated,
             markers={"ALP"},
-            threshold=2.0,
+            threshold=DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE,
             baseline_entries=baseline_entries,
             criterion_label="ALP >=2x reference on measurements at least 24 hours apart",
         )

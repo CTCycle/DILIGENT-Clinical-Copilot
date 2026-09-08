@@ -19,6 +19,11 @@ from openai import (
 )
 
 from common.constants import GEMINI_API_BASE, OPENAI_API_BASE
+from common.prompts.structured_output import (
+    COMPACT_JSON_REPAIR_SYSTEM_PROMPT,
+    build_compact_json_repair_user_prompt,
+    build_json_repair_user_prompt,
+)
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.generation_policy import GenerationPurpose
@@ -43,6 +48,7 @@ ProviderName = CloudProviderId
 _PROVIDER_FAILURE_HINT = (
     "Check the provider connection, credentials, rate limits, or transient service status."
 )
+_MAX_STRUCTURED_REPAIR_TEXT_CHARS = 30000
 
 ###############################################################################
 def _list_gemini_models_sync(client: genai.Client) -> list[Any]:
@@ -150,6 +156,33 @@ class LLMTimeout(LLMError):
 ###############################################################################
 def short_output_hash(output_text: str) -> str:
     return hashlib.sha256((output_text or "").encode("utf-8")).hexdigest()[:12]
+
+###############################################################################
+def clip_structured_repair_text(value: object) -> str:
+    text = str(value or "")
+    if len(text) <= _MAX_STRUCTURED_REPAIR_TEXT_CHARS:
+        return text
+    head_length = _MAX_STRUCTURED_REPAIR_TEXT_CHARS // 2
+    tail_length = _MAX_STRUCTURED_REPAIR_TEXT_CHARS - head_length
+    omitted = len(text) - head_length - tail_length
+    return (
+        f"{text[:head_length]}\n\n"
+        f"[TRUNCATED: {omitted} characters omitted]\n\n"
+        f"{text[-tail_length:]}"
+    )
+
+###############################################################################
+def looks_like_schema_echo(text: str) -> bool:
+    lowered = text.casefold()
+    schema_markers = (
+        '"$defs"',
+        '"properties"',
+        '"required"',
+        '"title"',
+        '"type"',
+        '"$ref"',
+    )
+    return sum(1 for marker in schema_markers if marker in lowered) >= 3
 
 ###############################################################################
 class CloudLLMClient:
@@ -1119,11 +1152,22 @@ class CloudLLMClient:
             {"role": "system", "content": system_prompt.strip()},
             {
                 "role": "user",
-                "content": (
-                    "The previous reply did not match the required JSON schema.\n"
-                    "Follow these format instructions exactly and return ONLY a valid JSON object:\n"
-                    f"{format_instructions}\n\n"
-                    f"Previous reply:\n{text}"
+                "content": build_json_repair_user_prompt(
+                    format_instructions=format_instructions,
+                    previous_reply=clip_structured_repair_text(text),
+                ),
+            },
+        ]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_compact_repair_messages(*, text: str) -> list[dict[str, str]]:
+        return [
+            {"role": "system", "content": COMPACT_JSON_REPAIR_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": build_compact_json_repair_user_prompt(
+                    previous_reply=clip_structured_repair_text(text),
                 ),
             },
         ]
@@ -1160,6 +1204,8 @@ class CloudLLMClient:
                     format_instructions=format_instructions,
                     text=text,
                 )
+                if looks_like_schema_echo(text):
+                    repair_messages = self.build_compact_repair_messages(text=text)
                 raw = await self.chat(
                     model=model,
                     messages=repair_messages,

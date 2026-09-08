@@ -4,6 +4,12 @@ import re
 from datetime import date, datetime
 from typing import Literal
 
+from common.constants import (
+    DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE,
+    DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE,
+    R_SCORE_CHOLESTATIC_THRESHOLD,
+    R_SCORE_HEPATOCELLULAR_THRESHOLD,
+)
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliInjuryPattern
 from domain.clinical.entities import ClinicalLabEntry, PatientLabTimeline
 
@@ -71,9 +77,9 @@ class DiliPatternEngine:
     ) -> Literal["hepatocellular", "cholestatic", "mixed", "indeterminate"]:
         if r_ratio is None:
             return "indeterminate"
-        if r_ratio >= 5:
+        if r_ratio >= R_SCORE_HEPATOCELLULAR_THRESHOLD:
             return "hepatocellular"
-        if r_ratio <= 2:
+        if r_ratio <= R_SCORE_CHOLESTATIC_THRESHOLD:
             return "cholestatic"
         return "mixed"
 
@@ -137,12 +143,14 @@ class DiliPatternEngine:
 
         dated = [item for item in assessable if item.sample_date]
         chronological = sorted(dated, key=lambda item: self._date_sort_key(item.sample_date))
-        abnormal = [
+        qualifying = [
             item
             for item in chronological
-            if self._is_abnormal_pair(item)
+            if self._is_qualifying_pair(item)
         ]
-        first = abnormal[0] if abnormal else (chronological[0] if chronological else assessable[0])
+        first = qualifying[0] if qualifying else (
+            chronological[0] if chronological else assessable[0]
+        )
         first_payload = first.model_copy(deep=True)
         first_payload.assessment_point = "first_qualifying"
 
@@ -160,7 +168,7 @@ class DiliPatternEngine:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _is_abnormal_pair(pattern: DiliInjuryPattern) -> bool:
+    def _is_qualifying_pair(pattern: DiliInjuryPattern) -> bool:
         alt_multiple = (
             pattern.alt / pattern.alt_uln
             if pattern.alt is not None and pattern.alt_uln is not None and pattern.alt_uln > 0
@@ -172,8 +180,14 @@ class DiliPatternEngine:
             else None
         )
         return bool(
-            (alt_multiple is not None and alt_multiple > 1.0)
-            or (alp_multiple is not None and alp_multiple > 1.0)
+            (
+                alt_multiple is not None
+                and alt_multiple >= DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE
+            )
+            or (
+                alp_multiple is not None
+                and alp_multiple >= DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE
+            )
         )
 
     # -------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from domain.clinical.entities import (
     ClinicalLabEntry,
     DrugEntry,
@@ -120,6 +121,81 @@ def test_structured_dossier_preserves_missing_competing_causes() -> None:
         for question in bundle.acceptance_questions
     )
     assert bundle.manual_review_required is True
+
+###############################################################################
+def test_structured_dili_bundle_uses_first_qualifying_panel_downstream() -> None:
+    labs = PatientLabTimeline(
+        entries=[
+            ClinicalLabEntry(
+                marker_name="ALT",
+                value=42,
+                upper_limit_normal=40,
+                sample_date="2026-07-29",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALP",
+                value=96,
+                upper_limit_normal=120,
+                sample_date="2026-07-29",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALT",
+                value=610,
+                upper_limit_normal=40,
+                sample_date="2026-08-10",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALP",
+                value=210,
+                upper_limit_normal=120,
+                sample_date="2026-08-10",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALT",
+                value=280,
+                upper_limit_normal=40,
+                sample_date="2026-08-21",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALP",
+                value=180,
+                upper_limit_normal=120,
+                sample_date="2026-08-21",
+                source="laboratory_analysis",
+            ),
+        ]
+    )
+    bundle = DiliEvidenceBuilder().build(
+        payload=PatientData(
+            anamnesis="Synthetic DILI regression case.",
+            drugs="Drug A started 2026-08-01.",
+            laboratory_analysis="ALT and ALP were measured serially.",
+        ),
+        drugs=PatientDrugs(
+            entries=[
+                DrugEntry(
+                    name="Drug A",
+                    source="therapy",
+                    therapy_start_date="2026-08-01",
+                )
+            ]
+        ),
+        labs=labs,
+        resolved_drugs=None,
+        rucam_bundle=PatientRucamAssessmentBundle(entries=[]),
+    )
+
+    primary = bundle.patterns[0]
+    assert primary.sample_date == "2026-08-10"
+    assert primary.r_ratio == pytest.approx((610 / 40) / (210 / 120))
+    assert primary.pattern == "hepatocellular"
+    assert bundle.case_qualification.status == "meets_typical_detection_criteria"
+    assert "hepatocellular" in DiliEvidenceBuilder.render_user_summary(bundle)
 
 ###############################################################################
 def test_generated_narrative_safety_gate_blocks_unsupported_certainty() -> None:

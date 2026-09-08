@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import httpx
 from collections.abc import Mapping
+from typing import Any
 
 from domain.llm.providers import CloudModelDescriptor
 from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
@@ -9,6 +10,23 @@ from services.llm.transports.base import StructuredTransportMixin
 
 ###############################################################################
 class OpenAIChatTransport(StructuredTransportMixin):
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _content_to_text(content: Any) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            chunks: list[str] = []
+            for part in content:
+                if isinstance(part, str):
+                    chunks.append(part)
+                elif isinstance(part, dict) and isinstance(part.get("text"), str):
+                    chunks.append(part["text"])
+            return "".join(chunks)
+        if isinstance(content, dict) and isinstance(content.get("text"), str):
+            return content["text"]
+        return str(content or "")
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -60,7 +78,7 @@ class OpenAIChatTransport(StructuredTransportMixin):
         response.raise_for_status()
         message = response.json()["choices"][0]["message"]
         return ChatResult(
-            content=str(message.get("content") or ""),
+            content=self._content_to_text(message.get("content")),
             reasoning_content=str(message.get("reasoning_content") or "") or None,
         )
 

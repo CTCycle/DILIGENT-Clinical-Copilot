@@ -156,6 +156,44 @@ def test_case_a_first_abnormal_pair_is_presentation_anchor_and_peak_is_retained(
     assert structured_patterns[1].assessment_point == "peak"
 
 ###############################################################################
+def test_mild_pretreatment_panel_does_not_anchor_r_ratio_or_classification() -> None:
+    entries: list[ClinicalLabEntry] = []
+    for sample_date, alt, alp in (
+        ("2026-07-29", 42, 96),
+        ("2026-08-10", 610, 210),
+        ("2026-08-21", 280, 180),
+    ):
+        entries.extend(
+            [
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=alt,
+                    upper_limit_normal=40,
+                    sample_date=sample_date,
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALP",
+                    value=alp,
+                    upper_limit_normal=120,
+                    sample_date=sample_date,
+                    source="laboratory_analysis",
+                ),
+            ]
+        )
+
+    timeline = PatientLabTimeline(entries=entries)
+
+    legacy_score = HepatotoxicityPatternAnalyzer().assess_payload(timeline).score
+    assert legacy_score.r_score == pytest.approx((610 / 40) / (210 / 120))
+    assert legacy_score.classification == "hepatocellular"
+
+    structured_patterns = DiliPatternEngine().assess(timeline)
+    assert structured_patterns[0].sample_date == "2026-08-10"
+    assert structured_patterns[0].r_ratio == pytest.approx((610 / 40) / (210 / 120))
+    assert structured_patterns[0].pattern == "hepatocellular"
+
+###############################################################################
 def test_primary_injury_anchor_uses_first_abnormal_pair_with_varying_ulns() -> None:
     timeline = PatientLabTimeline(
         entries=[

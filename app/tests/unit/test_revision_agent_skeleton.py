@@ -23,6 +23,7 @@ from services.inspection.revision_agent import (
     RevisionAgentRuntime,
     build_revision_agent_user_prompt,
 )
+import services.inspection.revision_agent as revision_agent_module
 from services.inspection.revision_context import build_revision_context
 from services.inspection.revision_scaffold import SessionRevisionConflictError
 from services.inspection.service import DataInspectionService
@@ -311,6 +312,37 @@ def test_revision_agent_assigns_stage_specific_generation_purposes(
         GenerationPurpose.REVISION_QA,
         GenerationPurpose.REVISION_SCAN,
     ]
+
+###############################################################################
+def test_revision_issue_scan_allows_bounded_provider_repair_retries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeProvider:
+        async def llm_structured_call(self, **kwargs: object) -> RevisionIssueScanResult:
+            captured.update(kwargs)
+            return RevisionIssueScanResult(summary="No issues detected.")
+
+    monkeypatch.setattr(
+        revision_agent_module,
+        "select_llm_provider",
+        lambda **_: FakeProvider(),
+    )
+    runner = object.__new__(RevisionAgentRunner)
+    runner.structured_call = None
+
+    result = runner._run_structured_scan(
+        runtime=RevisionAgentRuntime(
+            provider="opencode_go",
+            model="deepseek-v4-flash",
+        ),
+        user_prompt="{}",
+    )
+
+    assert result.summary == "No issues detected."
+    assert captured["max_repair_attempts"] == 3
+    assert captured["purpose"] is GenerationPurpose.REVISION_SCAN
 
 ###############################################################################
 def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> None:

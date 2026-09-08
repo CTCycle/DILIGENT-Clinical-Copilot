@@ -381,10 +381,7 @@
 
 .clinical-session-editor-surface {
     flex: 1 1 auto;
-    height: auto;
     min-height: 0;
-    max-height: none;
-    resize: none;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
@@ -415,12 +412,14 @@
 
 .clinical-session-preview-main {
   height: 100%;
-  max-height: 100%;
+  // Let the narrative scrollbar sit over the divider between the two panes.
+  margin-inline-end: calc(-1 * var(--space-md));
+  position: relative;
+  z-index: 1;
   overflow: hidden;
 }
 
 .clinical-session-preview-side {
-  max-height: 100%;
   overflow-y: auto;
   border-inline-start: 1px solid var(--cs-section-divider);
   padding-inline-start: var(--space-lg);
@@ -428,10 +427,7 @@
 }
 
 .clinical-session-preview-card {
-  border: 0;
   border-top: 1px solid var(--cs-section-divider);
-  border-radius: 0;
-  background: transparent;
   padding: var(--space-md) 0 0;
   min-width: 0;
   min-height: 0;
@@ -473,7 +469,6 @@
 
 .clinical-session-preview-content {
   height: 100%;
-  max-height: 100%;
   min-width: 0;
   overflow: auto;
   color: var(--cs-text);
@@ -787,8 +782,6 @@
 
 .clinical-session-editor-rendered {
   min-height: 520px;
-  height: auto;
-  overflow: visible;
 }
 
 .clinical-session-revision-model-actions {
@@ -796,7 +789,6 @@
   align-items: end;
   justify-content: flex-end;
   gap: var(--space-sm);
-  margin: 0;
 }
 
 .clinical-session-revision-model-actions .btn-primary {
@@ -856,12 +848,6 @@
   overflow-wrap: anywhere;
   color: var(--color-text-primary);
   line-height: 1.6;
-}
-
-.clinical-session-metadata-summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-lg);
 }
 
 .clinical-session-metadata-actions {
@@ -937,7 +923,6 @@
   display: none;
 }
 
-.clinical-session-metadata-summary section,
 .clinical-session-metadata-summary-card {
   border: 0;
   border-radius: 0;
@@ -948,14 +933,12 @@
   grid-column: 1 / -1;
 }
 
-.clinical-session-metadata-summary strong,
 .clinical-session-metadata-summary-card strong {
   display: block;
   color: var(--cs-text);
   margin-bottom: var(--space-sm);
 }
 
-.clinical-session-metadata-summary ul,
 .clinical-session-metadata-summary-card ul {
   display: grid;
   gap: var(--space-sm);
@@ -985,8 +968,6 @@
   white-space: pre-wrap;
 }
 
-.clinical-session-metadata-summary li,
-.clinical-session-metadata-summary p,
 .clinical-session-metadata-summary-card li,
 .clinical-session-metadata-summary-card p {
   margin: 0;
@@ -1014,7 +995,6 @@
   min-height: var(--control-height-sm);
   padding: 0;
   border-radius: var(--radius-sm);
-  pointer-events: auto;
   z-index: 1;
 }
 
