@@ -197,7 +197,7 @@ describe('ModelConfigPageComponent', () => {
       .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<void> }, 'persistConfigPatch')
       .mockResolvedValue();
 
-    component.draftRagSettings.set({
+    const draftWithRuntimeOnlyDevice = {
       chunk_size: 1024,
       chunk_overlap: 128,
       embedding_batch_size: 64,
@@ -209,9 +209,10 @@ describe('ModelConfigPageComponent', () => {
       hybrid_vector_weight: 0.65,
       hybrid_text_weight: 0.35,
       vector_stream_batch_size: 250,
-      embedding_device: 'cuda',
       embedding_offline_mode: false,
-    });
+      embedding_device: 'cuda',
+    };
+    component.draftRagSettings.set(draftWithRuntimeOnlyDevice);
     component.ragSettingsModalOpen.set(true);
 
     await component.saveRagSettings();
