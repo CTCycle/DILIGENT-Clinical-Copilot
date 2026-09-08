@@ -46,6 +46,13 @@ $script:PytestCacheDir = Join-Path $TestCacheDir 'pytest'
 $script:PythonBytecodeCacheDir = Join-Path $RuntimeCacheDir 'python'
 $script:RuffCacheDir = Join-Path $TestCacheDir 'ruff'
 $script:UvCacheDir = Join-Path $RepoRoot 'assets/QA/desktop-release-uv-cache'
+$script:LegacyUvCachePaths = @(
+    (Join-Path $RepoRoot '.uv-cache'),
+    (Join-Path $RepoRoot 'app/.uv-cache'),
+    (Join-Path $RepoRoot 'app/server/.uv-cache'),
+    (Join-Path $RepoRoot 'app/client/.uv-cache'),
+    (Join-Path $RepoRoot 'app/tests/.uv-cache')
+)
 $script:EnvFile = Join-Path $RepoRoot 'settings/.env'
 $script:EnvExample = Join-Path $RepoRoot 'settings/.env.example'
 $script:PythonVersion = '3.14.2'
@@ -1046,7 +1053,12 @@ function Remove-PythonCaches {
 function Remove-ToolCacheDirectories {
     $skipped = 0
     $cacheDirectories = @(Get-ChildItem -LiteralPath $RepoRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -in @('.mypy_cache', '.ruff_cache') -or $_.Name -like '.pytest_cache*' } |
+        Where-Object {
+            $_.Name -in @('.mypy_cache', '.ruff_cache', '.uv-cache') -or
+            $_.Name -like '.pytest_cache*' -or
+            $_.Name -like '.pytest-cache*' -or
+            $_.Name -like '.ruff-cache*'
+        } |
         Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
     foreach ($directory in $cacheDirectories) {
         $skipped += Remove-CacheContents -RootPath $directory.FullName
@@ -1063,7 +1075,7 @@ function Remove-ToolCacheDirectories {
 function Clear-ApplicationCache {
     if (-not (Confirm-DestructiveAction 'clear development caches and test artifacts')) { return }
     $skipped = 0
-    foreach ($cacheRoot in @($RuntimeCacheDir, $TestCacheDir, $LegacyCacheDir)) {
+    foreach ($cacheRoot in @($RuntimeCacheDir, $TestCacheDir, $LegacyCacheDir, $UvCacheDir) + @($LegacyUvCachePaths)) {
         $skipped += Remove-CacheContents -RootPath $cacheRoot
     }
     $skipped += Remove-PythonCaches
@@ -1078,12 +1090,16 @@ function Uninstall-Application {
     if (-not (Confirm-DestructiveAction 'remove local runtimes, dependencies, and build outputs')) { return }
     $targets = @(
         $RuntimesDir,
+        $TestCacheDir,
+        $LegacyCacheDir,
+        $UvCacheDir,
+        $LegacyUvCachePaths,
         $VenvDir,
         (Join-Path $RepoRoot '.venv'),
         (Join-Path $ClientDir 'node_modules'),
         (Join-Path $ClientDir '.angular'),
         (Join-Path $ClientDir 'dist')
-    )
+    ) | Select-Object -Unique
     $skipped = 0
     $progressId = Start-LauncherProgress -Activity 'DILIGENT: uninstall application' -Status "0 of $($targets.Count) paths"
     try {
@@ -1102,6 +1118,7 @@ function Uninstall-Application {
     }
 
     Remove-PythonCaches
+    [void](Remove-ToolCacheDirectories)
     if ($skipped -gt 0) {
         Write-Warning "$skipped uninstall target(s) could not be removed."
     }
