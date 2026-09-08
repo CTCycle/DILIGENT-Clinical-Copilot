@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import asyncio
 import json
+import re
 from typing import Any
 
 import httpx
@@ -29,15 +30,19 @@ from services.llm.structured import (
     parse_json_object_strict,
 )
 from domain.llm.providers import CloudModelDescriptor, CloudProviderId
-from domain.llm.transports import ChatRequest
+from domain.llm.transports import ChatRequest, RequestOperation
 from services.llm.provider_registry import provider_registry
 from services.llm.transports.anthropic_messages import AnthropicMessagesTransport
 from services.llm.transports.base import CloudTransport
+from services.llm.transports.gemini import gemini_model_requires_thinking
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.routed_gateway import RoutedGatewayTransport
 from services.llm.model_capabilities import EffectiveInferenceConfig
 
 ProviderName = CloudProviderId
+_PROVIDER_FAILURE_HINT = (
+    "Check the provider connection, credentials, rate limits, or transient service status."
+)
 
 ###############################################################################
 def _list_gemini_models_sync(client: genai.Client) -> list[Any]:
@@ -53,10 +58,70 @@ class LLMError(RuntimeError):
         *,
         error_code: str = "provider_error",
         retryable: bool = False,
+        provider: str | None = None,
+        model: str | None = None,
+        operation: str | None = None,
+        status_code: int | None = None,
+        request_id: str | None = None,
+        provider_detail: str | None = None,
     ) -> None:
         super().__init__(message)
         self.error_code = error_code
         self.retryable = bool(retryable)
+        self.provider = provider
+        self.model = model
+        self.operation = operation
+        self.status_code = status_code
+        self.request_id = request_id
+        self.provider_detail = self._sanitize_provider_detail(provider_detail)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _sanitize_provider_detail(value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, (dict, list, tuple)):
+            try:
+                value = json.dumps(value, ensure_ascii=True, separators=(",", ":"))
+            except (TypeError, ValueError):
+                value = str(value)
+        normalized = " ".join(str(value).split()).strip()
+        normalized = re.sub(
+            r"(?i)([\"']?(?:api[-_ ]?key|authorization|bearer|token|secret|password)[\"']?\s*[:=]\s*)(?:bearer\s+\S+|\"[^\"]*\"|'[^']*'|[^,;\s}]+)",
+            r"\1<redacted>",
+            normalized,
+        )
+        normalized = re.sub(r"(?i)\bbearer\s+\S+", "Bearer <redacted>", normalized)
+        return normalized[:320] or None
+
+    # -------------------------------------------------------------------------
+    def with_context(
+        self,
+        *,
+        provider: str | None = None,
+        model: str | None = None,
+        operation: str | None = None,
+    ) -> "LLMError":
+        if self.provider is None:
+            self.provider = provider
+        if self.model is None:
+            self.model = model
+        if self.operation is None:
+            self.operation = operation
+        return self
+
+    # -------------------------------------------------------------------------
+    def user_message(self) -> str:
+        if not self.provider or not self.model or not self.operation:
+            return str(self)
+        provider_label = self.provider.replace("_", "-")
+        status = f" (HTTP {self.status_code})" if self.status_code else ""
+        detail = f": {self.provider_detail}" if self.provider_detail else ""
+        verb = "rejected" if self.status_code else "failed"
+        return (
+            f"{_PROVIDER_FAILURE_HINT} Detail: {provider_label} {verb} "
+            f"{self.model} during {self.operation}{status}{detail}"
+        )
 
 ###############################################################################
 class LLMTimeout(LLMError):
@@ -69,8 +134,18 @@ class LLMTimeout(LLMError):
         *,
         error_code: str = "timeout",
         retryable: bool = True,
+        provider: str | None = None,
+        model: str | None = None,
+        operation: str | None = None,
     ) -> None:
-        super().__init__(message, error_code=error_code, retryable=retryable)
+        super().__init__(
+            message,
+            error_code=error_code,
+            retryable=retryable,
+            provider=provider,
+            model=model,
+            operation=operation,
+        )
 
 ###############################################################################
 def short_output_hash(output_text: str) -> str:
@@ -294,6 +369,8 @@ class CloudLLMClient:
                         if temperature_metadata is not None
                         else None
                     ),
+                    supports_json_mode=True,
+                    supports_native_json_schema=True,
                 )
             )
         return models
@@ -334,7 +411,42 @@ class CloudLLMClient:
                 f"Cloud provider returned HTTP {resp.status_code}",
                 error_code=error_code,
                 retryable=retryable,
+                status_code=resp.status_code,
+                request_id=CloudLLMClient._response_request_id(resp),
+                provider_detail=CloudLLMClient._response_detail(resp),
             ) from e
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _response_request_id(response: object) -> str | None:
+        headers = getattr(response, "headers", None)
+        if headers is None:
+            return None
+        for name in ("x-request-id", "request-id", "cf-ray"):
+            value = headers.get(name)
+            if value:
+                return str(value)[:120]
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _response_detail(response: object) -> str | None:
+        try:
+            payload = response.json()  # type: ignore[attr-defined]
+        except (AttributeError, TypeError, ValueError):
+            payload = getattr(response, "text", None)
+        if isinstance(payload, dict):
+            error = payload.get("error")
+            if isinstance(error, dict):
+                for key in ("message", "detail", "error", "code"):
+                    if error.get(key):
+                        return str(error[key])
+            for key in ("message", "detail", "error"):
+                if payload.get(key):
+                    return str(payload[key])
+        if payload is None:
+            return None
+        return str(payload)
 
     # -------------------------------------------------------------------------
     async def chat(
@@ -346,6 +458,8 @@ class CloudLLMClient:
         options: dict[str, Any] | None = None,
         purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
         timeline_complexity: str = "moderate",
+        operation: RequestOperation = "chat",
+        json_schema: dict[str, Any] | None = None,
     ) -> dict[str, Any] | str:
         resolved_model = model or self.default_model
         if not resolved_model:
@@ -371,6 +485,8 @@ class CloudLLMClient:
                         messages=messages,
                         options=options_payload,
                         json_mode=format == "json",
+                        operation=operation,
+                        json_schema=json_schema,
                         reasoning_level=effective.effective_reasoning_level.value,
                         reasoning_parameter=effective.reasoning_parameter,
                         reasoning_reserve=effective.reasoning_reserve,
@@ -396,7 +512,12 @@ class CloudLLMClient:
                     effective=effective,
                 )
         except Exception as exc:  # noqa: BLE001
-            raise self._map_provider_exception(exc) from exc
+            raise self._map_provider_exception(
+                exc,
+                provider=self.provider,
+                model=resolved_model,
+                operation=operation,
+            ) from exc
         raise LLMError(f"Provider '{self.provider}' does not support chat yet")
 
     # -------------------------------------------------------------------------
@@ -475,9 +596,14 @@ class CloudLLMClient:
             config_kwargs["max_output_tokens"] = effective.output_token_limit
             if effective.reasoning_parameter == "level":
                 if effective.effective_reasoning_level.value == "off":
-                    config_kwargs["thinking_config"] = genai_types.ThinkingConfig(
-                        thinking_budget=0
-                    )
+                    if gemini_model_requires_thinking(resolved_model):
+                        config_kwargs["thinking_config"] = genai_types.ThinkingConfig(
+                            thinking_level=genai_types.ThinkingLevel.LOW
+                        )
+                    else:
+                        config_kwargs["thinking_config"] = genai_types.ThinkingConfig(
+                            thinking_budget=0
+                        )
                 else:
                     sdk_level = (
                         genai_types.ThinkingLevel.LOW
@@ -619,18 +745,41 @@ class CloudLLMClient:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _map_provider_exception(exc: Exception) -> LLMError:
+    def _map_provider_exception(
+        exc: Exception,
+        *,
+        provider: str | None = None,
+        model: str | None = None,
+        operation: str | None = None,
+    ) -> LLMError:
         if isinstance(exc, LLMError):
-            return exc
+            return exc.with_context(
+                provider=provider,
+                model=model,
+                operation=operation,
+            )
         if isinstance(exc, (TimeoutError, APITimeoutError)):
-            return LLMTimeout("Timed out waiting for cloud chat response")
+            return LLMTimeout(
+                "Timed out waiting for cloud chat response",
+                provider=provider,
+                model=model,
+                operation=operation,
+            )
         if isinstance(exc, httpx.TimeoutException):
-            return LLMTimeout("Timed out waiting for cloud chat response")
+            return LLMTimeout(
+                "Timed out waiting for cloud chat response",
+                provider=provider,
+                model=model,
+                operation=operation,
+            )
         if isinstance(exc, (httpx.NetworkError, APIConnectionError)):
             return LLMError(
                 "Cloud provider connection failed",
                 error_code="network_unavailable",
                 retryable=True,
+                provider=provider,
+                model=model,
+                operation=operation,
             )
         if isinstance(exc, httpx.HTTPStatusError):
             status_code = exc.response.status_code
@@ -639,6 +788,12 @@ class CloudLLMClient:
                 f"Cloud provider returned HTTP {status_code}",
                 error_code=error_code,
                 retryable=retryable,
+                provider=provider,
+                model=model,
+                operation=operation,
+                status_code=status_code,
+                request_id=CloudLLMClient._response_request_id(exc.response),
+                provider_detail=CloudLLMClient._response_detail(exc.response),
             )
         if isinstance(exc, APIStatusError):
             status_code = getattr(exc, "status_code", None)
@@ -649,20 +804,53 @@ class CloudLLMClient:
                 error_code, retryable = CloudLLMClient._http_status_error_code(
                     status_code
                 )
+                response = getattr(exc, "response", None)
+                body = getattr(exc, "body", None)
                 return LLMError(
                     f"Cloud provider returned HTTP {status_code}",
                     error_code=error_code,
                     retryable=retryable,
+                    provider=provider,
+                    model=model,
+                    operation=operation,
+                    status_code=status_code,
+                    request_id=CloudLLMClient._response_request_id(response),
+                    provider_detail=(
+                        CloudLLMClient._response_detail(response)
+                        if response is not None
+                        else body
+                    ),
                 )
         timeout_error = getattr(genai_errors, "TimeoutError", None)
         if timeout_error is not None and isinstance(exc, timeout_error):
-            return LLMTimeout("Timed out waiting for cloud chat response")
+            return LLMTimeout(
+                "Timed out waiting for cloud chat response",
+                provider=provider,
+                model=model,
+                operation=operation,
+            )
         if isinstance(exc, OpenAIError):
-            return LLMError(f"Cloud LLM call failed: {exc}")
+            return LLMError(
+                f"Cloud LLM call failed: {exc}",
+                provider=provider,
+                model=model,
+                operation=operation,
+            )
         error_name = exc.__class__.__name__.lower()
         if "timeout" in error_name:
-            return LLMTimeout("Timed out waiting for cloud chat response")
-        return LLMError(f"Cloud LLM call failed: {exc}")
+            return LLMTimeout(
+                "Timed out waiting for cloud chat response",
+                provider=provider,
+                model=model,
+                operation=operation,
+            )
+        return LLMError(
+            f"Cloud LLM call failed: {exc}",
+            provider=provider,
+            model=model,
+            operation=operation,
+            provider_detail=str(exc),
+        )
 
     # -------------------------------------------------------------------------
     async def llm_text_call(
@@ -792,25 +980,19 @@ class CloudLLMClient:
         )
 
         if self.provider == "openai" and use_json_mode:
-            try:
-                effective = LLMRuntimeConfig.resolve_effective_inference_config(
-                    purpose=purpose,
-                    provider=self.provider,
-                    model=resolved_model,
-                    timeline_complexity=timeline_complexity,
-                )
-                return await self._structured_openai(
-                    model=resolved_model,
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    schema=schema,
-                    effective=effective,
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "OpenAI native structured output failed; falling back to local parser: %s",
-                    exc,
-                )
+            effective = LLMRuntimeConfig.resolve_effective_inference_config(
+                purpose=purpose,
+                provider=self.provider,
+                model=resolved_model,
+                timeline_complexity=timeline_complexity,
+            )
+            return await self._structured_openai(
+                model=resolved_model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                schema=schema,
+                effective=effective,
+            )
 
         if self.provider == "gemini" and use_json_mode:
             try:
@@ -834,7 +1016,12 @@ class CloudLLMClient:
                 text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
                 return parser.parse(text)
             except Exception as exc:  # noqa: BLE001
-                raise self._map_provider_exception(exc) from exc
+                raise self._map_provider_exception(
+                    exc,
+                    provider=self.provider,
+                    model=resolved_model,
+                    operation="structured_output",
+                ) from exc
 
         raw = await self.chat(
             model=resolved_model,
@@ -843,6 +1030,8 @@ class CloudLLMClient:
             options=None,
             purpose=purpose,
             timeline_complexity=timeline_complexity,
+            operation="structured_output",
+            json_schema=schema.model_json_schema() if use_json_mode else None,
         )
         text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
         return await self.parse_with_repairs(
@@ -888,10 +1077,12 @@ class CloudLLMClient:
         try:
             response = await self.openai_client.responses.parse(**kwargs)
         except Exception as exc:  # noqa: BLE001
-            mapped = self._map_provider_exception(exc)
-            if isinstance(mapped, LLMTimeout) or isinstance(exc, OpenAIError):
-                raise mapped from exc
-            raise
+            raise self._map_provider_exception(
+                exc,
+                provider=self.provider,
+                model=model,
+                operation="structured_output",
+            ) from exc
         parsed = getattr(response, "output_parsed", None)
         if isinstance(parsed, schema):
             return parsed
@@ -974,6 +1165,10 @@ class CloudLLMClient:
                     messages=repair_messages,
                     format="json" if use_json_mode else None,
                     purpose=GenerationPurpose.JSON_REPAIR,
+                    operation="json_repair",
+                    json_schema=parser.schema.model_json_schema()
+                    if use_json_mode
+                    else None,
                 )
                 text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
 

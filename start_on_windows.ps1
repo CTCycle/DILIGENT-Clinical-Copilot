@@ -13,7 +13,6 @@ param(
     [string]$DesktopTarget = 'All',
     [switch]$OfflineWebView2,
     [switch]$AllDesktopReleases,
-    [switch]$Force,
     [switch]$AllowDirtyTree
 )
 
@@ -838,7 +837,21 @@ function Invoke-TestSuite {
 # ============================================================
 # User data and cleanup maintenance
 # ============================================================
+function Confirm-DestructiveAction([string]$Description) {
+    if (-not $script:LauncherInteractive) {
+        throw "The destructive action '$Description' requires an interactive console; no files were changed."
+    }
+    Clear-LauncherProgress
+    $confirmation = ([string](Read-Host "Continue to $($Description)? [y/N]")).Trim()
+    if ($confirmation -notmatch '^(?i:y|yes)$') {
+        Write-Info 'Operation cancelled. No changes were made.'
+        return $false
+    }
+    return $true
+}
+
 function Remove-ApplicationLogs {
+    if (-not (Confirm-DestructiveAction 'remove application log files')) { return }
     $logDir = Join-Path $RepoRoot 'app/resources/logs'
     if (-not (Test-Path -LiteralPath $logDir)) {
         Write-Info "Log directory does not exist: $logDir"
@@ -1048,6 +1061,7 @@ function Remove-ToolCacheDirectories {
 }
 
 function Clear-ApplicationCache {
+    if (-not (Confirm-DestructiveAction 'clear development caches and test artifacts')) { return }
     $skipped = 0
     foreach ($cacheRoot in @($RuntimeCacheDir, $TestCacheDir, $LegacyCacheDir)) {
         $skipped += Remove-CacheContents -RootPath $cacheRoot
@@ -1061,6 +1075,7 @@ function Clear-ApplicationCache {
 }
 
 function Uninstall-Application {
+    if (-not (Confirm-DestructiveAction 'remove local runtimes, dependencies, and build outputs')) { return }
     $targets = @(
         $RuntimesDir,
         $VenvDir,
@@ -1177,27 +1192,9 @@ function Remove-UserDataPath {
     }
 }
 
-function Confirm-RemoveAllData {
-    param([switch]$Force)
-
-    if ($Force) {
-        return
-    }
-    if (-not [Environment]::UserInteractive -or [Console]::IsInputRedirected) {
-        throw 'Remove All Data requires -Force when the console is not interactive.'
-    }
-
-    Write-Host 'This permanently deletes local user data, including the database, settings, logs, RAG data, exports, and state.' -ForegroundColor Yellow
-    Write-Host 'Tracked application files are preserved.' -ForegroundColor Yellow
-    $confirmation = ([string](Read-Host 'Continue removing all local user data? [y/N]')).Trim()
-    if ($confirmation -notmatch '^(?i:y|yes)$') {
-        throw 'Remove All Data cancelled.'
-    }
-}
-
 function Remove-AllData {
     Import-DotEnv
-    Confirm-RemoveAllData -Force:$Force
+    if (-not (Confirm-DestructiveAction 'remove all local user data')) { return }
 
     $resourceRootValue = if ($env:DILIGENT_RESOURCES_PATH) { $env:DILIGENT_RESOURCES_PATH } else { 'app/resources' }
     $resourceRoot = Resolve-LauncherPath -Path $resourceRootValue
@@ -1716,6 +1713,7 @@ function Remove-DesktopRelease {
     )
 
     Assert-DesktopParameterContract -Interactive:$Interactive
+    if (-not (Confirm-DestructiveAction 'remove selected desktop release artifacts')) { return }
     $selectedTarget = if ($ArtifactTarget) { $ArtifactTarget } else { $DesktopTarget }
     $removeBuildState = $AllDesktopReleases -or $selectedTarget -eq 'All'
     if ($AllDesktopReleases) {

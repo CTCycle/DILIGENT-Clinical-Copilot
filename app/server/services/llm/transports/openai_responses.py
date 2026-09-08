@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from openai import AsyncOpenAI
 
 from domain.llm.providers import CloudModelDescriptor
@@ -10,8 +12,20 @@ from services.llm.transports.base import StructuredTransportMixin
 class OpenAIResponsesTransport(StructuredTransportMixin):
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
-        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str,
+        timeout: float,
+        default_headers: Mapping[str, str] | None = None,
+    ) -> None:
+        self.client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+            default_headers=default_headers,
+        )
 
     # -------------------------------------------------------------------------
     async def chat(self, request: ChatRequest) -> ChatResult:
@@ -48,6 +62,7 @@ class OpenAIResponsesTransport(StructuredTransportMixin):
                 ChatRequest(
                     model=model,
                     messages=[{"role": "user", "content": "Reply with exactly: OK"}],
+                    operation="connectivity",
                 )
             )
             return ConnectivityResult(ok=True, response_preview=result.content[:200])

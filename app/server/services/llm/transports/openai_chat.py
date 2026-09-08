@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import httpx
+from collections.abc import Mapping
 
 from domain.llm.providers import CloudModelDescriptor
 from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
@@ -10,15 +11,25 @@ from services.llm.transports.base import StructuredTransportMixin
 class OpenAIChatTransport(StructuredTransportMixin):
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, api_key: str, base_url: str, timeout: float) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str,
+        timeout: float,
+        default_headers: Mapping[str, str] | None = None,
+    ) -> None:
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        if default_headers:
+            headers.update(default_headers)
         self.client = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=timeout,
             trust_env=False,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
+            headers=headers,
         )
 
     # -------------------------------------------------------------------------
@@ -74,6 +85,7 @@ class OpenAIChatTransport(StructuredTransportMixin):
                 ChatRequest(
                     model=model,
                     messages=[{"role": "user", "content": "Reply with exactly: OK"}],
+                    operation="connectivity",
                 )
             )
             return ConnectivityResult(ok=True, response_preview=result.content[:200])

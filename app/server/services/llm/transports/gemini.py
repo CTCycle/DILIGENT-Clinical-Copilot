@@ -11,6 +11,13 @@ from domain.llm.transports import ChatRequest, ChatResult, ConnectivityResult
 from services.llm.transports.base import StructuredTransportMixin
 
 ###############################################################################
+def gemini_model_requires_thinking(model: str) -> bool:
+    normalized = (model or "").strip().lower()
+    return normalized.startswith("gemini-3") or normalized.startswith(
+        "gemini-2.5-pro"
+    )
+
+###############################################################################
 class GeminiTransport(StructuredTransportMixin):
 
     # -------------------------------------------------------------------------
@@ -55,6 +62,8 @@ class GeminiTransport(StructuredTransportMixin):
         if not request.reasoning_level or request.reasoning_parameter != "level":
             return None
         if request.reasoning_level == "off":
+            if gemini_model_requires_thinking(request.model):
+                return types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW)
             return types.ThinkingConfig(thinking_budget=0)
         sdk_level = (
             types.ThinkingLevel.LOW
@@ -97,6 +106,7 @@ class GeminiTransport(StructuredTransportMixin):
                 ChatRequest(
                     model=model,
                     messages=[{"role": "user", "content": "Reply with exactly: OK"}],
+                    operation="connectivity",
                 )
             )
             return ConnectivityResult(ok=True, response_preview=result.content[:200])

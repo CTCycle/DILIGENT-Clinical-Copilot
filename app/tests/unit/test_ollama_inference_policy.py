@@ -6,6 +6,7 @@ from services.llm import ollama_chat
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.runtime_config import LLMRuntimeConfig
 
+
 ###############################################################################
 def test_ollama_gpt_oss_preserves_level_reasoning_and_omits_temperature(
     monkeypatch,
@@ -98,3 +99,40 @@ def test_ollama_payload_omits_think_when_transport_does_not_support_reasoning() 
     )
 
     assert "think" not in payload
+
+###############################################################################
+def test_ollama_chat_payload_preserves_json_format_and_thinking() -> None:
+
+    ###############################################################################
+    class FakeOllama:
+
+        # -------------------------------------------------------------------------
+        @staticmethod
+        def compose_payload(
+            payload: dict[str, object],
+            *,
+            format: str | None,
+            options: dict[str, object] | None,
+            keep_alive: str | None,
+        ) -> dict[str, object]:
+            return ollama_chat.compose_payload(
+                payload,
+                format=format,
+                options=options,
+                keep_alive=keep_alive,
+            )
+
+    payload = ollama_chat.build_chat_payload(
+        FakeOllama(),
+        model="qwen3:8b",
+        messages=[{"role": "user", "content": "return JSON"}],
+        stream=False,
+        format="json",
+        temperature=None,
+        think="high",
+        options=None,
+        keep_alive=None,
+    )
+
+    assert payload["format"] == "json"
+    assert payload["think"] == "high"

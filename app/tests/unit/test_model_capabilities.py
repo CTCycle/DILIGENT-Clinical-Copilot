@@ -11,6 +11,7 @@ from services.llm.model_capabilities import (
     resolve_model_capabilities,
 )
 
+
 ###############################################################################
 def test_capability_resolution_prefers_exact_then_family_then_provider() -> None:
     exact = resolve_model_capabilities(provider="ollama", model="gpt-oss:20b")
@@ -51,6 +52,8 @@ def test_live_descriptor_metadata_overrides_catalog_limits() -> None:
             output_token_limit=4096,
             supports_thinking=False,
             supports_temperature=False,
+            supports_json_mode=True,
+            supports_native_json_schema=True,
         ),
     )
 
@@ -59,6 +62,28 @@ def test_live_descriptor_metadata_overrides_catalog_limits() -> None:
     assert capabilities.output_token_limit == 4096
     assert capabilities.supported_reasoning_levels == (ReasoningLevel.OFF,)
     assert capabilities.supports_temperature is False
+    assert capabilities.supports_json_mode is True
+    assert capabilities.supports_native_json_schema is True
+
+###############################################################################
+def test_current_provider_contract_capabilities_are_explicit() -> None:
+    gemini = resolve_model_capabilities(provider="gemini", model="gemini-3-pro")
+    anthropic = resolve_model_capabilities(
+        provider="anthropic", model="claude-sonnet-4-6"
+    )
+    opencode = resolve_model_capabilities(
+        provider="opencode_go", model="deepseek-v4-flash"
+    )
+
+    assert gemini.supported_reasoning_levels == (
+        ReasoningLevel.LOW,
+        ReasoningLevel.MEDIUM,
+        ReasoningLevel.HIGH,
+    )
+    assert anthropic.reasoning_parameter == "adaptive"
+    assert anthropic.supports_native_json_schema is True
+    assert opencode.supports_json_mode is True
+    assert opencode.supports_native_json_schema is False
 
 ###############################################################################
 def test_effective_config_preserves_request_and_reports_provider_coercion() -> None:

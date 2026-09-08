@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-08-21
+Last updated: 2026-09-07
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
@@ -10,6 +10,12 @@ translated; callers must send `reasoning_level` explicitly.
 See [generation policy](generation_policy.md) for the purpose responsibility
 matrix, capability catalog, provider transport rules, and context-budget
 provenance.
+
+Cloud model catalogs are provider-specific. OpenCode Zen and Go resolve the
+transport endpoint from the provider model metadata, with a documented fallback
+only for known Go model IDs. A configured model is never silently replaced when
+its provider rejects a request; the persisted fallback warning includes the
+operation and sanitized upstream detail when available.
 
 ## Primary Runtime Files
 - Active env file: `settings/.env`
