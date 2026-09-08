@@ -63,7 +63,6 @@ function modelConfigPayload(): ModelConfigStateResponse {
       hybrid_vector_weight: 0.7,
       hybrid_text_weight: 0.3,
       vector_stream_batch_size: 250,
-      embedding_device: 'auto',
       embedding_offline_mode: false,
     },
     embedding_runtime: {
