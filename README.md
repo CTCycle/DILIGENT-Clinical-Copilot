@@ -1,5 +1,5 @@
 # DILIGENT Clinical Copilot
-Last updated: 2026-09-01
+Last updated: 2026-09-08
 
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-GNU%20GPL%20v3-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
@@ -47,34 +47,47 @@ At a high level, DILIGENT combines an Angular user interface, a Python/FastAPI l
 
 ## Screenshots
 
-These release views use a fictional DILI case and public catalog records. They
-contain no real patient information, credentials, private files, or provider
-secrets.
+These current development views were captured on 2026-09-08 with a fictional
+synthetic DILI case and public catalog records. They contain no real patient
+information, credentials, private files, or provider secrets. The v3.3.0
+release capture set remains available under
+`assets/QA/release-v3.3.0-screenshots/` for release-baseline comparison.
 
 <table>
   <tr>
     <td>
-      <img src="assets/QA/release-v3.3.0-screenshots/01-dili-agent-synthetic-input.png" alt="DILI Agent with a structured fictional case ready for review" width="620">
-      <br><sub><strong>DILI Agent.</strong> Enter a structured case and prepare an assessment.</sub>
+      <img src="assets/QA/e2e-20260908-screenshots/01-dili-agent-synthetic-input.png" alt="DILI Agent with a structured synthetic case ready for review" width="620">
+      <br><sub><strong>DILI Agent.</strong> Enter a synthetic case and prepare an assessment.</sub>
     </td>
     <td>
-      <img src="assets/QA/release-v3.3.0-screenshots/02-clinical-sessions-synthetic-report.png" alt="Clinical Sessions showing a saved synthetic report" width="620">
+      <img src="assets/QA/e2e-20260908-screenshots/02-clinical-sessions-synthetic-report.png" alt="Clinical Sessions showing a saved synthetic report" width="620">
       <br><sub><strong>Clinical Sessions.</strong> Review a saved report and its structured findings.</sub>
     </td>
   </tr>
   <tr>
     <td>
-      <img src="assets/QA/release-v3.3.0-screenshots/03-patient-timeline-overview.png" alt="Patient Timeline showing review controls and a clinical chronology" width="620">
+      <img src="assets/QA/e2e-20260908-screenshots/03-patient-timeline-overview.png" alt="Patient Timeline showing review controls and a clinical chronology" width="620">
       <br><sub><strong>Patient Timeline.</strong> Focus chronology controls and compare dated events.</sub>
     </td>
     <td>
-      <img src="assets/QA/release-v3.3.0-screenshots/05-data-inspection-drug-catalog.png" alt="Data Inspection showing public amoxicillin catalog records" width="620">
+      <img src="assets/QA/e2e-20260908-screenshots/06-data-inspection-drug-catalog.png" alt="Data Inspection showing public catalog records" width="620">
       <br><sub><strong>Data Inspection.</strong> Inspect public catalog records and update status.</sub>
     </td>
   </tr>
 </table>
 
+The configuration surface used for the live provider validation is captured in
+[`assets/QA/e2e-20260908-screenshots/05-configurations-deepseek.png`](assets/QA/e2e-20260908-screenshots/05-configurations-deepseek.png).
+The complete synthetic end-to-end record, including the revision-review
+failure state and event inspector, is in
+[`assets/QA/e2e-validation-20260908.md`](assets/QA/e2e-validation-20260908.md).
+
 ## v3.3.0 release highlights
+
+As of 2026-09-08, v3.3.0 is still the most recent published release. The
+current development branch contains substantial post-release work and should
+not be described as v3.3.0-equivalent until the clinical-pattern and revision
+provider findings in the end-to-end audit are resolved.
 
 The v3.3.0 release provides Windows x64 desktop packages in two forms:
 
