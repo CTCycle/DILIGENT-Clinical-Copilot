@@ -1,6 +1,6 @@
 {
-  "policy_version": "2026-08-21",
-  "source_review_date": "2026-08-21",
+  "policy_version": "2026-09-07",
+  "source_review_date": "2026-09-07",
   "profiles": {
     "provider_default": {
       "structured_extraction": 0.0,

@@ -101,11 +101,13 @@ def _timeline_fallback_note(
     provider: object,
     model: object,
     error_code: PatientTimelineGenerationErrorCode,
+    diagnostic: str | None = None,
 ) -> str:
-    provider_label = coerce_optional_str(provider) or "configured provider"
+    provider_value = coerce_optional_str(provider) or "configured provider"
+    provider_label = provider_value.replace("_", "-")
     model_label = coerce_optional_str(model) or "configured model"
     if use_cloud_services:
-        provider_key = provider_label.casefold().replace("-", "_")
+        provider_key = provider_value.casefold().replace("-", "_")
         credential_hint = (
             "the active OpenCode access key"
             if provider_key == "opencode_go"
@@ -125,7 +127,13 @@ def _timeline_fallback_note(
             error_code,
             "The provider request failed unexpectedly. Check backend logs and retry.",
         )
-        return f"Cloud timeline extraction using {provider_label} / {model_label} did not complete. {message}"
+        if diagnostic:
+            message = diagnostic
+        note = (
+            f"Cloud timeline extraction using {provider_label} / {model_label} "
+            f"did not complete. {message}"
+        )
+        return note[:500]
     local_messages = {
         "timeout": "The local model runtime did not respond before the configured timeout.",
         "invalid_response": "The local model returned invalid structured data.",
@@ -410,6 +418,13 @@ class InspectionTimelineMixin:
                     type(exc).__name__,
                     exc_info=True,
                 )
+                diagnostic_method = cast(
+                    Callable[[], str] | None,
+                    getattr(exc, "user_message", None),
+                )
+                diagnostic = (
+                    diagnostic_method() if callable(diagnostic_method) else None
+                )
                 timeline = self.build_fallback_timeline(
                     session_id=safe_session_id,
                     source=source,
@@ -420,6 +435,7 @@ class InspectionTimelineMixin:
                         provider=requested_runtime_settings.get("llm_provider"),
                         model=source_model,
                         error_code=error_code,
+                        diagnostic=diagnostic,
                     ),
                     generation_error_code=error_code,
                 )

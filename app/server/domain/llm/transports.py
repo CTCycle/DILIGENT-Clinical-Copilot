@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, Field
 
 T = TypeVar("T", bound=BaseModel)
+RequestOperation = Literal[
+    "chat", "structured_output", "json_repair", "connectivity"
+]
 
 ###############################################################################
 class ChatRequest(BaseModel):
@@ -12,6 +15,8 @@ class ChatRequest(BaseModel):
     messages: list[dict[str, str]]
     options: dict[str, Any] = Field(default_factory=dict)
     json_mode: bool = False
+    operation: RequestOperation = "chat"
+    json_schema: dict[str, Any] | None = None
     reasoning_level: str | None = None
     reasoning_parameter: str | None = None
     reasoning_reserve: int | None = None

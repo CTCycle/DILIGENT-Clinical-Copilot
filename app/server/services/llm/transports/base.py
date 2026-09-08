@@ -53,6 +53,8 @@ class StructuredTransportMixin:
                 messages=request.messages,
                 options=request.options,
                 json_mode=True,
+                operation="structured_output",
+                json_schema=request.schema_type.model_json_schema(),
                 reasoning_level=request.reasoning_level,
                 reasoning_parameter=request.reasoning_parameter,
                 reasoning_reserve=request.reasoning_reserve,

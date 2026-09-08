@@ -10,6 +10,7 @@ from services.llm.transports.gemini import GeminiTransport
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
 
+
 ###############################################################################
 class FakeOpenAIChatResponse:
 
@@ -139,11 +140,62 @@ def test_anthropic_transport_reserves_reasoning_budget_without_fixed_default() -
     assert "temperature" not in captured
 
 ###############################################################################
+def test_anthropic_transport_uses_adaptive_thinking_and_native_schema() -> None:
+    captured: dict[str, Any] = {}
+
+    ###############################################################################
+    class FakeMessages:
+
+        # -------------------------------------------------------------------------
+        async def create(self, **kwargs: Any) -> SimpleNamespace:
+            captured.update(kwargs)
+            return SimpleNamespace(content=[SimpleNamespace(text='{"ok":true}')])
+
+    transport = AnthropicMessagesTransport.__new__(AnthropicMessagesTransport)
+    transport.client = SimpleNamespace(messages=FakeMessages())
+    result = asyncio.run(
+        transport.chat(
+            ChatRequest(
+                model="claude-sonnet-4-6",
+                messages=[{"role": "user", "content": "hello"}],
+                options={"temperature": 0.2},
+                json_mode=True,
+                operation="structured_output",
+                json_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
+                reasoning_level="high",
+                reasoning_parameter="adaptive",
+                reasoning_reserve=256,
+                output_token_limit=512,
+            )
+        )
+    )
+
+    assert result.content == '{"ok":true}'
+    assert captured["thinking"] == {"type": "adaptive"}
+    assert captured["output_config"]["effort"] == "high"
+    assert captured["output_config"]["format"]["type"] == "json_schema"
+    assert "temperature" not in captured
+
+###############################################################################
 def test_gemini_maps_medium_reasoning_to_low_sdk_level() -> None:
     request = ChatRequest(
         model="gemini-3",
         messages=[{"role": "user", "content": "hello"}],
         reasoning_level="medium",
+        reasoning_parameter="level",
+    )
+
+    config = GeminiTransport._thinking_config(request)
+
+    assert config is not None
+    assert str(config.thinking_level).lower().endswith("low")
+
+###############################################################################
+def test_gemini_does_not_send_zero_budget_to_always_thinking_models() -> None:
+    request = ChatRequest(
+        model="gemini-3-pro",
+        messages=[{"role": "user", "content": "hello"}],
+        reasoning_level="off",
         reasoning_parameter="level",
     )
 
