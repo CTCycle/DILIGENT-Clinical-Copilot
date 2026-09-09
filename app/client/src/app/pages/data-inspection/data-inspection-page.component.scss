@@ -33,6 +33,91 @@
   height: 1rem;
 }
 
+.inspection-rag-folder-browser {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.inspection-folder-browser-note,
+.inspection-folder-browser-status {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.inspection-rag-folder-browser-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.inspection-rag-folder-browser-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspection-rag-folder-up {
+  align-self: flex-start;
+}
+
+.inspection-rag-folder-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--space-sm);
+  min-height: 10rem;
+  max-height: 25rem;
+  overflow: auto;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-alt);
+}
+
+.inspection-rag-folder-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.inspection-rag-folder-item:hover:not(:disabled),
+.inspection-rag-folder-item:focus-visible {
+  border-color: var(--color-accent);
+  background: var(--color-surface-hover, var(--color-surface-alt));
+}
+
+.inspection-rag-folder-item:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.inspection-rag-folder-item .inspection-icon {
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--color-accent);
+}
+
+.inspection-rag-folder-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .inspection-rag-summary {
   margin: 0 0 var(--space-lg);
   padding: 0;

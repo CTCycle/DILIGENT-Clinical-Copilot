@@ -408,6 +408,9 @@ def _build_rag_settings(
     if candidate_count < selected_count:
         candidate_count = selected_count
     return RagSettings(
+        allow_local_filesystem_access=coerce_bool(
+            data.get("allow_local_filesystem_access"), True
+        ),
         vector_collection_name=coerce_str(
             data.get("vector_collection_name"), "documents"
         ),

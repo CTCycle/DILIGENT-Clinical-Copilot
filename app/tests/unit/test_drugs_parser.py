@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Sequence
 from typing import Any
 
@@ -847,6 +848,34 @@ def test_extract_drugs_from_therapy_falls_back_after_llm_failure() -> None:
     )
 
     assert [entry.name for entry in parsed.entries] == ["Cardiomed"]
+
+###############################################################################
+def test_therapy_failure_warning_logs_safe_runtime_metadata(caplog) -> None:
+    class SensitiveFailingStructuredClient:
+
+        async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
+            _ = kwargs
+            raise RuntimeError(
+                "patient=Mario Rossi api_key=super-secret clinical narrative"
+            )
+
+    caplog.set_level(logging.WARNING)
+    parser = DrugsParser(client=SensitiveFailingStructuredClient())
+
+    asyncio.run(parser.extract_drugs_from_therapy("Cardiomed 100 mg cpr"))
+
+    warning = next(
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("Therapy LLM extraction failed")
+    )
+    assert "provider=unknown" in warning
+    assert "model=" in warning
+    assert "failure_type=RuntimeError" in warning
+    assert "failure_code=RuntimeError" in warning
+    assert "super-secret" not in warning
+    assert "Mario Rossi" not in warning
+    assert "clinical narrative" not in warning
 
 
 ###############################################################################

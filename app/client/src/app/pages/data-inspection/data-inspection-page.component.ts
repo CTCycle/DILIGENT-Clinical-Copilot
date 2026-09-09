@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { InspectionActionIconButtonComponent } from '../../components/inspection-action-icon-button/inspection-action-icon-button.component';
@@ -9,6 +9,7 @@ import { InspectionCatalogToolbarComponent } from '../../components/inspection-c
 import {
   deleteInspectionLiverToxDrug,
   deleteInspectionRxNavDrug,
+  fetchInspectionRagDirectoryBrowse,
   fetchInspectionLiverToxCatalog,
   fetchInspectionLiverToxExcerpt,
   fetchInspectionRagDocuments,
@@ -37,6 +38,7 @@ import {
   InspectionDrugAliasesResponse,
   InspectionLiverToxExcerptResponse,
   InspectionLiverToxItem,
+  InspectionRagDirectoryItem,
   InspectionRagDocumentRow,
   InspectionRagVectorizationSummary,
   InspectionRagVectorStoreSummary,
@@ -90,16 +92,6 @@ const RAG_SUMMARY_FIELDS: ReadonlyArray<{
   { key: 'embedding_offline_mode', label: 'Offline mode' },
 ];
 
-function normalizeFolderSeparators(value: string): string {
-  return value.replace(/\\/g, '/');
-}
-
-function folderBasename(value: string): string {
-  const normalized = normalizeFolderSeparators(value).replace(/\/+$/g, '');
-  const segments = normalized.split('/');
-  return segments.at(-1)?.trim() || '';
-}
-
 @Component({
   selector: 'app-data-inspection-page',
   standalone: true,
@@ -116,8 +108,6 @@ function folderBasename(value: string): string {
   styleUrl: './data-inspection-page.component.scss',
 })
 export class DataInspectionPageComponent implements OnInit, OnDestroy {
-  @ViewChild('ragFolderInput') private ragFolderInput?: ElementRef<HTMLInputElement>;
-
   private readonly jobPolling = inject(JobPollingService);
   private readonly desktopDialog = inject(DesktopDialogService);
   private readonly inspectionUpdateTracker = inject(InspectionUpdateJobTrackerService);
@@ -174,6 +164,13 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly ragSearchInput = this.ragCatalog.searchInput;
   readonly ragVectorStore = signal<InspectionRagVectorStoreSummary | null>(null);
   readonly ragSelectedFolderPath = signal('');
+  readonly ragFolderBrowserOpen = signal(false);
+  readonly ragFolderBrowsePath = signal('');
+  readonly ragFolderBrowseParentPath = signal<string | null>(null);
+  readonly ragFolderBrowseItems = signal<InspectionRagDirectoryItem[]>([]);
+  readonly ragFolderBrowseLoading = signal(false);
+  readonly ragFolderBrowseError = signal<string | null>(null);
+  private ragFolderBrowseRequest = 0;
   private readonly aliasDetail = new InspectionDetailResource<InspectionDrugAliasesResponse>();
   readonly aliasData = this.aliasDetail.data;
   readonly aliasLoading = this.aliasDetail.loading;
@@ -485,57 +482,58 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const input = this.ragFolderInput?.nativeElement;
-    if (!input) {
-      this.ragError.set('Folder picker is unavailable in this browser runtime.');
-      return;
-    }
-    input.value = '';
-    input.click();
+    this.ragFolderBrowserOpen.set(true);
+    this.ragFolderBrowsePath.set('');
+    this.ragFolderBrowseParentPath.set(null);
+    this.ragFolderBrowseItems.set([]);
+    this.ragFolderBrowseError.set(null);
+    await this.browseRagFolder('');
   }
 
-  handleRagFolderSelection(event: Event): void {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement) || !target.files || target.files.length === 0) {
-      return;
-    }
-    const firstFile = target.files[0] as File & { path?: string; webkitRelativePath?: string };
-    const webkitPath = firstFile.webkitRelativePath || '';
-    const rootFolder = webkitPath.split('/')[0]?.trim() || '';
-    const absoluteCandidate = this.resolveAbsoluteFolderPath(firstFile, webkitPath, rootFolder);
-    if (absoluteCandidate) {
-      this.ragSelectedFolderPath.set(absoluteCandidate);
-      this.ragError.set(null);
-      return;
-    }
-    const currentPath = this.displayedRagFolderPath.trim();
-    if (rootFolder && folderBasename(currentPath).toLowerCase() === rootFolder.toLowerCase()) {
-      this.ragSelectedFolderPath.set(currentPath);
-      this.ragError.set(null);
-      return;
-    }
-    this.ragError.set(
-      'This browser did not expose an absolute folder path from folder selection.',
-    );
+  closeRagFolderBrowser(): void {
+    this.ragFolderBrowserOpen.set(false);
   }
 
-  private resolveAbsoluteFolderPath(
-    file: File & { path?: string },
-    webkitRelativePath: string,
-    rootFolder: string,
-  ): string {
-    const filePath = typeof file.path === 'string' ? file.path.trim() : '';
-    if (!filePath || !webkitRelativePath || !rootFolder) {
-      return '';
+  async browseRagFolder(path = this.ragFolderBrowsePath()): Promise<void> {
+    const requestId = ++this.ragFolderBrowseRequest;
+    this.ragFolderBrowseLoading.set(true);
+    this.ragFolderBrowseError.set(null);
+    try {
+      const result = await fetchInspectionRagDirectoryBrowse(path);
+      if (requestId !== this.ragFolderBrowseRequest) {
+        return;
+      }
+      this.ragFolderBrowsePath.set(result.current_path);
+      this.ragFolderBrowseParentPath.set(result.parent_path);
+      this.ragFolderBrowseItems.set(result.items);
+    } catch (error) {
+      if (requestId !== this.ragFolderBrowseRequest) {
+        return;
+      }
+      this.ragFolderBrowseError.set(
+        error instanceof Error
+          ? error.message
+          : 'Unable to browse local folders.',
+      );
+    } finally {
+      if (requestId === this.ragFolderBrowseRequest) {
+        this.ragFolderBrowseLoading.set(false);
+      }
     }
-    const normalizedFilePath = normalizeFolderSeparators(filePath);
-    const normalizedRelative = normalizeFolderSeparators(webkitRelativePath);
-    if (!normalizedFilePath.toLowerCase().endsWith(normalizedRelative.toLowerCase())) {
-      return '';
+  }
+
+  navigateRagFolder(path: string): void {
+    void this.browseRagFolder(path);
+  }
+
+  selectRagFolder(): void {
+    const selectedPath = this.ragFolderBrowsePath().trim();
+    if (!selectedPath || this.ragFolderBrowseLoading()) {
+      return;
     }
-    const base = normalizedFilePath.slice(0, normalizedFilePath.length - normalizedRelative.length);
-    const slash = base.endsWith('/') ? '' : '/';
-    return `${base}${slash}${rootFolder}`;
+    this.ragSelectedFolderPath.set(selectedPath);
+    this.ragError.set(null);
+    this.closeRagFolderBrowser();
   }
 
   async openUpdateModal(target: InspectionUpdateTarget): Promise<void> {

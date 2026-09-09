@@ -41,6 +41,7 @@ def test_build_rag_settings_reads_retrieval_counts() -> None:
     assert settings["hybrid_text_weight"] == 0.3
     assert "embedding_device" not in settings
     assert settings["embedding_offline_mode"] is True
+    assert settings["allow_local_filesystem_access"] is True
     assert "embedding_backend" not in settings
 
 ###############################################################################
@@ -63,4 +64,14 @@ def test_build_rag_settings_defaults_to_lightweight_reranker_profile() -> None:
     assert settings["chunk_overlap"] == 64
     assert "embedding_device" not in settings
     assert settings["embedding_offline_mode"] is False
+    assert settings["allow_local_filesystem_access"] is True
     assert "reset_vector_collection" not in settings
+
+###############################################################################
+def test_build_rag_settings_can_disable_local_filesystem_access() -> None:
+    payload = build_settings_payload_from_json(
+        {"rag": {"allow_local_filesystem_access": False}},
+        _env(),
+    )
+
+    assert payload["rag"]["allow_local_filesystem_access"] is False

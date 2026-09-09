@@ -700,6 +700,21 @@ class RagDocumentListResponse(BaseModel):
     limit: int = 0
 
 ###############################################################################
+class RagDirectoryItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    path: str
+    is_dir: bool = True
+
+###############################################################################
+class RagDirectoryBrowseResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_path: str
+    parent_path: str | None = None
+    items: list[RagDirectoryItem] = Field(default_factory=list)
+    drives: list[str] = Field(default_factory=list)
+
+###############################################################################
 class LanceVectorStoreSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source_documents_path: str

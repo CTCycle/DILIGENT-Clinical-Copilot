@@ -5,6 +5,7 @@ import {
   InspectionDrugAliasesResponse,
   InspectionLiverToxCatalogResponse,
   InspectionLiverToxExcerptResponse,
+  InspectionRagDirectoryBrowseResponse,
   InspectionRagDocumentsResponse,
   InspectionRagVectorStoreSummary,
   InspectionRxNavCatalogResponse,
@@ -107,6 +108,16 @@ export async function fetchInspectionRagDocuments(
 export async function fetchInspectionRagVectorStore(): Promise<InspectionRagVectorStoreSummary> {
   return requestJson<InspectionRagVectorStoreSummary>(
     `${API_BASE_URL}/inspection/rag/vector-store`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchInspectionRagDirectoryBrowse(
+  path = "",
+): Promise<InspectionRagDirectoryBrowseResponse> {
+  const queryString = buildQueryString({ path });
+  return requestJson<InspectionRagDirectoryBrowseResponse>(
+    `${API_BASE_URL}/inspection/rag/browse${queryString}`,
     { method: "GET" },
   );
 }

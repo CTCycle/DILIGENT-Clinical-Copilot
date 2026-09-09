@@ -59,6 +59,7 @@ class DrugsMatcherSettings(BaseModel):
 ###############################################################################
 class RagSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
+    allow_local_filesystem_access: bool
     vector_collection_name: str
     chunk_size: int
     chunk_overlap: int

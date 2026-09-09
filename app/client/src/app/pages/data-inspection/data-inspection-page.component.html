@@ -194,17 +194,6 @@
                     <path fill="currentColor" d="M10 4a2 2 0 0 1 1.41.59L13 6h7a2 2 0 0 1 2 2v1H2V6a2 2 0 0 1 2-2h6Zm12 7v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7h20Zm-6.2 2.22a1 1 0 0 0-1.42 0L13 14.59V13a1 1 0 0 0-2 0v1.59l-1.38-1.37a1 1 0 1 0-1.42 1.41l3.08 3.09a1 1 0 0 0 1.42 0l3.1-3.09a1 1 0 0 0 0-1.41Z"/>
                   </svg>
                 </button>
-                @if (!isTauriSurface) {
-                  <input
-                    #ragFolderInput
-                    type="file"
-                    class="inspection-folder-input"
-                    webkitdirectory
-                    directory
-                    aria-label="RAG documents folder picker"
-                    (change)="handleRagFolderSelection($event)"
-                  />
-                }
               </div>
             </app-inspection-catalog-toolbar>
 
@@ -256,6 +245,82 @@
       }
     </section>
   </section>
+
+  <app-modal-shell
+    [isOpen]="ragFolderBrowserOpen()"
+    title="Select RAG documents folder"
+    [subtitle]="ragFolderBrowsePath() || 'Choose a folder from this computer.'"
+    dialogClassName="modal-container inspection-modal inspection-modal-large"
+    [footer]="true"
+    closeLabel="Close RAG folder browser"
+    (close)="closeRagFolderBrowser()"
+  >
+    <div class="inspection-rag-folder-browser">
+      <p class="inspection-folder-browser-note">
+        Browse folders on the local application host. The selected folder path is validated by the server before it is used for vectorization.
+      </p>
+      <div class="inspection-rag-folder-browser-toolbar">
+        <span class="inspection-rag-folder-browser-path" aria-live="polite">
+          {{ ragFolderBrowsePath() || 'This computer' }}
+        </span>
+        <button
+          class="btn btn-secondary inspection-mini-btn"
+          type="button"
+          (click)="browseRagFolder('')"
+          [disabled]="ragFolderBrowseLoading() || !ragFolderBrowsePath()"
+        >
+          Browse drives
+        </button>
+      </div>
+      @if (ragFolderBrowseParentPath()) {
+        <button
+          class="btn btn-secondary inspection-mini-btn inspection-rag-folder-up"
+          type="button"
+          (click)="navigateRagFolder(ragFolderBrowseParentPath()!)"
+          [disabled]="ragFolderBrowseLoading()"
+        >
+          Up one level
+        </button>
+      }
+      @if (ragFolderBrowseLoading()) {
+        <p class="inspection-folder-browser-status">Loading folders...</p>
+      }
+      @if (ragFolderBrowseError()) {
+        <p class="inspection-error-text">{{ ragFolderBrowseError() }}</p>
+      }
+      @if (!ragFolderBrowseLoading() && !ragFolderBrowseError() && ragFolderBrowseItems().length === 0) {
+        <p class="inspection-folder-browser-status">No subfolders found.</p>
+      }
+      <div class="inspection-rag-folder-list" role="list" aria-label="Available folders">
+        @for (item of ragFolderBrowseItems(); track item.path) {
+          <button
+            class="inspection-rag-folder-item"
+            type="button"
+            (click)="navigateRagFolder(item.path)"
+            [disabled]="ragFolderBrowseLoading() || !item.is_dir"
+          >
+            <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M10 4a2 2 0 0 1 1.41.59L13 6h7a2 2 0 0 1 2 2v1H2V6a2 2 0 0 1 2-2h6Zm12 7v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7h20Z"/>
+            </svg>
+            <span>{{ item.name }}</span>
+          </button>
+        }
+      </div>
+    </div>
+    <div modal-footer class="inspection-pager-actions inspection-update-actions">
+      <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="closeRagFolderBrowser()">
+        Cancel
+      </button>
+      <button
+        class="btn btn-primary inspection-mini-btn"
+        type="button"
+        (click)="selectRagFolder()"
+        [disabled]="!ragFolderBrowsePath() || ragFolderBrowseLoading()"
+      >
+        Use this folder
+      </button>
+    </div>
+  </app-modal-shell>
 
   <app-modal-shell
     [isOpen]="!!aliasData() || !!aliasError() || aliasLoading()"

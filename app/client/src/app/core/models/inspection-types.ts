@@ -333,6 +333,19 @@ export type InspectionRagDocumentsResponse = {
   limit: number;
 };
 
+export type InspectionRagDirectoryItem = {
+  name: string;
+  path: string;
+  is_dir: boolean;
+};
+
+export type InspectionRagDirectoryBrowseResponse = {
+  current_path: string;
+  parent_path: string | null;
+  items: InspectionRagDirectoryItem[];
+  drives: string[];
+};
+
 export type InspectionRagVectorStoreSummary = {
   source_documents_path: string;
   vector_db_path: string;
