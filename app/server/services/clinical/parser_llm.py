@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import unicodedata
 from collections.abc import Callable
 from typing import Any, Literal, cast
@@ -37,12 +38,72 @@ from domain.clinical.extractor_contracts import (
 ###############################################################################
 class DrugLlmExtractionMixin(ParserHost):
 
+    _STRUCTURED_FAILURE_CODES = frozenset(
+        {
+            "empty_input",
+            "invalid_json_object",
+            "leading_prose_not_allowed",
+            "top_level_object_required",
+            "trailing_prose_not_allowed",
+            "validation_error",
+        }
+    )
+    _RUNTIME_FAILURE_CODES = frozenset(
+        {
+            "authentication",
+            "configuration",
+            "network_unavailable",
+            "provider_error",
+            "rate_limited",
+            "timeout",
+            "upstream_error",
+        }
+    )
+
     # -------------------------------------------------------------------------
     def active_provider_name(self) -> str | None:
         provider = self.forced_provider or self.client_provider
         if provider == "injected":
             return self.forced_provider
         return provider
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _sanitize_therapy_log_label(value: object, fallback: str) -> str:
+        normalized = str(value or "").strip()
+        safe = re.sub(r"[^A-Za-z0-9_.:/-]+", "_", normalized)
+        return safe[:96] or fallback
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _therapy_failure_code(cls, exc: Exception) -> str:
+        configured_code = getattr(exc, "error_code", None)
+        if isinstance(configured_code, str):
+            normalized_code = configured_code.strip().casefold()
+            if normalized_code in (
+                cls._STRUCTURED_FAILURE_CODES | cls._RUNTIME_FAILURE_CODES
+            ):
+                return normalized_code
+        if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+            return "timeout"
+        message = str(exc).casefold()
+        for code in cls._STRUCTURED_FAILURE_CODES:
+            if code in message:
+                return code
+        return cls._sanitize_therapy_log_label(type(exc).__name__, "unknown")
+
+    # -------------------------------------------------------------------------
+    def _therapy_failure_log_fields(self, exc: Exception) -> tuple[str, str, str, str]:
+        return (
+            self._sanitize_therapy_log_label(
+                self.active_provider_name(), "unknown"
+            ),
+            self._sanitize_therapy_log_label(self.model, "unknown"),
+            self._sanitize_therapy_log_label(type(exc).__name__, "unknown"),
+            self._sanitize_therapy_log_label(
+                self._therapy_failure_code(exc), "unknown"
+            ),
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -187,9 +248,16 @@ class DrugLlmExtractionMixin(ParserHost):
                 len(combined),
             )
         except Exception as exc:  # noqa: BLE001
+            provider, model, failure_type, failure_code = (
+                self._therapy_failure_log_fields(exc)
+            )
             logger.warning(
-                "Therapy LLM extraction failed; using deterministic fallback: %s",
-                exc,
+                "Therapy LLM extraction failed; using deterministic fallback: "
+                "provider=%s model=%s failure_type=%s failure_code=%s",
+                provider,
+                model,
+                failure_type,
+                failure_code,
             )
             combined = await self.extract_drugs_from_therapy_hybrid(
                 cleaned,
@@ -247,9 +315,16 @@ class DrugLlmExtractionMixin(ParserHost):
             combined = structured.entries
             structured_succeeded = True
         except Exception as exc:  # noqa: BLE001
+            provider, model, failure_type, failure_code = (
+                self._therapy_failure_log_fields(exc)
+            )
             logger.warning(
-                "Therapy audit LLM extraction failed; using deterministic fallback: %s",
-                exc,
+                "Therapy audit LLM extraction failed; using deterministic fallback: "
+                "provider=%s model=%s failure_type=%s failure_code=%s",
+                provider,
+                model,
+                failure_type,
+                failure_code,
             )
             combined = await self.extract_drugs_from_therapy_hybrid(
                 cleaned,
@@ -351,10 +426,18 @@ class DrugLlmExtractionMixin(ParserHost):
                 progress_callback=progress_callback,
             )
         except Exception as exc:  # noqa: BLE001
+            provider, model, failure_type, failure_code = (
+                self._therapy_failure_log_fields(exc)
+            )
             logger.warning(
-                "Contextual therapy LLM extraction failed for %s unresolved spans; using deterministic entries only: %s",
+                "Contextual therapy LLM extraction failed for %s unresolved spans; "
+                "using deterministic entries only: provider=%s model=%s "
+                "failure_type=%s failure_code=%s",
                 len(fallback_lines),
-                exc,
+                provider,
+                model,
+                failure_type,
+                failure_code,
             )
             structured = PatientDrugs(entries=[])
 

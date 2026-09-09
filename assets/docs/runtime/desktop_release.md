@@ -86,9 +86,12 @@ filesystem or shell access.
 Normal HTML file inputs remain in use for clinical-session image/document
 metadata and patient profile images because those workflows require browser
 `File` objects rather than filesystem paths. They open the native WebView2 file
-picker on Windows. Non-Tauri web development retains the browser directory
-fallback for RAG folder selection. No embedded filesystem browser or manual
-path-entry flow is part of the desktop surface.
+picker on Windows. Non-Tauri web development uses the local backend's
+server-side folder browser for RAG folder selection; it does not infer
+an absolute path from browser `File` metadata. The browser folder browser is
+directory-navigation only, and the backend returns the canonical path used by
+vectorization. No filesystem or shell capability is granted to the Tauri
+surface.
 
 ## Build
 
