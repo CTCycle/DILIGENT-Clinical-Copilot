@@ -441,6 +441,7 @@ function Set-LauncherEnvironment {
         # interpreter instead of an unrelated host Python installation.
         $env:PYTHONHOME = $PythonDir
     }
+    $env:PATH = "$NodeDir;$($env:PATH)"
 }
 
 function Install-ApplicationDependencies {
