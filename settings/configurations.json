@@ -3,6 +3,7 @@
     "polling_interval": 1
   },
   "rag": {
+    "allow_local_filesystem_access": true,
     "vector_collection_name": "documents",
     "hybrid_vector_weight": 0.65,
     "hybrid_text_weight": 0.35,

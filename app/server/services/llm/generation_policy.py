@@ -161,7 +161,7 @@ def _requirements(
             256,
             "clinical_relevance",
         ),
-        GenerationPurpose.STRUCTURED_EXTRACTION: (1536, 0, 256, 128, "current_source"),
+        GenerationPurpose.STRUCTURED_EXTRACTION: (3072, 0, 256, 128, "current_source"),
         GenerationPurpose.FAITHFUL_REWRITE: (2048, 0, 256, 128, "source_faithful"),
         GenerationPurpose.REVISION_SCAN: (1024, 0, 256, 128, "revision_priority"),
         GenerationPurpose.REVISION_PLANNING: (1536, 256, 256, 128, "revision_priority"),
@@ -175,7 +175,7 @@ def _requirements(
         GenerationPurpose.REVISION_EDITING: (3072, 512, 384, 192, "revision_priority"),
         GenerationPurpose.REVISION_QA: (1536, 0, 256, 128, "revision_priority"),
         GenerationPurpose.TIMELINE_EXTRACTION: (2048, 1024, 384, 192, "chronological"),
-        GenerationPurpose.JSON_REPAIR: (768, 0, 128, 64, "repair_only"),
+        GenerationPurpose.JSON_REPAIR: (3072, 0, 128, 64, "repair_only"),
         GenerationPurpose.CONNECTIVITY_CHECK: (64, 0, 32, 32, "connectivity_only"),
     }
     visible_output, base_reasoning, safety, padding, strategy = requirements[purpose]

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Query, status
+from fastapi import APIRouter, Body, HTTPException, Query, status
 
 from api.inspection.common import InspectionJobEndpointMixin
 from domain.inspection import (
     CatalogListFilters,
     InspectionRagUpdateRequest,
     InspectionUpdateConfigResponse,
+    RagDirectoryBrowseResponse,
     LanceVectorStoreSummaryResponse,
     RagDocumentListResponse,
 )
@@ -51,6 +52,31 @@ class InspectionRagEndpoint(InspectionJobEndpointMixin):
         return LanceVectorStoreSummaryResponse(
             **self.service.get_rag_vector_store_summary()
         )
+
+    # -------------------------------------------------------------------------
+    def browse_rag_directories(
+        self,
+        path: str = Query(default="", max_length=1024),
+    ) -> RagDirectoryBrowseResponse:
+        try:
+            return RagDirectoryBrowseResponse(
+                **self.service.browse_rag_directories(path)
+            )
+        except PermissionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Local filesystem browsing is not available.",
+            ) from exc
+        except FileNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The selected folder was not found.",
+            ) from exc
+        except (NotADirectoryError, ValueError, OSError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="The selected folder path is invalid or cannot be read.",
+            ) from exc
 
     # -------------------------------------------------------------------------
     def start_rag_update_job(
@@ -99,6 +125,13 @@ class InspectionRagEndpoint(InspectionJobEndpointMixin):
             self.get_rag_vector_store,
             methods=["GET"],
             response_model=LanceVectorStoreSummaryResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/rag/browse",
+            self.browse_rag_directories,
+            methods=["GET"],
+            response_model=RagDirectoryBrowseResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

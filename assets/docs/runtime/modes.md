@@ -39,4 +39,7 @@ Last updated: 2026-08-02
 - No official container workflow.
 - Long-running operations rely on backend job polling.
 - Some features require reachable external dependencies such as Ollama.
+- RAG folder selection uses the native operating-system picker in packaged
+  Tauri and the localhost backend's server-side directory browser in the
+  browser development surface.
 - Parser-model concurrency is guarded by parser batch preflight and falls back to sequential execution when runtime or model status cannot be validated safely.

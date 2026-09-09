@@ -54,6 +54,23 @@ def test_known_provider_defaults_use_base_temperature() -> None:
         assert not policy.uses_model_default
 
 ###############################################################################
+def test_structured_extraction_budgets_cover_multi_entry_payloads() -> None:
+    structured = resolve_generation_policy(
+        purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
+        provider="opencode_go",
+        model="deepseek-v4-flash",
+    )
+    repair = resolve_generation_policy(
+        purpose=GenerationPurpose.JSON_REPAIR,
+        provider="opencode_go",
+        model="deepseek-v4-flash",
+    )
+
+    assert structured.output_token_limit == 3072
+    assert repair.output_token_limit == 3072
+    assert structured.policy_version == "2026-09-09"
+
+###############################################################################
 def test_openai_and_deepseek_are_purpose_specific() -> None:
     assert (
         resolve_generation_policy(

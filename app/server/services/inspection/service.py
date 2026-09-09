@@ -1,7 +1,10 @@
 from __future__ import annotations
+
+import os
 from datetime import date
 from functools import partial
 from pathlib import Path
+from string import ascii_uppercase
 from threading import Lock
 from typing import Any, Literal
 
@@ -371,6 +374,77 @@ class DataInspectionService(
             "offset": bounded_offset,
             "limit": bounded_limit,
         }
+
+    # -------------------------------------------------------------------------
+    def browse_rag_directories(self, path: str | None = None) -> dict[str, Any]:
+        if not get_server_settings().rag.allow_local_filesystem_access:
+            raise PermissionError("Local filesystem browsing is disabled.")
+
+        requested_path = str(path or "").strip()
+        drives = self._rag_filesystem_roots()
+        if not requested_path:
+            return {
+                "current_path": "",
+                "parent_path": None,
+                "items": [
+                    {"name": root.name or str(root), "path": str(root), "is_dir": True}
+                    for root in drives
+                ],
+                "drives": [str(root) for root in drives],
+            }
+
+        directory = Path(requested_path)
+        if not directory.is_absolute():
+            raise ValueError("RAG browse path must be absolute.")
+        try:
+            directory = directory.resolve(strict=True)
+        except FileNotFoundError:
+            raise
+        except (OSError, RuntimeError) as exc:
+            raise OSError("The selected folder cannot be read.") from exc
+        if not directory.is_dir():
+            raise NotADirectoryError("RAG browse path is not a directory.")
+
+        try:
+            entries: list[Path] = []
+            for entry in directory.iterdir():
+                try:
+                    if entry.is_dir():
+                        entries.append(entry.resolve(strict=True))
+                except (FileNotFoundError, OSError, RuntimeError):
+                    # A protected or concurrently removed child must not make
+                    # an otherwise readable parent folder unusable.
+                    continue
+            entries.sort(key=lambda entry: entry.name.casefold())
+        except FileNotFoundError as exc:
+            raise FileNotFoundError("The selected folder was not found.") from exc
+        except PermissionError as exc:
+            raise PermissionError("The selected folder cannot be read.") from exc
+        except (OSError, RuntimeError) as exc:
+            raise OSError("The selected folder cannot be read.") from exc
+
+        parent = directory.parent
+        parent_path = None if parent == directory else str(parent)
+        return {
+            "current_path": str(directory),
+            "parent_path": parent_path,
+            "items": [
+                {"name": entry.name, "path": str(entry), "is_dir": True}
+                for entry in entries
+            ],
+            "drives": [str(root) for root in drives],
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _rag_filesystem_roots() -> list[Path]:
+        if os.name == "nt":
+            return [
+                Path(f"{letter}:\\")
+                for letter in ascii_uppercase
+                if Path(f"{letter}:\\").exists()
+            ]
+        return [Path("/")]
 
     # -------------------------------------------------------------------------
     def get_rag_vector_store_summary(self) -> dict[str, Any]:

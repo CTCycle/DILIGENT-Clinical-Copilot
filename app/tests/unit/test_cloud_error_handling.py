@@ -75,6 +75,47 @@ def test_deepseek_structured_repair_handles_schema_echo_before_valid_json() -> N
     assert calls[1]["json_schema"] == Payload.model_json_schema()
 
 ###############################################################################
+def test_structured_repair_recovers_from_truncated_patient_drugs_payload() -> None:
+    class Payload(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        name: str
+
+    client = CloudLLMClient.__new__(CloudLLMClient)
+    client.provider = "opencode_go"
+    client.default_model = "deepseek-v4-flash"
+    responses = iter(
+        [
+            '{"name":"Drug A"',
+            '{"name":"Drug A"}',
+        ]
+    )
+    calls: list[dict[str, object]] = []
+
+    async def fake_chat(**kwargs: object) -> str:
+        calls.append(kwargs)
+        return next(responses)
+
+    client.chat = fake_chat  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.llm_structured_call(
+            model="deepseek-v4-flash",
+            system_prompt="Return the requested object.",
+            user_prompt="Extract the medication.",
+            schema=Payload,
+            purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
+            max_repair_attempts=1,
+        )
+    )
+
+    assert result.name == "Drug A"
+    assert [call["purpose"] for call in calls] == [
+        GenerationPurpose.STRUCTURED_EXTRACTION,
+        GenerationPurpose.JSON_REPAIR,
+    ]
+
+###############################################################################
 def test_openai_chat_transport_extracts_json_from_content_parts() -> None:
     assert OpenAIChatTransport._content_to_text(
         [{"type": "text", "text": '{"ok":true}'}, {"type": "text", "text": "\n"}]
