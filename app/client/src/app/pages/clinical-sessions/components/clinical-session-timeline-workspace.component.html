@@ -5,11 +5,6 @@
         <h4>Generate a patient timeline</h4>
         <p>Uses the model assigned to the Timeline role in Configurations.</p>
       </div>
-      <app-help-popover
-        ariaLabel="Explain timeline generation"
-        title="About timeline generation"
-        body="Creates a dated event history from the current session using the configured Timeline model. Generated timelines are saved and can be reopened from the history list."
-      ></app-help-popover>
     </div>
 
     <p class="timeline-loading" aria-live="polite" [class.is-hidden]="!modelConfigLoading()">Loading model options…</p>

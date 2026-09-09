@@ -3,7 +3,6 @@ import { Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges, computed
 import { Router, RouterLink } from '@angular/router';
 
 import { ModalShellComponent } from '../../../components/modal-shell/modal-shell.component';
-import { HelpPopoverComponent } from '../../../core/guidance/help-popover.component';
 import { ClinicalSessionDetail, InspectionSessionTimelinePreview } from '../../../core/models/inspection-types';
 import { deleteInspectionSessionTimeline, fetchInspectionSessionTimelineJobStatus, fetchInspectionSessionTimelineList, startInspectionSessionTimelineJob } from '../../../core/services/session-timeline-api';
 import { JobPollingService } from '../../../core/services/job-polling.service';
@@ -13,7 +12,7 @@ import { formatUnknownError } from '../../../core/utils';
 @Component({
   selector: 'app-clinical-session-timeline-workspace',
   standalone: true,
-  imports: [CommonModule, ModalShellComponent, HelpPopoverComponent, RouterLink],
+  imports: [CommonModule, ModalShellComponent, RouterLink],
   templateUrl: './clinical-session-timeline-workspace.component.html',
   styleUrl: './clinical-session-timeline-workspace.component.scss',
 })
