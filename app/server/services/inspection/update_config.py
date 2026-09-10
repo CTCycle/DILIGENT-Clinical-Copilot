@@ -177,7 +177,10 @@ class InspectionUpdateConfigMixin:
                 "redownload": False,
             }
             allowed_fields = list(defaults.keys())
-        else:
+        elif target == "dilirank":
+            defaults = {"redownload": False}
+            allowed_fields = ["redownload"]
+        elif target == "rag":
             rag_settings = build_effective_rag_settings()
             defaults = {}
             allowed_fields = []
@@ -195,6 +198,8 @@ class InspectionUpdateConfigMixin:
                 "summary": summary,
                 "read_only": True,
             }
+        else:
+            raise ValueError(f"Unsupported inspection update target: {target}")
 
         return {
             "target": target,
