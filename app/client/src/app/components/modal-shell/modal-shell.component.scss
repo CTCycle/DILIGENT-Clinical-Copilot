@@ -25,7 +25,8 @@ dialog.modal-container {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  max-width: calc(100dvw - (2 * var(--space-md)));
+  width: 100%;
+  max-width: min(var(--modal-max-width, 480px), calc(100dvw - (2 * var(--space-md))));
   max-height: calc(100dvh - (2 * var(--space-md)));
   margin: auto;
   overflow: hidden;
@@ -35,6 +36,15 @@ dialog.modal-container {
 .modal-footer {
   flex: 0 0 auto;
   min-width: 0;
+}
+
+.modal-header-content {
+  min-width: 0;
+}
+
+.modal-title,
+.modal-subtitle {
+  overflow-wrap: anywhere;
 }
 
 .modal-body {
