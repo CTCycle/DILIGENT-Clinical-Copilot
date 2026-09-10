@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Response, status
 
 from common.utils.logger import logger
@@ -37,7 +39,7 @@ class InspectionJobEndpointMixin(InspectionEndpointBase):
             str(payload.get("job_type") or "") == DILIRANK_UPDATE_JOB_TYPE
             for payload in payloads
         ):
-            latest_dilirank: dict[str, object] | None = None
+            latest_dilirank: dict[str, Any] | None = None
             for payload in self.service.jobs.list_jobs():
                 if str(payload.get("job_type") or "") != DILIRANK_UPDATE_JOB_TYPE:
                     continue
