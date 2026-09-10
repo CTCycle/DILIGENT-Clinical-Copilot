@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-08-20
+Last updated: 2026-09-10
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -106,6 +106,12 @@ latest saved configuration and provider-catalog state.
 - `POST /api/inspection/livertox/jobs`
 - `GET /api/inspection/livertox/jobs/{job_id}`
 - `DELETE /api/inspection/livertox/jobs/{job_id}`
+- `GET /api/inspection/dilirank`
+- `GET /api/inspection/dilirank/{drug_id}`
+- `GET /api/inspection/dilirank/update-config`
+- `POST /api/inspection/dilirank/jobs`
+- `GET /api/inspection/dilirank/jobs/{job_id}`
+- `DELETE /api/inspection/dilirank/jobs/{job_id}`
 - `GET /api/inspection/reference-catalogs/runtime-observations`
 - `GET /api/inspection/reference-catalogs/runtime-observations/{category}`
 - `PUT /api/inspection/reference-catalogs/runtime-observations/{category}`
@@ -118,6 +124,7 @@ latest saved configuration and provider-catalog state.
 - `DELETE /api/inspection/rag/jobs/{job_id}`
 
 ## Notes
+- DILIrank inspection is read-only at record level. `GET /api/inspection/dilirank` exposes the complete persisted FDA snapshot, including rows that are intentionally unlinked to the local canonical drug catalog. The update routes use the same centralized inspection job manager as RxNav, LiverTox, and RAG. `redownload=true` forces a fresh FDA workbook; otherwise conditional HTTP metadata is used when a validated cache exists.
 - `POST /api/inspection/sessions/{session_id}/timeline-jobs` accepts
   `force_regenerate` and returns a job for polling. The job resolves the
   persisted `timeline_model` role at start; provider/model controls are managed
@@ -135,7 +142,6 @@ latest saved configuration and provider-catalog state.
   lineage/review reads. Dry runs and QA-blocked runs retain an auditable draft;
   an accepted non-dry run finalizes the revision lineage.
 - Research has no active route inventory in the current architecture source and should not be documented as an active API surface until implemented.
-
 
 ### Session revision agent
 `POST /api/inspection/sessions/{session_id}/revision/jobs` starts an agentic

@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-08-20
+Last updated: 2026-09-10
 
 ## Relational Database
 
@@ -120,6 +120,14 @@ erDiagram
         int drug_id FK
         string monograph_key UK
     }
+    DILIRANK_RECORDS {
+        int id PK
+        int drug_id FK
+        string ltkb_id UK
+        string compound_name
+        int severity_class
+        string dili_concern
+    }
     KB_MATCH_CACHE {
         int id PK
         int drug_id FK
@@ -178,6 +186,7 @@ erDiagram
     DRUGS ||--o{ DRUG_ALIASES : aliases
     DRUGS ||--o{ DRUG_IDENTIFIERS : identifiers
     DRUGS ||--o{ LIVERTOX_MONOGRAPHS : monographs
+    DRUGS o|--o{ DILIRANK_RECORDS : dilirank
     DRUGS o|--o{ KB_MATCH_CACHE : cached_matches
     DRUGS o|--o{ CLINICAL_DRUG_MENTIONS : resolves
 ```
@@ -213,24 +222,23 @@ erDiagram
 - Canonical repeated observations are stored in `clinical_lab_observations` and ordered drug mentions in `clinical_drug_mentions`.
 - Access-key ciphertext remains in the database; versioned Fernet key material is stored in the protected `DILIGENT_ACCESS_KEY_MATERIAL_FILE` store.
 - Canonical drug identifiers use `drug_identifiers` with unique `(identifier_system, identifier_value)` ownership.
+- FDA DILIrank 2.0 rows are stored in `dilirank_records` as a source-complete snapshot. `ltkb_id` is unique. `drug_id` is nullable so unmatched or ambiguous FDA rows remain inspectable without inventing a canonical drug mapping. A linked row also receives a `drug_identifiers` entry using identifier system `dilirank_ltkb`.
 - `application_configuration` is the fixed-ID singleton for validated configuration payloads, and `reference_catalog_manifests` records installed manifest state.
 
 ## Focused Repository Ownership
 
-- `KnowledgeRepository` owns evidence data.
+- `KnowledgeRepository` owns LiverTox and existing evidence data.
+- `DiliRankRepository` owns FDA DILIrank 2.0 source rows and their deterministic links to the canonical drug catalog.
 - `DrugCatalogRepository` owns RxNav data.
 - `ClinicalSessionRepository` owns session-result persistence.
 - `SessionTimelineRepository` owns timeline rows.
 - `SessionRevisionRepository` owns revision data, steps, and artifacts.
+- DILIrank linking accepts exact canonical drug names first, then exact aliases only from trusted `livertox` or `rxnorm` alias sources. Session-observed and manual aliases do not activate DILIrank evidence. Ambiguous and unmatched FDA rows remain unlinked.
 - `ClinicalKnowledgePreparation` is the application-level coordinator for
   drug-identity resolution, runtime vocabulary observations, and knowledge
   match-cache updates. `ClinicalSessionRepository` persists resolved drug
   mentions and does not learn catalog aliases while saving a session.
-- `DataInspectionService` coordinates cross-repository inspection responses;
-  it combines clinical session detail with revision records rather than making
-  either repository depend on the other. Session deletion follows the same
-  ownership boundary: it asks `SessionRevisionRepository` to remove
-  revision-owned rows before `ClinicalSessionRepository` removes the session.
+- `DataInspectionService` coordinates cross-repository inspection responses and owns the canonical update-job dispatch for RxNav, LiverTox, DILIrank, and RAG; it combines clinical session detail with revision records rather than making either repository depend on the other. Session deletion follows the same ownership boundary: it asks `SessionRevisionRepository` to remove revision-owned rows before `ClinicalSessionRepository` removes the session.
 - Feature-specific file serialization remains separate from SQLAlchemy persistence. `RepositoryContext` supplies the shared engine/session factory, and application services receive only the focused repositories they need. Transactions remain explicit at the repository boundary, including atomic session persistence and batch ingestion.
 - `repositories/serialization` is a mixed historical package: pure row and
   payload converters remain there, but access-key and model-configuration
@@ -260,6 +268,7 @@ erDiagram
 ## Filesystem Resources
 
 - In development, `app/resources/sources` contains source catalogs, documents, archives, vectors, models, and logs.
+- The validated FDA DILIrank workbook and its HTTP metadata cache live in the existing source archives location. New downloads are written to a candidate file and promoted only after workbook validation; failed or cancelled candidate refreshes do not replace the last-known-good cache.
 - In packaged desktop mode, immutable catalogs and Angular assets live under the extracted runtime; databases, logs, models, source documents, vectors, exports, state, and access-key material live under `%LOCALAPPDATA%\DILIGENT\data`.
 - `app/resources/catalogs` contains JSON seed manifests for database-backed reference catalogs and is copied to the immutable packaged runtime.
 

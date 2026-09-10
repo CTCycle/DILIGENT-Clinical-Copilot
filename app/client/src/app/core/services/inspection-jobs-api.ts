@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "../constants";
 import {
+  InspectionDiliRankUpdateRequest,
   InspectionLiverToxOverrideRequest,
   InspectionRagUpdateRequest,
   InspectionRxNavOverrideRequest,
@@ -92,6 +93,43 @@ export async function cancelInspectionLiverToxUpdateJob(
 ): Promise<JobCancelResponse> {
   return requestJson<JobCancelResponse>(
     `${API_BASE_URL}/inspection/livertox/jobs/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function fetchInspectionDiliRankUpdateConfig(): Promise<InspectionUpdateConfigResponse> {
+  return requestJson<InspectionUpdateConfigResponse>(
+    `${API_BASE_URL}/inspection/dilirank/update-config`,
+    { method: "GET" },
+  );
+}
+
+export async function startInspectionDiliRankUpdateJob(
+  payload: InspectionDiliRankUpdateRequest = {},
+): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(`${API_BASE_URL}/inspection/dilirank/jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchInspectionDiliRankUpdateJobStatus(
+  jobId: string,
+  timeoutSeconds: number = INSPECTION_JOB_STATUS_TIMEOUT_SECONDS,
+): Promise<InspectionUpdateJobStatusResponse> {
+  return requestJson<InspectionUpdateJobStatusResponse>(
+    `${API_BASE_URL}/inspection/dilirank/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+    timeoutSeconds,
+  );
+}
+
+export async function cancelInspectionDiliRankUpdateJob(
+  jobId: string,
+): Promise<JobCancelResponse> {
+  return requestJson<JobCancelResponse>(
+    `${API_BASE_URL}/inspection/dilirank/jobs/${encodeURIComponent(jobId)}`,
     { method: "DELETE" },
   );
 }
