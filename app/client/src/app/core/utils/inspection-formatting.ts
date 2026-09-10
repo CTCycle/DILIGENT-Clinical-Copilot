@@ -4,6 +4,7 @@ import { formatAppDateTime } from './date-formatting';
 export type InspectionViewId =
   | 'rxnav'
   | 'livertox'
+  | 'dilirank'
   | 'rag';
 
 export type InspectionViewOption = {
