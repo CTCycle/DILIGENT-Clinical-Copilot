@@ -20,6 +20,7 @@ from repositories.schemas.configuration import (
     ReferenceCatalogEntry,
     ReferenceCatalogManifest,
 )
+from repositories.schemas.dilirank import DiliRankRecord
 from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
@@ -47,6 +48,7 @@ __all__ = [
     "ProviderModelCatalogCache",
     "ReferenceCatalogEntry",
     "ReferenceCatalogManifest",
+    "DiliRankRecord",
     "Drug",
     "DrugAlias",
     "DrugIdentifier",
