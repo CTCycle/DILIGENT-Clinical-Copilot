@@ -7,13 +7,16 @@ import {
 } from '../models/inspection-types';
 import { JobStartResponse, JobStatus } from '../models/types';
 import {
+  cancelInspectionDiliRankUpdateJob,
   cancelInspectionLiverToxUpdateJob,
   cancelInspectionRagUpdateJob,
   cancelInspectionRxNavUpdateJob,
+  fetchInspectionDiliRankUpdateJobStatus,
   fetchInspectionLiverToxUpdateJobStatus,
   fetchInspectionRagUpdateJobStatus,
   fetchInspectionRxNavUpdateJobStatus,
   fetchInspectionUpdateJobs,
+  startInspectionDiliRankUpdateJob,
   startInspectionLiverToxUpdateJob,
   startInspectionRagUpdateJob,
   startInspectionRxNavUpdateJob,
@@ -37,6 +40,7 @@ const TERMINAL = new Set<JobStatus>(['completed', 'failed', 'cancelled']);
 const JOB_TYPES: Record<InspectionUpdateTarget, string> = {
   rxnav: 'rxnav_update',
   livertox: 'livertox_update',
+  dilirank: 'dilirank_update',
   rag: 'rag_update',
 };
 
@@ -58,7 +62,10 @@ function statusMessage(status: InspectionUpdateJobStatusResponse): string {
 export class InspectionUpdateJobTrackerService {
   private readonly polling = inject(JobPollingService);
   readonly targetState = signal<InspectionUpdateTargetStateMap>({
-    rxnav: initialState(), livertox: initialState(), rag: initialState(),
+    rxnav: initialState(),
+    livertox: initialState(),
+    dilirank: initialState(),
+    rag: initialState(),
   });
   private readonly pollTokens = new Map<InspectionUpdateTarget, number>();
   private readonly refreshedJobKeys = new Set<string>();
@@ -111,12 +118,14 @@ export class InspectionUpdateJobTrackerService {
   private async startRequest(request: InspectionUpdateStartRequest): Promise<JobStartResponse> {
     if (request.target === 'rxnav') return startInspectionRxNavUpdateJob(request.payload);
     if (request.target === 'livertox') return startInspectionLiverToxUpdateJob(request.payload);
+    if (request.target === 'dilirank') return startInspectionDiliRankUpdateJob(request.payload);
     return startInspectionRagUpdateJob(request.payload);
   }
 
   private async cancelRequest(target: InspectionUpdateTarget, jobId: string): Promise<void> {
     if (target === 'rxnav') await cancelInspectionRxNavUpdateJob(jobId);
     else if (target === 'livertox') await cancelInspectionLiverToxUpdateJob(jobId);
+    else if (target === 'dilirank') await cancelInspectionDiliRankUpdateJob(jobId);
     else await cancelInspectionRagUpdateJob(jobId);
     this.patch(target, { message: 'Cancellation requested.' });
   }
@@ -124,6 +133,7 @@ export class InspectionUpdateJobTrackerService {
   private statusRequest(target: InspectionUpdateTarget, jobId: string): Promise<InspectionUpdateJobStatusResponse> {
     if (target === 'rxnav') return fetchInspectionRxNavUpdateJobStatus(jobId);
     if (target === 'livertox') return fetchInspectionLiverToxUpdateJobStatus(jobId);
+    if (target === 'dilirank') return fetchInspectionDiliRankUpdateJobStatus(jobId);
     return fetchInspectionRagUpdateJobStatus(jobId);
   }
 

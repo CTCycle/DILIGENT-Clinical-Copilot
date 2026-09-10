@@ -50,6 +50,13 @@ describe('InspectionUpdateJobResource', () => {
         cancel: vi.fn(),
         refresh: vi.fn(),
       },
+      dilirank: {
+        fetchConfig: vi.fn(),
+        start: vi.fn(),
+        status: vi.fn(),
+        cancel: vi.fn(),
+        refresh: vi.fn(),
+      },
       rag: {
         fetchConfig: vi.fn(),
         start: vi.fn(),
@@ -75,6 +82,7 @@ describe('InspectionUpdateJobResource', () => {
     const actions = {
       rxnav: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
       livertox: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
+      dilirank: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
       rag: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
     } as unknown as InspectionUpdateTargetActionsMap;
     const tracker = {
@@ -82,6 +90,7 @@ describe('InspectionUpdateJobResource', () => {
       targetState: signal({
         rxnav: { jobId: null, running: false, progress: 0, message: '', error: null },
         livertox: { jobId: null, running: false, progress: 0, message: '', error: null },
+        dilirank: { jobId: null, running: false, progress: 0, message: '', error: null },
         rag: { jobId: null, running: false, progress: 0, message: '', error: null },
       }),
       start: vi.fn().mockResolvedValue(undefined),
@@ -99,6 +108,41 @@ describe('InspectionUpdateJobResource', () => {
     expect(tracker.start).toHaveBeenCalledWith({
       target: 'rag',
       payload: { documents_path: 'C:\\clinical-documents' },
+    });
+  });
+
+  it('passes DILIrank refresh options through the shared tracker', async () => {
+    const actions = {
+      rxnav: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
+      livertox: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
+      dilirank: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
+      rag: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
+    } as unknown as InspectionUpdateTargetActionsMap;
+    const tracker = {
+      configureRefreshers: vi.fn(),
+      discover: vi.fn().mockResolvedValue(undefined),
+      targetState: signal({
+        rxnav: { jobId: null, running: false, progress: 0, message: '', error: null },
+        livertox: { jobId: null, running: false, progress: 0, message: '', error: null },
+        dilirank: { jobId: null, running: false, progress: 0, message: '', error: null },
+        rag: { jobId: null, running: false, progress: 0, message: '', error: null },
+      }),
+      start: vi.fn().mockResolvedValue(undefined),
+    };
+    const resource = TestBed.runInInjectionContext(() => new InspectionUpdateJobResource(
+      {} as JobPollingService,
+      actions,
+      () => '',
+      tracker as never,
+    ));
+
+    await resource.open('dilirank');
+    resource.setConfigValue('redownload', true);
+    await resource.start();
+
+    expect(tracker.start).toHaveBeenCalledWith({
+      target: 'dilirank',
+      payload: { redownload: true },
     });
   });
 });

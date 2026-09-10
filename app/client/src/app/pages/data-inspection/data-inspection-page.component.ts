@@ -9,6 +9,7 @@ import { InspectionCatalogToolbarComponent } from '../../components/inspection-c
 import {
   deleteInspectionLiverToxDrug,
   deleteInspectionRxNavDrug,
+  fetchInspectionDiliRankCatalog,
   fetchInspectionRagDirectoryBrowse,
   fetchInspectionLiverToxCatalog,
   fetchInspectionLiverToxExcerpt,
@@ -19,15 +20,19 @@ import {
   updateInspectionRxNavDrug,
 } from '../../core/services/knowledge-catalog-api';
 import {
+  cancelInspectionDiliRankUpdateJob,
   cancelInspectionLiverToxUpdateJob,
   cancelInspectionRagUpdateJob,
   cancelInspectionRxNavUpdateJob,
+  fetchInspectionDiliRankUpdateConfig,
+  fetchInspectionDiliRankUpdateJobStatus,
   fetchInspectionLiverToxUpdateConfig,
   fetchInspectionLiverToxUpdateJobStatus,
   fetchInspectionRagUpdateConfig,
   fetchInspectionRagUpdateJobStatus,
   fetchInspectionRxNavUpdateConfig,
   fetchInspectionRxNavUpdateJobStatus,
+  startInspectionDiliRankUpdateJob,
   startInspectionLiverToxUpdateJob,
   startInspectionRagUpdateJob,
   startInspectionRxNavUpdateJob,
@@ -35,6 +40,7 @@ import {
 import { JobPollingService } from '../../core/services/job-polling.service';
 import { DesktopDialogService } from '../../core/services/desktop-dialog.service';
 import {
+  InspectionDiliRankItem,
   InspectionDrugAliasesResponse,
   InspectionLiverToxExcerptResponse,
   InspectionLiverToxItem,
@@ -72,6 +78,11 @@ const INSPECTION_VIEWS: InspectionViewOption[] = [
     id: 'livertox',
     label: 'LiverTox',
     iconPath: 'M8.25 4.5h7.5 M10.5 4.5v5.25l-3.75 7.5a2.25 2.25 0 0 0 2.01 3.25h6.48a2.25 2.25 0 0 0 2.01-3.25l-3.75-7.5V4.5 M8.5 15h7',
+  },
+  {
+    id: 'dilirank',
+    label: 'DILIrank',
+    iconPath: 'M12 3 4.5 6v5.25c0 4.15 2.9 7.97 7.5 9.75 4.6-1.78 7.5-5.6 7.5-9.75V6L12 3Z M9 12h6 M12 9v6',
   },
   {
     id: 'rag',
@@ -147,6 +158,22 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly livertoxError = this.liverToxCatalog.error;
   readonly livertoxSearchInput = this.liverToxCatalog.searchInput;
 
+  private readonly diliRankCatalog = new InspectionPagedResource<InspectionDiliRankItem>(
+    (params) => fetchInspectionDiliRankCatalog(params),
+    'Failed to load FDA DILIrank 2.0.',
+  );
+  readonly dilirankItems = this.diliRankCatalog.items;
+  readonly dilirankVisibleItems = this.diliRankCatalog.visibleItems;
+  readonly dilirankVisibleStartIndex = this.diliRankCatalog.visibleStartIndex;
+  readonly dilirankTopPaddingPx = this.diliRankCatalog.topPaddingPx;
+  readonly dilirankBottomPaddingPx = this.diliRankCatalog.bottomPaddingPx;
+  readonly dilirankTotal = this.diliRankCatalog.total;
+  readonly dilirankLoading = this.diliRankCatalog.loading;
+  readonly dilirankLoadingMore = this.diliRankCatalog.loadingMore;
+  readonly dilirankHasMore = this.diliRankCatalog.hasMore;
+  readonly dilirankError = this.diliRankCatalog.error;
+  readonly dilirankSearchInput = this.diliRankCatalog.searchInput;
+
   private readonly ragCatalog = new InspectionPagedResource<InspectionRagDocumentRow>(
     (params) => fetchInspectionRagDocuments(params),
     'Failed to load RAG state.',
@@ -208,6 +235,17 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
         await this.loadLiverTox();
       },
     },
+    dilirank: {
+      fetchConfig: () => fetchInspectionDiliRankUpdateConfig(),
+      start: (overrides) => startInspectionDiliRankUpdateJob(overrides),
+      status: (jobId, timeoutSeconds) => fetchInspectionDiliRankUpdateJobStatus(jobId, timeoutSeconds),
+      cancel: async (jobId) => {
+        await cancelInspectionDiliRankUpdateJob(jobId);
+      },
+      refresh: async () => {
+        await this.loadDiliRank();
+      },
+    },
     rag: {
       fetchConfig: () => fetchInspectionRagUpdateConfig(),
       start: (overrides) => startInspectionRagUpdateJob(overrides),
@@ -261,6 +299,9 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly livertoxUpdateRunning = computed(() => this.updateTargetState().livertox.running);
   readonly livertoxUpdateProgress = computed(() => this.updateTargetState().livertox.progress);
   readonly livertoxUpdateMessage = computed(() => this.updateTargetState().livertox.message);
+  readonly dilirankUpdateRunning = computed(() => this.updateTargetState().dilirank.running);
+  readonly dilirankUpdateProgress = computed(() => this.updateTargetState().dilirank.progress);
+  readonly dilirankUpdateMessage = computed(() => this.updateTargetState().dilirank.message);
 
   ngOnInit(): void {
     void this.initializePageData();
@@ -271,6 +312,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     await Promise.all([
       this.loadRxNav(),
       this.loadLiverTox(),
+      this.loadDiliRank(),
       this.loadRag(),
     ]);
   }
@@ -294,6 +336,10 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   async loadLiverTox(): Promise<void> {
     await this.liverToxCatalog.loadInitial();
+  }
+
+  async loadDiliRank(): Promise<void> {
+    await this.diliRankCatalog.loadInitial();
   }
 
   async loadRag(): Promise<void> {
@@ -452,6 +498,10 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     await this.liverToxCatalog.updateSearch(value);
   }
 
+  async updateDiliRankSearch(value: string): Promise<void> {
+    await this.diliRankCatalog.updateSearch(value);
+  }
+
   async updateRagSearch(value: string): Promise<void> {
     await this.ragCatalog.updateSearch(value);
   }
@@ -462,6 +512,10 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   onLiverToxScroll(event: Event): void {
     this.liverToxCatalog.handleScrollEvent(event);
+  }
+
+  onDiliRankScroll(event: Event): void {
+    this.diliRankCatalog.handleScrollEvent(event);
   }
 
   onRagScroll(event: Event): void {

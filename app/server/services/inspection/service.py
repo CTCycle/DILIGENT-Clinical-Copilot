@@ -15,6 +15,8 @@ from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.inspection import InspectionJobPhase
 from repositories.clinical_session_repository import ClinicalSessionRepository
+from repositories.context import RepositoryContext
+from repositories.dilirank_repository import DiliRankRepository
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
 from repositories.session_revision_repository import SessionRevisionRepository
@@ -31,7 +33,7 @@ from services.inspection.revision_agent import RevisionAgentRunner
 from services.runtime.jobs import JobManager
 
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
-UpdateTarget = Literal["rxnav", "livertox", "rag"]
+UpdateTarget = Literal["rxnav", "livertox", "dilirank", "rag"]
 
 ###############################################################################
 class DataInspectionService(
@@ -41,6 +43,7 @@ class DataInspectionService(
 ):
     RXNAV_JOB_TYPE = "rxnav_update"
     LIVERTOX_JOB_TYPE = "livertox_update"
+    DILIRANK_JOB_TYPE = "dilirank_update"
     RAG_JOB_TYPE = "rag_update"
     REVISION_JOB_TYPE = "session_revision"
     SESSION_TIMELINE_JOB_TYPE = "session_timeline"
@@ -63,6 +66,15 @@ class DataInspectionService(
             ("persistence_indexing", 5, 7, "Persisting extracted LiverTox data"),
             ("finalization", 6, 7, "Finalizing LiverTox update"),
             ("completed", 7, 7, "LiverTox update completed"),
+        ],
+        "dilirank": [
+            ("configuration_accepted", 1, 7, "Configuration accepted"),
+            ("update_started", 2, 7, "DILIrank update started"),
+            ("source_data_loading", 3, 7, "Loading FDA DILIrank 2.0 source"),
+            ("processing_extraction", 4, 7, "Validating and linking DILIrank records"),
+            ("persistence_indexing", 5, 7, "Persisting DILIrank snapshot"),
+            ("finalization", 6, 7, "Finalizing update"),
+            ("completed", 7, 7, "Completed"),
         ],
         "rag": [
             ("configuration_accepted", 1, 7, "Configuration accepted"),
@@ -90,6 +102,12 @@ class DataInspectionService(
         self.clinical_session_repository = clinical_session_repository
         self.drug_catalog_repository = drug_catalog_repository
         self.knowledge_repository = knowledge_repository
+        context = getattr(self.knowledge_repository, "context", None)
+        self.dilirank_repository = (
+            DiliRankRepository(context)
+            if isinstance(context, RepositoryContext)
+            else None
+        )
         self.session_timeline_repository = session_timeline_repository
         self.session_revision_repository = session_revision_repository
         self.timeline_extractor = timeline_extractor or PatientTimelineExtractor()
@@ -100,6 +118,7 @@ class DataInspectionService(
         self.update_job_runner = DataInspectionUpdateJobRunner(
             drug_catalog_repository=self.drug_catalog_repository,
             knowledge_repository=self.knowledge_repository,
+            dilirank_repository=self.dilirank_repository,
             jobs=self.jobs,
             report_phase_by_target=self._report_phase_by_target_for_runner,
             report_job_progress=self._report_job_progress_for_runner,
@@ -300,6 +319,41 @@ class DataInspectionService(
     # -------------------------------------------------------------------------
     def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
         return self.knowledge_repository.get_livertox_excerpt(drug_id)
+
+    # -------------------------------------------------------------------------
+    def list_dilirank_catalog(
+        self,
+        *,
+        search: str | None,
+        offset: int,
+        limit: int,
+    ) -> dict[str, Any]:
+        if self.dilirank_repository is None:
+            raise RuntimeError("DILIrank repository is unavailable.")
+        items, total = self.dilirank_repository.list_catalog(
+            search=search,
+            offset=offset,
+            limit=limit,
+        )
+        return {
+            "items": items,
+            "total": total,
+            "offset": max(int(offset), 0),
+            "limit": max(int(limit), 1),
+        }
+
+    # -------------------------------------------------------------------------
+    def get_dilirank_records(self, drug_id: int) -> dict[str, Any] | None:
+        if self.dilirank_repository is None:
+            raise RuntimeError("DILIrank repository is unavailable.")
+        records = self.dilirank_repository.get_records_for_drug(drug_id)
+        if not records:
+            return None
+        return {
+            "drug_id": int(drug_id),
+            "drug_name": records[0]["drug_name"],
+            "records": records,
+        }
 
     # -------------------------------------------------------------------------
     def delete_drug(self, drug_id: int) -> bool:
@@ -606,6 +660,12 @@ class DataInspectionService(
         return self.update_job_runner.run_livertox_update_job(job_id, overrides)
 
     # -------------------------------------------------------------------------
+    def run_dilirank_update_job(
+        self, job_id: str, overrides: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        return self.update_job_runner.run_dilirank_update_job(job_id, overrides)
+
+    # -------------------------------------------------------------------------
     def run_rag_update_job(
         self, job_id: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
@@ -626,6 +686,8 @@ class DataInspectionService(
             runner = partial(self.run_rxnav_update_job, overrides=override_values)
         elif job_type == self.LIVERTOX_JOB_TYPE:
             runner = partial(self.run_livertox_update_job, overrides=override_values)
+        elif job_type == self.DILIRANK_JOB_TYPE:
+            runner = partial(self.run_dilirank_update_job, overrides=override_values)
         elif job_type == self.RAG_JOB_TYPE:
             runner = partial(self.run_rag_update_job, overrides=override_values)
         else:
@@ -755,6 +817,7 @@ class DataInspectionService(
         supported_types = {
             self.RXNAV_JOB_TYPE,
             self.LIVERTOX_JOB_TYPE,
+            self.DILIRANK_JOB_TYPE,
             self.RAG_JOB_TYPE,
         }
         latest_by_type: dict[str, dict[str, Any]] = {}

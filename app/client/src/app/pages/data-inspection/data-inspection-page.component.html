@@ -1,6 +1,6 @@
 <main class="page-container inspection-page inspection-page-workbench">
   <header class="page-header inspection-page-intro">
-    <p class="lede">Inspect and update RxNav, LiverTox, and RAG knowledge sources.</p>
+    <p class="lede">Inspect and update RxNav, LiverTox, FDA DILIrank 2.0, and RAG knowledge sources.</p>
   </header>
 
   <section class="inspection-layout">
@@ -159,6 +159,72 @@
                 loadingMoreMessage="Loading more LiverTox rows..."
                 [hasMore]="livertoxHasMore()"
                 [error]="livertoxError()"
+              />
+            </div>
+          </div>
+        </section>
+      }
+
+      @if (activeView() === 'dilirank') {
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <app-inspection-catalog-toolbar
+              [searchPlaceholder]="'Search FDA DILIrank 2.0...'"
+              [searchAriaLabel]="'Search FDA DILIrank 2.0 data'"
+              [searchValue]="dilirankSearchInput()"
+              [updateButtonLabel]="'Update DILIrank'"
+              [updateInProgress]="dilirankUpdateRunning()"
+              [updateProgress]="dilirankUpdateProgress()"
+              [updateProgressMessage]="dilirankUpdateMessage()"
+              (searchChange)="updateDiliRankSearch($event)"
+              (updateClick)="openUpdateModal('dilirank')"
+            />
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact" (scroll)="onDiliRankScroll($event)">
+              <table class="inspection-table inspection-table-dense">
+                <thead>
+                  <tr>
+                    <th>Compound</th>
+                    <th>Linked drug</th>
+                    <th>LTKB ID</th>
+                    <th>DILI concern</th>
+                    <th>Severity</th>
+                    <th>Label section</th>
+                    <th>Comment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @if (dilirankTopPaddingPx() > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="7" [style.height.px]="dilirankTopPaddingPx()"></td></tr>
+                  }
+                  @for (row of dilirankVisibleItems(); track row.ltkb_id) {
+                    <tr>
+                      <td>{{ row.compound_name }}</td>
+                      <td [title]="row.drug_name || 'Not linked to the local drug catalog'">
+                        {{ row.drug_name || 'Unlinked' }}
+                      </td>
+                      <td>{{ row.ltkb_id }}</td>
+                      <td>{{ row.dili_concern }}</td>
+                      <td>{{ row.severity_class ?? 'N/A' }}</td>
+                      <td [title]="row.label_section || ''">{{ row.label_section || 'N/A' }}</td>
+                      <td [title]="row.comment || ''">{{ row.comment || 'N/A' }}</td>
+                    </tr>
+                  }
+                  @if (dilirankItems().length > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="7" [style.height.px]="dilirankBottomPaddingPx()"></td></tr>
+                  }
+                  @if (!dilirankLoading() && dilirankItems().length === 0) {
+                    <tr><td colspan="7" class="inspection-empty-row">No FDA DILIrank 2.0 rows found.</td></tr>
+                  }
+                </tbody>
+              </table>
+              <app-inspection-catalog-status
+                [loading]="dilirankLoading()"
+                loadingMessage="Loading FDA DILIrank 2.0 data..."
+                [loadingMore]="dilirankLoadingMore()"
+                loadingMoreMessage="Loading more DILIrank rows..."
+                [hasMore]="dilirankHasMore()"
+                [error]="dilirankError()"
               />
             </div>
           </div>
