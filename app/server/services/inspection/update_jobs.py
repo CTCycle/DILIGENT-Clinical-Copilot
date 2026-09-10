@@ -78,7 +78,7 @@ class DataInspectionUpdateJobRunner:
         *,
         drug_catalog_repository: DrugCatalogRepository,
         knowledge_repository: KnowledgeRepository,
-        dilirank_repository: DiliRankRepository,
+        dilirank_repository: DiliRankRepository | None,
         jobs: JobManager,
         report_phase_by_target: Callable[[str, str, int, str], None],
         report_job_progress: Callable[
@@ -163,6 +163,8 @@ class DataInspectionUpdateJobRunner:
     def run_dilirank_update_job(
         self, job_id: str, overrides: Mapping[str, object] | None = None
     ) -> dict[str, Any]:
+        if self.dilirank_repository is None:
+            raise RuntimeError("DILIrank repository is unavailable.")
         stop_check = partial(self.jobs.should_stop, job_id)
         progress_callback = DataInspectionProgressReporter(
             self.jobs, job_id, 10.0, 0.80
