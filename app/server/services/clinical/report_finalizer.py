@@ -26,6 +26,9 @@ from services.clinical.hepatox_constants import (
     STRUCTURED_DILI_SECTION_LINE_RE,
 )
 
+DILIRANK_PROVENANCE_KEY = "fda_dilirank_2"
+DILIRANK_SOURCE_LABEL = "FDA DILIrank 2.0"
+
 ###############################################################################
 class ReportFinalizer:
     """Builds the final patient report and conclusion from per-drug assessments."""
@@ -152,7 +155,7 @@ class ReportFinalizer:
             f"**{title}**\n\n{clinical_commentary}\n\n"
             f"**RUCAM**: {localized_rucam}\n\n"
             f"**{phrase('report_label', report_language)}**\n\n{body}\n\n"
-            f"**{phrase('bibliography_source', report_language)}**: {self.bibliography_source_label()}"
+            f"**{phrase('bibliography_source', report_language)}**: {self.bibliography_source_label(entry)}"
         ).strip()
 
     # -------------------------------------------------------------------------
@@ -467,10 +470,26 @@ class ReportFinalizer:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def bibliography_source_label() -> str:
-        return get_text_normalization_snapshot().knowledge_source_references.get(
-            "livertox", "LiverTox"
+    def has_dilirank_provenance(entry: DrugClinicalAssessment) -> bool:
+        return any(
+            isinstance(item, dict)
+            and item.get("knowledge_source") == DILIRANK_PROVENANCE_KEY
+            for item in entry.extraction_metadata
         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def bibliography_source_label(
+        cls, entry: DrugClinicalAssessment | None = None
+    ) -> str:
+        sources = [
+            get_text_normalization_snapshot().knowledge_source_references.get(
+                "livertox", "LiverTox"
+            )
+        ]
+        if entry is not None and cls.has_dilirank_provenance(entry):
+            sources.append(DILIRANK_SOURCE_LABEL)
+        return "; ".join(sources)
 
     # -------------------------------------------------------------------------
     def build_rag_bibliography_section(
