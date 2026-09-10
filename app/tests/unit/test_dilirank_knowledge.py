@@ -260,6 +260,54 @@ def test_dilirank_parser_normalizes_official_category_capitalization(
     assert records[0]["dili_concern"] == "vMost-DILI-concern"
 
 ###############################################################################
+def test_dilirank_updater_reads_official_version_two_sheet_header(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository, _ = build_repository()
+    updater = DiliRankUpdater(repository=repository, archives_path=tmp_path)
+    frame = pd.DataFrame(
+        [
+            {
+                "LTKBID": "LT001",
+                "CompoundName": "Acetaminophen",
+                "SeverityClass": 8,
+                "LabelSection": "Warnings & precautions",
+                "vDILI-Concern": "vMost-DILI-concern",
+                "Comment": "Unchanged",
+            }
+        ]
+    )
+    read_excel_kwargs: dict[str, object] = {}
+
+    def fake_download() -> dict[str, object]:
+        updater.candidate_path.write_bytes(b"candidate")
+        return {
+            "downloaded": True,
+            "source_url": "https://www.fda.gov/example",
+            "last_modified": None,
+            "etag": None,
+            "size": 9,
+        }
+
+    def fake_read_excel(path: Path, **kwargs: object) -> pd.DataFrame:
+        assert path == updater.candidate_path
+        read_excel_kwargs.update(kwargs)
+        return frame
+
+    monkeypatch.setattr(updater, "_download_workbook", fake_download)
+    monkeypatch.setattr(pd, "read_excel", fake_read_excel)
+
+    result = updater.update_from_fda()
+
+    assert result["persisted_records"] == 1
+    assert read_excel_kwargs == {
+        "sheet_name": "version 2",
+        "header": 1,
+        "engine": "openpyxl",
+    }
+
+###############################################################################
 def test_failed_download_candidate_preserves_last_known_good_cache(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

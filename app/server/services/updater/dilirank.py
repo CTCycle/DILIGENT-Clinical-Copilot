@@ -65,7 +65,12 @@ class DiliRankUpdater:
         try:
             self._raise_if_cancelled(should_stop)
             self._emit(progress_callback, 40.0, "Validating DILIrank 2.0 workbook")
-            frame = pd.read_excel(source_path, engine="openpyxl")
+            frame = pd.read_excel(
+                source_path,
+                sheet_name="version 2",
+                header=1,
+                engine="openpyxl",
+            )
             records = self._parse_records(frame, source_metadata)
             self._raise_if_cancelled(should_stop)
         except Exception:

@@ -26,22 +26,26 @@ class DiliRankRepository:
     def replace_records(self, records: list[dict[str, Any]]) -> dict[str, Any]:
         with self.session_factory() as db_session:
             try:
-                canonical_index: dict[str, int] = {
-                    str(name): int(drug_id)
-                    for name, drug_id in db_session.execute(
-                        select(Drug.canonical_name_norm, Drug.id)
-                    ).all()
-                    if str(name or "").strip()
-                }
+                canonical_index: dict[str, int] = {}
+                for name, drug_id in db_session.execute(
+                    select(Drug.canonical_name_norm, Drug.id)
+                ).all():
+                    if drug_id is None:
+                        continue
+                    normalized_name = str(name or "").strip()
+                    if normalized_name:
+                        canonical_index[normalized_name] = drug_id
                 alias_index: dict[str, set[int]] = defaultdict(set)
                 for alias_norm, drug_id in db_session.execute(
                     select(DrugAlias.alias_norm, DrugAlias.drug_id).where(
                         DrugAlias.source.in_(DILIRANK_TRUSTED_ALIAS_SOURCES)
                     )
                 ).all():
+                    if drug_id is None:
+                        continue
                     normalized_alias = str(alias_norm or "").strip()
                     if normalized_alias:
-                        alias_index[normalized_alias].add(int(drug_id))
+                        alias_index[normalized_alias].add(drug_id)
 
                 prepared: list[tuple[dict[str, Any], int | None]] = []
                 unmatched: list[str] = []
