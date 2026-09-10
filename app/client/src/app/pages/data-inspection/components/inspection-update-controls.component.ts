@@ -89,6 +89,23 @@ export type InspectionUpdateFieldChange = {
           </label>
         </div>
       }
+
+      @if (target === 'dilirank') {
+        <div class="inspection-update-field-grid">
+          <label class="inspection-update-field">
+            <span>Source handling</span>
+            <select
+              [ngModel]="booleanValue('redownload', false) ? 'fresh' : 'conditional'"
+              (ngModelChange)="updateBoolean('redownload', $event === 'fresh')"
+              [disabled]="disabled"
+            >
+              <option value="conditional">Reuse when FDA source is unchanged</option>
+              <option value="fresh">Force fresh FDA download</option>
+            </select>
+            <small>Validated downloads replace the local cache only after schema checks succeed.</small>
+          </label>
+        </div>
+      }
     </section>
   `,
   styles: `
