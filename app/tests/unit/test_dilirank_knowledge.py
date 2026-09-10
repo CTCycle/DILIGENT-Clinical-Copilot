@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -12,15 +13,17 @@ from sqlalchemy.pool import StaticPool
 
 from api.inspection.dilirank import InspectionDiliRankEndpoint
 from common.prompts.clinical_context import build_dilirank_knowledge_fragment
+from domain.clinical.entities import DrugClinicalAssessment
 from repositories.context import RepositoryContext
 from repositories.dilirank_repository import (
     DILIRANK_IDENTIFIER_SYSTEM,
     DiliRankRepository,
 )
+from repositories.knowledge_repository import KnowledgeRepository
 from repositories.schemas import Base
 from repositories.schemas.knowledge import Drug, DrugAlias, DrugIdentifier
-from repositories.knowledge_repository import KnowledgeRepository
 from services.clinical.knowledge import ClinicalKnowledgeComposer
+from services.clinical.report_finalizer import ReportFinalizer
 from services.updater.dilirank import DiliRankUpdater
 
 ###############################################################################
@@ -52,7 +55,10 @@ def seed_drugs(context: RepositoryContext) -> None:
         )
         collision_a = Drug(canonical_name="Alpha", canonical_name_norm="alpha")
         collision_b = Drug(canonical_name="Beta", canonical_name_norm="beta")
-        db_session.add_all([acetaminophen, ibuprofen, collision_a, collision_b])
+        session_only = Drug(canonical_name="Gamma", canonical_name_norm="gamma")
+        db_session.add_all(
+            [acetaminophen, ibuprofen, collision_a, collision_b, session_only]
+        )
         db_session.flush()
         db_session.add_all(
             [
@@ -77,7 +83,15 @@ def seed_drugs(context: RepositoryContext) -> None:
                     alias="Collision",
                     alias_norm="collision",
                     alias_kind="synonym",
-                    source="rxnav",
+                    source="rxnorm",
+                    term_type="SCD",
+                ),
+                DrugAlias(
+                    drug_id=session_only.id,
+                    alias="Session-only mention",
+                    alias_norm="session only mention",
+                    alias_kind="observed_query",
+                    source="session",
                     term_type=None,
                 ),
             ]
@@ -150,6 +164,28 @@ def test_replace_records_links_canonical_and_unique_alias_without_guessing() -> 
     assert {item.identifier_value for item in identifiers} == {"LT001", "LT002"}
 
 ###############################################################################
+def test_replace_records_ignores_session_observed_aliases_for_linkage() -> None:
+    repository, context = build_repository()
+    seed_drugs(context)
+
+    summary = repository.replace_records(
+        [
+            {
+                "ltkb_id": "LT005",
+                "compound_name": "Session-only mention",
+                "severity_class": 4,
+                "dili_concern": "vLess-DILI-concern",
+            }
+        ]
+    )
+
+    assert summary["linked_records"] == 0
+    assert summary["unmatched_records"] == 1
+    rows, total = repository.list_catalog(search="Session-only", offset=0, limit=10)
+    assert total == 1
+    assert rows[0]["drug_id"] is None
+
+###############################################################################
 def test_replace_records_preserves_unlinked_source_rows() -> None:
     repository, _ = build_repository()
     summary = repository.replace_records(
@@ -201,24 +237,6 @@ def test_dilirank_parser_preserves_official_schema_and_rejects_unknown_category(
         updater._parse_records(invalid_frame, {})
 
 ###############################################################################
-def test_dilirank_prompt_keeps_drug_level_prior_separate_from_patient_causality() -> None:
-    fragment = build_dilirank_knowledge_fragment(
-        records=[
-            {
-                "ltkb_id": "LT001",
-                "compound_name": "Acetaminophen",
-                "severity_class": 8,
-                "label_section": "Warnings and Precautions",
-                "dili_concern": "vMost-DILI-concern",
-                "comment": "Curated classification",
-            }
-        ]
-    )
-    assert "vMost-DILI-concern" in fragment
-    assert "patient-specific causality score" in fragment
-    assert "do not override chronology" in fragment
-
-###############################################################################
 def test_dilirank_parser_normalizes_official_category_capitalization(
     tmp_path: Path,
 ) -> None:
@@ -242,15 +260,95 @@ def test_dilirank_parser_normalizes_official_category_capitalization(
     assert records[0]["dili_concern"] == "vMost-DILI-concern"
 
 ###############################################################################
-def test_dilirank_inspection_routes_expose_catalog_config_and_job_contract() -> None:
+def test_failed_download_candidate_preserves_last_known_good_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository, _ = build_repository()
+    updater = DiliRankUpdater(repository=repository, archives_path=tmp_path)
+    updater.workbook_path.write_bytes(b"stable-workbook")
+    old_metadata = {"etag": "old-etag", "source_url": "stable-source"}
+    updater.metadata_path.write_text(json.dumps(old_metadata), encoding="utf-8")
+
+    def fake_download() -> dict[str, object]:
+        updater.candidate_path.write_bytes(b"PK-invalid-xlsx")
+        return {
+            "downloaded": True,
+            "etag": "new-etag",
+            "source_url": "new-source",
+            "last_modified": "now",
+            "size": 15,
+        }
+
+    monkeypatch.setattr(updater, "_download_workbook", fake_download)
+
+    with pytest.raises(Exception):
+        updater.update_from_fda()
+
+    assert updater.workbook_path.read_bytes() == b"stable-workbook"
+    assert json.loads(updater.metadata_path.read_text(encoding="utf-8")) == old_metadata
+    assert not updater.candidate_path.exists()
+
+###############################################################################
+def test_cancelled_download_candidate_preserves_last_known_good_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository, _ = build_repository()
+    updater = DiliRankUpdater(repository=repository, archives_path=tmp_path)
+    updater.workbook_path.write_bytes(b"stable-workbook")
+    old_metadata = {"etag": "old-etag", "source_url": "stable-source"}
+    updater.metadata_path.write_text(json.dumps(old_metadata), encoding="utf-8")
+
+    def fake_download() -> dict[str, object]:
+        updater.candidate_path.write_bytes(b"PK-candidate")
+        return {
+            "downloaded": True,
+            "etag": "new-etag",
+            "source_url": "new-source",
+            "last_modified": "now",
+            "size": 12,
+        }
+
+    stop_checks = iter([False, True])
+    monkeypatch.setattr(updater, "_download_workbook", fake_download)
+
+    with pytest.raises(RuntimeError, match="cancelled"):
+        updater.update_from_fda(should_stop=lambda: next(stop_checks))
+
+    assert updater.workbook_path.read_bytes() == b"stable-workbook"
+    assert json.loads(updater.metadata_path.read_text(encoding="utf-8")) == old_metadata
+    assert not updater.candidate_path.exists()
+
+###############################################################################
+def test_dilirank_prompt_keeps_drug_level_prior_separate_from_patient_causality() -> None:
+    fragment = build_dilirank_knowledge_fragment(
+        records=[
+            {
+                "ltkb_id": "LT001",
+                "compound_name": "Acetaminophen",
+                "severity_class": 8,
+                "label_section": "Warnings and Precautions",
+                "dili_concern": "vMost-DILI-concern",
+                "comment": "Curated classification",
+            }
+        ]
+    )
+    assert "vMost-DILI-concern" in fragment
+    assert "patient-specific causality score" in fragment
+    assert "do not override chronology" in fragment
+
+###############################################################################
+def test_dilirank_inspection_routes_use_shared_update_contract() -> None:
 
     ###############################################################################
     class ServiceStub:
-        JOB_TYPE = "dilirank_update"
+        DILIRANK_JOB_TYPE = "dilirank_update"
 
         # -------------------------------------------------------------------------
         @staticmethod
-        def build_update_config_response() -> dict[str, object]:
+        def build_update_config_response(target: str) -> dict[str, object]:
+            assert target == "dilirank"
             return {
                 "target": "dilirank",
                 "defaults": {"redownload": False},
@@ -261,7 +359,7 @@ def test_dilirank_inspection_routes_expose_catalog_config_and_job_contract() -> 
 
         # -------------------------------------------------------------------------
         @staticmethod
-        def list_catalog(
+        def list_dilirank_catalog(
             *, search: str | None, offset: int, limit: int
         ) -> dict[str, object]:
             assert search == "acetaminophen"
@@ -287,7 +385,7 @@ def test_dilirank_inspection_routes_expose_catalog_config_and_job_contract() -> 
 
         # -------------------------------------------------------------------------
         @staticmethod
-        def get_drug_records(drug_id: int) -> dict[str, object] | None:
+        def get_dilirank_records(drug_id: int) -> dict[str, object] | None:
             assert drug_id == 1
             return {
                 "drug_id": 1,
@@ -376,7 +474,7 @@ def test_dilirank_inspection_routes_expose_catalog_config_and_job_contract() -> 
     assert cancelled.status_code == 200
 
 ###############################################################################
-def test_clinical_composer_adds_linked_dilirank_evidence_to_knowledge_prompt() -> None:
+def test_clinical_composer_adds_linked_dilirank_evidence_and_provenance() -> None:
     dilirank_repository, context = build_repository()
     seed_drugs(context)
     dilirank_repository.replace_records(
@@ -415,3 +513,34 @@ def test_clinical_composer_adds_linked_dilirank_evidence_to_knowledge_prompt() -
     assert "LiverTox evidence." in payload["knowledge_prompt"]
     assert "vMost-DILI-concern" in payload["knowledge_prompt"]
     assert "patient-specific causality score" in payload["knowledge_prompt"]
+    provenance = [
+        item
+        for item in payload["extraction_metadata"]
+        if item.get("knowledge_source") == "fda_dilirank_2"
+    ]
+    assert provenance == [
+        {
+            "knowledge_source": "fda_dilirank_2",
+            "record_count": 1,
+            "ltkb_ids": ["LT00004"],
+        }
+    ]
+
+###############################################################################
+def test_report_source_attribution_is_conditional_on_dilirank_provenance() -> None:
+    without_dilirank = DrugClinicalAssessment(drug_name="Acetaminophen")
+    with_dilirank = DrugClinicalAssessment(
+        drug_name="Acetaminophen",
+        extraction_metadata=[
+            {
+                "knowledge_source": "fda_dilirank_2",
+                "record_count": 1,
+                "ltkb_ids": ["LT00004"],
+            }
+        ],
+    )
+
+    assert ReportFinalizer.bibliography_source_label(without_dilirank) == "LiverTox"
+    assert ReportFinalizer.bibliography_source_label(with_dilirank) == (
+        "LiverTox; FDA DILIrank 2.0"
+    )
