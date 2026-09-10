@@ -30,6 +30,7 @@ describe('DataInspectionPageComponent folder selection', () => {
       targetState: signal({
         rxnav: { jobId: null, running: false, progress: 0, message: '', error: null },
         livertox: { jobId: null, running: false, progress: 0, message: '', error: null },
+        dilirank: { jobId: null, running: false, progress: 0, message: '', error: null },
         rag: { jobId: null, running: false, progress: 0, message: '', error: null },
       }),
       configureRefreshers: vi.fn(),

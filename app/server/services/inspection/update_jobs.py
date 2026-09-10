@@ -6,15 +6,17 @@ from pathlib import Path
 from typing import Any, Literal
 
 from common.paths import ARCHIVES_PATH
+from repositories.dilirank_repository import DiliRankRepository
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
 from services.runtime.jobs import JobManager
+from services.updater.dilirank import DiliRankUpdater
 from services.updater.embeddings import RagEmbeddingUpdater
 from services.updater.livertox_core import LiverToxUpdater
 from services.updater.rxnav_builder import RxNavDrugCatalogBuilder
 from services.updater.rxnav_client import RxNavClient
 
-UpdateTarget = Literal["rxnav", "livertox", "rag"]
+UpdateTarget = Literal["rxnav", "livertox", "dilirank", "rag"]
 
 ###############################################################################
 def _override_float(values: Mapping[str, object], key: str) -> float | None:
@@ -76,6 +78,7 @@ class DataInspectionUpdateJobRunner:
         *,
         drug_catalog_repository: DrugCatalogRepository,
         knowledge_repository: KnowledgeRepository,
+        dilirank_repository: DiliRankRepository | None,
         jobs: JobManager,
         report_phase_by_target: Callable[[str, str, int, str], None],
         report_job_progress: Callable[
@@ -85,6 +88,7 @@ class DataInspectionUpdateJobRunner:
     ) -> None:
         self.drug_catalog_repository = drug_catalog_repository
         self.knowledge_repository = knowledge_repository
+        self.dilirank_repository = dilirank_repository
         self.jobs = jobs
         self.report_phase_by_target = report_phase_by_target
         self.report_job_progress = report_job_progress
@@ -153,6 +157,42 @@ class DataInspectionUpdateJobRunner:
         self.report_phase_by_target(job_id, "livertox", 88, "Persisting extracted data")
         self.report_phase_by_target(job_id, "livertox", 96, "Finalizing update")
         self.report_phase_by_target(job_id, "livertox", 100, "Completed")
+        return {"summary": result}
+
+    # -------------------------------------------------------------------------
+    def run_dilirank_update_job(
+        self, job_id: str, overrides: Mapping[str, object] | None = None
+    ) -> dict[str, Any]:
+        if self.dilirank_repository is None:
+            raise RuntimeError("DILIrank repository is unavailable.")
+        stop_check = partial(self.jobs.should_stop, job_id)
+        progress_callback = DataInspectionProgressReporter(
+            self.jobs, job_id, 10.0, 0.80
+        )
+        override_values = dict(overrides or {})
+        self.report_phase_by_target(job_id, "dilirank", 1, "Configuration accepted")
+        if stop_check():
+            return {}
+        self.report_phase_by_target(job_id, "dilirank", 4, "DILIrank update started")
+        self.report_phase_by_target(
+            job_id, "dilirank", 10, "Loading FDA DILIrank 2.0 source"
+        )
+        updater = DiliRankUpdater(
+            repository=self.dilirank_repository,
+            redownload=bool(_override_bool(override_values, "redownload") or False),
+        )
+        self.report_phase_by_target(
+            job_id, "dilirank", 20, "Validating and linking DILIrank records"
+        )
+        result = updater.update_from_fda(
+            progress_callback=progress_callback,
+            should_stop=stop_check,
+        )
+        self.report_phase_by_target(
+            job_id, "dilirank", 90, "Persisting DILIrank snapshot"
+        )
+        self.report_phase_by_target(job_id, "dilirank", 96, "Finalizing update")
+        self.report_phase_by_target(job_id, "dilirank", 100, "Completed")
         return {"summary": result}
 
     # -------------------------------------------------------------------------

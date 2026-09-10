@@ -267,21 +267,43 @@ export type InspectionLiverToxExcerptResponse = {
   last_update: string | null;
 };
 
+export type InspectionDiliRankItem = {
+  drug_id: number | null;
+  drug_name: string | null;
+  ltkb_id: string;
+  compound_name: string;
+  severity_class: number | null;
+  label_section: string | null;
+  dili_concern: string;
+  comment: string | null;
+  source_url: string | null;
+  source_last_modified: string | null;
+};
+
+export type InspectionDiliRankCatalogResponse = {
+  items: InspectionDiliRankItem[];
+  total: number;
+  offset: number;
+  limit: number;
+};
+
 export type InspectionDeleteResponse = {
   deleted: boolean;
 };
 
-export type InspectionUpdateTarget = "rxnav" | "livertox" | "rag";
+export type InspectionUpdateTarget = "rxnav" | "livertox" | "dilirank" | "rag";
 
 export type InspectionUpdateOverridesByTarget = {
   rxnav: InspectionRxNavOverrideRequest;
   livertox: InspectionLiverToxOverrideRequest;
+  dilirank: InspectionDiliRankUpdateRequest;
   rag: InspectionRagUpdateRequest;
 };
 
 export type InspectionUpdateStartRequest =
   | { target: "rxnav"; payload: InspectionUpdateOverridesByTarget["rxnav"] }
   | { target: "livertox"; payload: InspectionUpdateOverridesByTarget["livertox"] }
+  | { target: "dilirank"; payload: InspectionUpdateOverridesByTarget["dilirank"] }
   | { target: "rag"; payload: InspectionUpdateOverridesByTarget["rag"] };
 
 export type InspectionUpdateConfigResponse = {
@@ -300,6 +322,10 @@ export type InspectionRxNavOverrideRequest = {
 export type InspectionLiverToxOverrideRequest = {
   livertox_monograph_max_workers?: number;
   livertox_archive?: string;
+  redownload?: boolean;
+};
+
+export type InspectionDiliRankUpdateRequest = {
   redownload?: boolean;
 };
 
