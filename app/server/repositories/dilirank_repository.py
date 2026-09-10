@@ -12,6 +12,7 @@ from repositories.schemas.dilirank import DiliRankRecord
 from repositories.schemas.knowledge import Drug, DrugAlias, DrugIdentifier
 
 DILIRANK_IDENTIFIER_SYSTEM = "dilirank_ltkb"
+DILIRANK_TRUSTED_ALIAS_SOURCES = ("livertox", "rxnorm")
 
 ###############################################################################
 class DiliRankRepository:
@@ -34,7 +35,9 @@ class DiliRankRepository:
                 }
                 alias_index: dict[str, set[int]] = defaultdict(set)
                 for alias_norm, drug_id in db_session.execute(
-                    select(DrugAlias.alias_norm, DrugAlias.drug_id)
+                    select(DrugAlias.alias_norm, DrugAlias.drug_id).where(
+                        DrugAlias.source.in_(DILIRANK_TRUSTED_ALIAS_SOURCES)
+                    )
                 ).all():
                     normalized_alias = str(alias_norm or "").strip()
                     if normalized_alias:
