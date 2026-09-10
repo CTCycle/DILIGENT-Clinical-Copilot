@@ -2,6 +2,7 @@ import { API_BASE_URL } from "../constants";
 import {
   InspectionCatalogQuery,
   InspectionDeleteResponse,
+  InspectionDiliRankCatalogResponse,
   InspectionDrugAliasesResponse,
   InspectionLiverToxCatalogResponse,
   InspectionLiverToxExcerptResponse,
@@ -88,6 +89,20 @@ export async function deleteInspectionLiverToxDrug(
   return requestJson<InspectionDeleteResponse>(
     `${API_BASE_URL}/inspection/livertox/${encodeURIComponent(String(drugId))}`,
     { method: "DELETE" },
+  );
+}
+
+export async function fetchInspectionDiliRankCatalog(
+  query: InspectionCatalogQuery,
+): Promise<InspectionDiliRankCatalogResponse> {
+  const queryString = buildQueryString({
+    search: query.search,
+    offset: query.offset ?? 0,
+    limit: query.limit ?? 10,
+  });
+  return requestJson<InspectionDiliRankCatalogResponse>(
+    `${API_BASE_URL}/inspection/dilirank${queryString}`,
+    { method: "GET" },
   );
 }
 
