@@ -9,10 +9,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SessionStatus = Literal["successful", "failed"]
 DateFilterMode = Literal["before", "after", "exact"]
-InspectionUpdateTarget = Literal["rxnav", "livertox", "rag"]
+InspectionUpdateTarget = Literal["rxnav", "livertox", "dilirank", "rag"]
 InspectionUpdateJobType = Literal[
     "rxnav_update",
     "livertox_update",
+    "dilirank_update",
     "rag_update",
 ]
 InspectionJobPhase = Literal[
