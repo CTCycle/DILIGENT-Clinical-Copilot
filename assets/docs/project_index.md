@@ -93,6 +93,16 @@ branch-status record.
 - `ui/ui_standards.md`
   - Practical spacing, typography, color, component, and do/don't rules for frontend UI work.
 
+### Promotion
+- `promotion/promotion_strategy.md`
+  - Positioning, target audiences, claim boundaries, launch sequencing, channels, measurement, and repository metadata recommendations.
+- `promotion/launch_copy.md`
+  - Reusable release, Show HN, professional, technical-community, and research-oriented launch copy.
+- `promotion/visual_asset_brief.md`
+  - Social-preview, screenshot, architecture graphic, demo, privacy, and visual-claim requirements.
+- `promotion/promotion_checklist.md`
+  - Repository readiness, release gates, posting hygiene, measurement, and stop conditions.
+
 ### User
 - `user/getting_started.md`
   - Purpose, audience, prerequisites, safety, layout, and startup basics.
