@@ -48,6 +48,7 @@ class DiliRankUpdater:
         self.request_timeout = max(float(request_timeout), 1.0)
         self.workbook_path = self.archives_path / DILIRANK_FILE_NAME
         self.metadata_path = self.archives_path / DILIRANK_METADATA_FILE_NAME
+        self.candidate_path = self.workbook_path.with_suffix(".candidate.xlsx")
 
     # -------------------------------------------------------------------------
     def update_from_fda(
@@ -59,17 +60,32 @@ class DiliRankUpdater:
         self._raise_if_cancelled(should_stop)
         self._emit(progress_callback, 5.0, "Refreshing FDA DILIrank 2.0 source")
         source_metadata = self._download_workbook()
+        source_path = (
+            self.candidate_path
+            if bool(source_metadata.get("downloaded"))
+            else self.workbook_path
+        )
         self._raise_if_cancelled(should_stop)
         self._emit(progress_callback, 40.0, "Validating DILIrank 2.0 workbook")
         try:
-            frame = pd.read_excel(self.workbook_path, engine="openpyxl")
+            frame = pd.read_excel(source_path, engine="openpyxl")
             records = self._parse_records(frame, source_metadata)
         except Exception:
-            if source_metadata.get("downloaded"):
-                self.workbook_path.unlink(missing_ok=True)
-                self.metadata_path.unlink(missing_ok=True)
+            if bool(source_metadata.get("downloaded")):
+                self.candidate_path.unlink(missing_ok=True)
             raise
         self._raise_if_cancelled(should_stop)
+
+        if bool(source_metadata.get("downloaded")):
+            cache_metadata = {
+                "source_url": source_metadata.get("source_url"),
+                "last_modified": source_metadata.get("last_modified"),
+                "etag": source_metadata.get("etag"),
+                "size": source_metadata.get("size"),
+            }
+            self.candidate_path.replace(self.workbook_path)
+            self._save_metadata(cache_metadata)
+
         self._emit(progress_callback, 75.0, "Linking DILIrank records to local drugs")
         summary = self.repository.replace_records(records)
         self._emit(progress_callback, 98.0, "DILIrank 2.0 update completed")
@@ -114,17 +130,16 @@ class DiliRankUpdater:
             raise RuntimeError("FDA DILIrank 2.0 download returned an empty workbook.")
         if not response.content.startswith(b"PK"):
             raise RuntimeError("FDA DILIrank 2.0 download was not a valid XLSX payload.")
-        temporary_path = self.workbook_path.with_suffix(".xlsx.tmp")
-        temporary_path.write_bytes(response.content)
-        temporary_path.replace(self.workbook_path)
-        metadata = {
+
+        self.candidate_path.unlink(missing_ok=True)
+        self.candidate_path.write_bytes(response.content)
+        return {
             "source_url": str(response.url),
             "last_modified": response.headers.get("Last-Modified"),
             "etag": response.headers.get("ETag"),
             "size": len(response.content),
+            "downloaded": True,
         }
-        self._save_metadata(metadata)
-        return {**metadata, "downloaded": True}
 
     # -------------------------------------------------------------------------
     def _parse_records(
