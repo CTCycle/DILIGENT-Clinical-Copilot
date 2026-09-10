@@ -11,6 +11,8 @@ from domain.jobs import (
 )
 from services.inspection.service import DataInspectionService
 
+DILIRANK_UPDATE_JOB_TYPE = "dilirank_update"
+
 ###############################################################################
 class InspectionEndpointBase:
 
@@ -30,11 +32,32 @@ class InspectionJobEndpointMixin(InspectionEndpointBase):
     # -------------------------------------------------------------------------
     def list_update_jobs(self, response: Response) -> JobListResponse:
         response.headers["Cache-Control"] = "no-store"
+        payloads = list(self.service.list_update_jobs())
+        if not any(
+            str(payload.get("job_type") or "") == DILIRANK_UPDATE_JOB_TYPE
+            for payload in payloads
+        ):
+            latest_dilirank: dict[str, object] | None = None
+            for payload in self.service.jobs.list_jobs():
+                if str(payload.get("job_type") or "") != DILIRANK_UPDATE_JOB_TYPE:
+                    continue
+                if latest_dilirank is None:
+                    latest_dilirank = payload
+                    continue
+                incoming_key = (
+                    float(payload.get("created_at") or 0),
+                    int(payload.get("version") or 0),
+                )
+                current_key = (
+                    float(latest_dilirank.get("created_at") or 0),
+                    int(latest_dilirank.get("version") or 0),
+                )
+                if incoming_key > current_key:
+                    latest_dilirank = payload
+            if latest_dilirank is not None:
+                payloads.append(latest_dilirank)
         return JobListResponse(
-            jobs=[
-                JobStatusResponse(**payload)
-                for payload in self.service.list_update_jobs()
-            ]
+            jobs=[JobStatusResponse(**payload) for payload in payloads]
         )
 
     # -------------------------------------------------------------------------
