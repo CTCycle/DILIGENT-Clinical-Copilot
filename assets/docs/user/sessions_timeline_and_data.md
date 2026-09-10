@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-08-31
+Last updated: 2026-09-10
 
 ## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -34,8 +34,9 @@ Important distinctions:
 - Manual report edits do not create a new official version.
 - LLM-assisted revision creates a new versioned draft and keeps the previous version unchanged.
 - Human clinical review status is separate from LLM QA status.
-- Backend-provided matched drugs, structured case fields, revision entities, RxNav identifiers, and LiverTox matches are treated as authoritative persisted evidence.
-- Frontend-derived display fallbacks are labeled as **Display fallback** or **Not backend-confirmed**. These values are navigation aids only and must not be interpreted as RxNav, LiverTox, RUCAM, or backend-confirmed clinical evidence.
+- Backend-provided matched drugs, structured case fields, revision entities, RxNav identifiers, LiverTox matches, and linked FDA DILIrank identifiers are authoritative persisted evidence only within their documented source semantics.
+- A DILIrank category is a drug-level hepatotoxicity prior, not a patient-level causality score.
+- Frontend-derived display fallbacks are labeled as **Display fallback** or **Not backend-confirmed**. These values are navigation aids only and must not be interpreted as RxNav, LiverTox, DILIrank, RUCAM, or backend-confirmed clinical evidence.
 
 ## Use Patient Timeline from a session
 Select a session in **Clinical Sessions**, then open its **Timeline** tab. Saved timeline previews open at `/sessions/:sessionId/timetable/:timelineId`; the route without `:timelineId` starts from the session workspace. There is no separate Patient Timeline item in the primary sidebar.
@@ -89,12 +90,14 @@ Open **Data Inspection** from the sidebar.
 _Data Inspection filtered to public catalog records._
 
 Expected capabilities:
-- resource or table selection
+- resource or table selection for RxNav, LiverTox, FDA DILIrank 2.0, and RAG
 - refresh controls
 - record counts or metadata
 - table-style inspection
 - search, filter, or pagination where supported
 - embedding or resource update status where supported
+
+The **DILIrank** view is read-only. It shows FDA compound name, linked canonical drug when a safe deterministic link exists, LTKB ID, DILI concern class, severity class, labeling section, and source comment. `Unlinked` is an intentional state: it means the FDA row is preserved but is not eligible to contribute to clinical consultation. Do not infer a missing mapping manually from display similarity.
 
 Recommended workflow:
 1. Open **Data Inspection**.
@@ -102,17 +105,20 @@ Recommended workflow:
 3. Refresh the view.
 4. Confirm expected records are present.
 5. Use filters or pagination to inspect specific records.
+6. For DILIrank, distinguish linked records from preserved unlinked source rows before interpreting the clinical knowledge available for a drug.
 
 Do not edit local database files manually while the application is running.
 
 ## Update Local Resources
-Some resources or embeddings may require initialization or refresh through:
+Some resources or embeddings may require initialization or refresh through the Data Inspection update controls or through:
 
 ```text
 start_on_windows.ps1
 ```
 
-Use its menu options for database initialization, dependency maintenance, test execution, log cleanup, or cache cleanup.
+DILIrank updates use the official FDA workbook. The default update may reuse a validated local workbook while checking HTTP freshness metadata; **Download fresh source** forces a new download. A downloaded candidate is validated before it replaces the last-known-good cache.
+
+Use the launcher menu options for database initialization, dependency maintenance, test execution, log cleanup, or cache cleanup when those broader maintenance operations are needed.
 
 Expected result:
 - progress is reported
