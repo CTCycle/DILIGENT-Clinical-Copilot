@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-09-04
+Last updated: 2026-09-10
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -99,6 +99,8 @@ The clinical source hierarchy is AASLD, LiverTox, FDA DILI guidance, then DILIN 
 
 LiverTox likelihood describes a drug-level prior hepatotoxicity classification and remains separate from patient-specific causality. A weak or sparse LiverTox prior can limit the available reference support, but it does not impose an artificial hard ceiling on patient-level causality when stronger patient evidence exists.
 
+FDA DILIrank 2.0 is handled by the same principle. A linked DILIrank record contributes structured drug-level context such as `vDILI-Concern`, severity class, label section, and source comment. It is never converted into a numeric patient-causality weight and never overrides chronology, dechallenge or rechallenge, phenotype, competing causes, or patient-specific evidence. Only deterministic links to the canonical drug identity are eligible for clinical use; unlinked or ambiguous FDA rows remain inspection-only. When DILIrank evidence is supplied to a per-drug consultation, its LTKB identifiers are recorded in existing assessment provenance metadata and the rendered source label includes `FDA DILIrank 2.0` conditionally.
+
 The internal structured causality synthesis integrates auditable patient evidence such as drug identity, chronology, drug-specific dechallenge or rechallenge evidence, phenotype information, competing causes, and source quality. It is an internal deterministic synthesis for review, not a validated DILIN score and not a replacement for expert adjudication.
 
 The deterministic dossier provides the FDA-style fourteen-section report
@@ -181,6 +183,8 @@ aliases, runtime observations, and match-cache evidence in its own repository
 transaction. This keeps clinical session persistence and catalog learning
 separately owned while retaining the same evidence trail.
 
+DILIrank linking is a separate source-ingestion concern and does not add another clinical drug resolver. During DILIrank refresh, the FDA compound name first matches `drugs.canonical_name_norm`; only if no canonical match exists may a unique exact alias from trusted `livertox` or `rxnorm` aliases link the row. Session-observed or manual aliases are excluded from this path. Multiple alias candidates leave the DILIrank row unlinked rather than guessing.
+
 Per-drug clinical assessments carry claim envelopes and narrative limits. Claim review output distinguishes source-text claims, patient-record RUCAM claims, non-scoring RUCAM evidence, unsupported or unknown-source claims, and generated limitations so report consumers can see which statements require review.
 
 The rendered per-drug report consolidates evidence-match status, the matched local record, evidence warnings, claim-review requirements, and RUCAM limitations into one localized clinical commentary. The structured claim and evidence fields remain unchanged in persisted audit data.
@@ -220,6 +224,7 @@ not reuse the patient visit date as an invented exact event date.
 - Ambiguous or low-confidence section assignments require review.
 - Missing or ambiguous external drug matches do not force a match.
 - Ambiguous drug matches are included for review but are not used as authoritative LiverTox evidence.
+- Unlinked or ambiguously linked DILIrank rows remain inspection-only and are not supplied to clinical consultation.
 - Broad categories and rejected false-positive extracted text remain audit-only and do not become concrete drug matches.
 - LLM structured output failures fall back to direct deterministic parsing after bounded retries.
 - Missing patient-level RUCAM data never trigger a synthesized numeric RUCAM score; the pipeline retains a non-scoring evidence checklist instead.
@@ -229,4 +234,4 @@ not reuse the patient visit date as an invented exact event date.
 ## Testing Matrix
 Regression fixtures under `app/tests/fixtures/dili_pipeline_audit` cover clean, noisy, incomplete, and adversarial clinical documents, including duplicate headings, ambiguous headings, structured and unstructured therapy, structured and noisy laboratories, hepatic-pattern conflicts, family-history disease mentions, allergy-only drug mentions, negated diagnoses, combination therapy, brand/generic variants, and missing LiverTox matches.
 
-Focused clinical correctness unit coverage additionally checks presentation-versus-peak phenotype behavior, laboratory-specific ULN handling, missing-ULN and AST-substitution safeguards, patient-only RUCAM provenance, polypharmacy attribution, baseline-aware case qualification, drug-specific dechallenge, weak LiverTox prior handling, competing-cause semantics, and deterministic safety auditing of revised reports.
+Focused clinical correctness unit coverage additionally checks presentation-versus-peak phenotype behavior, laboratory-specific ULN handling, missing-ULN and AST-substitution safeguards, patient-only RUCAM provenance, polypharmacy attribution, baseline-aware case qualification, drug-specific dechallenge, weak LiverTox prior handling, competing-cause semantics, deterministic safety auditing of revised reports, DILIrank trusted-linking semantics, source-provenance attribution, and failed/cancelled DILIrank cache refresh behavior.
