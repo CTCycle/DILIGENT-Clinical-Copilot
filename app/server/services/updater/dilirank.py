@@ -60,23 +60,20 @@ class DiliRankUpdater:
         self._raise_if_cancelled(should_stop)
         self._emit(progress_callback, 5.0, "Refreshing FDA DILIrank 2.0 source")
         source_metadata = self._download_workbook()
-        source_path = (
-            self.candidate_path
-            if bool(source_metadata.get("downloaded"))
-            else self.workbook_path
-        )
-        self._raise_if_cancelled(should_stop)
-        self._emit(progress_callback, 40.0, "Validating DILIrank 2.0 workbook")
+        downloaded = bool(source_metadata.get("downloaded"))
+        source_path = self.candidate_path if downloaded else self.workbook_path
         try:
+            self._raise_if_cancelled(should_stop)
+            self._emit(progress_callback, 40.0, "Validating DILIrank 2.0 workbook")
             frame = pd.read_excel(source_path, engine="openpyxl")
             records = self._parse_records(frame, source_metadata)
+            self._raise_if_cancelled(should_stop)
         except Exception:
-            if bool(source_metadata.get("downloaded")):
+            if downloaded:
                 self.candidate_path.unlink(missing_ok=True)
             raise
-        self._raise_if_cancelled(should_stop)
 
-        if bool(source_metadata.get("downloaded")):
+        if downloaded:
             cache_metadata = {
                 "source_url": source_metadata.get("source_url"),
                 "last_modified": source_metadata.get("last_modified"),
@@ -91,7 +88,7 @@ class DiliRankUpdater:
         self._emit(progress_callback, 98.0, "DILIrank 2.0 update completed")
         return {
             **summary,
-            "downloaded": bool(source_metadata.get("downloaded")),
+            "downloaded": downloaded,
             "source_url": source_metadata.get("source_url"),
             "source_last_modified": source_metadata.get("last_modified"),
             "etag": source_metadata.get("etag"),
