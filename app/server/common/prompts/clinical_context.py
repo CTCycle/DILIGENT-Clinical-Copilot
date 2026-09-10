@@ -58,9 +58,9 @@ def build_dilirank_knowledge_fragment(
             f"compound={str(record.get('compound_name') or record.get('drug_name') or 'N/A')}",
             f"DILI concern={str(record.get('dili_concern') or 'N/A')}",
         ]
-        severity_class = str(record.get("severity_class") or "").strip()
-        label_section = str(record.get("label_section") or "").strip()
-        comment = str(record.get("comment") or "").strip()
+        severity_class = str(record.get("severity_class") or "")
+        label_section = str(record.get("label_section") or "")
+        comment = str(record.get("comment") or "")
         if severity_class:
             parts.append(f"severity class={severity_class}")
         if label_section:
