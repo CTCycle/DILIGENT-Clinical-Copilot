@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from repositories.context import RepositoryContext
+from repositories.dilirank_repository import DiliRankRepository
+
 ###############################################################################
 class RevisionToolRegistry:
     names = frozenset(
@@ -12,6 +15,8 @@ class RevisionToolRegistry:
             "read_version_lineage",
             "search_livertox_catalog",
             "get_livertox_excerpt",
+            "search_dilirank_catalog",
+            "get_dilirank_records",
             "get_drug_knowledge_bundle",
             "search_rag",
         }
@@ -30,6 +35,12 @@ class RevisionToolRegistry:
         self.clinical_session_repository = clinical_session_repository
         self.session_revision_repository = session_revision_repository
         self.knowledge_repository = knowledge_repository
+        repository_context = getattr(knowledge_repository, "context", None)
+        self.dilirank_repository = (
+            DiliRankRepository(repository_context)
+            if isinstance(repository_context, RepositoryContext)
+            else None
+        )
         self.session = session
         self.context = context
 
@@ -67,17 +78,42 @@ class RevisionToolRegistry:
                     self._positive_int(arguments.get("drug_id"))
                 )
             }
-        if name == "get_drug_knowledge_bundle":
+        if name == "get_dilirank_records":
             return {
-                "item": self.knowledge_repository.get_drug_knowledge_bundle(
-                    self._positive_int(arguments.get("drug_id"))
+                "items": (
+                    self.dilirank_repository.get_records_for_drug(
+                        self._positive_int(arguments.get("drug_id"))
+                    )
+                    if self.dilirank_repository is not None
+                    else []
                 )
             }
+        if name == "get_drug_knowledge_bundle":
+            drug_id = self._positive_int(arguments.get("drug_id"))
+            item = dict(self.knowledge_repository.get_drug_knowledge_bundle(drug_id))
+            item["dilirank_records"] = (
+                self.dilirank_repository.get_records_for_drug(drug_id)
+                if self.dilirank_repository is not None
+                else []
+            )
+            return {"item": item}
         if name == "search_livertox_catalog":
             return {
                 "items": self.knowledge_repository.list_livertox_catalog(
                     search=str(arguments.get("query") or ""), offset=0, limit=10
                 )[0]
+            }
+        if name == "search_dilirank_catalog":
+            return {
+                "items": (
+                    self.dilirank_repository.list_catalog(
+                        search=str(arguments.get("query") or ""),
+                        offset=0,
+                        limit=10,
+                    )[0]
+                    if self.dilirank_repository is not None
+                    else []
+                )
             }
         return {
             "available": False,
@@ -104,7 +140,7 @@ class RevisionToolRegistry:
     def _positive_int(value: Any) -> int:
         try:
             number = int(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             raise ValueError("Tool ids must be positive integers.") from None
         if number < 1:
             raise ValueError("Tool ids must be positive.")

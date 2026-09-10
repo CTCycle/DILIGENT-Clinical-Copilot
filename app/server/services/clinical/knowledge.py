@@ -2,16 +2,31 @@ from __future__ import annotations
 
 from typing import Any
 
-from common.prompts.clinical_context import build_livertox_knowledge_fragment
+from common.prompts.clinical_context import (
+    build_dilirank_knowledge_fragment,
+    build_livertox_knowledge_fragment,
+)
 from repositories import values as repository_values
+from repositories.context import RepositoryContext
+from repositories.dilirank_repository import DiliRankRepository
 from repositories.knowledge_repository import KnowledgeRepository
 
 ###############################################################################
 class ClinicalKnowledgeComposer:
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, knowledge_repository: KnowledgeRepository) -> None:
+    def __init__(
+        self,
+        *,
+        knowledge_repository: KnowledgeRepository,
+    ) -> None:
         self.knowledge_repository = knowledge_repository
+        context = getattr(knowledge_repository, "context", None)
+        self.dilirank_repository = (
+            DiliRankRepository(context)
+            if isinstance(context, RepositoryContext)
+            else None
+        )
 
     # -------------------------------------------------------------------------
     def enrich_resolved_drugs(
@@ -22,20 +37,29 @@ class ClinicalKnowledgeComposer:
             matched_row = payload.get("matched_livertox_row")
             if not isinstance(matched_row, dict):
                 payload["drug_id"] = None
+                payload["dilirank_records"] = []
                 payload["knowledge_prompt"] = ""
                 continue
             drug_id = repository_values.to_int(matched_row.get("drug_id"))
             payload["drug_id"] = drug_id
             if drug_id is None:
+                payload["dilirank_records"] = []
                 payload["knowledge_prompt"] = ""
                 continue
             bundle = self.knowledge_repository.get_drug_knowledge_bundle(drug_id)
             livertox_excerpt = self.select_livertox_excerpt(payload)
             if not livertox_excerpt:
                 livertox_excerpt = str(bundle.get("livertox_excerpt") or "")
+            dilirank_records = (
+                self.dilirank_repository.get_records_for_drug(drug_id)
+                if self.dilirank_repository is not None
+                else []
+            )
             payload["livertox_monographs"] = bundle.get("livertox_monographs") or []
+            payload["dilirank_records"] = dilirank_records
             payload["knowledge_prompt"] = self.build_combined_prompt_fragment(
                 livertox_excerpt=livertox_excerpt,
+                dilirank_records=dilirank_records,
             )
 
     # -------------------------------------------------------------------------
@@ -52,7 +76,13 @@ class ClinicalKnowledgeComposer:
         self,
         *,
         livertox_excerpt: str,
+        dilirank_records: list[dict[str, Any]],
     ) -> str:
-        return build_livertox_knowledge_fragment(
-            livertox_excerpt=livertox_excerpt.strip(),
+        return "\n\n".join(
+            [
+                build_livertox_knowledge_fragment(
+                    livertox_excerpt=livertox_excerpt.strip(),
+                ),
+                build_dilirank_knowledge_fragment(records=dilirank_records),
+            ]
         )
