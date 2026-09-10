@@ -11,6 +11,8 @@ from repositories.context import RepositoryContext
 from repositories.dilirank_repository import DiliRankRepository
 from repositories.knowledge_repository import KnowledgeRepository
 
+DILIRANK_PROVENANCE_KEY = "fda_dilirank_2"
+
 ###############################################################################
 class ClinicalKnowledgeComposer:
 
@@ -57,10 +59,41 @@ class ClinicalKnowledgeComposer:
             )
             payload["livertox_monographs"] = bundle.get("livertox_monographs") or []
             payload["dilirank_records"] = dilirank_records
+            self._attach_dilirank_provenance(payload, dilirank_records)
             payload["knowledge_prompt"] = self.build_combined_prompt_fragment(
                 livertox_excerpt=livertox_excerpt,
                 dilirank_records=dilirank_records,
             )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _attach_dilirank_provenance(
+        payload: dict[str, Any],
+        records: list[dict[str, Any]],
+    ) -> None:
+        metadata = payload.get("extraction_metadata")
+        metadata_items = list(metadata) if isinstance(metadata, list) else []
+        metadata_items = [
+            item
+            for item in metadata_items
+            if not (
+                isinstance(item, dict)
+                and item.get("knowledge_source") == DILIRANK_PROVENANCE_KEY
+            )
+        ]
+        if records:
+            metadata_items.append(
+                {
+                    "knowledge_source": DILIRANK_PROVENANCE_KEY,
+                    "record_count": len(records),
+                    "ltkb_ids": [
+                        str(record.get("ltkb_id") or "").strip()
+                        for record in records
+                        if str(record.get("ltkb_id") or "").strip()
+                    ],
+                }
+            )
+        payload["extraction_metadata"] = metadata_items
 
     # -------------------------------------------------------------------------
     def select_livertox_excerpt(self, payload: dict[str, Any]) -> str:
