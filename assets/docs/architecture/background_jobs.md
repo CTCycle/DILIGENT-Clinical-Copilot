@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-08-20
+Last updated: 2026-09-10
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -64,6 +64,9 @@ stateDiagram-v2
 - `livertox_update`
   - Start: `POST /api/inspection/livertox/jobs`
   - Poll or cancel: `GET|DELETE /api/inspection/livertox/jobs/{job_id}`
+- `dilirank_update`
+  - Start: `POST /api/inspection/dilirank/jobs`
+  - Poll or cancel: `GET|DELETE /api/inspection/dilirank/jobs/{job_id}`
 - `rag_update`
   - Start: `POST /api/inspection/rag/jobs`
   - Poll or cancel: `GET|DELETE /api/inspection/rag/jobs/{job_id}`
@@ -84,7 +87,8 @@ Additional rules:
 - Clients should treat `version` as monotonic and ignore out-of-order older snapshots.
 - Clinical progress snapshots expose canonical granular stage keys such as `drugs.extracting`, `retrieval.evidence`, `report.generating`, `session.saving`, and terminal `completed`; generic internal wrapper stages are not persisted as the user-facing stage.
 - Inspection update jobs may include `phase`, `step_index`, `step_count`, `progress_message`, and `summary`.
-- Inspection update runners use cooperative cancellation and progress callbacks consistently across `rxnav`, `livertox`, and `rag`.
+- Inspection update runners use cooperative cancellation and progress callbacks consistently across `rxnav`, `livertox`, `dilirank`, and `rag` through the same `DataInspectionService` and `DataInspectionUpdateJobRunner` path.
+- DILIrank refreshes validate a downloaded candidate workbook before promoting it to the stable cache. Validation failure or cancellation before promotion removes the candidate and preserves the last-known-good cached workbook and metadata.
 - Session revision jobs start the bounded revision agent. It creates a draft
   version and run, persists context and a plan, executes allow-listed tool
   iterations, validates the draft report, runs QA, and persists step, trace,
