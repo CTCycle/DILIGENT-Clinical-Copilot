@@ -167,6 +167,7 @@ export class InspectionUpdateJobResource {
   readonly targetState = signal<InspectionUpdateTargetSnapshotMap>({
     rxnav: { running: false, progress: 0, message: '', error: null },
     livertox: { running: false, progress: 0, message: '', error: null },
+    dilirank: { running: false, progress: 0, message: '', error: null },
     rag: { running: false, progress: 0, message: '', error: null },
   });
   readonly activeTarget = signal<InspectionUpdateTarget | null>(null);
@@ -191,11 +192,12 @@ export class InspectionUpdateJobResource {
       this.tracker.configureRefreshers({
         rxnav: this.actions.rxnav.refresh,
         livertox: this.actions.livertox.refresh,
+        dilirank: this.actions.dilirank.refresh,
         rag: this.actions.rag.refresh,
       });
       effect(() => {
         const states = this.tracker!.targetState();
-        for (const target of ['rxnav', 'livertox', 'rag'] as InspectionUpdateTarget[]) {
+        for (const target of ['rxnav', 'livertox', 'dilirank', 'rag'] as InspectionUpdateTarget[]) {
           const state = states[target];
           this.patchTargetState(target, {
             jobId: state.jobId,
@@ -346,6 +348,9 @@ export class InspectionUpdateJobResource {
       return { target, payload: this.buildStartPayload(target) };
     }
     if (target === 'livertox') {
+      return { target, payload: this.buildStartPayload(target) };
+    }
+    if (target === 'dilirank') {
       return { target, payload: this.buildStartPayload(target) };
     }
     return { target, payload: this.buildStartPayload(target) };
