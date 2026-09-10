@@ -15,6 +15,7 @@ from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.inspection import InspectionJobPhase
 from repositories.clinical_session_repository import ClinicalSessionRepository
+from repositories.context import RepositoryContext
 from repositories.dilirank_repository import DiliRankRepository
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
@@ -101,7 +102,12 @@ class DataInspectionService(
         self.clinical_session_repository = clinical_session_repository
         self.drug_catalog_repository = drug_catalog_repository
         self.knowledge_repository = knowledge_repository
-        self.dilirank_repository = DiliRankRepository(self.knowledge_repository.context)
+        context = getattr(self.knowledge_repository, "context", None)
+        self.dilirank_repository = (
+            DiliRankRepository(context)
+            if isinstance(context, RepositoryContext)
+            else None
+        )
         self.session_timeline_repository = session_timeline_repository
         self.session_revision_repository = session_revision_repository
         self.timeline_extractor = timeline_extractor or PatientTimelineExtractor()
@@ -322,6 +328,8 @@ class DataInspectionService(
         offset: int,
         limit: int,
     ) -> dict[str, Any]:
+        if self.dilirank_repository is None:
+            raise RuntimeError("DILIrank repository is unavailable.")
         items, total = self.dilirank_repository.list_catalog(
             search=search,
             offset=offset,
@@ -336,6 +344,8 @@ class DataInspectionService(
 
     # -------------------------------------------------------------------------
     def get_dilirank_records(self, drug_id: int) -> dict[str, Any] | None:
+        if self.dilirank_repository is None:
+            raise RuntimeError("DILIrank repository is unavailable.")
         records = self.dilirank_repository.get_records_for_drug(drug_id)
         if not records:
             return None
