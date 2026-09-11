@@ -336,6 +336,16 @@ def test_model_config_navigation(page: Page, base_url: str):
     expect(page.get_by_role("heading", name="Runtime Source")).to_be_visible()
 
 ###############################################################################
+def test_primary_navigation_restores_scroll_position(page: Page, base_url: str):
+    page.goto(f"{base_url}/model-config")
+    page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
+    page.get_by_role("tab", name="DILI Agent").click()
+
+    expect(page).to_have_url(re.compile(r"/?$"))
+    expect(page.get_by_role("heading", name="Clinical Input")).to_be_visible()
+    assert page.evaluate("document.documentElement.scrollTop") < 1
+
+###############################################################################
 def test_data_inspection_navigation(page: Page, base_url: str):
     page.goto(base_url)
 
