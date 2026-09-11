@@ -1,4 +1,30 @@
 
+.inspection-page-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+}
+
+.inspection-page-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+@media (max-width: 680px) {
+  .inspection-page-intro {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .inspection-page-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 .inspection-rag-path-editor {
   display: flex;
   align-items: center;

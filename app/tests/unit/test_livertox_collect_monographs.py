@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import tarfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -120,3 +121,22 @@ def test_collect_monographs_honors_cancellation(tmp_path: Path) -> None:
         livertox_module.collect_monographs(
             updater, str(archive_path), should_stop=lambda: True
         )
+
+###############################################################################
+def test_monograph_progress_keeps_ui_callback_without_repeated_info_log(caplog) -> None:
+    caplog.set_level(logging.INFO)
+    progress: list[tuple[float, str]] = []
+
+    livertox_module.emit_monograph_progress(
+        object(),
+        progress_callback=lambda value, message: progress.append((value, message)),
+        processed_count=25,
+        total_payloads=50,
+        last_reported_count=0,
+    )
+
+    assert progress == [(51.5, "Processed 25/50 LiverTox files")]
+    assert not any(
+        "LiverTox monograph progress" in record.getMessage()
+        for record in caplog.records
+    )

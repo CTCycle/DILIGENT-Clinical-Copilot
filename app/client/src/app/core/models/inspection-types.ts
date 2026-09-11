@@ -1,6 +1,7 @@
 import type {
   ClinicalActorConfidence,
   ClinicalActorSource,
+  JobStatus,
   JobStatusResponse,
 } from "./types";
 
@@ -294,6 +295,14 @@ export type InspectionDeleteResponse = {
 
 export type InspectionUpdateTarget = "rxnav" | "livertox" | "dilirank" | "rag";
 
+export const INSPECTION_UPDATE_ALL_TARGETS = [
+  "livertox",
+  "rxnav",
+  "dilirank",
+] as const;
+
+export type InspectionUpdateAllTarget = (typeof INSPECTION_UPDATE_ALL_TARGETS)[number];
+
 export type InspectionUpdateOverridesByTarget = {
   rxnav: InspectionRxNavOverrideRequest;
   livertox: InspectionLiverToxOverrideRequest;
@@ -306,6 +315,48 @@ export type InspectionUpdateStartRequest =
   | { target: "livertox"; payload: InspectionUpdateOverridesByTarget["livertox"] }
   | { target: "dilirank"; payload: InspectionUpdateOverridesByTarget["dilirank"] }
   | { target: "rag"; payload: InspectionUpdateOverridesByTarget["rag"] };
+
+export type InspectionUpdateAllStartRequestMap = {
+  [TTarget in InspectionUpdateAllTarget]: Extract<
+    InspectionUpdateStartRequest,
+    { target: TTarget }
+  >;
+};
+
+export type InspectionUpdateAllConfigMap = Record<
+  InspectionUpdateAllTarget,
+  Record<string, unknown> | null
+>;
+
+export type InspectionUpdateAllConfigLoadingMap = Record<InspectionUpdateAllTarget, boolean>;
+
+export type InspectionUpdateAllConfigErrorMap = Record<InspectionUpdateAllTarget, string | null>;
+
+export type InspectionUpdateAllPhase =
+  | "idle"
+  | "starting"
+  | "running"
+  | "completed"
+  | "partial_failure"
+  | "cancelled";
+
+export type InspectionUpdateAllTargetState = {
+  started: boolean;
+  jobId: string | null;
+  status: JobStatus | null;
+  progress: number;
+  message: string;
+  error: string | null;
+};
+
+export type InspectionUpdateAllState = {
+  runId: number | null;
+  phase: InspectionUpdateAllPhase;
+  progress: number;
+  message: string;
+  cancelRequested: boolean;
+  targets: Record<InspectionUpdateAllTarget, InspectionUpdateAllTargetState>;
+};
 
 export type InspectionUpdateConfigResponse = {
   target: InspectionUpdateTarget;

@@ -314,7 +314,6 @@ class RxNavDrugCatalogBuilder:
         ):
             return
         self.last_logged_count = count
-        logger.info("RxNav catalog progress: %d records upserted", count)
         if progress_callback is None:
             return
         denominator = float(self.total_records or 50_000)

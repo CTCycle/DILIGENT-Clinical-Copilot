@@ -6,6 +6,7 @@ import { InspectionActionIconButtonComponent } from '../../components/inspection
 import { InspectionCatalogStatusComponent } from '../../components/inspection-catalog-status/inspection-catalog-status.component';
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import { InspectionCatalogToolbarComponent } from '../../components/inspection-catalog-toolbar/inspection-catalog-toolbar.component';
+import { InspectionProgressButtonComponent } from '../../components/inspection-progress-button/inspection-progress-button.component';
 import {
   deleteInspectionLiverToxDrug,
   deleteInspectionRxNavDrug,
@@ -49,6 +50,8 @@ import {
   InspectionRagVectorizationSummary,
   InspectionRagVectorStoreSummary,
   InspectionRxNavItem,
+  INSPECTION_UPDATE_ALL_TARGETS,
+  InspectionUpdateAllTarget,
   InspectionUpdateTarget,
 } from '../../core/models/inspection-types';
 import { InspectionDetailResource } from '../../core/state/inspection-detail-resource';
@@ -67,6 +70,7 @@ import {
   InspectionUpdateControlsComponent,
   InspectionUpdateFieldChange,
 } from './components/inspection-update-controls.component';
+import { InspectionUpdateAllModalComponent } from './components/inspection-update-all-modal.component';
 
 const INSPECTION_VIEWS: InspectionViewOption[] = [
   {
@@ -114,6 +118,8 @@ const RAG_SUMMARY_FIELDS: ReadonlyArray<{
     InspectionCatalogStatusComponent,
     InspectionCatalogToolbarComponent,
     InspectionUpdateControlsComponent,
+    InspectionProgressButtonComponent,
+    InspectionUpdateAllModalComponent,
   ],
   templateUrl: './data-inspection-page.component.html',
   styleUrl: './data-inspection-page.component.scss',
@@ -273,6 +279,21 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly updateMessage = this.updateJob.updateMessage;
   readonly updateError = this.updateJob.updateError;
   readonly updateTargetState = this.updateJob.targetState;
+  readonly updateAllModalOpen = signal(false);
+  readonly updateAllActiveTarget = signal<InspectionUpdateAllTarget>('livertox');
+  readonly updateAllState = this.updateJob.updateAllState;
+  readonly updateAllConfigs = this.updateJob.updateAllConfigs;
+  readonly updateAllConfigLoading = this.updateJob.updateAllConfigLoading;
+  readonly updateAllConfigErrors = this.updateJob.updateAllConfigErrors;
+  readonly updateAllValidationError = this.updateJob.updateAllValidationError;
+  readonly updateAllRunning = this.updateJob.updateAllRunning;
+  readonly updateAllCanStart = this.updateJob.updateAllCanStart;
+  readonly updateAllButtonDisabled = computed(() =>
+    this.updateAllRunning() || INSPECTION_UPDATE_ALL_TARGETS.some(
+      (target) => this.updateTargetState()[target].running,
+    ),
+  );
+  readonly structuredUpdateActionsDisabled = computed(() => this.updateAllRunning());
   readonly isRagUpdateModal = computed(() => this.activeUpdateTarget() === 'rag');
   readonly updateModalSubtitle = computed(() =>
     this.isRagUpdateModal()
@@ -591,6 +612,9 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async openUpdateModal(target: InspectionUpdateTarget): Promise<void> {
+    if (target !== 'rag' && this.updateAllRunning()) {
+      return;
+    }
     await this.updateJob.open(target);
   }
 
@@ -608,6 +632,44 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   async cancelUpdateJob(): Promise<void> {
     await this.updateJob.cancel();
+  }
+
+  async openUpdateAllModal(): Promise<void> {
+    if (this.updateAllButtonDisabled()) {
+      return;
+    }
+    this.updateAllActiveTarget.set('livertox');
+    this.updateAllModalOpen.set(true);
+    await this.updateJob.openAll();
+  }
+
+  closeUpdateAllModal(): void {
+    this.updateAllModalOpen.set(false);
+    this.updateJob.closeAll();
+  }
+
+  changeUpdateAllTarget(target: InspectionUpdateAllTarget): void {
+    this.updateAllActiveTarget.set(target);
+  }
+
+  updateUpdateAllConfig(change: {
+    target: InspectionUpdateAllTarget;
+    change: InspectionUpdateFieldChange;
+  }): void {
+    this.updateJob.setConfigValueForTarget(change.target, change.change.key, change.change.value);
+  }
+
+  async retryUpdateAllConfig(target: InspectionUpdateAllTarget): Promise<void> {
+    await this.updateJob.openAll();
+    this.updateAllActiveTarget.set(target);
+  }
+
+  async startUpdateAll(): Promise<void> {
+    await this.updateJob.startAll();
+  }
+
+  async cancelUpdateAll(): Promise<void> {
+    await this.updateJob.cancelAll();
   }
 
   private formatRagSummaryValue(value: unknown): string {

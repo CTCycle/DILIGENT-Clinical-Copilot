@@ -1,6 +1,16 @@
 <main class="page-container inspection-page inspection-page-workbench">
   <header class="page-header inspection-page-intro">
     <p class="lede">Inspect and update RxNav, LiverTox, FDA DILIrank 2.0, and RAG knowledge sources.</p>
+    <div class="inspection-page-header-actions">
+      <app-inspection-progress-button
+        [buttonLabel]="'Update All Sources'"
+        [inProgress]="updateAllRunning()"
+        [progress]="updateAllState().progress"
+        [progressMessage]="updateAllState().message"
+        [disabled]="updateAllButtonDisabled()"
+        (activated)="openUpdateAllModal()"
+      />
+    </div>
   </header>
 
   <section class="inspection-layout">
@@ -46,6 +56,7 @@
               [updateInProgress]="rxnavUpdateRunning()"
               [updateProgress]="rxnavUpdateProgress()"
               [updateProgressMessage]="rxnavUpdateMessage()"
+              [updateDisabled]="structuredUpdateActionsDisabled()"
               (searchChange)="updateRxNavSearch($event)"
               (updateClick)="openUpdateModal('rxnav')"
             />
@@ -111,6 +122,7 @@
               [updateInProgress]="livertoxUpdateRunning()"
               [updateProgress]="livertoxUpdateProgress()"
               [updateProgressMessage]="livertoxUpdateMessage()"
+              [updateDisabled]="structuredUpdateActionsDisabled()"
               (searchChange)="updateLiverToxSearch($event)"
               (updateClick)="openUpdateModal('livertox')"
             />
@@ -177,6 +189,7 @@
               [updateInProgress]="dilirankUpdateRunning()"
               [updateProgress]="dilirankUpdateProgress()"
               [updateProgressMessage]="dilirankUpdateMessage()"
+              [updateDisabled]="structuredUpdateActionsDisabled()"
               (searchChange)="updateDiliRankSearch($event)"
               (updateClick)="openUpdateModal('dilirank')"
             />
@@ -457,6 +470,23 @@
       @if (excerptData()) { <pre class="inspection-excerpt-text">{{ excerptData()!.excerpt }}</pre> }
     </div>
   </app-modal-shell>
+
+  <app-inspection-update-all-modal
+    [isOpen]="updateAllModalOpen()"
+    [activeTarget]="updateAllActiveTarget()"
+    [configs]="updateAllConfigs()"
+    [configLoading]="updateAllConfigLoading()"
+    [configErrors]="updateAllConfigErrors()"
+    [state]="updateAllState()"
+    [canStart]="updateAllCanStart()"
+    [validationError]="updateAllValidationError()"
+    (close)="closeUpdateAllModal()"
+    (targetChange)="changeUpdateAllTarget($event)"
+    (configChange)="updateUpdateAllConfig($event)"
+    (retry)="retryUpdateAllConfig($event)"
+    (start)="startUpdateAll()"
+    (cancel)="cancelUpdateAll()"
+  />
 
   <app-modal-shell
     [isOpen]="!!activeUpdateTarget()"
