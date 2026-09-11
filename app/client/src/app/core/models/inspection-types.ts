@@ -251,6 +251,7 @@ export type InspectionLiverToxItem = {
   drug_id: number;
   drug_name: string;
   last_update: string | null;
+  has_excerpt: boolean;
 };
 
 export type InspectionLiverToxCatalogResponse = {

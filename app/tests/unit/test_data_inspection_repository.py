@@ -373,6 +373,7 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
     )
     assert livertox_total == 1
     assert livertox_items[0]["drug_name"] == "Acetaminophen"
+    assert livertox_items[0]["has_excerpt"] is True
 
     aliases = repository_graph.drug_catalog_repository.get_rxnav_alias_groups(
         rxnav_items[0]["drug_id"]
@@ -403,6 +404,53 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
         mentions = db_session.execute(select(ClinicalDrugMention)).scalars().all()
         assert len(mentions) == 1
         assert mentions[0].drug_id is None
+
+###############################################################################
+def test_livertox_catalog_reports_missing_excerpt() -> None:
+    repository_graph, engine = build_repository_graph_for_test()
+    session_factory = sessionmaker(bind=engine, future=True)
+    with session_factory() as db_session:
+        available = repository_graph.drug_catalog_repository.ensure_drug(
+            db_session,
+            canonical_name="Available Drug",
+            canonical_name_norm="available drug",
+            rxnorm_rxcui=None,
+            livertox_nbk_id=None,
+        )
+        missing = repository_graph.drug_catalog_repository.ensure_drug(
+            db_session,
+            canonical_name="Missing Excerpt Drug",
+            canonical_name_norm="missing excerpt drug",
+            rxnorm_rxcui=None,
+            livertox_nbk_id=None,
+        )
+        db_session.add_all(
+            [
+                LiverToxMonograph(
+                    drug_id=int(available.id),
+                    monograph_key="available-drug|unit",
+                    drug_name_norm="available drug",
+                    excerpt="A stored LiverTox excerpt.",
+                ),
+                LiverToxMonograph(
+                    drug_id=int(missing.id),
+                    monograph_key="missing-excerpt-drug|unit",
+                    drug_name_norm="missing excerpt drug",
+                    excerpt=None,
+                ),
+            ]
+        )
+        db_session.commit()
+
+    items, total = repository_graph.knowledge_repository.list_livertox_catalog(
+        search=None,
+        offset=0,
+        limit=10,
+    )
+    assert total == 2
+    by_name = {item["drug_name"]: item for item in items}
+    assert by_name["Available Drug"]["has_excerpt"] is True
+    assert by_name["Missing Excerpt Drug"]["has_excerpt"] is False
 
 ###############################################################################
 def test_update_job_lifecycle_with_cooperative_cancel() -> None:
