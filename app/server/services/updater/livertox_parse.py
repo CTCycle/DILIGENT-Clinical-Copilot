@@ -272,11 +272,6 @@ def emit_monograph_progress(
         progress=35.0 + (ratio * 33.0),
         message=f"Processed {processed_count}/{total_payloads} LiverTox files",
     )
-    logger.info(
-        "LiverTox monograph progress: %d/%d files processed",
-        processed_count,
-        total_payloads,
-    )
     return processed_count
 
 ###############################################################################

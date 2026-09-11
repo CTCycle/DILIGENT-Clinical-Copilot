@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -185,3 +186,22 @@ def test_curated_aliases_are_loaded_and_forwarded_to_serializer(
     assert kwargs["curated_aliases_by_canonical"]["metformin"] == [
         ("Metformina", "synonym")
     ]
+
+###############################################################################
+def test_catalog_progress_keeps_ui_callback_without_repeated_info_log(caplog) -> None:
+    caplog.set_level(logging.INFO)
+    builder = RxNavDrugCatalogBuilder(
+        rx_client=RxClientStub(),
+        drug_catalog_repository=SerializerStub(),  # type: ignore[arg-type]
+    )
+    builder.total_records = 1_000
+    progress: list[tuple[float, str]] = []
+
+    builder.emit_catalog_progress(
+        lambda value, message: progress.append((value, message)),
+        count=1_000,
+        force=True,
+    )
+
+    assert progress == [(95.0, "Upserted 1000 RxNav records")]
+    assert not any("RxNav catalog progress" in record.getMessage() for record in caplog.records)
