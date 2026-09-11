@@ -145,4 +145,98 @@ describe('InspectionUpdateJobResource', () => {
       payload: { redownload: true },
     });
   });
+
+  it('loads and submits the three structured configurations without including RAG', async () => {
+    const config = (target: 'livertox' | 'rxnav' | 'dilirank', defaults: Record<string, unknown>) => ({
+      target,
+      defaults,
+      allowed_fields: Object.keys(defaults),
+      summary: {},
+      read_only: false,
+    });
+    const actions = {
+      rxnav: {
+        fetchConfig: vi.fn().mockResolvedValue(config('rxnav', {
+          rxnav_request_timeout: 30,
+          rxnav_max_concurrency: 4,
+        })),
+        start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn(),
+      },
+      livertox: {
+        fetchConfig: vi.fn().mockResolvedValue(config('livertox', {
+          livertox_monograph_max_workers: 4,
+          livertox_archive: 'livertox.tar.gz',
+          redownload: false,
+        })),
+        start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn(),
+      },
+      dilirank: {
+        fetchConfig: vi.fn().mockResolvedValue(config('dilirank', { redownload: false })),
+        start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn(),
+      },
+      rag: {
+        fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn(),
+      },
+    } as unknown as InspectionUpdateTargetActionsMap;
+    const tracker = {
+      configureRefreshers: vi.fn(),
+      discover: vi.fn().mockResolvedValue(undefined),
+      targetState: signal({
+        rxnav: { jobId: null, running: false, progress: 0, message: '', error: null },
+        livertox: { jobId: null, running: false, progress: 0, message: '', error: null },
+        dilirank: { jobId: null, running: false, progress: 0, message: '', error: null },
+        rag: { jobId: null, running: false, progress: 0, message: '', error: null },
+      }),
+      updateAllState: signal({
+        runId: null,
+        phase: 'idle',
+        progress: 0,
+        message: '',
+        cancelRequested: false,
+        targets: {
+          livertox: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
+          rxnav: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
+          dilirank: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
+        },
+      }),
+      start: vi.fn(),
+      startAll: vi.fn().mockResolvedValue(undefined),
+      cancelAll: vi.fn(),
+    };
+    const resource = TestBed.runInInjectionContext(() => new InspectionUpdateJobResource(
+      {} as JobPollingService,
+      actions,
+      () => '',
+      tracker as never,
+    ));
+
+    await resource.openAll();
+    resource.setConfigValueForTarget('livertox', 'redownload', true);
+    await resource.startAll();
+
+    expect(tracker.discover).toHaveBeenCalled();
+    expect(actions.rag.fetchConfig).not.toHaveBeenCalled();
+    expect(resource.updateAllConfigs().livertox?.['redownload']).toBe(true);
+    expect(tracker.startAll).toHaveBeenCalledWith({
+      livertox: {
+        target: 'livertox',
+        payload: {
+          livertox_monograph_max_workers: 4,
+          livertox_archive: 'livertox.tar.gz',
+          redownload: true,
+        },
+      },
+      rxnav: {
+        target: 'rxnav',
+        payload: {
+          rxnav_request_timeout: 30,
+          rxnav_max_concurrency: 4,
+        },
+      },
+      dilirank: {
+        target: 'dilirank',
+        payload: { redownload: false },
+      },
+    });
+  });
 });

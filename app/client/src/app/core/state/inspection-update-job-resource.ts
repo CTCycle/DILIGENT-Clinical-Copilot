@@ -1,6 +1,13 @@
-import { effect, signal } from '@angular/core';
+import { computed, effect, signal } from '@angular/core';
 
 import {
+  INSPECTION_UPDATE_ALL_TARGETS,
+  InspectionUpdateAllConfigErrorMap,
+  InspectionUpdateAllConfigLoadingMap,
+  InspectionUpdateAllConfigMap,
+  InspectionUpdateAllStartRequestMap,
+  InspectionUpdateAllState,
+  InspectionUpdateAllTarget,
   InspectionUpdateOverridesByTarget,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobStatusResponse,
@@ -23,6 +30,7 @@ type InspectionUpdateTargetActions<TTarget extends InspectionUpdateTarget> = {
 
 type InspectionUpdateTargetState = {
   config: Record<string, unknown> | null;
+  configError: string | null;
   loading: boolean;
   running: boolean;
   jobId: string | null;
@@ -163,6 +171,70 @@ function resolvePollRequestTimeoutSeconds(intervalMs: number): number {
   return Math.min(30, Math.max(5, Math.ceil((Math.max(intervalMs, 250) / 1000) * 4)));
 }
 
+function initialUpdateAllConfigMap(): InspectionUpdateAllConfigMap {
+  return {
+    livertox: null,
+    rxnav: null,
+    dilirank: null,
+  };
+}
+
+function initialUpdateAllConfigLoadingMap(): InspectionUpdateAllConfigLoadingMap {
+  return {
+    livertox: false,
+    rxnav: false,
+    dilirank: false,
+  };
+}
+
+function initialUpdateAllConfigErrorMap(): InspectionUpdateAllConfigErrorMap {
+  return {
+    livertox: null,
+    rxnav: null,
+    dilirank: null,
+  };
+}
+
+function initialUpdateAllState(): InspectionUpdateAllState {
+  return {
+    runId: null,
+    phase: 'idle',
+    progress: 0,
+    message: '',
+    cancelRequested: false,
+    targets: {
+      livertox: {
+        started: false,
+        jobId: null,
+        status: null,
+        progress: 0,
+        message: 'Waiting to start.',
+        error: null,
+      },
+      rxnav: {
+        started: false,
+        jobId: null,
+        status: null,
+        progress: 0,
+        message: 'Waiting to start.',
+        error: null,
+      },
+      dilirank: {
+        started: false,
+        jobId: null,
+        status: null,
+        progress: 0,
+        message: 'Waiting to start.',
+        error: null,
+      },
+    },
+  };
+}
+
+function isUpdateAllRunning(state: InspectionUpdateAllState): boolean {
+  return state.phase === 'starting' || state.phase === 'running';
+}
+
 export class InspectionUpdateJobResource {
   readonly targetState = signal<InspectionUpdateTargetSnapshotMap>({
     rxnav: { running: false, progress: 0, message: '', error: null },
@@ -170,6 +242,11 @@ export class InspectionUpdateJobResource {
     dilirank: { running: false, progress: 0, message: '', error: null },
     rag: { running: false, progress: 0, message: '', error: null },
   });
+  readonly updateAllState = signal<InspectionUpdateAllState>(initialUpdateAllState());
+  readonly updateAllConfigs = signal<InspectionUpdateAllConfigMap>(initialUpdateAllConfigMap());
+  readonly updateAllConfigLoading = signal<InspectionUpdateAllConfigLoadingMap>(initialUpdateAllConfigLoadingMap());
+  readonly updateAllConfigErrors = signal<InspectionUpdateAllConfigErrorMap>(initialUpdateAllConfigErrorMap());
+  readonly updateAllValidationError = signal<string | null>(null);
   readonly activeTarget = signal<InspectionUpdateTarget | null>(null);
   readonly updateConfig = signal<Record<string, unknown> | null>(null);
   readonly updateLoading = signal(false);
@@ -178,6 +255,18 @@ export class InspectionUpdateJobResource {
   readonly updateProgress = signal(0);
   readonly updateMessage = signal('');
   readonly updateError = signal<string | null>(null);
+  readonly updateAllRunning = computed(() => isUpdateAllRunning(this.updateAllState()));
+  readonly updateAllCanStart = computed(() => {
+    const configs = this.updateAllConfigs();
+    const loading = this.updateAllConfigLoading();
+    const errors = this.updateAllConfigErrors();
+    const trackerStates = this.tracker?.targetState();
+    return INSPECTION_UPDATE_ALL_TARGETS.every(
+      (target) => configs[target] !== null && !loading[target] && !errors[target],
+    ) && !this.updateAllRunning() && !INSPECTION_UPDATE_ALL_TARGETS.some(
+      (target) => trackerStates?.[target].running,
+    );
+  });
 
   private updatePollToken = 0;
   private readonly targetStates = new Map<InspectionUpdateTarget, InspectionUpdateTargetState>();
@@ -208,6 +297,12 @@ export class InspectionUpdateJobResource {
           });
         }
       });
+      const updateAllState = this.tracker.updateAllState;
+      if (updateAllState) {
+        effect(() => {
+          this.updateAllState.set(updateAllState());
+        });
+      }
     }
   }
 
@@ -222,23 +317,52 @@ export class InspectionUpdateJobResource {
     this.activeTarget.set(target);
     const state = this.getTargetState(target);
     this.applyStateToSignals(state);
+    await this.loadConfig(target, { emptyOnFailure: true });
+  }
 
-    if (state.config !== null) {
+  async openAll(): Promise<void> {
+    if (this.tracker) {
+      await this.tracker.discover();
+    }
+    this.updateAllValidationError.set(null);
+    await Promise.all(
+      INSPECTION_UPDATE_ALL_TARGETS.map((target) => {
+        const state = this.getTargetState(target);
+        return this.loadConfig(target, {
+          force: state.configError !== null,
+          emptyOnFailure: false,
+        });
+      }),
+    );
+  }
+
+  private async loadConfig(
+    target: InspectionUpdateTarget,
+    options: { force?: boolean; emptyOnFailure: boolean },
+  ): Promise<void> {
+    const current = this.getTargetState(target);
+    if (!options.force && current.config !== null) {
       return;
     }
-
-    this.patchTargetState(target, { loading: true, error: null });
+    this.patchTargetState(target, {
+      loading: true,
+      error: null,
+      configError: null,
+    });
     try {
       const payload = await this.actions[target].fetchConfig();
       const defaults = { ...(payload.defaults ?? undefined) };
       const summary = isRecord(payload.summary) ? { ...payload.summary } : {};
       this.patchTargetState(target, {
         config: payload.read_only ? summary : defaults,
+        configError: null,
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load update configuration.';
       this.patchTargetState(target, {
-        config: {},
-        error: error instanceof Error ? error.message : 'Failed to load update configuration.',
+        config: options.emptyOnFailure ? {} : null,
+        configError: message,
+        error: message,
       });
     } finally {
       this.patchTargetState(target, { loading: false });
@@ -259,8 +383,88 @@ export class InspectionUpdateJobResource {
         ...(this.getTargetState(target).config ?? {}),
         [key]: value,
       },
+      configError: null,
       error: null,
     });
+  }
+
+  setConfigValueForTarget(target: InspectionUpdateAllTarget, key: string, value: unknown): void {
+    this.patchTargetState(target, {
+      config: {
+        ...(this.getTargetState(target).config ?? {}),
+        [key]: value,
+      },
+      configError: null,
+      error: null,
+    });
+    this.updateAllValidationError.set(null);
+  }
+
+  async startAll(): Promise<void> {
+    const validationError = this.validateUpdateAllConfiguration();
+    if (validationError) {
+      this.updateAllValidationError.set(validationError);
+      return;
+    }
+    if (!this.tracker) {
+      this.updateAllValidationError.set('Combined source updates are unavailable.');
+      return;
+    }
+    this.updateAllValidationError.set(null);
+    await this.tracker.startAll(this.buildUpdateAllStartRequests());
+  }
+
+  async cancelAll(): Promise<void> {
+    if (!this.tracker) {
+      return;
+    }
+    await this.tracker.cancelAll();
+  }
+
+  closeAll(): void {
+    this.updateAllValidationError.set(null);
+  }
+
+  private validateUpdateAllConfiguration(): string | null {
+    const configs = this.updateAllConfigs();
+    const loading = this.updateAllConfigLoading();
+    const errors = this.updateAllConfigErrors();
+    const loadingTarget = INSPECTION_UPDATE_ALL_TARGETS.find((target) => loading[target]);
+    if (loadingTarget) {
+      return 'Wait for all source configurations to finish loading.';
+    }
+    const failedTarget = INSPECTION_UPDATE_ALL_TARGETS.find((target) => errors[target]);
+    if (failedTarget) {
+      return 'Resolve the source configuration errors before starting the combined update.';
+    }
+    const missingTarget = INSPECTION_UPDATE_ALL_TARGETS.find((target) => configs[target] === null);
+    if (missingTarget) {
+      return 'Load configuration for all three sources before starting the combined update.';
+    }
+    const runningTarget = INSPECTION_UPDATE_ALL_TARGETS.find(
+      (target) => this.tracker?.targetState()[target].running,
+    );
+    if (runningTarget) {
+      return 'An update is already running for one of the selected sources.';
+    }
+    return null;
+  }
+
+  private buildUpdateAllStartRequests(): InspectionUpdateAllStartRequestMap {
+    return {
+      livertox: {
+        target: 'livertox',
+        payload: this.buildStartPayload('livertox'),
+      },
+      rxnav: {
+        target: 'rxnav',
+        payload: this.buildStartPayload('rxnav'),
+      },
+      dilirank: {
+        target: 'dilirank',
+        payload: this.buildStartPayload('dilirank'),
+      },
+    };
   }
 
   async start(): Promise<void> {
@@ -440,6 +644,7 @@ export class InspectionUpdateJobResource {
     }
     const initial: InspectionUpdateTargetState = {
       config: null,
+      configError: null,
       loading: false,
       running: false,
       jobId: null,
@@ -461,13 +666,18 @@ export class InspectionUpdateJobResource {
       ...patch,
     };
     this.targetStates.set(target, next);
+    if (target === 'livertox' || target === 'rxnav' || target === 'dilirank') {
+      this.updateAllConfigs.update((configs) => ({ ...configs, [target]: next.config }));
+      this.updateAllConfigLoading.update((loading) => ({ ...loading, [target]: next.loading }));
+      this.updateAllConfigErrors.update((errors) => ({ ...errors, [target]: next.configError }));
+    }
     this.targetState.update((current) => ({
       ...current,
       [target]: {
         running: next.running,
         progress: next.progress,
         message: next.message,
-        error: next.error,
+        error: next.error || next.configError,
       },
     }));
     if (this.activeTarget() === target) {
@@ -483,6 +693,6 @@ export class InspectionUpdateJobResource {
     this.updateJobId.set(state.jobId);
     this.updateProgress.set(state.progress);
     this.updateMessage.set(state.message);
-    this.updateError.set(state.error);
+    this.updateError.set(state.error || state.configError);
   }
 }

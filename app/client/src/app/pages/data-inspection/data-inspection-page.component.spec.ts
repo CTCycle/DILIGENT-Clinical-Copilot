@@ -15,9 +15,12 @@ describe('DataInspectionPageComponent folder selection', () => {
   };
   let tracker: {
     targetState: ReturnType<typeof signal>;
+    updateAllState: ReturnType<typeof signal>;
     configureRefreshers: ReturnType<typeof vi.fn>;
     discover: ReturnType<typeof vi.fn>;
     start: ReturnType<typeof vi.fn>;
+    startAll: ReturnType<typeof vi.fn>;
+    cancelAll: ReturnType<typeof vi.fn>;
   };
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -33,9 +36,23 @@ describe('DataInspectionPageComponent folder selection', () => {
         dilirank: { jobId: null, running: false, progress: 0, message: '', error: null },
         rag: { jobId: null, running: false, progress: 0, message: '', error: null },
       }),
+      updateAllState: signal({
+        runId: null,
+        phase: 'idle',
+        progress: 0,
+        message: '',
+        cancelRequested: false,
+        targets: {
+          livertox: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
+          rxnav: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
+          dilirank: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
+        },
+      }),
       configureRefreshers: vi.fn(),
       discover: vi.fn().mockResolvedValue(undefined),
       start: vi.fn().mockResolvedValue(undefined),
+      startAll: vi.fn().mockResolvedValue(undefined),
+      cancelAll: vi.fn().mockResolvedValue(undefined),
     };
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
@@ -183,6 +200,60 @@ describe('DataInspectionPageComponent folder selection', () => {
       target: 'rag',
       payload: { documents_path: 'G:\\RAG Démo' },
     });
+  });
+
+  it('loads all structured source configurations and starts only those sources', async () => {
+    createComponent(false);
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/inspection/jobs')) {
+        return jsonResponse({ jobs: [] });
+      }
+      const target = url.split('/').at(-2);
+      const defaults = target === 'livertox'
+        ? { livertox_monograph_max_workers: 4, livertox_archive: 'livertox.tar.gz', redownload: false }
+        : target === 'rxnav'
+          ? { rxnav_request_timeout: 30, rxnav_max_concurrency: 4 }
+          : { redownload: false };
+      return jsonResponse({
+        target,
+        defaults,
+        allowed_fields: Object.keys(defaults),
+        summary: {},
+        read_only: false,
+      });
+    });
+
+    await component.openUpdateAllModal();
+    component.updateUpdateAllConfig({
+      target: 'dilirank',
+      change: { key: 'redownload', value: true },
+    });
+    await component.startUpdateAll();
+
+    expect(component.updateAllModalOpen()).toBe(true);
+    expect(tracker.startAll).toHaveBeenCalledWith({
+      livertox: {
+        target: 'livertox',
+        payload: {
+          livertox_monograph_max_workers: 4,
+          livertox_archive: 'livertox.tar.gz',
+          redownload: false,
+        },
+      },
+      rxnav: {
+        target: 'rxnav',
+        payload: {
+          rxnav_request_timeout: 30,
+          rxnav_max_concurrency: 4,
+        },
+      },
+      dilirank: {
+        target: 'dilirank',
+        payload: { redownload: true },
+      },
+    });
+    expect(tracker.startAll.mock.calls[0][0]).not.toHaveProperty('rag');
   });
 
   it('keeps the modal open and exposes a safe browse error', async () => {
