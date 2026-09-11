@@ -9,7 +9,6 @@ For combination products, list active ingredients separately when identifiable. 
 The application independently validates every proposed identity against its local medication knowledge sources before accepting it. Return only data that conforms to the JSON schema supplied by the application.
 """
 
-
 ###############################################################################
 def build_medication_identity_user_prompt(mentions: list[str]) -> str:
     mention_lines = "\n".join(f"- {name}" for name in mentions)

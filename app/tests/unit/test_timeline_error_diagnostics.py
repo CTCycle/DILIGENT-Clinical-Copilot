@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from services.inspection.timeline import _timeline_fallback_note
 
-
 ###############################################################################
 def test_timeline_fallback_note_includes_provider_contract_detail() -> None:
     note = _timeline_fallback_note(

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 DILI_RAG_QUERY_TEMPLATE = """{drug_name} drug induced liver injury (DILI) {pattern_classification} pattern. Observed pattern: {r_score_summary}. Focus on latency, observed-versus-known pattern match, severity, risk factors, case reports, rechallenge outcomes, likelihood grading, management, contradictions, and association strength. Clinical context: {clinical_context}"""
 
-
 ###############################################################################
 def build_dili_rag_query(
     *,

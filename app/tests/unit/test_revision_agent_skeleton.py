@@ -319,7 +319,10 @@ def test_revision_issue_scan_allows_bounded_provider_repair_retries(
 ) -> None:
     captured: dict[str, object] = {}
 
+    ###############################################################################
     class FakeProvider:
+
+        # -------------------------------------------------------------------------
         async def llm_structured_call(self, **kwargs: object) -> RevisionIssueScanResult:
             captured.update(kwargs)
             return RevisionIssueScanResult(summary="No issues detected.")

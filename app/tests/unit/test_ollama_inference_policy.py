@@ -6,7 +6,6 @@ from services.llm import ollama_chat
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.runtime_config import LLMRuntimeConfig
 
-
 ###############################################################################
 def test_ollama_gpt_oss_preserves_level_reasoning_and_omits_temperature(
     monkeypatch,

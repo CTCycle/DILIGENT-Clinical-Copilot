@@ -8,7 +8,6 @@ from domain.llm.transports import ChatRequest, ChatResult
 from services.llm.transports import routed_gateway
 from services.llm.transports.routed_gateway import RoutedGatewayTransport
 
-
 ###############################################################################
 def _transport(models_path: str = "/zen/go/v1/models") -> RoutedGatewayTransport:
     return RoutedGatewayTransport(

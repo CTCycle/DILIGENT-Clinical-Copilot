@@ -5,7 +5,6 @@ REPORT_LANGUAGE_MAP = "en=English, it=Italian, de=German, fr=French, es=Spanish"
 CLINICAL_LANGUAGE_REWRITE_SYSTEM_PROMPT = """Rewrite clinical text faithfully into the requested target language. Preserve the clinical meaning and do not add, remove, infer, or reinterpret clinical facts.
 """
 
-
 ###############################################################################
 def build_clinical_language_rewrite_user_prompt(
     *,
