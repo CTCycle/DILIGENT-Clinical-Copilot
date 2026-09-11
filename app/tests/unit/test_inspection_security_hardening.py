@@ -245,6 +245,7 @@ def test_rag_directory_browse_route_returns_typed_payload() -> None:
     ###############################################################################
     class ServiceStub:
 
+        # -------------------------------------------------------------------------
         @staticmethod
         def browse_rag_directories(path: str) -> dict[str, object]:
             assert path == ""
@@ -302,6 +303,7 @@ def test_rag_directory_browse_route_sanitizes_filesystem_errors(
     ###############################################################################
     class ServiceStub:
 
+        # -------------------------------------------------------------------------
         @staticmethod
         def browse_rag_directories(path: str) -> dict[str, object]:
             _ = path

@@ -10,7 +10,6 @@ from services.llm.cloud import CloudLLMClient, LLMError, LLMTimeout
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.transports.openai_chat import OpenAIChatTransport
 
-
 ###############################################################################
 def _http_error(status_code: int) -> httpx.HTTPStatusError:
     request = httpx.Request("GET", "https://opencode.ai/zen/go/v1/models")
@@ -33,6 +32,8 @@ def test_provider_error_mapping_distinguishes_connection_failure() -> None:
 
 ###############################################################################
 def test_deepseek_structured_repair_handles_schema_echo_before_valid_json() -> None:
+
+    ###############################################################################
     class Payload(BaseModel):
         model_config = ConfigDict(extra="forbid")
 
@@ -76,6 +77,8 @@ def test_deepseek_structured_repair_handles_schema_echo_before_valid_json() -> N
 
 ###############################################################################
 def test_structured_repair_recovers_from_truncated_patient_drugs_payload() -> None:
+
+    ###############################################################################
     class Payload(BaseModel):
         model_config = ConfigDict(extra="forbid")
 
@@ -202,6 +205,8 @@ def test_provider_error_mapping_preserves_sanitized_contract_detail() -> None:
 def test_openai_structured_provider_failure_is_not_downgraded_to_chat(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+
+    ###############################################################################
     class Payload(BaseModel):
         ok: bool
 

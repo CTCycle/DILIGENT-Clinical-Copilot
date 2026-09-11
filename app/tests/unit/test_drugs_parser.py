@@ -851,8 +851,11 @@ def test_extract_drugs_from_therapy_falls_back_after_llm_failure() -> None:
 
 ###############################################################################
 def test_therapy_failure_warning_logs_safe_runtime_metadata(caplog) -> None:
+
+    ###############################################################################
     class SensitiveFailingStructuredClient:
 
+        # -------------------------------------------------------------------------
         async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
             _ = kwargs
             raise RuntimeError(

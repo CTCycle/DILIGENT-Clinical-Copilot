@@ -11,7 +11,6 @@ from services.llm.model_capabilities import (
     resolve_model_capabilities,
 )
 
-
 ###############################################################################
 def test_capability_resolution_prefers_exact_then_family_then_provider() -> None:
     exact = resolve_model_capabilities(provider="ollama", model="gpt-oss:20b")
