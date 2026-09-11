@@ -13,7 +13,6 @@ from services.llm.model_capabilities import (
     resolve_model_capabilities,
 )
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     ("model", "reasoning_level", "expected"),

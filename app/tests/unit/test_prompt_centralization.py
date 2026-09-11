@@ -7,11 +7,9 @@ APP_ROOT = Path(__file__).resolve().parents[2]
 PROMPT_ROOT = APP_ROOT / "server" / "common" / "prompts"
 SERVICE_ROOT = APP_ROOT / "server" / "services"
 
-
 ###############################################################################
 def _python_files(root: Path) -> list[Path]:
     return sorted(path for path in root.rglob("*.py") if "__pycache__" not in path.parts)
-
 
 ###############################################################################
 def test_prompt_package_contains_python_modules_only() -> None:
@@ -21,7 +19,6 @@ def test_prompt_package_contains_python_modules_only() -> None:
         if path.is_file() and path.suffix != ".py"
     ]
     assert unexpected == []
-
 
 ###############################################################################
 def test_prompt_definitions_do_not_call_strip() -> None:
@@ -39,7 +36,6 @@ def test_prompt_definitions_do_not_call_strip() -> None:
             if isinstance(value.func, ast.Attribute) and value.func.attr == "strip":
                 violations.append(f"{path.relative_to(APP_ROOT)}:{node.lineno}")
     assert violations == []
-
 
 ###############################################################################
 def test_services_do_not_define_prompt_constants() -> None:
@@ -64,7 +60,6 @@ def test_services_do_not_define_prompt_constants() -> None:
                     )
     assert violations == []
 
-
 ###############################################################################
 def test_services_do_not_embed_substantial_llm_call_prompts() -> None:
     violations: list[str] = []
@@ -85,7 +80,6 @@ def test_services_do_not_embed_substantial_llm_call_prompts() -> None:
                         f"{path.relative_to(APP_ROOT)}:{node.lineno}:{keyword.arg}"
                     )
     assert violations == []
-
 
 ###############################################################################
 def test_legacy_extraction_prompt_module_is_removed() -> None:

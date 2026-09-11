@@ -14,7 +14,6 @@ Use null or the schema's empty structure for missing information. Return the str
 LOCAL_LAB_EXTRACTION_SYSTEM_PROMPT = """Return compact JSON data only. Extract only liver-related laboratory entries explicitly supported by the source, including marker names, values, units, dates, and evidence. Do not invent measurements or timing.
 """
 
-
 ###############################################################################
 def build_lab_extraction_user_prompt(
     *,
