@@ -584,6 +584,7 @@ class LiverToxCatalogItem(BaseModel):
     drug_id: int
     drug_name: str
     last_update: str | None = None
+    has_excerpt: bool
 
 ###############################################################################
 class LiverToxCatalogResponse(BaseModel):

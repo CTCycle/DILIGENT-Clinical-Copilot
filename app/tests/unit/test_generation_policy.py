@@ -68,7 +68,25 @@ def test_structured_extraction_budgets_cover_multi_entry_payloads() -> None:
 
     assert structured.output_token_limit == 3072
     assert repair.output_token_limit == 3072
-    assert structured.policy_version == "2026-09-09"
+    assert structured.policy_version == "2026-09-10"
+
+###############################################################################
+def test_complex_timeline_budget_covers_long_event_lists() -> None:
+    simple = resolve_generation_policy(
+        purpose=GenerationPurpose.TIMELINE_EXTRACTION,
+        provider="opencode_go",
+        model="deepseek-v4-flash",
+        timeline_complexity="simple",
+    )
+    complex_timeline = resolve_generation_policy(
+        purpose=GenerationPurpose.TIMELINE_EXTRACTION,
+        provider="opencode_go",
+        model="deepseek-v4-flash",
+        timeline_complexity="complex",
+    )
+
+    assert simple.output_token_limit == 2048
+    assert complex_timeline.output_token_limit == 4096
 
 ###############################################################################
 def test_openai_and_deepseek_are_purpose_specific() -> None:

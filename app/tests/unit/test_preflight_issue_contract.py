@@ -47,6 +47,73 @@ def test_unknown_warning_receives_safe_fallback_metadata() -> None:
     assert issue.continuation_allowed is True
 
 ###############################################################################
+def test_too_short_input_is_presented_as_blocking() -> None:
+    issue = _present_preflight_issue(
+        ClinicalInputPreflightIssue(
+            severity="blocking",
+            code="clinical_input_too_short",
+            message="Clinical input contains fewer than 60 words.",
+            field="clinical_input",
+        )
+    )
+
+    assert issue.title == "Clinical input is too brief"
+    assert (
+        issue.consequence == "At least 60 words are required before analysis can start."
+    )
+    assert issue.affected_section == "Clinical input"
+    assert issue.continuation_allowed is False
+
+###############################################################################
+def test_missing_sections_do_not_add_a_generic_preflight_failure(monkeypatch) -> None:
+    service = SimpleNamespace(
+        apply_persisted_runtime_configuration=lambda: None,
+        session_repository=SimpleNamespace(
+            session_factory=lambda: nullcontext(
+                SimpleNamespace(connection=lambda: None)
+            )
+        ),
+    )
+    knowledge_repository = SimpleNamespace(
+        list_livertox_catalog=lambda **kwargs: ([{"id": 1}], 1),
+    )
+    drug_catalog_repository = SimpleNamespace(
+        list_rxnav_catalog=lambda **kwargs: ([{"id": 1}], 1),
+    )
+    monkeypatch.setattr(
+        "services.session.preflight._validate_provider_key", lambda blocking: None
+    )
+    monkeypatch.setattr(
+        "services.session.preflight._runtime_settings",
+        lambda: {"clinical_provider": "opencode_go"},
+    )
+    monkeypatch.setattr(
+        "services.session.preflight.check_rag_readiness",
+        lambda requested: RagReadiness(
+            requested=requested,
+            available=True,
+            backend="onnxruntime",
+            model="embedding-model",
+        ),
+    )
+
+    result = validate_clinical_input_preflight(
+        service,
+        ClinicalSessionRequest(
+            visit_date=date(2026, 9, 10),
+            clinical_input="Short input.",
+            selected_model_providers=["opencode_go"],
+        ),
+        knowledge_repository=knowledge_repository,
+        drug_catalog_repository=drug_catalog_repository,
+    )
+
+    blocking_codes = {issue.code for issue in result.blocking_issues}
+    assert "clinical_input_too_short" in blocking_codes
+    assert "required_sections_missing" in blocking_codes
+    assert "preflight_failed" not in blocking_codes
+
+###############################################################################
 def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
     monkeypatch,
 ) -> None:

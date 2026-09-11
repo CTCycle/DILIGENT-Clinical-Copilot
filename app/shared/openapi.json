@@ -4443,13 +4443,18 @@
               }
             ],
             "title": "Last Update"
+          },
+          "has_excerpt": {
+            "type": "boolean",
+            "title": "Has Excerpt"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "drug_id",
-          "drug_name"
+          "drug_name",
+          "has_excerpt"
         ],
         "title": "LiverToxCatalogItem"
       },

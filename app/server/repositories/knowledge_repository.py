@@ -301,7 +301,15 @@ class KnowledgeRepository:
             )
         with self.session_factory() as db_session:
             records_stmt = select(
-                Drug.id, Drug.canonical_name, LiverToxMonograph.last_update
+                Drug.id,
+                Drug.canonical_name,
+                LiverToxMonograph.last_update,
+                (
+                    func.length(
+                        func.trim(func.coalesce(LiverToxMonograph.excerpt, ""))
+                    )
+                    > 0
+                ).label("has_excerpt"),
             ).join(LiverToxMonograph, Drug.id == LiverToxMonograph.drug_id)
             count_stmt = (
                 select(func.count())
@@ -325,6 +333,7 @@ class KnowledgeRepository:
                     "drug_id": int(row.id),
                     "drug_name": row.canonical_name,
                     "last_update": repository_values.normalize_date(row.last_update),
+                    "has_excerpt": bool(row.has_excerpt),
                 }
                 for row in rows
             ], total

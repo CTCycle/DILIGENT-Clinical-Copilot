@@ -151,7 +151,9 @@ def _reasoning_target(
 
 ###############################################################################
 def _requirements(
-    purpose: GenerationPurpose, reasoning_level: ReasoningLevel
+    purpose: GenerationPurpose,
+    reasoning_level: ReasoningLevel,
+    timeline_complexity: TimelineComplexity,
 ) -> tuple[int, int, int, int, str]:
     requirements = {
         GenerationPurpose.CLINICAL_SYNTHESIS: (
@@ -179,6 +181,11 @@ def _requirements(
         GenerationPurpose.CONNECTIVITY_CHECK: (64, 0, 32, 32, "connectivity_only"),
     }
     visible_output, base_reasoning, safety, padding, strategy = requirements[purpose]
+    if (
+        purpose is GenerationPurpose.TIMELINE_EXTRACTION
+        and timeline_complexity in {"moderate", "complex"}
+    ):
+        visible_output = 4096
     reasoning_reserve = base_reasoning
     if reasoning_level is ReasoningLevel.OFF:
         reasoning_reserve = 0
@@ -201,6 +208,7 @@ def _policy(
     temperature: float | None,
     match_kind: PolicyMatchKind,
     rationale: str,
+    timeline_complexity: TimelineComplexity,
 ) -> GenerationPolicy:
     (
         visible_output_reserve,
@@ -208,7 +216,11 @@ def _policy(
         output_token_limit,
         context_safety_reserve,
         context_strategy,
-    ) = _requirements(purpose, requested_reasoning_level)
+    ) = _requirements(
+        purpose,
+        requested_reasoning_level,
+        timeline_complexity,
+    )
     return GenerationPolicy(
         policy_id=f"{match_kind.value}:{provider}:{model}:{purpose.value}",
         policy_version=_CATALOG["policy_version"],
@@ -258,6 +270,7 @@ def resolve_generation_policy(
             temperature=temperature,
             match_kind=PolicyMatchKind.EXACT_MODEL,
             rationale="Verified exact-model compatibility rule",
+            timeline_complexity=timeline_complexity,
         )
     family = (
         normalized_model.split(":", 1)[0]
@@ -282,6 +295,7 @@ def resolve_generation_policy(
             temperature=temperature,
             match_kind=PolicyMatchKind.MODEL_FAMILY,
             rationale="Verified model-family compatibility rule",
+            timeline_complexity=timeline_complexity,
         )
     local_names = set(get_clinical_model_choices()) | set(
         get_text_extraction_model_choices()
@@ -298,6 +312,7 @@ def resolve_generation_policy(
             temperature=temperature,
             match_kind=PolicyMatchKind.FALLBACK,
             rationale="Catalogued local instruction-model product default",
+            timeline_complexity=timeline_complexity,
         )
     provider_rule = _CATALOG.get("providers", {}).get(normalized_provider)
     if provider_rule is not None:
@@ -316,6 +331,7 @@ def resolve_generation_policy(
                 temperature=temperature,
                 match_kind=PolicyMatchKind.PROVIDER,
                 rationale="Provider compatibility rule",
+                timeline_complexity=timeline_complexity,
             )
     return _policy(
         provider=normalized_provider,
@@ -326,6 +342,7 @@ def resolve_generation_policy(
         temperature=None,
         match_kind=PolicyMatchKind.FALLBACK,
         rationale="Unknown model uses the provider/model default",
+        timeline_complexity=timeline_complexity,
     )
 
 ###############################################################################

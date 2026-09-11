@@ -196,9 +196,9 @@ def validate_clinical_input_preflight(
             rag_readiness,
         )
     if len(clinical_input.split()) < 60:
-        non_blocking.append(
+        blocking.append(
             ClinicalInputPreflightIssue(
-                severity="non_blocking",
+                severity="blocking",
                 code="clinical_input_too_short",
                 message=(
                     "Clinical input contains fewer than 60 words and may not provide "
@@ -227,6 +227,15 @@ def validate_clinical_input_preflight(
                 + ", ".join(parse_result.malformed_sections),
                 field="clinical_input",
             )
+        )
+    if parse_result.missing_required_sections or parse_result.malformed_sections:
+        return _result(
+            blocking,
+            non_blocking,
+            runtime_settings,
+            extraction_quality,
+            deterministic_diagnostics,
+            rag_readiness,
         )
     try:
         prepared = service.prepare_structured_clinical_input(
@@ -666,8 +675,8 @@ _ISSUE_PRESENTATIONS: dict[str, tuple[str, str]] = {
         "There is no clinical information available to analyse.",
     ),
     "clinical_input_too_short": (
-        "Clinical input may be too brief",
-        "The assessment may omit important chronology, competing causes, or clinical context.",
+        "Clinical input is too brief",
+        "At least 60 words are required before analysis can start.",
     ),
     "livertox_catalog_empty": (
         "LiverTox data is unavailable",
