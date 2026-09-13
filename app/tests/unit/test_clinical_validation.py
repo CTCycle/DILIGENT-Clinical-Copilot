@@ -194,6 +194,36 @@ def test_mild_pretreatment_panel_does_not_anchor_r_ratio_or_classification() -> 
     assert structured_patterns[0].pattern == "hepatocellular"
 
 ###############################################################################
+def test_nonqualifying_pair_is_indeterminate_in_both_clinical_paths() -> None:
+    timeline = PatientLabTimeline(
+        entries=[
+            ClinicalLabEntry(
+                marker_name="ALT",
+                value=80,
+                upper_limit_normal=40,
+                sample_date="2026-08-01",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALP",
+                value=150,
+                upper_limit_normal=120,
+                sample_date="2026-08-01",
+                source="laboratory_analysis",
+            ),
+        ]
+    )
+
+    legacy_assessment = HepatotoxicityPatternAnalyzer().assess_payload(timeline)
+    structured_pattern = DiliPatternEngine().assess(timeline)[0]
+
+    assert legacy_assessment.score.r_score is None
+    assert legacy_assessment.score.classification == "indeterminate"
+    assert structured_pattern.r_ratio is None
+    assert structured_pattern.pattern == "indeterminate"
+    assert structured_pattern.assessment_point == "first_qualifying"
+
+###############################################################################
 def test_primary_injury_anchor_uses_first_abnormal_pair_with_varying_ulns() -> None:
     timeline = PatientLabTimeline(
         entries=[
