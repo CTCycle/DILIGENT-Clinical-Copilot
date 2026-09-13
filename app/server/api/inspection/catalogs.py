@@ -9,6 +9,7 @@ from domain.inspection import (
     DrugAliasesResponse,
     InspectionLiverToxOverrideRequest,
     InspectionRxNavOverrideRequest,
+    InspectionStructuredSourcesUpdateRequest,
     InspectionUpdateConfigResponse,
     LiverToxCatalogResponse,
     LiverToxExcerptResponse,
@@ -194,6 +195,34 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
         )
 
     # -------------------------------------------------------------------------
+    def start_structured_sources_update_job(
+        self,
+        request: InspectionStructuredSourcesUpdateRequest | None = Body(default=None),
+    ) -> JobStartResponse:
+        request = request or InspectionStructuredSourcesUpdateRequest()
+        return self.start_update_job(
+            job_type=self.service.STRUCTURED_SOURCES_JOB_TYPE,
+            message="Structured source update job started",
+            overrides=request.model_dump(exclude_none=True),
+        )
+
+    # -------------------------------------------------------------------------
+    def get_structured_sources_update_job_status(
+        self, job_id: str
+    ) -> JobStatusResponse:
+        return self.get_update_job_status(
+            job_id=job_id,
+            job_type=self.service.STRUCTURED_SOURCES_JOB_TYPE,
+        )
+
+    # -------------------------------------------------------------------------
+    def cancel_structured_sources_update_job(self, job_id: str) -> JobCancelResponse:
+        return self.cancel_update_job(
+            job_id=job_id,
+            job_type=self.service.STRUCTURED_SOURCES_JOB_TYPE,
+        )
+
+    # -------------------------------------------------------------------------
     def list_reference_catalog_runtime_observations(
         self,
     ) -> list[ReferenceCatalogRuntimeObservationResponse]:
@@ -345,6 +374,27 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
         self.router.add_api_route(
             "/livertox/jobs/{job_id}",
             self.cancel_livertox_update_job,
+            methods=["DELETE"],
+            response_model=JobCancelResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/structured-sources/jobs",
+            self.start_structured_sources_update_job,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/structured-sources/jobs/{job_id}",
+            self.get_structured_sources_update_job_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/structured-sources/jobs/{job_id}",
+            self.cancel_structured_sources_update_job,
             methods=["DELETE"],
             response_model=JobCancelResponse,
             status_code=status.HTTP_200_OK,

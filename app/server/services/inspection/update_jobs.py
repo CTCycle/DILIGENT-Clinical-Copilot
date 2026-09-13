@@ -96,18 +96,28 @@ class DataInspectionUpdateJobRunner:
 
     # -------------------------------------------------------------------------
     def run_rxnav_update_job(
-        self, job_id: str, overrides: Mapping[str, object] | None = None
+        self,
+        job_id: str,
+        overrides: Mapping[str, object] | None = None,
+        *,
+        progress_callback: Callable[[float, str], None] | None = None,
+        report_phase: bool = True,
     ) -> dict[str, Any]:
         stop_check = partial(self.jobs.should_stop, job_id)
-        progress_callback = DataInspectionProgressReporter(
+        progress_callback = progress_callback or DataInspectionProgressReporter(
             self.jobs, job_id, 20.0, 0.68
         )
+        phase_reporter: Callable[[str, str, int, str], None] = (
+            self.report_phase_by_target
+            if report_phase
+            else lambda *_args: None
+        )
         override_values = dict(overrides or {})
-        self.report_phase_by_target(job_id, "rxnav", 1, "Configuration accepted")
+        phase_reporter(job_id, "rxnav", 1, "Configuration accepted")
         if stop_check():
             return {}
-        self.report_phase_by_target(job_id, "rxnav", 4, "RxNav update started")
-        self.report_phase_by_target(
+        phase_reporter(job_id, "rxnav", 4, "RxNav update started")
+        phase_reporter(
             job_id, "rxnav", 10, "Downloading source catalog data"
         )
         rx_client = RxNavClient(
@@ -117,30 +127,40 @@ class DataInspectionUpdateJobRunner:
         builder = RxNavDrugCatalogBuilder(
             drug_catalog_repository=self.drug_catalog_repository, rx_client=rx_client
         )
-        self.report_phase_by_target(
+        phase_reporter(
             job_id, "rxnav", 20, "Processing aliases and synonyms"
         )
         result = builder.update_drug_catalog(
             progress_callback=progress_callback, should_stop=stop_check
         )
-        self.report_phase_by_target(job_id, "rxnav", 88, "Persisting catalog updates")
-        self.report_phase_by_target(job_id, "rxnav", 96, "Finalizing update")
-        self.report_phase_by_target(job_id, "rxnav", 100, "Completed")
+        phase_reporter(job_id, "rxnav", 88, "Persisting catalog updates")
+        phase_reporter(job_id, "rxnav", 96, "Finalizing update")
+        phase_reporter(job_id, "rxnav", 100, "Completed")
         return {"summary": result}
 
     # -------------------------------------------------------------------------
     def run_livertox_update_job(
-        self, job_id: str, overrides: Mapping[str, object] | None = None
+        self,
+        job_id: str,
+        overrides: Mapping[str, object] | None = None,
+        *,
+        progress_callback: Callable[[float, str], None] | None = None,
+        report_phase: bool = True,
     ) -> dict[str, Any]:
         stop_check = partial(self.jobs.should_stop, job_id)
-        progress_callback = DataInspectionProgressReporter(
+        progress_callback = progress_callback or DataInspectionProgressReporter(
             self.jobs, job_id, 20.0, 0.68
         )
+        phase_reporter: Callable[[str, str, int, str], None] = (
+            self.report_phase_by_target
+            if report_phase
+            else lambda *_args: None
+        )
         override_values = dict(overrides or {})
-        self.report_phase_by_target(job_id, "livertox", 1, "Configuration accepted")
+        phase_reporter(job_id, "livertox", 1, "Configuration accepted")
         if stop_check():
             return {}
-        self.report_phase_by_target(job_id, "livertox", 4, "LiverTox update started")
+        phase_reporter(job_id, "livertox", 4, "LiverTox update started")
         updater = LiverToxUpdater(
             str(ARCHIVES_PATH),
             redownload=bool(_override_bool(override_values, "redownload") or False),
@@ -150,50 +170,200 @@ class DataInspectionUpdateJobRunner:
                 override_values, "livertox_monograph_max_workers"
             ),
         )
-        self.report_phase_by_target(job_id, "livertox", 10, "Loading source archive")
+        phase_reporter(job_id, "livertox", 10, "Loading source archive")
         result = updater.update_from_livertox(
             progress_callback=progress_callback, should_stop=stop_check
         )
-        self.report_phase_by_target(job_id, "livertox", 88, "Persisting extracted data")
-        self.report_phase_by_target(job_id, "livertox", 96, "Finalizing update")
-        self.report_phase_by_target(job_id, "livertox", 100, "Completed")
+        phase_reporter(job_id, "livertox", 88, "Persisting extracted data")
+        phase_reporter(job_id, "livertox", 96, "Finalizing update")
+        phase_reporter(job_id, "livertox", 100, "Completed")
         return {"summary": result}
 
     # -------------------------------------------------------------------------
     def run_dilirank_update_job(
-        self, job_id: str, overrides: Mapping[str, object] | None = None
+        self,
+        job_id: str,
+        overrides: Mapping[str, object] | None = None,
+        *,
+        progress_callback: Callable[[float, str], None] | None = None,
+        report_phase: bool = True,
     ) -> dict[str, Any]:
         if self.dilirank_repository is None:
             raise RuntimeError("DILIrank repository is unavailable.")
         stop_check = partial(self.jobs.should_stop, job_id)
-        progress_callback = DataInspectionProgressReporter(
+        progress_callback = progress_callback or DataInspectionProgressReporter(
             self.jobs, job_id, 10.0, 0.80
         )
+        phase_reporter: Callable[[str, str, int, str], None] = (
+            self.report_phase_by_target
+            if report_phase
+            else lambda *_args: None
+        )
         override_values = dict(overrides or {})
-        self.report_phase_by_target(job_id, "dilirank", 1, "Configuration accepted")
+        phase_reporter(job_id, "dilirank", 1, "Configuration accepted")
         if stop_check():
             return {}
-        self.report_phase_by_target(job_id, "dilirank", 4, "DILIrank update started")
-        self.report_phase_by_target(
+        phase_reporter(job_id, "dilirank", 4, "DILIrank update started")
+        phase_reporter(
             job_id, "dilirank", 10, "Loading FDA DILIrank 2.0 source"
         )
         updater = DiliRankUpdater(
             repository=self.dilirank_repository,
             redownload=bool(_override_bool(override_values, "redownload") or False),
         )
-        self.report_phase_by_target(
+        phase_reporter(
             job_id, "dilirank", 20, "Validating and linking DILIrank records"
         )
         result = updater.update_from_fda(
             progress_callback=progress_callback,
             should_stop=stop_check,
         )
-        self.report_phase_by_target(
+        phase_reporter(
             job_id, "dilirank", 90, "Persisting DILIrank snapshot"
         )
-        self.report_phase_by_target(job_id, "dilirank", 96, "Finalizing update")
-        self.report_phase_by_target(job_id, "dilirank", 100, "Completed")
+        phase_reporter(job_id, "dilirank", 96, "Finalizing update")
+        phase_reporter(job_id, "dilirank", 100, "Completed")
         return {"summary": result}
+
+    # -------------------------------------------------------------------------
+    def run_structured_sources_update_job(
+        self, job_id: str, overrides: Mapping[str, object] | None = None
+    ) -> dict[str, Any]:
+        """Run the dependent structured sources in one cancellable job."""
+
+        targets = ("rxnav", "livertox", "dilirank")
+        override_values = dict(overrides or {})
+        source_state: dict[str, dict[str, Any]] = {
+            target: {
+                "status": "pending",
+                "progress": 0.0,
+                "message": "Waiting to start.",
+                "error": None,
+            }
+            for target in targets
+        }
+        summaries: dict[str, Any] = {}
+
+        def patch_job(progress: float, message: str) -> None:
+            self.jobs.update_progress(job_id, progress)
+            self.jobs.update_result(
+                job_id,
+                {
+                    "sources": {
+                        target: dict(payload)
+                        for target, payload in source_state.items()
+                    },
+                    "summaries": dict(summaries),
+                    "progress_message": message,
+                },
+            )
+
+        def child_overrides(target: str) -> dict[str, object]:
+            payload = override_values.get(target)
+            return dict(payload) if isinstance(payload, Mapping) else {}
+
+        def mark_cancelled(start_index: int) -> None:
+            for target in targets[start_index:]:
+                if source_state[target]["status"] == "pending":
+                    source_state[target].update(
+                        status="cancelled",
+                        message="Cancellation requested.",
+                    )
+
+        patch_job(0.0, "Structured source updates queued.")
+        for index, target in enumerate(targets):
+            if self.jobs.should_stop(job_id):
+                mark_cancelled(index)
+                patch_job(
+                    (index / len(targets)) * 100.0,
+                    "Cancellation requested for the structured source updates.",
+                )
+                return {"sources": source_state, "summaries": summaries}
+
+            source_state[target].update(
+                status="running",
+                message=f"{target.capitalize()} update running.",
+            )
+            patch_job(
+                (index / len(targets)) * 100.0,
+                f"Running {target.capitalize()} update.",
+            )
+
+            def report_child_progress(progress: float, message: str) -> None:
+                bounded = min(100.0, max(0.0, float(progress)))
+                source_state[target].update(
+                    progress=bounded,
+                    message=message,
+                )
+                patch_job(((index + bounded / 100.0) / len(targets)) * 100.0, message)
+
+            try:
+                if target == "rxnav":
+                    child_result = self.run_rxnav_update_job(
+                        job_id,
+                        child_overrides(target),
+                        progress_callback=report_child_progress,
+                        report_phase=False,
+                    )
+                elif target == "livertox":
+                    child_result = self.run_livertox_update_job(
+                        job_id,
+                        child_overrides(target),
+                        progress_callback=report_child_progress,
+                        report_phase=False,
+                    )
+                else:
+                    child_result = self.run_dilirank_update_job(
+                        job_id,
+                        child_overrides(target),
+                        progress_callback=report_child_progress,
+                        report_phase=False,
+                    )
+            except Exception:
+                source_state[target].update(
+                    status="failed",
+                    message=f"{target.capitalize()} update failed.",
+                    error=f"{target.capitalize()} update failed.",
+                )
+                for remaining in targets[index + 1 :]:
+                    source_state[remaining].update(
+                        status="failed",
+                        message="Skipped because an earlier source update failed.",
+                        error="Skipped because an earlier source update failed.",
+                    )
+                patch_job(
+                    ((index + source_state[target]["progress"] / 100.0) / len(targets))
+                    * 100.0,
+                    f"{target.capitalize()} update failed.",
+                )
+                raise
+
+            if self.jobs.should_stop(job_id):
+                source_state[target].update(
+                    status="cancelled",
+                    message="Cancellation requested.",
+                )
+                mark_cancelled(index + 1)
+                patch_job(
+                    ((index + source_state[target]["progress"] / 100.0) / len(targets))
+                    * 100.0,
+                    "Cancellation requested for the structured source updates.",
+                )
+                return {"sources": source_state, "summaries": summaries}
+
+            source_state[target].update(
+                status="completed",
+                progress=100.0,
+                message=f"{target.capitalize()} update completed.",
+            )
+            if isinstance(child_result.get("summary"), Mapping):
+                summaries[target] = dict(child_result["summary"])
+            patch_job(
+                ((index + 1) / len(targets)) * 100.0,
+                f"{target.capitalize()} update completed.",
+            )
+
+        return {"sources": source_state, "summaries": summaries}
 
     # -------------------------------------------------------------------------
     def run_rag_update_job(
