@@ -263,7 +263,7 @@
               <div>
                 <dt>Source evidence</dt>
                 <dd class="source-evidence" [class.is-warning]="!selectedEventHasSourceEvidence()">
-                  {{ event.source_evidence || 'Source evidence is missing. Verify this event before using it for clinical review.' }}
+                  {{ event.source_evidence || 'Missing source evidence. Do not treat this event as clinically grounded chronology.' }}
                 </dd>
               </div>
             </dl>
