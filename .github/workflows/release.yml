@@ -13,7 +13,227 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-preflight:
+    permissions:
+      contents: read
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout tagged release
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.14.2"
+
+      - name: Set up UV
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.30"
+          enable-cache: true
+          cache-dependency-glob: app/server/uv.lock
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: app/client/package-lock.json
+
+      - name: Verify tagged SHA is synchronized with main
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          git fetch --no-tags origin main
+          $tagSha = (git rev-parse "refs/tags/$($env:RELEASE_TAG)^{commit}").Trim()
+          $mainSha = (git rev-parse "refs/remotes/origin/main^{commit}").Trim()
+          if ($tagSha -ne $mainSha) {
+            throw "Release tag $($env:RELEASE_TAG) resolves to $tagSha, but origin/main is $mainSha."
+          }
+          Write-Output "Release tag is synchronized with origin/main: $tagSha"
+
+      - name: Verify launcher release parameter contract
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $launcher = Get-Command .\start_on_windows.ps1 -CommandType ExternalScript
+          foreach ($parameter in @("Action", "Version", "DesktopTarget")) {
+            if (-not $launcher.Parameters.ContainsKey($parameter)) {
+              throw "Launcher is missing required release parameter: -$parameter"
+            }
+          }
+          if ($launcher.Parameters.ContainsKey("Force")) {
+            throw "Launcher exposes obsolete release parameter: -Force"
+          }
+          Write-Output "Launcher release parameter contract verified."
+
+      - name: Install backend test dependencies
+        working-directory: app/server
+        run: uv sync --locked --all-extras
+
+      - name: Install frontend dependencies
+        working-directory: app/client
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run backend release gates
+        shell: pwsh
+        env:
+          EMBEDDED_DATABASE: "true"
+          DILIGENT_SQLITE_PATH: ${{ runner.temp }}\diligent-release-preflight.sqlite3
+          DILIGENT_TEST_CACHE_ROOT: ${{ runner.temp }}\diligent-release-test-cache
+        run: |
+          $ErrorActionPreference = "Stop"
+          $python = Join-Path $env:GITHUB_WORKSPACE "app\server\.venv\Scripts\python.exe"
+          function Invoke-Checked([string]$label, [string]$executable, [string[]]$arguments) {
+            & $executable @arguments
+            if ($LASTEXITCODE -ne 0) {
+              throw "$label failed with exit code $LASTEXITCODE"
+            }
+          }
+          Push-Location (Join-Path $env:GITHUB_WORKSPACE "app\server")
+          try {
+            Invoke-Checked "Backend compilation" $python @("-m", "compileall", "-q", ".", "../tests")
+            Invoke-Checked "Alembic upgrade" $python @("-m", "alembic", "-c", "alembic.ini", "upgrade", "head")
+            Invoke-Checked "Alembic head validation" $python @("-m", "alembic", "-c", "alembic.ini", "current", "--check-heads")
+            Invoke-Checked "Alembic drift validation" $python @("-m", "alembic", "-c", "alembic.ini", "check")
+            Invoke-Checked "Ruff" $python @("-m", "ruff", "check", ".", "../tests", "--no-cache")
+            Invoke-Checked "Pyright" $python @("-m", "pyright", ".")
+            Invoke-Checked "Backend tests" $python @("-m", "pytest", "../tests/unit", "../tests/persistence", "-q")
+          } finally {
+            Pop-Location
+          }
+
+      - name: Run frontend tests and production build
+        working-directory: app/client
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npm run test -- --no-watch
+          if ($LASTEXITCODE -ne 0) { throw "Frontend tests failed with exit code $LASTEXITCODE" }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { throw "Frontend build failed with exit code $LASTEXITCODE" }
+
+      - name: Install Playwright browser
+        working-directory: app/server
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}\diligent-playwright
+        run: .\.venv\Scripts\python.exe -m playwright install chromium
+
+      - name: Run release browser regression slice
+        shell: pwsh
+        env:
+          DATABASE_BACKEND: sqlite
+          EMBEDDED_DATABASE: "true"
+          DATABASE_SQLITE_PATH: ${{ runner.temp }}\diligent-release-e2e.sqlite3
+          DILIGENT_SQLITE_PATH: ${{ runner.temp }}\diligent-release-e2e.sqlite3
+          DILIGENT_TEST_CACHE_ROOT: ${{ runner.temp }}\diligent-release-e2e-test-cache
+          APP_TEST_BACKEND_URL: http://127.0.0.1:7690
+          APP_TEST_FRONTEND_URL: http://127.0.0.1:9847
+          FASTAPI_HOST: 127.0.0.1
+          FASTAPI_PORT: "7690"
+          UI_HOST: 127.0.0.1
+          UI_PORT: "9847"
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}\diligent-playwright
+        run: |
+          $ErrorActionPreference = "Stop"
+          $python = Join-Path $env:GITHUB_WORKSPACE "app\server\.venv\Scripts\python.exe"
+          $backendDir = Join-Path $env:GITHUB_WORKSPACE "app\server"
+          $frontendDir = Join-Path $env:GITHUB_WORKSPACE "app\client"
+          $logDir = Join-Path $env:RUNNER_TEMP "diligent-release-e2e-logs"
+          New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+          $backend = $null
+          $frontend = $null
+          $backendReady = $false
+          $frontendReady = $false
+
+          function Write-Diagnostics($label, $process, $stdoutPath, $stderrPath) {
+            Write-Output "[$label]"
+            if ($null -eq $process) {
+              Write-Output "Process was not created."
+            } else {
+              $process.Refresh()
+              Write-Output "PID=$($process.Id) HasExited=$($process.HasExited)"
+              if ($process.HasExited) { Write-Output "ExitCode=$($process.ExitCode)" }
+            }
+            foreach ($log in @($stdoutPath, $stderrPath)) {
+              if (Test-Path -LiteralPath $log) {
+                Write-Output "--- $log ---"
+                Get-Content -LiteralPath $log -Tail 200
+              }
+            }
+          }
+
+          $backendOut = Join-Path $logDir "backend.out.log"
+          $backendErr = Join-Path $logDir "backend.err.log"
+          $frontendOut = Join-Path $logDir "frontend.out.log"
+          $frontendErr = Join-Path $logDir "frontend.err.log"
+          $backend = Start-Process -FilePath $python -ArgumentList "-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "7690" -WorkingDirectory $backendDir -RedirectStandardOutput $backendOut -RedirectStandardError $backendErr -WindowStyle Hidden -PassThru
+          try {
+            $backendDeadline = (Get-Date).AddMinutes(3)
+            while ((Get-Date) -lt $backendDeadline) {
+              try {
+                $health = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7690/api/health" -TimeoutSec 3
+                $config = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7690/api/model-config" -TimeoutSec 3
+                if ($health.StatusCode -eq 200 -and $config.StatusCode -eq 200) {
+                  $backendReady = $true
+                  break
+                }
+              } catch {
+                $backend.Refresh()
+                if ($backend.HasExited) { break }
+              }
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $backendReady) {
+              Write-Diagnostics "backend readiness failure" $backend $backendOut $backendErr
+              throw "Backend readiness failed before the release E2E deadline."
+            }
+
+            $frontend = Start-Process -FilePath "npm.cmd" -ArgumentList "run", "preview", "--", "--host", "127.0.0.1", "--port", "9847", "--strictPort" -WorkingDirectory $frontendDir -RedirectStandardOutput $frontendOut -RedirectStandardError $frontendErr -WindowStyle Hidden -PassThru
+            $frontendDeadline = (Get-Date).AddMinutes(3)
+            while ((Get-Date) -lt $frontendDeadline) {
+              try {
+                $response = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:9847/" -TimeoutSec 3
+                if ($response.StatusCode -lt 500) {
+                  $frontendReady = $true
+                  break
+                }
+              } catch {
+                $frontend.Refresh()
+                if ($frontend.HasExited) { break }
+              }
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $frontendReady) {
+              Write-Diagnostics "frontend readiness failure" $frontend $frontendOut $frontendErr
+              throw "Frontend readiness failed before the release E2E deadline."
+            }
+
+            & $python -m pytest app/tests/e2e/test_model_config_api.py app/tests/e2e/test_app_flow.py -k "model_config or runtime_toggle_enables_save_and_submits_put or dili_run_burst_click_submits_single_job or dili_run_conflict_surfaces_clear_error_message" -q
+            if ($LASTEXITCODE -ne 0) {
+              throw "Release browser regression slice failed with exit code $LASTEXITCODE"
+            }
+          } finally {
+            if (-not $backendReady -or -not $frontendReady) {
+              Write-Diagnostics "release E2E cleanup" $backend $backendOut $backendErr
+              Write-Diagnostics "release E2E cleanup" $frontend $frontendOut $frontendErr
+            }
+            foreach ($process in @($backend, $frontend)) {
+              if ($null -ne $process -and -not $process.HasExited) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              }
+            }
+          }
+
   package-and-publish:
+    permissions:
+      contents: write
+    needs: release-preflight
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
