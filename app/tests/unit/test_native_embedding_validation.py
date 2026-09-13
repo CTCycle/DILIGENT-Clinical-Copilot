@@ -126,6 +126,13 @@ def test_gemini_embedding_response_count_mismatch_raises(monkeypatch) -> None:
             self.kwargs = kwargs
 
     ###############################################################################
+    class FakeHttpOptions:
+
+        # -------------------------------------------------------------------------
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+    ###############################################################################
     class FakeGeminiClient:
 
         # -------------------------------------------------------------------------
@@ -139,6 +146,7 @@ def test_gemini_embedding_response_count_mismatch_raises(monkeypatch) -> None:
     ###############################################################################
     class FakeTypes:
         GenerateContentConfig = FakeGenerateContentConfig
+        HttpOptions = FakeHttpOptions
 
     monkeypatch.setattr(cloud_module, "genai", FakeGenAI)
     monkeypatch.setattr(cloud_module, "genai_types", FakeTypes)
