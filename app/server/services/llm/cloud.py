@@ -241,7 +241,12 @@ class CloudLLMClient:
                 "Content-Type": "application/json",
                 "x-goog-api-key": provider_access_key,
             }
-            self.gemini_client = genai.Client(api_key=provider_access_key)
+            self.gemini_client = genai.Client(
+                api_key=provider_access_key,
+                http_options=genai_types.HttpOptions(
+                    timeout=max(1, int(self.timeout_s * 1000))
+                ),
+            )
         elif provider == "deepseek":
             if not provider_access_key:
                 raise LLMError("No active DeepSeek access key configured")
