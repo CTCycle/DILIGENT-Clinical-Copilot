@@ -44,7 +44,12 @@ class DataInspectionService(
     RXNAV_JOB_TYPE = "rxnav_update"
     LIVERTOX_JOB_TYPE = "livertox_update"
     DILIRANK_JOB_TYPE = "dilirank_update"
+    STRUCTURED_SOURCES_JOB_TYPE = "structured_sources_update"
     RAG_JOB_TYPE = "rag_update"
+    STRUCTURED_SOURCE_JOB_TYPES = frozenset(
+        {RXNAV_JOB_TYPE, LIVERTOX_JOB_TYPE, DILIRANK_JOB_TYPE}
+    )
+    STRUCTURED_SOURCES_SCOPE_KEY = "catalog:structured_sources"
     REVISION_JOB_TYPE = "session_revision"
     SESSION_TIMELINE_JOB_TYPE = "session_timeline"
     RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"
@@ -666,6 +671,14 @@ class DataInspectionService(
         return self.update_job_runner.run_dilirank_update_job(job_id, overrides)
 
     # -------------------------------------------------------------------------
+    def run_structured_sources_update_job(
+        self, job_id: str, overrides: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        return self.update_job_runner.run_structured_sources_update_job(
+            job_id, overrides
+        )
+
+    # -------------------------------------------------------------------------
     def run_rag_update_job(
         self, job_id: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
@@ -678,8 +691,23 @@ class DataInspectionService(
     def start_update_job(
         self, job_type: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        scope_key = f"catalog:{job_type}"
-        if self.jobs.is_job_running(job_type, scope_key=scope_key):
+        scope_key = (
+            self.STRUCTURED_SOURCES_SCOPE_KEY
+            if job_type == self.STRUCTURED_SOURCES_JOB_TYPE
+            else f"catalog:{job_type}"
+        )
+        if job_type in self.STRUCTURED_SOURCE_JOB_TYPES or job_type == self.STRUCTURED_SOURCES_JOB_TYPE:
+            structured_scopes = [
+                f"catalog:{candidate}"
+                for candidate in self.STRUCTURED_SOURCE_JOB_TYPES
+            ]
+            structured_scopes.append(self.STRUCTURED_SOURCES_SCOPE_KEY)
+            if any(
+                self.jobs.is_job_running(scope_key=candidate_scope)
+                for candidate_scope in structured_scopes
+            ):
+                raise ValueError("A structured catalog update is already running")
+        elif self.jobs.is_job_running(job_type, scope_key=scope_key):
             raise ValueError(f"Job type '{job_type}' is already running")
         override_values = dict(overrides or {})
         if job_type == self.RXNAV_JOB_TYPE:
@@ -688,6 +716,10 @@ class DataInspectionService(
             runner = partial(self.run_livertox_update_job, overrides=override_values)
         elif job_type == self.DILIRANK_JOB_TYPE:
             runner = partial(self.run_dilirank_update_job, overrides=override_values)
+        elif job_type == self.STRUCTURED_SOURCES_JOB_TYPE:
+            runner = partial(
+                self.run_structured_sources_update_job, overrides=override_values
+            )
         elif job_type == self.RAG_JOB_TYPE:
             runner = partial(self.run_rag_update_job, overrides=override_values)
         else:
@@ -818,6 +850,7 @@ class DataInspectionService(
             self.RXNAV_JOB_TYPE,
             self.LIVERTOX_JOB_TYPE,
             self.DILIRANK_JOB_TYPE,
+            self.STRUCTURED_SOURCES_JOB_TYPE,
             self.RAG_JOB_TYPE,
         }
         latest_by_type: dict[str, dict[str, Any]] = {}

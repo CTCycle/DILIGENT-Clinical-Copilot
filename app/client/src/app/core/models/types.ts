@@ -246,9 +246,11 @@ export type ApiResult = {
 export type JobType =
   | "clinical"
   | "ollama_pull"
-  | "rxnav_update"
-  | "livertox_update"
-  | "rag_update"
+    | "rxnav_update"
+    | "livertox_update"
+    | "dilirank_update"
+    | "structured_sources_update"
+    | "rag_update"
   | "session_revision"
   | "session_timeline";
 
