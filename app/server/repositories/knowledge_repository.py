@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import pandas as pd
-from sqlalchemy import and_, exists, func, or_, select
+from sqlalchemy import and_, delete, exists, func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from common.constants import (
@@ -50,8 +50,23 @@ class KnowledgeRepository:
 
     # -------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:
+        self._persist_livertox_records(records, replace_source=False)
+
+    # -------------------------------------------------------------------------
+    def replace_livertox_records(self, records: pd.DataFrame) -> None:
+        self._persist_livertox_records(records, replace_source=True)
+
+    # -------------------------------------------------------------------------
+    def _persist_livertox_records(
+        self,
+        records: pd.DataFrame,
+        *,
+        replace_source: bool,
+    ) -> None:
         rows = self.prepare_livertox_rows(records)
         if not rows:
+            if replace_source:
+                raise ValueError("LiverTox refresh produced no usable records")
             return
         drug_values: dict[str, dict[str, Any]] = {}
         for row in rows:
@@ -67,6 +82,16 @@ class KnowledgeRepository:
             )
         with self.session_factory() as db_session:
             try:
+                if replace_source:
+                    db_session.execute(delete(LiverToxMonograph))
+                    db_session.execute(
+                        delete(DrugAlias).where(DrugAlias.source == "livertox")
+                    )
+                    db_session.execute(
+                        update(Drug)
+                        .where(Drug.livertox_nbk_id.is_not(None))
+                        .values(livertox_nbk_id=None)
+                    )
                 drug_insert = dialect_insert(db_session, Drug).values(
                     list(drug_values.values())
                 )
