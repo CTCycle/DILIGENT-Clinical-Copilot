@@ -1,135 +1,75 @@
 from __future__ import annotations
 
-import re
-from datetime import date, datetime
 from typing import Literal
 
-from common.constants import (
-    DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE,
-    DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE,
-    R_SCORE_CHOLESTATIC_THRESHOLD,
-    R_SCORE_HEPATOCELLULAR_THRESHOLD,
-)
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliInjuryPattern
 from domain.clinical.entities import ClinicalLabEntry, PatientLabTimeline
+from services.clinical.pattern_analyzer import (
+    HepatotoxicityPatternAnalyzer,
+    HepatotoxicityPatternCalculator,
+)
 
 ###############################################################################
 class DiliPatternEngine:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _value(entry: ClinicalLabEntry) -> float | None:
-        if entry.value is not None:
-            return float(entry.value)
-        raw = str(entry.value_text or "").replace(",", ".")
-        match = re.search(r"[-+]?\d*\.?\d+", raw)
-        return float(match.group()) if match else None
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _best_entry(
-        cls,
-        entries: list[ClinicalLabEntry],
-        marker_names: set[str],
-    ) -> ClinicalLabEntry | None:
-        selected: ClinicalLabEntry | None = None
-        selected_multiple: float | None = None
-        for entry in entries:
-            if entry.marker_name.upper() not in marker_names:
-                continue
-            value = cls._value(entry)
-            uln = cls._uln(entry)
-            current_multiple = (
-                value / uln if value is not None and uln is not None and uln > 0 else None
-            )
-            if selected is None:
-                selected = entry
-                selected_multiple = current_multiple
-                continue
-            if selected_multiple is None and current_multiple is not None:
-                selected = entry
-                selected_multiple = current_multiple
-            elif (
-                selected_multiple is not None
-                and current_multiple is not None
-                and current_multiple > selected_multiple
-            ):
-                selected = entry
-                selected_multiple = current_multiple
-        return selected
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _uln(entry: ClinicalLabEntry) -> float | None:
-        if entry.upper_limit_normal and entry.upper_limit_normal > 0:
-            return float(entry.upper_limit_normal)
-        raw = str(entry.upper_limit_text or "").replace(",", ".")
-        match = re.search(r"[-+]?\d*\.?\d+", raw)
-        if not match:
-            return None
-        parsed = float(match.group())
-        return parsed if parsed > 0 else None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
     def classify(
         r_ratio: float | None,
     ) -> Literal["hepatocellular", "cholestatic", "mixed", "indeterminate"]:
-        if r_ratio is None:
-            return "indeterminate"
-        if r_ratio >= R_SCORE_HEPATOCELLULAR_THRESHOLD:
-            return "hepatocellular"
-        if r_ratio <= R_SCORE_CHOLESTATIC_THRESHOLD:
-            return "cholestatic"
-        return "mixed"
+        return HepatotoxicityPatternCalculator.classify_r_score(r_ratio)
 
     # -------------------------------------------------------------------------
     def assess(self, timeline: PatientLabTimeline) -> list[DiliInjuryPattern]:
-        buckets: dict[str, list[ClinicalLabEntry]] = {}
-        for entry in timeline.entries:
-            buckets.setdefault(entry.sample_date or "undated", []).append(entry)
+        analyzer = HepatotoxicityPatternAnalyzer()
+        buckets = analyzer.group_entries_by_date(timeline.entries)
 
         calculated: list[DiliInjuryPattern] = []
-        for sample_date, entries in buckets.items():
-            alt = self._best_entry(entries, {"ALT"})
-            alp = self._best_entry(entries, {"ALP"})
-            if alt is None or alp is None:
-                continue
-            alt_value, alp_value = self._value(alt), self._value(alp)
-            alt_uln, alp_uln = self._uln(alt), self._uln(alp)
-            ratio = None
-            if (
-                alt_value is not None
-                and alp_value is not None
-                and alt_uln is not None
-                and alp_uln is not None
-                and alt_uln > 0
-                and alp_uln > 0
-                and alp_value != 0
-            ):
-                ratio = (alt_value / alt_uln) / (alp_value / alp_uln)
+
+        def add_bucket(
+            sample_date: str | None, entries: list[ClinicalLabEntry]
+        ) -> None:
+            pair = analyzer.build_anchor_from_bucket(entries)
+            if pair is None:
+                return
+            score = analyzer.calculator.calculate(
+                alt_value=pair["alt_value"],
+                alt_uln=pair["alt_uln"],
+                alp_value=pair["alp_value"],
+                alp_uln=pair["alp_uln"],
+            )
+            alt = analyzer.pick_best_entry(entries, {"ALT"})
+            alp = analyzer.pick_best_entry(entries, {"ALP"})
             calculated.append(
                 DiliInjuryPattern(
                     assessment_point="first_qualifying",
-                    alt=alt_value,
-                    alt_uln=alt_uln,
-                    alp=alp_value,
-                    alp_uln=alp_uln,
-                    r_ratio=ratio,
-                    pattern=self.classify(ratio),
-                    pattern_source="calculated" if ratio is not None else "unavailable",
-                    sample_date=None if sample_date == "undated" else sample_date,
+                    alt=pair["alt_value"],
+                    alt_uln=pair["alt_uln"],
+                    alp=pair["alp_value"],
+                    alp_uln=pair["alp_uln"],
+                    r_ratio=score.r_score,
+                    pattern=self.classify(score.r_score),
+                    pattern_source="calculated",
+                    sample_date=sample_date,
                     evidence=[
                         ClinicalEvidenceQuote(
                             claim="R-ratio input",
-                            quote=alt.evidence or alp.evidence,
+                            quote=(alt.evidence if alt is not None else None)
+                            or (alp.evidence if alp is not None else None),
                             source_section="laboratory_analysis",
-                            event_date=None if sample_date == "undated" else sample_date,
+                            event_date=sample_date,
                             source_kind="calculated",
                         )
                     ],
                 )
             )
+
+        for sample_date in sorted(buckets, key=analyzer._date_sort_key):
+            add_bucket(sample_date, buckets[sample_date])
+        add_bucket(
+            None,
+            [entry for entry in timeline.entries if not entry.sample_date],
+        )
 
         assessable = [item for item in calculated if item.r_ratio is not None]
         if not assessable:
@@ -141,16 +81,28 @@ class DiliPatternEngine:
                 )
             ]
 
-        dated = [item for item in assessable if item.sample_date]
-        chronological = sorted(dated, key=lambda item: self._date_sort_key(item.sample_date))
+        chronological = [item for item in assessable if item.sample_date]
         qualifying = [
             item
             for item in chronological
             if self._is_qualifying_pair(item)
         ]
-        first = qualifying[0] if qualifying else (
-            chronological[0] if chronological else assessable[0]
-        )
+        if not qualifying:
+            qualifying = [
+                item
+                for item in assessable
+                if not item.sample_date and self._is_qualifying_pair(item)
+            ]
+        if not qualifying:
+            return [
+                DiliInjuryPattern(
+                    assessment_point="first_qualifying",
+                    pattern="indeterminate",
+                    pattern_source="unavailable",
+                )
+            ]
+
+        first = qualifying[0]
         first_payload = first.model_copy(deep=True)
         first_payload.assessment_point = "first_qualifying"
 
@@ -169,40 +121,11 @@ class DiliPatternEngine:
     # -------------------------------------------------------------------------
     @staticmethod
     def _is_qualifying_pair(pattern: DiliInjuryPattern) -> bool:
-        alt_multiple = (
-            pattern.alt / pattern.alt_uln
-            if pattern.alt is not None and pattern.alt_uln is not None and pattern.alt_uln > 0
-            else None
+        if pattern.alt is None or pattern.alt_uln is None:
+            return False
+        if pattern.alp is None or pattern.alp_uln is None:
+            return False
+        return HepatotoxicityPatternAnalyzer.is_qualifying_pair(
+            pattern.alt / pattern.alt_uln,
+            pattern.alp / pattern.alp_uln,
         )
-        alp_multiple = (
-            pattern.alp / pattern.alp_uln
-            if pattern.alp is not None and pattern.alp_uln is not None and pattern.alp_uln > 0
-            else None
-        )
-        return bool(
-            (
-                alt_multiple is not None
-                and alt_multiple >= DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE
-            )
-            or (
-                alp_multiple is not None
-                and alp_multiple >= DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE
-            )
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _date_sort_key(value: str | None) -> date:
-        if not value:
-            return date.max
-        normalized = str(value).strip().replace("/", "-").replace(".", "-")
-        try:
-            return date.fromisoformat(normalized)
-        except ValueError:
-            pass
-        for fmt in ("%d-%m-%Y", "%m-%d-%Y", "%Y-%m-%d"):
-            try:
-                return datetime.strptime(normalized, fmt).date()
-            except ValueError:
-                continue
-        return date.max
