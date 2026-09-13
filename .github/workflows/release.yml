@@ -115,7 +115,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           npm run test -- --no-watch
           if ($LASTEXITCODE -ne 0) { throw "Frontend tests failed with exit code $LASTEXITCODE" }
-          npm run build
+          npm run build -- --progress=false
           if ($LASTEXITCODE -ne 0) { throw "Frontend build failed with exit code $LASTEXITCODE" }
 
       - name: Install Playwright browser
