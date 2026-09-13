@@ -153,4 +153,80 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
     expect(state.targets.dilirank.error).toContain('DILIrank unavailable');
     expect(state.message).toContain('One or more sources failed');
   });
+
+  it('marks a known job stale when backend recovery makes it unavailable', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      if (url.endsWith('/inspection/jobs')) return jsonResponse({ jobs: [] });
+      if (method === 'POST') {
+        return jsonResponse({
+          job_id: 'rxnav-lost',
+          job_type: 'rxnav_update',
+          status: 'pending',
+          message: 'RxNav queued',
+          poll_interval: 1,
+        });
+      }
+      if (url.endsWith('/inspection/rxnav/jobs/rxnav-lost')) {
+        return jsonResponse({ detail: 'Job not found after backend restart.' }, 404);
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`);
+    });
+
+    const tracker = TestBed.inject(InspectionUpdateJobTrackerService);
+    await tracker.start({ target: 'rxnav', payload: {} });
+    const pollStep = (polling.run.mock.calls[0]?.[0] as { pollStep: () => Promise<boolean> })
+      .pollStep;
+
+    expect(await pollStep()).toBe(false);
+    expect(tracker.targetState().rxnav.running).toBe(false);
+    expect(tracker.targetState().rxnav.status).toBe('failed');
+    expect(tracker.targetState().rxnav.message).toContain('lost after backend recovery');
+  });
+
+  it('retries transient polling failures and accepts eventual completion', async () => {
+    let statusCalls = 0;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      if (url.endsWith('/inspection/jobs')) return jsonResponse({ jobs: [] });
+      if (method === 'POST') {
+        return jsonResponse({
+          job_id: 'rxnav-recovery',
+          job_type: 'rxnav_update',
+          status: 'pending',
+          message: 'RxNav queued',
+          poll_interval: 1,
+        });
+      }
+      if (url.endsWith('/inspection/rxnav/jobs/rxnav-recovery')) {
+        statusCalls += 1;
+        if (statusCalls < 3) throw new Error('temporary network outage');
+        return jsonResponse({
+          job_id: 'rxnav-recovery',
+          job_type: 'rxnav_update',
+          status: 'completed',
+          progress: 100,
+          result: { progress_message: 'RxNav complete' },
+          error: null,
+          version: 3,
+        });
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`);
+    });
+
+    const tracker = TestBed.inject(InspectionUpdateJobTrackerService);
+    await tracker.start({ target: 'rxnav', payload: {} });
+    const pollStep = (polling.run.mock.calls[0]?.[0] as { pollStep: () => Promise<boolean> })
+      .pollStep;
+
+    expect(await pollStep()).toBe(true);
+    expect(await pollStep()).toBe(true);
+    expect(await pollStep()).toBe(false);
+    expect(statusCalls).toBe(3);
+    expect(tracker.targetState().rxnav.status).toBe('completed');
+    expect(tracker.targetState().rxnav.running).toBe(false);
+    expect(tracker.targetState().rxnav.progress).toBe(100);
+  });
 });
