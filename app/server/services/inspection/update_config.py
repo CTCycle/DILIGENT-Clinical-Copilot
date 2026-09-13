@@ -70,6 +70,16 @@ class InspectionUpdateConfigMixin:
             chunk_count=int(summary.get("chunks", 0) or 0),
             source_manifest_hash=str(summary.get("source_manifest_hash") or ""),
             libraries=libraries,
+            chunk_size=(
+                int(summary["chunk_size"])
+                if isinstance(summary.get("chunk_size"), int | float)
+                else None
+            ),
+            chunk_overlap=(
+                int(summary["chunk_overlap"])
+                if isinstance(summary.get("chunk_overlap"), int | float)
+                else None
+            ),
         )
         payload = manifest.to_dict()
         manifest_path.write_text(

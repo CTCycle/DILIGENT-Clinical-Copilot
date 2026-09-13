@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from common.paths import DOCS_PATH, VECTOR_DB_PATH
@@ -79,10 +80,12 @@ class RagEmbeddingUpdater:
         )
 
     # -------------------------------------------------------------------------
-    def refresh_embeddings(self) -> dict[str, int]:
+    def refresh_embeddings(self) -> dict[str, Any]:
         summary = self.serializer.serialize()
         summary["generation_id"] = self.generation_id
         summary["collection_name"] = self.vector_collection_name
+        summary["chunk_size"] = self.chunk_size
+        summary["chunk_overlap"] = self.chunk_overlap
         logger.info(
             "RAG embeddings refreshed using the multilingual Granite ONNX runtime (%d documents, %d chunks)",
             summary.get("documents", 0),

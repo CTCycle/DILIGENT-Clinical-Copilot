@@ -4,11 +4,13 @@ import asyncio
 
 import httpx
 import pytest
+import services.llm.cloud as cloud_module
 from openai import APIStatusError
 from pydantic import BaseModel, ConfigDict
 from services.llm.cloud import CloudLLMClient, LLMError, LLMTimeout
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.transports.openai_chat import OpenAIChatTransport
+
 
 ###############################################################################
 def _http_error(status_code: int) -> httpx.HTTPStatusError:
@@ -131,6 +133,33 @@ def test_provider_error_mapping_distinguishes_timeout() -> None:
     assert isinstance(mapped, LLMTimeout)
     assert mapped.error_code == "timeout"
     assert mapped.retryable is True
+
+###############################################################################
+def test_gemini_client_receives_configured_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeGeminiClient:
+
+        # ---------------------------------------------------------------------
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr(cloud_module.genai, "Client", FakeGeminiClient)
+    monkeypatch.setattr(
+        CloudLLMClient,
+        "resolve_provider_access_key",
+        lambda _self, _provider: "gemini-test-key",
+    )
+
+    client = CloudLLMClient(provider="gemini", timeout_s=12.5)
+    try:
+        options = captured["http_options"]
+        assert isinstance(options, cloud_module.genai_types.HttpOptions)
+        assert options.timeout == 12500
+    finally:
+        asyncio.run(client.close())
 
 ###############################################################################
 def test_provider_error_mapping_classifies_http_statuses() -> None:

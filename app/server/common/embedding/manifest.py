@@ -56,8 +56,18 @@ def build_embedding_index_manifest(
     chunk_count: int,
     source_manifest_hash: str,
     libraries: dict[str, str],
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
     config: CanonicalEmbeddingConfig = CANONICAL_EMBEDDING_CONFIG,
 ) -> EmbeddingIndexManifest:
+    effective_chunk_size = (
+        config.default_chunk_tokens if chunk_size is None else int(chunk_size)
+    )
+    effective_chunk_overlap = (
+        config.default_chunk_overlap_tokens
+        if chunk_overlap is None
+        else int(chunk_overlap)
+    )
     model = config.to_canonical_dict()
     tokenizer = {
         "model_revision": config.revision,
@@ -66,8 +76,8 @@ def build_embedding_index_manifest(
     }
     chunking = {
         "algorithm": "token_window_v1",
-        "target_tokens": config.default_chunk_tokens,
-        "overlap_tokens": config.default_chunk_overlap_tokens,
+        "target_tokens": effective_chunk_size,
+        "overlap_tokens": effective_chunk_overlap,
     }
     fingerprint_payload = {
         "model": model,
