@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-09-10
+Last updated: 2026-09-13
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -112,6 +112,9 @@ latest saved configuration and provider-catalog state.
 - `POST /api/inspection/dilirank/jobs`
 - `GET /api/inspection/dilirank/jobs/{job_id}`
 - `DELETE /api/inspection/dilirank/jobs/{job_id}`
+- `POST /api/inspection/structured-sources/jobs`
+- `GET /api/inspection/structured-sources/jobs/{job_id}`
+- `DELETE /api/inspection/structured-sources/jobs/{job_id}`
 - `GET /api/inspection/reference-catalogs/runtime-observations`
 - `GET /api/inspection/reference-catalogs/runtime-observations/{category}`
 - `PUT /api/inspection/reference-catalogs/runtime-observations/{category}`
@@ -124,7 +127,8 @@ latest saved configuration and provider-catalog state.
 - `DELETE /api/inspection/rag/jobs/{job_id}`
 
 ## Notes
-- DILIrank inspection is read-only at record level. `GET /api/inspection/dilirank` exposes the complete persisted FDA snapshot, including rows that are intentionally unlinked to the local canonical drug catalog. The update routes use the same centralized inspection job manager as RxNav, LiverTox, and RAG. `redownload=true` forces a fresh FDA workbook; otherwise conditional HTTP metadata is used when a validated cache exists.
+- DILIrank inspection is read-only at record level. `GET /api/inspection/dilirank` exposes the complete persisted FDA snapshot, including rows that are intentionally unlinked to the local canonical drug catalog. The update routes use the same centralized inspection job manager as RxNav, LiverTox, the combined structured-source workflow, and RAG. `redownload=true` forces a fresh FDA workbook; otherwise conditional HTTP metadata is used when a validated cache exists.
+- `POST /api/inspection/structured-sources/jobs` starts the dependency-aware `RxNav -> LiverTox -> DILIrank` sequence and returns child source state in the job result. RAG is intentionally excluded and remains independently controllable.
 - `POST /api/inspection/sessions/{session_id}/timeline-jobs` accepts
   `force_regenerate` and returns a job for polling. The job resolves the
   persisted `timeline_model` role at start; provider/model controls are managed

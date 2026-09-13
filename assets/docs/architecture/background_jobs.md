@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-09-10
+Last updated: 2026-09-13
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -67,6 +67,9 @@ stateDiagram-v2
 - `dilirank_update`
   - Start: `POST /api/inspection/dilirank/jobs`
   - Poll or cancel: `GET|DELETE /api/inspection/dilirank/jobs/{job_id}`
+- `structured_sources_update`
+  - Start: `POST /api/inspection/structured-sources/jobs`
+  - Poll or cancel: `GET|DELETE /api/inspection/structured-sources/jobs/{job_id}`
 - `rag_update`
   - Start: `POST /api/inspection/rag/jobs`
   - Poll or cancel: `GET|DELETE /api/inspection/rag/jobs/{job_id}`
@@ -88,6 +91,9 @@ Additional rules:
 - Clinical progress snapshots expose canonical granular stage keys such as `drugs.extracting`, `retrieval.evidence`, `report.generating`, `session.saving`, and terminal `completed`; generic internal wrapper stages are not persisted as the user-facing stage.
 - Inspection update jobs may include `phase`, `step_index`, `step_count`, `progress_message`, and `summary`.
 - Inspection update runners use cooperative cancellation and progress callbacks consistently across `rxnav`, `livertox`, `dilirank`, and `rag` through the same `DataInspectionService` and `DataInspectionUpdateJobRunner` path.
+- The combined structured-source job owns the dependency order `RxNav -> LiverTox -> DILIrank`; DILIrank linking starts only after the preceding identity/catalog phases complete. RAG remains an independent job and is not part of this sequence.
+- Full RxNav and LiverTox refreshes prepare source snapshots before replacing source-owned canonical rows. Cancellation or failure before the final transaction leaves the previous usable snapshot intact.
+- Inspection clients distinguish a transient polling failure from a lost in-memory job. Repeated failures are bounded, and a confirmed missing job is surfaced as a recoverable interrupted update rather than polled forever.
 - DILIrank refreshes validate a downloaded candidate workbook before promoting it to the stable cache. Validation failure or cancellation before promotion removes the candidate and preserves the last-known-good cached workbook and metadata.
 - Session revision jobs start the bounded revision agent. It creates a draft
   version and run, persists context and a plan, executes allow-listed tool
@@ -119,7 +125,7 @@ If a runner does not check stop requests, cancellation is delayed.
 - Clinical jobs run input preflight before job creation.
 - Clinical assessment concurrency is explicitly scoped as `clinical:global`.
 - Revision concurrency is scoped per root clinical session; a second revision for the same root session conflicts, while unrelated root sessions can follow their configured policy independently.
-- Catalog update concurrency is scoped per catalog target.
+- Structured catalog update concurrency uses one shared catalog scope, so individual RxNav, LiverTox, DILIrank, and combined jobs cannot overlap while shared identity data are changing.
 - Completed results include database-backed evidence-lock artifacts and gate fields such as `manual_review_required`, `blocking_issues`, `pipeline_artifacts`, and `run_bundle_index`.
 - These artifacts are persisted through the clinical session result payload rather than loose files.
 - Failed clinical results omit raw anamnesis, drug text, laboratory text, and patient image base64 content. Failure payloads expose generic error text plus `failure_metadata` for diagnostics.

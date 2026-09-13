@@ -1,5 +1,5 @@
 # DILIGENT Desktop Release
-Last updated: 2026-09-08
+Last updated: 2026-09-13
 
 ## Packaging architecture
 
@@ -35,7 +35,7 @@ The portable executable is a single distribution file for no-install use. The MS
 
 The GitHub release attaches the portable EXE, MSI, and `.sha256` manifest. Existing remote assets are never replaced unless the local and remote bytes are identical.
 
-### 2026-09-08 release audit
+### Historical 2026-09-08 release audit
 
 The latest published release is `v3.3.0`, published on 2026-09-01 from the
 main-line release commit. Its GitHub release contains the portable EXE, MSI,
@@ -46,11 +46,11 @@ it is not a byte-for-byte or behaviorally equivalent v3.3.0 build. The local
 used the live release metadata, tag ancestry, and the committed Tauri staging
 manifest rather than claiming a local packaged-binary launch test.
 
-The synthetic live-flow evidence and the remaining release risks are recorded
-in [`assets/QA/e2e-validation-20260908.md`](../../QA/e2e-validation-20260908.md).
-Before the next minor release, repeat the portable-EXE and MSI host smoke tests
-against the final tagged commit after the revision structured-output failure
-and DILI pattern-classification inconsistency have been resolved.
+The synthetic live-flow evidence is recorded in
+[`assets/QA/e2e-validation-20260908.md`](../../QA/e2e-validation-20260908.md).
+That historical evidence does not certify the current development source.
+Portable-EXE and MSI host smoke tests must still be repeated against the final
+tagged commit for each release.
 
 ## Runtime and data layout
 
@@ -113,9 +113,35 @@ Choose `9. Remove release artifacts` to open the cleanup submenu. It can remove 
 
 The build refuses to complete if the frozen backend, runtime manifest, artifact size, or MSI metadata checks fail. The portable artifact is the raw Tauri release executable copied to `release/` after those checks; remote publication is a separate maintainer action.
 
+## Structured source updates
+
+The Data Inspection "Update all" action starts one backend-owned job. Its
+structured-source sequence is deliberately ordered:
+
+1. RxNav refreshes and atomically reconciles the shared drug identity data.
+2. LiverTox refreshes and atomically reconciles its source-owned aliases,
+   monographs, and LiverTox identifiers.
+3. DILIrank validates and replaces its complete FDA snapshot, then resolves
+   links against the completed catalog state.
+
+Cancellation or failure before a source's final commit preserves the previous
+usable source snapshot. RAG rebuilding is a separate job and is not included in
+the structured-source sequence. After a backend restart, a lost in-memory job
+is surfaced as an interrupted/retryable update rather than remaining in a
+permanent running state.
+
 ## GitHub Actions publication
 
-`.github/workflows/release.yml` runs on a `vX.Y.Z` tag. It builds both Windows desktop targets from that tagged commit, creates or updates the matching GitHub Release, and attaches the portable EXE, MSI, and `.sha256` manifest. It refuses to overwrite an existing non-identical asset. Create the tag only after `develop` and `main` have been synchronized and local release validation has passed.
+`.github/workflows/release.yml` runs on a `vX.Y.Z` tag. Its release preflight
+first requires the tagged commit to equal `origin/main`, then runs the backend
+quality/migration/unit/persistence gates, frontend tests and production build,
+and the Windows browser regression slice. Packaging and publication depend on
+that preflight. The workflow builds both Windows desktop targets from the
+verified tag, creates or updates the matching GitHub Release, and attaches the
+portable EXE, MSI, and `.sha256` manifest. It refuses to overwrite an existing
+non-identical asset. Create a new SemVer tag only after `develop` and `main`
+have been intentionally synchronized and the local release validation has
+passed.
 
 The workflow uses the launcher's pinned portable Python runtime rather than installing a second host Python. The launcher clears inherited `PYTHONHOME`, `PYTHONPATH`, and user-site settings, then points `PYTHONHOME` at `runtimes/python` so the project venv uses the same embeddable interpreter family as the release runtime. The PyInstaller bootstrap removes hosted-toolcache Python entries from `sys.path`, registers only the pinned venv and `runtimes/python` native directories, explicitly loads the matching `libffi-8.dll` by absolute path through the CFFI bridge, preloads the supported CFFI native backend, and only then imports `ctypes`. Together these keep PyInstaller on the same embedded-Python and DLL set used by the release launcher without rewriting the host PATH.
 

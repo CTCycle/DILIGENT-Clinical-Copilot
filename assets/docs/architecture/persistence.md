@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-09-10
+Last updated: 2026-09-13
 
 ## Relational Database
 
@@ -223,6 +223,7 @@ erDiagram
 - Access-key ciphertext remains in the database; versioned Fernet key material is stored in the protected `DILIGENT_ACCESS_KEY_MATERIAL_FILE` store.
 - Canonical drug identifiers use `drug_identifiers` with unique `(identifier_system, identifier_value)` ownership.
 - FDA DILIrank 2.0 rows are stored in `dilirank_records` as a source-complete snapshot. `ltkb_id` is unique. `drug_id` is nullable so unmatched or ambiguous FDA rows remain inspectable without inventing a canonical drug mapping. A linked row also receives a `drug_identifiers` entry using identifier system `dilirank_ltkb`.
+- Complete RxNav and LiverTox refreshes reconcile their source-owned aliases, mappings, monographs, and source metadata after successful preparation in one database transaction. Shared `Drug` entities and records owned by other sources are preserved when obsolete source rows are removed.
 - `application_configuration` is the fixed-ID singleton for validated configuration payloads, and `reference_catalog_manifests` records installed manifest state.
 
 ## Focused Repository Ownership
@@ -239,6 +240,7 @@ erDiagram
   match-cache updates. `ClinicalSessionRepository` persists resolved drug
   mentions and does not learn catalog aliases while saving a session.
 - `DataInspectionService` coordinates cross-repository inspection responses and owns the canonical update-job dispatch for RxNav, LiverTox, DILIrank, and RAG; it combines clinical session detail with revision records rather than making either repository depend on the other. Session deletion follows the same ownership boundary: it asks `SessionRevisionRepository` to remove revision-owned rows before `ClinicalSessionRepository` removes the session.
+- The combined structured-source job is the backend orchestration boundary for `RxNav -> LiverTox -> DILIrank`; RAG remains independent. Its child progress is exposed through the same inspection job status contract.
 - Feature-specific file serialization remains separate from SQLAlchemy persistence. `RepositoryContext` supplies the shared engine/session factory, and application services receive only the focused repositories they need. Transactions remain explicit at the repository boundary, including atomic session persistence and batch ingestion.
 - `repositories/serialization` is a mixed historical package: pure row and
   payload converters remain there, but access-key and model-configuration
