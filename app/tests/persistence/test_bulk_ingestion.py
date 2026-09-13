@@ -215,3 +215,88 @@ def test_rxnav_snapshot_replacement_reconciles_only_rxnav_owned_rows(
         assert db_session.scalar(
             select(Drug).where(Drug.canonical_name_norm == "drug gamma")
         ) is not None
+
+###############################################################################
+def test_livertox_snapshot_replacement_reconciles_source_owned_rows(
+    persistence_engine,
+) -> None:  # type: ignore[no-untyped-def]
+    graph = build_repository_graph(engine=persistence_engine)
+    repository = graph.knowledge_repository
+    repository.save_livertox_records(
+        pd.DataFrame(
+            [
+                {
+                    "drug_name": "Drug Alpha",
+                    "nbk_id": "NBK001",
+                    "brand_name": "Alpha Brand",
+                    "excerpt": "Alpha excerpt",
+                },
+                {
+                    "drug_name": "Drug Beta",
+                    "nbk_id": "NBK002",
+                    "brand_name": "Beta Brand",
+                    "excerpt": "Beta excerpt",
+                },
+            ]
+        )
+    )
+    with graph.context.session_factory() as db_session:
+        alpha = db_session.scalar(
+            select(Drug).where(Drug.canonical_name_norm == "drug alpha")
+        )
+        assert alpha is not None
+        db_session.add(
+            DrugAlias(
+                drug_id=alpha.id,
+                alias="Alpha RxNav alias",
+                alias_norm="alpha rxnav alias",
+                alias_kind="synonym",
+                source="rxnav",
+                term_type=None,
+            )
+        )
+        db_session.commit()
+
+    repository.replace_livertox_records(
+        pd.DataFrame(
+            [
+                {
+                    "drug_name": "Drug Alpha",
+                    "nbk_id": "NBK003",
+                    "brand_name": "Alpha Updated Brand",
+                    "excerpt": "Updated alpha excerpt",
+                }
+            ]
+        )
+    )
+
+    with graph.context.session_factory() as db_session:
+        alpha = db_session.scalar(
+            select(Drug).where(Drug.canonical_name_norm == "drug alpha")
+        )
+        beta = db_session.scalar(
+            select(Drug).where(Drug.canonical_name_norm == "drug beta")
+        )
+        assert alpha is not None
+        assert beta is not None
+        assert alpha.livertox_nbk_id == "NBK003"
+        assert beta.livertox_nbk_id is None
+        assert db_session.scalar(
+            select(DrugAlias).where(
+                DrugAlias.drug_id == alpha.id,
+                DrugAlias.alias == "Alpha RxNav alias",
+                DrugAlias.source == "rxnav",
+            )
+        ) is not None
+        assert db_session.scalar(
+            select(DrugAlias).where(
+                DrugAlias.alias == "Beta Brand",
+                DrugAlias.source == "livertox",
+            )
+        ) is None
+        assert db_session.scalar(
+            select(LiverToxMonograph).where(LiverToxMonograph.nbk_id == "NBK002")
+        ) is None
+        assert db_session.scalar(
+            select(LiverToxMonograph).where(LiverToxMonograph.nbk_id == "NBK003")
+        ) is not None
