@@ -11,7 +11,16 @@ export type InspectionUpdateJobResult = {
   step_count?: number;
   progress_message?: string;
   summary?: Record<string, unknown>;
+  sources?: Partial<Record<InspectionUpdateAllTarget, InspectionStructuredSourceJobState>>;
+  summaries?: Partial<Record<InspectionUpdateAllTarget, Record<string, unknown>>>;
   [key: string]: unknown;
+};
+
+export type InspectionStructuredSourceJobState = {
+  status: JobStatus;
+  progress: number;
+  message: string;
+  error: string | null;
 };
 
 export type InspectionUpdateJobStatusResponse = JobStatusResponse<InspectionUpdateJobResult>;
@@ -315,6 +324,12 @@ export type InspectionUpdateStartRequest =
   | { target: "livertox"; payload: InspectionUpdateOverridesByTarget["livertox"] }
   | { target: "dilirank"; payload: InspectionUpdateOverridesByTarget["dilirank"] }
   | { target: "rag"; payload: InspectionUpdateOverridesByTarget["rag"] };
+
+export type InspectionStructuredSourcesUpdateRequest = {
+  rxnav: InspectionRxNavOverrideRequest;
+  livertox: InspectionLiverToxOverrideRequest;
+  dilirank: InspectionDiliRankUpdateRequest;
+};
 
 export type InspectionUpdateAllStartRequestMap = {
   [TTarget in InspectionUpdateAllTarget]: Extract<

@@ -4,6 +4,7 @@ import {
   InspectionLiverToxOverrideRequest,
   InspectionRagUpdateRequest,
   InspectionRxNavOverrideRequest,
+  InspectionStructuredSourcesUpdateRequest,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobListResponse,
   InspectionUpdateJobStatusResponse,
@@ -93,6 +94,39 @@ export async function cancelInspectionLiverToxUpdateJob(
 ): Promise<JobCancelResponse> {
   return requestJson<JobCancelResponse>(
     `${API_BASE_URL}/inspection/livertox/jobs/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function startInspectionStructuredSourcesUpdateJob(
+  payload: InspectionStructuredSourcesUpdateRequest,
+): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(
+    `${API_BASE_URL}/inspection/structured-sources/jobs`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function fetchInspectionStructuredSourcesUpdateJobStatus(
+  jobId: string,
+  timeoutSeconds: number = INSPECTION_JOB_STATUS_TIMEOUT_SECONDS,
+): Promise<InspectionUpdateJobStatusResponse> {
+  return requestJson<InspectionUpdateJobStatusResponse>(
+    `${API_BASE_URL}/inspection/structured-sources/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+    timeoutSeconds,
+  );
+}
+
+export async function cancelInspectionStructuredSourcesUpdateJob(
+  jobId: string,
+): Promise<JobCancelResponse> {
+  return requestJson<JobCancelResponse>(
+    `${API_BASE_URL}/inspection/structured-sources/jobs/${encodeURIComponent(jobId)}`,
     { method: "DELETE" },
   );
 }

@@ -14,6 +14,7 @@ InspectionUpdateJobType = Literal[
     "rxnav_update",
     "livertox_update",
     "dilirank_update",
+    "structured_sources_update",
     "rag_update",
 ]
 InspectionJobPhase = Literal[
@@ -676,6 +677,22 @@ class InspectionLiverToxOverrideRequest(BaseModel):
         if "/" in normalized or "\\" in normalized:
             raise ValueError("livertox_archive must be a file name only")
         return normalized
+
+###############################################################################
+class InspectionDiliRankOverrideRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    redownload: bool | None = None
+
+###############################################################################
+class InspectionStructuredSourcesUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rxnav: InspectionRxNavOverrideRequest = Field(default_factory=InspectionRxNavOverrideRequest)
+    livertox: InspectionLiverToxOverrideRequest = Field(
+        default_factory=InspectionLiverToxOverrideRequest
+    )
+    dilirank: InspectionDiliRankOverrideRequest = Field(
+        default_factory=InspectionDiliRankOverrideRequest
+    )
 
 ###############################################################################
 class InspectionRagUpdateRequest(BaseModel):

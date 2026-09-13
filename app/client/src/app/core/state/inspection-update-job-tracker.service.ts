@@ -7,6 +7,7 @@ import {
   InspectionUpdateAllTarget,
   InspectionUpdateAllTargetState,
   InspectionUpdateJobStatusResponse,
+  InspectionStructuredSourcesUpdateRequest,
   InspectionUpdateStartRequest,
   InspectionUpdateTarget,
 } from '../models/inspection-types';
@@ -16,15 +17,18 @@ import {
   cancelInspectionLiverToxUpdateJob,
   cancelInspectionRagUpdateJob,
   cancelInspectionRxNavUpdateJob,
+  cancelInspectionStructuredSourcesUpdateJob,
   fetchInspectionDiliRankUpdateJobStatus,
   fetchInspectionLiverToxUpdateJobStatus,
   fetchInspectionRagUpdateJobStatus,
   fetchInspectionRxNavUpdateJobStatus,
+  fetchInspectionStructuredSourcesUpdateJobStatus,
   fetchInspectionUpdateJobs,
   startInspectionDiliRankUpdateJob,
   startInspectionLiverToxUpdateJob,
   startInspectionRagUpdateJob,
   startInspectionRxNavUpdateJob,
+  startInspectionStructuredSourcesUpdateJob,
 } from '../services/inspection-jobs-api';
 import { resolvePollIntervalMs } from '../services/clinical-api';
 import { JobPollingService } from '../services/job-polling.service';
@@ -49,6 +53,13 @@ const JOB_TYPES: Record<InspectionUpdateTarget, string> = {
   dilirank: 'dilirank_update',
   rag: 'rag_update',
 };
+const STRUCTURED_SOURCES_JOB_TYPE = 'structured_sources_update';
+const STRUCTURED_SOURCE_JOB_TYPES = new Set([
+  'rxnav_update',
+  'livertox_update',
+  'dilirank_update',
+]);
+const MAX_POLL_FAILURES = 5;
 
 function initialState(): InspectionUpdateTargetState {
   return { jobId: null, status: null, running: false, progress: 0, message: '', error: null, version: -1 };
@@ -111,7 +122,8 @@ export class InspectionUpdateJobTrackerService {
   readonly updateAllState = signal<InspectionUpdateAllState>(initialUpdateAllState());
   private readonly pollTokens = new Map<InspectionUpdateTarget, number>();
   private readonly refreshedJobKeys = new Set<string>();
-  private readonly updateAllStartRunByTarget = new Map<InspectionUpdateAllTarget, number>();
+  private combinedPollToken = 0;
+  private combinedJobId: string | null = null;
   private updateAllRunSequence = 0;
   private refreshers: Partial<Record<InspectionUpdateTarget, () => Promise<void>>> = {};
 
@@ -126,7 +138,25 @@ export class InspectionUpdateJobTrackerService {
   async discover(): Promise<void> {
     try {
       const response = await fetchInspectionUpdateJobs();
+      const combinedSnapshot = response.jobs.find(
+        (snapshot) => snapshot.job_type === STRUCTURED_SOURCES_JOB_TYPE,
+      );
+      if (combinedSnapshot) {
+        this.applyCombinedSnapshot(combinedSnapshot);
+        if (!TERMINAL.has(combinedSnapshot.status)) {
+          this.startCombinedPolling(
+            combinedSnapshot.job_id,
+            1000,
+          );
+        } else {
+          await this.refreshCombinedIfNeeded(combinedSnapshot);
+        }
+      }
       for (const snapshot of response.jobs) {
+        if (snapshot.job_type === STRUCTURED_SOURCES_JOB_TYPE) continue;
+        if (combinedSnapshot && STRUCTURED_SOURCE_JOB_TYPES.has(snapshot.job_type)) {
+          continue;
+        }
         const target = (Object.keys(JOB_TYPES) as InspectionUpdateTarget[])
           .find((candidate) => JOB_TYPES[candidate] === snapshot.job_type);
         if (!target || !this.applySnapshot(target, snapshot)) continue;
@@ -158,6 +188,9 @@ export class InspectionUpdateJobTrackerService {
     if (UPDATE_ALL_ACTIVE_PHASES.has(current.phase)) {
       throw new Error('All source updates are already running.');
     }
+    if (INSPECTION_UPDATE_ALL_TARGETS.some((target) => this.targetState()[target].running)) {
+      throw new Error('A structured source update is already running.');
+    }
 
     const runId = ++this.updateAllRunSequence;
     const initialTargets = {
@@ -169,49 +202,34 @@ export class InspectionUpdateJobTrackerService {
       runId,
       phase: 'starting',
       progress: 0,
-      message: 'Starting LiverTox, RxNav, and DILIrank updates.',
+      message: 'Starting the RxNav, LiverTox, and DILIrank update sequence.',
       cancelRequested: false,
       targets: initialTargets,
     });
     await this.discover();
-
-    const startTargets = INSPECTION_UPDATE_ALL_TARGETS.filter((target) => {
-      if (!this.targetState()[target].running) return true;
-      this.markUpdateAllFailure(target, runId, 'An update is already running for this source.');
-      return false;
-    });
-
-    for (const target of startTargets) {
-      this.updateAllStartRunByTarget.set(target, runId);
+    if (INSPECTION_UPDATE_ALL_TARGETS.some((target) => this.targetState()[target].running)) {
+      this.syncUpdateAllState();
+      throw new Error('A structured source update is already running.');
     }
 
+    const payload: InspectionStructuredSourcesUpdateRequest = {
+      rxnav: requests.rxnav.payload,
+      livertox: requests.livertox.payload,
+      dilirank: requests.dilirank.payload,
+    };
     try {
-      const results = await Promise.allSettled(
-        startTargets.map((target) => this.startAllTarget(target, requests[target], runId)),
+      const started = await startInspectionStructuredSourcesUpdateJob(payload);
+      this.applyCombinedStarted(started, runId);
+      this.startCombinedPolling(
+        started.job_id,
+        resolvePollIntervalMs(started.poll_interval),
       );
-      results.forEach((result, index) => {
-        const target = startTargets[index];
-        if (!target || result.status !== 'rejected') return;
-        this.markUpdateAllFailure(
-          target,
-          runId,
-          updateErrorMessage(result.reason, 'Failed to start update job.'),
-          true,
-        );
-      });
-      for (const target of startTargets) {
-        const targetState = this.updateAllState().targets[target];
-        if (!targetState.started && !targetState.error) {
-          this.markUpdateAllFailure(target, runId, 'The source update did not start.', true);
-        }
+    } catch (error) {
+      await this.discover();
+      if (INSPECTION_UPDATE_ALL_TARGETS.some((target) => this.targetState()[target].running)) {
+        return;
       }
-      this.syncUpdateAllState();
-    } finally {
-      for (const target of startTargets) {
-        if (this.updateAllStartRunByTarget.get(target) === runId) {
-          this.updateAllStartRunByTarget.delete(target);
-        }
-      }
+      throw error;
     }
   }
 
@@ -231,38 +249,36 @@ export class InspectionUpdateJobTrackerService {
       message: 'Cancellation requested for the source updates.',
     }));
 
-    const cancellableTargets = INSPECTION_UPDATE_ALL_TARGETS.filter((target) => {
-      const targetState = this.updateAllState().targets[target];
-      return targetState.started && this.targetState()[target].running;
-    });
-    const results = await Promise.allSettled(
-      cancellableTargets.map(async (target) => {
-        await this.cancel(target);
-      }),
-    );
-    results.forEach((result, index) => {
-      const target = cancellableTargets[index];
-      if (!target || result.status !== 'rejected') return;
-      this.markUpdateAllFailure(
-        target,
-        current.runId!,
-        updateErrorMessage(result.reason, 'Failed to request source update cancellation.'),
-        true,
-      );
-    });
-    this.syncUpdateAllState();
-  }
-
-  private async startAllTarget<TTarget extends InspectionUpdateAllTarget>(
-    target: TTarget,
-    request: InspectionUpdateAllStartRequestMap[TTarget],
-    runId: number,
-  ): Promise<void> {
-    await this.start(request);
-    if (!this.isCurrentUpdateAllRun(runId)) return;
-    if (this.updateAllState().cancelRequested && this.targetState()[target].running) {
-      await this.cancel(target);
+    const jobId = INSPECTION_UPDATE_ALL_TARGETS
+      .map((target) => this.updateAllState().targets[target].jobId)
+      .find((candidate): candidate is string => !!candidate);
+    if (!jobId) {
+      this.syncUpdateAllState();
+      return;
     }
+    try {
+      await cancelInspectionStructuredSourcesUpdateJob(jobId);
+    } catch (error) {
+      const message = updateErrorMessage(
+        error,
+        'Failed to request source update cancellation.',
+      );
+      this.updateAllState.update((state) => ({
+        ...state,
+        message,
+        targets: Object.fromEntries(
+          INSPECTION_UPDATE_ALL_TARGETS.map((target) => [
+            target,
+            {
+              ...state.targets[target],
+              error: message,
+              message,
+            },
+          ]),
+        ) as InspectionUpdateAllState['targets'],
+      }));
+    }
+    this.syncUpdateAllState();
   }
 
   private async startRequest(request: InspectionUpdateStartRequest): Promise<JobStartResponse> {
@@ -292,11 +308,83 @@ export class InspectionUpdateJobTrackerService {
       jobId: started.job_id, status: started.status, running: !TERMINAL.has(started.status),
       progress: 0, message: started.message || 'Update running.', error: null, version: -1,
     });
-    if (target === 'rag') return;
-    const runId = this.updateAllStartRunByTarget.get(target);
-    if (runId !== undefined) {
-      this.markUpdateAllStarted(target, runId);
+  }
+
+  private applyCombinedStarted(started: JobStartResponse, runId: number): void {
+    this.combinedJobId = started.job_id;
+    const status = started.status as JobStatus;
+    this.updateAllState.update((state) => {
+      if (state.runId !== runId) return state;
+      return {
+        ...state,
+        targets: Object.fromEntries(
+          INSPECTION_UPDATE_ALL_TARGETS.map((target) => [
+            target,
+            {
+              ...state.targets[target],
+              started: true,
+              jobId: started.job_id,
+              status,
+              progress: 0,
+              message: started.message || 'Update queued.',
+              error: null,
+            },
+          ]),
+        ) as InspectionUpdateAllState['targets'],
+      };
+    });
+    this.syncUpdateAllState();
+  }
+
+  private applyCombinedSnapshot(
+    snapshot: InspectionUpdateJobStatusResponse,
+  ): boolean {
+    this.ensureUpdateAllRunForCombined();
+    this.combinedJobId = snapshot.job_id;
+    const sourceSnapshots = snapshot.result?.sources;
+    const fallbackStatus = snapshot.status === 'completed'
+      ? 'completed'
+      : snapshot.status === 'failed'
+        ? 'failed'
+        : snapshot.status === 'cancelled'
+          ? 'cancelled'
+          : 'pending';
+    this.updateAllState.update((state) => ({
+      ...state,
+      targets: Object.fromEntries(
+        INSPECTION_UPDATE_ALL_TARGETS.map((target) => [
+          target,
+          {
+            ...state.targets[target],
+            started: true,
+            jobId: snapshot.job_id,
+            status: (sourceSnapshots?.[target]?.status || fallbackStatus) as JobStatus,
+            error: sourceSnapshots?.[target]?.error || snapshot.error,
+          },
+        ]),
+      ) as InspectionUpdateAllState['targets'],
+    }));
+
+    let applied = false;
+    for (const target of INSPECTION_UPDATE_ALL_TARGETS) {
+      const source = sourceSnapshots?.[target];
+      const status = (source?.status || fallbackStatus) as JobStatus;
+      const progress = source?.progress ?? (
+        status === 'completed' ? 100 : status === 'pending' ? 0 : snapshot.progress
+      );
+      this.patch(target, {
+        jobId: snapshot.job_id,
+        status,
+        running: !TERMINAL.has(status),
+        progress,
+        message: source?.message || statusMessage(snapshot),
+        error: source?.error || snapshot.error,
+        version: typeof snapshot.version === 'number' ? snapshot.version : -1,
+      });
+      applied = true;
     }
+    this.syncUpdateAllState();
+    return applied;
   }
 
   private applySnapshot(target: InspectionUpdateTarget, snapshot: InspectionUpdateJobStatusResponse): boolean {
@@ -314,12 +402,15 @@ export class InspectionUpdateJobTrackerService {
   private startPolling(target: InspectionUpdateTarget, jobId: string, intervalMs: number): void {
     const token = (this.pollTokens.get(target) ?? 0) + 1;
     this.pollTokens.set(target, token);
+    let consecutiveFailures = 0;
+    let rediscoveryAttempted = false;
     void this.polling.run({
       intervalMs: Math.max(intervalMs, 250),
       isCancelled: () => this.pollTokens.get(target) !== token || this.targetState()[target].jobId !== jobId,
       pollStep: async () => {
         try {
           const snapshot = await this.statusRequest(target, jobId);
+          consecutiveFailures = 0;
           if (this.pollTokens.get(target) !== token) return false;
           const applied = this.applySnapshot(target, snapshot);
           if (applied && TERMINAL.has(snapshot.status)) {
@@ -328,12 +419,144 @@ export class InspectionUpdateJobTrackerService {
             return false;
           }
           return !TERMINAL.has(snapshot.status);
-        } catch {
-          // A transient poll failure must not fabricate a terminal backend state.
+        } catch (error) {
+          if (this.isJobNotFoundError(error)) {
+            if (!rediscoveryAttempted) {
+              rediscoveryAttempted = true;
+              await this.discover();
+              if (this.pollTokens.get(target) !== token) return false;
+            }
+            this.markTargetStale(target, jobId);
+            this.pollTokens.delete(target);
+            return false;
+          }
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= MAX_POLL_FAILURES) {
+            this.markTargetStale(target, jobId);
+            this.pollTokens.delete(target);
+            return false;
+          }
           return true;
         }
       },
     });
+  }
+
+  private startCombinedPolling(jobId: string, intervalMs: number): void {
+    const token = ++this.combinedPollToken;
+    this.combinedJobId = jobId;
+    let consecutiveFailures = 0;
+    let rediscoveryAttempted = false;
+    void this.polling.run({
+      intervalMs: Math.max(intervalMs, 250),
+      isCancelled: () => this.combinedPollToken !== token || this.combinedJobId !== jobId,
+      pollStep: async () => {
+        try {
+          const snapshot = await fetchInspectionStructuredSourcesUpdateJobStatus(jobId);
+          consecutiveFailures = 0;
+          if (this.combinedPollToken !== token) return false;
+          this.applyCombinedSnapshot(snapshot);
+          if (TERMINAL.has(snapshot.status)) {
+            this.combinedPollToken += 1;
+            await this.refreshCombinedIfNeeded(snapshot);
+            return false;
+          }
+          return true;
+        } catch (error) {
+          if (this.isJobNotFoundError(error)) {
+            if (!rediscoveryAttempted) {
+              rediscoveryAttempted = true;
+              await this.discover();
+              if (this.combinedPollToken !== token || this.combinedJobId !== jobId) {
+                return false;
+              }
+            }
+            this.markCombinedStale(jobId);
+            this.combinedPollToken += 1;
+            return false;
+          }
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= MAX_POLL_FAILURES) {
+            this.markCombinedStale(jobId);
+            this.combinedPollToken += 1;
+            return false;
+          }
+          return true;
+        }
+      },
+    });
+  }
+
+  private isJobNotFoundError(error: unknown): boolean {
+    return error instanceof Error && /not found|requested data was not found/i.test(error.message);
+  }
+
+  private markTargetStale(target: InspectionUpdateTarget, jobId: string): void {
+    const message = 'The update job was lost after backend recovery. Retry the update.';
+    if (this.targetState()[target].jobId !== jobId) return;
+    this.patch(target, {
+      status: 'failed',
+      running: false,
+      message,
+      error: message,
+    });
+  }
+
+  private markCombinedStale(jobId: string): void {
+    const message = 'The structured source update was lost after backend recovery. Retry the update.';
+    if (this.combinedJobId !== jobId) return;
+    this.updateAllState.update((state) => ({
+      ...state,
+      message,
+      targets: Object.fromEntries(
+        INSPECTION_UPDATE_ALL_TARGETS.map((target) => [
+          target,
+          {
+            ...state.targets[target],
+            status: 'failed',
+            message,
+            error: message,
+          },
+        ]),
+      ) as InspectionUpdateAllState['targets'],
+    }));
+    for (const target of INSPECTION_UPDATE_ALL_TARGETS) {
+      if (this.targetState()[target].jobId !== jobId) continue;
+      this.patch(target, {
+        status: 'failed',
+        running: false,
+        message,
+        error: message,
+      });
+    }
+    this.combinedJobId = null;
+    this.syncUpdateAllState();
+  }
+
+  private ensureUpdateAllRunForCombined(): void {
+    if (this.updateAllState().runId !== null) return;
+    const runId = ++this.updateAllRunSequence;
+    this.updateAllState.set({
+      ...initialUpdateAllState(),
+      runId,
+      phase: 'starting',
+      message: 'Recovering the structured source update status.',
+    });
+  }
+
+  private async refreshCombinedIfNeeded(
+    snapshot: InspectionUpdateJobStatusResponse,
+  ): Promise<void> {
+    if (snapshot.status !== 'completed') return;
+    for (const target of INSPECTION_UPDATE_ALL_TARGETS) {
+      const child = snapshot.result?.sources?.[target];
+      if (child?.status !== 'completed') continue;
+      await this.refreshIfNeeded(target, {
+        ...snapshot,
+        job_id: snapshot.job_id,
+        status: 'completed',
+      });
+    }
   }
 
   private async refreshIfNeeded(target: InspectionUpdateTarget, snapshot: InspectionUpdateJobStatusResponse): Promise<void> {
@@ -348,60 +571,6 @@ export class InspectionUpdateJobTrackerService {
     const current = this.targetState()[target];
     this.targetState.update((states) => ({ ...states, [target]: { ...current, ...patch } }));
     this.syncUpdateAllTarget(target);
-  }
-
-  private markUpdateAllStarted(target: InspectionUpdateAllTarget, runId: number): void {
-    if (!this.isCurrentUpdateAllRun(runId)) return;
-    const sourceState = this.targetState()[target];
-    this.updateAllState.update((state) => {
-      if (state.runId !== runId) return state;
-      return {
-        ...state,
-        targets: {
-          ...state.targets,
-          [target]: {
-            ...state.targets[target],
-            started: true,
-            jobId: sourceState.jobId,
-            status: sourceState.status,
-            progress: clampProgress(sourceState.progress),
-            message: sourceState.message || 'Update running.',
-            error: sourceState.error,
-          },
-        },
-      };
-    });
-    this.syncUpdateAllState();
-  }
-
-  private markUpdateAllFailure(
-    target: InspectionUpdateAllTarget,
-    runId: number,
-    message: string,
-    preserveActiveJob = false,
-  ): void {
-    if (!this.isCurrentUpdateAllRun(runId)) return;
-    const sourceState = this.targetState()[target];
-    const keepActiveJob = preserveActiveJob && sourceState.running && !!sourceState.jobId;
-    this.updateAllState.update((state) => {
-      if (state.runId !== runId) return state;
-      return {
-        ...state,
-        targets: {
-          ...state.targets,
-          [target]: {
-            ...state.targets[target],
-            started: keepActiveJob,
-            jobId: keepActiveJob ? sourceState.jobId : null,
-            status: keepActiveJob ? sourceState.status : 'failed',
-            progress: keepActiveJob ? sourceState.progress : 0,
-            message,
-            error: message,
-          },
-        },
-      };
-    });
-    this.syncUpdateAllState();
   }
 
   private syncUpdateAllTarget(target: InspectionUpdateTarget): void {
@@ -477,7 +646,4 @@ export class InspectionUpdateJobTrackerService {
     this.updateAllState.update((state) => ({ ...state, phase, progress, message }));
   }
 
-  private isCurrentUpdateAllRun(runId: number): boolean {
-    return this.updateAllState().runId === runId;
-  }
 }

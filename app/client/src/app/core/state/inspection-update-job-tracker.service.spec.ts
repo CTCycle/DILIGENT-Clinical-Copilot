@@ -21,12 +21,11 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
         return jsonResponse({ jobs: [] });
       }
       if (method === 'POST') {
-        const target = url.split('/').at(-2) || 'source';
         return jsonResponse({
-          job_id: `job-${target}`,
-          job_type: `${target}_update`,
+          job_id: 'job-structured-sources',
+          job_type: 'structured_sources_update',
           status: 'pending',
-          message: `${target} queued`,
+          message: 'structured sources queued',
           poll_interval: 60,
         });
       }
@@ -61,28 +60,25 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
     };
   }
 
-  function applySnapshot(
+  function applyCombinedSnapshot(
     tracker: InspectionUpdateJobTrackerService,
-    target: 'livertox' | 'rxnav' | 'dilirank',
-    jobId: string,
-    status: 'completed' | 'failed' | 'cancelled',
-    progress: number,
+    sources: NonNullable<InspectionUpdateJobStatusResponse['result']>['sources'],
   ): void {
     const privateTracker = tracker as unknown as {
-      applySnapshot: (target: string, snapshot: InspectionUpdateJobStatusResponse) => boolean;
+      applyCombinedSnapshot: (snapshot: InspectionUpdateJobStatusResponse) => boolean;
     };
-    privateTracker.applySnapshot(target, {
-      job_id: jobId,
-      job_type: 'rxnav_update',
-      status,
-      progress,
-      result: { progress_message: status },
-      error: status === 'failed' ? 'Source failed.' : null,
+    privateTracker.applyCombinedSnapshot({
+      job_id: 'job-structured-sources',
+      job_type: 'structured_sources_update',
+      status: sources?.dilirank?.status === 'failed' ? 'failed' : 'running',
+      progress: 67,
+      result: { sources },
+      error: null,
       version: 1,
     });
   }
 
-  it('starts the three existing source jobs in parallel and excludes RAG', async () => {
+  it('starts one ordered structured-source job and excludes RAG', async () => {
     const tracker = TestBed.inject(InspectionUpdateJobTrackerService);
 
     await tracker.startAll(requests());
@@ -90,10 +86,8 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
     const postUrls = fetchMock.mock.calls
       .filter((call) => (call[1] as RequestInit | undefined)?.method === 'POST')
       .map((call) => String(call[0]));
-    expect(postUrls).toHaveLength(3);
-    expect(postUrls.some((url) => url.includes('/livertox/jobs'))).toBe(true);
-    expect(postUrls.some((url) => url.includes('/rxnav/jobs'))).toBe(true);
-    expect(postUrls.some((url) => url.includes('/dilirank/jobs'))).toBe(true);
+    expect(postUrls).toHaveLength(1);
+    expect(postUrls[0]).toContain('/structured-sources/jobs');
     expect(postUrls.some((url) => url.includes('/rag/jobs'))).toBe(false);
     expect(tracker.updateAllState().phase).toBe('running');
     expect(tracker.updateAllState().progress).toBe(0);
@@ -106,7 +100,8 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
     const deleteUrls = fetchMock.mock.calls
       .filter((call) => (call[1] as RequestInit | undefined)?.method === 'DELETE')
       .map((call) => String(call[0]));
-    expect(deleteUrls).toHaveLength(3);
+    expect(deleteUrls).toHaveLength(1);
+    expect(deleteUrls[0]).toContain('/structured-sources/jobs/');
     expect(deleteUrls.some((url) => url.includes('/rag/'))).toBe(false);
     expect(tracker.updateAllState().cancelRequested).toBe(true);
   });
@@ -115,16 +110,12 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith('/inspection/jobs')) return jsonResponse({ jobs: [] });
-      if (url.includes('/dilirank/jobs') && init?.method === 'POST') {
-        return jsonResponse({ detail: 'DILIrank unavailable' }, 422);
-      }
       if (init?.method === 'POST') {
-        const target = url.split('/').at(-2) || 'source';
         return jsonResponse({
-          job_id: `job-${target}`,
-          job_type: `${target}_update`,
+          job_id: 'job-structured-sources',
+          job_type: 'structured_sources_update',
           status: 'pending',
-          message: `${target} queued`,
+          message: 'structured sources queued',
           poll_interval: 60,
         });
       }
@@ -134,8 +125,26 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
     const tracker = TestBed.inject(InspectionUpdateJobTrackerService);
     await tracker.startAll(requests());
 
-    applySnapshot(tracker, 'livertox', 'job-livertox', 'completed', 100);
-    applySnapshot(tracker, 'rxnav', 'job-rxnav', 'completed', 100);
+    applyCombinedSnapshot(tracker, {
+      livertox: {
+        status: 'completed',
+        progress: 100,
+        message: 'LiverTox complete',
+        error: null,
+      },
+      rxnav: {
+        status: 'completed',
+        progress: 100,
+        message: 'RxNav complete',
+        error: null,
+      },
+      dilirank: {
+        status: 'failed',
+        progress: 0,
+        message: 'DILIrank unavailable',
+        error: 'DILIrank unavailable',
+      },
+    });
 
     const state = tracker.updateAllState();
     expect(state.phase).toBe('partial_failure');
