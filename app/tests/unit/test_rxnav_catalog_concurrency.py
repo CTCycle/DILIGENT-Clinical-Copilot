@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import pytest
 from services.updater.rxnav_builder import RxNavDrugCatalogBuilder
+
 
 ###############################################################################
 class RxClientStub:
@@ -51,12 +53,22 @@ class SerializerStub:
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.replacement_calls: list[dict[str, Any]] = []
 
     # -------------------------------------------------------------------------
     def upsert_drugs_catalog_records(self, records: Any, **kwargs: Any) -> None:
         self.calls.append(
             {
                 "records_type": type(records).__name__,
+                "kwargs": kwargs,
+            }
+        )
+
+    # -------------------------------------------------------------------------
+    def replace_rxnav_catalog_records(self, records: Any, **kwargs: Any) -> None:
+        self.replacement_calls.append(
+            {
+                "records": list(records),
                 "kwargs": kwargs,
             }
         )
@@ -88,13 +100,13 @@ def test_prefetch_concept_queries_fetches_unique_cache_misses() -> None:
 
 ###############################################################################
 def test_persist_catalog_prefetches_by_batch() -> None:
+    serializer_stub = SerializerStub()
     builder = RxNavDrugCatalogBuilder(
         rx_client=RxClientStub(),
-        drug_catalog_repository=SerializerStub(),  # type: ignore[arg-type]
+        drug_catalog_repository=serializer_stub,  # type: ignore[arg-type]
     )
     builder.BATCH_SIZE = 2
     prefetch_batch_sizes: list[int] = []
-    persisted_batch_sizes: list[int] = []
 
     def prefetch_stub(concepts: list[dict[str, Any]]) -> None:
         prefetch_batch_sizes.append(len(concepts))
@@ -109,12 +121,8 @@ def test_persist_catalog_prefetches_by_batch() -> None:
             "synonyms": [],
         }
 
-    def persist_batch_stub(batch: list[dict[str, Any]]) -> None:
-        persisted_batch_sizes.append(len(batch))
-
     builder.prefetch_concept_queries = prefetch_stub  # type: ignore[method-assign]
     builder.sanitize_concept = sanitize_stub  # type: ignore[method-assign]
-    builder.persist_batch = persist_batch_stub  # type: ignore[method-assign]
 
     payload = [
         {"fullName": "Drug Alpha 10 MG Tablet", "rxcui": "1001"},
@@ -127,7 +135,37 @@ def test_persist_catalog_prefetches_by_batch() -> None:
 
     assert result["count"] == 3
     assert prefetch_batch_sizes == [2, 1]
-    assert persisted_batch_sizes == [2, 1]
+    assert len(serializer_stub.replacement_calls) == 1
+    assert len(serializer_stub.replacement_calls[0]["records"]) == 3
+
+###############################################################################
+def test_persist_catalog_cancellation_does_not_replace_previous_snapshot() -> None:
+    serializer_stub = SerializerStub()
+    builder = RxNavDrugCatalogBuilder(
+        rx_client=RxClientStub(),
+        drug_catalog_repository=serializer_stub,  # type: ignore[arg-type]
+    )
+    builder.BATCH_SIZE = 2
+    stop_checks = 0
+
+    def should_stop() -> bool:
+        nonlocal stop_checks
+        stop_checks += 1
+        return stop_checks >= 4
+
+    payload = [
+        {"fullName": "Drug Alpha 10 MG Tablet", "rxcui": "1001"},
+        {"fullName": "Drug Beta 20 MG Tablet", "rxcui": "1002"},
+        {"fullName": "Drug Gamma 30 MG Tablet", "rxcui": "1003"},
+    ]
+
+    with pytest.raises(RuntimeError, match="cancelled"):
+        builder.persist_catalog(
+            iter([json.dumps(payload).encode("utf-8")]),
+            should_stop=should_stop,
+        )
+
+    assert serializer_stub.replacement_calls == []
 
 ###############################################################################
 def test_curated_aliases_are_loaded_and_forwarded_to_serializer(

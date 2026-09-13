@@ -5,6 +5,7 @@ import codecs
 import json
 from pathlib import Path
 import re
+from tempfile import TemporaryDirectory
 import time
 import unicodedata
 from collections.abc import Callable, Iterator
@@ -61,6 +62,7 @@ class RxNavDrugCatalogBuilder:
         self.rxcui_cache: dict[str, list[str]] = {}
         self.total_records: int | None = None
         self.last_logged_count = 0
+        self.enrichment_failures = 0
         self.drug_catalog_repository = drug_catalog_repository
         resolved_path = (
             Path(curated_aliases_path)
@@ -167,6 +169,7 @@ class RxNavDrugCatalogBuilder:
     ) -> dict[str, Any]:
         self.total_records = total_records
         self.last_logged_count = 0
+        self.enrichment_failures = 0
         attempt = 0
         last_error: Exception | None = None
         self.emit_progress(
@@ -282,23 +285,43 @@ class RxNavDrugCatalogBuilder:
     ) -> dict[str, Any]:
         count = 0
         concepts_batch: list[dict[str, Any]] = []
-        for concept in self.stream_min_concepts(chunks):
-            if self.should_cancel(should_stop):
-                raise RuntimeError("RxNav update cancelled by user request")
-            concepts_batch.append(concept)
-            if len(concepts_batch) >= self.BATCH_SIZE:
-                persisted = self.persist_concept_batch(concepts_batch)
-                count += persisted
-                concepts_batch.clear()
-                self.emit_catalog_progress(progress_callback, count=count)
-        if concepts_batch:
-            if self.should_cancel(should_stop):
-                raise RuntimeError("RxNav update cancelled by user request")
-            persisted = self.persist_concept_batch(concepts_batch)
-            count += persisted
-            self.emit_catalog_progress(progress_callback, count=count, force=True)
+        with TemporaryDirectory(prefix="diligent-rxnav-") as staging_dir:
+            staging_path = Path(staging_dir) / "records.jsonl"
+            with staging_path.open("w", encoding="utf-8") as staging_file:
+                for concept in self.stream_min_concepts(chunks):
+                    if self.should_cancel(should_stop):
+                        raise RuntimeError("RxNav update cancelled by user request")
+                    concepts_batch.append(concept)
+                    if len(concepts_batch) >= self.BATCH_SIZE:
+                        prepared = self.prepare_concept_batch(concepts_batch)
+                        count += self.write_staged_batch(staging_file, prepared)
+                        concepts_batch.clear()
+                        self.emit_catalog_progress(progress_callback, count=count)
+                if concepts_batch:
+                    if self.should_cancel(should_stop):
+                        raise RuntimeError("RxNav update cancelled by user request")
+                    prepared = self.prepare_concept_batch(concepts_batch)
+                    count += self.write_staged_batch(staging_file, prepared)
+                    self.emit_catalog_progress(progress_callback, count=count, force=True)
+                staging_file.flush()
 
-        return {"table_name": self.TABLE_NAME, "count": count}
+            if self.should_cancel(should_stop):
+                raise RuntimeError("RxNav update cancelled by user request")
+            if self.enrichment_failures:
+                raise RuntimeError(
+                    "RxNav enrichment failed; the previous catalog snapshot was retained"
+                )
+            if count <= 0:
+                raise RuntimeError(
+                    "RxNav catalog contained no usable records; the previous snapshot was retained"
+                )
+            self.replace_staged_batch(staging_path)
+
+        return {
+            "table_name": self.TABLE_NAME,
+            "count": count,
+            "enrichment_failures": self.enrichment_failures,
+        }
 
     # -------------------------------------------------------------------------
     def emit_catalog_progress(
@@ -327,8 +350,18 @@ class RxNavDrugCatalogBuilder:
 
     # -------------------------------------------------------------------------
     def persist_concept_batch(self, concepts: list[dict[str, Any]]) -> int:
-        if not concepts:
+        payload_batch = self.prepare_concept_batch(concepts)
+        if not payload_batch:
             return 0
+        self.persist_batch(payload_batch)
+        return len(payload_batch)
+
+    # -------------------------------------------------------------------------
+    def prepare_concept_batch(
+        self, concepts: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        if not concepts:
+            return []
         self.prefetch_concept_queries(concepts)
         payload_batch: list[dict[str, Any]] = []
         for concept in concepts:
@@ -336,10 +369,28 @@ class RxNavDrugCatalogBuilder:
             if payload is None:
                 continue
             payload_batch.append(payload)
-        if not payload_batch:
-            return 0
-        self.persist_batch(payload_batch)
-        return len(payload_batch)
+        return payload_batch
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def write_staged_batch(handle: Any, batch: list[dict[str, Any]]) -> int:
+        for payload in batch:
+            handle.write(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+            handle.write("\n")
+        return len(batch)
+
+    # -------------------------------------------------------------------------
+    def replace_staged_batch(self, staging_path: Path) -> None:
+        records: list[dict[str, Any]] = []
+        with staging_path.open("r", encoding="utf-8") as staging_file:
+            for line in staging_file:
+                payload = json.loads(line)
+                if isinstance(payload, dict):
+                    records.append(payload)
+        self.drug_catalog_repository.replace_rxnav_catalog_records(
+            records,
+            curated_aliases_by_canonical=self.curated_aliases_by_canonical,
+        )
 
     # -------------------------------------------------------------------------
     def prefetch_concept_queries(self, concepts: list[dict[str, Any]]) -> None:
@@ -422,6 +473,7 @@ class RxNavDrugCatalogBuilder:
                     try:
                         alias_results[cache_key] = await task
                     except Exception as exc:  # noqa: BLE001
+                        self.enrichment_failures += 1
                         logger.warning(
                             "Failed to prefetch RxNav aliases for '%s': %s",
                             pending_alias_queries.get(cache_key),
@@ -449,6 +501,7 @@ class RxNavDrugCatalogBuilder:
                     try:
                         synonym_results[identifier] = await task
                     except Exception as exc:  # noqa: BLE001
+                        self.enrichment_failures += 1
                         logger.warning(
                             "Failed to prefetch RxNav synonyms for '%s': %s",
                             identifier,
