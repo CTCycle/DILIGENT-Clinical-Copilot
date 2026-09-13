@@ -64,6 +64,65 @@ class DrugCatalogRepository:
         prepared_rows = self.prepare_rxnav_rows(records)
         if not prepared_rows:
             return
+        db_session = self.session_factory()
+        try:
+            self._upsert_prepared_rxnav_rows(
+                db_session,
+                prepared_rows,
+                curated_aliases_by_canonical=curated_aliases_by_canonical,
+            )
+            db_session.commit()
+        except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
+
+    # -------------------------------------------------------------------------
+    def replace_rxnav_catalog_records(
+        self,
+        records: pd.DataFrame | list[dict[str, Any]],
+        *,
+        curated_aliases_by_canonical: dict[str, list[tuple[str, str]]] | None = None,
+    ) -> None:
+        """Replace the complete RxNav-owned snapshot in one transaction."""
+
+        prepared_rows = self.prepare_rxnav_rows(records)
+        if not prepared_rows:
+            raise ValueError("RxNav catalog replacement contains no usable records")
+        db_session = self.session_factory()
+        try:
+            db_session.execute(delete(DrugRxnormCode))
+            db_session.execute(
+                delete(DrugAlias).where(
+                    func.lower(DrugAlias.source).in_(["rxnorm", "derived"])
+                )
+            )
+            db_session.execute(
+                update(Drug)
+                .where(Drug.rxnav_last_update.is_not(None))
+                .values(rxnav_last_update=None)
+            )
+            self._upsert_prepared_rxnav_rows(
+                db_session,
+                prepared_rows,
+                curated_aliases_by_canonical=curated_aliases_by_canonical,
+            )
+            db_session.commit()
+        except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
+
+    # -------------------------------------------------------------------------
+    def _upsert_prepared_rxnav_rows(
+        self,
+        db_session: Session,
+        prepared_rows: list[dict[str, Any]],
+        *,
+        curated_aliases_by_canonical: dict[str, list[tuple[str, str]]] | None,
+    ) -> None:
         today_marker = date.today().isoformat()
         values_by_norm: dict[str, dict[str, Any]] = {}
         for row in prepared_rows:
@@ -75,102 +134,92 @@ class DrugCatalogRepository:
                     "rxnav_last_update": today_marker,
                 },
             )
-        db_session = self.session_factory()
-        try:
-            drug_insert = dialect_insert(db_session, Drug).values(
-                list(values_by_norm.values())
-            )
-            drug_insert = drug_insert.on_conflict_do_update(
-                index_elements=[Drug.canonical_name_norm],
-                set_={
-                    "canonical_name": drug_insert.excluded.canonical_name,
-                    "rxnav_last_update": drug_insert.excluded.rxnav_last_update,
-                },
-            )
-            db_session.execute(drug_insert)
-            db_session.flush()
-            names = list(values_by_norm)
-            drug_ids = {
-                str(name): int(drug_id)
-                for name, drug_id in db_session.execute(
-                    select(Drug.canonical_name_norm, Drug.id).where(
-                        Drug.canonical_name_norm.in_(names)
-                    )
-                ).all()
-            }
-            rxcuis = list({str(row["_rxcui"]) for row in prepared_rows})
-            existing_mappings = {
-                str(rxcui): int(drug_id)
-                for rxcui, drug_id in db_session.execute(
-                    select(DrugRxnormCode.rxcui, DrugRxnormCode.drug_id).where(
-                        DrugRxnormCode.rxcui.in_(rxcuis)
-                    )
-                ).all()
-            }
-            for row in prepared_rows:
-                current_drug_id = existing_mappings.get(row["_rxcui"])
-                expected_drug_id = drug_ids[row["_canonical_name_norm"]]
-                if current_drug_id is not None and current_drug_id != expected_drug_id:
-                    raise RuntimeError(
-                        f"Conflicting rxcui mapping for existing drug row (rxcui='{row['_rxcui']}', "
-                        f"existing_drug_id={current_drug_id}, incoming_drug_id={expected_drug_id})"
-                    )
-            upsert_drug_rxnorm_codes(
-                db_session,
-                [
-                    {
-                        "drug_id": drug_ids[row["_canonical_name_norm"]],
-                        "rxcui": row["_rxcui"],
-                    }
-                    for row in prepared_rows
-                ],
-            )
-            aliases: dict[tuple[int, str, str, str], dict[str, Any]] = {}
-            for row in prepared_rows:
-                drug_id = drug_ids[row["_canonical_name_norm"]]
-                candidates: list[tuple[Any, str, str]] = [
-                    (row["_canonical_name"], "canonical", "derived"),
-                    (row.get("_raw_name"), "raw_name", "rxnorm"),
-                    (row.get("_standard_name"), "standard_name", "rxnorm"),
-                ]
-                candidates.extend(
-                    (alias, "brand", "rxnorm")
-                    for alias in self.extract_text_candidates(row.get("brand_names"))
+        drug_insert = dialect_insert(db_session, Drug).values(
+            list(values_by_norm.values())
+        )
+        drug_insert = drug_insert.on_conflict_do_update(
+            index_elements=[Drug.canonical_name_norm],
+            set_={
+                "canonical_name": drug_insert.excluded.canonical_name,
+                "rxnav_last_update": drug_insert.excluded.rxnav_last_update,
+            },
+        )
+        db_session.execute(drug_insert)
+        db_session.flush()
+        names = list(values_by_norm)
+        drug_ids = {
+            str(name): int(drug_id)
+            for name, drug_id in db_session.execute(
+                select(Drug.canonical_name_norm, Drug.id).where(
+                    Drug.canonical_name_norm.in_(names)
                 )
-                candidates.extend(
-                    (alias, "synonym", "rxnorm")
-                    for alias in self.extract_synonym_candidates(row.get("synonyms"))
+            ).all()
+        }
+        rxcuis = list({str(row["_rxcui"]) for row in prepared_rows})
+        existing_mappings = {
+            str(rxcui): int(drug_id)
+            for rxcui, drug_id in db_session.execute(
+                select(DrugRxnormCode.rxcui, DrugRxnormCode.drug_id).where(
+                    DrugRxnormCode.rxcui.in_(rxcuis)
                 )
-                if curated_aliases_by_canonical:
-                    candidates.extend(
-                        (alias, kind, "curated")
-                        for alias, kind in curated_aliases_by_canonical.get(
-                            row["_canonical_name_norm"], []
-                        )
+            ).all()
+        }
+        for row in prepared_rows:
+            current_drug_id = existing_mappings.get(row["_rxcui"])
+            expected_drug_id = drug_ids[row["_canonical_name_norm"]]
+            if current_drug_id is not None and current_drug_id != expected_drug_id:
+                raise RuntimeError(
+                    f"Conflicting rxcui mapping for existing drug row (rxcui='{row['_rxcui']}', "
+                    f"existing_drug_id={current_drug_id}, incoming_drug_id={expected_drug_id})"
+                )
+        upsert_drug_rxnorm_codes(
+            db_session,
+            [
+                {
+                    "drug_id": drug_ids[row["_canonical_name_norm"]],
+                    "rxcui": row["_rxcui"],
+                }
+                for row in prepared_rows
+            ],
+        )
+        aliases: dict[tuple[int, str, str, str], dict[str, Any]] = {}
+        for row in prepared_rows:
+            drug_id = drug_ids[row["_canonical_name_norm"]]
+            candidates: list[tuple[Any, str, str]] = [
+                (row["_canonical_name"], "canonical", "derived"),
+                (row.get("_raw_name"), "raw_name", "rxnorm"),
+                (row.get("_standard_name"), "standard_name", "rxnorm"),
+            ]
+            candidates.extend(
+                (alias, "brand", "rxnorm")
+                for alias in self.extract_text_candidates(row.get("brand_names"))
+            )
+            candidates.extend(
+                (alias, "synonym", "rxnorm")
+                for alias in self.extract_synonym_candidates(row.get("synonyms"))
+            )
+            if curated_aliases_by_canonical:
+                candidates.extend(
+                    (alias, kind, "curated")
+                    for alias, kind in curated_aliases_by_canonical.get(
+                        row["_canonical_name_norm"], []
                     )
-                for alias, alias_kind, source in candidates:
-                    clean_alias = repository_values.normalize_string(alias)
-                    alias_norm = (
-                        normalize_drug_name(clean_alias) if clean_alias else None
-                    )
-                    if not alias_norm or clean_alias is None:
-                        continue
-                    key = (drug_id, alias_norm, alias_kind, source)
-                    aliases[key] = {
-                        "drug_id": drug_id,
-                        "alias": clean_alias,
-                        "alias_norm": alias_norm,
-                        "alias_kind": alias_kind,
-                        "source": source,
-                        "term_type": row.get("_term_type"),
-                    }
-            upsert_drug_aliases(db_session, list(aliases.values()))
-            db_session.commit()
-        except Exception:
-            db_session.rollback()
-            raise
-        finally:
-            db_session.close()
+                )
+            for alias, alias_kind, source in candidates:
+                clean_alias = repository_values.normalize_string(alias)
+                alias_norm = normalize_drug_name(clean_alias) if clean_alias else None
+                if not alias_norm or clean_alias is None:
+                    continue
+                key = (drug_id, alias_norm, alias_kind, source)
+                aliases[key] = {
+                    "drug_id": drug_id,
+                    "alias": clean_alias,
+                    "alias_norm": alias_norm,
+                    "alias_kind": alias_kind,
+                    "source": source,
+                    "term_type": row.get("_term_type"),
+                }
+        upsert_drug_aliases(db_session, list(aliases.values()))
 
     # -------------------------------------------------------------------------
     def list_rxnav_catalog(
