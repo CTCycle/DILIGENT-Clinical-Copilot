@@ -47,7 +47,7 @@ jobs:
             throw "Unsupported release tag: $env:RELEASE_TAG"
           }
           $version = $Matches.version
-          & .\start_on_windows.ps1 -Action BuildDesktopRelease -Version $version -DesktopTarget All -Force
+          & .\start_on_windows.ps1 -Action BuildDesktopRelease -Version $version -DesktopTarget All
           if ($LASTEXITCODE -ne 0) {
             throw "Desktop release build failed with exit code $LASTEXITCODE"
           }
