@@ -140,7 +140,7 @@ class LiverToxUpdater:
             progress=95.0,
             message="Persisting LiverTox records",
         )
-        self.knowledge_repository.save_livertox_records(final_dataset)
+        self.knowledge_repository.replace_livertox_records(final_dataset)
         payload = {**master_metadata, **archive_metadata, **local_info}
         payload["processed_entries"] = len(final_dataset.index)
         payload["records"] = len(final_dataset.index)
