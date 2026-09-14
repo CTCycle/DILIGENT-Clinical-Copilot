@@ -18,20 +18,41 @@ The runtime allowlist excludes source code, tests, documentation, credentials, `
 
 ## Current source and artifact status
 
-The current source manifests report version `3.3.0`. The `v3.3.0` desktop release
-is created from the synchronized `main` branch. Publication is confirmed only
-after the portable EXE and MSI, annotated tag, remote-release metadata, and
-downloaded hash evidence have all been verified.
+The current source manifests report synchronized candidate version `3.4.0`. The
+latest published desktop release remains `v3.3.0`; no `v3.4.0` tag or release is
+created by the current local readiness work. Publication is confirmed only after
+the portable EXE and MSI, annotated tag, remote-release metadata, and downloaded
+hash evidence have all been verified.
 
-The expected output names for a verified `3.3.0` build are:
+The expected output names for a verified `3.4.0` build are:
 
 ```text
-release/DILIGENT-v3.3.0-windows-x64-portable.exe
-release/DILIGENT-v3.3.0-windows-x64.msi
-release/DILIGENT-v3.3.0-windows-x64.sha256
+release/DILIGENT-v3.4.0-windows-x64-portable.exe
+release/DILIGENT-v3.4.0-windows-x64.msi
+release/DILIGENT-v3.4.0-windows-x64.sha256
 ```
 
 The portable executable is a single distribution file for no-install use. The MSI installs the same Tauri shell and packaged runtime. The `.sha256` file contains one SHA-256 entry per built artifact and must be checked before distribution. Publication requires separate tag, remote-release, and download/hash evidence.
+
+### v3.4.0 release-candidate gate
+
+Status: **NOT READY**. The source and lock manifests are synchronized to strict
+SemVer `3.4.0`, but the candidate must remain unpublished until all of these
+independent gates have current evidence:
+
+- hosted CI is green for the exact candidate commit;
+- the complete browser E2E suite passes, including the explicit live provider
+  flow using synthetic data and the approved OpenCode Go / `deepseek-v4-flash`
+  configuration;
+- the portable EXE launches and shuts down cleanly, and the MSI installs,
+  launches, upgrades, and uninstalls on a Windows host;
+- Python, npm, and Cargo dependency scans have been reviewed with no unresolved
+  release-blocking findings;
+- `develop` and `main` are intentionally synchronized before an annotated
+  `v3.4.0` tag is created.
+
+The local work in this session does not create a tag, publish a GitHub release,
+upload assets, or push branches.
 
 The GitHub release attaches the portable EXE, MSI, and `.sha256` manifest. Existing remote assets are never replaced unless the local and remote bytes are identical.
 
@@ -98,7 +119,7 @@ surface.
 Run on a Windows x64 host with Rust 1.95.0/Cargo, the Windows build toolchain, the pinned portable runtimes, and network access for dependencies and the default WebView2 bootstrapper. The launcher pins Python 3.14.2, Node.js 22.13.0, uv 0.11.30, and PyInstaller 6.21.0; downloaded Python, Node, and uv archives are SHA-256 checked before extraction:
 
 ```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.3.0 -DesktopTarget All
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.4.0 -DesktopTarget All
 ```
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a clean worktree by default; use `-AllowDirtyTree` only when the dirty state is intentional and recorded. `-OfflineWebView2` is valid only with `-DesktopTarget Msi` or `All` and changes the MSI WebView2 installation mode.
@@ -135,8 +156,9 @@ permanent running state.
 `.github/workflows/release.yml` runs on a `vX.Y.Z` tag. Its release preflight
 first requires the tagged commit to equal `origin/main`, then runs the backend
 quality/migration/unit/persistence gates, frontend tests and production build,
-and the Windows browser regression slice. Packaging and publication depend on
-that preflight. The workflow builds both Windows desktop targets from the
+the complete browser suite, the explicit live provider flow, dependency scans,
+and Windows EXE/MSI host smoke checks. Packaging and publication depend on all
+of those gates. The workflow builds both Windows desktop targets from the
 verified tag, creates or updates the matching GitHub Release, and attaches the
 portable EXE, MSI, and `.sha256` manifest. It refuses to overwrite an existing
 non-identical asset. Create a new SemVer tag only after `develop` and `main`
@@ -155,14 +177,16 @@ The launcher validates:
   `/api/health`, `/`, and `/clinical-sessions`;
 - deterministic runtime archive manifest and digest;
 - Tauri compilation;
-- portable executable size, MSI metadata, and SHA-256 entries.
+- portable executable size, MSI metadata, and SHA-256 entries;
+- `app/desktop/build/smoke_release.ps1` portable launch/close and MSI install,
+  upgrade, launch, and uninstall checks on a Windows host.
 
 After publishing, perform a Windows host smoke test by opening the portable EXE, confirming a window titled `DILIGENT Clinical Copilot`, checking `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`, and requesting the port recorded there at `/api/health`. MSI install, upgrade, uninstall, WebView2 offline installation, code signing, and clean-machine testing remain separate distribution gates.
 
 ## Cleanup
 
 ```powershell
-.\start_on_windows.ps1 -Action RemoveDesktopRelease -Version 3.3.0
+.\start_on_windows.ps1 -Action RemoveDesktopRelease -Version 3.4.0
 .\start_on_windows.ps1 -Action RemoveDesktopRelease -AllDesktopReleases
 ```
 

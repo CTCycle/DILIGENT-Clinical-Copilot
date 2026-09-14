@@ -2,20 +2,27 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Literal, Mapping
+from typing import Literal
 
 from common.paths import CATALOGS_PATH
-from domain.llm.providers import CloudModelDescriptor
+from domain.llm.providers import (
+    CloudModelDescriptor,
+    ModelCapabilityMetadata,
+    ReasoningToggleParameter,
+    ToolCallMode,
+)
 from domain.model_configs import ReasoningLevel
 from services.llm.generation_policy import GenerationPolicy
 
 CapabilitySource = Literal[
-    "exact_model", "model_family", "provider", "live", "fallback"
+    "exact_model", "model_family", "provider", "live", "documented", "probe", "fallback"
 ]
 ReasoningParameter = Literal[
     "none", "boolean", "level", "effort", "budget_tokens", "adaptive"
 ]
+ReasoningToggle = ReasoningToggleParameter
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -24,10 +31,28 @@ class ModelCapabilities:
     output_token_limit: int | None
     supported_reasoning_levels: tuple[ReasoningLevel, ...]
     reasoning_parameter: ReasoningParameter
+    reasoning_toggle_parameter: ReasoningToggle
     supports_temperature: bool
     supports_json_mode: bool
     supports_native_json_schema: bool
     source: CapabilitySource
+    semantic_model_id: str | None = None
+    provider_model_id: str | None = None
+    aliases: tuple[str, ...] = ()
+    endpoint_family: str | None = None
+    supports_chat: bool | None = None
+    supports_streaming: bool | None = None
+    supports_tools: bool | None = None
+    tool_call_mode: ToolCallMode = "unsupported"
+    supports_tool_choice: bool | None = None
+    supports_parallel_tool_calls: bool | None = None
+    supports_top_p: bool | None = None
+    supports_usage_metadata: bool | None = None
+    supports_finish_reason: bool | None = None
+    reasoning_counts_toward_output_limit: bool | None = None
+    reasoning_unsupported_parameters: tuple[str, ...] = ()
+    requires_reasoning_content_for_tool_calls: bool | None = None
+    requires_assistant_content_for_tool_calls: bool | None = None
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -161,87 +186,452 @@ def resolve_model_capabilities(
 ) -> ModelCapabilities:
     rule, source = _find_catalog_rule(provider, model)
     fallback = _fallback_rule()
-    descriptor_has_metadata = (
-        descriptor is not None
-        and (
-            any(
-                value is not None
-                for value in (
-                    descriptor.input_token_limit,
-                    descriptor.output_token_limit,
-                    descriptor.supports_thinking,
-                    descriptor.supports_temperature,
-                    descriptor.supports_json_mode,
-                    descriptor.supports_native_json_schema,
-                )
+    metadata = descriptor.model_capabilities if descriptor is not None else None
+    descriptor_has_metadata = descriptor is not None and (
+        any(
+            value is not None
+            for value in (
+                metadata.context_window_tokens if metadata else None,
+                metadata.max_output_tokens if metadata else None,
+                metadata.supports_reasoning if metadata else None,
+                metadata.supports_temperature if metadata else None,
+                metadata.supports_json_mode if metadata else None,
+                metadata.supports_native_json_schema if metadata else None,
+                metadata.supports_tools if metadata else None,
+                metadata.supports_streaming if metadata else None,
+                metadata.supports_tool_choice if metadata else None,
             )
-            or descriptor.capabilities is not None
         )
+        or (metadata is not None and metadata.evidence != "fallback")
+        or (descriptor is not None and descriptor.capabilities is not None)
     )
 
+    def metadata_value(name: str) -> object:
+        if metadata is None:
+            return None
+        return getattr(metadata, name)
+
+    def rule_value(name: str, fallback_name: str | None = None) -> object:
+        if name in rule:
+            return rule[name]
+        return fallback.get(fallback_name or name)
+
     input_token_limit = _coerce_optional_positive_int(
-        descriptor.input_token_limit
-        if descriptor_has_metadata
-        and descriptor is not None
-        and descriptor.input_token_limit is not None
-        else rule.get("input_token_limit", fallback.get("input_token_limit"))
+        metadata_value("context_window_tokens")
+        if descriptor_has_metadata and metadata_value("context_window_tokens") is not None
+        else rule_value("input_token_limit")
     )
     output_token_limit = _coerce_optional_positive_int(
-        descriptor.output_token_limit
-        if descriptor_has_metadata
-        and descriptor is not None
-        and descriptor.output_token_limit is not None
-        else rule.get("output_token_limit", fallback.get("output_token_limit"))
+        metadata_value("max_output_tokens")
+        if descriptor_has_metadata and metadata_value("max_output_tokens") is not None
+        else rule_value("output_token_limit")
     )
     levels = _coerce_reasoning_levels(
-        rule.get(
-            "supported_reasoning_levels", fallback.get("supported_reasoning_levels")
-        )
+        metadata_value("reasoning_levels")
+        if descriptor_has_metadata and metadata_value("reasoning_levels")
+        else rule_value("supported_reasoning_levels")
     )
     if (
         descriptor_has_metadata
-        and descriptor is not None
-        and descriptor.supports_thinking is not None
+        and metadata_value("supports_reasoning") is not None
     ):
-        levels = levels if descriptor.supports_thinking else (ReasoningLevel.OFF,)
+        levels = levels if metadata_value("supports_reasoning") else (ReasoningLevel.OFF,)
     supports_temperature = bool(
-        descriptor.supports_temperature
-        if descriptor_has_metadata
-        and descriptor is not None
-        and descriptor.supports_temperature is not None
-        else rule.get(
-            "supports_temperature", fallback.get("supports_temperature", False)
-        )
+        metadata_value("supports_temperature")
+        if descriptor_has_metadata and metadata_value("supports_temperature") is not None
+        else rule_value("supports_temperature")
     )
-    if descriptor is not None and descriptor.supports_json_mode is not None:
-        supports_json_mode = bool(descriptor.supports_json_mode)
+    if descriptor_has_metadata and metadata_value("supports_json_mode") is not None:
+        supports_json_mode = bool(metadata_value("supports_json_mode"))
     elif descriptor is not None and descriptor.capabilities is not None:
         supports_json_mode = bool(descriptor.capabilities.structured_output)
     else:
-        supports_json_mode = bool(
-            rule.get("supports_json_mode", fallback.get("supports_json_mode", False))
-        )
-    if descriptor is not None and descriptor.supports_native_json_schema is not None:
-        supports_native_json_schema = bool(descriptor.supports_native_json_schema)
+        supports_json_mode = bool(rule_value("supports_json_mode"))
+    if descriptor_has_metadata and metadata_value("supports_native_json_schema") is not None:
+        supports_native_json_schema = bool(metadata_value("supports_native_json_schema"))
     else:
-        supports_native_json_schema = bool(
-            rule.get(
-                "supports_native_json_schema",
-                fallback.get("supports_native_json_schema", False),
-            )
-        )
+        supports_native_json_schema = bool(rule_value("supports_native_json_schema"))
+    reasoning_parameter = _coerce_reasoning_parameter(
+        metadata_value("reasoning_parameter")
+        if descriptor_has_metadata
+        and metadata is not None
+        and metadata_value("reasoning_parameter") != "none"
+        else rule_value("reasoning_parameter")
+    )
+    reasoning_toggle_parameter = _coerce_reasoning_toggle(
+        metadata_value("reasoning_toggle_parameter")
+        if descriptor_has_metadata
+        and metadata is not None
+        and metadata_value("reasoning_toggle_parameter") != "provider_default"
+        else rule_value("reasoning_toggle_parameter")
+    )
+    effective_source: CapabilitySource = (
+        metadata.evidence
+        if descriptor_has_metadata and metadata is not None and metadata.evidence != "fallback"
+        else "live"
+        if descriptor_has_metadata
+        else source
+    )
+    merged_aliases = list(
+        metadata_value("aliases") if descriptor_has_metadata else ()
+    )
+    merged_aliases.extend(rule_value("aliases") or ())
     return ModelCapabilities(
         input_token_limit=input_token_limit,
         output_token_limit=output_token_limit,
         supported_reasoning_levels=levels,
-        reasoning_parameter=_coerce_reasoning_parameter(
-            rule.get("reasoning_parameter", fallback.get("reasoning_parameter"))
-        ),
+        reasoning_parameter=reasoning_parameter,
+        reasoning_toggle_parameter=reasoning_toggle_parameter,
         supports_temperature=supports_temperature,
         supports_json_mode=supports_json_mode,
         supports_native_json_schema=supports_native_json_schema,
-        source="live" if descriptor_has_metadata else source,
+        source=effective_source,
+        semantic_model_id=(
+            str(metadata_value("semantic_model_id"))
+            if metadata_value("semantic_model_id")
+            else str(rule_value("semantic_model_id"))
+            if rule_value("semantic_model_id")
+            else None
+        ),
+        provider_model_id=descriptor.id if descriptor is not None else model,
+        aliases=tuple(
+            dict.fromkeys(str(item) for item in merged_aliases if str(item).strip())
+        ),
+        endpoint_family=(
+            str(metadata_value("endpoint_family"))
+            if descriptor_has_metadata and metadata_value("endpoint_family")
+            else str(rule_value("endpoint_family"))
+            if rule_value("endpoint_family")
+            else None
+        ),
+        supports_chat=(
+            bool(metadata_value("supports_chat"))
+            if descriptor_has_metadata and metadata_value("supports_chat") is not None
+            else _optional_bool(rule_value("supports_chat"))
+        ),
+        supports_streaming=(
+            bool(metadata_value("supports_streaming"))
+            if descriptor_has_metadata and metadata_value("supports_streaming") is not None
+            else _optional_bool(rule_value("supports_streaming"))
+        ),
+        supports_tools=(
+            bool(metadata_value("supports_tools"))
+            if descriptor_has_metadata and metadata_value("supports_tools") is not None
+            else _optional_bool(rule_value("supports_tools"))
+        ),
+        tool_call_mode=(
+            metadata.tool_call_mode
+            if descriptor_has_metadata
+            and metadata is not None
+            and metadata.tool_call_mode != "unsupported"
+            else _coerce_tool_call_mode(rule_value("tool_call_mode"))
+        ),
+        supports_tool_choice=(
+            metadata.supports_tool_choice
+            if descriptor_has_metadata
+            and metadata is not None
+            and metadata.supports_tool_choice is not None
+            else _optional_bool(rule_value("supports_tool_choice"))
+        ),
+        supports_parallel_tool_calls=(
+            metadata.supports_parallel_tool_calls
+            if descriptor_has_metadata and metadata is not None and metadata.supports_parallel_tool_calls is not None
+            else _optional_bool(rule_value("supports_parallel_tool_calls"))
+        ),
+        supports_top_p=(
+            metadata.supports_top_p
+            if descriptor_has_metadata and metadata is not None and metadata.supports_top_p is not None
+            else _optional_bool(rule_value("supports_top_p"))
+        ),
+        supports_usage_metadata=(
+            metadata.supports_usage_metadata
+            if descriptor_has_metadata and metadata is not None and metadata.supports_usage_metadata is not None
+            else _optional_bool(rule_value("supports_usage_metadata"))
+        ),
+        supports_finish_reason=(
+            metadata.supports_finish_reason
+            if descriptor_has_metadata and metadata is not None and metadata.supports_finish_reason is not None
+            else _optional_bool(rule_value("supports_finish_reason"))
+        ),
+        reasoning_counts_toward_output_limit=(
+            metadata.reasoning_counts_toward_output_limit
+            if descriptor_has_metadata and metadata is not None and metadata.reasoning_counts_toward_output_limit is not None
+            else _optional_bool(rule_value("reasoning_counts_toward_output_limit"))
+        ),
+        reasoning_unsupported_parameters=tuple(
+            str(item)
+            for item in (
+                metadata.reasoning_unsupported_parameters
+                if descriptor_has_metadata
+                and metadata is not None
+                and metadata.reasoning_unsupported_parameters
+                else rule_value("reasoning_unsupported_parameters") or ()
+            )
+            if str(item).strip()
+        ),
+        requires_reasoning_content_for_tool_calls=(
+            metadata.requires_reasoning_content_for_tool_calls
+            if descriptor_has_metadata
+            and metadata is not None
+            and metadata.requires_reasoning_content_for_tool_calls is not None
+            else _optional_bool(rule_value("requires_reasoning_content_for_tool_calls"))
+        ),
+        requires_assistant_content_for_tool_calls=(
+            metadata.requires_assistant_content_for_tool_calls
+            if descriptor_has_metadata
+            and metadata is not None
+            and metadata.requires_assistant_content_for_tool_calls is not None
+            else _optional_bool(rule_value("requires_assistant_content_for_tool_calls"))
+        ),
     )
+
+###############################################################################
+def _optional_bool(value: object) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    normalized = str(value).strip().lower()
+    if normalized in {"true", "yes", "1", "supported"}:
+        return True
+    if normalized in {"false", "no", "0", "unsupported"}:
+        return False
+    return None
+
+###############################################################################
+def _coerce_tool_call_mode(value: object) -> ToolCallMode:
+    normalized = str(value or "unsupported").strip().lower()
+    return normalized if normalized in {"native", "structured", "unsupported"} else "unsupported"  # type: ignore[return-value]
+
+###############################################################################
+def _coerce_reasoning_toggle(value: object) -> ReasoningToggle:
+    normalized = str(value or "provider_default").strip().lower()
+    allowed = {"none", "thinking", "reasoning", "provider_default"}
+    return normalized if normalized in allowed else "provider_default"  # type: ignore[return-value]
+
+###############################################################################
+def capability_metadata(
+    *, provider: str, model: str, descriptor: CloudModelDescriptor | None = None
+) -> ModelCapabilityMetadata:
+    """Return the transport-facing canonical metadata for a selected model."""
+
+    resolved = resolve_model_capabilities(
+        provider=provider,
+        model=model,
+        descriptor=descriptor,
+    )
+    return ModelCapabilityMetadata(
+        semantic_model_id=resolved.semantic_model_id,
+        aliases=resolved.aliases,
+        endpoint_family=resolved.endpoint_family,
+        context_window_tokens=resolved.input_token_limit,
+        max_output_tokens=resolved.output_token_limit,
+        supports_chat=resolved.supports_chat,
+        supports_streaming=resolved.supports_streaming,
+        supports_tools=resolved.supports_tools,
+        tool_call_mode=resolved.tool_call_mode,
+        supports_tool_choice=resolved.supports_tool_choice,
+        supports_parallel_tool_calls=resolved.supports_parallel_tool_calls,
+        supports_structured_output=resolved.supports_json_mode,
+        supports_json_mode=resolved.supports_json_mode,
+        supports_native_json_schema=resolved.supports_native_json_schema,
+        supports_reasoning=bool(
+            resolved.supported_reasoning_levels
+            and resolved.supported_reasoning_levels != (ReasoningLevel.OFF,)
+        ),
+        reasoning_levels=tuple(level.value for level in resolved.supported_reasoning_levels),
+        reasoning_parameter=resolved.reasoning_parameter,
+        reasoning_toggle_parameter=resolved.reasoning_toggle_parameter,
+        reasoning_counts_toward_output_limit=resolved.reasoning_counts_toward_output_limit,
+        reasoning_unsupported_parameters=resolved.reasoning_unsupported_parameters,
+        requires_reasoning_content_for_tool_calls=(
+            resolved.requires_reasoning_content_for_tool_calls
+        ),
+        requires_assistant_content_for_tool_calls=(
+            resolved.requires_assistant_content_for_tool_calls
+        ),
+        supports_temperature=resolved.supports_temperature,
+        supports_top_p=resolved.supports_top_p,
+        supports_usage_metadata=resolved.supports_usage_metadata,
+        supports_finish_reason=resolved.supports_finish_reason,
+        evidence=(
+            resolved.source
+            if resolved.source in {"documented", "probe", "provider", "fallback"}
+            else "catalog"
+        ),
+    )
+
+###############################################################################
+def catalog_capability_metadata(
+    raw_item: object, *, endpoint_family: str | None = None
+) -> ModelCapabilityMetadata:
+    """Parse common provider catalog capability keys into the shared contract."""
+
+    if not isinstance(raw_item, Mapping):
+        return ModelCapabilityMetadata(endpoint_family=endpoint_family)
+    item = dict(raw_item)
+    nested = item.get("capabilities")
+    capabilities = dict(nested) if isinstance(nested, Mapping) else {}
+
+    def pick(*names: str) -> object:
+        for name in names:
+            if name in item and item[name] is not None:
+                return item[name]
+            if name in capabilities and capabilities[name] is not None:
+                return capabilities[name]
+        return None
+
+    def optional_bool(*names: str) -> bool | None:
+        value = pick(*names)
+        return _optional_bool(value)
+
+    values: dict[str, object] = {}
+    string_fields = {
+        "semantic_model_id": ("semantic_model_id", "canonical_model", "canonical_id"),
+        "endpoint_family": ("endpoint_family", "endpoint"),
+        "reasoning_parameter": ("reasoning_parameter",),
+        "reasoning_toggle_parameter": (
+            "reasoning_toggle_parameter",
+            "reasoning_toggle",
+            "thinking_parameter",
+        ),
+        "tool_call_mode": ("tool_call_mode",),
+    }
+    for target, names in string_fields.items():
+        value = (
+            endpoint_family
+            if target == "endpoint_family" and endpoint_family is not None
+            else pick(*names)
+        )
+        if value is not None and not isinstance(value, (dict, list, tuple)):
+            values[target] = str(value)
+
+    aliases = pick("aliases", "model_aliases")
+    if isinstance(aliases, str):
+        values["aliases"] = (aliases,)
+    elif isinstance(aliases, (list, tuple)):
+        values["aliases"] = tuple(str(item) for item in aliases if str(item).strip())
+
+    reasoning_levels = pick("reasoning_levels", "supported_reasoning_levels")
+    if isinstance(reasoning_levels, (list, tuple)):
+        values["reasoning_levels"] = tuple(
+            str(level) for level in reasoning_levels if str(level).strip()
+        )
+
+    integer_fields = {
+        "context_window_tokens": (
+            "context_window_tokens",
+            "context_window",
+            "input_token_limit",
+            "max_input_tokens",
+        ),
+        "max_output_tokens": (
+            "max_output_tokens",
+            "output_token_limit",
+        ),
+    }
+    for target, names in integer_fields.items():
+        value = pick(*names)
+        parsed = _coerce_optional_positive_int(value)
+        if parsed is not None:
+            values[target] = parsed
+
+    bool_fields = {
+        "supports_chat": ("supports_chat", "chat"),
+        "supports_streaming": ("supports_streaming", "streaming"),
+        "supports_tools": ("supports_tools", "tools", "tool_calling"),
+        "supports_tool_choice": ("supports_tool_choice", "tool_choice"),
+        "supports_parallel_tool_calls": (
+            "supports_parallel_tool_calls",
+            "parallel_tool_calls",
+        ),
+        "supports_structured_output": (
+            "supports_structured_output",
+            "structured_output",
+            "structured_outputs",
+        ),
+        "supports_json_mode": ("supports_json_mode", "json_mode"),
+        "supports_native_json_schema": (
+            "supports_native_json_schema",
+            "native_json_schema",
+            "json_schema",
+        ),
+        "supports_reasoning": ("supports_reasoning", "reasoning", "thinking"),
+        "supports_temperature": ("supports_temperature", "temperature"),
+        "supports_top_p": ("supports_top_p", "top_p"),
+        "supports_usage_metadata": ("supports_usage_metadata", "usage"),
+        "supports_finish_reason": ("supports_finish_reason", "finish_reason"),
+        "reasoning_counts_toward_output_limit": (
+            "reasoning_counts_toward_output_limit",
+            "reasoning_counts_toward_output",
+        ),
+        "requires_reasoning_content_for_tool_calls": (
+            "requires_reasoning_content_for_tool_calls",
+            "requires_reasoning_content",
+        ),
+        "requires_assistant_content_for_tool_calls": (
+            "requires_assistant_content_for_tool_calls",
+            "requires_assistant_content",
+        ),
+    }
+    for target, names in bool_fields.items():
+        parsed = optional_bool(*names)
+        if parsed is not None:
+            values[target] = parsed
+
+    unsupported = pick(
+        "reasoning_unsupported_parameters", "unsupported_reasoning_parameters"
+    )
+    if isinstance(unsupported, (list, tuple)):
+        values["reasoning_unsupported_parameters"] = tuple(
+            str(parameter) for parameter in unsupported if str(parameter).strip()
+        )
+    if "tool_call_mode" not in values and values.get("supports_tools") is True:
+        values["tool_call_mode"] = "native"
+    if values:
+        values["evidence"] = "provider"
+    return ModelCapabilityMetadata.model_validate(values)
+
+###############################################################################
+def enrich_model_descriptor(
+    *, provider: str, descriptor: CloudModelDescriptor
+) -> CloudModelDescriptor:
+    """Merge live descriptor data with the canonical static model contract."""
+
+    metadata = capability_metadata(
+        provider=provider,
+        model=descriptor.id,
+        descriptor=descriptor,
+    )
+    return CloudModelDescriptor.model_validate(
+        {
+            **descriptor.model_dump(mode="python"),
+            "model_capabilities": metadata.model_dump(mode="python"),
+            "endpoint_family": descriptor.endpoint_family or metadata.endpoint_family,
+            "input_token_limit": descriptor.input_token_limit or metadata.context_window_tokens,
+            "output_token_limit": descriptor.output_token_limit or metadata.max_output_tokens,
+            "supports_thinking": descriptor.supports_thinking
+            if descriptor.supports_thinking is not None
+            else metadata.supports_reasoning,
+            "supports_temperature": descriptor.supports_temperature
+            if descriptor.supports_temperature is not None
+            else metadata.supports_temperature,
+            "supports_json_mode": descriptor.supports_json_mode
+            if descriptor.supports_json_mode is not None
+            else metadata.supports_json_mode,
+            "supports_native_json_schema": descriptor.supports_native_json_schema
+            if descriptor.supports_native_json_schema is not None
+            else metadata.supports_native_json_schema,
+        }
+    )
+
+###############################################################################
+def resolve_endpoint_family(*, provider: str, model: str) -> str | None:
+    """Resolve a cataloged transport family without creating a live request."""
+
+    return resolve_model_capabilities(provider=provider, model=model).endpoint_family
 
 ###############################################################################
 def _select_supported_reasoning_level(

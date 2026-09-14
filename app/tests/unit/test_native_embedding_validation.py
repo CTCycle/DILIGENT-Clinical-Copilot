@@ -6,6 +6,7 @@ import services.llm.cloud as cloud_module
 from services.llm.ollama_chat import normalize_embedding_payload
 from services.llm.ollama_client import OllamaClient, OllamaError
 
+
 ###############################################################################
 def test_ollama_embedding_payload_returns_normalized_float_vectors(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
@@ -13,7 +14,6 @@ def test_ollama_embedding_payload_returns_normalized_float_vectors(monkeypatch) 
 
     async def fake_ready(model: str) -> None:
         _ = model
-        return None
 
     ###############################################################################
     class FakeResponse:
@@ -63,7 +63,7 @@ def test_ollama_embedding_payload_validation_errors() -> None:
 def test_openai_embedding_response_sorting_by_index_is_preserved(monkeypatch) -> None:
 
     ###############################################################################
-    class FakeAsyncOpenAI:
+    class FakeResponsesTransport:
 
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs) -> None:
@@ -73,7 +73,7 @@ def test_openai_embedding_response_sorting_by_index_is_preserved(monkeypatch) ->
         async def close(self) -> None:
             return None
 
-    monkeypatch.setattr(cloud_module, "AsyncOpenAI", FakeAsyncOpenAI)
+    monkeypatch.setattr(cloud_module, "OpenAIResponsesTransport", FakeResponsesTransport)
     monkeypatch.setattr(
         cloud_module.CloudLLMClient,
         "resolve_provider_access_key",
@@ -119,37 +119,17 @@ def test_openai_embedding_response_sorting_by_index_is_preserved(monkeypatch) ->
 def test_gemini_embedding_response_count_mismatch_raises(monkeypatch) -> None:
 
     ###############################################################################
-    class FakeGenerateContentConfig:
-
-        # -------------------------------------------------------------------------
-        def __init__(self, **kwargs) -> None:
-            self.kwargs = kwargs
-
-    ###############################################################################
-    class FakeHttpOptions:
-
-        # -------------------------------------------------------------------------
-        def __init__(self, **kwargs) -> None:
-            self.kwargs = kwargs
-
-    ###############################################################################
     class FakeGeminiClient:
 
         # -------------------------------------------------------------------------
         def __init__(self, **kwargs) -> None:
             self.kwargs = kwargs
 
-    ###############################################################################
-    class FakeGenAI:
-        Client = FakeGeminiClient
+        # -------------------------------------------------------------------------
+        async def close(self) -> None:
+            return None
 
-    ###############################################################################
-    class FakeTypes:
-        GenerateContentConfig = FakeGenerateContentConfig
-        HttpOptions = FakeHttpOptions
-
-    monkeypatch.setattr(cloud_module, "genai", FakeGenAI)
-    monkeypatch.setattr(cloud_module, "genai_types", FakeTypes)
+    monkeypatch.setattr(cloud_module, "GeminiTransport", FakeGeminiClient)
     monkeypatch.setattr(
         cloud_module.CloudLLMClient,
         "resolve_provider_access_key",

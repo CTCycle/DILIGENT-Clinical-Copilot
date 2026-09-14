@@ -34,6 +34,9 @@ from services.inspection.revision_tools import RevisionToolRegistry
 from services.llm.provider_factory import select_llm_provider
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.generation_policy import GenerationPurpose
+from services.llm.model_capabilities import resolve_model_capabilities
+from services.llm.tool_loop import ToolLoopExecutor, ToolLoopResult
+from domain.llm.transports import ChatMessage
 from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.knowledge_repository import KnowledgeRepository
 from repositories.session_revision_repository import SessionRevisionRepository
@@ -49,12 +52,17 @@ MAX_REPORT_CHARS = 20000
 MAX_JSON_CHARS = 30000
 
 StructuredCall = Callable[..., Any]
+StopCheck = Callable[[], bool]
 
 ###############################################################################
 @dataclass(frozen=True)
 class RevisionAgentRuntime:
     provider: str
     model: str
+
+###############################################################################
+class RevisionAgentCancelled(RuntimeError):
+    """Raised when a revision job is cancelled at a cooperative checkpoint."""
 
 ###############################################################################
 def _clip_text(value: Any, limit: int) -> str:
@@ -295,9 +303,10 @@ class RevisionAgentRunner:
         session: dict[str, Any],
         request: SessionRevisionRequest,
         model_configuration: dict[str, Any],
+        stop_check: StopCheck | None = None,
     ) -> dict[str, Any]:
-        del job_id
         runtime = resolve_revision_agent_runtime()
+        self._raise_if_stopped(stop_check)
         lineage = self.session_revision_repository.list_session_versions(
             int(session["session_id"])
         )
@@ -322,6 +331,20 @@ class RevisionAgentRunner:
             context=context,
         )
         manifest = registry.manifest(request.allowed_tools)
+        native_tool_definitions = registry.tool_definitions(request.allowed_tools)
+        capabilities = resolve_model_capabilities(
+            provider=runtime.provider,
+            model=runtime.model,
+            descriptor=LLMRuntimeConfig.get_model_descriptor(
+                runtime.provider, runtime.model
+            ),
+        )
+        use_native_tools = (
+            self.structured_call is None
+            and bool(native_tool_definitions)
+            and capabilities.supports_tools is True
+            and capabilities.tool_call_mode == "native"
+        )
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
@@ -334,6 +357,7 @@ class RevisionAgentRunner:
             RevisionAgentPlan,
             purpose=GenerationPurpose.REVISION_PLANNING,
         )
+        self._raise_if_stopped(stop_check)
         plan.tasks = plan.tasks[: request.max_tasks]
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
@@ -344,6 +368,10 @@ class RevisionAgentRunner:
         observations: list[dict[str, Any]] = []
         tool_calls = 0
         for task_index, task in enumerate(plan.tasks, start=1):
+            self._raise_if_stopped(stop_check)
+            remaining_tool_calls = request.max_tool_iterations - tool_calls
+            if remaining_tool_calls <= 0:
+                break
             step = self.session_revision_repository.start_revision_step(
                 pipeline_run_id=pipeline_run_id,
                 step_name=f"revision_agent_task_{task_index}",
@@ -361,33 +389,51 @@ class RevisionAgentRunner:
             attempt = int(step["attempt_number"])
             task_observations: list[dict[str, Any]] = []
             try:
-                for _ in range(request.max_tool_iterations - tool_calls):
-                    decision = self._call_schema(
-                        runtime,
-                        tool_prompt(
-                            task.model_dump(mode="json"), task_observations, manifest
-                        ),
-                        RevisionAgentToolCall,
-                        purpose=GenerationPurpose.REVISION_TOOL_SELECTION,
+                self._raise_if_stopped(stop_check)
+                if use_native_tools:
+                    native_result = self._run_native_tool_task(
+                        runtime=runtime,
+                        task=task,
+                        manifest=manifest,
+                        tools=native_tool_definitions,
+                        registry=registry,
+                        max_tool_calls=remaining_tool_calls,
+                        stop_check=stop_check,
                     )
-                    if decision.task_complete:
-                        break
-                    try:
-                        observation = registry.execute(
-                            decision.tool_name,
-                            decision.arguments,
-                            request.allowed_tools,
+                    task_observations.extend(native_result.observations)
+                    observations.extend(native_result.observations)
+                    tool_calls += native_result.tool_call_count
+                    if native_result.stopped:
+                        raise RevisionAgentCancelled("Revision job cancelled.")
+                else:
+                    for _ in range(remaining_tool_calls):
+                        self._raise_if_stopped(stop_check)
+                        decision = self._call_schema(
+                            runtime,
+                            tool_prompt(
+                                task.model_dump(mode="json"), task_observations, manifest
+                            ),
+                            RevisionAgentToolCall,
+                            purpose=GenerationPurpose.REVISION_TOOL_SELECTION,
                         )
-                    except ValueError as exc:
-                        observation = {
-                            "error": str(exc),
-                            "invalid_tool_input": True,
-                        }
-                    task_observations.append(
-                        {"tool": decision.tool_name, "observation": observation}
-                    )
-                    observations.append(task_observations[-1])
-                    tool_calls += 1
+                        if decision.task_complete:
+                            break
+                        try:
+                            observation = registry.execute(
+                                decision.tool_name,
+                                decision.arguments,
+                                request.allowed_tools,
+                            )
+                        except ValueError as exc:
+                            observation = {
+                                "error": str(exc),
+                                "invalid_tool_input": True,
+                            }
+                        task_observations.append(
+                            {"tool": decision.tool_name, "observation": observation}
+                        )
+                        observations.append(task_observations[-1])
+                        tool_calls += 1
                 self.session_revision_repository.complete_revision_step(
                     pipeline_run_id=pipeline_run_id,
                     step_name=f"revision_agent_task_{task_index}",
@@ -406,12 +452,14 @@ class RevisionAgentRunner:
                 raise
             if tool_calls >= request.max_tool_iterations:
                 break
+        self._raise_if_stopped(stop_check)
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
             artifact_key="revision_agent_tool_trace",
             payload={"observations": observations},
         )
+        self._raise_if_stopped(stop_check)
         draft = self._call_schema(
             runtime,
             editor_prompt(context, observations),
@@ -448,6 +496,7 @@ class RevisionAgentRunner:
             RevisionAgentQaResult,
             purpose=GenerationPurpose.REVISION_QA,
         )
+        self._raise_if_stopped(stop_check)
         clinical_safety_issues = audit_revised_dili_report(
             session=session,
             report_text=applied_report,
@@ -544,6 +593,70 @@ class RevisionAgentRunner:
         }
 
     # -------------------------------------------------------------------------
+    def _run_native_tool_task(
+        self,
+        *,
+        runtime: RevisionAgentRuntime,
+        task: Any,
+        manifest: list[str],
+        tools: list[Any],
+        registry: RevisionToolRegistry,
+        max_tool_calls: int,
+        stop_check: StopCheck | None,
+    ) -> ToolLoopResult:
+        async def run() -> ToolLoopResult:
+            client = select_llm_provider(
+                provider=runtime.provider,
+                default_model=runtime.model,
+            )
+            try:
+                executor = ToolLoopExecutor(
+                    chat=client.chat_result,  # type: ignore[attr-defined]
+                    execute=lambda name, arguments: registry.execute(
+                        name, arguments, manifest
+                    ),
+                    max_iterations=max(1, max_tool_calls),
+                    max_tool_calls=max(1, max_tool_calls),
+                    stop_check=stop_check,
+                )
+                try:
+                    return await executor.run(
+                        model=runtime.model,
+                        messages=[
+                            ChatMessage(
+                                role="system",
+                                content=REVISION_AGENT_SYSTEM_PROMPT,
+                            ),
+                            ChatMessage(
+                                role="user",
+                                content=tool_prompt(
+                                    task.model_dump(mode="json"), [], manifest
+                                ),
+                            ),
+                        ],
+                        tools=tools,
+                        purpose=GenerationPurpose.REVISION_TOOL_SELECTION,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    if getattr(exc, "error_code", None) == "cancelled" or (
+                        stop_check is not None and stop_check()
+                    ):
+                        raise RevisionAgentCancelled("Revision job cancelled.") from exc
+                    raise
+            finally:
+                close = getattr(client, "close", None)
+                if close is not None:
+                    await close()
+
+        return asyncio.run(run())
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _raise_if_stopped(stop_check: StopCheck | None) -> None:
+        if stop_check is not None and stop_check():
+            raise RevisionAgentCancelled("Revision job cancelled.")
+
+    # -------------------------------------------------------------------------
     def _call_schema(
         self,
         runtime: RevisionAgentRuntime,
@@ -565,17 +678,23 @@ class RevisionAgentRunner:
         client = select_llm_provider(
             provider=runtime.provider, default_model=runtime.model
         )
-        return asyncio.run(
-            client.llm_structured_call(
-                model=runtime.model,
-                system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
-                user_prompt=user_prompt,
-                schema=schema,
-                purpose=purpose,
-                use_json_mode=True,
-                max_repair_attempts=3,
-            )
-        )
+        async def call() -> Any:
+            try:
+                return await client.llm_structured_call(
+                    model=runtime.model,
+                    system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
+                    user_prompt=user_prompt,
+                    schema=schema,
+                    purpose=purpose,
+                    use_json_mode=True,
+                    max_repair_attempts=3,
+                )
+            finally:
+                close = getattr(client, "close", None)
+                if close is not None:
+                    await close()
+
+        return asyncio.run(call())
 
     # -------------------------------------------------------------------------
     def _run_structured_scan(
@@ -600,14 +719,20 @@ class RevisionAgentRunner:
             provider=runtime.provider,
             default_model=runtime.model,
         )
-        return asyncio.run(
-            client.llm_structured_call(
-                model=runtime.model,
-                system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
-                user_prompt=user_prompt,
-                schema=RevisionIssueScanResult,
-                purpose=GenerationPurpose.REVISION_SCAN,
-                use_json_mode=True,
-                max_repair_attempts=3,
-            )
-        )
+        async def call() -> RevisionIssueScanResult:
+            try:
+                return await client.llm_structured_call(
+                    model=runtime.model,
+                    system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
+                    user_prompt=user_prompt,
+                    schema=RevisionIssueScanResult,
+                    purpose=GenerationPurpose.REVISION_SCAN,
+                    use_json_mode=True,
+                    max_repair_attempts=3,
+                )
+            finally:
+                close = getattr(client, "close", None)
+                if close is not None:
+                    await close()
+
+        return asyncio.run(call())

@@ -11,16 +11,16 @@ The exact source commit is intentionally read from git (`git rev-parse
 develop`) rather than duplicated here, so this index does not become a stale
 branch-status record.
 
-- Backend, frontend, and desktop source manifests report version `3.3.0`.
+- Backend, frontend, and desktop source manifests report synchronized candidate version `3.4.0`.
 - Release versions use strict `major.minor.patch` SemVer and must remain synchronized across the frontend, backend, and desktop manifests; the backend exposes the frontend package version unless `DILIGENT_RELEASE_VERSION` is explicitly set for packaging.
-- The `v3.3.0` desktop release target is created from the synchronized `main` branch. Its portable EXE, MSI, and published checksum manifest require independent artifact, tag, remote-release, and download/hash verification.
+- The latest published desktop release is `v3.3.0`; `3.4.0` is an unpublished release candidate. Its portable EXE, MSI, checksum manifest, synchronized source/tag state, hosted CI, full browser/provider E2E, vulnerability review, and Windows host smoke evidence are independent gates.
 - Model configuration reads are cache-only and non-cacheable. Provider contact is limited to explicit catalog load/refresh operations, and catalog attempts persist in `provider_model_catalog_cache`.
 - The revision workflow is a bounded, persisted agentic workflow with context, planning, allow-listed tool traces, deterministic patch validation, QA, artifacts, and optional `agentic_revision` session finalization.
 - Running job cancellation is cooperative: pending jobs can become terminal immediately, while a running stop-requested worker remains active and occupies its concurrency scope until it exits.
 - The standard CI workflow runs the existing Angular/Vitest suite with `npm run test -- --no-watch` in addition to the frontend build.
 - Deterministic hepatic injury-pattern calculation is shared by the clinical workflow and DILI evidence; nonqualifying laboratory pairs remain indeterminate rather than being promoted to a qualifying anchor.
 - Combined structured-source updates are backend-owned and ordered RxNav -> LiverTox -> DILIrank; RAG has a separate job and control. RxNav and LiverTox source-owned records are reconciled only after a complete successful snapshot is prepared.
-- Desktop tag publication is gated by a preflight that requires the tag SHA to equal `origin/main` and passes backend, frontend, and browser regression checks before packaging.
+- Desktop tag publication is gated by a preflight that requires the tag SHA to equal `origin/main` and passes backend, frontend, full browser/provider E2E, vulnerability review, packaging, and Windows EXE/MSI smoke checks before publication.
 - Angular page and component state uses signals/computed state in current model-configuration, access-key, and clinical-session preview surfaces.
 - The primary UI navigation has four workspaces: DILI Agent, Clinical Sessions, Data Inspection, and Configurations; Patient Timeline is opened from a selected session's Timeline tab.
 - FDA DILIrank 2.0 is a structured drug-level hepatotoxicity knowledge source. Its complete source snapshot is persisted separately, only canonical or trusted LiverTox/RxNorm identity links are eligible for clinical use, and unlinked or ambiguous source rows remain inspectable without becoming patient-level causality evidence.
