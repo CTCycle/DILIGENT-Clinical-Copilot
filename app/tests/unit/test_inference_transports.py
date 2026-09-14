@@ -10,6 +10,7 @@ from services.llm.transports.gemini import GeminiTransport
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
 
+
 ###############################################################################
 class FakeOpenAIChatResponse:
 

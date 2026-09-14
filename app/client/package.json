@@ -1,6 +1,6 @@
 {
   "name": "diligent-client",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "private": true,
   "scripts": {
     "ng": "ng",
@@ -25,12 +25,12 @@
     "tslib": "^2.3.0"
   },
   "devDependencies": {
-    "@angular/build": "21.2.20",
-    "@angular/cli": "21.2.20",
+    "@angular/build": "21.2.24",
+    "@angular/cli": "21.2.24",
     "@angular/compiler-cli": "21.2.20",
     "@types/node": "^25.9.3",
     "jsdom": "^29.1.0",
     "typescript": "~5.9.2",
-    "vitest": "4.1.7"
+    "vitest": "4.1.11"
   }
 }

@@ -1,5 +1,5 @@
 # Local Deployment
-Last updated: 2026-09-01
+Last updated: 2026-09-13
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
@@ -42,16 +42,16 @@ Last updated: 2026-09-01
 
 ## Windows desktop distribution
 
-Build from a Windows x64 host with Rust/Cargo, the Windows build toolchain, and the pinned frontend/backend dependencies. The current source manifests report version `3.3.0`:
+Build from a Windows x64 host with Rust/Cargo, the Windows build toolchain, and the pinned frontend/backend dependencies. The current source manifests report synchronized unpublished candidate version `3.4.0`:
 
 ```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.3.0 -DesktopTarget All -Force
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.4.0 -DesktopTarget All
 ```
 
 The build produces `DILIGENT-v<version>-windows-x64-portable.exe`, `DILIGENT-v<version>-windows-x64.msi`, and a matching `.sha256` file under `release/`. The portable EXE is a single-file Tauri distribution; the MSI installs the same shell and packaged runtime. Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Add `-OfflineWebView2` only for an MSI when an offline WebView2 installer is required. Release builds reject dirty worktrees unless `-AllowDirtyTree` is supplied.
 
 The portable executable embeds the PyInstaller backend and deterministic runtime archive. At runtime it extracts immutable content to `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>`, starts the backend on a random localhost port, and keeps mutable user data under `%LOCALAPPDATA%\DILIGENT\data`. It uses the system WebView2 runtime. MSI uninstall removes installed program files but preserves `%LOCALAPPDATA%\DILIGENT\data`.
 
-Before distribution, verify the `.sha256` file and perform a Windows host smoke test of the portable EXE. Clean-machine, MSI upgrade/uninstall, WebView2 offline, code-signing, and enterprise deployment tests are separate release gates.
+Before distribution, verify the `.sha256` file and perform the tracked Windows host smoke script for the portable EXE and MSI. Clean-machine, MSI upgrade/uninstall, WebView2 offline, code-signing, and enterprise deployment tests remain separate release gates.
 
-Pushing the annotated `v3.3.0` tag invokes `.github/workflows/release.yml` on Windows. The workflow rebuilds both desktop targets from the tag and attaches the portable EXE, MSI, and checksum manifest to the corresponding GitHub Release.
+The annotated `v3.4.0` tag must not be created until hosted CI, full browser and live-provider E2E, vulnerability-scan review, and Windows EXE/MSI smoke evidence are green and `main` is intentionally synchronized with the candidate source. Pushing that tag later invokes `.github/workflows/release.yml` on Windows; this session does not create or publish it.

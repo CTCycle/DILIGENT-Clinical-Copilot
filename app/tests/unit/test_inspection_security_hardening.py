@@ -332,7 +332,7 @@ def test_rag_cancel_route_uses_delete_only() -> None:
     app.include_router(data_inspection.router)
     routes = {
         (method, getattr(route, "path", ""))
-        for route in app.routes
+        for route in data_inspection.router.routes
         for method in getattr(route, "methods", set()) or set()
     }
 
@@ -344,7 +344,7 @@ def test_reference_catalog_runtime_observation_routes_are_registered() -> None:
     app = FastAPI()
     app.include_router(data_inspection.router)
     routes: set[tuple[str, str]] = set()
-    for route in app.routes:
+    for route in data_inspection.router.routes:
         path = getattr(route, "path", "")
         if not path.startswith("/inspection/"):
             continue

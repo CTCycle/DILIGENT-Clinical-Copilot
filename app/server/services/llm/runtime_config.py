@@ -13,7 +13,7 @@ from common.catalogs.model_choices import (
     get_text_extraction_model_choices,
 )
 from domain.model_configs import ModelConfigSnapshot, ReasoningLevel
-from domain.llm.providers import CloudProviderId
+from domain.llm.providers import CloudModelDescriptor, CloudProviderId
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
@@ -373,6 +373,13 @@ class LLMRuntimeConfig:
         policy: GenerationPolicy,
         effective: EffectiveInferenceConfig,
     ) -> dict[str, object]:
+        capabilities = resolve_model_capabilities(
+            provider=effective.provider,
+            model=effective.model,
+            descriptor=LLMRuntimeConfig.get_model_descriptor(
+                effective.provider, effective.model
+            ),
+        )
         return {
             "policy_id": policy.policy_id,
             "policy_version": policy.policy_version,
@@ -396,7 +403,25 @@ class LLMRuntimeConfig:
             "output_token_limit": effective.output_token_limit,
             "context_safety_reserve": effective.context_safety_reserve,
             "context_selection_report": dict(effective.context_selection_report),
+            "model_capabilities": LLMRuntimeConfig._capability_snapshot(capabilities),
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _capability_snapshot(capabilities: object) -> dict[str, object]:
+        values = dict(getattr(capabilities, "__dict__", {}))
+        normalized: dict[str, object] = {}
+        for key, value in values.items():
+            if isinstance(value, tuple):
+                normalized[key] = [
+                    item.value if isinstance(item, ReasoningLevel) else item
+                    for item in value
+                ]
+            elif isinstance(value, ReasoningLevel):
+                normalized[key] = value.value
+            else:
+                normalized[key] = value
+        return normalized
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -432,6 +457,7 @@ class LLMRuntimeConfig:
         timeline_complexity: str = "moderate",
         runtime_context_limit: int | None = None,
         selected_input_tokens: int = 0,
+        descriptor: CloudModelDescriptor | None = None,
     ) -> EffectiveInferenceConfig:
         policy = cls.resolve_generation_policy(
             purpose=purpose,
@@ -440,13 +466,35 @@ class LLMRuntimeConfig:
             user_reasoning_level=user_reasoning_level,
             timeline_complexity=timeline_complexity,
         )
-        capabilities = resolve_model_capabilities(provider=provider, model=model)
+        capabilities = resolve_model_capabilities(
+            provider=provider,
+            model=model,
+            descriptor=descriptor or cls.get_model_descriptor(provider, model),
+        )
         return resolve_effective_config(
             policy=policy,
             capabilities=capabilities,
             runtime_context_limit=runtime_context_limit,
             selected_input_tokens=selected_input_tokens,
         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def get_model_descriptor(
+        cls, provider: str, model: str
+    ) -> CloudModelDescriptor | None:
+        """Read the last successful catalog descriptor without making a request."""
+
+        try:
+            record = model_catalog.load_catalog_record(
+                ProviderModelCatalogCacheSerializer(), provider  # type: ignore[arg-type]
+            )
+        except Exception:
+            return None
+        for descriptor in model_catalog.cloud_models_from_record(record):
+            if descriptor.id == model:
+                return descriptor
+        return None
 
     # -------------------------------------------------------------------------
     @classmethod

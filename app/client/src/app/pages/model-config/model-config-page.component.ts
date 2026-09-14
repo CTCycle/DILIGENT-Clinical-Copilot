@@ -20,6 +20,7 @@ import {
   AccessKeyProvider,
   CatalogProvider,
   CloudProvider,
+  CloudModelDescriptor,
   ModelConfigStateResponse,
   ModelConfigPersistResponse,
   ModelConfigUpdateRequest,
@@ -237,6 +238,12 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     this.cloudProviders().find((provider) => provider.id === this.draftProvider()) || null,
   );
 
+  readonly selectedCloudModelDescriptor = computed<CloudModelDescriptor | null>(() => {
+    const model = this.draftCloudModel();
+    if (!model) return null;
+    return this.selectedCloudProvider()?.models.find((candidate) => candidate.id === model) || null;
+  });
+
   readonly cloudCatalogMessage = computed(() => {
     const provider = this.selectedCloudProvider();
     if (!provider) return '';
@@ -305,9 +312,29 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     if (draft.useCloudServices) {
       const providerLabel = resolveProviderLabel(this.draftProvider(), this.cloudProviders());
       const modelName = this.draftCloudModel() || draft.cloudModel;
-      return modelName
-        ? `Cloud model selected: ${modelName} (${providerLabel}). Provider-supplied model details are not available.`
-        : `No cloud model is selected for ${providerLabel}.`;
+      if (!modelName) return `No cloud model is selected for ${providerLabel}.`;
+      const descriptor = this.selectedCloudModelDescriptor();
+      const metadata = descriptor?.model_capabilities;
+      if (!metadata) {
+        return `Cloud model selected: ${modelName} (${providerLabel}).`;
+      }
+      const semantic = metadata.semantic_model_id && metadata.semantic_model_id !== modelName
+        ? ` Semantic model: ${metadata.semantic_model_id}.`
+        : '';
+      const context = metadata.context_window_tokens
+        ? ` Context: ${this.formatTokenCount(metadata.context_window_tokens)}.`
+        : '';
+      const output = metadata.max_output_tokens
+        ? ` Max output: ${this.formatTokenCount(metadata.max_output_tokens)}.`
+        : '';
+      const features = [
+        metadata.supports_streaming ? 'streaming' : '',
+        metadata.supports_tools ? 'tools' : '',
+        metadata.supports_json_mode ? 'JSON' : '',
+        metadata.supports_reasoning ? 'reasoning' : '',
+      ].filter(Boolean).join(', ');
+      const featureSummary = features ? ` Features: ${features}.` : '';
+      return `Cloud model selected: ${modelName} (${providerLabel}).${semantic}${context}${output}${featureSummary}`;
     }
     const selectedNames = [
       draft.clinicalModel,
@@ -324,6 +351,21 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     }
     return 'Select an installed model to show catalog details here.';
   });
+
+  cloudModelDescriptor(modelName: string): CloudModelDescriptor | null {
+    return this.selectedCloudProvider()?.models.find((model) => model.id === modelName) || null;
+  }
+
+  cloudModelContextLabel(modelName: string): string {
+    const tokens = this.cloudModelDescriptor(modelName)?.model_capabilities?.context_window_tokens;
+    return tokens ? this.formatTokenCount(tokens) : 'Provider default';
+  }
+
+  private formatTokenCount(tokens: number): string {
+    if (tokens >= 1_000_000) return `${tokens / 1_000_000}M tokens`;
+    if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}K tokens`;
+    return `${tokens} tokens`;
+  }
 
   readonly cloudProviderOptions = computed<CloudProvider[]>(() => {
     return this.cloudProviders().map((provider) => provider.id);

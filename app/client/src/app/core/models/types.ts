@@ -143,6 +143,36 @@ export type CloudModelDescriptor = {
   output_token_limit: number | null;
   supports_thinking: boolean | null;
   supports_temperature: boolean | null;
+  model_capabilities?: ModelCapabilityMetadata;
+};
+
+export type ModelCapabilityMetadata = {
+  semantic_model_id: string | null;
+  aliases: string[];
+  endpoint_family: string | null;
+  context_window_tokens: number | null;
+  max_output_tokens: number | null;
+  supports_chat: boolean | null;
+  supports_streaming: boolean | null;
+  supports_tools: boolean | null;
+  tool_call_mode: 'native' | 'structured' | 'unsupported';
+  supports_tool_choice: boolean | null;
+  supports_parallel_tool_calls: boolean | null;
+  supports_structured_output: boolean | null;
+  supports_json_mode: boolean | null;
+  supports_native_json_schema: boolean | null;
+  supports_reasoning: boolean | null;
+  reasoning_levels: string[];
+  reasoning_parameter: string;
+  reasoning_counts_toward_output_limit: boolean | null;
+  reasoning_unsupported_parameters: string[];
+  requires_reasoning_content_for_tool_calls: boolean | null;
+  requires_assistant_content_for_tool_calls: boolean | null;
+  supports_temperature: boolean | null;
+  supports_top_p: boolean | null;
+  supports_usage_metadata: boolean | null;
+  supports_finish_reason: boolean | null;
+  evidence: 'catalog' | 'documented' | 'probe' | 'provider' | 'fallback';
 };
 
 export type CloudProviderDescriptor = {

@@ -4,7 +4,10 @@ import uuid
 from typing import Any
 
 from domain.inspection import SessionRevisionRequest
-from services.inspection.revision_agent import resolve_revision_agent_runtime
+from services.inspection.revision_agent import (
+    RevisionAgentCancelled,
+    resolve_revision_agent_runtime,
+)
 
 REVISION_JOB_MISSING_STATUS_MESSAGE = (
     "Revision job worker is no longer available. Reload the persisted revision run "
@@ -38,8 +41,14 @@ class InspectionRevisionScaffoldMixin:
     def _run_revision_agent(self, **kwargs: Any) -> dict[str, Any]:
         pipeline_run_id = str(kwargs["pipeline_run_id"])
         job_id = str(kwargs["job_id"])
+        kwargs["stop_check"] = lambda: self.jobs.should_stop(job_id)
         try:
             result = self.revision_agent_runner.run_agentic(**kwargs)
+        except RevisionAgentCancelled:
+            self.session_revision_repository.cancel_revision_run(
+                pipeline_run_id=pipeline_run_id
+            )
+            raise
         except Exception:
             self.session_revision_repository.fail_revision_run(
                 pipeline_run_id=pipeline_run_id,

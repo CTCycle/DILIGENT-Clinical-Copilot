@@ -13,7 +13,14 @@ from services.session.session_service import ClinicalSessionService
 
 ###############################################################################
 def get_route_service(route_path: str) -> Any:
+    routes = []
     for route in server_app_module.app.routes:
+        original_router = getattr(route, "original_router", None)
+        if original_router is not None:
+            routes.extend(original_router.routes)
+        else:
+            routes.append(route)
+    for route in routes:
         if getattr(route, "path", "").endswith(route_path):
             endpoint_owner = getattr(route.endpoint, "__self__", None)
             if endpoint_owner is not None:

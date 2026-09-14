@@ -1,5 +1,5 @@
 # DILIGENT Clinical Copilot
-Last updated: 2026-09-08
+Last updated: 2026-09-13
 
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-GNU%20GPL%20v3-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
@@ -97,6 +97,17 @@ The v3.3.0 release provides Windows x64 desktop packages in two forms:
 The packaged application contains the runtime it needs, starts its local services automatically, and keeps user data separate from the downloaded package. A matching SHA-256 file is published so a downloaded package can be checked before use or distribution.
 
 This release also makes the four model roles explicit in **Configurations**, keeps saved session and timeline review together, and uses the native Windows directory picker for desktop RAG folder selection. The standard release workflow builds and publishes the packages from the synchronized main branch.
+
+## Current release candidate
+
+The checked-out source and lock manifests are synchronized to SemVer `3.4.0`,
+but `v3.4.0` is not published. Release status remains **NOT READY** until the
+exact candidate commit has green hosted CI, full browser E2E including the live
+OpenCode Go / `deepseek-v4-flash` provider flow with synthetic data, reviewed
+dependency-scan results, and Windows portable-EXE/MSI host smoke evidence.
+`develop` and `main` must also be intentionally synchronized before an
+annotated tag is created. No tag, push, or release publication is performed by
+the current readiness work.
 
 ## Before you use it
 
