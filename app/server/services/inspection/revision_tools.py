@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from domain.llm.transports import ToolDefinition
 from repositories.context import RepositoryContext
 from repositories.dilirank_repository import DiliRankRepository
 
@@ -49,6 +50,94 @@ class RevisionToolRegistry:
         return sorted(
             self.names if allowed is None else self.names.intersection(allowed)
         )
+
+    # -------------------------------------------------------------------------
+    def tool_definitions(self, allowed: list[str] | None) -> list[ToolDefinition]:
+        schemas: dict[str, ToolDefinition] = {
+            "read_session_context": ToolDefinition(
+                name="read_session_context",
+                description="Read the bounded session context prepared for revision.",
+            ),
+            "read_result_payload_path": ToolDefinition(
+                name="read_result_payload_path",
+                description="Read one safe dot-separated path from the persisted result payload.",
+                parameters={
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                    "required": ["path"],
+                    "additionalProperties": False,
+                },
+            ),
+            "read_manual_edits": ToolDefinition(
+                name="read_manual_edits",
+                description="Read persisted manual report-edit history.",
+            ),
+            "read_version_lineage": ToolDefinition(
+                name="read_version_lineage",
+                description="Read the session version lineage.",
+            ),
+            "search_livertox_catalog": ToolDefinition(
+                name="search_livertox_catalog",
+                description="Search the LiverTox catalog for a drug or term.",
+                parameters={
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                    "additionalProperties": False,
+                },
+            ),
+            "get_livertox_excerpt": ToolDefinition(
+                name="get_livertox_excerpt",
+                description="Retrieve one LiverTox excerpt by positive drug id.",
+                parameters={
+                    "type": "object",
+                    "properties": {"drug_id": {"type": "integer", "minimum": 1}},
+                    "required": ["drug_id"],
+                    "additionalProperties": False,
+                },
+            ),
+            "search_dilirank_catalog": ToolDefinition(
+                name="search_dilirank_catalog",
+                description="Search the DILIrank catalog for a drug or term.",
+                parameters={
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                    "additionalProperties": False,
+                },
+            ),
+            "get_dilirank_records": ToolDefinition(
+                name="get_dilirank_records",
+                description="Retrieve DILIrank records by positive drug id.",
+                parameters={
+                    "type": "object",
+                    "properties": {"drug_id": {"type": "integer", "minimum": 1}},
+                    "required": ["drug_id"],
+                    "additionalProperties": False,
+                },
+            ),
+            "get_drug_knowledge_bundle": ToolDefinition(
+                name="get_drug_knowledge_bundle",
+                description="Retrieve the bounded knowledge bundle for a positive drug id.",
+                parameters={
+                    "type": "object",
+                    "properties": {"drug_id": {"type": "integer", "minimum": 1}},
+                    "required": ["drug_id"],
+                    "additionalProperties": False,
+                },
+            ),
+            "search_rag": ToolDefinition(
+                name="search_rag",
+                description="Report that RAG retrieval is unavailable for this revision run.",
+                parameters={
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                    "additionalProperties": False,
+                },
+            ),
+        }
+        return [schemas[name] for name in self.manifest(allowed)]
 
     # -------------------------------------------------------------------------
     def execute(

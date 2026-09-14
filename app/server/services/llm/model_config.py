@@ -44,6 +44,7 @@ from services.llm.cloud import CloudLLMClient, LLMError
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.ollama_client import OllamaClient, OllamaError
 from services.llm.provider_registry import provider_registry
+from services.llm.model_capabilities import enrich_model_descriptor
 from services.retrieval.embedding_runtime import get_embedding_runtime
 from services.retrieval.settings import (
     build_effective_rag_settings,
@@ -787,7 +788,10 @@ class ModelConfigService:
                 capabilities=item.capabilities,
                 catalog_status="available" if item.models else "not_loaded",
                 models=[
-                    CloudModelDescriptor(id=model, display_name=model)
+                    enrich_model_descriptor(
+                        provider=item.provider_id,
+                        descriptor=CloudModelDescriptor(id=model, display_name=model),
+                    )
                     for model in item.models
                 ],
             )
@@ -802,7 +806,10 @@ class ModelConfigService:
         for item in provider_registry.all():
             if item.models:
                 models = [
-                    CloudModelDescriptor(id=model, display_name=model)
+                    enrich_model_descriptor(
+                        provider=item.provider_id,
+                        descriptor=CloudModelDescriptor(id=model, display_name=model),
+                    )
                     for model in item.models
                 ]
                 status = "available"
@@ -812,7 +819,13 @@ class ModelConfigService:
                 record = model_catalog.load_catalog_record(
                     self.catalog_cache, item.provider_id
                 )
-                models = model_catalog.cloud_models_from_record(record)
+                models = [
+                    enrich_model_descriptor(
+                        provider=item.provider_id,
+                        descriptor=descriptor,
+                    )
+                    for descriptor in model_catalog.cloud_models_from_record(record)
+                ]
                 if record is None:
                     status = "not_loaded"
                     catalog_updated_at = None
@@ -973,7 +986,10 @@ class ModelConfigService:
             if isinstance(model, str) and model.strip()
         }
         return [
-            CloudModelDescriptor(id=model, display_name=model)
+            enrich_model_descriptor(
+                provider=provider_id,
+                descriptor=CloudModelDescriptor(id=model, display_name=model),
+            )
             for model in sorted(model_names, key=str.casefold)
         ]
 

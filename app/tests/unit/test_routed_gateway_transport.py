@@ -4,9 +4,10 @@ import asyncio
 
 import pytest
 from domain.llm.providers import CloudModelDescriptor
-from domain.llm.transports import ChatRequest, ChatResult
+from domain.llm.transports import ChatMessage, ChatRequest, ChatResult
 from services.llm.transports import routed_gateway
 from services.llm.transports.routed_gateway import RoutedGatewayTransport
+
 
 ###############################################################################
 def _transport(models_path: str = "/zen/go/v1/models") -> RoutedGatewayTransport:
@@ -63,6 +64,7 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
             base_url: str,
             timeout: float,
             default_headers: dict[str, str],
+            max_retries: int = 0,
         ) -> None:
             captured.update(
                 api_key=api_key,
@@ -107,9 +109,9 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
     headers = captured["default_headers"]
     assert isinstance(headers, dict)
     assert headers["x-opencode-session"]
-    assert headers["User-Agent"] == "diligent-clinical-copilot/3.3"
+    assert headers["User-Agent"] == "diligent-clinical-copilot/3.4.0"
     assert "clinical prompt" not in caplog.text
-    assert "route_source=documented_opencode_go_route@2026-09-07" in caplog.text
+    assert "route_source=documented_opencode_go_route@2026-09-14" in caplog.text
     assert "Cloud chat request attempted" in caplog.text
 
 ###############################################################################
@@ -134,6 +136,7 @@ def test_opencode_go_missing_catalog_model_uses_direct_route(
             base_url: str,
             timeout: float,
             default_headers: dict[str, str],
+            max_retries: int = 0,
         ) -> None:
             captured["base_url"] = base_url
 
@@ -184,6 +187,7 @@ def test_opencode_go_connectivity_check_uses_direct_route(
             base_url: str,
             timeout: float,
             default_headers: dict[str, str],
+            max_retries: int = 0,
         ) -> None:
             captured["base_url"] = base_url
 
@@ -205,7 +209,9 @@ def test_opencode_go_connectivity_check_uses_direct_route(
     assert captured["base_url"] == "https://opencode.ai/zen/go/v1"
     request = captured["request"]
     assert isinstance(request, ChatRequest)
-    assert request.messages == [{"role": "user", "content": "Reply with exactly: OK"}]
+    assert request.messages == [
+        ChatMessage(role="user", content="Reply with exactly: OK")
+    ]
 
 ###############################################################################
 def test_other_routed_gateways_keep_strict_catalog_requirement(

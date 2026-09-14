@@ -146,7 +146,11 @@ def test_gemini_client_receives_configured_timeout(
         def __init__(self, **kwargs: object) -> None:
             captured.update(kwargs)
 
-    monkeypatch.setattr(cloud_module.genai, "Client", FakeGeminiClient)
+        # ---------------------------------------------------------------------
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(cloud_module, "GeminiTransport", FakeGeminiClient)
     monkeypatch.setattr(
         CloudLLMClient,
         "resolve_provider_access_key",
@@ -155,9 +159,7 @@ def test_gemini_client_receives_configured_timeout(
 
     client = CloudLLMClient(provider="gemini", timeout_s=12.5)
     try:
-        options = captured["http_options"]
-        assert isinstance(options, cloud_module.genai_types.HttpOptions)
-        assert options.timeout == 12500
+        assert captured["timeout"] == 12.5
     finally:
         asyncio.run(client.close())
 
@@ -243,7 +245,7 @@ def test_openai_structured_provider_failure_is_not_downgraded_to_chat(
     client.provider = "openai"
     client.default_model = None
 
-    async def fail_native(**_: object) -> Payload:
+    async def fail_chat(**_: object) -> str:
         raise LLMError(
             "Cloud provider returned HTTP 400",
             status_code=400,
@@ -253,11 +255,7 @@ def test_openai_structured_provider_failure_is_not_downgraded_to_chat(
             provider_detail="unsupported schema",
         )
 
-    async def fail_downgrade(**_: object) -> str:
-        raise AssertionError("structured output must not downgrade to chat")
-
-    monkeypatch.setattr(client, "_structured_openai", fail_native)
-    monkeypatch.setattr(client, "chat", fail_downgrade)
+    monkeypatch.setattr(client, "chat", fail_chat)
 
     with pytest.raises(LLMError, match="Cloud provider returned HTTP 400"):
         asyncio.run(

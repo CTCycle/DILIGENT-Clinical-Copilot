@@ -7,14 +7,11 @@ import re
 from typing import Any
 
 import httpx
-from google import genai
 from google.genai import errors as genai_errors
-from google.genai import types as genai_types
 from openai import (
     APIConnectionError,
     APIStatusError,
     APITimeoutError,
-    AsyncOpenAI,
     OpenAIError,
 )
 
@@ -35,24 +32,36 @@ from services.llm.structured import (
     parse_json_object_strict,
 )
 from domain.llm.providers import CloudModelDescriptor, CloudProviderId
-from domain.llm.transports import ChatRequest, RequestOperation
+from domain.llm.transports import (
+    ChatMessage,
+    ChatRequest,
+    ChatResult,
+    ChatStreamEvent,
+    RequestOperation,
+    ToolDefinition,
+)
 from services.llm.provider_registry import provider_registry
 from services.llm.transports.anthropic_messages import AnthropicMessagesTransport
 from services.llm.transports.base import CloudTransport
-from services.llm.transports.gemini import gemini_model_requires_thinking
+from services.llm.transports.gemini import GeminiTransport
 from services.llm.transports.openai_chat import OpenAIChatTransport
+from services.llm.transports.openai_responses import OpenAIResponsesTransport
 from services.llm.transports.routed_gateway import RoutedGatewayTransport
-from services.llm.model_capabilities import EffectiveInferenceConfig
+from services.llm.transports.errors import (
+    TransportCancellation,
+    TransportPartialResponse,
+    TransportUnsupportedCapability,
+)
+from services.llm.model_capabilities import (
+    capability_metadata,
+    enrich_model_descriptor,
+)
 
 ProviderName = CloudProviderId
 _PROVIDER_FAILURE_HINT = (
     "Check the provider connection, credentials, rate limits, or transient service status."
 )
 _MAX_STRUCTURED_REPAIR_TEXT_CHARS = 30000
-
-###############################################################################
-def _list_gemini_models_sync(client: genai.Client) -> list[Any]:
-    return list(client.models.list())
 
 ###############################################################################
 class LLMError(RuntimeError):
@@ -210,8 +219,6 @@ class CloudLLMClient:
         self.timeout_s = float(runtime_timeout if timeout_s is None else timeout_s)
         provider_access_key = self.resolve_provider_access_key(provider)
         self.provider_access_key = provider_access_key
-        self.openai_client: AsyncOpenAI | None = None
-        self.gemini_client: Any | None = None
         self.transport: CloudTransport | None = None
 
         if provider == "openai":
@@ -222,16 +229,12 @@ class CloudLLMClient:
                 "Authorization": f"Bearer {provider_access_key}",
                 "Content-Type": "application/json",
             }
-            _openai_http_client = httpx.AsyncClient(
-                timeout=httpx.Timeout(self.timeout_s),
-                trust_env=False,
-            )
-            self.openai_client = AsyncOpenAI(
+            self.transport = OpenAIResponsesTransport(
                 api_key=provider_access_key,
                 base_url=self.base_url,
                 timeout=self.timeout_s,
-                max_retries=max(0, int(max_retries)),
-                http_client=_openai_http_client,
+                default_headers=headers,
+                max_retries=max_retries,
             )
         elif provider == "gemini":
             if not provider_access_key:
@@ -241,11 +244,10 @@ class CloudLLMClient:
                 "Content-Type": "application/json",
                 "x-goog-api-key": provider_access_key,
             }
-            self.gemini_client = genai.Client(
+            self.transport = GeminiTransport(
                 api_key=provider_access_key,
-                http_options=genai_types.HttpOptions(
-                    timeout=max(1, int(self.timeout_s * 1000))
-                ),
+                timeout=self.timeout_s,
+                max_retries=max_retries,
             )
         elif provider == "deepseek":
             if not provider_access_key:
@@ -256,6 +258,7 @@ class CloudLLMClient:
                 api_key=provider_access_key,
                 base_url=self.base_url,
                 timeout=self.timeout_s,
+                max_retries=max_retries,
             )
         elif provider == "anthropic":
             if not provider_access_key:
@@ -266,6 +269,7 @@ class CloudLLMClient:
                 api_key=provider_access_key,
                 base_url=self.base_url,
                 timeout=self.timeout_s,
+                max_retries=max_retries,
             )
         elif provider in {"opencode_zen", "opencode_go"}:
             if not provider_access_key:
@@ -278,6 +282,7 @@ class CloudLLMClient:
                 base_url=self.base_url,
                 models_path=definition.models_endpoint or "",
                 timeout=self.timeout_s,
+                max_retries=max_retries,
             )
         else:
             raise LLMError(f"Unknown provider: {provider}")
@@ -309,8 +314,6 @@ class CloudLLMClient:
 
     # -------------------------------------------------------------------------
     async def close(self) -> None:
-        if self.openai_client is not None:
-            await self.openai_client.close()
         if self.transport is not None:
             await self.transport.close()
         await self.client.aclose()
@@ -332,102 +335,23 @@ class CloudLLMClient:
         self, *, force_refresh: bool = False
     ) -> list[CloudModelDescriptor]:
         if self.transport is not None:
-            return await self.transport.list_models(force_refresh=force_refresh)
-        if self.provider == "openai":
-            try:
-                resp = await self.client.get("/models")
-            except httpx.TimeoutException as e:
-                raise LLMTimeout("Timed out listing OpenAI models") from e
-            self.raise_for_status(resp)
-            data = resp.json()
+            descriptors = await self.transport.list_models(force_refresh=force_refresh)
             return [
-                CloudModelDescriptor(
-                    id=str(item["id"]),
-                    display_name=str(item.get("name") or item["id"]),
-                )
-                for item in data.get("data", [])
-                if isinstance(item, dict) and item.get("id")
+                enrich_model_descriptor(provider=self.provider, descriptor=item)
+                for item in descriptors
             ]
-        if self.provider == "gemini":
-            return await self._list_gemini_model_descriptors()
         return []
 
     # -------------------------------------------------------------------------
-    async def _list_gemini_model_descriptors(self) -> list[CloudModelDescriptor]:
-        if self.gemini_client is None:
-            raise LLMError("Gemini client is not configured")
-
-        try:
-            raw_models = await asyncio.to_thread(
-                _list_gemini_models_sync, self.gemini_client
-            )
-        except Exception as exc:  # noqa: BLE001
-            raise self._map_provider_exception(exc) from exc
-
-        models: list[CloudModelDescriptor] = []
-        for item in raw_models:
-            name = str(getattr(item, "name", "") or "").strip()
-            model_id = name.removeprefix("models/")
-            actions = getattr(item, "supported_actions", None)
-            if actions is None:
-                actions = getattr(item, "supported_generation_methods", ())
-            normalized_actions = {
-                str(action).replace("_", "").lower() for action in (actions or ())
-            }
-            if not model_id or "generatecontent" not in normalized_actions:
-                continue
-            input_token_limit = self._coerce_optional_int(
-                getattr(item, "input_token_limit", None)
-            )
-            output_token_limit = self._coerce_optional_int(
-                getattr(item, "output_token_limit", None)
-            )
-            thinking_metadata = getattr(item, "thinking", None)
-            if thinking_metadata is None:
-                thinking_metadata = getattr(item, "thinking_config", None)
-            supports_thinking = (
-                bool(thinking_metadata)
-                if thinking_metadata is not None
-                else (
-                    any("think" in action for action in normalized_actions)
-                    if any("think" in action for action in normalized_actions)
-                    else None
-                )
-            )
-            temperature_metadata = getattr(item, "temperature", None)
-            models.append(
-                CloudModelDescriptor(
-                    id=model_id,
-                    display_name=str(getattr(item, "display_name", None) or model_id),
-                    input_token_limit=input_token_limit,
-                    output_token_limit=output_token_limit,
-                    supports_thinking=supports_thinking,
-                    supports_temperature=(
-                        bool(temperature_metadata)
-                        if temperature_metadata is not None
-                        else None
-                    ),
-                    supports_json_mode=True,
-                    supports_native_json_schema=True,
-                )
-            )
-        return models
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _coerce_optional_int(value: object) -> int | None:
-        if value is None:
-            return None
-        try:
-            parsed = int(str(value))
-        except TypeError, ValueError:
-            return None
-        return parsed if parsed > 0 else None
-
-    # -------------------------------------------------------------------------
     async def check_model_availability(self, name: str) -> None:
-        models = set(await self.list_models())
-        if models and name not in models:
+        descriptors = await self.list_model_descriptors()
+        models = {item.id for item in descriptors}
+        aliases = {
+            alias
+            for item in descriptors
+            for alias in item.model_capabilities.aliases
+        }
+        if models and name not in models and name not in aliases:
             raise LLMError(f"Model '{name}' not found for provider {self.provider}")
 
     # -------------------------------------------------------------------------
@@ -491,7 +415,7 @@ class CloudLLMClient:
         self,
         *,
         model: str,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]] | list[ChatMessage],
         format: str | None = None,
         options: dict[str, Any] | None = None,
         purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
@@ -499,14 +423,51 @@ class CloudLLMClient:
         operation: RequestOperation = "chat",
         json_schema: dict[str, Any] | None = None,
     ) -> dict[str, Any] | str:
+        result = await self.chat_result(
+            model=model,
+            messages=messages,
+            format=format,
+            options=options,
+            purpose=purpose,
+            timeline_complexity=timeline_complexity,
+            operation=operation,
+            json_schema=json_schema,
+        )
+        return self._normalize_content(result.content)
+
+    # -------------------------------------------------------------------------
+    async def chat_result(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, Any]] | list[ChatMessage],
+        format: str | None = None,
+        options: dict[str, Any] | None = None,
+        purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
+        timeline_complexity: str = "moderate",
+        operation: RequestOperation = "chat",
+        json_schema: dict[str, Any] | None = None,
+        tools: list[ToolDefinition] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+        stream: bool = False,
+        cancel_check: Any | None = None,
+    ) -> ChatResult:
         resolved_model = model or self.default_model
         if not resolved_model:
             raise LLMError("Model is required")
+        canonical_messages = [
+            item if isinstance(item, ChatMessage) else ChatMessage.model_validate(item)
+            for item in messages
+        ]
+        descriptor = LLMRuntimeConfig.get_model_descriptor(
+            self.provider, resolved_model
+        )
         effective = LLMRuntimeConfig.resolve_effective_inference_config(
             purpose=purpose,
             provider=self.provider,
             model=resolved_model,
             timeline_complexity=timeline_complexity,
+            descriptor=descriptor,
         )
         options_payload = {
             key: value for key, value in (options or {}).items() if key != "temperature"
@@ -515,40 +476,37 @@ class CloudLLMClient:
             options_payload["temperature"] = effective.temperature
         options_payload.setdefault("max_output_tokens", effective.output_token_limit)
 
+        capability = capability_metadata(
+            provider=self.provider,
+            model=resolved_model,
+            descriptor=descriptor,
+        )
+        if self.transport is None:
+            raise LLMError(f"Provider '{self.provider}' does not support chat yet")
+        request = ChatRequest(
+            model=resolved_model,
+            messages=canonical_messages,
+            options=options_payload,
+            json_mode=format == "json",
+            operation=operation,
+            json_schema=json_schema,
+            reasoning_level=effective.effective_reasoning_level.value,
+            reasoning_parameter=effective.reasoning_parameter,
+            reasoning_reserve=effective.reasoning_reserve,
+            output_token_limit=effective.output_token_limit,
+            temperature=effective.temperature,
+            top_p=options_payload.get("top_p"),
+            tools=tools or [],
+            tool_choice=tool_choice,
+            stream=stream,
+            capabilities=capability,
+            deadline_at=asyncio.get_running_loop().time() + self.timeout_s,
+            cancel_check=cancel_check,
+        )
         try:
-            if self.transport is not None:
-                result = await self.transport.chat(
-                    ChatRequest(
-                        model=resolved_model,
-                        messages=messages,
-                        options=options_payload,
-                        json_mode=format == "json",
-                        operation=operation,
-                        json_schema=json_schema,
-                        reasoning_level=effective.effective_reasoning_level.value,
-                        reasoning_parameter=effective.reasoning_parameter,
-                        reasoning_reserve=effective.reasoning_reserve,
-                        output_token_limit=effective.output_token_limit,
-                    )
-                )
-                return self._normalize_content(result.content)
-            if self.provider == "openai":
-                return await self._chat_openai(
-                    resolved_model=resolved_model,
-                    format=format,
-                    options=options_payload,
-                    messages=messages,
-                    effective=effective,
-                )
-            if self.provider == "gemini":
-                return await self._chat_gemini(
-                    resolved_model=resolved_model,
-                    options=options_payload,
-                    messages=messages,
-                    schema=None,
-                    json_mode=format == "json",
-                    effective=effective,
-                )
+            if stream:
+                return await self._collect_stream_result(request)
+            return await self.transport.chat(request)
         except Exception as exc:  # noqa: BLE001
             raise self._map_provider_exception(
                 exc,
@@ -556,112 +514,145 @@ class CloudLLMClient:
                 model=resolved_model,
                 operation=operation,
             ) from exc
-        raise LLMError(f"Provider '{self.provider}' does not support chat yet")
 
     # -------------------------------------------------------------------------
-    async def _chat_openai(
+    async def stream(
         self,
         *,
-        resolved_model: str,
+        model: str,
+        messages: list[dict[str, Any]] | list[ChatMessage],
+        format: str | None = None,
+        options: dict[str, Any] | None = None,
+        purpose: GenerationPurpose = GenerationPurpose.CLINICAL_SYNTHESIS,
+        timeline_complexity: str = "moderate",
+        operation: RequestOperation = "chat",
+        json_schema: dict[str, Any] | None = None,
+        tools: list[ToolDefinition] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+        cancel_check: Any | None = None,
+    ):
+        if self.transport is None:
+            raise LLMError(f"Provider '{self.provider}' does not support streaming")
+        try:
+            request_result = await self._build_chat_request(
+                model=model,
+                messages=messages,
+                format=format,
+                options=options,
+                purpose=purpose,
+                timeline_complexity=timeline_complexity,
+                operation=operation,
+                json_schema=json_schema,
+                tools=tools,
+                tool_choice=tool_choice,
+                cancel_check=cancel_check,
+            )
+            async for event in self.transport.stream(request_result):
+                yield event
+        except Exception as exc:  # noqa: BLE001
+            raise self._map_provider_exception(
+                exc,
+                provider=self.provider,
+                model=model or self.default_model,
+                operation=operation,
+            ) from exc
+
+    # -------------------------------------------------------------------------
+    async def _collect_stream_result(self, request: ChatRequest) -> ChatResult:
+        if self.transport is None:
+            raise LLMError(f"Provider '{self.provider}' does not support streaming")
+        partial_error: ChatStreamEvent | None = None
+        try:
+            async for event in self.transport.stream(request):
+                if event.kind == "error":
+                    partial_error = event
+                if event.kind == "completed" and event.result is not None:
+                    if event.result.partial or partial_error is not None:
+                        raise LLMError(
+                            partial_error.error_message
+                            if partial_error is not None
+                            else "Provider stream ended before completion",
+                            error_code=partial_error.error_code
+                            if partial_error is not None and partial_error.error_code
+                            else "partial_response",
+                        )
+                    return event.result
+        except Exception as exc:  # noqa: BLE001
+            if partial_error is not None:
+                raise LLMError(
+                    partial_error.error_message or "Provider stream failed",
+                    error_code=partial_error.error_code or "partial_response",
+                ) from exc
+            raise
+        raise LLMError(
+            "Provider stream ended without a completion event",
+            error_code="partial_response",
+        )
+
+    # -------------------------------------------------------------------------
+    async def _build_chat_request(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, Any]] | list[ChatMessage],
         format: str | None,
         options: dict[str, Any] | None,
-        messages: list[dict[str, str]],
-        effective: EffectiveInferenceConfig,
-    ) -> dict[str, Any] | str:
-        if self.openai_client is None:
-            raise LLMError("OpenAI client is not configured")
-        instructions, input_messages = self._build_openai_responses_input(messages)
-        kwargs: dict[str, Any] = {"model": resolved_model, "input": input_messages}
-        if instructions:
-            kwargs["instructions"] = instructions
-        supports_sampling = not self.is_gpt5_family_model(resolved_model)
-        if supports_sampling and options and "temperature" in options:
-            kwargs["temperature"] = float(options["temperature"])
-        if supports_sampling and options and "top_p" in options:
-            kwargs["top_p"] = float(options["top_p"])
-        if effective.output_token_limit > 0:
-            kwargs["max_output_tokens"] = effective.output_token_limit
-        if (
-            effective.effective_reasoning_level.value != "off"
-            and effective.reasoning_parameter
-            in {
-                "effort",
-                "level",
-            }
-        ):
-            kwargs["reasoning"] = {"effort": effective.effective_reasoning_level.value}
-        if format == "json":
-            json_instruction = "Return the response as one valid JSON object."
-            kwargs["instructions"] = (
-                f"{instructions}\n\n{json_instruction}"
-                if instructions
-                else json_instruction
-            )
-            kwargs["input"] = [
-                *input_messages,
-                {"role": "user", "content": json_instruction},
-            ]
-            kwargs["text"] = {"format": {"type": "json_object"}}
-        response = await self.openai_client.responses.create(**kwargs)
-        return self._normalize_content(self._extract_openai_output_text(response))
-
-    # -------------------------------------------------------------------------
-    async def _chat_gemini(
-        self,
-        *,
-        resolved_model: str,
-        options: dict[str, Any] | None,
-        messages: list[dict[str, str]],
-        schema: type[T] | None,
-        json_mode: bool,
-        effective: EffectiveInferenceConfig | None = None,
-    ) -> dict[str, Any] | str:
-        if self.gemini_client is None:
-            raise LLMError("Gemini client is not configured")
-        system_instruction, contents = self._build_gemini_contents(messages)
-        config_kwargs: dict[str, Any] = {}
-        if system_instruction:
-            config_kwargs["system_instruction"] = system_instruction
-        if options and "temperature" in options:
-            config_kwargs["temperature"] = max(
-                0.0, min(2.0, float(options["temperature"]))
-            )
-        if json_mode or schema is not None:
-            config_kwargs["response_mime_type"] = "application/json"
-        if schema is not None:
-            config_kwargs["response_json_schema"] = schema.model_json_schema()
-        if effective is not None:
-            config_kwargs["max_output_tokens"] = effective.output_token_limit
-            if effective.reasoning_parameter == "level":
-                if effective.effective_reasoning_level.value == "off":
-                    if gemini_model_requires_thinking(resolved_model):
-                        config_kwargs["thinking_config"] = genai_types.ThinkingConfig(
-                            thinking_level=genai_types.ThinkingLevel.LOW
-                        )
-                    else:
-                        config_kwargs["thinking_config"] = genai_types.ThinkingConfig(
-                            thinking_budget=0
-                        )
-                else:
-                    sdk_level = (
-                        genai_types.ThinkingLevel.LOW
-                        if effective.effective_reasoning_level.value
-                        in {"low", "medium"}
-                        else genai_types.ThinkingLevel.HIGH
-                    )
-                    config_kwargs["thinking_config"] = genai_types.ThinkingConfig(
-                        thinking_level=sdk_level
-                    )
-        config = self._build_gemini_config(config_kwargs)
-        response = await asyncio.to_thread(
-            self.gemini_client.models.generate_content,
-            model=resolved_model,
-            contents=contents,
-            config=config,
+        purpose: GenerationPurpose,
+        timeline_complexity: str,
+        operation: RequestOperation,
+        json_schema: dict[str, Any] | None,
+        tools: list[ToolDefinition] | None,
+        tool_choice: str | dict[str, Any] | None,
+        cancel_check: Any | None,
+    ) -> ChatRequest:
+        resolved_model = model or self.default_model
+        if not resolved_model:
+            raise LLMError("Model is required")
+        canonical_messages = [
+            item if isinstance(item, ChatMessage) else ChatMessage.model_validate(item)
+            for item in messages
+        ]
+        descriptor = LLMRuntimeConfig.get_model_descriptor(
+            self.provider, resolved_model
         )
-        return self._normalize_content(getattr(response, "text", response))
+        effective = LLMRuntimeConfig.resolve_effective_inference_config(
+            purpose=purpose,
+            provider=self.provider,
+            model=resolved_model,
+            timeline_complexity=timeline_complexity,
+            descriptor=descriptor,
+        )
+        options_payload = {
+            key: value for key, value in (options or {}).items() if key != "temperature"
+        }
+        if effective.temperature is not None:
+            options_payload["temperature"] = effective.temperature
+        options_payload.setdefault("max_output_tokens", effective.output_token_limit)
+        return ChatRequest(
+            model=resolved_model,
+            messages=canonical_messages,
+            options=options_payload,
+            json_mode=format == "json",
+            operation=operation,
+            json_schema=json_schema,
+            reasoning_level=effective.effective_reasoning_level.value,
+            reasoning_parameter=effective.reasoning_parameter,
+            reasoning_reserve=effective.reasoning_reserve,
+            output_token_limit=effective.output_token_limit,
+            temperature=effective.temperature,
+            top_p=options_payload.get("top_p"),
+            tools=tools or [],
+            tool_choice=tool_choice,
+            stream=True,
+            capabilities=capability_metadata(
+                provider=self.provider,
+                model=resolved_model,
+                descriptor=descriptor,
+            ),
+            deadline_at=asyncio.get_running_loop().time() + self.timeout_s,
+            cancel_check=cancel_check,
+        )
 
-    # -------------------------------------------------------------------------
     @staticmethod
     def resolve_gemini_model_resource(model: str | None) -> str:
         model_name = (model or "").strip()
@@ -670,75 +661,6 @@ class CloudLLMClient:
         if model_name.startswith("models/"):
             return model_name
         return f"models/{model_name}"
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _build_openai_responses_input(
-        messages: list[dict[str, str]],
-    ) -> tuple[str | None, list[dict[str, str]]]:
-        instructions: list[str] = []
-        input_messages: list[dict[str, str]] = []
-        for item in messages:
-            role = str(item.get("role", "user")).strip().lower()
-            content = str(item.get("content", ""))
-            if role == "system":
-                if content.strip():
-                    instructions.append(content.strip())
-            elif role in {"assistant", "model"}:
-                input_messages.append({"role": "assistant", "content": content})
-            else:
-                input_messages.append({"role": "user", "content": content})
-        if not input_messages:
-            input_messages.append({"role": "user", "content": ""})
-        return "\n\n".join(instructions) or None, input_messages
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _build_gemini_contents(
-        messages: list[dict[str, str]],
-    ) -> tuple[str | None, list[dict[str, Any]]]:
-        system_instruction: list[str] = []
-        contents: list[dict[str, Any]] = []
-        for item in messages:
-            role = str(item.get("role", "user")).strip().lower()
-            content = str(item.get("content", ""))
-            if role == "system":
-                if content.strip():
-                    system_instruction.append(content.strip())
-                continue
-            gemini_role = "model" if role in {"assistant", "model"} else "user"
-            contents.append({"role": gemini_role, "parts": [{"text": content}]})
-        if not contents:
-            contents.append({"role": "user", "parts": [{"text": ""}]})
-        return "\n\n".join(system_instruction) or None, contents
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _build_gemini_config(config_kwargs: dict[str, Any]) -> Any | None:
-        if not config_kwargs:
-            return None
-        return genai_types.GenerateContentConfig(**config_kwargs)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _extract_openai_output_text(response: Any) -> str:
-        output_text = getattr(response, "output_text", None)
-        if isinstance(output_text, str):
-            return output_text
-        output = getattr(response, "output", None)
-        if isinstance(output, list):
-            chunks: list[str] = []
-            for item in output:
-                content = getattr(item, "content", None)
-                if not isinstance(content, list):
-                    continue
-                for part in content:
-                    text = getattr(part, "text", None)
-                    if isinstance(text, str):
-                        chunks.append(text)
-            if chunks:
-                return "".join(chunks)
-        return str(response)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -790,6 +712,31 @@ class CloudLLMClient:
         model: str | None = None,
         operation: str | None = None,
     ) -> LLMError:
+        if isinstance(exc, TransportCancellation):
+            return LLMError(
+                "LLM request cancelled",
+                error_code="cancelled",
+                provider=provider,
+                model=model,
+                operation=operation,
+            )
+        if isinstance(exc, TransportUnsupportedCapability):
+            return LLMError(
+                str(exc),
+                error_code="unsupported_capability",
+                provider=provider,
+                model=model,
+                operation=operation,
+            )
+        if isinstance(exc, TransportPartialResponse):
+            return LLMError(
+                str(exc),
+                error_code="partial_response",
+                retryable=True,
+                provider=provider,
+                model=model,
+                operation=operation,
+            )
         if isinstance(exc, LLMError):
             return exc.with_context(
                 provider=provider,
@@ -1016,51 +963,6 @@ class CloudLLMClient:
             user_prompt=user_prompt,
             format_instructions=format_instructions,
         )
-
-        if self.provider == "openai" and use_json_mode:
-            effective = LLMRuntimeConfig.resolve_effective_inference_config(
-                purpose=purpose,
-                provider=self.provider,
-                model=resolved_model,
-                timeline_complexity=timeline_complexity,
-            )
-            return await self._structured_openai(
-                model=resolved_model,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                schema=schema,
-                effective=effective,
-            )
-
-        if self.provider == "gemini" and use_json_mode:
-            try:
-                effective = LLMRuntimeConfig.resolve_effective_inference_config(
-                    purpose=purpose,
-                    provider=self.provider,
-                    model=resolved_model,
-                    timeline_complexity=timeline_complexity,
-                )
-                raw = await self._chat_gemini(
-                    resolved_model=resolved_model,
-                    options=None,
-                    messages=[
-                        {"role": "system", "content": system_prompt.strip()},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    schema=schema,
-                    json_mode=True,
-                    effective=effective,
-                )
-                text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
-                return parser.parse(text)
-            except Exception as exc:  # noqa: BLE001
-                raise self._map_provider_exception(
-                    exc,
-                    provider=self.provider,
-                    model=resolved_model,
-                    operation="structured_output",
-                ) from exc
-
         raw = await self.chat(
             model=resolved_model,
             messages=messages,
@@ -1081,53 +983,6 @@ class CloudLLMClient:
             use_json_mode=use_json_mode,
             max_repair_attempts=max_repair_attempts,
         )
-
-    # -------------------------------------------------------------------------
-    async def _structured_openai(
-        self,
-        *,
-        model: str,
-        system_prompt: str,
-        user_prompt: str,
-        schema: type[T],
-        effective: EffectiveInferenceConfig,
-    ) -> T:
-        if self.openai_client is None:
-            raise LLMError("OpenAI client is not configured")
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "instructions": system_prompt.strip(),
-            "input": [{"role": "user", "content": user_prompt}],
-            "text_format": schema,
-        }
-        if effective.temperature is not None:
-            kwargs["temperature"] = effective.temperature
-        kwargs["max_output_tokens"] = effective.output_token_limit
-        if (
-            effective.effective_reasoning_level.value != "off"
-            and effective.reasoning_parameter
-            in {
-                "effort",
-                "level",
-            }
-        ):
-            kwargs["reasoning"] = {"effort": effective.effective_reasoning_level.value}
-        try:
-            response = await self.openai_client.responses.parse(**kwargs)
-        except Exception as exc:  # noqa: BLE001
-            raise self._map_provider_exception(
-                exc,
-                provider=self.provider,
-                model=model,
-                operation="structured_output",
-            ) from exc
-        parsed = getattr(response, "output_parsed", None)
-        if isinstance(parsed, schema):
-            return parsed
-        if parsed is not None:
-            return schema.model_validate(parsed)
-        text = self._extract_openai_output_text(response)
-        return StructuredOutputParser(schema=schema).parse(text)
 
     # -------------------------------------------------------------------------
     @staticmethod
