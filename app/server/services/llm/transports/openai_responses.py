@@ -266,7 +266,7 @@ class OpenAIResponsesTransport(StructuredTransportMixin):
                         reasoning_parts.append(reasoning)
                         yield ChatStreamEvent(kind="reasoning_delta", reasoning=reasoning)
                 elif event_type.endswith("function_call_arguments.delta"):
-                    index = int(self._value(event, "output_index", 0) or 0)
+                    index = int(str(self._value(event, "output_index", 0) or 0))
                     state = tool_state.setdefault(index, {})
                     call_id = self._value(event, "call_id")
                     name = self._value(event, "name")
@@ -382,7 +382,7 @@ class OpenAIResponsesTransport(StructuredTransportMixin):
             result = await self.chat(
                 ChatRequest(
                     model=model,
-                    messages=[{"role": "user", "content": "Reply with exactly: OK"}],
+                    messages=[ChatMessage(role="user", content="Reply with exactly: OK")],
                     output_token_limit=16,
                     operation="connectivity",
                 )

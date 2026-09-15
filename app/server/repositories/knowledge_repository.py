@@ -391,6 +391,8 @@ class KnowledgeRepository:
     # -------------------------------------------------------------------------
     def resolve_drug_id_by_name(self, drug_name: str | None) -> int | None:
         """Resolve a canonical LiverTox drug name to its persisted identity."""
+        if not drug_name:
+            return None
         normalized_name = normalize_drug_name(drug_name)
         if not normalized_name:
             return None

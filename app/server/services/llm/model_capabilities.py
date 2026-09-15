@@ -17,7 +17,14 @@ from domain.model_configs import ReasoningLevel
 from services.llm.generation_policy import GenerationPolicy
 
 CapabilitySource = Literal[
-    "exact_model", "model_family", "provider", "live", "documented", "probe", "fallback"
+    "exact_model",
+    "model_family",
+    "provider",
+    "live",
+    "documented",
+    "probe",
+    "fallback",
+    "catalog",
 ]
 ReasoningParameter = Literal[
     "none", "boolean", "level", "effort", "budget_tokens", "adaptive"
@@ -165,6 +172,16 @@ def _coerce_reasoning_levels(value: object) -> tuple[ReasoningLevel, ...]:
     return tuple(levels) or (ReasoningLevel.OFF,)
 
 ###############################################################################
+def _coerce_string_tuple(value: object) -> tuple[str, ...]:
+    if isinstance(value, str):
+        values: tuple[object, ...] = (value,)
+    elif isinstance(value, (list, tuple)):
+        values = tuple(value)
+    else:
+        return ()
+    return tuple(str(item) for item in values if str(item).strip())
+
+###############################################################################
 def _coerce_reasoning_parameter(value: object) -> ReasoningParameter:
     allowed: tuple[ReasoningParameter, ...] = (
         "none",
@@ -273,9 +290,11 @@ def resolve_model_capabilities(
         else source
     )
     merged_aliases = list(
-        metadata_value("aliases") if descriptor_has_metadata else ()
+        _coerce_string_tuple(
+            metadata_value("aliases") if descriptor_has_metadata else ()
+        )
     )
-    merged_aliases.extend(rule_value("aliases") or ())
+    merged_aliases.extend(_coerce_string_tuple(rule_value("aliases")))
     return ModelCapabilities(
         input_token_limit=input_token_limit,
         output_token_limit=output_token_limit,
@@ -358,16 +377,12 @@ def resolve_model_capabilities(
             if descriptor_has_metadata and metadata is not None and metadata.reasoning_counts_toward_output_limit is not None
             else _optional_bool(rule_value("reasoning_counts_toward_output_limit"))
         ),
-        reasoning_unsupported_parameters=tuple(
-            str(item)
-            for item in (
-                metadata.reasoning_unsupported_parameters
-                if descriptor_has_metadata
-                and metadata is not None
-                and metadata.reasoning_unsupported_parameters
-                else rule_value("reasoning_unsupported_parameters") or ()
-            )
-            if str(item).strip()
+        reasoning_unsupported_parameters=_coerce_string_tuple(
+            metadata.reasoning_unsupported_parameters
+            if descriptor_has_metadata
+            and metadata is not None
+            and metadata.reasoning_unsupported_parameters
+            else rule_value("reasoning_unsupported_parameters")
         ),
         requires_reasoning_content_for_tool_calls=(
             metadata.requires_reasoning_content_for_tool_calls
@@ -458,7 +473,10 @@ def capability_metadata(
         supports_finish_reason=resolved.supports_finish_reason,
         evidence=(
             resolved.source
-            if resolved.source in {"documented", "probe", "provider", "fallback"}
+            if resolved.source == "documented"
+            or resolved.source == "probe"
+            or resolved.source == "provider"
+            or resolved.source == "fallback"
             else "catalog"
         ),
     )

@@ -285,7 +285,7 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
                     if isinstance(input_tokens, (int, float)):
                         usage = UsageMetadata(input_tokens=int(input_tokens))
                 elif event_type == "content_block_start":
-                    index = int(self._value(event, "index", 0) or 0)
+                    index = int(str(self._value(event, "index", 0) or 0))
                     block = self._value(event, "content_block")
                     block_type = str(self._value(block, "type", ""))
                     state = tool_state.setdefault(index, {})
@@ -293,7 +293,7 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
                         state["id"] = str(self._value(block, "id") or f"call_{index}")
                         state["name"] = str(self._value(block, "name") or "")
                 elif event_type == "content_block_delta":
-                    index = int(self._value(event, "index", 0) or 0)
+                    index = int(str(self._value(event, "index", 0) or 0))
                     delta = self._value(event, "delta")
                     delta_type = str(self._value(delta, "type", ""))
                     if delta_type == "text_delta":
@@ -396,8 +396,10 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
                     max_retries=getattr(self, "max_retries", 0),
                 )
             else:
+                cursor = after_id
+                assert cursor is not None
                 page = await call_with_retries(
-                    lambda: self.client.models.list(limit=100, after_id=after_id),
+                    lambda: self.client.models.list(limit=100, after_id=cursor),
                     max_retries=getattr(self, "max_retries", 0),
                 )
             for item in page.data:
@@ -444,7 +446,7 @@ class AnthropicMessagesTransport(StructuredTransportMixin):
             result = await self.chat(
                 ChatRequest(
                     model=model,
-                    messages=[{"role": "user", "content": "Reply with exactly: OK"}],
+                    messages=[ChatMessage(role="user", content="Reply with exactly: OK")],
                     options={"max_tokens": 16},
                     output_token_limit=16,
                     operation="connectivity",
