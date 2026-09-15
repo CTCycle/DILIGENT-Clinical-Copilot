@@ -575,6 +575,89 @@ def test_clinical_composer_adds_linked_dilirank_evidence_and_provenance() -> Non
     ]
 
 ###############################################################################
+def test_clinical_composer_scopes_component_dilirank_evidence_for_combinations() -> None:
+    dilirank_repository, context = build_repository()
+    with context.session_factory() as db_session:
+        parent = Drug(
+            canonical_name="Amoxicillin-Clavulanate",
+            canonical_name_norm="amoxicillin clavulanate",
+        )
+        component = Drug(
+            canonical_name="Amoxicillin",
+            canonical_name_norm="amoxicillin",
+        )
+        db_session.add_all([parent, component])
+        db_session.flush()
+        parent_id = int(parent.id)
+        component_id = int(component.id)
+        db_session.commit()
+
+    dilirank_repository.replace_records(
+        [
+            {
+                "ltkb_id": "LT-AMOX",
+                "compound_name": "Amoxicillin",
+                "severity_class": 3,
+                "label_section": "Warnings",
+                "dili_concern": "vLess-DILI-concern",
+            }
+        ]
+    )
+    composer = ClinicalKnowledgeComposer(
+        knowledge_repository=KnowledgeRepository(context=context)
+    )
+    resolved = {
+        "amoxicillin clavulanate": {
+            "normalized_name": "amoxicillin clavulanate",
+            "matched_livertox_row": {
+                "drug_name": "Amoxicillin-Clavulanate",
+            },
+            "extracted_excerpts": ["Combination LiverTox evidence."],
+            "is_regimen_parent": True,
+            "regimen_components": ["Amoxicillin", "Clavulanate"],
+            "accepted_rxnav_rxcui": "12345",
+            "rxnav_validation_status": "exact_rxcui",
+        },
+        "amoxicillin": {
+            "normalized_name": "amoxicillin",
+            "matched_livertox_row": {
+                "drug_name": "Amoxicillin",
+            },
+            "extracted_excerpts": ["Amoxicillin LiverTox evidence."],
+            "is_regimen_parent": False,
+            "regimen_components": ["Amoxicillin", "Clavulanate"],
+        },
+    }
+
+    composer.enrich_resolved_drugs(resolved)
+
+    parent_payload = resolved["amoxicillin clavulanate"]
+    assert parent_payload["drug_id"] == parent_id
+    assert resolved["amoxicillin"]["drug_id"] == component_id
+    assert parent_payload["dilirank_records"][0]["ltkb_id"] == "LT-AMOX"
+    assert parent_payload["dilirank_records"][0]["evidence_scope"] == (
+        "regimen_component"
+    )
+    assert "not combo-specific evidence" in parent_payload["knowledge_prompt"]
+    provenance = next(
+        item
+        for item in parent_payload["extraction_metadata"]
+        if item.get("knowledge_source") == "fda_dilirank_2"
+    )
+    assert provenance["evidence_scope"] == "regimen_component"
+    assert provenance["components"][0]["name"] == "Amoxicillin"
+    assert parent_payload["source_provenance"]["rxnav"]["rxcui"] == "12345"
+
+    assessment = DrugClinicalAssessment(
+        drug_name="Amoxicillin/clavulanate",
+        extraction_metadata=parent_payload["extraction_metadata"],
+        rxnav_rxcui=parent_payload["accepted_rxnav_rxcui"],
+    )
+    assert ReportFinalizer.bibliography_source_label(assessment) == (
+        "LiverTox; RxNav (RxCUI 12345); FDA DILIrank 2.0 (component-level)"
+    )
+
+###############################################################################
 def test_report_source_attribution_is_conditional_on_dilirank_provenance() -> None:
     without_dilirank = DrugClinicalAssessment(drug_name="Acetaminophen")
     with_dilirank = DrugClinicalAssessment(
@@ -591,4 +674,23 @@ def test_report_source_attribution_is_conditional_on_dilirank_provenance() -> No
     assert ReportFinalizer.bibliography_source_label(without_dilirank) == "LiverTox"
     assert ReportFinalizer.bibliography_source_label(with_dilirank) == (
         "LiverTox; FDA DILIrank 2.0"
+    )
+
+###############################################################################
+def test_report_source_attribution_includes_validated_rxnav_identity() -> None:
+    assessment = DrugClinicalAssessment(
+        drug_name="Amoxicillin/clavulanate",
+        rxnav_rxcui="12345",
+        extraction_metadata=[
+            {
+                "knowledge_source": "fda_dilirank_2",
+                "record_count": 1,
+                "ltkb_ids": ["LT-AMOX"],
+                "evidence_scope": "regimen_component",
+            }
+        ],
+    )
+
+    assert ReportFinalizer.bibliography_source_label(assessment) == (
+        "LiverTox; RxNav (RxCUI 12345); FDA DILIrank 2.0 (component-level)"
     )

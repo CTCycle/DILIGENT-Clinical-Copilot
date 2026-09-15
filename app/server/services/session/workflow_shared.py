@@ -89,12 +89,21 @@ def build_single_matched_drug_row(
         missing_livertox=bool(resolved.get("missing_livertox", True)),
         ambiguous_match=bool(resolved.get("ambiguous_match", False)),
     )
+    accepted_rxnav_rxcui = resolved.get("accepted_rxnav_rxcui")
+    rxnorm_rxcui = matched_row.get("rxnorm_rxcui") or accepted_rxnav_rxcui
+    source_provenance = resolved.get("source_provenance")
+    if not isinstance(source_provenance, dict):
+        source_provenance = {}
+    extraction_metadata = resolved.get("extraction_metadata")
+    if not isinstance(extraction_metadata, list):
+        extraction_metadata = []
     return {
         "raw_drug_name": detected_name,
         "drug_id": resolved.get("drug_id"),
         "matched_drug_name": matched_row.get("drug_name"),
         "nbk_id": matched_row.get("nbk_id"),
-        "rxnorm_rxcui": matched_row.get("rxnorm_rxcui"),
+        "rxnorm_rxcui": rxnorm_rxcui,
+        "rxcui": rxnorm_rxcui,
         "match_confidence": match_confidence,
         "match_reason": resolved.get("match_reason"),
         "match_notes": match_notes,
@@ -107,7 +116,7 @@ def build_single_matched_drug_row(
         "resolution_decision": resolved.get("resolution_decision"),
         "rxnav_candidates": resolved.get("rxnav_candidates", []),
         "livertox_candidates": resolved.get("livertox_candidates", []),
-        "accepted_rxnav_rxcui": resolved.get("accepted_rxnav_rxcui"),
+        "accepted_rxnav_rxcui": accepted_rxnav_rxcui,
         "accepted_livertox_nbk_id": resolved.get("accepted_livertox_nbk_id"),
         "accepted_livertox_name": resolved.get("accepted_livertox_name"),
         "requires_human_review": resolved.get("requires_human_review", False),
@@ -116,9 +125,12 @@ def build_single_matched_drug_row(
         "missing_livertox": resolved.get("missing_livertox", True),
         "ambiguous_match": resolved.get("ambiguous_match", False),
         "regimen_group_ids": resolved.get("regimen_group_ids", []),
+        "is_regimen_parent": resolved.get("is_regimen_parent", False),
         "regimen_components": resolved.get("regimen_components", []),
         "origins": resolved.get("origins", []),
         "raw_mentions": resolved.get("raw_mentions", []),
+        "extraction_metadata": extraction_metadata,
+        "source_provenance": source_provenance,
         "rucam": rucam_entry.model_dump() if rucam_entry is not None else None,
     }
 

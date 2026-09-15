@@ -40,7 +40,7 @@ def _sentences(text: str) -> list[str]:
     normalized = re.sub(r"\s+", " ", str(text or "")).strip()
     return [
         sentence.strip()
-        for sentence in re.split(r"(?<=[.!?;])\s+|\r?\n+", normalized)
+        for sentence in re.split(r"(?<=[.!?])\s+|\r?\n+", normalized)
         if sentence.strip()
     ]
 
@@ -53,6 +53,24 @@ def contains_rechallenge_recommendation(text: str | None) -> bool:
             continue
         for match in _PERMISSIVE_RE.finditer(sentence):
             clause = match.group(0)
+            prefix = sentence[: match.start()]
+            negative_match = list(_NEGATIVE_RE.finditer(prefix))[-1:]
+            if negative_match:
+                bridge = prefix[negative_match[0].end() :]
+                if not re.search(
+                    r"\b(?:but|however|yet|although)\b", bridge
+                ) and not re.search(
+                    r"\b(?:but|however|yet|although)\b", clause
+                ):
+                    continue
+            trailing_text = sentence[match.end() :]
+            if re.search(
+                rf"\b(?:no|not|never|must\s+not|should\s+not|do\s+not|don't)\b"
+                rf"[^.!?;]{{0,80}}\b{_RECHALLENGE_TERM}\b",
+                trailing_text,
+                re.IGNORECASE,
+            ):
+                continue
             context = sentence[max(0, match.start() - 18) : match.end() + 40]
             if _NEGATIVE_RE.search(context):
                 connector = re.search(r"\b(?:but|however|yet|although)\b", clause)

@@ -389,6 +389,18 @@ class KnowledgeRepository:
             }
 
     # -------------------------------------------------------------------------
+    def resolve_drug_id_by_name(self, drug_name: str | None) -> int | None:
+        """Resolve a canonical LiverTox drug name to its persisted identity."""
+        normalized_name = normalize_drug_name(drug_name)
+        if not normalized_name:
+            return None
+        with self.session_factory() as db_session:
+            drug_id = db_session.scalar(
+                select(Drug.id).where(Drug.canonical_name_norm == normalized_name)
+            )
+            return int(drug_id) if drug_id is not None else None
+
+    # -------------------------------------------------------------------------
     def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
         safe_drug_id = int(drug_id)
         with self.session_factory() as db_session:

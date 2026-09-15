@@ -24,6 +24,7 @@ from services.clinical.deterministic_extraction import (
 from common.utils.text_utils import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
 from services.clinical.parser_host import ParserHost
+from services.clinical.parser_validation import is_obvious_non_drug_name
 
 ###############################################################################
 class DrugRulesMixin(ParserHost):
@@ -555,6 +556,8 @@ class DrugRulesMixin(ParserHost):
 
     # -------------------------------------------------------------------------
     def is_non_drug_fragment_name(self, value: str) -> bool:
+        if is_obvious_non_drug_name(value):
+            return True
         normalized = self.normalize_filter_key(value)
         snapshot = get_text_normalization_snapshot()
         non_drug_exact = set(self.NON_DRUG_EXACT_NAMES) | set(
