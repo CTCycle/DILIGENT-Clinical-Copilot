@@ -106,14 +106,18 @@ class GeminiTransport(StructuredTransportMixin):
     def _tool_config(cls, request: ChatRequest) -> types.ToolConfig | None:
         if request.tool_choice is None:
             return None
-        mode = "AUTO"
+        mode = types.FunctionCallingConfigMode.AUTO
         allowed: list[str] | None = None
         if isinstance(request.tool_choice, str):
-            mode = {"auto": "AUTO", "none": "NONE", "required": "ANY"}.get(
-                request.tool_choice.lower(), "AUTO"
+            mode = {
+                "auto": types.FunctionCallingConfigMode.AUTO,
+                "none": types.FunctionCallingConfigMode.NONE,
+                "required": types.FunctionCallingConfigMode.ANY,
+            }.get(
+                request.tool_choice.lower(), types.FunctionCallingConfigMode.AUTO
             )
         elif isinstance(request.tool_choice, dict):
-            mode = "ANY"
+            mode = types.FunctionCallingConfigMode.ANY
             name = request.tool_choice.get("name")
             if name:
                 allowed = [str(name)]
@@ -403,7 +407,7 @@ class GeminiTransport(StructuredTransportMixin):
             result = await self.chat(
                 ChatRequest(
                     model=model,
-                    messages=[{"role": "user", "content": "Reply with exactly: OK"}],
+                    messages=[ChatMessage(role="user", content="Reply with exactly: OK")],
                     output_token_limit=16,
                     operation="connectivity",
                 )

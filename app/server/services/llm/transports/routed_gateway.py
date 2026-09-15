@@ -11,6 +11,7 @@ from common.utils.logger import logger
 from common.version import resolve_application_version
 from domain.llm.providers import CloudModelDescriptor
 from domain.llm.transports import (
+    ChatMessage,
     ChatRequest,
     ChatResult,
     ChatStreamEvent,
@@ -413,7 +414,7 @@ class RoutedGatewayTransport(StructuredTransportMixin):
             result = await self.chat(
                 ChatRequest(
                     model=model,
-                    messages=[{"role": "user", "content": "Reply with exactly: OK"}],
+                    messages=[ChatMessage(role="user", content="Reply with exactly: OK")],
                     operation="connectivity",
                 )
             )
