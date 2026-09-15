@@ -738,6 +738,34 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
     ]
 
 ###############################################################################
+def test_synthetic_dili_case_keeps_only_the_actual_regimen_drug() -> None:
+    parser = DrugsParser(client=object())
+    anamnesis = (
+        "Synthetic QA case only; no real patient data. 42-year-old adult with no known "
+        "chronic liver disease, no alcohol use, and no known viral hepatitis risk. "
+        "Developed fatigue, nausea, pruritus, and dark urine on 2026-09-10. No hypotension "
+        "or ischemic episode. Viral hepatitis serologies are negative, autoimmune markers "
+        "are negative, and ultrasound shows no biliary obstruction. No herbal or dietary "
+        "supplements. Symptoms began improving after the suspected drug was stopped."
+    )
+    therapy = (
+        "Amoxicillin/clavulanate 875/125 mg orally twice daily for sinusitis, "
+        "started 2026-08-30.\n"
+        "Last dose 2026-09-07; stopped after symptoms appeared.\n"
+        "No other new prescription or over-the-counter drugs; no regular acetaminophen "
+        "use.\n"
+        "Dechallenge: symptoms and liver tests improved after suspension. No rechallenge."
+    )
+
+    anamnesis_result = parser.extract_drugs_from_anamnesis_deterministic(anamnesis)
+    therapy_result = parser.extract_drugs_from_therapy_deterministic(therapy)
+
+    assert [entry.name for entry in anamnesis_result.entries] == []
+    assert [entry.name for entry in therapy_result.entries] == [
+        "Amoxicillin/clavulanate"
+    ]
+
+###############################################################################
 def test_extract_drugs_from_anamnesis_rejects_grounded_non_medication_entities() -> (
     None
 ):

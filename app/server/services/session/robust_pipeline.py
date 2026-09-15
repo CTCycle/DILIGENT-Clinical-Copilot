@@ -29,6 +29,7 @@ from domain.clinical.robustness import (
     SourceSpan,
     TimedDrugMention,
 )
+from services.clinical.parser_validation import is_obvious_non_drug_name
 
 TIMING_RE = re.compile(
     r"\b(?P<date>\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|"
@@ -614,7 +615,10 @@ def _guess_drug_name(line: str) -> str | None:
     words = candidate.split()
     if not words:
         return None
-    return " ".join(words[:4])
+    candidate = " ".join(words[:4])
+    if is_obvious_non_drug_name(candidate):
+        return None
+    return candidate
 
 ###############################################################################
 def _drug_node(

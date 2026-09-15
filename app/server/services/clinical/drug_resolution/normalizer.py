@@ -12,6 +12,7 @@ from services.text.normalization import (
     canonicalize_drug_query,
     normalize_drug_query_name,
 )
+from services.clinical.parser_validation import is_obvious_non_drug_name
 
 _MIN_DRUG_NAME_LENGTH = 3
 _MAX_DRUG_NAME_WORDS = 6
@@ -97,6 +98,8 @@ class DrugMentionNormalizer:
     def _looks_like_drug_candidate(self, normalized_name: str, raw_name: str) -> bool:
         """Admit plausible medication labels without requiring catalog recognition."""
         if not normalized_name or len(normalized_name) < _MIN_DRUG_NAME_LENGTH:
+            return False
+        if is_obvious_non_drug_name(raw_name):
             return False
         if len(normalized_name) > _MAX_DRUG_NAME_CHARS:
             return False

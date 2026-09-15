@@ -69,6 +69,33 @@ def test_extraction_artifact_uses_ui_metadata_outside_document_sections() -> Non
     assert artifact.timed_drugs[0].drug == "Zetamycin 10 mg 1-0-0-0"
 
 ###############################################################################
+def test_timed_drug_extraction_rejects_status_and_symptom_fragments() -> None:
+    payload = PatientData(
+        anamnesis=(
+            "Developed fatigue, nausea, pruritus, and dark urine on 2026-09-10. "
+            "Symptoms began improving after the suspected drug was stopped."
+        ),
+        drugs=(
+            "Amoxicillin/clavulanate 875/125 mg orally twice daily, started 2026-08-30.\n"
+            "Last dose 2026-09-07; stopped after symptoms appeared."
+        ),
+    )
+
+    artifact = build_extraction_artifact(
+        normalized_document=DocumentNormalizer().normalize(
+            "Amoxicillin/clavulanate 875/125 mg orally twice daily, started 2026-08-30."
+        ),
+        section_extraction=None,
+        payload=payload,
+    )
+
+    timed_names = [item.drug.casefold() for item in artifact.timed_drugs]
+    assert timed_names
+    assert not any("last dose" in name for name in timed_names)
+    assert not any("dark urine" in name for name in timed_names)
+    assert not any(name.startswith("and ") for name in timed_names)
+
+###############################################################################
 def test_fact_graph_validation_blocks_source_verbatim_nodes_without_spans() -> None:
     graph = FactGraph(
         nodes=[

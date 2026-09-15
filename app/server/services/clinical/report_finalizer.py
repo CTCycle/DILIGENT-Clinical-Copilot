@@ -478,6 +478,11 @@ class ReportFinalizer:
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def has_rxnav_provenance(entry: DrugClinicalAssessment) -> bool:
+        return bool(str(entry.rxnav_rxcui or "").strip())
+
+    # -------------------------------------------------------------------------
     @classmethod
     def bibliography_source_label(
         cls, entry: DrugClinicalAssessment | None = None
@@ -487,8 +492,19 @@ class ReportFinalizer:
                 "livertox", "LiverTox"
             )
         ]
+        if entry is not None and cls.has_rxnav_provenance(entry):
+            sources.append(f"RxNav (RxCUI {entry.rxnav_rxcui})")
         if entry is not None and cls.has_dilirank_provenance(entry):
-            sources.append(DILIRANK_SOURCE_LABEL)
+            dilirank_label = DILIRANK_SOURCE_LABEL
+            if any(
+                isinstance(item, dict)
+                and item.get("knowledge_source") == DILIRANK_PROVENANCE_KEY
+                and item.get("evidence_scope")
+                in {"regimen_component", "drug_and_regimen_component"}
+                for item in entry.extraction_metadata
+            ):
+                dilirank_label = f"{dilirank_label} (component-level)"
+            sources.append(dilirank_label)
         return "; ".join(sources)
 
     # -------------------------------------------------------------------------

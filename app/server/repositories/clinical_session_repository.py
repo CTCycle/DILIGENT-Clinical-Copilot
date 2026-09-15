@@ -557,7 +557,9 @@ class ClinicalSessionRepository:
                 item.get("matched_drug_name")
             )
             rxcui = repository_values.normalize_string(
-                item.get("rxcui") or item.get("rxnorm_rxcui")
+                item.get("rxcui")
+                or item.get("accepted_rxnav_rxcui")
+                or item.get("rxnorm_rxcui")
             )
             nbk_id = repository_values.normalize_string(item.get("nbk_id"))
             resolved_drug_id = repository_values.to_int(item.get("drug_id"))
@@ -582,7 +584,16 @@ class ClinicalSessionRepository:
                     evidence_json={
                         "matched_drug_name": matched_drug_name,
                         "rxcui": rxcui,
+                        "accepted_rxnav_rxcui": repository_values.normalize_string(
+                            item.get("accepted_rxnav_rxcui")
+                        ),
+                        "rxnav_candidates": item.get("rxnav_candidates") or [],
+                        "rxnav_validation_status": repository_values.normalize_string(
+                            item.get("rxnav_validation_status")
+                        ),
                         "nbk_id": nbk_id,
+                        "source_provenance": item.get("source_provenance") or {},
+                        "extraction_metadata": item.get("extraction_metadata") or [],
                         "duplicate_mention": duplicate_mention,
                     },
                 )

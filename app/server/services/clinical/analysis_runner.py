@@ -555,11 +555,28 @@ class AnalysisRunner:
             },
         ]
         knowledge_prompt = str(livertox_data.get("knowledge_prompt") or "").strip()
+        source_provenance = livertox_data.get("source_provenance")
+        if not isinstance(source_provenance, dict):
+            source_provenance = {}
+        rxnav_rxcui = (
+            str(
+                livertox_data.get("accepted_rxnav_rxcui")
+                or livertox_data.get("rxnav_rxcui")
+                or ""
+            ).strip()
+            or None
+        )
+        rxnav_validation_status = (
+            str(livertox_data.get("rxnav_validation_status") or "").strip() or None
+        )
         entry = DrugClinicalAssessment(
             drug_name=drug_entry.name,
             canonical_name=canonical_name,
             origins=origins,
             extraction_metadata=extraction_metadata,
+            source_provenance=source_provenance,
+            rxnav_rxcui=rxnav_rxcui,
+            rxnav_validation_status=rxnav_validation_status,
             matched_livertox_row=matched_lvt_row,
             extracted_excerpts=excerpts_list,
             missing_livertox=missing_livertox,

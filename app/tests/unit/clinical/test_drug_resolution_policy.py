@@ -265,6 +265,52 @@ def test_combination_product_preserves_parent_and_components() -> None:
     )
 
 ###############################################################################
+def test_combination_strength_selects_the_matching_rxnav_formulation() -> None:
+    catalog = pd.DataFrame(
+        [
+            {
+                "rxcui": "562251",
+                "term_type": "SCD",
+                "raw_name": "amoxicillin 875 MG / clavulanate 125 MG Oral Tablet",
+                "name": "amoxicillin clavulanate oral",
+                "brand_names": "Augmentin",
+                "synonyms": '["amoxicillin 875 MG / clavulanate 125 MG Oral Tablet"]',
+            },
+            {
+                "rxcui": "861689",
+                "term_type": "SCD",
+                "raw_name": "amoxicillin 1000 MG / clavulanate 62.5 MG extended release oral",
+                "name": "amoxicillin clavulanate extended release oral",
+                "brand_names": "Augmentin XR",
+                "synonyms": '["amoxicillin 1000 MG / clavulanate 62.5 MG extended release oral"]',
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(_livertox_frame(), drugs_catalog_df=catalog)
+    resolver = DrugResolutionService(matcher)
+
+    resolved = resolver.resolve(
+        PatientDrugs(
+            entries=[
+                DrugEntry(
+                    name="Amoxicillin/clavulanate",
+                    dosage="875/125 mg",
+                    route="oral",
+                )
+            ]
+        )
+    )
+
+    payload = resolved["amoxicillin clavulanate"]
+    assert payload["decision_status"] == "accepted_rxnav_validated"
+    assert payload["accepted_rxnav_rxcui"] == "562251"
+    assert any(
+        item["rxcui"] == "861689"
+        and item["rejected_reason"]
+        for item in payload["rxnav_candidates"]
+    )
+
+###############################################################################
 def test_ambiguous_alias_requires_review() -> None:
     payload = _resolve_one("SharedAlias")
 
@@ -393,6 +439,98 @@ def test_db_cache_hit_returns_cached_result() -> None:
         "accepted_exact_livertox",
         "accepted_livertox_without_rxnav",
     }
+
+###############################################################################
+def test_livertox_only_cache_revalidates_against_loaded_rxnav_catalog() -> None:
+    serializer, _drug, _monograph = _build_cache_db()
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0001",
+                "drug_name": "Acetaminophen",
+                "excerpt": "Fresh Acetaminophen excerpt.",
+                "synonyms": "Tylenol; Paracetamol",
+                "ingredient": "Acetaminophen",
+                "brand_name": "Tylenol",
+            },
+        ]
+    )
+    catalog = pd.DataFrame(
+        [
+            {
+                "rxcui": "161",
+                "term_type": "IN",
+                "raw_name": "Acetaminophen",
+                "name": "Acetaminophen",
+                "brand_names": ["Tylenol"],
+                "synonyms": ["Paracetamol"],
+            }
+        ]
+    )
+    matcher = LiverToxMatcher(frame, drugs_catalog_df=catalog)
+
+    def cache_lookup(key: str):
+        return serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+
+    resolver = DrugResolutionService(
+        matcher,
+        cache_lookup=cache_lookup,
+    )
+    resolved = resolver.resolve(PatientDrugs(entries=[DrugEntry(name="Acetaminophen")]))
+    assert resolved
+    payload = next(iter(resolved.values()))
+
+    assert "cache_hit_previous_match" not in payload.get("match_reason", "")
+    assert payload["accepted_rxnav_rxcui"] == "161"
+    assert payload["rxnav_candidates"]
+    assert payload["decision_status"] == "accepted_rxnav_validated"
+
+###############################################################################
+def test_cached_rxnav_identity_is_revalidated_when_catalog_changes() -> None:
+    serializer, drug, _monograph = _build_cache_db()
+    factory = sessionmaker(
+        bind=serializer.session_factory.kw["bind"],
+        future=True,
+    )
+    with factory() as session:
+        cache = session.query(KbMatchCache).first()
+        assert cache is not None
+        cache.rxnorm_rxcui = "old-rxcui"
+        cache.source = "rxnav"
+        session.add(
+            DrugRxnormCode(drug_id=int(cache.drug_id), rxcui="old-rxcui")
+        )
+        session.commit()
+
+    matcher = LiverToxMatcher(
+        _livertox_frame().iloc[[0]],
+        drugs_catalog_df=pd.DataFrame(
+            [
+                {
+                    "rxcui": "new-rxcui",
+                    "term_type": "IN",
+                    "raw_name": "Acetaminophen",
+                    "name": "Acetaminophen",
+                    "brand_names": [],
+                    "synonyms": [],
+                }
+            ]
+        ),
+    )
+
+    def cache_lookup(key: str):
+        return serializer.load_livertox_match_from_db_cache(
+            normalized_drug_key=key,
+        )
+
+    resolver = DrugResolutionService(matcher, cache_lookup=cache_lookup)
+    resolved = resolver.resolve(PatientDrugs(entries=[DrugEntry(name="Acetaminophen")]))
+    payload = next(iter(resolved.values()))
+
+    assert "cache_hit_previous_match" not in payload.get("match_reason", "")
+    assert payload["accepted_rxnav_rxcui"] == "new-rxcui"
 
 ###############################################################################
 def test_db_cache_miss_falls_through_to_pipeline() -> None:

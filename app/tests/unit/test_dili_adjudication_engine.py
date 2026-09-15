@@ -274,6 +274,28 @@ def test_generated_narrative_safety_gate_blocks_unsupported_certainty() -> None:
         issue["code"] for issue in negated_safety_language_issues
     }
 
+    precluded_diagnosis_issues = DiliEvidenceBuilder.audit_generated_narrative(
+        clinical_narrative=(
+            "The indeterminate pattern and incomplete causality scoring preclude a "
+            "definitive diagnosis; clinician review remains required."
+        ),
+        bundle=bundle,
+    )
+    assert "clinical_narrative_overstates_causality" not in {
+        issue["code"] for issue in precluded_diagnosis_issues
+    }
+
+    qualified_exclusion_issues = DiliEvidenceBuilder.audit_generated_narrative(
+        clinical_narrative=(
+            "The report does not explicitly state that all competing causes were "
+            "excluded; the differential remains unresolved."
+        ),
+        bundle=bundle,
+    )
+    assert "clinical_narrative_contradicts_competing_causes" not in {
+        issue["code"] for issue in qualified_exclusion_issues
+    }
+
 ###############################################################################
 def test_generated_narrative_safety_gate_blocks_rechallenge_permission() -> None:
     bundle = DiliEvidenceBuilder().build(
@@ -304,6 +326,18 @@ def test_generated_narrative_safety_gate_blocks_rechallenge_permission() -> None
     )
     assert "clinical_narrative_recommends_rechallenge" not in {
         issue["code"] for issue in safe_issues
+    }
+
+    specialist_decision_with_prohibition = DiliEvidenceBuilder.audit_generated_narrative(
+        clinical_narrative=(
+            "If the drug is indispensable, this should be a specialist-level decision "
+            "after recovery with explicit acknowledgment of recurrence risk on "
+            "re-exposure; no monitored or observed rechallenge should be undertaken."
+        ),
+        bundle=bundle,
+    )
+    assert "clinical_narrative_recommends_rechallenge" not in {
+        issue["code"] for issue in specialist_decision_with_prohibition
     }
 
 ###############################################################################

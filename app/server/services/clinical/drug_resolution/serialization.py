@@ -62,6 +62,7 @@ def decision_to_payload(
         "regimen_group_ids": [mention.regimen_group_id]
         if mention.regimen_group_id
         else [],
+        "is_regimen_parent": mention.is_regimen_parent,
         "regimen_components": mention.regimen_components,
         "rxnav_candidates": [
             candidate.model_dump(mode="json") for candidate in decision.rxnav_candidates
