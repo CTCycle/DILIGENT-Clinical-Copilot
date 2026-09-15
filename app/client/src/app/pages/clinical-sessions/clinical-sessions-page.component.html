@@ -1,10 +1,4 @@
 <main class="page-container clinical-sessions-page">
-  <header class="clinical-sessions-header">
-    <div>
-      <p class="lede">Browse, edit, annotate, and inspect persisted clinical sessions while building clearer patient timelines across each saved review.</p>
-    </div>
-  </header>
-
   @if (listError()) {
     <p class="clinical-sessions-status is-error">{{ listError() }}</p>
   }
@@ -454,11 +448,15 @@
                 <div class="clinical-session-card-title"><span>Generated draft</span><small>Current report remains unchanged until a human decision.</small></div>
                 <div class="clinical-session-revision-draft-content" [innerHTML]="revisionDraftReportHtml()"></div>
               </section>
-            }
-            @if (revisionReviewAvailable()) { <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="recordRevisionReview('approved')">Approve by human</button><button type="button" class="btn" (click)="recordRevisionReview('rejected')">Reject</button></div> }
-            @if (revisionSteps().length) { <h4>Agent trace</h4><ul class="clinical-session-side-list">@for (step of revisionSteps(); track step.step_name) { <li><strong>{{ step.step_name }}</strong><small>{{ step.status }}</small></li> }</ul> }
-            @if (revisionArtifacts().length) { <h4>Draft artifacts</h4><ul class="clinical-session-side-list">@for (artifact of revisionArtifacts(); track artifact.artifact_key) { <li><strong>{{ artifact.artifact_key || 'artifact' }}</strong><small>{{ artifact.status || 'recorded' }}</small></li> }</ul> }
-          </div>        }
+             }
+             @if (revisionReviewAvailable()) { <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="recordRevisionReview('approved')">Approve by human</button><button type="button" class="btn" (click)="recordRevisionReview('rejected')">Reject</button></div> }
+             @if (revisionAuditVisible()) {
+               <app-clinical-session-revision-audit
+                 [steps]="revisionSteps()"
+                 [artifacts]="revisionArtifacts()"
+               />
+             }
+           </div>        }
 
         @if (activeSection() === 'timeline' && selected(); as detail) {
           <app-clinical-session-timeline-workspace [session]="detail"></app-clinical-session-timeline-workspace>

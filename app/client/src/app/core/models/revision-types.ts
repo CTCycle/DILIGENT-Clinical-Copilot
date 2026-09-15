@@ -29,21 +29,48 @@ export type RevisionJobResult = Record<string, unknown> & {
 export type RevisionJobStatusResponse = JobStatusResponse<RevisionJobResult>;
 
 export type RevisionPipelineStep = {
+  pipeline_run_id?: string;
   step_name: string;
   step_index: number;
   step_count: number;
+  attempt_number?: number;
   status: string;
+  input_hash?: string | null;
+  output_hash?: string | null;
+  input_summary?: Record<string, unknown> | null;
   output_summary?: Record<string, unknown> | null;
   output_payload?: Record<string, unknown> | null;
+  schema_name?: string | null;
+  schema_version?: string | null;
+  prompt_version?: string | null;
+  parser_version?: string | null;
+  model_provider?: string | null;
+  model_name?: string | null;
+  token_usage?: Record<string, unknown> | null;
+  latency_ms?: number | null;
+  retry_count?: number;
   error?: Record<string, unknown> | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  superseded_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type RevisionPipelineStepListResponse = { items: RevisionPipelineStep[] };
 
 export type RevisionArtifact = {
+  revision_version_id?: number;
+  pipeline_run_id?: string;
+  artifact_kind?: string | null;
   artifact_key: string | null;
+  entity_type?: string | null;
+  entity_name?: string | null;
   status: string | null;
+  schema_version?: string | null;
   payload: Record<string, unknown> | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type RevisionArtifactListResponse = { items: RevisionArtifact[] };

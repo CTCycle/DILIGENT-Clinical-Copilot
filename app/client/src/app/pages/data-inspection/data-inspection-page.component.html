@@ -1,18 +1,4 @@
 <main class="page-container inspection-page inspection-page-workbench">
-  <header class="page-header inspection-page-intro">
-    <p class="lede">Inspect and update RxNav, LiverTox, FDA DILIrank 2.0, and RAG knowledge sources.</p>
-    <div class="inspection-page-header-actions">
-      <app-inspection-progress-button
-        [buttonLabel]="'Update All Sources'"
-        [inProgress]="updateAllRunning()"
-        [progress]="updateAllState().progress"
-        [progressMessage]="updateAllState().message"
-        [disabled]="updateAllButtonDisabled()"
-        (activated)="openUpdateAllModal()"
-      />
-    </div>
-  </header>
-
   <section class="inspection-layout">
     <aside class="inspection-toolbar" aria-label="Data inspection views">
       <p class="inspection-toolbar-eyebrow">Views</p>
@@ -36,6 +22,17 @@
             <span>{{ view.label }}</span>
           </button>
         }
+      </div>
+      <div class="inspection-toolbar-maintenance" aria-label="Data source maintenance">
+        <p class="inspection-toolbar-eyebrow">Maintenance</p>
+        <app-inspection-progress-button
+          [buttonLabel]="'Update all'"
+          [inProgress]="updateAllRunning()"
+          [progress]="updateAllState().progress"
+          [progressMessage]="updateAllState().message"
+          [disabled]="updateAllButtonDisabled()"
+          (activated)="openUpdateAllModal()"
+        />
       </div>
     </aside>
 
