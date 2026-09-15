@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from common.utils.text_utils import coerce_text
@@ -12,6 +13,8 @@ from services.text.normalization import normalize_drug_query_name
 
 ###############################################################################
 class RxNavCandidateResolver:
+
+    _DOSAGE_NUMBER_RE = re.compile(r"(?<![A-Za-z])\d+(?:\.\d+)?")
 
     # -------------------------------------------------------------------------
     def __init__(self, matcher: Any | None) -> None:
@@ -56,19 +59,186 @@ class RxNavCandidateResolver:
         exact = index.get(mention.normalized_name)
         if exact is not None:
             return [self._candidate_from_payload(exact, "exact_catalog_match")]
-        candidates: list[RxNavResolutionCandidate] = []
+        matches: list[
+            tuple[
+                RxNavResolutionCandidate,
+                tuple[dict[str, Any], bool, str],
+                list[str],
+                bool,
+            ]
+        ] = []
         query_tokens = mention.normalized_name.split()
         for key, payload in index.items():
             key_tokens = key.split()
-            if not key_tokens or key_tokens != query_tokens[: len(key_tokens)]:
+            if not key_tokens:
                 continue
-            suffix_tokens = query_tokens[len(key_tokens) :]
+            is_query_prefix = key_tokens == query_tokens[: len(key_tokens)]
+            is_catalog_formulation = (
+                len(query_tokens) < len(key_tokens)
+                and query_tokens == key_tokens[: len(query_tokens)]
+            )
+            if not is_query_prefix and not is_catalog_formulation:
+                continue
+            suffix_tokens = (
+                query_tokens[len(key_tokens) :]
+                if is_query_prefix
+                else key_tokens[len(query_tokens) :]
+            )
             if not self.allow_catalog_prefix_match(suffix_tokens, payload):
                 continue
-            candidates.append(
-                self._candidate_from_payload(payload, "guarded_prefix_catalog_match")
+            reason = (
+                "formulation_prefix_catalog_match"
+                if is_catalog_formulation
+                else "guarded_prefix_catalog_match"
             )
-        return candidates[:4]
+            matches.append(
+                (
+                    self._candidate_from_payload(payload, reason),
+                    payload,
+                    suffix_tokens,
+                    is_catalog_formulation,
+                )
+            )
+        return self._rank_formulation_matches(mention, matches)[:4]
+
+    # -------------------------------------------------------------------------
+    def _rank_formulation_matches(
+        self,
+        mention: NormalizedDrugMention,
+        matches: list[
+            tuple[
+                RxNavResolutionCandidate,
+                tuple[dict[str, Any], bool, str],
+                list[str],
+                bool,
+            ]
+        ],
+    ) -> list[RxNavResolutionCandidate]:
+        """Deduplicate catalog aliases and use explicit exposure details safely.
+
+        A bare ingredient combination can be a prefix of several RxNav product
+        labels.  A strength and route captured from the therapy entry are
+        deterministic formulation evidence; without that evidence, retain all
+        viable candidates so the clinical policy keeps the match ambiguous.
+        """
+        if not matches:
+            return []
+
+        deduplicated: dict[str, tuple[RxNavResolutionCandidate, Any, list[str], bool]] = {}
+        for candidate, payload, suffix_tokens, is_catalog_formulation in matches:
+            identity = candidate.rxcui or candidate.normalized_name
+            current = deduplicated.get(identity)
+            if current is None or (
+                is_catalog_formulation and not current[3]
+            ):
+                deduplicated[identity] = (
+                    candidate,
+                    payload,
+                    suffix_tokens,
+                    is_catalog_formulation,
+                )
+
+        unique_matches = list(deduplicated.values())
+        formulation_matches = [item for item in unique_matches if item[3]]
+        if not formulation_matches:
+            return [item[0] for item in unique_matches]
+
+        scored = [
+            (
+                item,
+                self._formulation_evidence_score(
+                    mention,
+                    item[1],
+                    item[2],
+                ),
+            )
+            for item in formulation_matches
+        ]
+        dosage_numbers = self._mention_dosage_numbers(mention)
+        if dosage_numbers:
+            best_evidence = max(
+                (score[0], score[1]) for _item, score in scored
+            )
+            strongest = [
+                item
+                for item, score in scored
+                if (score[0], score[1]) == best_evidence
+            ]
+            strongest_rxcuis = {
+                item[0].rxcui for item in strongest if item[0].rxcui
+            }
+            if best_evidence[0] > 0 and len(strongest_rxcuis) == 1:
+                selected_rxcui = next(iter(strongest_rxcuis))
+                for item, score in scored:
+                    candidate = item[0]
+                    if candidate.rxcui == selected_rxcui:
+                        candidate.reason = (
+                            "strength_matched_formulation_catalog_match"
+                        )
+                        candidate.confidence = 0.88
+                        continue
+                    candidate.rejected_reason = (
+                        "not selected by formulation strength and route evidence"
+                    )
+
+        return [item[0] for item in unique_matches]
+
+    # -------------------------------------------------------------------------
+    def _formulation_evidence_score(
+        self,
+        mention: NormalizedDrugMention,
+        payload: tuple[dict[str, Any], bool, str],
+        suffix_tokens: list[str],
+    ) -> tuple[int, int, int]:
+        entry, _matched_is_synonym, _matched_value = payload
+        dosage_numbers = self._mention_dosage_numbers(mention)
+        catalog_numbers = self._catalog_numbers(entry)
+        matched_strengths = sum(
+            1 for number in dosage_numbers if number in catalog_numbers
+        )
+        route_tokens = {
+            token
+            for metadata in mention.extraction_metadata
+            if isinstance(metadata, dict)
+            for field_name in ("route", "administration_mode")
+            for token in str(metadata.get(field_name) or "")
+            .casefold()
+            .replace("/", " ")
+            .split()
+        }
+        route_match = int(bool(route_tokens & set(suffix_tokens)))
+        return matched_strengths, route_match, -len(suffix_tokens)
+
+    # -------------------------------------------------------------------------
+    def _mention_dosage_numbers(self, mention: NormalizedDrugMention) -> set[str]:
+        numbers: set[str] = set()
+        for metadata in mention.extraction_metadata:
+            if not isinstance(metadata, dict):
+                continue
+            dosage = str(metadata.get("dosage") or "")
+            numbers.update(self._DOSAGE_NUMBER_RE.findall(dosage))
+        return numbers
+
+    # -------------------------------------------------------------------------
+    def _catalog_numbers(self, entry: dict[str, Any]) -> set[str]:
+        values: list[str] = []
+        for field_name in (
+            "raw_name",
+            "name",
+            "synonyms",
+            "fallback_aliases",
+            "brand_names",
+        ):
+            value = entry.get(field_name)
+            if isinstance(value, list):
+                values.extend(str(item) for item in value)
+            elif value is not None:
+                values.append(str(value))
+        return set(
+            number
+            for value in values
+            for number in self._DOSAGE_NUMBER_RE.findall(value)
+        )
 
     # -------------------------------------------------------------------------
     def allow_catalog_prefix_match(

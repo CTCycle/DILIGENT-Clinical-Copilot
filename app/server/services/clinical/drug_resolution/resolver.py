@@ -121,6 +121,8 @@ class DrugResolutionService:
             return None
 
         has_rxcui = bool(cached.get("rxnorm_rxcui"))
+        if self._should_revalidate_cached_rxnav(mention, cached, has_rxcui):
+            return None
         exact_name = cached.get("normalized_drug_name") == mention.normalized_name
         if has_rxcui:
             status = "accepted_rxnav_validated"
@@ -185,6 +187,31 @@ class DrugResolutionService:
             decision,
             matched_row=matched_row,
             excerpts=excerpts,
+        )
+
+    # -------------------------------------------------------------------------
+    def _should_revalidate_cached_rxnav(
+        self,
+        mention: NormalizedDrugMention,
+        cached: dict[str, Any],
+        has_rxcui: bool,
+    ) -> bool:
+        """Return whether a loaded RxNav catalog supersedes this cache entry."""
+        lookup = getattr(self.matcher, "lookup", None)
+        catalog_index = getattr(lookup, "catalog_global_index", {}) if lookup else {}
+        if not catalog_index:
+            # Preserve the established cache-only behavior when no RxNav
+            # snapshot is available to validate against.
+            return False
+        candidates = self.rxnav_resolver.build_candidates(mention)
+        if not has_rxcui:
+            # A previous LiverTox-only cache entry must not hide a newly
+            # available RxNav identity.
+            return True
+        cached_rxcui = str(cached.get("rxnorm_rxcui") or "").strip()
+        return not any(
+            str(candidate.rxcui or "").strip() == cached_rxcui
+            for candidate in candidates
         )
 
     # -------------------------------------------------------------------------

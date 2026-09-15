@@ -13,7 +13,7 @@ LIVERTOX_TITLE_LINE_RE = re.compile(
 )
 REPORT_LABEL_LINE_RE = re.compile(r"^\s*\*{0,2}\s*Report\s*\*{0,2}\s*$", re.IGNORECASE)
 BIBLIOGRAPHY_LINE_RE = re.compile(
-    r"^\s*\*{0,2}\s*Bibliography source\s*\*{0,2}\s*:\s*LiverTox\s*$",
+    r"^\s*\*{0,2}\s*Bibliography source\s*\*{0,2}\s*:\s*.+$",
     re.IGNORECASE,
 )
 DRIFT_SECTION_LINE_RE = re.compile(

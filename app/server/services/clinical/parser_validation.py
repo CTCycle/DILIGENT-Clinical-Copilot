@@ -1,9 +1,54 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from functools import lru_cache
 from typing import Any
 
 from services.catalogs.runtime import get_reference_catalog_snapshot
+
+_STATUS_LABEL_RE = re.compile(
+    r"^(?:last|first|final|ultima|ultimo|ricevut[oaie]?|"
+    r"interrott[oaie]?|iniziat[oaie]?|sospes[oaie]?|termine)"
+    r"(?:\s+(?:dose|doses|administration|somministrazione|somministrazioni|"
+    r"received|given|il|dal|al))?$",
+    re.IGNORECASE,
+)
+_LEADING_NARRATIVE_RE = re.compile(
+    r"^(?:and|or|but|then|on|after|before|no)\b",
+    re.IGNORECASE,
+)
+
+###############################################################################
+def normalize_parser_filter_key(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", str(value or ""))
+    normalized = normalized.encode("ascii", "ignore").decode("ascii").lower()
+    normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
+    return re.sub(r"\s+", " ", normalized).strip()
+
+###############################################################################
+def is_obvious_non_drug_name(value: str | None) -> bool:
+    """Reject status labels and prose fragments before clinical resolution."""
+    raw = str(value or "").strip()
+    normalized = normalize_parser_filter_key(raw)
+    if not normalized:
+        return True
+    if re.search(r"[.;:]\s", raw):
+        return True
+    if _STATUS_LABEL_RE.fullmatch(normalized):
+        return True
+    if _LEADING_NARRATIVE_RE.match(normalized):
+        return True
+    snapshot = get_reference_catalog_snapshot()
+    catalog_names = {
+        normalize_parser_filter_key(item)
+        for item in (
+            snapshot.values("clinical_extraction", "drug_non_name_exact")
+            + snapshot.values("text_normalization", "drug_non_mentions")
+        )
+        if item
+    }
+    return normalized in catalog_names
 
 ###############################################################################
 @lru_cache(maxsize=1)

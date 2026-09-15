@@ -35,6 +35,8 @@ from repositories.schemas.knowledge import (
     LiverToxMonograph,
 )
 
+_RXNAV_SQL_PARAMETER_BUDGET = 900
+
 ###############################################################################
 def _build_search_pattern(search: str | None) -> str | None:
     normalized = repository_values.normalize_string(search)
@@ -42,6 +44,12 @@ def _build_search_pattern(search: str | None) -> str | None:
         return None
     escaped = re.sub(r"([%_\\])", r"\\\1", normalized.casefold())
     return f"%{escaped}%"
+
+###############################################################################
+def _chunks(values: list[Any], size: int) -> Iterator[list[Any]]:
+    safe_size = max(1, int(size))
+    for start in range(0, len(values), safe_size):
+        yield values[start : start + safe_size]
 
 ###############################################################################
 class DrugCatalogRepository:
@@ -123,6 +131,28 @@ class DrugCatalogRepository:
         *,
         curated_aliases_by_canonical: dict[str, list[tuple[str, str]]] | None,
     ) -> None:
+        configured_batch_size = int(
+            get_server_settings().database.insert_batch_size
+        )
+        row_batch_size = min(
+            max(1, configured_batch_size),
+            _RXNAV_SQL_PARAMETER_BUDGET // 3,
+        )
+        for row_batch in _chunks(prepared_rows, row_batch_size):
+            self._upsert_prepared_rxnav_batch(
+                db_session,
+                row_batch,
+                curated_aliases_by_canonical=curated_aliases_by_canonical,
+            )
+
+    # -------------------------------------------------------------------------
+    def _upsert_prepared_rxnav_batch(
+        self,
+        db_session: Session,
+        prepared_rows: list[dict[str, Any]],
+        *,
+        curated_aliases_by_canonical: dict[str, list[tuple[str, str]]] | None,
+    ) -> None:
         today_marker = date.today().isoformat()
         values_by_norm: dict[str, dict[str, Any]] = {}
         for row in prepared_rows:
@@ -134,36 +164,49 @@ class DrugCatalogRepository:
                     "rxnav_last_update": today_marker,
                 },
             )
-        drug_insert = dialect_insert(db_session, Drug).values(
-            list(values_by_norm.values())
-        )
-        drug_insert = drug_insert.on_conflict_do_update(
-            index_elements=[Drug.canonical_name_norm],
-            set_={
-                "canonical_name": drug_insert.excluded.canonical_name,
-                "rxnav_last_update": drug_insert.excluded.rxnav_last_update,
-            },
-        )
-        db_session.execute(drug_insert)
+        drug_values = list(values_by_norm.values())
+        for drug_value_batch in _chunks(
+            drug_values,
+            _RXNAV_SQL_PARAMETER_BUDGET // 3,
+        ):
+            drug_insert = dialect_insert(db_session, Drug).values(
+                drug_value_batch
+            )
+            drug_insert = drug_insert.on_conflict_do_update(
+                index_elements=[Drug.canonical_name_norm],
+                set_={
+                    "canonical_name": drug_insert.excluded.canonical_name,
+                    "rxnav_last_update": drug_insert.excluded.rxnav_last_update,
+                },
+            )
+            db_session.execute(drug_insert)
         db_session.flush()
         names = list(values_by_norm)
-        drug_ids = {
-            str(name): int(drug_id)
-            for name, drug_id in db_session.execute(
-                select(Drug.canonical_name_norm, Drug.id).where(
-                    Drug.canonical_name_norm.in_(names)
-                )
-            ).all()
-        }
+        drug_ids: dict[str, int] = {}
+        for name_batch in _chunks(names, _RXNAV_SQL_PARAMETER_BUDGET):
+            drug_ids.update(
+                {
+                    str(name): int(drug_id)
+                    for name, drug_id in db_session.execute(
+                        select(Drug.canonical_name_norm, Drug.id).where(
+                            Drug.canonical_name_norm.in_(name_batch)
+                        )
+                    ).all()
+                }
+            )
         rxcuis = list({str(row["_rxcui"]) for row in prepared_rows})
-        existing_mappings = {
-            str(rxcui): int(drug_id)
-            for rxcui, drug_id in db_session.execute(
-                select(DrugRxnormCode.rxcui, DrugRxnormCode.drug_id).where(
-                    DrugRxnormCode.rxcui.in_(rxcuis)
-                )
-            ).all()
-        }
+        existing_mappings: dict[str, int] = {}
+        for rxcui_batch in _chunks(rxcuis, _RXNAV_SQL_PARAMETER_BUDGET):
+            existing_mappings.update(
+                {
+                    str(rxcui): int(drug_id)
+                    for rxcui, drug_id in db_session.execute(
+                        select(DrugRxnormCode.rxcui, DrugRxnormCode.drug_id).where(
+                            DrugRxnormCode.rxcui.in_(rxcui_batch)
+                        )
+                    ).all()
+                }
+            )
         for row in prepared_rows:
             current_drug_id = existing_mappings.get(row["_rxcui"])
             expected_drug_id = drug_ids[row["_canonical_name_norm"]]
@@ -172,16 +215,20 @@ class DrugCatalogRepository:
                     f"Conflicting rxcui mapping for existing drug row (rxcui='{row['_rxcui']}', "
                     f"existing_drug_id={current_drug_id}, incoming_drug_id={expected_drug_id})"
                 )
-        upsert_drug_rxnorm_codes(
-            db_session,
-            [
+        mapping_values_by_rxcui: dict[str, dict[str, Any]] = {}
+        for row in prepared_rows:
+            mapping_values_by_rxcui.setdefault(
+                row["_rxcui"],
                 {
                     "drug_id": drug_ids[row["_canonical_name_norm"]],
                     "rxcui": row["_rxcui"],
-                }
-                for row in prepared_rows
-            ],
-        )
+                },
+            )
+        for mapping_batch in _chunks(
+            list(mapping_values_by_rxcui.values()),
+            _RXNAV_SQL_PARAMETER_BUDGET // 2,
+        ):
+            upsert_drug_rxnorm_codes(db_session, mapping_batch)
         aliases: dict[tuple[int, str, str, str], dict[str, Any]] = {}
         for row in prepared_rows:
             drug_id = drug_ids[row["_canonical_name_norm"]]
@@ -219,7 +266,11 @@ class DrugCatalogRepository:
                     "source": source,
                     "term_type": row.get("_term_type"),
                 }
-        upsert_drug_aliases(db_session, list(aliases.values()))
+        for alias_batch in _chunks(
+            list(aliases.values()),
+            _RXNAV_SQL_PARAMETER_BUDGET // 6,
+        ):
+            upsert_drug_aliases(db_session, alias_batch)
 
     # -------------------------------------------------------------------------
     def list_rxnav_catalog(

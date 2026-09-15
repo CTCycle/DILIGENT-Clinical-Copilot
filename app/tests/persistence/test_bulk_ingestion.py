@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections import Counter
 
 import pandas as pd
+import pytest
+from repositories.schemas.clinical import ClinicalDrugMention
 from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
@@ -215,6 +217,121 @@ def test_rxnav_snapshot_replacement_reconciles_only_rxnav_owned_rows(
         assert db_session.scalar(
             select(Drug).where(Drug.canonical_name_norm == "drug gamma")
         ) is not None
+
+###############################################################################
+def _large_rxnav_snapshot(size: int = 350) -> list[dict[str, object]]:
+    return [
+        {
+            "rxcui": str(50000 + index),
+            "raw_name": f"RepairDrug {index} 10 MG Tablet",
+            "term_type": "SCD",
+            "name": f"RepairDrug {index}",
+            "brand_names": [f"RepairBrand {index}"],
+            "synonyms": [f"Repair Synonym {index}"],
+        }
+        for index in range(size)
+    ]
+
+###############################################################################
+def test_rxnav_snapshot_replacement_batches_sql_parameters(
+    persistence_engine,
+) -> None:  # type: ignore[no-untyped-def]
+    graph = build_repository_graph(engine=persistence_engine)
+    repository = graph.drug_catalog_repository
+
+    repository.replace_rxnav_catalog_records(_large_rxnav_snapshot())
+
+    with graph.context.session_factory() as db_session:
+        assert len(db_session.execute(select(Drug)).scalars().all()) == 350
+        assert len(db_session.execute(select(DrugRxnormCode)).scalars().all()) == 350
+        assert len(db_session.execute(select(DrugAlias)).scalars().all()) >= 350 * 3
+
+###############################################################################
+def test_rxnav_snapshot_replacement_rolls_back_after_later_batch_failure(
+    persistence_engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:  # type: ignore[no-untyped-def]
+    graph = build_repository_graph(engine=persistence_engine)
+    repository = graph.drug_catalog_repository
+    repository.upsert_drugs_catalog_records(
+        [
+            {
+                "rxcui": "49001",
+                "raw_name": "Stable Drug 10 MG Tablet",
+                "term_type": "SCD",
+                "name": "Stable Drug",
+                "brand_names": ["Stable Brand"],
+                "synonyms": ["Stable Synonym"],
+            }
+        ]
+    )
+
+    import repositories.drug_catalog_repository as repository_module
+
+    original_upsert_aliases = repository_module.upsert_drug_aliases
+    call_count = 0
+
+    def fail_on_second_alias_batch(db_session, values):  # type: ignore[no-untyped-def]
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            raise RuntimeError("synthetic later RxNav alias batch failure")
+        original_upsert_aliases(db_session, values)
+
+    monkeypatch.setattr(repository_module, "upsert_drug_aliases", fail_on_second_alias_batch)
+
+    with pytest.raises(RuntimeError, match="later RxNav alias batch failure"):
+        repository.replace_rxnav_catalog_records(_large_rxnav_snapshot())
+
+    with graph.context.session_factory() as db_session:
+        assert db_session.scalar(
+            select(DrugRxnormCode).where(DrugRxnormCode.rxcui == "49001")
+        ) is not None
+        assert db_session.scalar(
+            select(DrugRxnormCode).where(DrugRxnormCode.rxcui == "50000")
+        ) is None
+        assert db_session.scalar(
+            select(Drug).where(Drug.canonical_name_norm == "stable drug")
+        ) is not None
+
+###############################################################################
+def test_session_drug_persistence_retains_rxnav_and_source_provenance(
+    persistence_engine,
+) -> None:  # type: ignore[no-untyped-def]
+    graph = build_repository_graph(engine=persistence_engine)
+    session_id = graph.clinical_session_repository.save_clinical_session(
+        {
+            "patient_name": "Provenance Patient",
+            "drugs": "Amoxicillin/clavulanate",
+            "matched_drugs": [
+                {
+                    "raw_drug_name": "Amoxicillin/clavulanate",
+                    "rxcui": "12345",
+                    "accepted_rxnav_rxcui": "12345",
+                    "rxnav_candidates": [
+                        {"rxcui": "12345", "accepted": True}
+                    ],
+                    "rxnav_validation_status": "exact_rxcui",
+                    "source_provenance": {
+                        "rxnav": {"validated": True, "rxcui": "12345"},
+                        "dilirank": {
+                            "knowledge_source": "fda_dilirank_2",
+                            "evidence_scope": "regimen_component",
+                        },
+                    },
+                }
+            ],
+        }
+    )
+    assert session_id is not None
+
+    with graph.context.session_factory() as db_session:
+        mention = db_session.query(ClinicalDrugMention).one()
+        assert mention.evidence_json["rxcui"] == "12345"
+        assert mention.evidence_json["rxnav_candidates"][0]["accepted"] is True
+        assert mention.evidence_json["source_provenance"]["dilirank"][
+            "evidence_scope"
+        ] == "regimen_component"
 
 ###############################################################################
 def test_livertox_snapshot_replacement_reconciles_source_owned_rows(

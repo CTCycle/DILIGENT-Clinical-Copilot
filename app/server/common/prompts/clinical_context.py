@@ -45,8 +45,18 @@ def build_dilirank_knowledge_fragment(
 ) -> str:
     if not records:
         return "FDA DILIrank 2.0: No linked local DILIrank record available."
+    has_component_evidence = any(
+        isinstance(record, dict)
+        and record.get("evidence_scope") == "regimen_component"
+        for record in records
+    )
+    heading = (
+        "FDA DILIrank 2.0 structured evidence, including explicitly scoped regimen-component records:"
+        if has_component_evidence
+        else "FDA DILIrank 2.0 structured drug-level evidence:"
+    )
     lines = [
-        "FDA DILIrank 2.0 structured drug-level evidence:",
+        heading,
         "Use this only as an external hepatotoxicity prior. Do not treat it as a patient-specific causality score, do not convert it into a numeric causality weight, and do not override chronology, dechallenge/rechallenge, competing causes, phenotype, or patient-specific evidence.",
     ]
     for record in records:
@@ -64,5 +74,12 @@ def build_dilirank_knowledge_fragment(
             parts.append(f"label section={label_section}")
         if comment:
             parts.append(f"comment={comment}")
+        if record.get("evidence_scope") == "regimen_component":
+            component_name = str(
+                record.get("evidence_component_name") or "the regimen component"
+            )
+            parts.append(
+                f"evidence scope=regimen component ({component_name}); not combo-specific evidence"
+            )
         lines.append("- " + "; ".join(parts))
     return "\n".join(lines)

@@ -61,7 +61,7 @@ class DiliEvidenceBuilder:
     )
     _DEFINITIVE_LANGUAGE_NEGATION_RE = re.compile(
         r"\b(?:not|never|no|without|cannot|can't|unable|uncertain|"
-        r"unassessable|avoid\w*|refrain\w*)\b"
+        r"unassessable|avoid\w*|refrain\w*|preclud\w*|prevent\w*)\b"
     )
 
     # -------------------------------------------------------------------------
@@ -85,8 +85,8 @@ class DiliEvidenceBuilder:
                     "message": RECHALLENGE_RECOMMENDATION_MESSAGE,
                 }
             )
-        if not bundle.differential.all_major_causes_excluded and cls._contains_any(
-            text, cls._COMPETING_CAUSES_EXCLUDED_PHRASES
+        if not bundle.differential.all_major_causes_excluded and cls._contains_unqualified_competing_cause_exclusion(
+            text
         ):
             issues.append(
                 {
@@ -146,6 +146,22 @@ class DiliEvidenceBuilder:
     @staticmethod
     def _contains_any(text: str, phrases: Sequence[str]) -> bool:
         return any(phrase in text for phrase in phrases)
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _contains_unqualified_competing_cause_exclusion(cls, text: str) -> bool:
+        """Detect unsupported exclusion claims without flagging their negation."""
+        negation = re.compile(
+            r"\b(?:not|never|cannot|can't|unable|unresolved|incomplete|"
+            r"partially|partial|does\s+not|do\s+not)\b"
+        )
+        for phrase in cls._COMPETING_CAUSES_EXCLUDED_PHRASES:
+            for match in re.finditer(re.escape(phrase), text):
+                prefix = text[max(0, match.start() - 120) : match.start()]
+                if negation.search(prefix):
+                    continue
+                return True
+        return False
 
     # -------------------------------------------------------------------------
     @classmethod
