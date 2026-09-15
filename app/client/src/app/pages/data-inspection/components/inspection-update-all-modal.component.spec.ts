@@ -70,7 +70,11 @@ describe('InspectionUpdateAllModalComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('DILIrank');
     expect(Array.from(tabs).map((tab) => (tab as HTMLElement).textContent)).not.toContain('RAG');
     expect(fixture.nativeElement.querySelector('input[type="number"]')).not.toBeNull();
-    expect(fixture.nativeElement.textContent).toContain('Update All');
+    expect(fixture.nativeElement.textContent).toContain('Update all');
+    const sourceProgressbars = fixture.nativeElement.querySelectorAll(
+      '.inspection-update-all-source [role="progressbar"]',
+    );
+    expect(sourceProgressbars).toHaveLength(3);
   });
 
   it('switches tabs and disables configuration/start controls while running', () => {
@@ -88,11 +92,12 @@ describe('InspectionUpdateAllModalComponent', () => {
       fixture.nativeElement.querySelectorAll('button'),
     ) as HTMLButtonElement[];
     const updateButton = buttons
-      .find((button) => button.textContent?.trim() === 'Update All') as HTMLButtonElement;
+      .find((button) => button.textContent?.trim() === 'Update all') as HTMLButtonElement;
     const cancelButton = buttons
-      .find((button) => button.textContent?.trim() === 'Cancel updates') as HTMLButtonElement;
+      .find((button) => button.textContent?.trim() === 'Cancel') as HTMLButtonElement;
     expect(updateButton.disabled).toBe(true);
     expect(cancelButton.disabled).toBe(false);
     expect(fixture.nativeElement.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('42');
+    expect(fixture.nativeElement.querySelector('[aria-label="RxNav update progress"]')?.getAttribute('aria-valuenow')).toBe('44');
   });
 });

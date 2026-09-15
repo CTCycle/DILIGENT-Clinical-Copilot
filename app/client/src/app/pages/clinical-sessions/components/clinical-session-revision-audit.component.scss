@@ -1,0 +1,213 @@
+.clinical-session-revision-audit {
+  display: grid;
+  gap: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--cs-border);
+}
+
+.clinical-session-revision-audit-header,
+.clinical-session-revision-audit-group-header,
+.clinical-session-revision-audit-row-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.clinical-session-revision-audit-header h4,
+.clinical-session-revision-audit-group-header h5 {
+  margin: 0;
+  color: var(--cs-text);
+}
+
+.clinical-session-revision-audit-header h4 {
+  font-size: var(--font-md);
+}
+
+.clinical-session-revision-audit-group-header h5 {
+  font-size: var(--font-sm);
+}
+
+.clinical-session-revision-audit-header p:last-child,
+.clinical-session-revision-audit-group-header p:last-child {
+  margin: var(--space-xs) 0 0;
+  color: var(--cs-muted);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+}
+
+.clinical-session-revision-eyebrow {
+  margin: 0 0 2px;
+  color: var(--cs-faint);
+  font-size: var(--font-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.clinical-session-revision-audit-counts {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+  color: var(--cs-muted);
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.clinical-session-revision-audit-counts span,
+.clinical-session-revision-audit-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75rem;
+  min-height: 1.5rem;
+  padding: 2px 7px;
+  border: 1px solid var(--cs-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cs-muted);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.clinical-session-revision-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-lg);
+}
+
+.clinical-session-revision-audit-group {
+  min-width: 0;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--cs-border);
+}
+
+.clinical-session-revision-step-list,
+.clinical-session-revision-artifact-list {
+  display: grid;
+  gap: 0;
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clinical-session-revision-step,
+.clinical-session-revision-artifact {
+  min-width: 0;
+  padding: var(--space-sm) 0;
+  border-top: 1px solid var(--cs-border);
+}
+
+.clinical-session-revision-step {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  gap: var(--space-sm);
+}
+
+.clinical-session-revision-step:first-child,
+.clinical-session-revision-artifact:first-child {
+  border-top: 0;
+}
+
+.clinical-session-revision-step-marker {
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--cs-selection-border);
+  border-radius: 999px;
+  background: var(--cs-selection-bg);
+  color: var(--color-brand);
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.clinical-session-revision-audit-row-content {
+  min-width: 0;
+}
+
+.clinical-session-revision-audit-row-heading strong {
+  min-width: 0;
+  color: var(--cs-text);
+  font-size: var(--font-sm);
+  overflow-wrap: anywhere;
+}
+
+.clinical-session-revision-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 1.35rem;
+  padding: 2px 7px;
+  border: 1px solid var(--cs-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cs-muted);
+  font-size: var(--font-xs);
+  font-weight: 750;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.clinical-session-revision-status.is-success {
+  border-color: var(--cs-success-border);
+  background: var(--cs-success-bg);
+  color: var(--cs-success-text);
+}
+
+.clinical-session-revision-status.is-warning {
+  border-color: var(--cs-warning-border);
+  background: var(--cs-warning-bg);
+  color: var(--cs-warning-text);
+}
+
+.clinical-session-revision-status.is-error {
+  border-color: var(--cs-error-border);
+  background: var(--cs-error-bg);
+  color: var(--cs-error-text);
+}
+
+.clinical-session-revision-audit-meta,
+.clinical-session-revision-audit-summary,
+.clinical-session-revision-audit-error {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--font-xs);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.clinical-session-revision-audit-meta {
+  color: var(--cs-faint);
+}
+
+.clinical-session-revision-audit-summary {
+  color: var(--cs-muted);
+}
+
+.clinical-session-revision-audit-error {
+  color: var(--cs-error-text);
+  font-weight: 700;
+}
+
+.clinical-session-revision-audit-empty {
+  margin: var(--space-sm) 0 0;
+  color: var(--cs-muted);
+  font-size: var(--font-sm);
+}
+
+@media (max-width: 900px) {
+  .clinical-session-revision-audit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .clinical-session-revision-audit-header,
+  .clinical-session-revision-audit-row-heading {
+    flex-wrap: wrap;
+  }
+}

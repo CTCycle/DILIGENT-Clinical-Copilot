@@ -51,6 +51,7 @@ import {
   readMetadataEntries,
 } from './clinical-session-metadata';
 import { ClinicalSessionEditorToolbarComponent } from './components/clinical-session-editor-toolbar.component';
+import { ClinicalSessionRevisionAuditComponent } from './components/clinical-session-revision-audit.component';
 import { ClinicalSessionTimelineWorkspaceComponent } from './components/clinical-session-timeline-workspace.component';
 import { applyMarkdownCommand } from './markdown-editor';
 import {
@@ -85,6 +86,7 @@ import {
     ModalShellComponent,
     HelpPopoverComponent,
     ClinicalSessionEditorToolbarComponent,
+    ClinicalSessionRevisionAuditComponent,
     ClinicalSessionTimelineWorkspaceComponent,
     LucideFileText,
     LucideFlaskConical,
@@ -170,6 +172,12 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     return error ? formatUnknownError(error, 'Unable to load revision model options.') : null;
   });
   readonly revisionModelName = computed(() => this.modelConfigState.settings()?.revisionModel ?? '');
+  readonly revisionAuditVisible = computed(() => (
+    this.revisionRunning()
+    || this.revisionVersionId() !== null
+    || this.revisionSteps().length > 0
+    || this.revisionArtifacts().length > 0
+  ));
   private revisionPollCancelled = false;
 
   ngOnInit(): void {

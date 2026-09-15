@@ -116,7 +116,14 @@ type InspectionUpdateAllConfigChange = {
                   <strong>{{ targetLabel(target) }}</strong>
                   <span>{{ targetStatusLabel(target) }}</span>
                 </div>
-                <div class="inspection-job-bar-track">
+                <div
+                  class="inspection-job-bar-track"
+                  role="progressbar"
+                  [attr.aria-valuenow]="targetProgress(target)"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  [attr.aria-label]="targetLabel(target) + ' update progress'"
+                >
                   <div class="inspection-job-bar-fill" [style.width.%]="targetProgress(target)"></div>
                 </div>
                 <p class="inspection-job-message">{{ targetMessage(target) }}</p>
@@ -141,7 +148,7 @@ type InspectionUpdateAllConfigChange = {
           (click)="cancel.emit()"
           [disabled]="!isRunning()"
         >
-          Cancel updates
+          Cancel
         </button>
         <button
           class="btn btn-primary inspection-mini-btn"
@@ -149,7 +156,7 @@ type InspectionUpdateAllConfigChange = {
           (click)="start.emit()"
           [disabled]="!canStart() || isRunning()"
         >
-          Update All
+          Update all
         </button>
       </div>
     </app-modal-shell>
@@ -162,7 +169,7 @@ type InspectionUpdateAllConfigChange = {
     .inspection-update-all {
       display: flex;
       flex-direction: column;
-      gap: var(--space-lg);
+      gap: var(--space-md);
     }
 
     .inspection-update-all-tabs {
@@ -213,10 +220,16 @@ type InspectionUpdateAllConfigChange = {
       display: flex;
       flex-direction: column;
       gap: var(--space-md);
-      padding: var(--space-md);
-      border: 1px solid var(--color-border-subtle);
-      border-radius: var(--radius-lg);
-      background: var(--color-surface-alt);
+      background: transparent;
+    }
+
+    .inspection-update-all-config {
+      padding: 0 0 var(--space-md);
+    }
+
+    .inspection-update-all-status {
+      padding: var(--space-md) 0 0;
+      border-top: 1px solid var(--color-border-subtle);
     }
 
     .inspection-update-all-config:focus-visible {
@@ -277,6 +290,10 @@ type InspectionUpdateAllConfigChange = {
       margin: 0;
     }
 
+    .inspection-update-all-inline-error .btn {
+      white-space: nowrap;
+    }
+
     .inspection-update-all-source-list {
       display: grid;
       gap: var(--space-sm);
@@ -285,7 +302,7 @@ type InspectionUpdateAllConfigChange = {
     .inspection-update-all-source {
       display: grid;
       gap: var(--space-xs);
-      padding-top: var(--space-sm);
+      padding-top: var(--space-md);
       border-top: 1px solid var(--color-border-subtle);
     }
 
@@ -300,6 +317,21 @@ type InspectionUpdateAllConfigChange = {
 
     .inspection-update-all-status .inspection-job-message {
       margin: 0;
+    }
+
+    .inspection-update-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: nowrap;
+      width: 100%;
+      gap: var(--space-sm);
+    }
+
+    .inspection-update-actions .btn {
+      width: auto;
+      min-width: fit-content;
+      white-space: nowrap;
     }
 
     @media (max-width: 680px) {

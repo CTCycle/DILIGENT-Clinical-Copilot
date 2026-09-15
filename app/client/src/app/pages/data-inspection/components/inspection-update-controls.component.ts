@@ -115,7 +115,7 @@ export type InspectionUpdateFieldChange = {
 
     .inspection-update-parameters {
       display: grid;
-      gap: var(--space-lg);
+      gap: var(--space-md);
     }
 
     .inspection-update-field-grid {
@@ -144,13 +144,22 @@ export type InspectionUpdateFieldChange = {
     .inspection-update-field input,
     .inspection-update-field select {
       width: 100%;
-      min-height: var(--control-height-md);
-      padding: 0 var(--space-md);
+      min-height: var(--control-height-sm);
+      box-sizing: border-box;
+      padding: 0 var(--space-sm);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-sm);
       background: var(--color-surface);
       color: var(--color-text-primary);
       font: inherit;
+      font-size: var(--font-sm);
+      line-height: 1.2;
+    }
+
+    .inspection-update-field input:focus-visible,
+    .inspection-update-field select:focus-visible {
+      outline: var(--focus-ring);
+      outline-offset: var(--focus-ring-offset);
     }
 
     .inspection-update-field small {
