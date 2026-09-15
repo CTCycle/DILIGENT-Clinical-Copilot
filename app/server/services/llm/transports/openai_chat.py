@@ -501,7 +501,7 @@ class OpenAIChatTransport(StructuredTransportMixin):
             result = await self.chat(
                 ChatRequest(
                     model=model,
-                    messages=[{"role": "user", "content": "Reply with exactly: OK"}],
+                    messages=[ChatMessage(role="user", content="Reply with exactly: OK")],
                     output_token_limit=16,
                     operation="connectivity",
                 )

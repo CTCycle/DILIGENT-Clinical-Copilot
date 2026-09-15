@@ -570,7 +570,7 @@ class CloudLLMClient:
                     if event.result.partial or partial_error is not None:
                         raise LLMError(
                             partial_error.error_message
-                            if partial_error is not None
+                            if partial_error is not None and partial_error.error_message
                             else "Provider stream ended before completion",
                             error_code=partial_error.error_code
                             if partial_error is not None and partial_error.error_code
