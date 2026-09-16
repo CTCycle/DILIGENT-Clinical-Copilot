@@ -23,7 +23,7 @@ from services.llm.model_capabilities import (
 from services.llm.tool_loop import ToolLoopExecutor
 from services.llm.transports.anthropic_messages import AnthropicMessagesTransport
 from services.llm.transports.base import validate_request_capabilities
-from services.llm.transports.errors import TransportUnsupportedCapability
+from services.llm.transports.errors import TransportCancellation, TransportUnsupportedCapability
 from services.llm.transports.gemini import GeminiTransport
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
@@ -218,6 +218,35 @@ def test_openai_chat_parses_deepseek_tool_calls_usage_and_finish_reason() -> Non
     assert result.usage.reasoning_tokens == 12
     assert captured["payload"]["tools"][0]["function"]["name"] == "lookup"
     assert "tool_choice" not in captured["payload"]
+
+###############################################################################
+def test_openai_chat_cancels_an_inflight_request() -> None:
+    async def exercise() -> None:
+        started = asyncio.Event()
+        request_cancelled = False
+
+        class FakeClient:
+
+            async def post(self, path: str, *, json: dict[str, Any]) -> Any:
+                del path, json
+                started.set()
+                await asyncio.Event().wait()
+
+        transport = OpenAIChatTransport.__new__(OpenAIChatTransport)
+        transport.client = FakeClient()
+        transport.max_retries = 0
+
+        request = _deepseek_request(
+            cancel_check=lambda: request_cancelled,
+        )
+        operation = asyncio.create_task(transport.chat(request))
+        await started.wait()
+        request_cancelled = True
+
+        with pytest.raises(TransportCancellation):
+            await asyncio.wait_for(operation, timeout=2.0)
+
+    asyncio.run(exercise())
 
 ###############################################################################
 def test_openai_chat_reinjects_reasoning_and_empty_assistant_content_for_tools() -> None:
