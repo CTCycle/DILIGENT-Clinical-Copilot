@@ -1,11 +1,11 @@
 # LLM-assisted revision end-to-end validation
 
-Execution window: 2026-09-16, Europe/Rome  
-Repository: `DILIGENT Clinical Copilot`  
-Branch: `develop`  
-Browser: Chrome through the Codex in-app browser tooling, normal desktop viewport  
-Frontend used for the primary run: `http://127.0.0.1:9848/clinical-sessions`  
-Backend: `http://127.0.0.1:7690`  
+Execution window: 2026-09-16, Europe/Rome
+Repository: `DILIGENT Clinical Copilot`
+Branch: `develop`
+Browser: Chrome through the Codex in-app browser tooling, normal desktop viewport
+Frontend used for the primary run: `http://127.0.0.1:9848/clinical-sessions`
+Backend: `http://127.0.0.1:7690`
 Test data: synthetic clinical sessions only; no real patient identifiers
 
 ## Scope and model lane
