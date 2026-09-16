@@ -21,6 +21,7 @@ from repository_fixtures import build_repository_graph
 from services.inspection.revision_agent import (
     RevisionAgentRunner,
     RevisionAgentRuntime,
+    _requested_append_sentence,
     build_revision_agent_user_prompt,
 )
 import services.inspection.revision_agent as revision_agent_module
@@ -260,6 +261,19 @@ def test_revision_editor_prompt_requires_exact_source_patches() -> None:
     assert "zero-based Python slice offsets" in prompt
     assert "expected_text` must equal the exact source substring character-for-character" in prompt
     assert "return an empty `patches` list" in prompt
+
+###############################################################################
+def test_requested_append_sentence_is_extracted_from_explicit_instruction() -> None:
+    instruction = (
+        "Append exactly this sentence to the revised report: "
+        "Reviewer instruction check: human clinical review is required before reuse. "
+        "Preserve all existing clinical facts and sections."
+    )
+
+    assert _requested_append_sentence(instruction) == (
+        "Reviewer instruction check: human clinical review is required before reuse."
+    )
+    assert _requested_append_sentence("Focus on unsupported claims.") is None
 
 ###############################################################################
 def test_revision_context_preserves_long_canonical_report() -> None:
