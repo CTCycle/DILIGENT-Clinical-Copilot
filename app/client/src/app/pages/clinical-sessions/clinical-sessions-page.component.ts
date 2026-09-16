@@ -595,6 +595,11 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         metadata: {},
       });
       this.selected.set(response.session);
+      this.sessions.update((items) => items.map((item) => (
+        item.session_id === response.session.session_id
+          ? { ...item, version: response.session.version }
+          : item
+      )));
       this.editorText.set(persistedEditorValue);
       this.manualEditReviewerNote.set('');
       this.saveStatus.set('Manual report edit saved.');
