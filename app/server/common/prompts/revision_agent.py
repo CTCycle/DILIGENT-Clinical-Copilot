@@ -83,7 +83,7 @@ For the current task, choose exactly one allowed tool call or mark the task comp
 ###############################################################################
 def editor_prompt(context: object, observations: object) -> str:
     return f"""{SAFETY_RULES}
-Return a revised report and exact evidence-backed patches.
+Return exact evidence-backed patches for the canonical report. Keep the response compact by setting `revised_report_text` to an empty string; the application derives the persisted report from the validated patches. If no patch can be verified, return an empty `patches` list and an empty `revised_report_text`.
 
 Patch contract:
 - The canonical patch source is `review_target.official_report.text` in the context.
@@ -92,7 +92,7 @@ Patch contract:
 - `review_target.final_report` is supporting context only. Never derive offsets from it.
 - Never derive offsets from a shortened, reformatted, escaped, or paraphrased copy.
 - Verify every patch against the canonical source before returning it.
-- If any proposed edit cannot be verified exactly, return an empty `patches` list and set `revised_report_text` exactly to `review_target.official_report.text`. Record the unresolved issue and human-review requirement instead of guessing.
+- If any proposed edit cannot be verified exactly, return an empty `patches` list and an empty `revised_report_text`. Record the unresolved issue and human-review requirement instead of guessing.
 - Every non-empty patch must include evidence references.
 - The persisted report is always the deterministic patch result. Model-provided full text is advisory.
 

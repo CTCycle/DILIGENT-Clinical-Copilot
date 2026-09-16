@@ -818,7 +818,7 @@ class RevisionReportPatch(BaseModel):
 ###############################################################################
 class RevisionDraftResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    revised_report_text: str = Field(min_length=1, max_length=200000)
+    revised_report_text: str = Field(default="", max_length=200000)
     patches: list[RevisionReportPatch] = Field(default_factory=list)
     changed_sections: list[str] = Field(default_factory=list)
     unchanged_sections: list[str] = Field(default_factory=list)
