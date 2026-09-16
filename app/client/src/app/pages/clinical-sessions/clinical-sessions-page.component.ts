@@ -208,6 +208,15 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   async openSession(sessionId: number): Promise<void> {
+    this.revisionPollCancelled = true;
+    this.revisionInstruction.set('');
+    this.revisionStatus.set('');
+    this.revisionRunning.set(false);
+    this.revisionJobId.set(null);
+    this.revisionVersionId.set(null);
+    this.revisionSteps.set([]);
+    this.revisionArtifacts.set([]);
+    this.revisionDraftReport.set('');
     this.detailLoading.set(true);
     this.detailError.set(null);
     try {
@@ -302,6 +311,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.labSummary.set([]);
     this.labTimeline.set([]);
     this.hepatotoxicityPattern.set('N/A');
+    this.revisionPollCancelled = true;
+    this.revisionInstruction.set('');
     this.revisionStatus.set('');
     this.revisionRunning.set(false);
     this.revisionJobId.set(null);
@@ -458,10 +469,10 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   async cancelRevision(): Promise<void> {
     const jobId = this.revisionJobId();
     if (!jobId) return;
-    await cancelSessionRevisionJob(jobId);
     this.revisionPollCancelled = true;
     this.revisionRunning.set(false);
     this.revisionStatus.set('Cancellation requested.');
+    await cancelSessionRevisionJob(jobId);
   }
 
   async recordRevisionReview(status: 'approved' | 'rejected'): Promise<void> {
@@ -485,6 +496,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       isCancelled: () => this.revisionPollCancelled,
       pollStep: async () => {
         const status = await fetchSessionRevisionJobStatus(jobId);
+        if (this.revisionPollCancelled) return false;
         const result = status.result;
         this.revisionStatus.set(status.status === 'running' ? 'Revision agent is working...' : status.status);
         if (typeof result?.revision_version_id === 'number') this.revisionVersionId.set(result.revision_version_id);
