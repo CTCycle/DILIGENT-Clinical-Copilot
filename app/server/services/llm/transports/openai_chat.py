@@ -322,11 +322,27 @@ class OpenAIChatTransport(StructuredTransportMixin):
             response.raise_for_status()
             return response
 
-        response = await call_with_retries(
-            post_checked,
-            max_retries=getattr(self, "max_retries", 0),
-            cancel_check=request.cancel_check,
+        operation = asyncio.create_task(
+            call_with_retries(
+                post_checked,
+                max_retries=getattr(self, "max_retries", 0),
+                cancel_check=request.cancel_check,
+            )
         )
+        try:
+            while not operation.done():
+                await asyncio.wait({operation}, timeout=0.25)
+                if not operation.done():
+                    self._check_active(request)
+            response = operation.result()
+        except BaseException:
+            if not operation.done():
+                operation.cancel()
+            try:
+                await operation
+            except BaseException:
+                pass
+            raise
         return self._parse_result(response.json(), response)
 
     # -------------------------------------------------------------------------
