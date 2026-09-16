@@ -417,7 +417,9 @@ class DataInspectionUpdateJobRunner:
             job_id, "rag", 90, "Persisting embeddings and index"
         )
         self.report_phase_by_target(job_id, "rag", 96, "Finalizing update")
-        self.report_phase_by_target(job_id, "rag", 100, "Completed")
+        self.report_phase_by_target(
+            job_id, "rag", 100, "RAG embeddings update completed"
+        )
         backend = "onnxruntime"
         model_spec = getattr(getattr(updater, "serializer", None), "model_spec", None)
         vector_model = None
