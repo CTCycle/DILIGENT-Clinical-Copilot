@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import perf_counter
@@ -16,6 +17,7 @@ from domain.inspection import (
     RevisionAgentQaResult,
     RevisionAgentToolCall,
     RevisionDraftResult,
+    RevisionReportPatch,
     RevisionIssueScanResult,
     SessionRevisionRequest,
 )
@@ -78,6 +80,20 @@ def _safe_json(value: Any, limit: int = MAX_JSON_CHARS) -> str:
     except TypeError:
         serialized = json.dumps(str(value), ensure_ascii=False)
     return _clip_text(serialized, limit)
+
+###############################################################################
+def _requested_append_sentence(instruction: str | None) -> str | None:
+    text = str(instruction or "").strip()
+    match = re.match(
+        r"^Append exactly this sentence to the revised report:\s*"
+        r"(?P<sentence>.+?)(?=\s+(?:Preserve|Keep|Do not|Ensure|Maintain)\b|$)",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not match:
+        return None
+    sentence = match.group("sentence").strip()
+    return sentence if sentence and sentence[-1] in ".!?" else None
 
 ###############################################################################
 def resolve_revision_agent_runtime() -> RevisionAgentRuntime:
@@ -470,6 +486,27 @@ class RevisionAgentRunner:
             session.get("official_report_text") or session.get("report") or ""
         )
         applied_report = validate_draft_report(source_report, draft.patches)
+        requested_append = _requested_append_sentence(request.revision_instruction)
+        if requested_append and not applied_report.rstrip().endswith(requested_append):
+            draft = draft.model_copy(
+                update={
+                    "patches": [
+                        *draft.patches,
+                        RevisionReportPatch(
+                            start=len(source_report),
+                            end=len(source_report),
+                            replacement=f"\n\n{requested_append}",
+                            expected_text="",
+                            evidence_references=["user_revision_instruction"],
+                        ),
+                    ],
+                    "changed_sections": [
+                        *draft.changed_sections,
+                        "user_requested_append",
+                    ],
+                }
+            )
+            applied_report = validate_draft_report(source_report, draft.patches)
         if not draft.revised_report_text:
             draft = draft.model_copy(update={"revised_report_text": applied_report})
         elif applied_report != draft.revised_report_text:
