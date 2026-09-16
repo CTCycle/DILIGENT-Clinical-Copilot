@@ -272,12 +272,16 @@ export function previewDetectedDiseases(detail: ClinicalSessionDetail): string[]
   const fromAnamnesis = detail.result_payload?.['anamnesis_diseases'];
   const structuredCase = recordValue(detail.result_payload?.['structured_case']);
   const structuredDiseases = structuredCase?.['anamnesis_diseases'];
+  if (hasStructuredDiseaseRecords(fromPayload)) {
+    return collectDiseaseNames(fromPayload);
+  }
+  if (hasStructuredDiseaseRecords(structuredDiseases)) {
+    return collectDiseaseNames(structuredDiseases);
+  }
   const direct = collectDiseaseNames(fromPayload);
   if (direct.length) return direct;
   const anamnesis = collectDiseaseNames(fromAnamnesis);
   if (anamnesis.length) return anamnesis;
-  const structured = collectDiseaseNames(structuredDiseases);
-  if (structured.length) return structured;
   const fromSourceText = collectDiseasesFromSourceText(detail);
   if (fromSourceText.length) return fromSourceText;
   const report = previewReport(detail);
@@ -291,6 +295,10 @@ export function previewDetectedDiseases(detail: ClinicalSessionDetail): string[]
     .split(',')
     .map((item) => item.replace(/[*-]/g, '').trim())
     .filter((item) => item.length > 0);
+}
+
+function hasStructuredDiseaseRecords(value: unknown): boolean {
+  return Array.isArray(value) && value.some((item) => recordValue(item) !== null);
 }
 
 function collectDiseasesFromSourceText(detail: ClinicalSessionDetail): string[] {
@@ -333,6 +341,13 @@ function collectDiseaseNames(value: unknown): string[] {
       if (typeof item === 'string') return item.trim();
       const record = recordValue(item);
       if (!record) return '';
+      const attribution = stringValue(record['attribution'])?.toLowerCase();
+      const diagnosisStatus = stringValue(record['diagnosis_status'])?.toLowerCase();
+      if (
+        attribution === 'negated'
+        || diagnosisStatus === 'ruled-out'
+        || diagnosisStatus === 'ruled_out'
+      ) return '';
       return stringValue(record['name']) || stringValue(record['disease_name']) || '';
     })
     .filter((name) => name.length > 0);

@@ -64,6 +64,24 @@ describe('clinical-session-preview', () => {
     }))).toEqual([]);
   });
 
+  it('does not present negated or ruled-out diseases as detected conditions', () => {
+    expect(previewDetectedDiseases(detail({
+      result_payload: {
+        anamnesis_diseases: ['chronic liver disease', 'gastroesophageal reflux disease'],
+        structured_case: {
+          anamnesis_diseases: [
+            {
+              name: 'chronic liver disease',
+              diagnosis_status: 'ruled-out',
+              attribution: 'negated',
+            },
+            { name: 'gastroesophageal reflux disease', diagnosis_status: 'confirmed' },
+          ],
+        },
+      },
+    }))).toEqual(['gastroesophageal reflux disease']);
+  });
+
   it('extracts laboratory and hepatotoxicity previews without requiring a fixed payload shape', () => {
     const session = detail({
       result_payload: {

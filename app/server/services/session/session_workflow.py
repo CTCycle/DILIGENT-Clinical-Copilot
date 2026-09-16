@@ -430,6 +430,13 @@ async def process_single_patient_workflow(
         progress_callback=progress_callback,
         stop_check=stop_check,
     )
+    provisional_dili_evidence_bundle = DiliEvidenceBuilder().build(
+        payload=payload,
+        drugs=analysis_drugs,
+        labs=lab_timeline,
+        resolved_drugs=None,
+        rucam_bundle=rucam_bundle,
+    )
     structured_context = service.build_structured_clinical_context(
         payload,
         therapy_drugs=therapy_drugs,
@@ -438,6 +445,7 @@ async def process_single_patient_workflow(
         lab_timeline=lab_timeline,
         onset_context=onset_context,
         pattern_score=pattern_score,
+        hys_law=provisional_dili_evidence_bundle.hys_law,
     )
     _emit_progress(
         progress_callback,

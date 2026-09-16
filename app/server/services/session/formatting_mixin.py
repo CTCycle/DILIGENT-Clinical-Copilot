@@ -6,6 +6,7 @@ from typing import Any
 from pydantic_core import ErrorDetails
 
 from common.utils.types import coerce_bool_or_unknown
+from domain.clinical.dili import DiliHysLawAssessment
 from domain.clinical.entities import (
     ClinicalLabEntry,
     DiseaseContextEntry,
@@ -179,6 +180,7 @@ class ClinicalSessionFormattingMixin:
         lab_timeline: PatientLabTimeline,
         onset_context: LiverInjuryOnsetContext | None,
         pattern_score: Any,
+        hys_law: DiliHysLawAssessment | None = None,
     ) -> str:
         therapy_mentions = [
             entry.name.strip()
@@ -236,4 +238,21 @@ class ClinicalSessionFormattingMixin:
                 f" | R={getattr(pattern_score, 'r_score', ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN)}"
             ),
         ]
+        if hys_law is not None:
+            lines.extend(
+                [
+                    "",
+                    "# Structured Hy's Law Assessment",
+                    f"- status={hys_law.status}",
+                    (
+                        "- thresholds="
+                        f"aminotransferase:{hys_law.aminotransferase_threshold_met}"
+                        f" | bilirubin:{hys_law.bilirubin_threshold_met}"
+                        f" | same_episode:{hys_law.same_episode}"
+                        f" | cholestasis_excluded:{hys_law.cholestasis_excluded}"
+                        f" | alternative_causes_excluded:{hys_law.alternative_causes_excluded}"
+                        f" | exposure_timing_compatible:{hys_law.exposure_timing_compatible}"
+                    ),
+                ]
+            )
         return "\n".join(lines).strip()
