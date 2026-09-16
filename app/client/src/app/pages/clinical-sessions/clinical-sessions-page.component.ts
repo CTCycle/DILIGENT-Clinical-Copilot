@@ -498,7 +498,14 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         const status = await fetchSessionRevisionJobStatus(jobId);
         if (this.revisionPollCancelled) return false;
         const result = status.result;
-        this.revisionStatus.set(status.status === 'running' ? 'Revision agent is working...' : status.status);
+        const revisionStatus = result?.revision_status;
+        this.revisionStatus.set(
+          revisionStatus === 'qa_failed'
+            ? 'Revision completed with QA issues.'
+            : status.status === 'running'
+              ? 'Revision agent is working...'
+              : status.status,
+        );
         if (typeof result?.revision_version_id === 'number') this.revisionVersionId.set(result.revision_version_id);
         if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
           this.revisionRunning.set(false);
