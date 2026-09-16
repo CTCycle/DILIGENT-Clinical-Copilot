@@ -470,7 +470,9 @@ class RevisionAgentRunner:
             session.get("official_report_text") or session.get("report") or ""
         )
         applied_report = validate_draft_report(source_report, draft.patches)
-        if applied_report != draft.revised_report_text:
+        if not draft.revised_report_text:
+            draft = draft.model_copy(update={"revised_report_text": applied_report})
+        elif applied_report != draft.revised_report_text:
             draft = draft.model_copy(
                 update={
                     "revised_report_text": applied_report,
