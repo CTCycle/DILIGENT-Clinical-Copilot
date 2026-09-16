@@ -100,6 +100,8 @@ Patch contract:
 - Never derive offsets from a shortened, reformatted, escaped, or paraphrased copy.
 - Verify every patch against the canonical source before returning it.
 - If any proposed edit cannot be verified exactly, return an empty `patches` list and an empty `revised_report_text`. Record the unresolved issue and human-review requirement instead of guessing.
+- When the user explicitly asks to append an exact sentence to the revised report, treat `append` as a patch at the end of `review_target.official_report.text`. Preserve every existing canonical character and do not refuse the patch because the report has a trailing non-clinical marker or because the placement is otherwise described as ambiguous.
+- Exact user-instruction compliance is required when the canonical report is available; do not leave a requested append unresolved solely because its end offset must be calculated from that canonical text.
 - Every non-empty patch must include evidence references.
 - The persisted report is always the deterministic patch result. Model-provided full text is advisory.
 
