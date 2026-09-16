@@ -54,10 +54,10 @@ def planner_prompt(context: object, manifest: object) -> str:
 Plan a bounded set of revision tasks from the supplied context using only the allowed tool manifest. Do not execute tools in this step. Return only compact JSON matching the supplied schema.
 
 Keep the plan concise and operational:
-- Return no more than 4 tasks; return an empty task list when no actionable revision is supported.
+- Prefer the smallest complete task set, with no more than the eight tasks allowed by the request; return an empty task list when no actionable revision is supported.
 - Do not restate the supplied context, report, or tool manifest.
-- Keep `instruction_profile` under 240 characters, each issue under 160 characters, each task objective under 300 characters, and each stop criterion under 200 characters.
-- Use at most 6 affected sections and 6 required tools per task.
+- Preserve every materially distinct issue and all detail needed to execute the tasks; do not omit information solely to meet an arbitrary character cap.
+- Use only the affected sections and required tools needed for the planned tasks.
 - Deduplicate overlapping tasks and use short evidence-backed labels.
 
 <revision_context>

@@ -781,18 +781,18 @@ class ReferenceCatalogRuntimeObservationUpsertRequest(BaseModel):
 ###############################################################################
 class RevisionAgentTask(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    task_id: str = Field(max_length=80)
+    task_id: str = Field(max_length=200)
     priority: Literal["low", "medium", "high", "critical"]
-    objective: str = Field(max_length=300)
-    affected_sections: list[str] = Field(default_factory=list, max_length=6)
-    required_tools: list[str] = Field(default_factory=list, max_length=6)
-    stop_criteria: str = Field(max_length=200)
+    objective: str = Field(max_length=4000)
+    affected_sections: list[str] = Field(default_factory=list, max_length=24)
+    required_tools: list[str] = Field(default_factory=list, max_length=12)
+    stop_criteria: str = Field(max_length=2000)
 
 ###############################################################################
 class RevisionAgentPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    instruction_profile: str = Field(max_length=240)
-    evident_issues: list[str] = Field(default_factory=list, max_length=8)
+    instruction_profile: str = Field(max_length=4000)
+    evident_issues: list[str] = Field(default_factory=list, max_length=24)
     tasks: list[RevisionAgentTask] = Field(default_factory=list, max_length=8)
     expected_final_output_type: Literal["revised_report", "review_only"] = (
         "revised_report"
