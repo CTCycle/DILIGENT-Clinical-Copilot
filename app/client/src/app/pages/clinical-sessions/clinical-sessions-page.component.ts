@@ -179,6 +179,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     || this.revisionArtifacts().length > 0
   ));
   private revisionPollCancelled = false;
+  private revisionLoadGeneration = 0;
 
   ngOnInit(): void {
     void this.loadSessions();
@@ -208,6 +209,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   async openSession(sessionId: number): Promise<void> {
+    const revisionLoadGeneration = ++this.revisionLoadGeneration;
     this.revisionPollCancelled = true;
     this.revisionInstruction.set('');
     this.revisionStatus.set('');
@@ -235,7 +237,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.labTimeline.set(this.previewLabTimeline(detail));
       this.hepatotoxicityPattern.set(this.previewHepatotoxicityPattern(detail));
       void this.loadDetectedDrugEvidence(detail);
-      void this.loadPersistedRevision(detail.session_id);
+      void this.loadPersistedRevision(detail.session_id, revisionLoadGeneration);
     } catch (error) {
       this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
     } finally {
@@ -301,6 +303,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   private clearSelectedSession(): void {
+    this.revisionLoadGeneration += 1;
     this.selected.set(null);
     this.editorText.set('');
     this.manualEditReviewerNote.set('');
@@ -448,6 +451,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   async startRevision(): Promise<void> {
     const detail = this.selected();
     if (!detail || this.revisionRunning()) return;
+    this.revisionLoadGeneration += 1;
     this.revisionVersionId.set(null);
     this.revisionSteps.set([]);
     this.revisionArtifacts.set([]);
@@ -524,22 +528,31 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  private async loadPersistedRevision(sessionId: number): Promise<void> {
+  private async loadPersistedRevision(sessionId: number, revisionLoadGeneration: number): Promise<void> {
     try {
+      const isCurrentLoad = (): boolean =>
+        revisionLoadGeneration === this.revisionLoadGeneration
+        && this.selected()?.session_id === sessionId;
       const versions = (await fetchSessionVersions(sessionId)).items
         .filter((version) => version.revision_kind === 'llm_assisted_revision')
         .sort((left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at));
       const latest = versions[0];
-      if (!latest || this.selected()?.session_id !== sessionId) return;
+      if (!latest || !isCurrentLoad()) return;
       this.revisionVersionId.set(latest.version_id);
       const configuration = latest.model_configuration || {};
       const pipelineRunId = latest.pipeline_run_id;
-      if (pipelineRunId) this.revisionSteps.set((await fetchRevisionPipelineSteps(pipelineRunId)).items);
+      if (pipelineRunId) {
+        const steps = (await fetchRevisionPipelineSteps(pipelineRunId)).items;
+        if (!isCurrentLoad()) return;
+        this.revisionSteps.set(steps);
+      }
       const artifacts = (await fetchRevisionArtifacts(sessionId, latest.version_id)).items;
+      if (!isCurrentLoad()) return;
       this.revisionArtifacts.set(artifacts);
       this.applyRevisionDraftArtifact(artifacts);
       const jobId = typeof configuration['job_id'] === 'string' ? configuration['job_id'] : null;
       if (jobId && ['draft_revision', 'pending_qa'].includes(latest.version_status)) {
+        if (!isCurrentLoad()) return;
         this.revisionJobId.set(jobId);
         this.revisionRunning.set(true);
         this.revisionStatus.set('Revision agent is working...');
@@ -547,6 +560,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         await this.pollRevision(sessionId, jobId);
         return;
       }
+      if (!isCurrentLoad()) return;
       this.revisionStatus.set(
         latest.version_status === 'qa_failed'
           ? 'Revision completed with QA issues.'
