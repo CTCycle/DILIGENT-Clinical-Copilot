@@ -6,6 +6,12 @@ from domain.llm.transports import ToolDefinition
 from repositories.context import RepositoryContext
 from repositories.dilirank_repository import DiliRankRepository
 
+EMPTY_TOOL_PARAMETERS = {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": False,
+}
+
 ###############################################################################
 class RevisionToolRegistry:
     names = frozenset(
@@ -57,6 +63,7 @@ class RevisionToolRegistry:
             "read_session_context": ToolDefinition(
                 name="read_session_context",
                 description="Read the bounded session context prepared for revision.",
+                parameters=EMPTY_TOOL_PARAMETERS,
             ),
             "read_result_payload_path": ToolDefinition(
                 name="read_result_payload_path",
@@ -71,10 +78,12 @@ class RevisionToolRegistry:
             "read_manual_edits": ToolDefinition(
                 name="read_manual_edits",
                 description="Read persisted manual report-edit history.",
+                parameters=EMPTY_TOOL_PARAMETERS,
             ),
             "read_version_lineage": ToolDefinition(
                 name="read_version_lineage",
                 description="Read the session version lineage.",
+                parameters=EMPTY_TOOL_PARAMETERS,
             ),
             "search_livertox_catalog": ToolDefinition(
                 name="search_livertox_catalog",
