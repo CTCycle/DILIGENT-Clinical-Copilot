@@ -15,6 +15,7 @@ from domain.clinical import (
     PatientDrugs,
     PatientLabTimeline,
 )
+from domain.clinical.dili import DiliHysLawAssessment
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.clinical.disease import DiseaseExtractor
 from services.session.session_service import ClinicalSessionService
@@ -225,6 +226,7 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
         lab_timeline=PatientLabTimeline(entries=[]),
         onset_context=LiverInjuryOnsetContext(onset_basis="unknown"),
         pattern_score=pattern_score,
+        hys_law=DiliHysLawAssessment(status="possible"),
     )
 
     assert "# Disease Timeline" in context
@@ -232,6 +234,8 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
     assert "# Visit Date" in context
     assert "# Onset Anchor" in context
     assert "# Pattern" in context
+    assert "# Structured Hy's Law Assessment" in context
+    assert "- status=possible" in context
     assert "2025-04-14" in context
     assert "class=mixed | R=1.67" in context
 

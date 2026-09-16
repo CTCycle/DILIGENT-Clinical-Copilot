@@ -187,6 +187,8 @@ def test_livertox_prompt_removes_per_drug_management_recommendation_directive() 
     )
     assert "RUCAM evidence:" in LIVERTOX_CLINICAL_USER_PROMPT
     assert "Estimated RUCAM:" not in LIVERTOX_CLINICAL_USER_PROMPT
+    assert "authoritative Hy's Law status" in LIVERTOX_CLINICAL_SYSTEM_PROMPT
+    assert "Use the authoritative Hy's Law status" in LIVERTOX_CLINICAL_USER_PROMPT
     assert (
         "If a patient-record RUCAM score is supplied, treat it as supportive"
         in LIVERTOX_CLINICAL_USER_PROMPT
