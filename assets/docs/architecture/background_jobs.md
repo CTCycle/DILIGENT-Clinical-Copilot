@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-09-13
+Last updated: 2026-09-16
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -145,6 +145,10 @@ If a runner does not check stop requests, cancellation is delayed.
 issue-scan-only placeholder. It persists context and a plan, selects allow-listed tools from
 `RevisionToolRegistry`, records observations and tool traces, drafts a revised
 report, applies deterministic patch validation, runs QA, and persists revision
-artifacts. A non-dry run can create an `agentic_revision` session after the
-gates pass; dry runs and QA-blocked runs retain an auditable draft and do not
-replace the source session.
+artifacts. Planner, editor, and QA attempts record latency and retry metadata.
+An unchanged or QA-blocked draft receives at most one evidence-focused repair
+attempt against the original canonical report. A non-dry run can create an
+`agentic_revision` session only after a validated patch and blocker-free QA;
+dry runs, no-op drafts, and QA-blocked runs retain an auditable draft and do not
+replace the source session. The configured provider and model remain fixed for
+the run, with the revision transport retry budget capped at one retry.

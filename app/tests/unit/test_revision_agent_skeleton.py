@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import services.inspection.revision_agent as revision_agent_module
 from common.prompts.revision_agent import editor_prompt
 from domain.inspection import (
     RevisionAgentPlan,
@@ -24,13 +25,13 @@ from services.inspection.revision_agent import (
     _requested_append_sentence,
     build_revision_agent_user_prompt,
 )
-import services.inspection.revision_agent as revision_agent_module
 from services.inspection.revision_context import build_revision_context
 from services.inspection.revision_scaffold import SessionRevisionConflictError
 from services.inspection.service import DataInspectionService
 from services.llm.generation_policy import GenerationPurpose
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
+
 
 ###############################################################################
 def build_file_serializer(tmp_path: Path) -> Any:
@@ -398,8 +399,17 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
 
     steps = service.list_revision_steps(pipeline_run_id)
     assert len(steps) >= 1
-    assert steps[0]["step_name"].startswith("revision_agent_task_")
-    assert steps[0]["output_payload"]["observations"] == []
+    task_step = next(
+        step for step in steps if step["step_name"].startswith("revision_agent_task_")
+    )
+    assert task_step["output_payload"]["observations"] == []
+    result = service.get_revision_job_status(started["job_id"])["result"]
+    assert result["revision_status"] == "requires_human_review"
+    assert result["revised_session_id"] is None
+    assert result["repair_attempt"] == 1
+    source_session = serializer.clinical_session_repository.get_session_detail(session_id)
+    assert source_session is not None
+    assert source_session["report"] == "Possible DILI from amoxicillin."
 
     revision_version_id = int(started["result"]["revision_version_id"])
     artifacts = service.list_revision_artifacts(
@@ -413,6 +423,84 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
         "revision_agent_draft_report",
         "revision_agent_qa",
     }
+
+###############################################################################
+def test_revision_repairs_noop_draft_once_before_accepting_validated_patch(
+    tmp_path: Path,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    draft_calls = 0
+
+    def structured_call(**kwargs: Any) -> dict[str, Any]:
+        nonlocal draft_calls
+        if kwargs["schema"].__name__ != "RevisionDraftResult":
+            return fake_issue_scan_call(**kwargs)
+        draft_calls += 1
+        if draft_calls == 1:
+            return fake_issue_scan_call(**kwargs)
+        source = "Possible DILI from amoxicillin."
+        replacement = "Clinician review required: Possible DILI from amoxicillin."
+        return {
+            "revised_report_text": "",
+            "patches": [
+                {
+                    "start": 0,
+                    "end": len(source),
+                    "replacement": replacement,
+                    "expected_text": source,
+                    "evidence_references": ["dili_evidence_bundle"],
+                }
+            ],
+            "changed_sections": ["final_report"],
+            "unchanged_sections": [],
+            "unresolved_issues": [],
+            "human_review_requirements": ["Clinical review required."],
+            "entity_change_proposals": [],
+        }
+
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=structured_call,
+    )
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    for _ in range(50):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision repair job did not complete")
+
+    result = status["result"]
+    assert result["revision_status"] == "llm_qa_passed"
+    assert result["repair_attempt"] == 1
+    assert result["revised_session_id"] is not None
+    artifacts = service.list_revision_artifacts(
+        session_id,
+        version_id=int(result["revision_version_id"]),
+    )
+    assert {item["artifact_key"] for item in artifacts} >= {
+        "revision_agent_draft_report_repair",
+        "revision_agent_qa_repair",
+    }
+    steps = service.list_revision_steps(started["result"]["pipeline_run_id"])
+    editor_steps = [step for step in steps if step["step_name"] == "revision_agent_editor"]
+    qa_steps = [step for step in steps if step["step_name"] == "revision_agent_qa"]
+    assert [step["attempt_number"] for step in editor_steps] == [1, 2]
+    assert [step["attempt_number"] for step in qa_steps] == [1, 2]
+    source_session = serializer.clinical_session_repository.get_session_detail(session_id)
+    revised_session = serializer.clinical_session_repository.get_session_detail(
+        int(result["revised_session_id"])
+    )
+    assert source_session is not None
+    assert revised_session is not None
+    assert source_session["report"] == "Possible DILI from amoxicillin."
+    assert revised_session["report"] == (
+        "Clinician review required: Possible DILI from amoxicillin."
+    )
 
 ###############################################################################
 def test_revision_persists_deterministic_patch_when_model_text_differs(
@@ -543,7 +631,10 @@ def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> 
         raise AssertionError("Revision job did not recover from invalid tool input")
 
     steps = service.list_revision_steps(started["result"]["pipeline_run_id"])
-    observation = steps[0]["output_payload"]["observations"][0]["observation"]
+    task_step = next(
+        step for step in steps if step["step_name"].startswith("revision_agent_task_")
+    )
+    observation = task_step["output_payload"]["observations"][0]["observation"]
     assert observation == {
         "error": "Tool ids must be positive integers.",
         "invalid_tool_input": True,

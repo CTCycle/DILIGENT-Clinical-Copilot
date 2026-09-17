@@ -8,7 +8,9 @@ const ARTIFACT_LABELS: Readonly<Record<string, string>> = {
   revision_agent_plan: 'Revision plan',
   revision_agent_tool_trace: 'Tool trace',
   revision_agent_draft_report: 'Generated draft',
+  revision_agent_draft_report_repair: 'Repair draft',
   revision_agent_qa: 'Quality review',
+  revision_agent_qa_repair: 'Repair quality review',
 };
 
 const ARTIFACT_PURPOSES: Readonly<Record<string, string>> = {
@@ -17,7 +19,9 @@ const ARTIFACT_PURPOSES: Readonly<Record<string, string>> = {
   revision_agent_plan: 'Plan used to guide the revision tasks.',
   revision_agent_tool_trace: 'Recorded tool interactions used during revision.',
   revision_agent_draft_report: 'Proposed report retained for human review.',
+  revision_agent_draft_report_repair: 'Evidence-focused repair candidate retained before its follow-up quality review.',
   revision_agent_qa: 'Quality checks applied to the generated draft.',
+  revision_agent_qa_repair: 'Follow-up quality checks applied after the bounded repair attempt.',
 };
 
 function normalizedStatus(status: string | null | undefined): string {
@@ -43,6 +47,9 @@ function countLabel(value: unknown, singular: string, plural: string): string | 
 export function formatRevisionStepLabel(step: RevisionPipelineStep): string {
   const stepName = step.step_name.trim();
   if (stepName === 'revision_agent_issue_scan') return 'Issue scan';
+  if (stepName === 'revision_agent_planner') return 'Revision planning';
+  if (stepName === 'revision_agent_editor') return 'Report editor';
+  if (stepName === 'revision_agent_qa') return 'Quality review';
   const taskMatch = /^revision_agent_task_(\d+)$/.exec(stepName);
   if (taskMatch) return `Revision task ${taskMatch[1]}`;
   return humanize(stepName, 'Revision step');
@@ -131,6 +138,8 @@ export function formatRevisionStatusLabel(status: string | null | undefined): st
       return 'Under review';
     case 'derived':
       return 'Derived';
+    case 'pending_qa':
+      return 'Pending QA';
     case 'recorded':
     case '':
       return 'Recorded';
@@ -158,6 +167,7 @@ export function revisionStatusTone(status: string | null | undefined): RevisionA
     case 'queued':
     case 'requires_human_review':
     case 'under_review':
+    case 'pending_qa':
       return 'warning';
     default:
       return 'neutral';

@@ -49,6 +49,28 @@ describe('clinical-session-revision-display', () => {
     expect(revisionStatusTone(artifact.status)).toBe('warning');
   });
 
+  it('labels bounded repair stages and artifacts explicitly', () => {
+    const editorStep: RevisionPipelineStep = {
+      step_name: 'revision_agent_editor',
+      step_index: 4,
+      step_count: 6,
+      attempt_number: 2,
+      status: 'completed',
+    };
+    const repairArtifact: RevisionArtifact = {
+      artifact_key: 'revision_agent_draft_report_repair',
+      artifact_kind: 'pipeline_artifact',
+      status: 'pending_qa',
+      payload: null,
+    };
+
+    expect(formatRevisionStepLabel(editorStep)).toBe('Report editor');
+    expect(formatRevisionArtifactLabel(repairArtifact)).toBe('Repair draft');
+    expect(formatRevisionArtifactPurpose(repairArtifact)).toContain('repair candidate');
+    expect(formatRevisionStatusLabel(repairArtifact.status)).toBe('Pending QA');
+    expect(revisionStatusTone(repairArtifact.status)).toBe('warning');
+  });
+
   it('preserves safe fallbacks when records have unknown or missing labels', () => {
     const step: RevisionPipelineStep = {
       step_name: 'custom_revision_checkpoint',

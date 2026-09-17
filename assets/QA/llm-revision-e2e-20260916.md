@@ -168,3 +168,26 @@ The tested LLM-powered revision subset using DeepSeek Flash 4.1 through `opencod
 - Not fully reliable for the no-instruction case or for repeated provider runs to pass the clinical QA gate; Run 11 and Run 16 were correctly blocked from becoming accepted sessions.
 
 This conclusion applies only to LLM-powered revision of existing sessions on the tested DeepSeek Flash 4.1/OpenCode Go lane. It does not generalize to the rest of the application.
+
+## Bounded reliability plan implementation and post-change checks
+
+The selected follow-up plan is implemented as a fail-closed, bounded workflow:
+
+- A draft must produce a validated deterministic patch before a non-dry run can create a new session. No-op and invalid-patch results remain `requires_human_review` and preserve the source session.
+- A no-op or QA-blocked draft receives at most one repair attempt. The repair prompt points back to the original canonical report, includes the blocking issues, and retains the repair draft and repair QA artifacts separately.
+- The configured Revision provider and model remain fixed. Revision transport retries are capped at one retry, the existing configured timeout caps are respected, and planner/editor/QA steps persist latency, attempt, and outcome metadata.
+- Live job results expose planning, tool selection, editing, quality review, repair, and finalization phases. The frontend labels repair artifacts and shows `Revision requires human review.` for the fail-closed terminal status.
+- The implementation scope stayed at direct frontend production proof; the desktop launcher/release rebuild was not expanded or claimed as verified.
+
+Post-change checks:
+
+| Check | Result |
+|---|---|
+| Revision backend and adjacent inspection unit suite | `55 passed, 3 warnings` using the existing `app/server/.venv` and an isolated QA cache |
+| Revision no-op/repair regression coverage | No-op retained the source session with `requires_human_review`; one repair produced a persisted accepted revision; editor and QA attempts were recorded as 1 then 2 |
+| Python lint on changed backend/test files | Ruff: `All checks passed!` |
+| Revision audit display Vitest | `4 passed` |
+| Angular production build | `Application bundle generation complete` in 9.890 seconds; no build warnings |
+| Browser rendering check | Rebuilt dev UI opened the persisted Session 19 Revision panel, showed the configured `deepseek-v4-flash` model, the persisted QA-aware status, and the original report remained unchanged; no visible runtime error remained after the backend was available |
+
+The new deterministic repair path is covered locally with synthetic structured calls. The live provider lane remains subject to the latency and variable QA-acceptance limitations documented above; no additional provider run was started for this implementation check.
