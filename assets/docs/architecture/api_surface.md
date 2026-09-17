@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-09-13
+Last updated: 2026-09-16
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -168,6 +168,10 @@ sequenceDiagram
     S->>A: Run bounded agent
     A->>RR: Context, plan, steps, traces
     A->>A: Draft and deterministic patch validation
+    alt no-op or QA blocker
+        A->>A: One bounded evidence-focused repair
+        A->>RR: Repair attempt and latency metadata
+    end
     A->>RR: QA and final artifacts
     alt accepted non-dry run
         A->>CR: Save agentic_revision session

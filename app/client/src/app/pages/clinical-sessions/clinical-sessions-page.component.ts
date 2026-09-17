@@ -39,7 +39,11 @@ import {
   InspectionSessionItem,
   InspectionSessionStatus,
 } from '../../core/models/inspection-types';
-import { RevisionArtifact, RevisionPipelineStep } from '../../core/models/revision-types';
+import {
+  RevisionArtifact,
+  RevisionJobResult,
+  RevisionPipelineStep,
+} from '../../core/models/revision-types';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { JobPollingService } from '../../core/services/job-polling.service';
 import { ModelConfigStateService } from '../../core/state/model-config-state.service';
@@ -502,14 +506,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         const status = await fetchSessionRevisionJobStatus(jobId);
         if (this.revisionPollCancelled) return false;
         const result = status.result;
-        const revisionStatus = result?.revision_status;
-        this.revisionStatus.set(
-          revisionStatus === 'qa_failed'
-            ? 'Revision completed with QA issues.'
-            : status.status === 'running'
-              ? 'Revision agent is working...'
-              : status.status,
-        );
+        this.revisionStatus.set(this.revisionJobStatusLabel(status.status, result));
         if (typeof result?.revision_version_id === 'number') this.revisionVersionId.set(result.revision_version_id);
         if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
           this.revisionRunning.set(false);
@@ -526,6 +523,33 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         return true;
       },
     });
+  }
+
+  private revisionJobStatusLabel(
+    jobStatus: string,
+    result: RevisionJobResult | null | undefined,
+  ): string {
+    if (result?.revision_status === 'qa_failed') return 'Revision completed with QA issues.';
+    if (result?.revision_status === 'requires_human_review') return 'Revision requires human review.';
+    if (jobStatus !== 'running') return jobStatus;
+    switch (result?.revision_phase) {
+      case 'planning':
+        return 'Planning revision...';
+      case 'tool_selection':
+        return 'Selecting revision evidence...';
+      case 'editing':
+        return 'Generating revision draft...';
+      case 'quality_review':
+        return result.repair_attempt
+          ? `Reviewing repaired draft (attempt ${result.repair_attempt})...`
+          : 'Reviewing revision draft...';
+      case 'repairing':
+        return `Repairing revision draft (attempt ${result.repair_attempt || 1})...`;
+      case 'finalizing':
+        return 'Finalizing revision audit...';
+      default:
+        return 'Revision agent is working...';
+    }
   }
 
   private async loadPersistedRevision(sessionId: number, revisionLoadGeneration: number): Promise<void> {
@@ -564,6 +588,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.revisionStatus.set(
         latest.version_status === 'qa_failed'
           ? 'Revision completed with QA issues.'
+          : latest.version_status === 'requires_human_review'
+            ? 'Revision requires human review.'
           : 'Revision draft loaded from persisted session data.',
       );
     } catch (error) {
@@ -574,7 +600,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   private applyRevisionDraftArtifact(artifacts: RevisionArtifact[]): void {
-    const artifact = artifacts.find((candidate) => candidate.artifact_key === 'revision_agent_draft_report');
+    const artifact = artifacts.find((candidate) => candidate.artifact_key === 'revision_agent_draft_report_repair')
+      || artifacts.find((candidate) => candidate.artifact_key === 'revision_agent_draft_report');
     const payload = artifact?.payload;
     const report = payload && typeof payload['revised_report_text'] === 'string'
       ? payload['revised_report_text']

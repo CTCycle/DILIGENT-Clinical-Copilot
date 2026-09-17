@@ -24,6 +24,15 @@ export type RevisionJobResult = Record<string, unknown> & {
   tool_call_count?: number;
   blocking_issue_count?: number;
   manual_review_required?: boolean;
+  revision_phase?:
+    | 'planning'
+    | 'tool_selection'
+    | 'editing'
+    | 'quality_review'
+    | 'repairing'
+    | 'finalizing'
+    | 'completed';
+  repair_attempt?: number;
 };
 
 export type RevisionJobStatusResponse = JobStatusResponse<RevisionJobResult>;
