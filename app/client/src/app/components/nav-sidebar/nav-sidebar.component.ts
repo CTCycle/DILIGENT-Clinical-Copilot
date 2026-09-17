@@ -20,7 +20,7 @@ export class NavSidebarComponent {
     { pageId: 'dili-agent', label: 'DILI Agent' },
     { pageId: 'clinical-sessions', label: 'Clinical Sessions' },
     { pageId: 'data-inspection', label: 'Data Inspection' },
-    { pageId: 'model-config', label: 'Configurations' },
+    { pageId: 'settings', label: 'Settings' },
   ];
 
   onNavigate(pageId: PageId): void {

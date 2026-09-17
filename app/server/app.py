@@ -16,6 +16,7 @@ from api.health import router as health_router
 from api.model_config import router as model_config_router
 from api.ollama import router as ollama_router
 from api.session import router as session_router
+from api.settings import router as settings_router
 from common.constants import (
     FASTAPI_API_PREFIX,
     FASTAPI_ASSETS_ENDPOINT,
@@ -53,13 +54,10 @@ def _client_build_available() -> bool:
 def _resolve_client_file(full_path: str) -> Path | None:
     client_root = CLIENT_DIST_PATH.resolve()
     requested_path = (client_root / full_path).resolve()
-
     if not requested_path.is_relative_to(client_root):
         return None
-
     if requested_path.is_file():
         return requested_path
-
     return None
 
 ###############################################################################
@@ -81,12 +79,10 @@ def redirect_root_to_docs() -> RedirectResponse:
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     settings = get_server_settings()
-
     get_job_manager().begin_startup()
     ensure_database_ready(settings.database)
     initialize_reference_catalog_provider()
     run_startup_validations(settings)
-
     application.state.server_settings = settings
     try:
         yield
@@ -97,7 +93,6 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
 ###############################################################################
 def create_app() -> FastAPI:
     initialize_settings()
-
     application = FastAPI(
         title=FASTAPI_TITLE,
         version=resolve_application_version(),
@@ -114,13 +109,13 @@ def create_app() -> FastAPI:
         DesktopSecurityMiddleware,
         security=desktop_runtime.security,
     )
-
     for router in (
         session_router,
         data_inspection_router,
         health_router,
         ollama_router,
         model_config_router,
+        settings_router,
         access_keys_router,
         desktop_router,
     ):
@@ -152,7 +147,6 @@ def create_app() -> FastAPI:
             methods=["GET"],
             include_in_schema=False,
         )
-
     return application
 
 

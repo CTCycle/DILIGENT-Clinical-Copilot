@@ -1,0 +1,200 @@
+:host {
+  display: block;
+}
+
+.operational-settings-page {
+  min-width: 0;
+  padding: 0 0 var(--space-6, 1.5rem);
+}
+
+.operational-settings-header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-5, 1.25rem);
+  align-items: flex-start;
+  padding-bottom: var(--space-5, 1.25rem);
+  border-bottom: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+}
+
+.operational-settings-header h2 {
+  margin: 0.2rem 0 0.35rem;
+  font-size: 1.35rem;
+}
+
+.operational-settings-header p,
+.operational-settings-boundary {
+  margin: 0;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.operational-settings-kicker {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.operational-settings-source {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: end;
+  white-space: nowrap;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.7rem;
+}
+
+.operational-settings-source code {
+  font-size: 0.74rem;
+}
+
+.operational-settings-form {
+  margin-top: var(--space-3, 0.75rem);
+}
+
+.operational-settings-list {
+  display: grid;
+}
+
+.operational-setting-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+  gap: var(--space-6, 1.5rem);
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border-color, rgba(127, 127, 127, 0.16));
+}
+
+.operational-setting-copy {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.operational-setting-copy strong {
+  font-size: 0.9rem;
+}
+
+.operational-setting-copy > span {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.operational-setting-copy code {
+  width: fit-content;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.7rem;
+}
+
+.operational-setting-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.operational-setting-control input {
+  width: 100%;
+  height: var(--control-height-md, 38px);
+  box-sizing: border-box;
+  padding: 0 0.65rem;
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.32));
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface-color, transparent);
+  color: inherit;
+}
+
+.operational-setting-control input:focus-visible,
+.settings-secondary-button:focus-visible,
+.settings-primary-button:focus-visible {
+  outline: 2px solid var(--focus-color, currentColor);
+  outline-offset: 2px;
+}
+
+.operational-setting-control > span {
+  min-width: 4rem;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.72rem;
+}
+
+.operational-settings-validation {
+  margin: 0.75rem 0 0;
+  color: var(--danger-color, #b91c1c);
+  font-size: 0.8rem;
+}
+
+.operational-settings-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding-top: var(--space-5, 1.25rem);
+}
+
+.operational-settings-meta {
+  display: grid;
+  gap: 0.2rem;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.72rem;
+}
+
+.operational-settings-meta strong {
+  color: inherit;
+}
+
+.operational-settings-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.settings-secondary-button,
+.settings-primary-button {
+  min-height: var(--control-height-md, 38px);
+  padding: 0 0.85rem;
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.32));
+  border-radius: var(--radius-sm, 6px);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-secondary-button {
+  background: transparent;
+  color: inherit;
+}
+
+.settings-primary-button {
+  border-color: var(--accent-color, #2563eb);
+  background: var(--accent-color, #2563eb);
+  color: white;
+}
+
+.settings-secondary-button:hover:not(:disabled),
+.settings-primary-button:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.settings-secondary-button:disabled,
+.settings-primary-button:disabled,
+.operational-setting-control input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.operational-settings-state {
+  padding: 1.25rem 0;
+  color: var(--text-secondary, #6b7280);
+}
+
+.operational-settings-error p {
+  margin-top: 0;
+}
+
+.operational-settings-boundary {
+  margin-top: var(--space-5, 1.25rem);
+  padding-top: var(--space-4, 1rem);
+  border-top: 1px solid var(--border-color, rgba(127, 127, 127, 0.16));
+}
