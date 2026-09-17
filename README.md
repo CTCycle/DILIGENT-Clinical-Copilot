@@ -20,7 +20,7 @@ DILIGENT follows a clear review flow:
 
 The application deliberately separates model-generated suggestions from saved evidence and human decisions. A polished paragraph is still a draft until a clinician has checked it against the source record.
 
-The four primary workspaces are **DILI Agent**, **Clinical Sessions**, **Data Inspection**, and **Configurations**. Patient Timeline is a contextual workspace opened from the **Timeline** tab of a selected clinical session, rather than a separate top-level page.
+The four primary workspaces are **DILI Agent**, **Clinical Sessions**, **Data Inspection**, and **Settings**. Patient Timeline is a contextual workspace opened from the **Timeline** tab of a selected clinical session, rather than a separate top-level page.
 
 ### Principles behind the assessment
 
@@ -96,7 +96,7 @@ The v3.3.0 release provides Windows x64 desktop packages in two forms:
 
 The packaged application contains the runtime it needs, starts its local services automatically, and keeps user data separate from the downloaded package. A matching SHA-256 file is published so a downloaded package can be checked before use or distribution.
 
-This release also makes the four model roles explicit in **Configurations**, keeps saved session and timeline review together, and uses the native Windows directory picker for desktop RAG folder selection. The standard release workflow builds and publishes the packages from the synchronized main branch.
+This release also makes the four model roles explicit in **Settings**, keeps saved session and timeline review together, and uses the native Windows directory picker for desktop RAG folder selection. The standard release workflow builds and publishes the packages from the synchronized main branch.
 
 ## Current release candidate
 
@@ -192,7 +192,7 @@ Open the interface at [http://127.0.0.1:9847](http://127.0.0.1:9847). The local 
 
 ## Configure models and access keys
 
-Open **Configurations** from the sidebar before starting an assessment. This is where you choose how DILIGENT should use models.
+Open **Settings** from the sidebar before starting an assessment. This is where you choose how DILIGENT should use models.
 
 The page presents four independent role assignments: **Clinical**, **Text extraction**, **Revision**, and **Timeline**. One compatible model may be used for more than one role.
 
@@ -204,7 +204,7 @@ The page presents four independent role assignments: **Clinical**, **Text extrac
 
 For local use, Ollama must be running with a compatible chat-capable model installed. For cloud use, the active provider key is used when the model list is refreshed. After a key is saved, the interface shows a fingerprint and metadata rather than the full secret. Do not paste access keys into screenshots, chat messages, issue reports, or shared logs.
 
-Opening **Configurations** uses the last saved model list. Use **Refresh** when you explicitly want a new provider listing. If a refresh fails, the last valid list may remain visible so that you can understand the previous setup. Changing between local and cloud modes requires compatible role selections; incompatible choices are cleared rather than silently reused.
+Opening **Settings** uses the last saved model list. Use **Refresh** when you explicitly want a new provider listing. If a refresh fails, the last valid list may remain visible so that you can understand the previous setup. Changing between local and cloud modes requires compatible role selections; incompatible choices are cleared rather than silently reused.
 
 ## Run a DILI assessment
 
@@ -278,7 +278,7 @@ Manual report edits do not create a new official version. Before approving or re
 
 From **Clinical Sessions**, select a saved session and open its **Timeline** tab to review event order and clinical chronology. Generate a timeline when needed, or reopen a previously saved timeline instead of regenerating it. Compare medication exposure dates with symptoms and laboratory changes before refining the DILI Agent input.
 
-Timeline generation uses the model assigned to the Timeline role in **Configurations**. If model extraction is unavailable, DILIGENT may build a deterministic fallback from saved session fields. Approximate dates, missing source evidence, and fallback chronology are labeled warnings and navigation aids, not clinically established facts.
+Timeline generation uses the model assigned to the Timeline role in **Settings**. If model extraction is unavailable, DILIGENT may build a deterministic fallback from saved session fields. Approximate dates, missing source evidence, and fallback chronology are labeled warnings and navigation aids, not clinically established facts.
 
 ### Data Inspection
 
@@ -299,7 +299,7 @@ Open **Data Inspection** to view available local resources, records, metadata, a
 | The Windows desktop app does not open | The download may be incomplete, WebView2 may be unavailable, or packaged startup may have failed. | Verify the matching SHA-256 file, download the package again if needed, and make sure WebView2 is available. See the [desktop troubleshooting guide](assets/docs/runtime/troubleshooting.md) for the packaged log location. |
 | The source-mode page is blank or does not load | The launcher has not finished preparing the local services or frontend. | Run `.\start_on_windows.ps1` again. On a fresh checkout, complete **Install dependencies** before **Launch application**, then open [http://127.0.0.1:9847](http://127.0.0.1:9847). |
 | The UI says that the local service is unavailable | The service is still starting, stopped, or another local application is using its port. | Open [http://127.0.0.1:7690/api/health](http://127.0.0.1:7690/api/health), then restart the launcher. |
-| A model cannot be selected or saved | The provider mode and model are incompatible, or the saved catalog is out of date. | In **Configurations**, choose the correct local or cloud mode, use **Refresh**, assign compatible roles, and save again. |
+| A model cannot be selected or saved | The provider mode and model are incompatible, or the saved catalog is out of date. | In **Settings**, choose the correct local or cloud mode, use **Refresh**, assign compatible roles, and save again. |
 | A cloud model catalog is unavailable | The active key, network connection, provider quota, or provider service may be unavailable. | Confirm that the correct key is active, check network access and provider status, then use **Refresh** again. A previously valid catalog may remain visible. |
 | A local run fails | Ollama is not running or the selected model is not installed or chat-capable. | Start Ollama, confirm that the selected model is installed, and retry the run. |
 | The assessment is blocked before it starts | Pre-flight checks found missing or inconsistent input. | Follow the feedback, add or correct the requested history, timing, medication, or laboratory details, and retry. |

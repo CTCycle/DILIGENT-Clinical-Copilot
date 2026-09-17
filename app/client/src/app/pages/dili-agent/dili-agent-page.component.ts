@@ -128,7 +128,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   openConfigurations(): void {
-    void this.router.navigateByUrl('/model-config');
+    void this.router.navigateByUrl('/settings/models');
   }
 
   ngOnDestroy(): void {

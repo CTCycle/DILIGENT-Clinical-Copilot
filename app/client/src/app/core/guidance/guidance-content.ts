@@ -82,7 +82,7 @@ export const TIPS_AND_TRICKS: readonly TipDefinition[] = [
     id: 'model-roles',
     title: 'Choose model roles',
     body: 'The clinical role and text-extraction role can use different models. Choose each role in the catalog, then save the configuration.',
-    actionLabel: 'Open Configurations',
+    actionLabel: 'Open Settings',
     action: 'configurations',
   },
   {

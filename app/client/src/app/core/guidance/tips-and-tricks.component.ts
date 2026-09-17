@@ -32,7 +32,7 @@ export class TipsAndTricksComponent {
     this.close();
     queueMicrotask(() => {
       if (action === 'tour') this.tourService.restart(DILI_ASSESSMENT_TOUR);
-      if (action === 'configurations') void this.router.navigateByUrl('/model-config');
+      if (action === 'configurations') void this.router.navigateByUrl('/settings/models');
       if (action === 'sessions') void this.router.navigateByUrl('/clinical-sessions');
       if (action === 'data') void this.router.navigateByUrl('/data');
     });
