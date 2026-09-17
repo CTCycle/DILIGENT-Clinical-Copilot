@@ -3,7 +3,7 @@ import { Injectable, effect, signal } from '@angular/core';
 import { DEFAULT_FORM_STATE } from '../constants';
 import { ClinicalFormState, JobStatus } from '../models/types';
 
-export type PageId = 'dili-agent' | 'clinical-sessions' | 'data-inspection' | 'model-config';
+export type PageId = 'dili-agent' | 'clinical-sessions' | 'data-inspection' | 'settings';
 export type ThemeMode = 'light' | 'dark';
 
 const DEFAULT_PAGE: PageId = 'dili-agent';
@@ -12,7 +12,7 @@ const PAGE_PATHS: Record<PageId, string> = {
   'dili-agent': '/',
   'clinical-sessions': '/clinical-sessions',
   'data-inspection': '/data',
-  'model-config': '/model-config',
+  settings: '/settings/general',
 };
 
 export function normalizePathname(pathname: string): string {
@@ -28,7 +28,7 @@ export function resolvePageIdFromPath(pathname: string): PageId {
   const normalized = normalizePathname(pathname);
   if (normalized === PAGE_PATHS['clinical-sessions'] || normalized.startsWith('/sessions/')) return 'clinical-sessions';
   if (normalized === PAGE_PATHS['data-inspection']) return 'data-inspection';
-  if (normalized === PAGE_PATHS['model-config']) return 'model-config';
+  if (normalized === '/model-config' || normalized === '/settings' || normalized.startsWith('/settings/')) return 'settings';
   return DEFAULT_PAGE;
 }
 
@@ -169,4 +169,3 @@ export class AppStateService {
     this.state.update((prev) => ({ ...prev, diliAgent: { ...prev.diliAgent, ...updates } }));
   }
 }
-

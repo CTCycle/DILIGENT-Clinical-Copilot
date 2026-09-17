@@ -1,0 +1,31 @@
+<main class="page-container settings-page">
+  <aside class="settings-navigation" aria-label="Settings sections">
+    <div class="settings-navigation-heading">
+      <span class="settings-kicker">Application</span>
+      <h1>Settings</h1>
+      <p>Runtime controls backed by the application settings configuration.</p>
+    </div>
+
+    <nav class="settings-navigation-list">
+      @for (item of navItems; track item.path) {
+        <a
+          class="settings-navigation-link"
+          [routerLink]="item.path"
+          routerLinkActive="is-active"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          <span>{{ item.label }}</span>
+          <small>{{ item.description }}</small>
+        </a>
+      }
+    </nav>
+
+    <p class="settings-environment-note">
+      Environment and deployment configuration from <code>.env</code> is intentionally not editable here.
+    </p>
+  </aside>
+
+  <section class="settings-content" aria-label="Selected settings section">
+    <router-outlet></router-outlet>
+  </section>
+</main>
