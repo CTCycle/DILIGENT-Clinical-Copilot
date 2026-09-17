@@ -1,0 +1,98 @@
+<section class="operational-settings-page">
+  <header class="operational-settings-header">
+    <div>
+      <span class="operational-settings-kicker">Runtime settings</span>
+      <h2>{{ definition().title }}</h2>
+      <p>{{ definition().description }}</p>
+    </div>
+    <div class="operational-settings-source" title="Authoritative runtime settings source">
+      <span>Source</span>
+      <code>settings/configurations.json</code>
+    </div>
+  </header>
+
+  @if (settingsState.isLoading() && !draft()) {
+    <div class="operational-settings-state" role="status">Loading settings...</div>
+  } @else if (settingsState.status() === 'error' && !draft()) {
+    <div class="operational-settings-state operational-settings-error" role="alert">
+      <p>{{ settingsState.error() || 'Unable to load settings.' }}</p>
+      <button type="button" class="settings-secondary-button" (click)="retryLoad()">Retry</button>
+    </div>
+  } @else if (draft()) {
+    <form class="operational-settings-form" (ngSubmit)="save()">
+      <div class="operational-settings-list">
+        @for (field of fields(); track field.key) {
+          <label class="operational-setting-row">
+            <span class="operational-setting-copy">
+              <strong>{{ field.label }}</strong>
+              <span>{{ field.help }}</span>
+              <code>{{ field.jsonPath }}</code>
+            </span>
+            <span class="operational-setting-control">
+              <input
+                type="number"
+                [attr.min]="field.min"
+                [attr.max]="field.max"
+                [attr.step]="field.step"
+                [ngModel]="fieldValue(field)"
+                (ngModelChange)="updateField(field, $event)"
+                [name]="field.key"
+                [disabled]="isSaving() || isResetting()"
+                [attr.aria-label]="field.label"
+              />
+              @if (field.unit) {
+                <span>{{ field.unit }}</span>
+              }
+            </span>
+          </label>
+        }
+      </div>
+
+      @if (validationMessage()) {
+        <p class="operational-settings-validation" role="alert">{{ validationMessage() }}</p>
+      }
+
+      @if (statusMessage()) {
+        <app-status-message [message]="statusMessage()" [tone]="statusTone()"></app-status-message>
+      }
+
+      <footer class="operational-settings-actions">
+        <div class="operational-settings-meta">
+          <span>Last persisted: {{ updatedAtLabel() }}</span>
+          @if (isDirty()) {
+            <strong>Unsaved changes</strong>
+          }
+        </div>
+        <div class="operational-settings-buttons">
+          <button
+            type="button"
+            class="settings-secondary-button"
+            (click)="resetToDefaults()"
+            [disabled]="isSaving() || isResetting()"
+          >
+            {{ isResetting() ? 'Resetting...' : 'Reset to defaults' }}
+          </button>
+          <button
+            type="button"
+            class="settings-secondary-button"
+            (click)="discardChanges()"
+            [disabled]="!isDirty() || isSaving() || isResetting()"
+          >
+            Discard
+          </button>
+          <button
+            type="submit"
+            class="settings-primary-button"
+            [disabled]="!canSave()"
+          >
+            {{ isSaving() ? 'Saving...' : 'Save changes' }}
+          </button>
+        </div>
+      </footer>
+    </form>
+  }
+
+  <p class="operational-settings-boundary">
+    Environment variables, credentials, ports, database configuration, filesystem/bootstrap paths, and deployment settings are not part of this Settings surface.
+  </p>
+</section>
