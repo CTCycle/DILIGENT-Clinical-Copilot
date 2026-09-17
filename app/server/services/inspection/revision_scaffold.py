@@ -42,6 +42,10 @@ class InspectionRevisionScaffoldMixin:
         pipeline_run_id = str(kwargs["pipeline_run_id"])
         job_id = str(kwargs["job_id"])
         kwargs["stop_check"] = lambda: self.jobs.should_stop(job_id)
+        kwargs["progress_update"] = lambda patch: self.jobs.update_result(
+            job_id,
+            patch,
+        )
         try:
             result = self.revision_agent_runner.run_agentic(**kwargs)
         except RevisionAgentCancelled:

@@ -7,6 +7,7 @@ PLANNER_PROMPT_VERSION = "revision-agent-planner-v1"
 TOOL_PROMPT_VERSION = "revision-agent-tool-controller-v1"
 EDITOR_PROMPT_VERSION = "revision-agent-report-editor-v1"
 QA_PROMPT_VERSION = "revision-agent-qa-v1"
+REPAIR_PROMPT_VERSION = "revision-agent-report-repair-v1"
 
 REVISION_AGENT_SYSTEM_PROMPT = """You are the DILIGENT Revision Agent, a clinical revision controller for drug-induced liver injury session review.
 
@@ -103,6 +104,7 @@ Patch contract:
 - When the user explicitly asks to append an exact sentence to the revised report, treat `append` as a patch at the end of `review_target.official_report.text`. Preserve every existing canonical character and do not refuse the patch because the report has a trailing non-clinical marker or because the placement is otherwise described as ambiguous.
 - Exact user-instruction compliance is required when the canonical report is available; do not leave a requested append unresolved solely because its end offset must be calculated from that canonical text.
 - Every non-empty patch must include evidence references.
+- `changed_sections`, `unchanged_sections`, `unresolved_issues`, and `human_review_requirements` are arrays of plain strings in the supplied schema. Do not invent a separate issue-object schema for these fields.
 - The persisted report is always the deterministic patch result. Model-provided full text is advisory.
 
 <revision_context>
@@ -115,9 +117,44 @@ Patch contract:
 """
 
 ###############################################################################
+def repair_editor_prompt(
+    context: object,
+    observations: object,
+    prior_draft: object,
+    blocking_issues: object,
+) -> str:
+    return f"""{SAFETY_RULES}
+Repair the prior revision draft using the QA blockers below. Return a complete `RevisionDraftResult` for the original canonical report, not an incremental patch against the prior draft.
+
+Repair rules:
+- The canonical patch source remains `review_target.official_report.text` in the revision context.
+- `start`, `end`, and `expected_text` must be verified against that original canonical string.
+- Preserve every unrelated canonical character and make only evidence-backed changes that resolve the supplied blockers.
+- If a blocker cannot be resolved safely with an exact evidence-backed patch, return no patch for that issue and state the human-review requirement.
+- `changed_sections`, `unchanged_sections`, `unresolved_issues`, and `human_review_requirements` are arrays of plain strings in the supplied schema. Do not return issue objects in those fields.
+- The application derives the persisted report from validated patches; `revised_report_text` may be empty.
+
+<revision_context>
+{context}
+</revision_context>
+
+<prior_draft>
+{prior_draft}
+</prior_draft>
+
+<qa_blocking_issues>
+{blocking_issues}
+</qa_blocking_issues>
+
+<observations>
+{observations}
+</observations>
+"""
+
+###############################################################################
 def qa_prompt(context: object, draft: object) -> str:
     return f"""{SAFETY_RULES}
-Review the draft changes against the supplied context. Block changed claims that are unsupported, unsafe, or inconsistent with the evidence and return the QA result only.
+Review the draft changes against the supplied context. Block changed claims that are unsupported, unsafe, or inconsistent with the evidence and return the QA result only. The draft's `unresolved_issues` and `human_review_requirements` fields are plain string arrays by contract; do not reject them for not being issue objects. A report with no validated patch is not an accepted revision; identify that condition as a blocking issue when the runner has supplied an unchanged draft.
 
 <revision_context>
 {context}

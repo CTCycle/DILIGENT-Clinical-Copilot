@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any, Callable
 
+from configurations.startup import get_server_settings
 from common.utils.clinical_safety import (
     RECHALLENGE_RECOMMENDATION_MESSAGE,
     contains_rechallenge_recommendation,
@@ -25,12 +26,18 @@ from services.inspection.revision_clinical_safety import audit_revised_dili_repo
 from services.inspection.revision_context import build_revision_context
 from services.inspection.revision_patches import validate_draft_report
 from common.prompts.revision_agent import (
+    EDITOR_PROMPT_VERSION,
+    PLANNER_PROMPT_VERSION,
+    QA_PROMPT_VERSION,
+    REPAIR_PROMPT_VERSION,
     REVISION_AGENT_SYSTEM_PROMPT,
     build_revision_issue_scan_user_prompt,
     editor_prompt,
     planner_prompt,
     qa_prompt,
+    repair_editor_prompt,
     tool_prompt,
+    TOOL_PROMPT_VERSION,
 )
 from services.inspection.revision_tools import RevisionToolRegistry
 from services.llm.provider_factory import select_llm_provider
@@ -47,6 +54,8 @@ REVISION_AGENT_PROMPT_VERSION = "revision-agent-issue-scan-v1"
 REVISION_AGENT_SCHEMA_NAME = "revision_issue_scan_result"
 REVISION_AGENT_SCHEMA_VERSION = "1"
 REVISION_AGENT_STEP_NAME = "revision_agent_issue_scan"
+REVISION_PROVIDER_MAX_RETRIES = 1
+MAX_QA_REPAIR_ATTEMPTS = 1
 
 
 MAX_TEXT_CHARS = 30000
@@ -55,6 +64,7 @@ MAX_JSON_CHARS = 30000
 
 StructuredCall = Callable[..., Any]
 StopCheck = Callable[[], bool]
+ProgressUpdate = Callable[[dict[str, Any]], None]
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -94,6 +104,19 @@ def _requested_append_sentence(instruction: str | None) -> str | None:
         return None
     sentence = match.group("sentence").strip()
     return sentence if sentence and sentence[-1] in ".!?" else None
+
+###############################################################################
+def _revision_provider_timeout(provider: str) -> float:
+    runtime = get_server_settings().runtime
+    cap = (
+        runtime.local_llm_timeout_cap
+        if provider.strip().lower() == "ollama"
+        else runtime.cloud_llm_timeout_cap
+    )
+    return max(
+        float(runtime.minimum_llm_timeout),
+        min(float(runtime.default_llm_timeout), float(cap)),
+    )
 
 ###############################################################################
 def resolve_revision_agent_runtime() -> RevisionAgentRuntime:
@@ -180,6 +203,201 @@ class RevisionAgentRunner:
         self.session_revision_repository = session_revision_repository
         self.knowledge_repository = knowledge_repository
         self.structured_call = structured_call
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _publish_phase(
+        progress_update: ProgressUpdate | None,
+        phase: str,
+        *,
+        repair_attempt: int = 0,
+    ) -> None:
+        if progress_update is None:
+            return
+        try:
+            progress_update(
+                {
+                    "revision_phase": phase,
+                    "repair_attempt": repair_attempt,
+                }
+            )
+        except Exception:  # noqa: BLE001
+            # Progress reporting must never turn a completed revision into a
+            # failed revision when a job-status backend is unavailable.
+            return
+
+    # -------------------------------------------------------------------------
+    def _call_revision_stage(
+        self,
+        *,
+        runtime: RevisionAgentRuntime,
+        pipeline_run_id: str,
+        step_name: str,
+        step_index: int,
+        step_count: int,
+        input_summary: dict[str, Any],
+        prompt: str,
+        schema: type[Any],
+        purpose: GenerationPurpose,
+        prompt_version: str,
+        stop_check: StopCheck | None,
+        output_summary: Callable[[Any], dict[str, Any]],
+    ) -> Any:
+        step = self.session_revision_repository.start_revision_step(
+            pipeline_run_id=pipeline_run_id,
+            step_name=step_name,
+            step_index=step_index,
+            step_count=max(1, step_count),
+            input_summary=input_summary,
+            schema_name=schema.__name__,
+            schema_version="1",
+            prompt_version=prompt_version,
+            parser_version="structured-llm-v1",
+            model_provider=runtime.provider,
+            model_name=runtime.model,
+        )
+        attempt_number = int(step["attempt_number"])
+        started = perf_counter()
+        try:
+            result = self._call_schema(
+                runtime,
+                prompt,
+                schema,
+                purpose=purpose,
+            )
+            self._raise_if_stopped(stop_check)
+            latency_ms = int((perf_counter() - started) * 1000)
+            self.session_revision_repository.complete_revision_step(
+                pipeline_run_id=pipeline_run_id,
+                step_name=step_name,
+                attempt_number=attempt_number,
+                status="completed",
+                output_summary=output_summary(result),
+                output_payload=result.model_dump(mode="json"),
+                latency_ms=latency_ms,
+                retry_count=max(0, attempt_number - 1),
+            )
+            return result
+        except Exception as exc:
+            latency_ms = int((perf_counter() - started) * 1000)
+            self.session_revision_repository.fail_revision_step(
+                pipeline_run_id=pipeline_run_id,
+                step_name=step_name,
+                attempt_number=attempt_number,
+                error={"message": str(exc)},
+                latency_ms=latency_ms,
+            )
+            raise
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_draft(
+        *,
+        source_report: str,
+        draft: RevisionDraftResult,
+        request: SessionRevisionRequest,
+    ) -> tuple[RevisionDraftResult, str]:
+        try:
+            applied_report = validate_draft_report(source_report, draft.patches)
+        except ValueError as exc:
+            draft = draft.model_copy(
+                update={
+                    "patches": [],
+                    "revised_report_text": source_report,
+                    "unresolved_issues": [
+                        *draft.unresolved_issues,
+                        f"The proposed patch could not be validated against the canonical report: {exc}",
+                    ],
+                    "human_review_requirements": [
+                        *draft.human_review_requirements,
+                        "Repair or manually review the invalid patch before accepting this revision.",
+                    ],
+                }
+            )
+            applied_report = source_report
+        requested_append = _requested_append_sentence(request.revision_instruction)
+        if requested_append and not applied_report.rstrip().endswith(requested_append):
+            draft = draft.model_copy(
+                update={
+                    "patches": [
+                        *draft.patches,
+                        RevisionReportPatch(
+                            start=len(source_report),
+                            end=len(source_report),
+                            replacement=f"\n\n{requested_append}",
+                            expected_text="",
+                            evidence_references=["user_revision_instruction"],
+                        ),
+                    ],
+                    "changed_sections": [
+                        *draft.changed_sections,
+                        "user_requested_append",
+                    ],
+                }
+            )
+            try:
+                applied_report = validate_draft_report(source_report, draft.patches)
+            except ValueError as exc:  # pragma: no cover - deterministic append
+                draft = draft.model_copy(
+                    update={
+                        "patches": [],
+                        "revised_report_text": source_report,
+                        "unresolved_issues": [
+                            *draft.unresolved_issues,
+                            f"The requested append could not be validated: {exc}",
+                        ],
+                    }
+                )
+                applied_report = source_report
+        if not draft.revised_report_text:
+            draft = draft.model_copy(update={"revised_report_text": applied_report})
+        elif applied_report != draft.revised_report_text:
+            draft = draft.model_copy(
+                update={
+                    "revised_report_text": applied_report,
+                    "unresolved_issues": [
+                        *draft.unresolved_issues,
+                        "Model-provided revised report text differed from the deterministic patch output; the deterministic result is authoritative.",
+                    ],
+                    "human_review_requirements": [
+                        *draft.human_review_requirements,
+                        "Verify the deterministic patch result during clinical review.",
+                    ],
+                }
+            )
+        return draft, applied_report
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _merge_quality_gates(
+        *,
+        qa: RevisionAgentQaResult,
+        session: dict[str, Any],
+        applied_report: str,
+        source_report: str,
+    ) -> RevisionAgentQaResult:
+        blocking_issues = list(qa.blocking_issues)
+        if applied_report == source_report:
+            blocking_issues.append(
+                "Revision produced no validated report edits; a new session cannot be created until a verified patch is produced."
+            )
+        clinical_safety_issues = audit_revised_dili_report(
+            session=session,
+            report_text=applied_report,
+        )
+        if contains_rechallenge_recommendation(applied_report) and (
+            RECHALLENGE_RECOMMENDATION_MESSAGE not in clinical_safety_issues
+        ):
+            clinical_safety_issues.append(RECHALLENGE_RECOMMENDATION_MESSAGE)
+        blocking_issues.extend(clinical_safety_issues)
+        if not blocking_issues:
+            return qa
+        return qa.model_copy(
+            update={
+                "blocking_issues": list(dict.fromkeys(blocking_issues)),
+                "manual_review_required": True,
+            }
+        )
 
     # -------------------------------------------------------------------------
     def run_issue_scan(
@@ -320,9 +538,11 @@ class RevisionAgentRunner:
         request: SessionRevisionRequest,
         model_configuration: dict[str, Any],
         stop_check: StopCheck | None = None,
+        progress_update: ProgressUpdate | None = None,
     ) -> dict[str, Any]:
         runtime = resolve_revision_agent_runtime()
         self._raise_if_stopped(stop_check)
+        self._publish_phase(progress_update, "planning")
         lineage = self.session_revision_repository.list_session_versions(
             int(session["session_id"])
         )
@@ -367,13 +587,27 @@ class RevisionAgentRunner:
             artifact_key="revision_agent_context",
             payload=context,
         )
-        plan = self._call_schema(
-            runtime,
-            planner_prompt(context, manifest),
-            RevisionAgentPlan,
+        stage_count = max(3, request.max_tasks + 3)
+        plan = self._call_revision_stage(
+            runtime=runtime,
+            pipeline_run_id=pipeline_run_id,
+            step_name="revision_agent_planner",
+            step_index=1,
+            step_count=stage_count,
+            input_summary={
+                "manifest_count": len(manifest),
+                "context_keys": sorted(context.keys()),
+            },
+            prompt=planner_prompt(context, manifest),
+            schema=RevisionAgentPlan,
             purpose=GenerationPurpose.REVISION_PLANNING,
+            prompt_version=PLANNER_PROMPT_VERSION,
+            stop_check=stop_check,
+            output_summary=lambda value: {
+                "task_count": len(value.tasks),
+                "expected_final_output_type": value.expected_final_output_type,
+            },
         )
-        self._raise_if_stopped(stop_check)
         plan.tasks = plan.tasks[: request.max_tasks]
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
@@ -383,6 +617,7 @@ class RevisionAgentRunner:
         )
         observations: list[dict[str, Any]] = []
         tool_calls = 0
+        self._publish_phase(progress_update, "tool_selection")
         for task_index, task in enumerate(plan.tasks, start=1):
             self._raise_if_stopped(stop_check)
             remaining_tool_calls = request.max_tool_iterations - tool_calls
@@ -392,17 +627,18 @@ class RevisionAgentRunner:
                 pipeline_run_id=pipeline_run_id,
                 step_name=f"revision_agent_task_{task_index}",
                 step_index=task_index + 1,
-                step_count=len(plan.tasks) + 3,
+                step_count=stage_count,
                 input_summary={"task_id": task.task_id},
                 input_payload=task.model_dump(mode="json"),
                 schema_name="revision_agent_tool_call",
                 schema_version="1",
-                prompt_version="revision-agent-tool-controller-v1",
+                prompt_version=TOOL_PROMPT_VERSION,
                 parser_version="structured-llm-v1",
                 model_provider=runtime.provider,
                 model_name=runtime.model,
             )
             attempt = int(step["attempt_number"])
+            task_started = perf_counter()
             task_observations: list[dict[str, Any]] = []
             try:
                 self._raise_if_stopped(stop_check)
@@ -457,6 +693,8 @@ class RevisionAgentRunner:
                     status="completed",
                     output_summary={"tool_call_count": len(task_observations)},
                     output_payload={"observations": task_observations},
+                    latency_ms=int((perf_counter() - task_started) * 1000),
+                    retry_count=max(0, attempt - 1),
                 )
             except Exception as exc:
                 self.session_revision_repository.fail_revision_step(
@@ -464,6 +702,7 @@ class RevisionAgentRunner:
                     step_name=f"revision_agent_task_{task_index}",
                     attempt_number=attempt,
                     error={"message": str(exc)},
+                    latency_ms=int((perf_counter() - task_started) * 1000),
                 )
                 raise
             if tool_calls >= request.max_tool_iterations:
@@ -476,82 +715,69 @@ class RevisionAgentRunner:
             payload={"observations": observations},
         )
         self._raise_if_stopped(stop_check)
-        draft = self._call_schema(
-            runtime,
-            editor_prompt(context, observations),
-            RevisionDraftResult,
+        self._publish_phase(progress_update, "editing")
+        draft = self._call_revision_stage(
+            runtime=runtime,
+            pipeline_run_id=pipeline_run_id,
+            step_name="revision_agent_editor",
+            step_index=len(plan.tasks) + 2,
+            step_count=stage_count,
+            input_summary={
+                "observation_count": len(observations),
+                "repair_attempt": 0,
+            },
+            prompt=editor_prompt(context, observations),
+            schema=RevisionDraftResult,
             purpose=GenerationPurpose.REVISION_EDITING,
+            prompt_version=EDITOR_PROMPT_VERSION,
+            stop_check=stop_check,
+            output_summary=lambda value: {
+                "patch_count": len(value.patches),
+                "changed_section_count": len(value.changed_sections),
+            },
         )
         source_report = str(
             session.get("official_report_text") or session.get("report") or ""
         )
-        applied_report = validate_draft_report(source_report, draft.patches)
-        requested_append = _requested_append_sentence(request.revision_instruction)
-        if requested_append and not applied_report.rstrip().endswith(requested_append):
-            draft = draft.model_copy(
-                update={
-                    "patches": [
-                        *draft.patches,
-                        RevisionReportPatch(
-                            start=len(source_report),
-                            end=len(source_report),
-                            replacement=f"\n\n{requested_append}",
-                            expected_text="",
-                            evidence_references=["user_revision_instruction"],
-                        ),
-                    ],
-                    "changed_sections": [
-                        *draft.changed_sections,
-                        "user_requested_append",
-                    ],
-                }
-            )
-            applied_report = validate_draft_report(source_report, draft.patches)
-        if not draft.revised_report_text:
-            draft = draft.model_copy(update={"revised_report_text": applied_report})
-        elif applied_report != draft.revised_report_text:
-            draft = draft.model_copy(
-                update={
-                    "revised_report_text": applied_report,
-                    "unresolved_issues": [
-                        *draft.unresolved_issues,
-                        "Model-provided revised report text differed from the deterministic patch output; the deterministic result is authoritative.",
-                    ],
-                    "human_review_requirements": [
-                        *draft.human_review_requirements,
-                        "Verify the deterministic patch result during clinical review.",
-                    ],
-                }
-            )
+        draft, applied_report = self._normalize_draft(
+            source_report=source_report,
+            draft=draft,
+            request=request,
+        )
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
             artifact_key="revision_agent_draft_report",
             payload=draft.model_dump(mode="json"),
         )
-        qa = self._call_schema(
-            runtime,
-            qa_prompt(context, draft.model_dump(mode="json")),
-            RevisionAgentQaResult,
+        self._publish_phase(progress_update, "quality_review")
+        qa = self._call_revision_stage(
+            runtime=runtime,
+            pipeline_run_id=pipeline_run_id,
+            step_name="revision_agent_qa",
+            step_index=len(plan.tasks) + 3,
+            step_count=stage_count,
+            input_summary={
+                "patch_count": len(draft.patches),
+                "changed_section_count": len(draft.changed_sections),
+                "repair_attempt": 0,
+            },
+            prompt=qa_prompt(context, draft.model_dump(mode="json")),
+            schema=RevisionAgentQaResult,
             purpose=GenerationPurpose.REVISION_QA,
+            prompt_version=QA_PROMPT_VERSION,
+            stop_check=stop_check,
+            output_summary=lambda value: {
+                "blocking_issue_count": len(value.blocking_issues),
+                "warning_count": len(value.warnings),
+            },
         )
-        self._raise_if_stopped(stop_check)
-        clinical_safety_issues = audit_revised_dili_report(
+        qa = self._merge_quality_gates(
+            qa=qa,
             session=session,
-            report_text=applied_report,
+            applied_report=applied_report,
+            source_report=source_report,
         )
-        if contains_rechallenge_recommendation(applied_report) and (
-            RECHALLENGE_RECOMMENDATION_MESSAGE not in clinical_safety_issues
-        ):
-            clinical_safety_issues.append(RECHALLENGE_RECOMMENDATION_MESSAGE)
-        if clinical_safety_issues:
-            blocking_issues = list(dict.fromkeys([*qa.blocking_issues, *clinical_safety_issues]))
-            qa = qa.model_copy(
-                update={
-                    "blocking_issues": blocking_issues,
-                    "manual_review_required": True,
-                }
-            )
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
@@ -559,9 +785,128 @@ class RevisionAgentRunner:
             payload=qa.model_dump(mode="json"),
             status="qa_failed" if qa.blocking_issues else "passed",
         )
+        repair_attempt = 0
+        if qa.blocking_issues and MAX_QA_REPAIR_ATTEMPTS > 0:
+            repair_attempt = 1
+            self._publish_phase(
+                progress_update,
+                "repairing",
+                repair_attempt=repair_attempt,
+            )
+            repair_draft = self._call_revision_stage(
+                runtime=runtime,
+                pipeline_run_id=pipeline_run_id,
+                step_name="revision_agent_editor",
+                step_index=len(plan.tasks) + 2,
+                step_count=stage_count,
+                input_summary={
+                    "observation_count": len(observations),
+                    "repair_attempt": repair_attempt,
+                    "blocking_issue_count": len(qa.blocking_issues),
+                },
+                prompt=repair_editor_prompt(
+                    context,
+                    observations,
+                    draft.model_dump(mode="json"),
+                    qa.blocking_issues,
+                ),
+                schema=RevisionDraftResult,
+                purpose=GenerationPurpose.REVISION_EDITING,
+                prompt_version=REPAIR_PROMPT_VERSION,
+                stop_check=stop_check,
+                output_summary=lambda value: {
+                    "patch_count": len(value.patches),
+                    "changed_section_count": len(value.changed_sections),
+                    "repair_attempt": repair_attempt,
+                },
+            )
+            repair_draft, applied_report = self._normalize_draft(
+                source_report=source_report,
+                draft=repair_draft,
+                request=request,
+            )
+            draft = repair_draft
+            self.session_revision_repository.persist_revision_artifact(
+                pipeline_run_id=pipeline_run_id,
+                revision_version_id=revision_version_id,
+                artifact_key="revision_agent_draft_report_repair",
+                payload={
+                    **draft.model_dump(mode="json"),
+                    "repair_attempt": repair_attempt,
+                    "prior_blocking_issues": qa.blocking_issues,
+                },
+                status="pending_qa",
+            )
+            self._publish_phase(
+                progress_update,
+                "quality_review",
+                repair_attempt=repair_attempt,
+            )
+            qa = self._call_revision_stage(
+                runtime=runtime,
+                pipeline_run_id=pipeline_run_id,
+                step_name="revision_agent_qa",
+                step_index=len(plan.tasks) + 3,
+                step_count=stage_count,
+                input_summary={
+                    "patch_count": len(draft.patches),
+                    "changed_section_count": len(draft.changed_sections),
+                    "repair_attempt": repair_attempt,
+                },
+                prompt=qa_prompt(context, draft.model_dump(mode="json")),
+                schema=RevisionAgentQaResult,
+                purpose=GenerationPurpose.REVISION_QA,
+                prompt_version=QA_PROMPT_VERSION,
+                stop_check=stop_check,
+                output_summary=lambda value: {
+                    "blocking_issue_count": len(value.blocking_issues),
+                    "warning_count": len(value.warnings),
+                    "repair_attempt": repair_attempt,
+                },
+            )
+            qa = self._merge_quality_gates(
+                qa=qa,
+                session=session,
+                applied_report=applied_report,
+                source_report=source_report,
+            )
+            self.session_revision_repository.persist_revision_artifact(
+                pipeline_run_id=pipeline_run_id,
+                revision_version_id=revision_version_id,
+                artifact_key="revision_agent_qa_repair",
+                payload={
+                    **qa.model_dump(mode="json"),
+                    "repair_attempt": repair_attempt,
+                },
+                status="qa_failed" if qa.blocking_issues else "passed",
+            )
+        self._publish_phase(
+            progress_update,
+            "finalizing",
+            repair_attempt=repair_attempt,
+        )
+        model_configuration = {
+            **model_configuration,
+            "repair_attempt_count": repair_attempt,
+            "provider_max_retries": REVISION_PROVIDER_MAX_RETRIES,
+        }
         revised_session_id: int | None = None
-        version_status = "qa_failed" if qa.blocking_issues else "llm_qa_passed"
-        if not request.dry_run and not qa.blocking_issues:
+        has_validated_edit = applied_report != source_report and bool(draft.patches)
+        version_status = (
+            "requires_human_review"
+            if not has_validated_edit
+            else "qa_failed"
+            if qa.blocking_issues
+            else "llm_qa_passed"
+        )
+        llm_qa_status = (
+            "requires_human_review"
+            if not has_validated_edit
+            else "failed"
+            if qa.blocking_issues
+            else "passed"
+        )
+        if not request.dry_run and not qa.blocking_issues and has_validated_edit:
             root_session_id = int(model_configuration["root_session_id"])
             session_sections = session.get("sections")
             sections: dict[str, Any] = (
@@ -604,7 +949,7 @@ class RevisionAgentRunner:
                 persisted_session_id=revised_session_id,
                 model_configuration=model_configuration,
                 version_status=version_status,
-                llm_qa_status="failed" if qa.blocking_issues else "passed",
+                llm_qa_status=llm_qa_status,
                 clinical_review_status="not_reviewed",
             )
         self.session_revision_repository.create_or_update_revision_run(
@@ -620,6 +965,11 @@ class RevisionAgentRunner:
             status="completed",
             completed_at=datetime.now(UTC),
         )
+        self._publish_phase(
+            progress_update,
+            "completed",
+            repair_attempt=repair_attempt,
+        )
         return {
             "pipeline_run_id": pipeline_run_id,
             "revision_version_id": revision_version_id,
@@ -629,6 +979,8 @@ class RevisionAgentRunner:
             "tool_call_count": tool_calls,
             "blocking_issue_count": len(qa.blocking_issues),
             "manual_review_required": True,
+            "revision_phase": "completed",
+            "repair_attempt": repair_attempt,
         }
 
     # -------------------------------------------------------------------------
@@ -647,6 +999,8 @@ class RevisionAgentRunner:
             client = select_llm_provider(
                 provider=runtime.provider,
                 default_model=runtime.model,
+                timeout_s=_revision_provider_timeout(runtime.provider),
+                max_retries=REVISION_PROVIDER_MAX_RETRIES,
             )
             try:
                 executor = ToolLoopExecutor(
@@ -715,7 +1069,10 @@ class RevisionAgentRunner:
                 )
             )
         client = select_llm_provider(
-            provider=runtime.provider, default_model=runtime.model
+            provider=runtime.provider,
+            default_model=runtime.model,
+            timeout_s=_revision_provider_timeout(runtime.provider),
+            max_retries=REVISION_PROVIDER_MAX_RETRIES,
         )
         async def call() -> Any:
             try:
@@ -757,6 +1114,8 @@ class RevisionAgentRunner:
         client = select_llm_provider(
             provider=runtime.provider,
             default_model=runtime.model,
+            timeout_s=_revision_provider_timeout(runtime.provider),
+            max_retries=REVISION_PROVIDER_MAX_RETRIES,
         )
         async def call() -> RevisionIssueScanResult:
             try:
