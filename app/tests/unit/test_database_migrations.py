@@ -183,6 +183,93 @@ def test_model_role_data_migration_populates_only_missing_roles(tmp_path: Path) 
         engine.dispose()
 
 ###############################################################################
+def test_cancelled_revision_runs_reconcile_pending_versions(tmp_path: Path) -> None:
+    database_path = tmp_path / "cancelled-revision-migration.db"
+    engine = _engine(database_path)
+    try:
+        _upgrade_to(engine, "202609100001")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "insert into clinical_sessions "
+                    "(id, patient_name, session_status, session_kind) "
+                    "values (1, 'Migration fixture', 'successful', 'original')"
+                )
+            )
+            connection.execute(
+                text(
+                    "insert into clinical_session_versions "
+                    "(id, root_session_id, version_number, version_status, "
+                    "revision_kind, llm_qa_status, clinical_review_status, "
+                    "pipeline_run_id) values "
+                    "(1, 1, 1, 'current', 'original', 'not_run', 'not_reviewed', null), "
+                    "(2, 1, 2, 'draft_revision', 'llm_assisted_revision', "
+                    "'pending', 'not_reviewed', 'cancelled-draft'), "
+                    "(3, 1, 3, 'pending_qa', 'llm_assisted_revision', "
+                    "'pending', 'not_reviewed', 'cancelled-pending')"
+                )
+            )
+            connection.execute(
+                text(
+                    "insert into clinical_session_revision_runs "
+                    "(pipeline_run_id, session_id, root_session_id, source_version_id, "
+                    "target_revision_version_id, revision_mode, revision_kind, "
+                    "actor_source, actor_confidence, started_at, completed_at, status) "
+                    "values "
+                    "('cancelled-draft', 1, 1, 1, 2, 'agentic_revision', "
+                    "'llm_assisted_revision', 'system', 'system', "
+                    "'2026-09-17 10:00:00', '2026-09-17 10:01:00', 'cancelled'), "
+                    "('cancelled-pending', 1, 1, 1, 3, 'agentic_revision', "
+                    "'llm_assisted_revision', 'system', 'system', "
+                    "'2026-09-17 10:02:00', null, 'cancelled')"
+                )
+            )
+            connection.execute(
+                text(
+                    "insert into clinical_session_revision_steps "
+                    "(pipeline_run_id, step_name, step_index, step_count, "
+                    "attempt_number, status) values "
+                    "('cancelled-draft', 'revision_agent_task_1', 1, 1, 1, 'running'), "
+                    "('cancelled-pending', 'revision_agent_task_1', 1, 1, 1, 'running')"
+                )
+            )
+
+        result = migrate_database(engine, database_was_empty=False)
+
+        assert result.target_heads == (HEAD_REVISION,)
+        with engine.connect() as connection:
+            rows = connection.execute(
+                text(
+                    "select id, version_status, llm_qa_status, session_id, "
+                    "completed_at from clinical_session_versions "
+                    "where id in (2, 3) order by id"
+                )
+            ).mappings().all()
+            assert [row["version_status"] for row in rows] == ["cancelled", "cancelled"]
+            assert [row["llm_qa_status"] for row in rows] == ["not_run", "not_run"]
+            assert [row["session_id"] for row in rows] == [None, None]
+            assert all(row["completed_at"] is not None for row in rows)
+            steps = connection.execute(
+                text(
+                    "select status, error_json, completed_at "
+                    "from clinical_session_revision_steps "
+                    "order by pipeline_run_id"
+                )
+            ).mappings().all()
+            assert [row["status"] for row in steps] == ["cancelled", "cancelled"]
+            assert all(row["error_json"] for row in steps)
+            assert all(row["completed_at"] is not None for row in steps)
+            runs = connection.execute(
+                text(
+                    "select completed_at from clinical_session_revision_runs "
+                    "where status = 'cancelled' order by pipeline_run_id"
+                )
+            ).scalars().all()
+            assert all(value is not None for value in runs)
+    finally:
+        engine.dispose()
+
+###############################################################################
 def test_unknown_versioned_schema_is_rejected_without_changing_revision(
     tmp_path: Path,
 ) -> None:

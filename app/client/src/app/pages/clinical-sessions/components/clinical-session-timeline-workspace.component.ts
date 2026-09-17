@@ -42,6 +42,7 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
   readonly deletingTimelineId = signal<number | null>(null);
   readonly deleteError = signal<string | null>(null);
   private generationPollToken = 0;
+  private timelineLoadGeneration = 0;
 
   readonly selectedConfigurationLabel = computed(() => this.modelName() || 'No Timeline model configured');
   readonly canGenerate = computed(() => Boolean(this.modelName()) && !this.generationRunning() && !this.modelConfigLoading() && !this.modelConfigError());
@@ -52,10 +53,13 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
   ngOnDestroy(): void { this.stopTimelinePolling(); }
 
   private resetAndLoad(): void {
+    const loadGeneration = ++this.timelineLoadGeneration;
+    const sessionId = this.session?.session_id;
     this.stopTimelinePolling();
     this.timelinePreviews.set([]); this.timelineListError.set(null); this.generationError.set(null); this.generationStatus.set(null);
     this.generationJobId.set(null); this.generationProgress.set(0); this.generationProgressMessage.set(null); this.generationRunning.set(false);
-    void this.loadModelConfiguration(); void this.loadTimelineHistory();
+    void this.loadModelConfiguration();
+    void this.loadTimelineHistory(sessionId, loadGeneration);
   }
 
   async loadModelConfiguration(): Promise<void> {
@@ -66,49 +70,94 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
     }
   }
 
-  async loadTimelineHistory(): Promise<void> {
-    if (!this.session?.session_id) return;
+  async loadTimelineHistory(
+    sessionId = this.session?.session_id,
+    loadGeneration = this.timelineLoadGeneration,
+  ): Promise<void> {
+    const isCurrentLoad = (): boolean => (
+      loadGeneration === this.timelineLoadGeneration
+      && this.session?.session_id === sessionId
+    );
+    if (!sessionId || !isCurrentLoad()) return;
     this.timelineListLoading.set(true); this.timelineListError.set(null);
-    try { this.timelinePreviews.set((await fetchInspectionSessionTimelineList(this.session.session_id)).items); }
-    catch (error) { this.timelineListError.set(formatUnknownError(error, 'Unable to load timeline history.')); }
-    finally { this.timelineListLoading.set(false); }
+    try {
+      const payload = await fetchInspectionSessionTimelineList(sessionId);
+      if (isCurrentLoad()) this.timelinePreviews.set(payload.items);
+    } catch (error) {
+      if (isCurrentLoad()) {
+        this.timelineListError.set(formatUnknownError(error, 'Unable to load timeline history.'));
+      }
+    } finally {
+      if (isCurrentLoad()) this.timelineListLoading.set(false);
+    }
   }
 
   async generateTimeline(): Promise<void> {
     if (!this.canGenerate()) return;
+    const sessionId = this.session.session_id;
+    const loadGeneration = this.timelineLoadGeneration;
+    const isCurrentGeneration = (): boolean => (
+      loadGeneration === this.timelineLoadGeneration
+      && this.session?.session_id === sessionId
+    );
     this.generationRunning.set(true); this.generationError.set(null); this.generationStatus.set('Starting timeline generation…'); this.generationProgress.set(0); this.generationProgressMessage.set('Preparing timeline generation');
     try {
-      const response = await startInspectionSessionTimelineJob(this.session.session_id, { force_regenerate: true });
-      this.attachToTimelineJob(response.job_id, response.poll_interval);
-    } catch (error) { this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(formatUnknownError(error, 'Unable to start timeline generation.')); }
+      const response = await startInspectionSessionTimelineJob(sessionId, { force_regenerate: true });
+      if (isCurrentGeneration()) {
+        this.attachToTimelineJob(response.job_id, response.poll_interval, sessionId, loadGeneration);
+      }
+    } catch (error) {
+      if (isCurrentGeneration()) {
+        this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(formatUnknownError(error, 'Unable to start timeline generation.'));
+      }
+    }
   }
 
-  private attachToTimelineJob(jobId: string, pollIntervalSeconds: number): void {
+  private attachToTimelineJob(
+    jobId: string,
+    pollIntervalSeconds: number,
+    sessionId: number,
+    loadGeneration: number,
+  ): void {
     this.stopTimelinePolling(); this.generationJobId.set(jobId); this.generationRunning.set(true);
-    this.generationStatus.set('Generating timeline…'); void this.pollTimelineJob(jobId, pollIntervalSeconds);
+    this.generationStatus.set('Generating timeline…');
+    void this.pollTimelineJob(jobId, pollIntervalSeconds, sessionId, loadGeneration);
   }
   private stopTimelinePolling(): void { this.generationPollToken += 1; }
-  private async pollTimelineJob(jobId: string, pollIntervalSeconds: number): Promise<void> {
+  private async pollTimelineJob(
+    jobId: string,
+    pollIntervalSeconds: number,
+    sessionId: number,
+    loadGeneration: number,
+  ): Promise<void> {
     const token = ++this.generationPollToken;
+    const isCurrentGeneration = (): boolean => (
+      token === this.generationPollToken
+      && this.generationJobId() === jobId
+      && loadGeneration === this.timelineLoadGeneration
+      && this.session?.session_id === sessionId
+    );
     const delayMs = Math.max(500, Math.round((Number.isFinite(pollIntervalSeconds) ? pollIntervalSeconds : 1) * 1000));
     let consecutiveErrors = 0;
     await this.jobPolling.run({
       intervalMs: delayMs,
-      isCancelled: () => token !== this.generationPollToken || this.generationJobId() !== jobId,
+      isCancelled: () => !isCurrentGeneration(),
       pollStep: async () => {
         try {
-          const job = await fetchInspectionSessionTimelineJobStatus(this.session.session_id, jobId);
-          if (token !== this.generationPollToken || this.generationJobId() !== jobId) return false;
+          const job = await fetchInspectionSessionTimelineJobStatus(sessionId, jobId);
+          if (!isCurrentGeneration()) return false;
           consecutiveErrors = 0; this.generationProgress.set(Math.max(0, Math.min(100, Number(job.progress) || 0)));
           const message = job.result?.progress_message;
           if (typeof message === 'string' && message) this.generationProgressMessage.set(message);
           if (job.status === 'completed') {
-            this.generationProgress.set(100); this.generationRunning.set(false); this.generationStatus.set('Timeline generated and saved.'); this.generationJobId.set(null); await this.loadTimelineHistory(); return false;
+            this.generationProgress.set(100); this.generationRunning.set(false); this.generationStatus.set('Timeline generated and saved.'); this.generationJobId.set(null); await this.loadTimelineHistory(sessionId, loadGeneration); return false;
           }
           if (job.status === 'failed' || job.status === 'cancelled') {
+            if (!isCurrentGeneration()) return false;
             this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(job.error || 'Timeline generation did not complete.'); this.generationJobId.set(null); return false;
           }
         } catch (error) {
+          if (!isCurrentGeneration()) return false;
           consecutiveErrors += 1;
           if (consecutiveErrors >= 5) { this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(formatUnknownError(error, 'Unable to load timeline generation status.')); this.generationJobId.set(null); return false; }
         }

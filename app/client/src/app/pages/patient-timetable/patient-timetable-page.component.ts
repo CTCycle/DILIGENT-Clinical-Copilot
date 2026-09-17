@@ -169,6 +169,7 @@ export class PatientTimetablePageComponent implements OnInit {
   readonly evidenceFilterOptions = EVIDENCE_FILTER_OPTIONS;
   readonly densityOptions = DENSITY_OPTIONS;
   private lastFocusedElement: HTMLElement | null = null;
+  private routeLoadGeneration = 0;
 
   readonly orderedEvents = computed(() => [...(this.timeline()?.events ?? [])].sort((a, b) => {
     const left = normalizeTimelineDate(a.event_date);
@@ -300,17 +301,27 @@ export class PatientTimetablePageComponent implements OnInit {
       });
   }
 
-  async loadTimeline(sessionId: number, timelineId: number | null): Promise<void> {
+  async loadTimeline(
+    sessionId: number,
+    timelineId: number | null,
+    loadGeneration = ++this.routeLoadGeneration,
+  ): Promise<void> {
+    const isCurrentLoad = (): boolean => (
+      loadGeneration === this.routeLoadGeneration
+      && this.sessionId() === sessionId
+    );
     this.loading.set(true);
     this.error.set(null);
     try {
       const payload = timelineId
         ? await fetchInspectionSessionTimelineById(sessionId, timelineId)
         : await this.fetchLatestTimeline(sessionId);
+      if (!isCurrentLoad()) return;
       this.timeline.set(payload);
       this.timelineId.set(payload.timeline_id ?? timelineId ?? null);
       this.selectedEventId.set(null);
     } catch (error) {
+      if (!isCurrentLoad()) return;
       this.timeline.set(null);
       if (this.isNotFoundError(error)) {
         this.error.set(
@@ -322,19 +333,26 @@ export class PatientTimetablePageComponent implements OnInit {
         this.error.set(error instanceof Error ? error.message : 'Failed to load timetable.');
       }
     } finally {
-      this.loading.set(false);
+      if (isCurrentLoad()) this.loading.set(false);
     }
   }
 
   async regenerate(): Promise<void> {
     const id = this.sessionId();
+    const loadGeneration = this.routeLoadGeneration;
+    const isCurrentGeneration = (): boolean => (
+      loadGeneration === this.routeLoadGeneration
+      && this.sessionId() === id
+    );
     if (!id || this.loading()) return;
     this.loading.set(true);
     this.error.set(null);
     try {
       const started = await startInspectionSessionTimelineJob(id, { force_regenerate: true });
-      const job = await this.waitForTimelineJob(id, started.job_id, started.poll_interval);
+      if (!isCurrentGeneration()) return;
+      const job = await this.waitForTimelineJob(id, started.job_id, started.poll_interval, loadGeneration);
       if (!job) return;
+      if (!isCurrentGeneration()) return;
       if (job.status !== 'completed') {
         throw new Error(job.error || 'Timeline generation did not complete.');
       }
@@ -342,18 +360,20 @@ export class PatientTimetablePageComponent implements OnInit {
       const payload = typeof generatedTimelineId === 'number'
         ? await fetchInspectionSessionTimelineById(id, generatedTimelineId)
         : await this.fetchLatestTimeline(id);
+      if (!isCurrentGeneration()) return;
       this.timeline.set(payload);
       this.timelineId.set(payload.timeline_id ?? null);
       this.selectedEventId.set(null);
       if (payload.timeline_id) {
+        if (!isCurrentGeneration()) return;
         await this.router.navigate(['/sessions', id, 'timetable', payload.timeline_id], { replaceUrl: true });
       }
     } catch (error) {
-      if (!this.destroyRef.destroyed) {
+      if (!this.destroyRef.destroyed && isCurrentGeneration()) {
         this.error.set(error instanceof Error ? error.message : 'Failed to regenerate timetable.');
       }
     } finally {
-      if (!this.destroyRef.destroyed) this.loading.set(false);
+      if (!this.destroyRef.destroyed && isCurrentGeneration()) this.loading.set(false);
     }
   }
 
@@ -500,6 +520,7 @@ export class PatientTimetablePageComponent implements OnInit {
   }
 
   private async handleRouteChange(sessionId: number, timelineId: number | null): Promise<void> {
+    const loadGeneration = ++this.routeLoadGeneration;
     if (!Number.isFinite(sessionId) || sessionId <= 0) {
       this.error.set('Invalid session id.');
       this.timeline.set(null);
@@ -512,7 +533,7 @@ export class PatientTimetablePageComponent implements OnInit {
     }
     this.sessionId.set(sessionId);
     this.timelineId.set(timelineId);
-    await this.loadTimeline(sessionId, timelineId);
+    await this.loadTimeline(sessionId, timelineId, loadGeneration);
   }
 
   private async fetchLatestTimeline(sessionId: number): Promise<InspectionSessionTimeline> {
@@ -526,6 +547,7 @@ export class PatientTimetablePageComponent implements OnInit {
     sessionId: number,
     jobId: string,
     pollIntervalSeconds: number,
+    loadGeneration: number,
   ): Promise<InspectionTimelineJobStatusResponse | null> {
     const deadline = Date.now() + 360_000;
     const delayMs = Math.max(
@@ -539,7 +561,12 @@ export class PatientTimetablePageComponent implements OnInit {
     let terminalStatus: InspectionTimelineJobStatusResponse | null = null;
     await this.jobPolling.run({
       intervalMs: delayMs,
-      isCancelled: () => this.destroyRef.destroyed || Date.now() >= deadline,
+      isCancelled: () => (
+        this.destroyRef.destroyed
+        || Date.now() >= deadline
+        || loadGeneration !== this.routeLoadGeneration
+        || this.sessionId() !== sessionId
+      ),
       pollStep: async () => {
         const job = await fetchInspectionSessionTimelineJobStatus(sessionId, jobId);
         if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
@@ -550,7 +577,11 @@ export class PatientTimetablePageComponent implements OnInit {
       },
     });
     if (terminalStatus) return terminalStatus;
-    if (this.destroyRef.destroyed) return null;
+    if (
+      this.destroyRef.destroyed
+      || loadGeneration !== this.routeLoadGeneration
+      || this.sessionId() !== sessionId
+    ) return null;
     throw new Error('Timeline generation timed out. Check the saved timeline history and retry if needed.');
   }
 

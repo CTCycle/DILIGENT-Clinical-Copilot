@@ -220,6 +220,7 @@ class RevisionQaValidationPayload(BaseModel):
         "llm_qa_passed",
         "qa_failed",
         "requires_human_review",
+        "cancelled",
     ]
     addressed_items: list[str] = Field(default_factory=list)
     unaddressed_items: list[str] = Field(default_factory=list)

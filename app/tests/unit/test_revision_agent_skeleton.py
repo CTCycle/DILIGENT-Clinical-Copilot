@@ -767,6 +767,161 @@ def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
     }
 
 ###############################################################################
+def test_cancelled_revision_finalizes_version_and_steps(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    source_version = (
+        serializer.session_revision_repository.get_version_record_for_session(
+            session_id
+        )
+    )
+    assert source_version is not None
+    pipeline_run_id = "cancelled-revision-run"
+    shell = serializer.session_revision_repository.create_revision_version_shell(
+        session_id,
+        reviewer_note="Synthetic cancellation validation.",
+        configuration={"job_id": "cancelled-job"},
+        pipeline_run_id=pipeline_run_id,
+    )
+    assert shell is not None
+    serializer.session_revision_repository.create_or_update_revision_run(
+        pipeline_run_id=pipeline_run_id,
+        session_id=session_id,
+        root_session_id=session_id,
+        source_version_id=int(source_version["version_id"]),
+        target_revision_version_id=int(shell["revision_version_id"]),
+        revision_mode="agentic_revision",
+        revision_kind="llm_assisted_revision",
+        configuration={"job_id": "cancelled-job"},
+        reviewer_note="Synthetic cancellation validation.",
+        status="running",
+    )
+    serializer.session_revision_repository.start_revision_step(
+        pipeline_run_id=pipeline_run_id,
+        step_name="revision_agent_task_1",
+        step_index=1,
+        step_count=1,
+    )
+
+    serializer.session_revision_repository.cancel_revision_run(
+        pipeline_run_id=pipeline_run_id
+    )
+
+    run = serializer.session_revision_repository.get_revision_run(pipeline_run_id)
+    assert run is not None
+    assert run["status"] == "cancelled"
+    version_detail = serializer.session_revision_repository.get_session_version_detail(
+        session_id,
+        version_id=int(shell["revision_version_id"]),
+    )
+    assert version_detail is not None
+    assert version_detail["version"]["version_status"] == "cancelled"
+    assert version_detail["version"]["llm_qa_status"] == "not_run"
+    assert version_detail["version"]["session_id"] is None
+    assert version_detail["version"]["completed_at"] is not None
+    steps = serializer.session_revision_repository.list_revision_steps(pipeline_run_id)
+    assert [step["status"] for step in steps] == ["cancelled"]
+
+    serializer.session_revision_repository.complete_revision_step(
+        pipeline_run_id=pipeline_run_id,
+        step_name="revision_agent_task_1",
+        attempt_number=1,
+        output_summary={"late": True},
+    )
+    serializer.session_revision_repository.fail_revision_step(
+        pipeline_run_id=pipeline_run_id,
+        step_name="revision_agent_task_1",
+        attempt_number=1,
+        error={"message": "Late worker failure."},
+    )
+    serializer.session_revision_repository.fail_revision_run(
+        pipeline_run_id=pipeline_run_id,
+        error={"message": "Late worker failure."},
+    )
+    serializer.session_revision_repository.create_or_update_revision_run(
+        pipeline_run_id=pipeline_run_id,
+        session_id=session_id,
+        root_session_id=session_id,
+        source_version_id=int(source_version["version_id"]),
+        target_revision_version_id=int(shell["revision_version_id"]),
+        revision_mode="agentic_revision",
+        revision_kind="llm_assisted_revision",
+        configuration={"job_id": "cancelled-job", "late_worker": True},
+        reviewer_note="Synthetic cancellation validation.",
+        status="completed",
+    )
+
+    serializer.session_revision_repository.cancel_revision_run(
+        pipeline_run_id=pipeline_run_id
+    )
+    run_after_retry = serializer.session_revision_repository.get_revision_run(
+        pipeline_run_id
+    )
+    assert run_after_retry is not None
+    assert run_after_retry["status"] == "cancelled"
+    assert [
+        step["status"]
+        for step in serializer.session_revision_repository.list_revision_steps(
+            pipeline_run_id
+        )
+    ] == ["cancelled"]
+
+###############################################################################
+def test_finalized_revision_wins_over_late_cancellation(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    source_version = (
+        serializer.session_revision_repository.get_version_record_for_session(
+            session_id
+        )
+    )
+    assert source_version is not None
+    pipeline_run_id = "finalized-before-cancel-run"
+    shell = serializer.session_revision_repository.create_revision_version_shell(
+        session_id,
+        reviewer_note="Synthetic finalization race validation.",
+        configuration={"job_id": "finalized-before-cancel-job"},
+        pipeline_run_id=pipeline_run_id,
+        source_version_id=int(source_version["version_id"]),
+    )
+    assert shell is not None
+    serializer.session_revision_repository.create_or_update_revision_run(
+        pipeline_run_id=pipeline_run_id,
+        session_id=session_id,
+        root_session_id=session_id,
+        source_version_id=int(source_version["version_id"]),
+        target_revision_version_id=int(shell["revision_version_id"]),
+        revision_mode="agentic_revision",
+        revision_kind="llm_assisted_revision",
+        configuration={"job_id": "finalized-before-cancel-job"},
+        reviewer_note="Synthetic finalization race validation.",
+        status="running",
+    )
+
+    serializer.session_revision_repository.finalize_revision_version(
+        pipeline_run_id=pipeline_run_id,
+        persisted_session_id=session_id,
+        version_status="llm_qa_passed",
+        llm_qa_status="passed",
+        clinical_review_status="not_reviewed",
+    )
+    serializer.session_revision_repository.cancel_revision_run(
+        pipeline_run_id=pipeline_run_id
+    )
+
+    run = serializer.session_revision_repository.get_revision_run(pipeline_run_id)
+    assert run is not None
+    assert run["status"] == "completed"
+    version_detail = serializer.session_revision_repository.get_session_version_detail(
+        session_id,
+        version_id=int(shell["revision_version_id"]),
+    )
+    assert version_detail is not None
+    assert version_detail["version"]["version_status"] == "llm_qa_passed"
+    assert version_detail["version"]["llm_qa_status"] == "passed"
+    assert version_detail["version"]["session_id"] == session_id
+
+###############################################################################
 def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)

@@ -165,6 +165,8 @@ export function revisionStatusTone(status: string | null | undefined): RevisionA
     case 'in_progress':
     case 'pending':
     case 'queued':
+    case 'cancelled':
+    case 'canceled':
     case 'requires_human_review':
     case 'under_review':
     case 'pending_qa':

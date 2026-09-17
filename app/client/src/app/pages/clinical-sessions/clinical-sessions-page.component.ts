@@ -43,6 +43,7 @@ import {
   RevisionArtifact,
   RevisionJobResult,
   RevisionPipelineStep,
+  SessionVersionSummary,
 } from '../../core/models/revision-types';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { JobPollingService } from '../../core/services/job-polling.service';
@@ -161,6 +162,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionRunning = signal(false);
   readonly revisionJobId = signal<string | null>(null);
   readonly revisionVersionId = signal<number | null>(null);
+  readonly revisionVersionStatus = signal<SessionVersionSummary['version_status'] | null>(null);
   readonly revisionSteps = signal<RevisionPipelineStep[]>([]);
   readonly revisionArtifacts = signal<RevisionArtifact[]>([]);
   readonly revisionDraftReport = signal('');
@@ -168,7 +170,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionReviewAvailable = computed(() => (
     this.revisionVersionId() !== null
     && !this.revisionRunning()
-    && this.revisionStatus().trim().toLowerCase() === 'completed'
+    && this.revisionVersionStatus() === 'llm_qa_passed'
   ));
   readonly revisionModelLoading = computed(() => this.modelConfigState.status() === 'loading');
   readonly revisionModelError = computed(() => {
@@ -184,6 +186,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   ));
   private revisionPollCancelled = false;
   private revisionLoadGeneration = 0;
+  private sessionsLoadGeneration = 0;
+  private detailLoadGeneration = 0;
 
   ngOnInit(): void {
     void this.loadSessions();
@@ -195,6 +199,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   async loadSessions(): Promise<void> {
+    const loadGeneration = ++this.sessionsLoadGeneration;
+    const isCurrentLoad = (): boolean => loadGeneration === this.sessionsLoadGeneration;
     this.loading.set(true);
     this.listError.set(null);
     try {
@@ -203,16 +209,21 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         offset: 0,
         limit: 100,
       });
+      if (!isCurrentLoad()) return;
       this.sessions.set(payload.items);
-      await this.ensureSelectedSessionVisible();
+      await this.ensureSelectedSessionVisible(loadGeneration);
     } catch (error) {
-      this.listError.set(formatUnknownError(error, 'Failed to load clinical sessions.'));
+      if (isCurrentLoad()) {
+        this.listError.set(formatUnknownError(error, 'Failed to load clinical sessions.'));
+      }
     } finally {
-      this.loading.set(false);
+      if (isCurrentLoad()) this.loading.set(false);
     }
   }
 
   async openSession(sessionId: number): Promise<void> {
+    const detailLoadGeneration = ++this.detailLoadGeneration;
+    const isCurrentLoad = (): boolean => detailLoadGeneration === this.detailLoadGeneration;
     const revisionLoadGeneration = ++this.revisionLoadGeneration;
     this.revisionPollCancelled = true;
     this.revisionInstruction.set('');
@@ -220,6 +231,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.revisionRunning.set(false);
     this.revisionJobId.set(null);
     this.revisionVersionId.set(null);
+    this.revisionVersionStatus.set(null);
     this.revisionSteps.set([]);
     this.revisionArtifacts.set([]);
     this.revisionDraftReport.set('');
@@ -227,6 +239,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.detailError.set(null);
     try {
       const detail = await fetchClinicalSessionDetail(sessionId);
+      if (!isCurrentLoad()) return;
       this.selected.set(detail);
       this.editorText.set(this.previewOfficialReport(detail));
       this.editorUndoStack = [];
@@ -240,12 +253,14 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.labSummary.set(this.previewLaboratorySummary(detail));
       this.labTimeline.set(this.previewLabTimeline(detail));
       this.hepatotoxicityPattern.set(this.previewHepatotoxicityPattern(detail));
-      void this.loadDetectedDrugEvidence(detail);
+      void this.loadDetectedDrugEvidence(detail, detailLoadGeneration);
       void this.loadPersistedRevision(detail.session_id, revisionLoadGeneration);
     } catch (error) {
-      this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
+      if (isCurrentLoad()) {
+        this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
+      }
     } finally {
-      this.detailLoading.set(false);
+      if (isCurrentLoad()) this.detailLoading.set(false);
     }
   }
 
@@ -292,7 +307,12 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     void this.ensureSelectedSessionVisible();
   }
 
-  private async ensureSelectedSessionVisible(): Promise<void> {
+  private async ensureSelectedSessionVisible(expectedLoadGeneration?: number): Promise<void> {
+    const isCurrentLoad = (): boolean => (
+      expectedLoadGeneration === undefined
+      || expectedLoadGeneration === this.sessionsLoadGeneration
+    );
+    if (!isCurrentLoad()) return;
     const visibleSessions = this.filteredSessions();
     const selectedId = this.selected()?.session_id;
     if (selectedId && visibleSessions.some((session) => session.session_id === selectedId)) {
@@ -303,10 +323,12 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       await this.openSession(nextSession.session_id);
       return;
     }
+    if (!isCurrentLoad()) return;
     this.clearSelectedSession();
   }
 
   private clearSelectedSession(): void {
+    this.detailLoadGeneration += 1;
     this.revisionLoadGeneration += 1;
     this.selected.set(null);
     this.editorText.set('');
@@ -324,6 +346,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.revisionRunning.set(false);
     this.revisionJobId.set(null);
     this.revisionVersionId.set(null);
+    this.revisionVersionStatus.set(null);
     this.revisionSteps.set([]);
     this.revisionArtifacts.set([]);
     this.revisionDraftReport.set('');
@@ -455,8 +478,13 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   async startRevision(): Promise<void> {
     const detail = this.selected();
     if (!detail || this.revisionRunning()) return;
-    this.revisionLoadGeneration += 1;
+    const revisionLoadGeneration = ++this.revisionLoadGeneration;
+    const isCurrentLoad = (): boolean => (
+      revisionLoadGeneration === this.revisionLoadGeneration
+      && this.selected()?.session_id === detail.session_id
+    );
     this.revisionVersionId.set(null);
+    this.revisionVersionStatus.set(null);
     this.revisionSteps.set([]);
     this.revisionArtifacts.set([]);
     this.revisionRunning.set(true);
@@ -466,55 +494,102 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       const started = await startSessionRevisionJob(detail.session_id, {
         revision_instruction: this.revisionInstruction().trim() || null,
       });
+      if (!isCurrentLoad()) return;
       this.revisionJobId.set(started.job_id);
-      await this.pollRevision(detail.session_id, started.job_id);
+      await this.pollRevision(detail.session_id, started.job_id, revisionLoadGeneration);
     } catch (error) {
-      this.revisionStatus.set(formatUnknownError(error, 'Failed to start revision agent.'));
-      this.revisionRunning.set(false);
+      if (isCurrentLoad()) {
+        this.revisionStatus.set(formatUnknownError(error, 'Failed to start revision agent.'));
+        this.revisionRunning.set(false);
+      }
     }
   }
 
   async cancelRevision(): Promise<void> {
     const jobId = this.revisionJobId();
+    const detail = this.selected();
+    const revisionLoadGeneration = this.revisionLoadGeneration;
+    const isCurrentLoad = (): boolean => (
+      revisionLoadGeneration === this.revisionLoadGeneration
+      && (!detail || this.selected()?.session_id === detail.session_id)
+    );
     if (!jobId) return;
     this.revisionPollCancelled = true;
-    this.revisionRunning.set(false);
-    this.revisionStatus.set('Cancellation requested.');
-    await cancelSessionRevisionJob(jobId);
+    if (isCurrentLoad()) {
+      this.revisionRunning.set(false);
+      this.revisionStatus.set('Cancellation requested.');
+    }
+    try {
+      await cancelSessionRevisionJob(jobId);
+      if (detail && isCurrentLoad()) {
+        await this.loadPersistedRevision(detail.session_id, revisionLoadGeneration);
+      }
+    } catch (error) {
+      if (isCurrentLoad()) {
+        this.revisionStatus.set(formatUnknownError(error, 'Failed to cancel revision.'));
+      }
+    }
   }
 
   async recordRevisionReview(status: 'approved' | 'rejected'): Promise<void> {
     const detail = this.selected();
     const versionId = this.revisionVersionId();
     if (!detail || versionId === null) return;
+    const revisionLoadGeneration = this.revisionLoadGeneration;
+    const isCurrentLoad = (): boolean => (
+      revisionLoadGeneration === this.revisionLoadGeneration
+      && this.selected()?.session_id === detail.session_id
+    );
     try {
       await updateRevisionClinicalReview(detail.session_id, versionId, {
         clinical_review_status: status === 'approved' ? 'approved_by_human' : 'rejected_by_human',
         reviewed_by: this.manualEditEditedBy().trim() || null,
         reviewer_note: this.revisionInstruction().trim() || null,
       });
-      this.revisionStatus.set(`Draft ${status} by human reviewer.`);
+      if (isCurrentLoad()) this.revisionStatus.set(`Draft ${status} by human reviewer.`);
     } catch (error) {
-      this.revisionStatus.set(formatUnknownError(error, 'Failed to record clinical review.'));
+      if (isCurrentLoad()) {
+        this.revisionStatus.set(formatUnknownError(error, 'Failed to record clinical review.'));
+      }
     }
   }
-  private async pollRevision(sessionId: number, jobId: string): Promise<void> {
+  private async pollRevision(
+    sessionId: number,
+    jobId: string,
+    revisionLoadGeneration: number,
+  ): Promise<void> {
+    const isCurrentLoad = (): boolean => (
+      revisionLoadGeneration === this.revisionLoadGeneration
+      && this.selected()?.session_id === sessionId
+    );
     await this.jobPolling.run({
       intervalMs: 1000,
-      isCancelled: () => this.revisionPollCancelled,
+      isCancelled: () => this.revisionPollCancelled || !isCurrentLoad(),
       pollStep: async () => {
         const status = await fetchSessionRevisionJobStatus(jobId);
-        if (this.revisionPollCancelled) return false;
+        if (this.revisionPollCancelled || !isCurrentLoad()) return false;
         const result = status.result;
         this.revisionStatus.set(this.revisionJobStatusLabel(status.status, result));
         if (typeof result?.revision_version_id === 'number') this.revisionVersionId.set(result.revision_version_id);
+        if (this.isRevisionVersionStatus(result?.revision_status)) {
+          this.revisionVersionStatus.set(result.revision_status);
+        }
         if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
           this.revisionRunning.set(false);
+          this.revisionJobId.set(null);
+          if (status.status === 'cancelled') {
+            this.revisionVersionStatus.set('cancelled');
+          }
           const pipelineRunId = typeof result?.pipeline_run_id === 'string' ? result.pipeline_run_id : null;
           const versionId = this.revisionVersionId();
-          if (pipelineRunId) this.revisionSteps.set((await fetchRevisionPipelineSteps(pipelineRunId)).items);
+          if (pipelineRunId) {
+            const steps = (await fetchRevisionPipelineSteps(pipelineRunId)).items;
+            if (!isCurrentLoad()) return false;
+            this.revisionSteps.set(steps);
+          }
           if (versionId) {
             const artifacts = (await fetchRevisionArtifacts(sessionId, versionId)).items;
+            if (!isCurrentLoad()) return false;
             this.revisionArtifacts.set(artifacts);
             this.applyRevisionDraftArtifact(artifacts);
           }
@@ -531,6 +606,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   ): string {
     if (result?.revision_status === 'qa_failed') return 'Revision completed with QA issues.';
     if (result?.revision_status === 'requires_human_review') return 'Revision requires human review.';
+    if (jobStatus === 'cancelled') return 'Revision cancelled.';
     if (jobStatus !== 'running') return jobStatus;
     switch (result?.revision_phase) {
       case 'planning':
@@ -553,16 +629,17 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   private async loadPersistedRevision(sessionId: number, revisionLoadGeneration: number): Promise<void> {
+    const isCurrentLoad = (): boolean =>
+      revisionLoadGeneration === this.revisionLoadGeneration
+      && this.selected()?.session_id === sessionId;
     try {
-      const isCurrentLoad = (): boolean =>
-        revisionLoadGeneration === this.revisionLoadGeneration
-        && this.selected()?.session_id === sessionId;
       const versions = (await fetchSessionVersions(sessionId)).items
         .filter((version) => version.revision_kind === 'llm_assisted_revision')
         .sort((left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at));
       const latest = versions[0];
       if (!latest || !isCurrentLoad()) return;
       this.revisionVersionId.set(latest.version_id);
+      this.revisionVersionStatus.set(latest.version_status);
       const configuration = latest.model_configuration || {};
       const pipelineRunId = latest.pipeline_run_id;
       if (pipelineRunId) {
@@ -581,21 +658,51 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         this.revisionRunning.set(true);
         this.revisionStatus.set('Revision agent is working...');
         this.revisionPollCancelled = false;
-        await this.pollRevision(sessionId, jobId);
+        await this.pollRevision(sessionId, jobId, revisionLoadGeneration);
         return;
       }
       if (!isCurrentLoad()) return;
       this.revisionStatus.set(
-        latest.version_status === 'qa_failed'
-          ? 'Revision completed with QA issues.'
-          : latest.version_status === 'requires_human_review'
-            ? 'Revision requires human review.'
-          : 'Revision draft loaded from persisted session data.',
+        this.revisionVersionStatusLabel(latest.version_status),
       );
     } catch (error) {
-      if (this.selected()?.session_id === sessionId) {
+      if (isCurrentLoad()) {
         this.revisionStatus.set(formatUnknownError(error, 'Unable to restore the saved revision draft.'));
       }
+    }
+  }
+
+  private isRevisionVersionStatus(value: unknown): value is SessionVersionSummary['version_status'] {
+    return [
+      'current',
+      'superseded',
+      'draft_revision',
+      'pending_qa',
+      'cancelled',
+      'qa_failed',
+      'requires_human_review',
+      'llm_qa_passed',
+      'human_approved',
+      'human_rejected',
+    ].includes(value as SessionVersionSummary['version_status']);
+  }
+
+  private revisionVersionStatusLabel(status: SessionVersionSummary['version_status']): string {
+    switch (status) {
+      case 'cancelled':
+        return 'Revision cancelled.';
+      case 'qa_failed':
+        return 'Revision completed with QA issues.';
+      case 'requires_human_review':
+        return 'Revision requires human review.';
+      case 'llm_qa_passed':
+        return 'Revision draft loaded from persisted session data.';
+      case 'human_approved':
+        return 'Draft approved by human reviewer.';
+      case 'human_rejected':
+        return 'Draft rejected by human reviewer.';
+      default:
+        return 'Revision draft loaded from persisted session data.';
     }
   }
 
@@ -733,9 +840,16 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     return previewDiseaseTemporalLabel(disease);
   }
 
-  private async loadDetectedDrugEvidence(detail: ClinicalSessionDetail): Promise<void> {
+  private async loadDetectedDrugEvidence(
+    detail: ClinicalSessionDetail,
+    detailLoadGeneration: number,
+  ): Promise<void> {
+    const isCurrentLoad = (): boolean => (
+      detailLoadGeneration === this.detailLoadGeneration
+      && this.selected()?.session_id === detail.session_id
+    );
     const rows = buildPersistedDrugEvidence(detail);
-    if (this.selected()?.session_id === detail.session_id) {
+    if (isCurrentLoad()) {
       this.detectedDrugEvidence.set(rows.map(({ hasPersistedMatch: _hasPersistedMatch, ...row }) => row));
     }
     if (!rows.length) return;
@@ -751,7 +865,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       ]);
       fallbackByName.set(row.name, { rxNav, liverTox });
     }));
-    if (this.selected()?.session_id === detail.session_id) {
+    if (isCurrentLoad()) {
       this.detectedDrugEvidence.set(rows.map(({ hasPersistedMatch: _hasPersistedMatch, ...row }) => ({
         ...row,
         bibliographyLabel: resolveDrugBibliographyLabel(row, fallbackByName.get(row.name)),

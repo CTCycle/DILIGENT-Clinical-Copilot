@@ -278,6 +278,17 @@ class RevisionAgentRunner:
                 retry_count=max(0, attempt_number - 1),
             )
             return result
+        except RevisionAgentCancelled as exc:
+            latency_ms = int((perf_counter() - started) * 1000)
+            self.session_revision_repository.fail_revision_step(
+                pipeline_run_id=pipeline_run_id,
+                step_name=step_name,
+                attempt_number=attempt_number,
+                status="cancelled",
+                error={"message": str(exc)},
+                latency_ms=latency_ms,
+            )
+            raise
         except Exception as exc:
             latency_ms = int((perf_counter() - started) * 1000)
             self.session_revision_repository.fail_revision_step(
@@ -696,6 +707,16 @@ class RevisionAgentRunner:
                     latency_ms=int((perf_counter() - task_started) * 1000),
                     retry_count=max(0, attempt - 1),
                 )
+            except RevisionAgentCancelled as exc:
+                self.session_revision_repository.fail_revision_step(
+                    pipeline_run_id=pipeline_run_id,
+                    step_name=f"revision_agent_task_{task_index}",
+                    attempt_number=attempt,
+                    status="cancelled",
+                    error={"message": str(exc)},
+                    latency_ms=int((perf_counter() - task_started) * 1000),
+                )
+                raise
             except Exception as exc:
                 self.session_revision_repository.fail_revision_step(
                     pipeline_run_id=pipeline_run_id,

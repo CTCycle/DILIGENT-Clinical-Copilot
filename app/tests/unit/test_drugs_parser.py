@@ -5,9 +5,18 @@ import logging
 from collections.abc import Sequence
 from typing import Any
 
-from domain.clinical import DrugEntry, PatientDrugs
+from domain.clinical import (
+    ClinicalLabEntry,
+    DrugEntry,
+    PatientData,
+    PatientDrugs,
+    PatientLabTimeline,
+    PatientRucamAssessmentBundle,
+)
 from domain.clinical.extractor_contracts import LocalDrugEntryDraft, LocalPatientDrugs
 from services.clinical.drug_blocks import isolate_drug_blocks
+from services.clinical.dili_evidence import DiliEvidenceBuilder
+from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.clinical.parser import DrugsParser
 
 ###############################################################################
@@ -736,6 +745,101 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
     assert [entry.name for entry in parsed.entries] == [
         "Rescuecin",
     ]
+
+###############################################################################
+def test_extract_drugs_from_anamnesis_rejects_sentence_like_entity_names() -> None:
+    false_fragment = "The fictional patient reports no other newly"
+    valid_drug = "Hydroxychloroquine sulfate"
+    fake_client = FakeStructuredClient(
+        [
+            PatientDrugs(
+                entries=[
+                    DrugEntry(
+                        name=false_fragment,
+                        evidence=false_fragment,
+                    ),
+                    DrugEntry(
+                        name="This subject denies additional treatment",
+                        evidence="This subject denies additional treatment",
+                    ),
+                    DrugEntry(
+                        name=valid_drug,
+                        evidence=f"therapy with {valid_drug}",
+                    ),
+                ]
+            )
+        ]
+    )
+    parser = DrugsParser(client=fake_client)
+
+    parsed = asyncio.run(
+        parser.extract_drugs_from_anamnesis(
+            "The fictional patient reports no other newly prescribed medicines. "
+            "This subject denies additional treatment. "
+            "There was therapy with Hydroxychloroquine sulfate."
+        )
+    )
+
+    assert [entry.name for entry in parsed.entries] == [
+        valid_drug,
+    ]
+
+    resolved_drugs = {
+        "hydroxychloroquine sulfate": {
+            "decision_status": "missing_livertox",
+            "match_confidence": 0.2,
+            "raw_mentions": [valid_drug],
+        }
+    }
+    unresolved = ClinicalKnowledgePreparation.collect_identity_fallback_mentions(
+        parsed,
+        resolved_drugs,
+    )
+    assert list(unresolved) == ["hydroxychloroquine sulfate"]
+    assert false_fragment.casefold() not in {
+        name.casefold() for name in unresolved
+    }
+
+    bundle = DiliEvidenceBuilder().build(
+        payload=PatientData(
+            anamnesis=(
+                f"{false_fragment} prescribed medicines. "
+                f"There was therapy with {valid_drug}."
+            ),
+            drugs=f"{valid_drug} therapy",
+            laboratory_analysis="ALT 210 U/L; ALP 130 U/L.",
+        ),
+        drugs=parsed,
+        labs=PatientLabTimeline(
+            entries=[
+                ClinicalLabEntry(
+                    marker_name="ALT",
+                    value=210,
+                    upper_limit_normal=40,
+                    sample_date="2026-09-10",
+                    source="laboratory_analysis",
+                ),
+                ClinicalLabEntry(
+                    marker_name="ALP",
+                    value=130,
+                    upper_limit_normal=120,
+                    sample_date="2026-09-10",
+                    source="laboratory_analysis",
+                ),
+            ]
+        ),
+        resolved_drugs=resolved_drugs,
+        rucam_bundle=PatientRucamAssessmentBundle(entries=[]),
+    )
+
+    assert [exposure.drug_name for exposure in bundle.exposures] == [valid_drug]
+    assert all(
+        event.drug_name != false_fragment for event in bundle.timeline.events
+    )
+    assert all(
+        false_fragment.casefold() not in str(exposure).casefold()
+        for exposure in bundle.exposures
+    )
 
 ###############################################################################
 def test_synthetic_dili_case_keeps_only_the_actual_regimen_drug() -> None:

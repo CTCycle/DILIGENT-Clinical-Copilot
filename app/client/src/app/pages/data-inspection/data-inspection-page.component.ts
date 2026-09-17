@@ -297,7 +297,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly isRagUpdateModal = computed(() => this.activeUpdateTarget() === 'rag');
   readonly updateModalSubtitle = computed(() =>
     this.isRagUpdateModal()
-      ? 'Review current vectorization settings. Modify RAG settings only from Model Configurations.'
+      ? 'Review current vectorization settings. Modify RAG settings only from Settings.'
       : 'Configure update parameters and monitor progress.',
   );
   readonly ragUpdateSummaryEntries = computed(() => {

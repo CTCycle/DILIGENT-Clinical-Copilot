@@ -147,6 +147,7 @@ class SessionVersionSummary(BaseModel):
         "superseded",
         "draft_revision",
         "pending_qa",
+        "cancelled",
         "qa_failed",
         "requires_human_review",
         "llm_qa_passed",
