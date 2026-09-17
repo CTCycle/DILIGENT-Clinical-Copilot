@@ -1,7 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { AppStateService } from './app-state.service';
+import {
+  AppStateService,
+  resolvePageIdFromPath,
+  resolvePathFromPage,
+} from './app-state.service';
 
 const UI_STATE_KEY = 'dili-agent-ui-state-v1';
 
@@ -60,5 +64,12 @@ describe('AppStateService', () => {
     expect(service.state().diliAgent.isExpanded).toBe(true);
     expect(service.state().diliAgent.jobId).toBeNull();
     expect(service.state().diliAgent.isRunning).toBe(false);
+  });
+
+  it('maps canonical and legacy configuration routes to Settings', () => {
+    expect(resolvePageIdFromPath('/settings/general')).toBe('settings');
+    expect(resolvePageIdFromPath('/settings/models')).toBe('settings');
+    expect(resolvePageIdFromPath('/model-config')).toBe('settings');
+    expect(resolvePathFromPage('settings')).toBe('/settings/general');
   });
 });
