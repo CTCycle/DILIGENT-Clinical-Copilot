@@ -433,7 +433,7 @@
                   <h4>Configured Revision model</h4>
                   <p>{{ revisionModelName() || 'No Revision model is configured.' }} · Changes are managed centrally.</p>
                 </div>
-                <a class="clinical-session-config-link" [routerLink]="['/model-config']" fragment="model-roles">Manage model roles</a>
+                <a class="clinical-session-config-link" [routerLink]="['/settings/models']" fragment="model-roles">Manage model roles</a>
               </div>
               @if (revisionModelLoading()) { <p class="clinical-session-panel-note">Loading configured role...</p> }
               <div class="clinical-session-actions clinical-session-revision-model-actions">

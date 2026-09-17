@@ -18,6 +18,19 @@ _LEADING_NARRATIVE_RE = re.compile(
     r"^(?:and|or|but|then|on|after|before|no)\b",
     re.IGNORECASE,
 )
+_NARRATIVE_SUBJECT_RE = re.compile(
+    r"^(?:the|this|that|a|an|patient|paziente|subject|soggetto|"
+    r"person|persona|case|caso)\b",
+    re.IGNORECASE,
+)
+_NARRATIVE_PREDICATE_RE = re.compile(
+    r"\b(?:reports?|denies?|states?|describes?|presents?|experienced?|"
+    r"developed?|received?|takes?|took|has|have|had|is|was|were|shows?|"
+    r"indicates?|underwent|used?|uses?|notes?|noted|riferisce|nega|"
+    r"descrive|presenta|sviluppa|ricev(?:e|uto)|assume|assunto|"
+    r"mostra|indica)\b",
+    re.IGNORECASE,
+)
 
 ###############################################################################
 def normalize_parser_filter_key(value: str) -> str:
@@ -25,6 +38,17 @@ def normalize_parser_filter_key(value: str) -> str:
     normalized = normalized.encode("ascii", "ignore").decode("ascii").lower()
     normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
     return re.sub(r"\s+", " ", normalized).strip()
+
+###############################################################################
+def is_sentence_like_non_drug_name(value: str | None) -> bool:
+    """Reject multi-token narrative clauses returned as entity names."""
+    normalized = normalize_parser_filter_key(str(value or ""))
+    if len(normalized.split()) < 4:
+        return False
+    return bool(
+        _NARRATIVE_SUBJECT_RE.match(normalized)
+        and _NARRATIVE_PREDICATE_RE.search(normalized)
+    )
 
 ###############################################################################
 def is_obvious_non_drug_name(value: str | None) -> bool:
@@ -38,6 +62,8 @@ def is_obvious_non_drug_name(value: str | None) -> bool:
     if _STATUS_LABEL_RE.fullmatch(normalized):
         return True
     if _LEADING_NARRATIVE_RE.match(normalized):
+        return True
+    if is_sentence_like_non_drug_name(normalized):
         return True
     snapshot = get_reference_catalog_snapshot()
     catalog_names = {

@@ -1,10 +1,29 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { InspectionSessionTimeline } from '../../core/models/inspection-types';
 import { PatientTimetablePageComponent } from './patient-timetable-page.component';
 import { createTimelineScale, normalizeTimelineDate } from './timeline-date';
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+};
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => { resolve = next; });
+  return { promise, resolve };
+}
+
+function jsonResponse(value: unknown): Response {
+  return new Response(JSON.stringify(value), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
 describe('PatientTimetablePageComponent', () => {
   let fixture: ComponentFixture<PatientTimetablePageComponent>;
@@ -25,6 +44,11 @@ describe('PatientTimetablePageComponent', () => {
     }).compileComponents();
     fixture = TestBed.createComponent(PatientTimetablePageComponent);
     component = fixture.componentInstance;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fixture.destroy();
   });
 
   it('describes cloud-generated timelines correctly', () => {
@@ -175,5 +199,46 @@ describe('PatientTimetablePageComponent', () => {
     expect(scale.toPercent(event!.startDay)).toBeCloseTo(56.4516, 3);
     expect(scale.toPercent(normalizeTimelineDate('2025-01-01')!.startDay)).toBeLessThan(scale.toPercent(event!.startDay));
     expect(scale.toPercent(normalizeTimelineDate('2025-02-01')!.startDay)).toBeGreaterThan(scale.toPercent(event!.startDay));
+  });
+
+  it('ignores a late timetable response after the route changes', async () => {
+    const firstResponse = deferred<Response>();
+    const secondResponse = deferred<Response>();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/sessions/1/timelines/11')) return firstResponse.promise;
+      if (url.endsWith('/sessions/2/timelines/22')) return secondResponse.promise;
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    const handleRouteChange = (component as unknown as {
+      handleRouteChange: (sessionId: number, timelineId: number | null) => Promise<void>;
+    }).handleRouteChange.bind(component);
+
+    const firstLoad = handleRouteChange(1, 11);
+    await Promise.resolve();
+    const secondLoad = handleRouteChange(2, 22);
+    await Promise.resolve();
+
+    secondResponse.resolve(jsonResponse({
+      timeline_id: 22,
+      session_id: 2,
+      generated_at: '2026-09-17T10:00:00Z',
+      events: [],
+    }));
+    await secondLoad;
+    firstResponse.resolve(jsonResponse({
+      timeline_id: 11,
+      session_id: 1,
+      generated_at: '2026-09-17T09:00:00Z',
+      events: [],
+    }));
+    await firstLoad;
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(component.sessionId()).toBe(2);
+    expect(component.timelineId()).toBe(22);
+    expect(component.timeline()?.session_id).toBe(2);
+    expect(component.loading()).toBe(false);
+    expect(component.error()).toBeNull();
   });
 });

@@ -838,11 +838,34 @@ class DrugRulesMixin(ParserHost):
         ):
             return True
         if evidence_start >= 0:
-            window_start = max(0, evidence_start - 80)
-            window_end = min(len(source_text), evidence_end + 80)
-            evidence_context = source_text[window_start:window_end]
+            evidence_context = self.medication_context_sentence(
+                source_text,
+                anchor_start=evidence_start,
+                anchor_end=evidence_end,
+            )
             return self.has_medication_context_signal(evidence_context)
         return False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def medication_context_sentence(
+        source_text: str,
+        *,
+        anchor_start: int,
+        anchor_end: int,
+    ) -> str:
+        """Return only the sentence/line containing an extraction anchor."""
+        left_boundary = max(
+            source_text.rfind(marker, 0, anchor_start)
+            for marker in (".", "!", "?", ";", "\n")
+        )
+        right_candidates = [
+            source_text.find(marker, anchor_end)
+            for marker in (".", "!", "?", ";", "\n")
+        ]
+        right_candidates = [index for index in right_candidates if index >= 0]
+        right_boundary = min(right_candidates) if right_candidates else len(source_text)
+        return source_text[left_boundary + 1 : right_boundary]
 
     # -------------------------------------------------------------------------
     def name_has_medication_syntax(

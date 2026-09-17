@@ -12,7 +12,7 @@ from repositories.database.migrations import (
 from sqlalchemy import Engine, create_engine, inspect, text
 
 PREVIOUS_RELEASE_HEAD = "202608200003"
-CURRENT_RELEASE_HEAD = "202609100001"
+CURRENT_RELEASE_HEAD = "202609170001"
 
 ###############################################################################
 def _engine(path: Path) -> Engine:

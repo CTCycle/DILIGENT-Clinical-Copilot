@@ -524,7 +524,7 @@ class SessionRevisionRepository:
             ).scalar_one_or_none()
             if row is None:
                 return None
-            if row.status != "failed":
+            if row.status not in {"completed", "failed", "cancelled"}:
                 row.status = "failed"
                 row.completed_at = datetime.now(UTC)
                 row.error_json = serialize_json_payload(error)
@@ -541,10 +541,41 @@ class SessionRevisionRepository:
                 )
             ).scalar_one_or_none()
             if row is not None and row.status not in {"completed", "failed"}:
+                now = datetime.now(UTC)
                 row.status = "cancelled"
-                row.completed_at = datetime.now(UTC)
+                row.completed_at = now
                 row.error_json = serialize_json_payload(
                     {"message": "Revision was cancelled."}
+                )
+                if row.target_revision_version_id is not None:
+                    version = db_session.get(
+                        ClinicalSessionVersion, int(row.target_revision_version_id)
+                    )
+                    if version is not None and version.version_status in {
+                        "draft_revision",
+                        "pending_qa",
+                    }:
+                        version.version_status = "cancelled"
+                        version.llm_qa_status = "not_run"
+                        version.clinical_review_status = "not_reviewed"
+                        version.session_id = None
+                        version.completed_at = now
+                db_session.execute(
+                    update(ClinicalSessionRevisionStep)
+                    .where(
+                        ClinicalSessionRevisionStep.pipeline_run_id
+                        == str(pipeline_run_id),
+                        ClinicalSessionRevisionStep.status.notin_(
+                            ("completed", "failed", "cancelled")
+                        ),
+                    )
+                    .values(
+                        status="cancelled",
+                        error_json=serialize_json_payload(
+                            {"message": "Revision was cancelled."}
+                        ),
+                        completed_at=now,
+                    )
                 )
             db_session.commit()
 
@@ -653,6 +684,8 @@ class SessionRevisionRepository:
             ).scalar_one_or_none()
             if row is None:
                 return None
+            if row.status in {"completed", "failed", "cancelled"} and status != row.status:
+                return serialize_revision_step_row(row)
             row.status = status
             row.output_hash = (
                 build_payload_hash(
@@ -678,6 +711,7 @@ class SessionRevisionRepository:
         pipeline_run_id: str,
         step_name: str,
         attempt_number: int | None = None,
+        status: str = "failed",
         error: dict[str, Any] | None = None,
         latency_ms: int | None = None,
         completed_at: datetime | None = None,
@@ -703,7 +737,9 @@ class SessionRevisionRepository:
             ).scalar_one_or_none()
             if row is None:
                 return None
-            row.status = "failed"
+            if row.status in {"completed", "failed", "cancelled"} and status != row.status:
+                return serialize_revision_step_row(row)
+            row.status = status
             row.error_json = serialize_json_payload(error)
             row.latency_ms = latency_ms
             row.completed_at = completed_at or datetime.now(UTC)
@@ -990,17 +1026,35 @@ class SessionRevisionRepository:
             ).scalar_one_or_none()
             if row is None:
                 return None
+            revision_run = db_session.execute(
+                select(ClinicalSessionRevisionRun).where(
+                    ClinicalSessionRevisionRun.pipeline_run_id == str(pipeline_run_id)
+                )
+            ).scalar_one_or_none()
+            if revision_run is not None and revision_run.status == "cancelled":
+                row.session_id = None
+                row.version_status = "cancelled"
+                row.llm_qa_status = "not_run"
+                row.clinical_review_status = "not_reviewed"
+                row.completed_at = row.completed_at or datetime.now(UTC)
+                db_session.commit()
+                db_session.refresh(row)
+                return serialize_version_row(row)
+            finalized_at = datetime.now(UTC)
             row.session_id = (
                 int(persisted_session_id) if persisted_session_id is not None else None
             )
             row.version_status = version_status
             row.llm_qa_status = llm_qa_status
             row.clinical_review_status = clinical_review_status
-            row.completed_at = datetime.now(UTC)
+            row.completed_at = finalized_at
             if model_configuration is not None:
                 row.model_configuration_json = serialize_json_payload(
                     model_configuration
                 )
+            if revision_run is not None:
+                revision_run.status = "completed"
+                revision_run.completed_at = revision_run.completed_at or finalized_at
             db_session.commit()
             db_session.refresh(row)
             return serialize_version_row(row)

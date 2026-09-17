@@ -3,7 +3,7 @@
     <div class="timeline-model-header" data-guidance-target="timeline-generation-controls">
       <div>
         <h4>Generate a patient timeline</h4>
-        <p>Uses the model assigned to the Timeline role in Configurations.</p>
+        <p>Uses the model assigned to the Timeline role in Settings.</p>
       </div>
     </div>
 
@@ -16,7 +16,7 @@
     <div class="timeline-configured-model">
       <span class="timeline-configured-model-label">Configured Timeline model</span>
       <strong>{{ selectedConfigurationLabel() }}</strong>
-      <a class="timeline-config-link" [routerLink]="['/model-config']" fragment="model-roles">Manage model roles</a>
+      <a class="timeline-config-link" [routerLink]="['/settings/models']" fragment="model-roles">Manage model roles</a>
     </div>
     <div class="timeline-model-actions">
       <button type="button" class="btn btn-primary" (click)="generateTimeline()" [disabled]="!canGenerate()">{{ generationRunning() ? 'Generating timeline…' : 'Generate Timeline' }}</button>

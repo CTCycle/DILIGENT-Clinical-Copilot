@@ -131,7 +131,7 @@ def test_model_config_initial_load_has_no_console_errors_or_failed_requests(
         ),
     )
 
-    page.goto(f"{base_url}/model-config")
+    page.goto(f"{base_url}/settings/models")
     page.wait_for_timeout(1500)
 
     assert console_errors == []
@@ -278,7 +278,7 @@ def test_keyboard_navigation_reaches_primary_tabs(page: Page, base_url: str):
             "DILI Agent",
             "Clinical Sessions",
             "Data Inspection",
-            "Configurations",
+            "Settings",
         ):
             return
     raise AssertionError(
@@ -328,16 +328,24 @@ def test_keyboard_tab_traversal_reaches_home_form_controls(page: Page, base_url:
 def test_model_config_navigation(page: Page, base_url: str):
     page.goto(base_url)
 
-    model_button = page.get_by_role("tab", name="Configurations")
+    model_button = page.get_by_role("tab", name="Settings")
     expect(model_button).to_be_visible()
     model_button.click()
+    page.get_by_role("link", name=re.compile(r"^Models Providers")).click()
 
-    expect(page).to_have_url(re.compile(r"/model-config/?$"))
+    expect(page).to_have_url(re.compile(r"/settings/models/?$"))
+    expect(page.get_by_role("heading", name="Runtime Source")).to_be_visible()
+
+###############################################################################
+def test_legacy_model_config_route_redirects_to_settings(page: Page, base_url: str):
+    page.goto(f"{base_url}/model-config")
+
+    expect(page).to_have_url(re.compile(r"/settings/models/?$"))
     expect(page.get_by_role("heading", name="Runtime Source")).to_be_visible()
 
 ###############################################################################
 def test_primary_navigation_restores_scroll_position(page: Page, base_url: str):
-    page.goto(f"{base_url}/model-config")
+    page.goto(f"{base_url}/settings/models")
     page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
     page.get_by_role("tab", name="DILI Agent").click()
 
@@ -452,7 +460,7 @@ def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
                 '"progress_message":"Extracting therapy and medication data"},'
                 '"error":null,"created_at":1,"completed_at":null,"version":1}'
             )
-        elif status_call_count in (2, 3):
+        elif status_call_count <= 5:
             body = (
                 '{"job_id":"nav-resume","job_type":"clinical","status":"running",'
                 '"progress":62,"result":{"progress_stage":"retrieval.evidence",'
@@ -476,8 +484,9 @@ def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
         expect(page.locator(".spinner-label")).to_contain_text(
             "Extracting therapy and medication data"
         )
-        page.get_by_role("tab", name="Configurations").click()
-        expect(page).to_have_url(re.compile(r"/model-config/?$"))
+        page.get_by_role("tab", name="Settings").click()
+        page.get_by_role("link", name=re.compile(r"^Models Providers")).click()
+        expect(page).to_have_url(re.compile(r"/settings/models/?$"))
         page.wait_for_timeout(900)
         page.get_by_role("tab", name="DILI Agent").click()
         expect(page).to_have_url(re.compile(r"/?$"))
@@ -818,9 +827,12 @@ def test_home_form_state_persists_across_back_forward_navigation(
         "Navigation persistence verification input."
     )
 
-    page.get_by_role("tab", name="Configurations").click()
-    expect(page).to_have_url(re.compile(r"/model-config/?$"))
+    page.get_by_role("tab", name="Settings").click()
+    page.get_by_role("link", name=re.compile(r"^Models Providers")).click()
+    expect(page).to_have_url(re.compile(r"/settings/models/?$"))
 
+    page.go_back()
+    expect(page).to_have_url(re.compile(r"/settings/general/?$"))
     page.go_back()
     expect(page).to_have_url(re.compile(r"/?$"))
     expect(page.get_by_label("Patient Name")).to_have_value("Back Forward Persist")
@@ -830,7 +842,9 @@ def test_home_form_state_persists_across_back_forward_navigation(
     )
 
     page.go_forward()
-    expect(page).to_have_url(re.compile(r"/model-config/?$"))
+    expect(page).to_have_url(re.compile(r"/settings/general/?$"))
+    page.go_forward()
+    expect(page).to_have_url(re.compile(r"/settings/models/?$"))
 
 ###############################################################################
 def test_clinical_sessions_row_selection_loads_matching_detail(

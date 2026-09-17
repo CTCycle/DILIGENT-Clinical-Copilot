@@ -464,6 +464,132 @@ jobs:
             throw "Desktop release build failed with exit code $LASTEXITCODE"
           }
 
+      - name: Sign Windows desktop artifacts
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
+          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
+          WINDOWS_CODESIGN_CERT_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_CERT_THUMBPRINT }}
+          WINDOWS_CODESIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_CODESIGN_TIMESTAMP_URL }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          foreach ($required in @(
+            "WINDOWS_CODESIGN_PFX_BASE64",
+            "WINDOWS_CODESIGN_PFX_PASSWORD",
+            "WINDOWS_CODESIGN_CERT_THUMBPRINT",
+            "WINDOWS_CODESIGN_TIMESTAMP_URL"
+          )) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($required))) {
+              throw "Missing required Windows signing material: $required"
+            }
+          }
+
+          $version = $env:RELEASE_TAG.Substring(1)
+          $artifacts = @(
+            (Join-Path "release" "DILIGENT-v$version-windows-x64-portable.exe"),
+            (Join-Path "release" "DILIGENT-v$version-windows-x64.msi")
+          )
+          foreach ($artifact in $artifacts) {
+            if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
+              throw "Cannot sign missing release artifact: $artifact"
+            }
+          }
+
+          $signtoolCommand = Get-Command signtool.exe -ErrorAction SilentlyContinue
+          if ($null -eq $signtoolCommand) {
+            $signtoolCommand = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -File -Recurse -ErrorAction SilentlyContinue |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1
+          }
+          if ($null -eq $signtoolCommand) {
+            throw "Windows SDK signtool.exe was not found; refusing to publish unsigned artifacts."
+          }
+          $signtool = if ($signtoolCommand.PSObject.Properties.Name -contains "Source") {
+            $signtoolCommand.Source
+          } else {
+            $signtoolCommand.FullName
+          }
+
+          $pfxPath = Join-Path $env:RUNNER_TEMP "diligent-release-signing.pfx"
+          try {
+            try {
+              [IO.File]::WriteAllBytes(
+                $pfxPath,
+                [Convert]::FromBase64String($env:WINDOWS_CODESIGN_PFX_BASE64)
+              )
+            } catch {
+              throw "WINDOWS_CODESIGN_PFX_BASE64 is not valid base64: $($_.Exception.Message)"
+            }
+            if ((Get-Item -LiteralPath $pfxPath).Length -le 0) {
+              throw "Decoded Windows signing PFX is empty."
+            }
+
+            foreach ($artifact in $artifacts) {
+              & $signtool sign /fd SHA256 /td SHA256 /tr $env:WINDOWS_CODESIGN_TIMESTAMP_URL /f $pfxPath /p $env:WINDOWS_CODESIGN_PFX_PASSWORD $artifact
+              if ($LASTEXITCODE -ne 0) {
+                throw "Authenticode signing failed for $artifact with exit code $LASTEXITCODE"
+              }
+            }
+
+            $expectedThumbprint = ($env:WINDOWS_CODESIGN_CERT_THUMBPRINT -replace '\s', '').ToUpperInvariant()
+            foreach ($artifact in $artifacts) {
+              $signature = Get-AuthenticodeSignature -LiteralPath $artifact
+              if ($signature.Status -ne "Valid" -or $null -eq $signature.SignerCertificate) {
+                throw "Authenticode validation failed for ${artifact}: status=$($signature.Status)"
+              }
+              $actualThumbprint = ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
+              if ($actualThumbprint -ne $expectedThumbprint) {
+                throw "Unexpected Authenticode signer for ${artifact}: $actualThumbprint != $expectedThumbprint"
+              }
+              if ($signature.SignerCertificate.NotAfter -lt (Get-Date)) {
+                throw "Authenticode signer certificate is expired for $artifact."
+              }
+              & $signtool verify /pa /all /tw $artifact
+              if ($LASTEXITCODE -ne 0) {
+                throw "signtool verification failed for $artifact with exit code $LASTEXITCODE"
+              }
+              Write-Output "Signed and verified: $(Split-Path -Leaf $artifact) ($actualThumbprint)"
+            }
+          } finally {
+            if (Test-Path -LiteralPath $pfxPath -PathType Leaf) {
+              Remove-Item -LiteralPath $pfxPath -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+      - name: Regenerate signed artifact checksums
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = $env:RELEASE_TAG.Substring(1)
+          $artifacts = @(
+            (Join-Path "release" "DILIGENT-v$version-windows-x64-portable.exe"),
+            (Join-Path "release" "DILIGENT-v$version-windows-x64.msi")
+          )
+          foreach ($artifact in $artifacts) {
+            if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
+              throw "Cannot checksum missing signed release artifact: $artifact"
+            }
+          }
+          $manifest = Join-Path "release" "DILIGENT-v$version-windows-x64.sha256"
+          $lines = foreach ($artifact in $artifacts) {
+            $name = Split-Path -Leaf $artifact
+            "SHA256  $name"
+            "$((Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant())  $name"
+          }
+          Set-Content -LiteralPath $manifest -Value $lines -Encoding ascii
+          $manifestText = Get-Content -LiteralPath $manifest -Raw
+          foreach ($artifact in $artifacts) {
+            $name = Split-Path -Leaf $artifact
+            $hash = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($manifestText -notmatch [regex]::Escape("$hash  $name")) {
+              throw "Regenerated checksum manifest does not match $name"
+            }
+          }
+          Write-Output "Signed artifact checksum manifest regenerated and verified: $manifest"
+
       - name: Verify release version contract
         shell: pwsh
         env:

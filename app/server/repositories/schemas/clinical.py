@@ -206,7 +206,7 @@ class ClinicalSessionVersion(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "version_status IN ('current', 'superseded', 'draft_revision', 'pending_qa', 'qa_failed', 'requires_human_review', 'llm_qa_passed', 'human_approved', 'human_rejected')",
+            "version_status IN ('current', 'superseded', 'draft_revision', 'pending_qa', 'cancelled', 'qa_failed', 'requires_human_review', 'llm_qa_passed', 'human_approved', 'human_rejected')",
             name="ck_clinical_session_versions_version_status",
         ),
         CheckConstraint(
