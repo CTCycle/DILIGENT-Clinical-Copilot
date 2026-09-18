@@ -6,7 +6,7 @@ Last updated: 2026-08-31
 1. Verify the portable EXE or MSI against the matching `.sha256` file.
 2. Open the portable EXE, or launch the installed MSI application.
 3. Confirm the window title is `DILIGENT Clinical Copilot` and the window responds.
-4. If startup fails, inspect `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log` and `state\desktop-backend-ready.json`.
+4. If startup fails, inspect `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log` and `state\desktop-backend-ready.json`.
 5. Confirm the ready-file port returns `200` from `/api/health`.
 
 ## Recommended End-to-end Journey

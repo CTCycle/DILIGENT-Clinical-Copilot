@@ -7,21 +7,26 @@ set "APP_DIR=%PROJECT_ROOT%\app"
 set "SERVER_DIR=%APP_DIR%\server"
 set "CLIENT_DIR=%APP_DIR%\client"
 set "TESTS_DIR=%APP_DIR%\tests"
-set "RUNTIME_CACHE_DIR=%PROJECT_ROOT%\runtimes\cache"
-set "CACHE_DIR=%TESTS_DIR%\cache"
-if defined DILIGENT_TEST_CACHE_ROOT set "CACHE_DIR=%DILIGENT_TEST_CACHE_ROOT%"
+set "CACHE_DIR=%PROJECT_ROOT%\runtimes\cache"
 set "PYTEST_CACHE_DIR=%CACHE_DIR%\pytest"
 set "PYTEST_BASETEMP=%PYTEST_CACHE_DIR%\basetemp"
-set "UV_CACHE_DIR=%RUNTIME_CACHE_DIR%\uv"
+set "UV_CACHE_DIR=%CACHE_DIR%\uv"
 set "RUFF_CACHE_DIR=%CACHE_DIR%\ruff"
-set "NPM_CONFIG_CACHE=%RUNTIME_CACHE_DIR%\npm"
-set "PLAYWRIGHT_BROWSERS_PATH=%RUNTIME_CACHE_DIR%\playwright"
+set "NPM_CONFIG_CACHE=%CACHE_DIR%\npm"
+set "PLAYWRIGHT_BROWSERS_PATH=%CACHE_DIR%\playwright"
 set "MYPY_CACHE_DIR=%CACHE_DIR%\mypy"
 set "COVERAGE_FILE=%CACHE_DIR%\coverage\.coverage"
-set "PIP_CACHE_DIR=%RUNTIME_CACHE_DIR%\pip"
-set "PYTHONPYCACHEPREFIX=%RUNTIME_CACHE_DIR%\python"
+set "PIP_CACHE_DIR=%CACHE_DIR%\pip"
+set "PYTHONPYCACHEPREFIX=%CACHE_DIR%\python"
+set "CARGO_TARGET_DIR=%CACHE_DIR%\cargo\target"
+set "HF_HOME=%CACHE_DIR%\huggingface"
+set "HF_HUB_CACHE=%HF_HOME%\hub"
+set "HF_ASSETS_CACHE=%HF_HOME%\assets"
+set "HUGGINGFACE_HUB_CACHE=%HF_HUB_CACHE%"
 set "SETTINGS_ENV=%PROJECT_ROOT%\settings\.env"
 set "VENV_PYTHON=%SERVER_DIR%\.venv\Scripts\python.exe"
+set "UV_EXE=%PROJECT_ROOT%\runtimes\uv\uv.exe"
+set "RUNTIME_PYTHON=%PROJECT_ROOT%\runtimes\python\python.exe"
 set "RUNTIME_NPM=%PROJECT_ROOT%\runtimes\nodejs\npm.cmd"
 
 set "FASTAPI_HOST=127.0.0.1"
@@ -64,7 +69,6 @@ if not exist "%VENV_PYTHON%" (
 )
 set "PYTHON_CMD=%VENV_PYTHON%"
 
-if not exist "%RUNTIME_CACHE_DIR%" mkdir "%RUNTIME_CACHE_DIR%" >nul 2>&1
 if not exist "%CACHE_DIR%" mkdir "%CACHE_DIR%" >nul 2>&1
 set "PYTEST_TEMP_ARGS=--basetemp "%PYTEST_BASETEMP%" -o cache_dir="%PYTEST_CACHE_DIR%""
 
@@ -178,6 +182,15 @@ echo [INFO] Backend URL : %APP_TEST_BACKEND_URL%
 echo [INFO] Frontend URL: %APP_TEST_FRONTEND_URL%
 echo.
 
+if "%NEED_FRONTEND%"=="1" (
+  echo [INFO] Ensuring Playwright Chromium is installed in the canonical cache...
+  "%UV_EXE%" run --project "%SERVER_DIR%" --extra test --python "%RUNTIME_PYTHON%" python -m playwright install chromium
+  if errorlevel 1 (
+    echo [ERROR] Playwright Chromium installation failed.
+    exit /b 1
+  )
+)
+
 if defined MODELCONFIG_KIND (
   set "TIMESTAMP=%DATE:/=-%_%TIME::=-%"
   set "TIMESTAMP=!TIMESTAMP: =0!"
@@ -247,7 +260,7 @@ if defined MODELCONFIG_KIND (
   set "MC_FLOW=%TESTS_DIR%\e2e\test_app_flow.py"
 
   echo [STEP] Running model-config unit tests...
-  "%PYTHON_CMD%" -m pytest "!MC_UNIT!" -q !PYTEST_TEMP_ARGS!
+  "%UV_EXE%" run --project "%SERVER_DIR%" --extra test --python "%RUNTIME_PYTHON%" python -m pytest "!MC_UNIT!" -q !PYTEST_TEMP_ARGS!
   if errorlevel 1 set "TEST_RESULT=1" & goto cleanup
 
   set "APP_TEST_BACKEND_URL=http://127.0.0.1:7690"
@@ -256,17 +269,17 @@ if defined MODELCONFIG_KIND (
   if /i "%MODELCONFIG_KIND%"=="slice" (
     set "MC_K=runtime_toggle_enables_save_and_submits_put or model_config or dili_run_burst_click_submits_single_job or dili_run_conflict_surfaces_clear_error_message"
     echo [STEP] Running model-config API + app-flow e2e slice...
-    "%PYTHON_CMD%" -m pytest "!MC_API!" "!MC_FLOW!" -k "!MC_K!" -q !PYTEST_TEMP_ARGS!
+    "%UV_EXE%" run --project "%SERVER_DIR%" --extra test --python "%RUNTIME_PYTHON%" python -m pytest "!MC_API!" "!MC_FLOW!" -k "!MC_K!" -q !PYTEST_TEMP_ARGS!
   ) else (
     echo [STEP] Running full model-config API + app-flow e2e suite...
-    "%PYTHON_CMD%" -m pytest "!MC_API!" "!MC_FLOW!" -q !PYTEST_TEMP_ARGS!
+    "%UV_EXE%" run --project "%SERVER_DIR%" --extra test --python "%RUNTIME_PYTHON%" python -m pytest "!MC_API!" "!MC_FLOW!" -q !PYTEST_TEMP_ARGS!
   )
   if errorlevel 1 set "TEST_RESULT=1"
   goto cleanup
 )
 
 echo [STEP] Running pytest...
-"%PYTHON_CMD%" -m pytest "%PYTEST_TARGET%" -v --tb=short %EXTRA_PYTEST_ARGS% !PYTEST_TEMP_ARGS!
+"%UV_EXE%" run --project "%SERVER_DIR%" --extra test --python "%RUNTIME_PYTHON%" python -m pytest "%PYTEST_TARGET%" -v --tb=short %EXTRA_PYTEST_ARGS% !PYTEST_TEMP_ARGS!
 if errorlevel 1 set "TEST_RESULT=1"
 
 :cleanup

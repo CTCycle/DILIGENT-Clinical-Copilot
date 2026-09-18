@@ -7,6 +7,32 @@ from pathlib import Path
 from common.runtime_layout import resolve_runtime_layout
 
 ###############################################################################
+def configure_cache_environment() -> None:
+    """Keep packaged dependency and model caches inside the runtime cache root."""
+    cache_root = resolve_runtime_layout().cache_root.resolve()
+    pytest_root = cache_root / "pytest"
+    environment_paths = {
+        "CARGO_TARGET_DIR": cache_root / "cargo" / "target",
+        "COVERAGE_FILE": cache_root / "coverage" / ".coverage",
+        "HF_HOME": cache_root / "huggingface",
+        "HF_HUB_CACHE": cache_root / "huggingface" / "hub",
+        "HF_ASSETS_CACHE": cache_root / "huggingface" / "assets",
+        "HUGGINGFACE_HUB_CACHE": cache_root / "huggingface" / "hub",
+        "MYPY_CACHE_DIR": cache_root / "mypy",
+        "NPM_CONFIG_CACHE": cache_root / "npm",
+        "PIP_CACHE_DIR": cache_root / "pip",
+        "PLAYWRIGHT_BROWSERS_PATH": cache_root / "playwright",
+        "PYTHONPYCACHEPREFIX": cache_root / "python",
+        "RUFF_CACHE_DIR": cache_root / "ruff",
+        "UV_CACHE_DIR": cache_root / "uv",
+    }
+    for name, path in environment_paths.items():
+        os.environ[name] = str(path)
+    os.environ["PYTEST_ADDOPTS"] = (
+        f'--basetemp="{pytest_root / "basetemp"}" -o cache_dir="{pytest_root}"'
+    )
+
+###############################################################################
 def copy_initial_file_if_missing(source: Path, destination: Path) -> bool:
     """Atomically seed one persistent file without overwriting user data."""
     if destination.exists():
@@ -26,9 +52,8 @@ def copy_initial_file_if_missing(source: Path, destination: Path) -> bool:
 def create_mutable_resource_directories() -> None:
     layout = resolve_runtime_layout()
     mutable_root = layout.mutable_resources_root
+    (layout.cache_root / "embeddings").mkdir(parents=True, exist_ok=True)
     for relative_path in (
-        "logs",
-        "models/embeddings",
         "sources/archives",
         "sources/documents",
         "sources/vectors",
@@ -40,6 +65,7 @@ def create_mutable_resource_directories() -> None:
 ###############################################################################
 def ensure_runtime_data_layout() -> None:
     layout = resolve_runtime_layout()
+    configure_cache_environment()
     if not layout.packaged:
         return
 
@@ -58,5 +84,6 @@ def ensure_runtime_data_layout() -> None:
 __all__ = [
     "copy_initial_file_if_missing",
     "create_mutable_resource_directories",
+    "configure_cache_environment",
     "ensure_runtime_data_layout",
 ]

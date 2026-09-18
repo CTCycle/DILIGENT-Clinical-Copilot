@@ -9,6 +9,13 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "cwd": "${workspaceFolder}/app/server",
+      "env": {
+        "HF_ASSETS_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/assets",
+        "HF_HOME": "${workspaceFolder}/runtimes/cache/huggingface",
+        "HF_HUB_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/hub",
+        "HUGGINGFACE_HUB_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/hub",
+        "PYTHONPYCACHEPREFIX": "${workspaceFolder}/runtimes/cache/python"
+      },
       "python": "${workspaceFolder}/app/server/.venv/Scripts/python.exe"
     },
     {
@@ -30,6 +37,22 @@
         "uriFormat": "%s/docs"
       },
       "envFile": "${workspaceFolder}/settings/.env",
+      "env": {
+        "CARGO_TARGET_DIR": "${workspaceFolder}/runtimes/cache/cargo/target",
+        "COVERAGE_FILE": "${workspaceFolder}/runtimes/cache/coverage/.coverage",
+        "HF_ASSETS_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/assets",
+        "HF_HOME": "${workspaceFolder}/runtimes/cache/huggingface",
+        "HF_HUB_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/hub",
+        "HUGGINGFACE_HUB_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/hub",
+        "MYPY_CACHE_DIR": "${workspaceFolder}/runtimes/cache/mypy",
+        "NPM_CONFIG_CACHE": "${workspaceFolder}/runtimes/cache/npm",
+        "PIP_CACHE_DIR": "${workspaceFolder}/runtimes/cache/pip",
+        "PLAYWRIGHT_BROWSERS_PATH": "${workspaceFolder}/runtimes/cache/playwright",
+        "PYTHONPYCACHEPREFIX": "${workspaceFolder}/runtimes/cache/python",
+        "PYTEST_ADDOPTS": "--basetemp=${workspaceFolder}/runtimes/cache/pytest/basetemp -o cache_dir=${workspaceFolder}/runtimes/cache/pytest",
+        "RUFF_CACHE_DIR": "${workspaceFolder}/runtimes/cache/ruff",
+        "UV_CACHE_DIR": "${workspaceFolder}/runtimes/cache/uv"
+      },
       "cwd": "${workspaceFolder}/app",
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -40,6 +63,14 @@
       "type": "pwa-node",
       "request": "launch",
       "cwd": "${workspaceFolder}/app/client",
+      "env": {
+        "HF_ASSETS_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/assets",
+        "HF_HOME": "${workspaceFolder}/runtimes/cache/huggingface",
+        "HF_HUB_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/hub",
+        "HUGGINGFACE_HUB_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/hub",
+        "NPM_CONFIG_CACHE": "${workspaceFolder}/runtimes/cache/npm",
+        "PLAYWRIGHT_BROWSERS_PATH": "${workspaceFolder}/runtimes/cache/playwright"
+      },
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "run",

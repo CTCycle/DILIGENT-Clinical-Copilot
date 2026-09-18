@@ -50,7 +50,7 @@ impl BackendProcess {
         session_secret: &str,
     ) -> Result<Self, String> {
         let state_root = paths.data_root.join("state");
-        let log_root = paths.data_root.join("resources").join("logs");
+        let log_root = paths.data_root.join("cache").join("logs");
         fs::create_dir_all(&state_root).map_err(|error| error.to_string())?;
         fs::create_dir_all(&log_root).map_err(|error| error.to_string())?;
         let ready_file = state_root.join("desktop-backend-ready.json");

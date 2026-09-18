@@ -2,37 +2,22 @@
 app/resources/sources/archives/**
 app/resources/sources/documents/**
 app/resources/sources/vectors/**
-app/resources/models/embeddings/**
-app/resources/logs/**
 app/client/node_modules/
 app/client/dist/
 app/client/dist-ssr/
-app/client/logs/
 runtimes/**
 !runtimes/cache/
 runtimes/cache/**
 !runtimes/cache/.gitkeep
 assets/QA/**
-assets/cache/**
-app/tests/cache/**
-!app/tests/cache/
-app/tests/cache/**
-!app/tests/cache/.gitkeep
 .playwright-mcp/
 
 # Python
-*.py[cod]
 *.egg-info/
 .venv/
 venv/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
 dist/
 build/
-.coverage
-htmlcov/
-__pycache__/
 
 # Node / JS
 **/node_modules/
@@ -46,7 +31,6 @@ lerna-debug.log*
 package-lock.json
 !app/client/package-lock.json
 yarn.lock
-.angular/cache/**
 
 # IDE / OS
 !.vscode/extensions.json
@@ -57,7 +41,6 @@ Thumbs.db
 # Misc
 *.env
 *.lock
-*.log
 *.db*
 *.sqlite*
 *.exe
@@ -72,7 +55,6 @@ app/desktop/node_modules/
 app/desktop/src-tauri/generated/**
 !app/desktop/src-tauri/generated/.gitkeep
 app/desktop/src-tauri/gen/**
-app/desktop/src-tauri/target/
 !app/desktop/package-lock.json
 !app/desktop/src-tauri/Cargo.lock
 !app/server/uv.lock

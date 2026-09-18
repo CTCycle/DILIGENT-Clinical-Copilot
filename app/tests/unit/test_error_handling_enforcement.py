@@ -22,8 +22,6 @@ import app as server_app_module
 EXCLUDED_DIRS = {
     "__pycache__",
     ".venv",
-    ".uv-cache",
-    ".pytest_cache",
     "node_modules",
     "dist",
 }

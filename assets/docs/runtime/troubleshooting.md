@@ -13,7 +13,7 @@ Opening `release\DILIGENT-v<version>-windows-x64-portable.exe` produces no visib
 
 1. Check **Event Viewer → Windows Logs → Application** for an `Application Error` entry naming the portable executable.
 2. Inspect `%LOCALAPPDATA%\DILIGENT\runtime\<version>` for a hash directory containing `extraction.complete`.
-3. Inspect `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log` and `state\desktop-backend-ready.json`.
+3. Inspect `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log` and `state\desktop-backend-ready.json`.
 
 The packaged shell extracts the runtime before starting the backend. A stale `.extract-*` directory means extraction or validation was interrupted; close any running DILIGENT process and remove only those temporary directories under the matching version before retrying. Do not remove `%LOCALAPPDATA%\DILIGENT\data` unless a full user-data reset is intentional.
 
@@ -36,7 +36,7 @@ The portable executable uses the system WebView2 runtime. The standard MSI uses 
 
 ## RAG Embedding Cache Is Missing or Invalid
 
-The canonical runtime uses only the pinned Granite 97M multilingual ONNX artifact at `app/resources/models/embeddings/<revision>/onnx/model_quint8_avx2.onnx`. A missing cache requires network access followed by a RAG rebuild. A dependency error requires reinstalling the synchronized Python environment. For an invalid digest or incomplete snapshot, remove only that revision directory and rebuild. The runtime never substitutes another artifact or backend; disable RAG for the current assessment while repairing the cache.
+The canonical runtime uses only the pinned Granite 97M multilingual ONNX artifact at `runtimes/cache/embeddings/<revision>/onnx/model_quint8_avx2.onnx` in source mode, or the equivalent packaged `data/cache/embeddings` path. A missing cache requires network access followed by a RAG rebuild. A dependency error requires reinstalling the synchronized Python environment. For an invalid digest or incomplete snapshot, remove only that revision directory and rebuild. The runtime never substitutes another artifact or backend; disable RAG for the current assessment while repairing the cache.
 
 ## Expected Local Ports
 - Backend: `127.0.0.1:7690`

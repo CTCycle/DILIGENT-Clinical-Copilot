@@ -269,9 +269,9 @@ erDiagram
 
 ## Filesystem Resources
 
-- In development, `app/resources/sources` contains source catalogs, documents, archives, vectors, models, and logs.
+- In development, `app/resources/sources` contains persistent source catalogs, documents, archives, and vectors. Disposable embeddings and logs are stored under `runtimes/cache`.
 - The validated FDA DILIrank workbook and its HTTP metadata cache live in the existing source archives location. New downloads are written to a candidate file and promoted only after workbook validation; failed or cancelled candidate refreshes do not replace the last-known-good cache.
-- In packaged desktop mode, immutable catalogs and Angular assets live under the extracted runtime; databases, logs, models, source documents, vectors, exports, state, and access-key material live under `%LOCALAPPDATA%\DILIGENT\data`.
+- In packaged desktop mode, immutable catalogs and Angular assets live under the extracted runtime; databases, source documents, vectors, exports, state, and access-key material live under `%LOCALAPPDATA%\DILIGENT\data`, while disposable logs and embeddings live under `%LOCALAPPDATA%\DILIGENT\data\cache`.
 - `app/resources/catalogs` contains JSON seed manifests for database-backed reference catalogs and is copied to the immutable packaged runtime.
 
 The extracted runtime is versioned and hash-addressed so it can be replaced during upgrades. The persistent data root is intentionally outside the runtime and is not removed by desktop artifact cleanup or MSI uninstall.
