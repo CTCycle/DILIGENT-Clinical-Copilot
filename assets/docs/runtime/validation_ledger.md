@@ -17,18 +17,18 @@ Status meanings:
 
 ## Current release assessment
 
-The source tree is not release-ready. The standard launcher cannot start the existing populated database because migration `202609170001` fails with `sqlite3.IntegrityError: FOREIGN KEY constraint failed` while Alembic batch-alters `clinical_session_versions`. The failure is at `app/server/migrations/versions/202609170001_add_cancelled_revision_status.py:40-45`, where the batch operation recreates the parent table while populated child tables still reference it.
+The original populated-database migration blocker has been remediated in source. SQLite migration transactions now suspend foreign-key enforcement only while Alembic performs the atomic parent-table rebuild, run `PRAGMA foreign_key_check` before commit, and restore the connection's prior enforcement state. The fix was verified with foreign keys enabled in the migration fixture and with a task-local clone of the current populated database through `start_on_windows.ps1 -Action InitializeDatabase`; all existing clinical/revision row counts and SQLite integrity checks were preserved. The shared source database was intentionally not advanced and remains at `202609100001`.
 
-The failure is bounded and non-destructive in the observed run: the shared database remained at Alembic revision `202609100001`, and `PRAGMA integrity_check` remained `ok`. A fresh disposable database migrated to `202609170001` and served the application successfully, so fresh-bootstrap evidence must not be mistaken for upgrade safety of an existing installation.
+Release readiness remains blocked by the separate absence of live provider, populated-session, timeline, revision, citation, and final-report evidence. The migration remediation is not a claim that those clinical or external-provider gates passed.
 
-Register counts: `PASS 12`, `ATTENTION 2`, `FAIL 2`, `NOT TESTED 21`, `NOT APPLICABLE 2`.
+Post-remediation register counts: `PASS 13`, `ATTENTION 3`, `FAIL 0`, `NOT TESTED 21`, `NOT APPLICABLE 2`.
 
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
 |---:|---|---|---|---|---|
-| 1 | Standard source launcher against the populated database | Runtime / migration | `FAIL` | `start_on_windows.ps1 -Action Launch` reached migration `202609100001 -> 202609170001` and then failed with a foreign-key integrity error. | Existing `app/resources/database.db` was not advanced; release blocker. |
-| 2 | Fresh SQLite bootstrap and Alembic head | Runtime / migration | `PASS` | Disposable source DB migrated through `202609170001`; `/api/health` returned 200. | Fresh DB only; does not clear the populated-upgrade failure. |
+| 1 | Standard source launcher against the populated database | Runtime / migration | `PASS` | A task-local clone of the current populated database migrated through `202609170001` via `start_on_windows.ps1 -Action InitializeDatabase`; the same 18 sessions, 38 versions, 17 revision runs, and 54 artifacts remained available. | The shared `app/resources/database.db` was intentionally not advanced; the clone retained `PRAGMA foreign_key_check=[]` and `PRAGMA integrity_check=ok`. |
+| 2 | Fresh SQLite bootstrap and Alembic head | Runtime / migration | `PASS` | Disposable source DB migrated through `202609170001`; `/api/health` returned 200. | Fresh DB evidence is complemented by the populated-clone remediation below. |
 | 3 | Application shell and primary workspace navigation | UI | `PASS` | In-app Browser rendered DILI Agent, Clinical Sessions, Data Inspection, and Settings. | Browser smoke at one desktop viewport; no provider call. |
 | 4 | General runtime settings persistence | Settings | `PASS` | Changed polling interval `1 -> 2`, saved, navigated, reloaded, and restored `2 -> 1`; value and persisted timestamp remained visible. | `settings/configurations.json` is back at baseline `1.0`; `.env` remained excluded. |
 | 5 | Settings section surfaces | Settings | `PASS` | General, Models, Data Processing, Integrations, and Advanced routes rendered with source labels and controls. | Surface validation only for sections other than General persistence. |
@@ -60,20 +60,20 @@ Register counts: `PASS 12`, `ATTENTION 2`, `FAIL 2`, `NOT TESTED 21`, `NOT APPLI
 | 31 | Ordered structured-source update and reconciliation jobs | Data Inspection / jobs | `NOT TESTED` | No source update job was started. | Deliberately excluded to avoid mutating source caches during validation. |
 | 32 | Health and inspection API boundaries on a fresh runtime | API | `PASS` | `/api/health`, sessions, RxNav, LiverTox, DILIrank, RAG documents/vector-store, model-config, and settings requests returned expected 2xx responses. | Fresh disposable DB only. |
 | 33 | Browser smoke, visible error handling, and console diagnostics | UI / QA | `PASS` | DILI Agent, Settings, Clinical Sessions, and Data Inspection rendered; browser error/warn diagnostics were empty; blocking dialogs were visible and actionable. | One viewport and smoke coverage; not a full accessibility audit. |
-| 34 | Backend unit and supported model-config gates | Automated QA | `PASS` | `731 passed` unit tests; model-config slice `40 passed`; isolated app/API slice `10 passed`. | Default test cache hit an ACL error and was rerouted to a writable QA cache; migration test does not enable SQLite foreign keys. |
+| 34 | Backend unit and supported model-config gates | Automated QA | `PASS` | `731 passed` unit tests; model-config slice `40 passed`; isolated app/API slice `10 passed`; migration slice now runs with SQLite foreign keys enabled. | Default test cache hit an ACL error and was rerouted to a writable QA cache. |
 | 35 | Frontend test and production build gates | Automated QA | `PASS` | Angular/Vitest `23 files, 94 tests passed`; `npm run build` completed successfully. | No packaging assertion. |
 | 36 | Exact OpenCode Go / DeepSeek end-to-end clinical provider lane | External provider | `NOT TESTED` | No live cloud clinical call was made; disposable DB had no active OpenCode key, and the shared runtime was blocked before provider resolution. | Must be validated without fallback before release. |
-| 37 | Restart and reuse of existing persisted clinical data | Persistence / release | `FAIL` | Same migration blocker prevents the source runtime from reopening the populated DB; read-only checks showed 18 sessions, 45 drug mentions, 228 lab observations, 18 results, and intact SQLite integrity. | Release blocker is migration safety, not observed data corruption. |
+| 37 | Restart and reuse of existing persisted clinical data | Persistence / release | `ATTENTION` | The populated clone reopened through the launcher database-initialization path after migration, preserving 18 sessions, 45 drug mentions, 228 lab observations, 18 results, and SQLite integrity. | The shared source database was intentionally not advanced; rendered populated-session reuse remains untested. |
 | 38 | EXE/MSI packaging, installer, checksum, and publication | Release packaging | `NOT APPLICABLE` | Explicitly outside this source/development audit. | Separate release gate. |
 | 39 | Clean-machine install and Windows host smoke | Release packaging | `NOT APPLICABLE` | Explicitly outside this source/development audit. | Separate release gate. |
 
 ## Release blockers and required remediation
 
-### B1 — populated-database migration is release-blocking
+### B1 — populated-database migration remediation (resolved)
 
-The current populated database has 38 `clinical_session_versions`, 17 revision runs, and 54 revision artifacts. The revision-run and artifact tables contain foreign keys to `clinical_session_versions`. Migration `202609170001` uses Alembic batch alteration on that parent table before those relationships are safely handled. With SQLite foreign keys enabled by the application, startup fails at the table drop/recreate step.
+The current populated database has 38 `clinical_session_versions`, 17 revision runs, and 54 revision artifacts. The revision-run, review, and artifact tables contain foreign keys to `clinical_session_versions`. The migration coordinator now temporarily disables SQLite enforcement inside the existing atomic migration transaction, validates `PRAGMA foreign_key_check` before commit, and restores enforcement afterward. This allows migration `202609170001` to batch-recreate the parent table without weakening post-migration integrity.
 
-The unit fixture at `app/tests/unit/test_database_migrations.py:186-260` inserts representative revision rows but its local `_engine` does not enable `PRAGMA foreign_keys=ON`. Add an upgrade fixture that enables foreign keys and exercises the real populated relationship shape, then implement an FK-safe migration sequence. Re-run the standard launcher against the unchanged shared DB and verify that all existing sessions, source data, revision artifacts, and configuration remain available.
+The migration fixture now enables `PRAGMA foreign_keys=ON` and exercises revision runs, review rows, and artifacts. Ten migration tests and the full 731-test backend unit suite pass. A clone of the unchanged source database was migrated through the standard launcher initialization path with all populated counts preserved. The shared database remains unchanged by this remediation run, so direct source-runtime session UI reuse is still marked `ATTENTION`.
 
 ### B2 — current clinical/provider evidence is incomplete
 
@@ -94,13 +94,21 @@ The first unit invocation failed before collection because the default cache/dat
 5. Ran the backend unit suite with a writable QA cache (`731 passed`), the supported model-config regression slice (`40 + 10 passed`), the frontend suite (`23 files / 94 tests passed`), and the production client build (successful).
 6. Rechecked the browser after reload, verified the settings baseline remained `1`, inspected browser diagnostics (`[]`), stopped the task-owned backend/frontend listeners, and retained only small source-runtime log evidence under `assets/QA/pre-release-e2e-20260918/`. Disposable DB/cache files were removed.
 
+### 2026-09-18, populated-database migration remediation
+
+1. Added FK-safe SQLite migration coordination: enforcement is suspended only around the atomic Alembic transaction, `PRAGMA foreign_key_check` gates commit, and the prior connection state is restored.
+2. Enabled foreign keys in the migration test engine and expanded the cancellation fixture to cover revision-run, review, and artifact child relationships.
+3. Migrated a clone of the source database through `start_on_windows.ps1 -Action InitializeDatabase`; the clone reached `202609170001` with 18 sessions, 38 versions, 17 revision runs, 54 artifacts, `foreign_key_check=[]`, and `integrity_check=ok`.
+4. Confirmed the source database remained at `202609100001` with its original counts and `integrity_check=ok`. The provider and live clinical workflow gates remain untested.
+
 ## Evidence register
 
-- `app/server/migrations/versions/202609170001_add_cancelled_revision_status.py:40-45` — parent-table batch alteration at the failing migration step.
+- `app/server/migrations/versions/202609170001_add_cancelled_revision_status.py:40-45` — parent-table batch alteration now covered by the FK-safe migration transaction.
 - `app/tests/unit/test_database_migrations.py:14-22,186-260` — migration fixture and its foreign-key configuration gap.
 - `assets/QA/pre-release-e2e-20260918/manual-backend.stderr.log` — disposable source startup and request-runtime log.
 - `assets/QA/pre-release-e2e-20260918/manual-backend.stdout.log` — disposable backend process output.
 - `assets/QA/pre-release-e2e-20260918/manual-frontend-2.stdout.log` — disposable frontend preview output.
 - `assets/QA/release-blocker-remediation-20260917.md` — historical evidence only; it was not used as current release proof.
+- `assets/QA/release-blocker-remediation-20260918.md` — current FK-safe migration remediation evidence.
 
 The in-app Browser captures from this run were inspected inline for DILI Agent, Settings, Clinical Sessions, and Data Inspection/RAG. The browser tool did not expose a disk-export path for those captures, so this ledger records the visual assertions and the reproducible routes rather than inventing screenshot filenames.

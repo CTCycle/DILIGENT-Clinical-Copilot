@@ -1,37 +1,49 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
 
 import pytest
-from alembic import command
-from sqlalchemy import create_engine, inspect, text
-
 import repositories.database.migrations as migration_coordinator
+from alembic import command
 from repositories.database.migrations import (
     HEAD_REVISION,
     MigrationError,
     build_alembic_config,
     migrate_database,
 )
+from sqlalchemy import create_engine, event, inspect, text
+
 
 ###############################################################################
 def _engine(path: Path):
-    return create_engine(
+    engine = create_engine(
         f"sqlite+pysqlite:///{path}",
         future=True,
         connect_args={"timeout": 30.0, "autocommit": False},
     )
+    event.listen(engine, "connect", _enable_foreign_keys)
+    return engine
+
+###############################################################################
+def _enable_foreign_keys(dbapi_connection, _connection_record) -> None:  # type: ignore[no-untyped-def]
+    previous_autocommit = getattr(dbapi_connection, "autocommit", None)
+    if previous_autocommit is not None:
+        dbapi_connection.autocommit = True
+    try:
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+    finally:
+        if previous_autocommit is not None:
+            dbapi_connection.autocommit = previous_autocommit
 
 ###############################################################################
 def _upgrade_to(engine, revision: str) -> None:  # type: ignore[no-untyped-def]
     config = build_alembic_config()
-    with engine.connect() as connection:
-        with connection.begin():
-            config.attributes["connection"] = connection
-            command.upgrade(config, revision)
+    with engine.connect() as connection, connection.begin():
+        config.attributes["connection"] = connection
+        command.upgrade(config, revision)
 
 ###############################################################################
 def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) -> None:
@@ -233,6 +245,22 @@ def test_cancelled_revision_runs_reconcile_pending_versions(tmp_path: Path) -> N
                     "('cancelled-pending', 'revision_agent_task_1', 1, 1, 1, 'running')"
                 )
             )
+            connection.execute(
+                text(
+                    "insert into clinical_session_revision_reviews "
+                    "(revision_version_id, session_id, clinical_review_status, "
+                    "actor_source, actor_confidence) values "
+                    "(2, 1, 'under_review', 'system', 'system')"
+                )
+            )
+            connection.execute(
+                text(
+                    "insert into clinical_session_revision_artifacts "
+                    "(revision_version_id, pipeline_run_id, artifact_kind, "
+                    "artifact_key) values "
+                    "(2, 'cancelled-draft', 'pipeline_artifact', 'fixture-artifact')"
+                )
+            )
 
         result = migrate_database(engine, database_was_empty=False)
 
@@ -266,6 +294,14 @@ def test_cancelled_revision_runs_reconcile_pending_versions(tmp_path: Path) -> N
                 )
             ).scalars().all()
             assert all(value is not None for value in runs)
+            assert connection.execute(
+                text("select count(*) from clinical_session_revision_reviews")
+            ).scalar_one() == 1
+            assert connection.execute(
+                text("select count(*) from clinical_session_revision_artifacts")
+            ).scalar_one() == 1
+            assert connection.execute(text("pragma foreign_keys")).scalar_one() == 1
+            assert connection.execute(text("pragma foreign_key_check")).all() == []
     finally:
         engine.dispose()
 
