@@ -93,6 +93,32 @@ def _begin_sqlite_exclusive(connection: Connection) -> None:
             driver_connection.autocommit = previous_autocommit
 
 ###############################################################################
+def _sqlite_foreign_keys_enabled(connection: Connection) -> bool:
+    driver_connection: Any = connection.connection.driver_connection
+    previous_autocommit = getattr(driver_connection, "autocommit", None)
+    if previous_autocommit is not None:
+        driver_connection.autocommit = True
+    try:
+        return bool(driver_connection.execute("PRAGMA foreign_keys").fetchone()[0])
+    finally:
+        if previous_autocommit is not None:
+            driver_connection.autocommit = previous_autocommit
+
+###############################################################################
+def _set_sqlite_foreign_keys(connection: Connection, enabled: bool) -> None:
+    driver_connection: Any = connection.connection.driver_connection
+    previous_autocommit = getattr(driver_connection, "autocommit", None)
+    if previous_autocommit is not None:
+        driver_connection.autocommit = True
+    try:
+        driver_connection.execute(
+            f"PRAGMA foreign_keys={'ON' if enabled else 'OFF'}"
+        )
+    finally:
+        if previous_autocommit is not None:
+            driver_connection.autocommit = previous_autocommit
+
+###############################################################################
 @contextmanager
 def _migration_transaction(engine: Engine) -> Iterator[Connection]:
     exclusive_listener = None
@@ -102,16 +128,43 @@ def _migration_transaction(engine: Engine) -> Iterator[Connection]:
 
     try:
         with engine.connect() as connection:
-            with connection.begin():
-                if engine.dialect.name == "postgresql":
-                    connection.execute(
-                        text("SELECT pg_advisory_xact_lock(:lock_key)"),
-                        {"lock_key": MIGRATION_LOCK_KEY},
-                    )
-                    logger.info("Acquired PostgreSQL Alembic migration lock")
-                elif engine.dialect.name == "sqlite":
-                    logger.info("Acquired SQLite exclusive Alembic migration lock")
-                yield connection
+            sqlite_foreign_keys_were_enabled = False
+            if engine.dialect.name == "sqlite":
+                sqlite_foreign_keys_were_enabled = _sqlite_foreign_keys_enabled(
+                    connection
+                )
+                if sqlite_foreign_keys_were_enabled:
+                    # SQLite cannot drop/recreate a referenced table while FK
+                    # enforcement is active.  Keep the migration atomic, then
+                    # validate all relationships before committing.
+                    _set_sqlite_foreign_keys(connection, False)
+
+            try:
+                with connection.begin():
+                    if engine.dialect.name == "postgresql":
+                        connection.execute(
+                            text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                            {"lock_key": MIGRATION_LOCK_KEY},
+                        )
+                        logger.info("Acquired PostgreSQL Alembic migration lock")
+                    elif engine.dialect.name == "sqlite":
+                        logger.info("Acquired SQLite exclusive Alembic migration lock")
+                    yield connection
+
+                    if engine.dialect.name == "sqlite":
+                        violations = connection.exec_driver_sql(
+                            "PRAGMA foreign_key_check"
+                        ).all()
+                        if violations:
+                            first_violation = violations[0]
+                            raise MigrationError(
+                                "SQLite foreign-key check failed after migration: "
+                                f"{len(violations)} violation(s); "
+                                f"first={tuple(first_violation)}"
+                            )
+            finally:
+                if sqlite_foreign_keys_were_enabled:
+                    _set_sqlite_foreign_keys(connection, True)
     finally:
         if exclusive_listener is not None:
             event.remove(engine, "begin", exclusive_listener)
