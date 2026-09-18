@@ -159,6 +159,13 @@ On a fresh checkout:
 1. Choose **Install dependencies** from the launcher menu (option 2). This prepares the local runtimes, dependencies, database, and frontend output.
 2. Choose **Launch application** (option 1).
 
+The source launcher always keeps the backend terminal visible. If a previous
+launch leaves application processes or a backend terminal running, use:
+
+```powershell
+.\start_on_windows.ps1 -Action KillApplicationProcesses
+```
+
 For later launches, you can run the launcher directly with its launch action:
 
 ```powershell
