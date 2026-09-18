@@ -136,7 +136,7 @@ Download the package you need from the [GitHub Releases page](https://github.com
 
 The portable executable and MSI do not require a separate Python, Node.js, Rust, npm, uv, or source checkout on the target machine. On first launch, the application may take a little longer while it prepares its local runtime. Windows WebView2 is also required; an MSI may need network access to obtain it on a system where it is not already installed.
 
-Windows desktop startup does not use the source-mode development addresses shown below. User settings, sessions, logs, models, source documents, evidence resources, exports, and access-key material are kept in DILIGENT's local application-data area.
+Windows desktop startup does not use the source-mode development addresses shown below. User settings, sessions, source documents, evidence resources, exports, and access-key material are kept in DILIGENT's local application-data area; disposable logs and embedding caches live under its `data/cache` directory.
 
 ## Start the application
 

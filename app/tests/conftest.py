@@ -15,21 +15,16 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from common import paths as common_paths
 from configurations.startup import get_server_settings
-from repositories.database.initializer import initialize_sqlite_database
 from repositories.database import sqlite as sqlite_module
+from repositories.database.initializer import initialize_sqlite_database
 from services.catalogs.runtime import initialize_reference_catalog_provider
 
 ###############################################################################
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_TEST_CACHE_ROOT = Path(__file__).resolve().parent / "cache"
-TEST_CACHE_ROOT = Path(
-    os.getenv("DILIGENT_TEST_CACHE_ROOT", str(DEFAULT_TEST_CACHE_ROOT))
-)
-RUNTIME_CACHE_ROOT = REPO_ROOT / "runtimes" / "cache"
-PYTEST_CACHE_ROOT = TEST_CACHE_ROOT / "pytest"
+CACHE_ROOT = REPO_ROOT / "runtimes" / "cache"
+PYTEST_CACHE_ROOT = CACHE_ROOT / "pytest"
 
 ###############################################################################
 def _configure_test_embedded_database_path() -> None:
@@ -55,7 +50,7 @@ def _configure_playwright_node_runtime() -> None:
     """
     os.environ.setdefault(
         "PLAYWRIGHT_BROWSERS_PATH",
-        str(RUNTIME_CACHE_ROOT / "playwright"),
+        str(CACHE_ROOT / "playwright"),
     )
     if os.getenv("PLAYWRIGHT_NODEJS_PATH"):
         return
@@ -131,7 +126,7 @@ class CoroutineThreadRunner:
                 *self.args,
                 **self.kwargs,
             )
-        except BaseException as exc:
+        except BaseException as exc:  # noqa: BLE001 - preserve worker failure details, including cancellation
             self.box["error"] = exc
 
 ###############################################################################

@@ -6,7 +6,7 @@
     "analytics": false,
     "cache": {
       "enabled": true,
-      "path": "../tests/cache/angular"
+      "path": "../../runtimes/cache/angular"
     }
   },
   "newProjectRoot": "projects",
@@ -77,7 +77,8 @@
           "defaultConfiguration": "development"
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "runnerConfig": "vitest.config.ts"
         }
       }
     }

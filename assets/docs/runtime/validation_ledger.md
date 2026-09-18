@@ -81,7 +81,7 @@ Because the populated runtime cannot start, the audit could not prove a current 
 
 ### B3 — test cache permissions need an explicit environment decision
 
-The first unit invocation failed before collection because the default cache/database location was not writable. The same suite passed after setting `DILIGENT_TEST_CACHE_ROOT` to the task-owned writable QA directory. This is classified as an environment/test-runner attention item, not a product pass.
+The first unit invocation failed before collection because the historical split cache/database location was not writable. The same suite passed after the test runner was moved to the canonical task-owned `runtimes/cache/pytest` hierarchy. This is classified as an environment/test-runner attention item, not a product pass.
 
 ## Validation diary
 

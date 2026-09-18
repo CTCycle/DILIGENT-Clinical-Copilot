@@ -249,7 +249,7 @@ pub fn prepare_runtime(version: &str) -> Result<RuntimePaths, String> {
     }
     let data_root = app_root.join("data");
     fs::create_dir_all(data_root.join("settings")).map_err(|error| error.to_string())?;
-    fs::create_dir_all(data_root.join("resources").join("logs"))
+    fs::create_dir_all(data_root.join("cache").join("logs"))
         .map_err(|error| error.to_string())?;
     Ok(RuntimePaths {
         backend: runtime_root.join("backend").join("DILIGENTBackend.exe"),

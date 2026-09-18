@@ -34,7 +34,7 @@ operation and sanitized upstream detail when available.
 
 Packaged mode requires `DILIGENT_RUNTIME_ROOT` and `DILIGENT_DATA_ROOT` together. Relative or partial desktop roots are rejected; source-mode paths are never used as a fallback.
 
-The Tauri shell sets these desktop-only variables when it starts the frozen backend. Operators should not add them to `settings/.env` or override them manually. Packaged desktop chooses a free localhost port and records it in `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`; the packaged log is `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log`.
+The Tauri shell sets these desktop-only variables when it starts the frozen backend. Operators should not add them to `settings/.env` or override them manually. Packaged desktop chooses a free localhost port and records it in `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`; the packaged log is `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log`.
 
 ## Default Local Ports
 - Backend: `127.0.0.1:7690`
@@ -87,7 +87,7 @@ authentication, and provider-side errors still fail promptly.
 ## Packaged Desktop Runtime
 - The packaged Tauri shell does not read the development UI/API port settings for its backend listener.
 - The immutable runtime is addressed by version and payload digest under `%LOCALAPPDATA%\DILIGENT\runtime`.
-- Mutable settings, database, logs, models, vectors, exports, state, and access-key material live under `%LOCALAPPDATA%\DILIGENT\data`.
+- Mutable settings, database, vectors, exports, state, and access-key material live under `%LOCALAPPDATA%\DILIGENT\data`; disposable logs and embedding caches live under `%LOCALAPPDATA%\DILIGENT\data\cache`.
 
 ## Feature Toggles
 - Cloud-versus-local model usage is runtime-configured through model configuration APIs.
@@ -139,4 +139,12 @@ versioned Fernet material used to decrypt the `access_keys` ciphertext; it must
 not be committed, copied into a database backup, or exposed through logs.
 ## RAG embedding runtime
 
-The multilingual Granite ONNX snapshot is downloaded lazily into `app/resources/models/embeddings/<revision>/` and loaded once per process with `onnxruntime` and `CPUExecutionProvider`. There is no backend or artifact fallback, and no PyTorch requirement. Offline mode requires a complete verified snapshot; changing the model contract requires a full vector-store rebuild. Readiness is available only after the pinned artifact digest validates.
+The multilingual Granite ONNX snapshot is downloaded lazily into the disposable
+source cache at `runtimes/cache/embeddings/<revision>/`, or into
+`%LOCALAPPDATA%\DILIGENT\data\cache\embeddings\<revision>\` for packaged desktop
+execution. Hugging Face metadata and download bookkeeping are also kept under
+the same cache root. It is loaded once per process with `onnxruntime` and
+`CPUExecutionProvider`. There is no backend or artifact fallback, and no
+PyTorch requirement. Offline mode requires a complete verified snapshot;
+changing the model contract requires a full vector-store rebuild. Readiness is
+available only after the pinned artifact digest validates.

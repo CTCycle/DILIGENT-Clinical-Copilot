@@ -12,6 +12,22 @@ concurrency:
   group: desktop-release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  CARGO_TARGET_DIR: ${{ github.workspace }}/runtimes/cache/cargo/target
+  COVERAGE_FILE: ${{ github.workspace }}/runtimes/cache/coverage/.coverage
+  HF_ASSETS_CACHE: ${{ github.workspace }}/runtimes/cache/huggingface/assets
+  HF_HOME: ${{ github.workspace }}/runtimes/cache/huggingface
+  HF_HUB_CACHE: ${{ github.workspace }}/runtimes/cache/huggingface/hub
+  HUGGINGFACE_HUB_CACHE: ${{ github.workspace }}/runtimes/cache/huggingface/hub
+  MYPY_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/mypy
+  NPM_CONFIG_CACHE: ${{ github.workspace }}/runtimes/cache/npm
+  PIP_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/pip
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/runtimes/cache/playwright
+  PYTHONPYCACHEPREFIX: ${{ github.workspace }}/runtimes/cache/python
+  PYTEST_ADDOPTS: "--basetemp=${{ github.workspace }}/runtimes/cache/pytest/basetemp -o cache_dir=${{ github.workspace }}/runtimes/cache/pytest"
+  RUFF_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/ruff
+  UV_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/uv
+
 jobs:
   release-preflight:
     permissions:
@@ -33,15 +49,11 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           version: "0.11.30"
-          enable-cache: true
-          cache-dependency-glob: app/server/uv.lock
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22.13.0"
-          cache: npm
-          cache-dependency-path: app/client/package-lock.json
 
       - name: Verify tagged SHA is synchronized with main
         shell: pwsh
@@ -84,8 +96,7 @@ jobs:
         shell: pwsh
         env:
           EMBEDDED_DATABASE: "true"
-          DILIGENT_SQLITE_PATH: ${{ runner.temp }}\diligent-release-preflight.sqlite3
-          DILIGENT_TEST_CACHE_ROOT: ${{ runner.temp }}\diligent-release-test-cache
+          DILIGENT_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-preflight.sqlite3
         run: |
           $ErrorActionPreference = "Stop"
           $python = Join-Path $env:GITHUB_WORKSPACE "app\server\.venv\Scripts\python.exe"
@@ -121,7 +132,7 @@ jobs:
       - name: Install Playwright browser
         working-directory: app/server
         env:
-          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}\diligent-playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\runtimes\cache\playwright
         run: .\.venv\Scripts\python.exe -m playwright install chromium
 
       - name: Run full release browser E2E suite
@@ -129,22 +140,21 @@ jobs:
         env:
           DATABASE_BACKEND: sqlite
           EMBEDDED_DATABASE: "true"
-          DATABASE_SQLITE_PATH: ${{ runner.temp }}\diligent-release-e2e.sqlite3
-          DILIGENT_SQLITE_PATH: ${{ runner.temp }}\diligent-release-e2e.sqlite3
-          DILIGENT_TEST_CACHE_ROOT: ${{ runner.temp }}\diligent-release-e2e-test-cache
+          DATABASE_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-e2e.sqlite3
+          DILIGENT_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-e2e.sqlite3
           APP_TEST_BACKEND_URL: http://127.0.0.1:7690
           APP_TEST_FRONTEND_URL: http://127.0.0.1:9847
           FASTAPI_HOST: 127.0.0.1
           FASTAPI_PORT: "7690"
           UI_HOST: 127.0.0.1
           UI_PORT: "9847"
-          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}\diligent-playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\runtimes\cache\playwright
         run: |
           $ErrorActionPreference = "Stop"
           $python = Join-Path $env:GITHUB_WORKSPACE "app\server\.venv\Scripts\python.exe"
           $backendDir = Join-Path $env:GITHUB_WORKSPACE "app\server"
           $frontendDir = Join-Path $env:GITHUB_WORKSPACE "app\client"
-          $logDir = Join-Path $env:RUNNER_TEMP "diligent-release-e2e-logs"
+          $logDir = Join-Path $env:GITHUB_WORKSPACE "runtimes/cache/pytest/release-e2e-logs"
           New-Item -ItemType Directory -Path $logDir -Force | Out-Null
           $backend = $null
           $frontend = $null
@@ -264,8 +274,6 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           version: "0.11.30"
-          enable-cache: true
-          cache-dependency-glob: app/server/uv.lock
 
       - name: Install backend test dependencies
         working-directory: app/server
@@ -277,7 +285,6 @@ jobs:
         working-directory: app/server
         env:
           TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/diligent_release_test
-          DILIGENT_TEST_CACHE_ROOT: ${{ runner.temp }}/diligent-release-persistence-test-cache
         run: python -m pytest ../tests/persistence -q
 
   release-live-provider-e2e:
@@ -309,15 +316,11 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           version: '0.11.30'
-          enable-cache: true
-          cache-dependency-glob: app/server/uv.lock
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22.13.0'
-          cache: npm
-          cache-dependency-path: app/client/package-lock.json
 
       - name: Verify provider secret is present
         shell: pwsh
@@ -343,16 +346,15 @@ jobs:
       - name: Install Playwright browser
         working-directory: app/server
         env:
-          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}\diligent-release-live-provider-playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\runtimes\cache\playwright
         run: .\.venv\Scripts\python.exe -m playwright install chromium
 
       - name: Run release live-provider browser E2E
         shell: pwsh
         env:
-          DATABASE_SQLITE_PATH: ${{ runner.temp }}\diligent-release-live-provider.sqlite3
-          DILIGENT_SQLITE_PATH: ${{ runner.temp }}\diligent-release-live-provider.sqlite3
-          DILIGENT_TEST_CACHE_ROOT: ${{ runner.temp }}\diligent-release-live-provider-test-cache
-          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}\diligent-release-live-provider-playwright
+          DATABASE_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-live-provider.sqlite3
+          DILIGENT_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-live-provider.sqlite3
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\runtimes\cache\playwright
         run: .\app\tests\ci\run_browser_e2e.ps1 -Suite LiveProvider
 
       - name: Upload provider E2E diagnostics on failure
@@ -362,7 +364,7 @@ jobs:
           name: release-live-provider-e2e-logs-${{ github.run_id }}
           retention-days: 3
           if-no-files-found: ignore
-          path: ${{ runner.temp }}/diligent-browser-e2e-logs/**
+          path: runtimes/cache/pytest/browser-e2e-logs/**
 
   release-security-preflight:
     permissions:
@@ -382,17 +384,11 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           version: '0.11.30'
-          enable-cache: true
-          cache-dependency-glob: app/server/uv.lock
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22.13.0'
-          cache: npm
-          cache-dependency-path: |
-            app/client/package-lock.json
-            app/desktop/package-lock.json
 
       - name: Export locked Python dependencies
         working-directory: app/server
@@ -438,10 +434,6 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22.13.0"
-          cache: npm
-          cache-dependency-path: |
-            app/client/package-lock.json
-            app/desktop/package-lock.json
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master 2026-08-26

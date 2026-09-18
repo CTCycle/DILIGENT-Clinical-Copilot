@@ -37,7 +37,7 @@ CUA screenshots were emitted and visually inspected inline in the task trace at 
 4. Session 22 after reload, showing the appended sentence in the Clinical Report.
 5. Session 19 Preview after returning from Session 22, showing the original report without the appended sentence.
 
-The final browser console check returned no `error` or `warn` entries. The backend log used for corroboration was [DILIGENT_20260916_182107_879344_17396.log](<G:/Projects/Repositories/Active projects/DILIGENT Clinical Copilot/app/resources/logs/DILIGENT_20260916_182107_879344_17396.log>).
+The final browser console check returned no `error` or `warn` entries. The backend log used for corroboration was [DILIGENT_20260916_182107_879344_17396.log](<G:/Projects/Repositories/Active projects/DILIGENT Clinical Copilot/runtimes/cache/logs/DILIGENT_20260916_182107_879344_17396.log>).
 
 ## Test cases and results
 

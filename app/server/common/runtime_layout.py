@@ -21,6 +21,7 @@ class RuntimeLayout:
     settings_root: Path
     immutable_resources_root: Path
     mutable_resources_root: Path
+    cache_root: Path
     client_dist_root: Path
 
 ###############################################################################
@@ -65,6 +66,7 @@ def _resolve_source_layout() -> RuntimeLayout:
         settings_root=repository_root / "settings",
         immutable_resources_root=resources_root,
         mutable_resources_root=resources_root,
+        cache_root=repository_root / "runtimes" / "cache",
         client_dist_root=application_root / "client" / "dist" / "browser",
     )
 
@@ -81,6 +83,7 @@ def _resolve_packaged_layout() -> RuntimeLayout:
         settings_root=data_root / "settings",
         immutable_resources_root=application_root / "resources",
         mutable_resources_root=data_root / "resources",
+        cache_root=data_root / "cache",
         client_dist_root=application_root / "client" / "dist" / "browser",
     )
 

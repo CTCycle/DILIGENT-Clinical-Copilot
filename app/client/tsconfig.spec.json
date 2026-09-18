@@ -3,7 +3,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "./out-tsc/spec",
+    "outDir": "../../runtimes/cache/angular/out-tsc/spec",
     "rootDir": "./src",
     "types": [
       "node",

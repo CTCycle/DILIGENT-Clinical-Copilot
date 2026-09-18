@@ -20,12 +20,13 @@ The launcher:
 - recreates a stale backend virtual environment when the repository has moved
 - provides grouped `APPLICATION`, `SETUP & VALIDATION`, `SOURCE CONTROL`, `BUILD & DISTRIBUTION`, and `DATA & MAINTENANCE` options, followed by a final sequential `EXIT` option; the desktop-release submenu uses the same aligned numeric rows
 
-Runtime and development tool caches are split between `runtimes/cache/` and
-`app/tests/cache/`. The launcher routes uv, pip, npm, Playwright, Python
-bytecode, and Cargo build caches to `runtimes/cache/`, and routes pytest, Ruff,
-Mypy, Angular, and coverage state to `app/tests/cache/`, while leaving
-functional frontend and desktop release outputs in their required runtime
-locations.
+All source-mode disposable runtime, application, test, and tool state is rooted
+at `runtimes/cache/`. The launcher routes uv, pip, npm, Playwright, Python
+bytecode, Cargo, pytest, Ruff, Mypy, Angular, coverage, logs, embeddings, test
+databases, Hugging Face metadata, and reports below that root. The hierarchy is disposable and may be
+deleted and recreated without affecting settings, databases, source documents,
+vectors, or user exports. Packaged desktop mode uses the equivalent writable
+`%LOCALAPPDATA%\DILIGENT\data\cache` root.
 
 All launcher recursive cleanup uses the local `Remove-LauncherPath` contract:
 targets are normalized, recursively inventoried, filtered for tracked files and
@@ -51,13 +52,13 @@ Database startup behavior is migration-driven:
   and frontend dependencies are ready. Launch performs the check again so
   startup remains safe when installation was skipped.
 
-Use this launcher as the default startup path for local development, Codex sessions, and browser-driven UI work. On a fresh checkout, execute option 2 first to install dependencies, synchronize the database, and build the frontend, then execute option 1 to launch the application. Use option 3, or `.\start_on_windows.ps1 -Action RebuildFrontend`, to rebuild only the frontend after frontend changes or when its production output needs refreshing; this does not synchronize Python dependencies or the database. Option 6 checks `origin/main` with `git ls-remote` and does not download or apply changes. Option 7 updates source only from a non-detached, clean `main` checkout with `git pull --ff-only origin main`; it does not switch branches or modify local changes. Option 12 removes local user data, including the SQLite database and generated/user-created resource files, while preserving tracked application files; it always requires an interactive `[y/N]` confirmation and fails closed when input is redirected. Option 1 also recovers missing or unusable environments and frontend output. Do not start backend and frontend manually first unless the task specifically requires isolating one side or the launcher has already failed and the failure has been diagnosed.
+For a deterministic disposable-state reset, run `\.\start_on_windows.ps1 -Action ClearCache`; it requires the same interactive `[y/N]` confirmation, preserves only `runtimes/cache/.gitkeep`, and reports locked entries without aborting the cleanup.
 
 ## Packaged desktop startup
 
 The Windows portable executable and MSI use the Tauri shell. Open the verified portable EXE directly, or launch the application installed by the MSI; do not run the source launcher for packaged operation. On first launch the shell verifies the embedded runtime archive, extracts it to a versioned hash directory under `%LOCALAPPDATA%\DILIGENT\runtime`, creates persistent data directories under `%LOCALAPPDATA%\DILIGENT\data`, starts the packaged backend on a random localhost port, waits for its atomic ready file and `/api/health`, and then shows the desktop window. The backend is owned by a Windows Job Object and is terminated when the shell exits.
 
-The packaged desktop does not use the development ports `7690` and `9847`. If the window does not appear, inspect `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log`, confirm that `state\desktop-backend-ready.json` exists, and request `/api/health` on the recorded port. A successful launch leaves `runtime\<version>\<payload-sha256>\extraction.complete` in place.
+The packaged desktop does not use the development ports `7690` and `9847`. If the window does not appear, inspect `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log`, confirm that `state\desktop-backend-ready.json` exists, and request `/api/health` on the recorded port. A successful launch leaves `runtime\<version>\<payload-sha256>\extraction.complete` in place.
 
 ## Manual Backend Startup
 From repository root:

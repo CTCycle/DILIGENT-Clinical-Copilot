@@ -8,14 +8,10 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../..')).Path
 $serverDir = Join-Path $repoRoot 'app/server'
 $clientDir = Join-Path $repoRoot 'app/client'
+$cacheRoot = Join-Path $repoRoot 'runtimes/cache'
+$pytestCacheDir = Join-Path $cacheRoot 'pytest'
 $python = Join-Path $serverDir '.venv/Scripts/python.exe'
-$runnerTemp = if ([string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) {
-    [IO.Path]::GetTempPath()
-}
-else {
-    $env:RUNNER_TEMP
-}
-$logDir = Join-Path $runnerTemp 'diligent-browser-e2e-logs'
+$logDir = Join-Path $pytestCacheDir 'browser-e2e-logs'
 $backendOut = Join-Path $logDir 'backend.out.log'
 $backendErr = Join-Path $logDir 'backend.err.log'
 $frontendOut = Join-Path $logDir 'frontend.out.log'
@@ -65,7 +61,21 @@ function Stop-ProcessTree($process) {
     }
 }
 
-New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+New-Item -ItemType Directory -Path @($cacheRoot, $pytestCacheDir, $logDir) -Force | Out-Null
+$env:UV_CACHE_DIR = Join-Path $cacheRoot 'uv'
+$env:PIP_CACHE_DIR = Join-Path $cacheRoot 'pip'
+$env:NPM_CONFIG_CACHE = Join-Path $cacheRoot 'npm'
+$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $cacheRoot 'playwright'
+$env:HF_HOME = Join-Path $cacheRoot 'huggingface'
+$env:HF_HUB_CACHE = Join-Path $env:HF_HOME 'hub'
+$env:HF_ASSETS_CACHE = Join-Path $env:HF_HOME 'assets'
+$env:HUGGINGFACE_HUB_CACHE = $env:HF_HUB_CACHE
+$env:RUFF_CACHE_DIR = Join-Path $cacheRoot 'ruff'
+$env:MYPY_CACHE_DIR = Join-Path $cacheRoot 'mypy'
+$env:COVERAGE_FILE = Join-Path $cacheRoot 'coverage/.coverage'
+$env:PYTHONPYCACHEPREFIX = Join-Path $cacheRoot 'python'
+$env:CARGO_TARGET_DIR = Join-Path $cacheRoot 'cargo/target'
+$env:PYTEST_ADDOPTS = "--basetemp=$pytestCacheDir/basetemp -o cache_dir=$pytestCacheDir"
 $backend = Start-Process -FilePath $python -ArgumentList '-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '7690' -WorkingDirectory $serverDir -RedirectStandardOutput $backendOut -RedirectStandardError $backendErr -WindowStyle Hidden -PassThru
 try {
     if (-not (Wait-HttpReady 'http://127.0.0.1:7690/api/health') -or -not (Wait-HttpReady 'http://127.0.0.1:7690/api/model-config')) {
