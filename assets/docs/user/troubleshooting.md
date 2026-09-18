@@ -1,5 +1,5 @@
 # User Troubleshooting
-Last updated: 2026-09-07
+Last updated: 2026-09-18
 
 ## Windows desktop app does not open
 
@@ -32,6 +32,9 @@ http://127.0.0.1:7690/api/health
 ```
 
 - If unreachable, restart the application and inspect backend console output.
+- If an earlier launch left stale application processes or a backend terminal,
+  run `start_on_windows.ps1 -Action KillApplicationProcesses`, confirm the
+  cleanup, and launch again.
 
 ## Model Call Fails
 Check that:

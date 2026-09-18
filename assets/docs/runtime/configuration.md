@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-09-07
+Last updated: 2026-09-18
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
@@ -47,7 +47,6 @@ The Tauri shell sets these desktop-only variables when it starts the frozen back
 - `UI_PORT=9847`
 - `VITE_API_BASE_URL=/api`
 - `RELOAD=false`
-- `BACKEND_LOGS_VISIBLE=true` (defaults to `true` when absent)
 
 ## Source-mode Resource Location
 
@@ -81,7 +80,7 @@ authentication, and provider-side errors still fail promptly.
 
 ## Local Runtime
 - Local runs serve the frontend from a preview or dev process.
-- `BACKEND_LOGS_VISIBLE=true` opens a dedicated backend terminal; `false` keeps it hidden. The launcher defaults to visible logs when the key is absent.
+- The Windows launcher always opens a dedicated backend terminal so backend output remains visible while the application is running.
 - The frontend preview runs without a visible terminal window.
 
 ## Packaged Desktop Runtime

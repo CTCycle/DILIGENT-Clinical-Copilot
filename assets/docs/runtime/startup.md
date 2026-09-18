@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-09-01
+Last updated: 2026-09-18
 
 ## Recommended Local Startup
 On Windows, use:
@@ -16,6 +16,7 @@ The launcher:
 - rebuilds the frontend when the main-menu install option 2 or frontend rebuild option 3 is executed, or when option 1 detects missing or unusable dependencies or frontend output during recovery
 - validates that the frontend build is available before starting the preview server
 - starts the backend with the synchronized virtual-environment Python and `uvicorn`
+- opens a visible dedicated backend terminal for every source-mode launch
 - starts the frontend preview server
 - recreates a stale backend virtual environment when the repository has moved
 - provides grouped `APPLICATION`, `SETUP & VALIDATION`, `SOURCE CONTROL`, `BUILD & DISTRIBUTION`, and `DATA & MAINTENANCE` options, followed by a final sequential `EXIT` option; the desktop-release submenu uses the same aligned numeric rows
@@ -52,7 +53,11 @@ Database startup behavior is migration-driven:
   and frontend dependencies are ready. Launch performs the check again so
   startup remains safe when installation was skipped.
 
-For a deterministic disposable-state reset, run `\.\start_on_windows.ps1 -Action ClearCache`; it requires the same interactive `[y/N]` confirmation, preserves only `runtimes/cache/.gitkeep`, and reports locked entries without aborting the cleanup.
+For a deterministic disposable-state reset, run `.\start_on_windows.ps1 -Action ClearCache`; it requires the same interactive `[y/N]` confirmation, preserves only `runtimes/cache/.gitkeep`, and reports locked entries without aborting the cleanup.
+
+If a previous launch left backend, frontend, or launcher wrapper processes running,
+run `.\start_on_windows.ps1 -Action KillApplicationProcesses` and confirm the
+cleanup when prompted.
 
 ## Packaged desktop startup
 
