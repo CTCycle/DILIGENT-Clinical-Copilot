@@ -38,7 +38,7 @@ Last updated: 2026-09-13
 - Network deployment, reverse proxies, and unauthenticated multi-user access are unsupported.
 - No supported container deployment path exists.
 - Backend resources and the frontend build must remain aligned within the local repository checkout.
-- Offline deployments must pre-populate and verify `app/resources/models/embeddings/<revision>/`; a complete rebuild is mandatory after this model migration.
+- Offline source deployments must pre-populate and verify `runtimes/cache/embeddings/<revision>/`; packaged deployments use `%LOCALAPPDATA%\DILIGENT\data\cache\embeddings\<revision>\`. A complete rebuild is mandatory after this model migration.
 
 ## Windows desktop distribution
 

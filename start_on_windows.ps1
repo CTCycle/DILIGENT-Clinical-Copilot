@@ -3,7 +3,7 @@
 # ============================================================
 [CmdletBinding()]
 param(
-    [ValidateSet('Launch', 'Install', 'RebuildFrontend', 'InitializeDatabase', 'Test', 'Uninstall', 'Update', 'CheckForUpdates', 'RemoveAllData', 'BuildDesktopRelease', 'RemoveDesktopRelease')]
+    [ValidateSet('Launch', 'Install', 'RebuildFrontend', 'InitializeDatabase', 'Test', 'ClearCache', 'Uninstall', 'Update', 'CheckForUpdates', 'RemoveAllData', 'BuildDesktopRelease', 'RemoveDesktopRelease')]
     [string]$Action,
     [ValidateSet('Standard', 'Development')]
     [string]$InstallationType,
@@ -33,26 +33,22 @@ $script:TestsDir = Join-Path $RepoRoot 'app/tests'
 $script:VenvDir = Join-Path $ServerDir '.venv'
 $script:VenvPython = Join-Path $VenvDir 'Scripts/python.exe'
 $script:RuntimeCacheDir = Join-Path $RuntimesDir 'cache'
-$script:TestCacheDir = Join-Path $TestsDir 'cache'
-$script:LegacyCacheDir = Join-Path $RepoRoot 'assets/cache'
-$script:AngularCacheDir = Join-Path $TestCacheDir 'angular'
-$script:CoverageDir = Join-Path $TestCacheDir 'coverage'
-$script:CargoTargetDir = Join-Path $RepoRoot 'assets/QA/desktop-cargo-target'
-$script:MypyCacheDir = Join-Path $TestCacheDir 'mypy'
+$script:AngularCacheDir = Join-Path $RuntimeCacheDir 'angular'
+$script:CoverageDir = Join-Path $RuntimeCacheDir 'coverage'
+$script:CargoTargetDir = Join-Path $RuntimeCacheDir 'cargo/target'
+$script:EmbeddingCacheDir = Join-Path $RuntimeCacheDir 'embeddings'
+$script:HuggingFaceHomeDir = Join-Path $RuntimeCacheDir 'huggingface'
+$script:HuggingFaceHubCacheDir = Join-Path $HuggingFaceHomeDir 'hub'
+$script:HuggingFaceAssetsCacheDir = Join-Path $HuggingFaceHomeDir 'assets'
+$script:MypyCacheDir = Join-Path $RuntimeCacheDir 'mypy'
 $script:NpmCacheDir = Join-Path $RuntimeCacheDir 'npm'
 $script:PipCacheDir = Join-Path $RuntimeCacheDir 'pip'
 $script:PlaywrightCacheDir = Join-Path $RuntimeCacheDir 'playwright'
-$script:PytestCacheDir = Join-Path $TestCacheDir 'pytest'
+$script:PytestCacheDir = Join-Path $RuntimeCacheDir 'pytest'
+$script:PytestBaseTempDir = Join-Path $PytestCacheDir 'basetemp'
 $script:PythonBytecodeCacheDir = Join-Path $RuntimeCacheDir 'python'
-$script:RuffCacheDir = Join-Path $TestCacheDir 'ruff'
-$script:UvCacheDir = Join-Path $RepoRoot 'assets/QA/desktop-release-uv-cache'
-$script:LegacyUvCachePaths = @(
-    (Join-Path $RepoRoot '.uv-cache'),
-    (Join-Path $RepoRoot 'app/.uv-cache'),
-    (Join-Path $RepoRoot 'app/server/.uv-cache'),
-    (Join-Path $RepoRoot 'app/client/.uv-cache'),
-    (Join-Path $RepoRoot 'app/tests/.uv-cache')
-)
+$script:RuffCacheDir = Join-Path $RuntimeCacheDir 'ruff'
+$script:UvCacheDir = Join-Path $RuntimeCacheDir 'uv'
 $script:EnvFile = Join-Path $RepoRoot 'settings/.env'
 $script:EnvExample = Join-Path $RepoRoot 'settings/.env.example'
 $script:PythonVersion = '3.14.2'
@@ -408,8 +404,8 @@ function Import-DotEnv {
 function Set-LauncherEnvironment {
     New-Item -ItemType Directory -Path @(
         $RuntimeCacheDir,
-        $TestCacheDir,
         $AngularCacheDir,
+        $EmbeddingCacheDir,
         $CoverageDir,
         $CargoTargetDir,
         $MypyCacheDir,
@@ -419,19 +415,27 @@ function Set-LauncherEnvironment {
         $PytestCacheDir,
         $PythonBytecodeCacheDir,
         $RuffCacheDir,
-        $UvCacheDir
+        $UvCacheDir,
+        $HuggingFaceHomeDir,
+        $HuggingFaceHubCacheDir,
+        $HuggingFaceAssetsCacheDir
     ) -Force | Out-Null
     $env:UV_CACHE_DIR = $UvCacheDir
     $env:UV_PROJECT_ENVIRONMENT = $VenvDir
     $env:UV_LINK_MODE = 'copy'
     $env:PIP_CACHE_DIR = $PipCacheDir
     $env:NPM_CONFIG_CACHE = $NpmCacheDir
+    $env:HF_HOME = $HuggingFaceHomeDir
+    $env:HF_HUB_CACHE = $HuggingFaceHubCacheDir
+    $env:HF_ASSETS_CACHE = $HuggingFaceAssetsCacheDir
+    $env:HUGGINGFACE_HUB_CACHE = $HuggingFaceHubCacheDir
     $env:PLAYWRIGHT_BROWSERS_PATH = $PlaywrightCacheDir
     $env:RUFF_CACHE_DIR = $RuffCacheDir
     $env:MYPY_CACHE_DIR = $MypyCacheDir
     $env:COVERAGE_FILE = Join-Path $CoverageDir '.coverage'
     $env:PYTHONPYCACHEPREFIX = $PythonBytecodeCacheDir
     $env:CARGO_TARGET_DIR = $CargoTargetDir
+    $env:PYTEST_ADDOPTS = "--basetemp=`"$PytestBaseTempDir`" -o cache_dir=`"$PytestCacheDir`""
     Remove-Item Env:PYTHONHOME -ErrorAction SilentlyContinue
     Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
     Remove-Item Env:PYTHONNOUSERSITE -ErrorAction SilentlyContinue
@@ -833,7 +837,7 @@ function Confirm-DestructiveAction([string]$Description) {
 
 function Remove-ApplicationLogs {
     if (-not (Confirm-DestructiveAction 'remove application log files')) { return }
-    $logDir = Join-Path $RepoRoot 'app/resources/logs'
+    $logDir = Join-Path $RuntimeCacheDir 'logs'
     if (-not (Test-Path -LiteralPath $logDir)) {
         Write-Info "Log directory does not exist: $logDir"
         return
@@ -956,7 +960,7 @@ function Remove-LauncherPath {
             }
             if ($WhatIf) { continue }
             try {
-                Remove-Item -LiteralPath $entry.FullName -Force -Confirm:$false -ErrorAction Stop
+                Remove-Item -LiteralPath $entry.FullName -Force -Recurse:$entry.PSIsContainer -Confirm:$false -ErrorAction Stop
                 [void]$removed.Add($entry.FullName)
             }
             catch {
@@ -980,9 +984,10 @@ function Remove-LauncherPath {
 function Remove-PathSafely {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [switch]$Recurse
+        [switch]$Recurse,
+        [string[]]$PreserveNames = @('.gitkeep')
     )
-    $result = Remove-LauncherPath -Path $Path -Activity "DILIGENT: remove $([IO.Path]::GetFileName($Path))"
+    $result = Remove-LauncherPath -Path $Path -PreserveNames $PreserveNames -Activity "DILIGENT: remove $([IO.Path]::GetFileName($Path))"
     return $result.Skipped -eq 0 -and $result.EnumerationErrors.Count -eq 0
 }
 
@@ -1006,41 +1011,8 @@ function Remove-CacheContents {
         if ($item.Name -eq '.gitkeep') {
             continue
         }
-        if (-not (Remove-PathSafely -Path $item.FullName -Recurse:$item.PSIsContainer)) {
+        if (-not (Remove-PathSafely -Path $item.FullName -Recurse:$item.PSIsContainer -PreserveNames @())) {
             $skipped++
-        }
-    }
-    return $skipped
-}
-
-function Remove-PythonCaches {
-    $skipped = 0
-    $cacheDirectories = @(Get-ChildItem -LiteralPath $RepoRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
-        Where-Object Name -eq '__pycache__' |
-        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
-    foreach ($directory in $cacheDirectories) {
-        if (-not (Remove-PathSafely -Path $directory.FullName -Recurse)) { $skipped++ }
-    }
-    return $skipped
-}
-
-function Remove-ToolCacheDirectories {
-    $skipped = 0
-    $cacheDirectories = @(Get-ChildItem -LiteralPath $RepoRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.Name -in @('.mypy_cache', '.ruff_cache', '.uv-cache') -or
-            $_.Name -like '.pytest_cache*' -or
-            $_.Name -like '.pytest-cache*' -or
-            $_.Name -like '.ruff-cache*'
-        } |
-        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
-    foreach ($directory in $cacheDirectories) {
-        $skipped += Remove-CacheContents -RootPath $directory.FullName
-        if (Test-Path -LiteralPath $directory.FullName -PathType Container -ErrorAction SilentlyContinue) {
-            $remaining = @(Get-ChildItem -LiteralPath $directory.FullName -Force -ErrorAction SilentlyContinue)
-            if ($remaining.Count -eq 0 -and -not (Remove-PathSafely -Path $directory.FullName -Recurse)) {
-                $skipped++
-            }
         }
     }
     return $skipped
@@ -1048,30 +1020,26 @@ function Remove-ToolCacheDirectories {
 
 function Clear-ApplicationCache {
     if (-not (Confirm-DestructiveAction 'clear development caches and test artifacts')) { return }
-    $skipped = 0
-    foreach ($cacheRoot in @($RuntimeCacheDir, $TestCacheDir, $LegacyCacheDir, $UvCacheDir) + @($LegacyUvCachePaths)) {
-        $skipped += Remove-CacheContents -RootPath $cacheRoot
+    New-Item -ItemType Directory -Path $RuntimeCacheDir -Force | Out-Null
+    $gitkeep = Join-Path $RuntimeCacheDir '.gitkeep'
+    if (-not (Test-Path -LiteralPath $gitkeep -PathType Leaf)) {
+        New-Item -ItemType File -Path $gitkeep -Force | Out-Null
     }
-    $skipped += Remove-PythonCaches
-    $skipped += Remove-ToolCacheDirectories
+    $skipped = 0
+    $skipped += Remove-CacheContents -RootPath $RuntimeCacheDir
     if ($skipped -gt 0) {
         Write-Info "$skipped cache entr$(if ($skipped -eq 1) { 'y' } else { 'ies' }) could not be removed; rerun as administrator to remove locked entries"
     }
-    Write-Ok 'Development caches and test artifacts cleared from runtimes/cache and app/tests/cache'
+    Write-Ok 'Development caches and test artifacts cleared from runtimes/cache'
 }
 
 function Uninstall-Application {
     if (-not (Confirm-DestructiveAction 'remove local runtimes, dependencies, and build outputs')) { return }
     $targets = @(
         $RuntimesDir,
-        $TestCacheDir,
-        $LegacyCacheDir,
-        $UvCacheDir,
-        $LegacyUvCachePaths,
         $VenvDir,
         (Join-Path $RepoRoot '.venv'),
         (Join-Path $ClientDir 'node_modules'),
-        (Join-Path $ClientDir '.angular'),
         (Join-Path $ClientDir 'dist')
     ) | Select-Object -Unique
     $skipped = 0
@@ -1091,8 +1059,6 @@ function Uninstall-Application {
         Complete-LauncherProgress $progressId
     }
 
-    Remove-PythonCaches
-    [void](Remove-ToolCacheDirectories)
     if ($skipped -gt 0) {
         Write-Warning "$skipped uninstall target(s) could not be removed."
     }
@@ -1208,8 +1174,7 @@ function Remove-AllData {
         [pscustomobject]@{ Path = ('{0}-wal' -f $databasePath); Label = 'SQLite write-ahead log' },
         [pscustomobject]@{ Path = ('{0}-shm' -f $databasePath); Label = 'SQLite shared-memory file' },
         [pscustomobject]@{ Path = $keyMaterialPath; Label = 'access-key material' },
-        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'logs'); Label = 'application logs' },
-        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'models/embeddings'); Label = 'generated embedding models' },
+        [pscustomobject]@{ Path = (Join-Path $RuntimeCacheDir 'logs'); Label = 'application logs' },
         [pscustomobject]@{ Path = (Join-Path $resourceRoot 'sources/archives'); Label = 'downloaded source archives' },
         [pscustomobject]@{ Path = (Join-Path $resourceRoot 'sources/documents'); Label = 'user source documents' },
         [pscustomobject]@{ Path = (Join-Path $resourceRoot 'sources/vectors'); Label = 'generated vector index' },
@@ -1928,6 +1893,7 @@ if ($Action) {
             'RebuildFrontend' { Rebuild-Frontend }
             'InitializeDatabase' { Initialize-Database }
             'Test' { Invoke-TestSuite }
+            'ClearCache' { Clear-ApplicationCache }
             'Uninstall' { Uninstall-Application }
             'Update' { Update-Application }
             'CheckForUpdates' { Check-ForUpdates }

@@ -36,7 +36,7 @@ CUA screenshot checkpoints were emitted and visually inspected at these stages:
 10. Timeline generation progress and saved fallback detail page.
 11. Revision progress, cancellation, and persisted partial agent trace.
 
-Browser console checks on the Data Inspection and Clinical Sessions tabs were empty for `error` and `warn` entries at the final check. The backend log is [DILIGENT_20260914_223727_951483_8092.log](<G:/Projects/Repositories/Active projects/DILIGENT Clinical Copilot/app/resources/logs/DILIGENT_20260914_223727_951483_8092.log>).
+Browser console checks on the Data Inspection and Clinical Sessions tabs were empty for `error` and `warn` entries at the final check. The backend log is [DILIGENT_20260914_223727_951483_8092.log](<G:/Projects/Repositories/Active projects/DILIGENT Clinical Copilot/runtimes/cache/logs/DILIGENT_20260914_223727_951483_8092.log>).
 
 ## Repository and startup state
 

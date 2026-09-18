@@ -88,8 +88,8 @@ Mutable user data is kept outside the extracted runtime:
 ```text
 %LOCALAPPDATA%\DILIGENT\data\settings
 %LOCALAPPDATA%\DILIGENT\data\resources\database.db
-%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log
-%LOCALAPPDATA%\DILIGENT\data\resources\models
+%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log
+%LOCALAPPDATA%\DILIGENT\data\cache\embeddings
 %LOCALAPPDATA%\DILIGENT\data\resources\sources
 %LOCALAPPDATA%\DILIGENT\data\state
 ```
@@ -124,7 +124,7 @@ Run on a Windows x64 host with Rust 1.95.0/Cargo, the Windows build toolchain, t
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a clean worktree by default; use `-AllowDirtyTree` only when the dirty state is intentional and recorded. `-OfflineWebView2` is valid only with `-DesktopTarget Msi` or `All` and changes the MSI WebView2 installation mode.
 
-Final desktop artifacts are written directly to `release/`. Intermediate desktop staging remains under `assets/QA/desktop-release-staging/`, with validation output under `assets/QA/release-audit-20260826/`; the release-only native Cargo output is kept under `assets/QA/desktop-cargo-target/x86_64-pc-windows-msvc/release/`.
+Final desktop artifacts are written directly to `release/`. Intermediate desktop staging remains under `assets/QA/desktop-release-staging/`, with validation output under `assets/QA/release-audit-20260826/`; the release-only native Cargo output is kept under `runtimes/cache/cargo/target/x86_64-pc-windows-msvc/release/`.
 
 ### Interactive artifact menu
 

@@ -245,6 +245,7 @@ class EmbeddingRuntime:
                 repo_id=self.config.model_id,
                 revision=self.config.revision,
                 local_dir=str(cached),
+                cache_dir=str(self.cache_directory.parent / "huggingface"),
                 allow_patterns=sorted(REQUIRED_SNAPSHOT_FILES),
                 local_files_only=False,
             )

@@ -5,7 +5,7 @@ Last updated: 2026-09-07
 
 - Confirm that you are opening the current `DILIGENT-v<version>-windows-x64-portable.exe` or launching the application installed by the matching MSI.
 - Check **Event Viewer → Windows Logs → Application** for an error naming the portable executable.
-- Inspect `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log` and `state\desktop-backend-ready.json`.
+- Inspect `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log` and `state\desktop-backend-ready.json`.
 - If the runtime contains stale `.extract-*` directories, close DILIGENT and remove only those temporary directories under `%LOCALAPPDATA%\DILIGENT\runtime\<version>`, then retry.
 - The portable app uses the system WebView2 runtime. An MSI built with the standard bootstrapper may need network access for WebView2; use an offline-WebView2 MSI when network access is unavailable.
 

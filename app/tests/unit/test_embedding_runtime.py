@@ -7,15 +7,15 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-
-from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 import services.retrieval.embedding_runtime as embedding_runtime_module
+from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 from services.retrieval.embedding_runtime import (
+    REQUIRED_SNAPSHOT_FILES,
     EmbeddingRuntime,
     EmbeddingRuntimeUnavailable,
     EmbeddingVectorValidationError,
-    REQUIRED_SNAPSHOT_FILES,
 )
+
 
 ###############################################################################
 class FakeTokenizer:

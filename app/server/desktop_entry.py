@@ -10,6 +10,7 @@ from typing import Any
 
 import uvicorn
 
+from configurations.runtime_bootstrap import ensure_runtime_data_layout
 from services.runtime.desktop import get_desktop_runtime_service
 
 _VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
@@ -55,6 +56,7 @@ def run_desktop_backend(*, ready_file: Path, host: str = "127.0.0.1") -> None:
     if host != "127.0.0.1":
         raise ValueError("Desktop backend host must be 127.0.0.1")
     release_version = _validate_desktop_environment()
+    ensure_runtime_data_layout()
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     try:

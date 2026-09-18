@@ -110,4 +110,4 @@ settings/.env
 
 Confirm backend and frontend host or port values are correct for the local environment. If they change, restart the application so both processes use the same configuration.
 
-For packaged startup failures, inspect `%LOCALAPPDATA%\DILIGENT\data\resources\logs\desktop-backend.log` and `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`. See [runtime troubleshooting](../runtime/troubleshooting.md) for extraction, health, and WebView2 checks.
+For packaged startup failures, inspect `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log` and `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`. See [runtime troubleshooting](../runtime/troubleshooting.md) for extraction, health, and WebView2 checks.
