@@ -3,7 +3,7 @@
 # ============================================================
 [CmdletBinding()]
 param(
-    [ValidateSet('Launch', 'Install', 'RebuildFrontend', 'InitializeDatabase', 'Test', 'ClearCache', 'Uninstall', 'Update', 'CheckForUpdates', 'RemoveAllData', 'BuildDesktopRelease', 'RemoveDesktopRelease')]
+    [ValidateSet('Launch', 'Install', 'RebuildFrontend', 'InitializeDatabase', 'Test', 'ClearCache', 'Uninstall', 'Update', 'CheckForUpdates', 'RemoveAllData', 'KillApplicationProcesses', 'BuildDesktopRelease', 'RemoveDesktopRelease')]
     [string]$Action,
     [ValidateSet('Standard', 'Development')]
     [string]$InstallationType,
@@ -599,20 +599,105 @@ function Convert-ToCommandLineArgument([string]$Value) {
     '"{0}"' -f ($Value -replace '"', '\\"')
 }
 
-function Get-BooleanEnvironmentValue {
+function Get-ApplicationProcessRecords {
     param(
-        [Parameter(Mandatory = $true)][string]$Name,
-        [Parameter(Mandatory = $true)][bool]$Default
+        [Parameter(Mandatory = $true)][int]$BackendPort,
+        [Parameter(Mandatory = $true)][int]$FrontendPort
     )
 
-    $value = [Environment]::GetEnvironmentVariable($Name, 'Process')
-    if ([string]::IsNullOrWhiteSpace($value)) {
-        return $Default
+    $processes = @(Get-CimInstance -ClassName Win32_Process -ErrorAction SilentlyContinue)
+    $processById = @{}
+    foreach ($process in $processes) {
+        $processId = [int]$process.ProcessId
+        if ($processId -gt 0) {
+            $processById[$processId] = $process
+        }
     }
-    if ($value -notmatch '^(?i:true|false)$') {
-        throw "$Name must be true or false when set"
+
+    $repositoryPattern = [regex]::Escape(([IO.Path]::GetFullPath($RepoRoot)).TrimEnd('\'))
+    $backendPortPattern = [regex]::Escape([string]$BackendPort)
+    $frontendPortPattern = [regex]::Escape([string]$FrontendPort)
+    $candidateIds = [Collections.Generic.HashSet[int]]::new()
+
+    foreach ($process in $processes) {
+        $processId = [int]$process.ProcessId
+        if ($processId -eq $PID) { continue }
+        $commandLine = [string]$process.CommandLine
+        $isBackendProcess = $commandLine -match "(?i)$repositoryPattern.*uvicorn.*app:app.*--port[^0-9]*$backendPortPattern\b"
+        $isFrontendProcess = $commandLine -match "(?i)$repositoryPattern.*(?:run\s+preview|vite).*--port[^0-9]*$frontendPortPattern\b"
+        if ($isBackendProcess -or $isFrontendProcess) {
+            [void]$candidateIds.Add($processId)
+        }
     }
-    return $value -ieq 'true'
+
+    foreach ($port in @($BackendPort, $FrontendPort)) {
+        foreach ($processId in @(Get-ListeningProcessIds -Port $port)) {
+            if ($processId -gt 0 -and $processId -ne $PID) {
+                [void]$candidateIds.Add([int]$processId)
+            }
+        }
+    }
+
+    $pending = [Collections.Generic.Queue[int]]::new()
+    foreach ($processId in $candidateIds) {
+        $pending.Enqueue($processId)
+    }
+    $expanded = [Collections.Generic.HashSet[int]]::new()
+    while ($pending.Count -gt 0) {
+        $processId = $pending.Dequeue()
+        if (-not $expanded.Add($processId)) { continue }
+        if (-not $processById.ContainsKey($processId)) { continue }
+
+        $parentId = [int]$processById[$processId].ParentProcessId
+        if ($parentId -le 0 -or $parentId -eq $PID -or -not $processById.ContainsKey($parentId)) {
+            continue
+        }
+        $parent = $processById[$parentId]
+        if ([string]$parent.Name -match '^(?i:cmd|node|npm|python|python3|uvicorn)(?:\.exe)?$') {
+            [void]$candidateIds.Add($parentId)
+            $pending.Enqueue($parentId)
+        }
+    }
+
+    foreach ($processId in $candidateIds) {
+        if ($processById.ContainsKey($processId)) {
+            $processById[$processId]
+        }
+    }
+}
+
+function Stop-ApplicationProcesses {
+    if (-not (Confirm-DestructiveAction 'stop all application processes')) { return }
+
+    Import-DotEnv
+    $fastApiPort = if ($env:FASTAPI_PORT) { [int]$env:FASTAPI_PORT } else { 8000 }
+    $uiPort = if ($env:UI_PORT) { [int]$env:UI_PORT } else { 7861 }
+    $processes = @(Get-ApplicationProcessRecords -BackendPort $fastApiPort -FrontendPort $uiPort)
+    if ($processes.Count -eq 0) {
+        foreach ($port in @($fastApiPort, $uiPort) | Sort-Object -Unique) {
+            Stop-PortListeners -Port $port
+        }
+        Write-Info 'No application processes were found'
+        return
+    }
+
+    $orderedProcesses = @($processes | Sort-Object `
+        @{ Expression = { if ([string]$_.Name -match '^(?i:cmd)(?:\.exe)?$') { 0 } else { 1 } } }, `
+        @{ Expression = { [int]$_.ProcessId } })
+    $stopped = 0
+    foreach ($process in $orderedProcesses) {
+        if ([int]$process.ProcessId -eq $PID) { continue }
+        Write-Info "Stopping $($process.Name) (PID $($process.ProcessId))"
+        & taskkill.exe /PID $process.ProcessId /T /F 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            $stopped++
+        }
+    }
+
+    foreach ($port in @($fastApiPort, $uiPort) | Sort-Object -Unique) {
+        Stop-PortListeners -Port $port
+    }
+    Write-Ok "Stopped $stopped application process tree(s) and released the configured application ports"
 }
 
 function Start-Application {
@@ -638,7 +723,6 @@ function Start-Application {
     $uiHost = if ($env:UI_HOST) { $env:UI_HOST } else { '127.0.0.1' }
     $uiPort = if ($env:UI_PORT) { [int]$env:UI_PORT } else { 7861 }
     $reload = $env:RELOAD -eq 'true'
-    $backendLogsVisible = Get-BooleanEnvironmentValue -Name 'BACKEND_LOGS_VISIBLE' -Default $true
 
     Stop-PortListeners -Port $fastApiPort
     Stop-PortListeners -Port $uiPort
@@ -660,15 +744,8 @@ function Start-Application {
     $backendCommand = '"{0}"' -f ($backendCommandParts -join ' ')
 
     Write-Step 'Launching backend'
-    $backendProcess = $null
-    if ($backendLogsVisible) {
-        $backendProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/d', '/k', $backendCommand) `
-            -WorkingDirectory $RepoRoot -WindowStyle Normal -PassThru
-    }
-    else {
-        $backendProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/d', '/c', $backendCommand) `
-            -WorkingDirectory $RepoRoot -WindowStyle Hidden -PassThru
-    }
+    $backendProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/d', '/k', $backendCommand) `
+        -WorkingDirectory $RepoRoot -WindowStyle Normal -PassThru
 
     $healthUrl = "http://$fastApiHost`:$fastApiPort/api/health"
     Write-Info "Waiting up to 60 seconds for $healthUrl"
@@ -1744,6 +1821,7 @@ function Get-MainMenuEntries {
         [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Clear cache'; Description = 'Remove temporary caches'; Key = 'Cache'; Destructive = $true }
         [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Remove all data'; Description = 'Delete local user data only'; Key = 'AllData'; Destructive = $true }
         [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Uninstall application'; Description = 'Remove generated dependencies'; Key = 'Uninstall'; Destructive = $true }
+        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Kill all application processes'; Description = 'Stop backend, frontend, and wrappers'; Key = 'KillApplicationProcesses'; Destructive = $true }
         [pscustomobject]@{ Section = 'EXIT'; Label = 'Exit'; Description = 'Close launcher'; Key = 'Exit'; Destructive = $false }
     )
 }
@@ -1898,6 +1976,7 @@ if ($Action) {
             'Update' { Update-Application }
             'CheckForUpdates' { Check-ForUpdates }
             'RemoveAllData' { Remove-AllData }
+            'KillApplicationProcesses' { Stop-ApplicationProcesses }
             'BuildDesktopRelease' { Build-DesktopRelease }
             'RemoveDesktopRelease' { Remove-DesktopRelease }
         }
@@ -1941,6 +2020,7 @@ while ($true) {
                 'Cache' { Clear-ApplicationCache }
                 'AllData' { Remove-AllData }
                 'Uninstall' { Uninstall-Application }
+                'KillApplicationProcesses' { Stop-ApplicationProcesses }
             }
         }
     }

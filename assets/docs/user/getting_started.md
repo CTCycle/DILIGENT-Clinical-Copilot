@@ -1,5 +1,5 @@
 # Getting Started
-Last updated: 2026-08-31
+Last updated: 2026-09-18
 
 ## Purpose
 DILIGENT is a local clinical copilot interface for Drug-Induced Liver Injury review workflows. It helps users enter clinical context, configure model providers, inspect local data, run DILI-oriented analysis, and review saved sessions.
@@ -84,7 +84,7 @@ On Windows, open PowerShell in the repository root and run:
 ```
 
 Expected source-mode result:
-- backend process starts
+- backend process starts in a visible dedicated terminal
 - frontend process starts
 - browser opens to the DILIGENT UI
 - application loads without a blank page or connection error
