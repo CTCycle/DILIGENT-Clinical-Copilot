@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-09-17
+Last updated: 2026-09-18
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -88,6 +88,8 @@ branch-status record.
   - Startup failures, port conflicts, backend launch recovery steps, and Angular sandbox-build fallback guidance for `spawn EPERM`.
 - `runtime/qa_regression.md`
   - Repeatable regression slice for model configuration and app-flow validation.
+- `runtime/validation_ledger.md`
+  - Canonical feature-state register and chronological pre-release validation diary.
 
 ### UI
 - `ui/design_tokens.md`
