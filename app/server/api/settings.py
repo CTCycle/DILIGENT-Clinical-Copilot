@@ -14,7 +14,10 @@ from services.settings.runtime import RuntimeSettingsService
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 
+###############################################################################
 class SettingsEndpoint:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -24,23 +27,27 @@ class SettingsEndpoint:
         self.router = router
         self.service = service or RuntimeSettingsService()
 
+    # -------------------------------------------------------------------------
     def get_state(self, response: Response) -> RuntimeSettingsStateResponse:
         response.headers["Cache-Control"] = "no-store, no-cache, max-age=0"
         response.headers["Pragma"] = "no-cache"
         return self.service.get_state()
 
+    # -------------------------------------------------------------------------
     def update_state(
         self,
         payload: RuntimeSettingsUpdateRequest = Body(...),
     ) -> RuntimeSettingsStateResponse:
         return self.service.update_state(payload)
 
+    # -------------------------------------------------------------------------
     def reset_category(
         self,
         category: Annotated[RuntimeSettingsCategory, Path()],
     ) -> RuntimeSettingsStateResponse:
         return self.service.reset_category(category)
 
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "",

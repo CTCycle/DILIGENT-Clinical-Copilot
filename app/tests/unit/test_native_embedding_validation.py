@@ -6,7 +6,6 @@ import services.llm.cloud as cloud_module
 from services.llm.ollama_chat import normalize_embedding_payload
 from services.llm.ollama_client import OllamaClient, OllamaError
 
-
 ###############################################################################
 def test_ollama_embedding_payload_returns_normalized_float_vectors(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
