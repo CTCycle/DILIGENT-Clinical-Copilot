@@ -9,6 +9,7 @@ from openai import APIStatusError
 from pydantic import BaseModel, ConfigDict
 from services.llm.cloud import CloudLLMClient, LLMError, LLMTimeout
 from services.llm.generation_policy import GenerationPurpose
+from services.llm.transports.base import call_with_retries
 from services.llm.transports.openai_chat import OpenAIChatTransport
 
 
@@ -168,6 +169,7 @@ def test_provider_error_mapping_classifies_http_statuses() -> None:
     authentication = CloudLLMClient._map_provider_exception(_http_error(401))
     rate_limited = CloudLLMClient._map_provider_exception(_http_error(429))
     upstream = CloudLLMClient._map_provider_exception(_http_error(503))
+    gateway_timeout = CloudLLMClient._map_provider_exception(_http_error(530))
     missing_endpoint = CloudLLMClient._map_provider_exception(_http_error(404))
 
     assert authentication.error_code == "authentication"
@@ -176,8 +178,27 @@ def test_provider_error_mapping_classifies_http_statuses() -> None:
     assert rate_limited.retryable is True
     assert upstream.error_code == "upstream_error"
     assert upstream.retryable is True
+    assert gateway_timeout.error_code == "upstream_error"
+    assert gateway_timeout.retryable is True
+    assert gateway_timeout.status_code == 530
     assert missing_endpoint.error_code == "configuration"
     assert missing_endpoint.retryable is False
+
+###############################################################################
+def test_revision_retry_policy_retries_http_503_and_530_before_success() -> None:
+    attempts = 0
+
+    async def flaky_provider() -> str:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise _http_error(503)
+        if attempts == 2:
+            raise _http_error(530)
+        return "ok"
+
+    assert asyncio.run(call_with_retries(flaky_provider, max_retries=2)) == "ok"
+    assert attempts == 3
 
 ###############################################################################
 def test_provider_error_mapping_classifies_openai_sdk_status_errors() -> None:
