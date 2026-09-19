@@ -174,6 +174,12 @@ class InspectionRevisionScaffoldMixin:
             scope_key=scope_key,
         )
         model_configuration["job_id"] = job_id
+        if self.session_revision_repository.update_revision_version_configuration(
+            pipeline_run_id=pipeline_run_id,
+            configuration=model_configuration,
+        ) is None:
+            self.jobs.cancel_job(job_id)
+            raise RuntimeError("Failed to persist revision job recovery metadata.")
         self.session_revision_repository.create_or_update_revision_run(
             pipeline_run_id=pipeline_run_id,
             session_id=int(session_id),

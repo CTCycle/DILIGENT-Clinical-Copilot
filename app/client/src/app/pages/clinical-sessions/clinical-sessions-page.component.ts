@@ -81,6 +81,29 @@ import {
   resolveDrugBibliographyLabel,
 } from './clinical-session-preview';
 
+function selectPersistedRevision(
+  versions: SessionVersionSummary[],
+  sessionId: number,
+): SessionVersionSummary | undefined {
+  const sessionVersions = versions
+    .filter((version) => version.session_id === sessionId)
+    .sort((left, right) => right.version_number - left.version_number);
+  const currentSessionVersionId = sessionVersions[0]?.version_id ?? null;
+  const candidates = versions
+    .filter((version) => version.revision_kind === 'llm_assisted_revision')
+    .filter((version) => (
+      version.session_id === sessionId
+      || (currentSessionVersionId !== null
+        && version.source_version_id === currentSessionVersionId)
+    ))
+    .sort((left, right) => (
+      Date.parse(right.updated_at) - Date.parse(left.updated_at)
+      || right.version_number - left.version_number
+      || right.version_id - left.version_id
+    ));
+  return candidates[0];
+}
+
 @Component({
   selector: 'app-clinical-sessions-page',
   standalone: true,
@@ -633,10 +656,10 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       revisionLoadGeneration === this.revisionLoadGeneration
       && this.selected()?.session_id === sessionId;
     try {
-      const versions = (await fetchSessionVersions(sessionId)).items
-        .filter((version) => version.revision_kind === 'llm_assisted_revision')
-        .sort((left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at));
-      const latest = versions[0];
+      const latest = selectPersistedRevision(
+        (await fetchSessionVersions(sessionId)).items,
+        sessionId,
+      );
       if (!latest || !isCurrentLoad()) return;
       this.revisionVersionId.set(latest.version_id);
       this.revisionVersionStatus.set(latest.version_status);
@@ -769,6 +792,18 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       )));
       this.editorText.set(persistedEditorValue);
       this.manualEditReviewerNote.set('');
+      const revisionLoadGeneration = ++this.revisionLoadGeneration;
+      this.revisionPollCancelled = true;
+      this.revisionInstruction.set('');
+      this.revisionStatus.set('');
+      this.revisionRunning.set(false);
+      this.revisionJobId.set(null);
+      this.revisionVersionId.set(null);
+      this.revisionVersionStatus.set(null);
+      this.revisionSteps.set([]);
+      this.revisionArtifacts.set([]);
+      this.revisionDraftReport.set('');
+      void this.loadPersistedRevision(response.session.session_id, revisionLoadGeneration);
       this.saveStatus.set('Manual report edit saved.');
     } catch (error) {
       this.saveStatus.set(formatUnknownError(error, 'Failed to save manual report edit.'));
