@@ -27,6 +27,7 @@ class ToolLoopResult:
 class ToolLoopExecutor:
     """Run the provider-neutral assistant/tool/result continuation protocol."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

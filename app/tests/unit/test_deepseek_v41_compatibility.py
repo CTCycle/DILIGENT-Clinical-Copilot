@@ -28,7 +28,6 @@ from services.llm.transports.gemini import GeminiTransport
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
 
-
 ###############################################################################
 def _deepseek_request(**overrides: Any) -> ChatRequest:
     values: dict[str, Any] = {
@@ -147,11 +146,14 @@ def test_deepseek_non_thinking_request_disables_provider_default_thinking() -> N
 def test_openai_chat_parses_deepseek_tool_calls_usage_and_finish_reason() -> None:
     captured: dict[str, Any] = {}
 
+    ###############################################################################
     class FakeResponse:
 
+        # -------------------------------------------------------------------------
         def raise_for_status(self) -> None:
             return None
 
+        # -------------------------------------------------------------------------
         def json(self) -> dict[str, Any]:
             return {
                 "id": "req-1",
@@ -184,8 +186,10 @@ def test_openai_chat_parses_deepseek_tool_calls_usage_and_finish_reason() -> Non
                 },
             }
 
+    ###############################################################################
     class FakeClient:
 
+        # -------------------------------------------------------------------------
         async def post(self, path: str, *, json: dict[str, Any]) -> FakeResponse:
             captured["path"] = path
             captured["payload"] = json
@@ -225,8 +229,10 @@ def test_openai_chat_cancels_an_inflight_request() -> None:
         started = asyncio.Event()
         request_cancelled = False
 
+        ###############################################################################
         class FakeClient:
 
+            # -------------------------------------------------------------------------
             async def post(self, path: str, *, json: dict[str, Any]) -> Any:
                 del path, json
                 started.set()
@@ -291,10 +297,13 @@ def test_openai_chat_reinjects_reasoning_and_empty_assistant_content_for_tools()
 
 ###############################################################################
 def test_openai_chat_stream_aggregates_reasoning_tool_deltas_and_usage() -> None:
+
+    ###############################################################################
     class FakeResponse:
 
         headers: ClassVar[dict[str, str]] = {"x-request-id": "req-stream"}
 
+        # -------------------------------------------------------------------------
         async def aiter_lines(self) -> AsyncIterator[str]:
             for line in (
                 'data: {"model":"deepseek-v4.1-flash","choices":[{"delta":{"reasoning_content":"think"},"finish_reason":null}]}',
@@ -305,19 +314,25 @@ def test_openai_chat_stream_aggregates_reasoning_tool_deltas_and_usage() -> None
             ):
                 yield line
 
+        # -------------------------------------------------------------------------
         def raise_for_status(self) -> None:
             return None
 
+    ###############################################################################
     class FakeStreamContext:
 
+        # -------------------------------------------------------------------------
         async def __aenter__(self) -> FakeResponse:
             return FakeResponse()
 
+        # -------------------------------------------------------------------------
         async def __aexit__(self, *_: object) -> None:
             return None
 
+    ###############################################################################
     class FakeClient:
 
+        # -------------------------------------------------------------------------
         def stream(self, *args: Any, **kwargs: Any) -> FakeStreamContext:
             return FakeStreamContext()
 

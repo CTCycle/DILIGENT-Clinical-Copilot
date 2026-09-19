@@ -15,6 +15,7 @@ from configurations.startup import get_configuration_manager
 _WRITE_LOCK = RLock()
 
 
+###############################################################################
 def persist_configuration_blocks(
     config_path: str | Path,
     block_updates: dict[str, dict[str, object]],

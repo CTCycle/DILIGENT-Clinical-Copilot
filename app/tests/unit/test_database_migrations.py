@@ -16,7 +16,6 @@ from repositories.database.migrations import (
 )
 from sqlalchemy import create_engine, event, inspect, text
 
-
 ###############################################################################
 def _engine(path: Path):
     engine = create_engine(

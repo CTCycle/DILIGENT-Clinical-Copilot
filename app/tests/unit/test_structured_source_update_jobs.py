@@ -8,7 +8,6 @@ from services.inspection.update_jobs import DataInspectionUpdateJobRunner
 from services.runtime.jobs import JobManager
 from services.runtime.state import JobState
 
-
 ###############################################################################
 def build_runner(jobs: JobManager) -> DataInspectionUpdateJobRunner:
     return DataInspectionUpdateJobRunner(

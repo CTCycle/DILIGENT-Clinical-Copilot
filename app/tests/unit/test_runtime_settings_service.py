@@ -11,6 +11,7 @@ from domain.settings.runtime_ui import RuntimeSettingsUpdateRequest
 from services.settings.runtime import RuntimeSettingsService
 
 
+###############################################################################
 def _write_configuration(path: Path) -> None:
     path.write_text(
         json.dumps(
@@ -54,6 +55,7 @@ def _write_configuration(path: Path) -> None:
     )
 
 
+###############################################################################
 def test_runtime_settings_state_exposes_only_supported_json_settings(
     tmp_path: Path,
 ) -> None:
@@ -79,6 +81,7 @@ def test_runtime_settings_state_exposes_only_supported_json_settings(
     assert "livertox_archive" not in serialized
 
 
+###############################################################################
 def test_runtime_settings_partial_update_persists_and_preserves_static_keys(
     tmp_path: Path,
 ) -> None:
@@ -108,6 +111,7 @@ def test_runtime_settings_partial_update_persists_and_preserves_static_keys(
     assert persisted["session_pipeline"]["text_extraction_batch_size"] == 4
 
 
+###############################################################################
 def test_runtime_settings_reload_observes_persisted_update(tmp_path: Path) -> None:
     config_path = tmp_path / "configurations.json"
     _write_configuration(config_path)
@@ -123,6 +127,7 @@ def test_runtime_settings_reload_observes_persisted_update(tmp_path: Path) -> No
     assert reloaded.values.data.drug_name_max_tokens == 11
 
 
+###############################################################################
 def test_runtime_settings_reset_restores_checked_in_defaults(tmp_path: Path) -> None:
     config_path = tmp_path / "configurations.json"
     _write_configuration(config_path)
@@ -141,6 +146,7 @@ def test_runtime_settings_reset_restores_checked_in_defaults(tmp_path: Path) -> 
     assert persisted["runtime"]["livertox_archive"] == "custom-livertox.tar.gz"
 
 
+###############################################################################
 def test_runtime_settings_reject_unknown_environment_fields() -> None:
     with pytest.raises(ValidationError):
         RuntimeSettingsUpdateRequest.model_validate(
@@ -153,6 +159,7 @@ def test_runtime_settings_reject_unknown_environment_fields() -> None:
         )
 
 
+###############################################################################
 def test_runtime_settings_reject_incompatible_timeout_caps(tmp_path: Path) -> None:
     config_path = tmp_path / "configurations.json"
     _write_configuration(config_path)

@@ -11,6 +11,7 @@ from api.settings import SettingsEndpoint
 from services.settings.runtime import RuntimeSettingsService
 
 
+###############################################################################
 def _client(tmp_path: Path) -> tuple[TestClient, Path]:
     config_path = tmp_path / "configurations.json"
     config_path.write_text(
@@ -52,6 +53,7 @@ def _client(tmp_path: Path) -> tuple[TestClient, Path]:
     return TestClient(application), config_path
 
 
+###############################################################################
 def test_settings_api_get_patch_and_reset(tmp_path: Path) -> None:
     client, config_path = _client(tmp_path)
 
@@ -75,6 +77,7 @@ def test_settings_api_get_patch_and_reset(tmp_path: Path) -> None:
     assert response.json()["values"]["general"]["polling_interval"] == 1.0
 
 
+###############################################################################
 def test_settings_api_rejects_unknown_or_invalid_fields(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
 

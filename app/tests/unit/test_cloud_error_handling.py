@@ -12,7 +12,6 @@ from services.llm.generation_policy import GenerationPurpose
 from services.llm.transports.base import call_with_retries
 from services.llm.transports.openai_chat import OpenAIChatTransport
 
-
 ###############################################################################
 def _http_error(status_code: int) -> httpx.HTTPStatusError:
     request = httpx.Request("GET", "https://opencode.ai/zen/go/v1/models")
@@ -141,13 +140,14 @@ def test_gemini_client_receives_configured_timeout(
 ) -> None:
     captured: dict[str, object] = {}
 
+    ###############################################################################
     class FakeGeminiClient:
 
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------------
         def __init__(self, **kwargs: object) -> None:
             captured.update(kwargs)
 
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------------
         async def close(self) -> None:
             return None
 

@@ -14,7 +14,6 @@ from repositories.schemas.knowledge import (
 from repository_fixtures import build_repository_graph
 from sqlalchemy import event, select
 
-
 ###############################################################################
 def test_rxnav_ingestion_uses_set_based_writes(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     statements: Counter[str] = Counter()
