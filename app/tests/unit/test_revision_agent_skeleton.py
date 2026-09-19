@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 import services.inspection.revision_agent as revision_agent_module
-from common.prompts.revision_agent import editor_prompt
+from common.prompts.revision_agent import editor_prompt, planner_prompt
 from domain.inspection import (
     RevisionAgentPlan,
     RevisionAgentQaResult,
@@ -20,14 +20,17 @@ from pydantic import ValidationError
 from repositories.schemas.base import Base
 from repository_fixtures import build_repository_graph
 from services.inspection.revision_agent import (
+    REVISION_PROVIDER_MAX_RETRIES,
     RevisionAgentRunner,
     RevisionAgentRuntime,
     _requested_append_sentence,
     build_revision_agent_user_prompt,
+    revision_error_payload,
 )
 from services.inspection.revision_context import build_revision_context
 from services.inspection.revision_scaffold import SessionRevisionConflictError
 from services.inspection.service import DataInspectionService
+from services.llm.cloud import LLMError
 from services.llm.generation_policy import GenerationPurpose
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
@@ -264,6 +267,140 @@ def test_revision_editor_prompt_requires_exact_source_patches() -> None:
     assert "return an empty `patches` list" in prompt
 
 ###############################################################################
+def test_revision_prompts_serialize_context_as_strict_json() -> None:
+    prompt = planner_prompt(
+        {"enabled": True, "nested": {"items": [1, "two"]}},
+        ["read_session_context"],
+    )
+
+    assert '"enabled":true' in prompt
+    assert "'enabled'" not in prompt
+    assert "True" not in prompt
+
+###############################################################################
+def test_revision_plan_accepts_25_evident_issues_but_keeps_eight_task_bound() -> None:
+    plan = RevisionAgentPlan.model_validate(
+        {
+            "instruction_profile": "Preserve all distinct evidence issues.",
+            "evident_issues": [f"issue-{index}" for index in range(25)],
+            "tasks": [],
+            "expected_final_output_type": "revised_report",
+        }
+    )
+
+    assert len(plan.evident_issues) == 25
+    with pytest.raises(ValidationError):
+        RevisionAgentPlan.model_validate(
+            {
+                "instruction_profile": "Too many tasks.",
+                "evident_issues": [],
+                "tasks": [
+                    {
+                        "task_id": f"task-{index}",
+                        "priority": "low",
+                        "objective": "Review.",
+                        "stop_criteria": "Reviewed.",
+                    }
+                    for index in range(9)
+                ],
+                "expected_final_output_type": "revised_report",
+            }
+        )
+
+###############################################################################
+def test_revision_error_payload_persists_sanitized_provider_status() -> None:
+    error = LLMError(
+        "Cloud provider returned HTTP 530",
+        error_code="upstream_error",
+        retryable=True,
+        provider="opencode_go",
+        model="deepseek-v4-flash",
+        operation="structured_output",
+        status_code=530,
+        request_id="req-revision-530",
+        provider_detail="api_key=secret-value",
+    )
+
+    payload = revision_error_payload(error)
+
+    assert payload["error_code"] == "upstream_error"
+    assert payload["retryable"] is True
+    assert payload["status_code"] == 530
+    assert payload["provider"] == "opencode_go"
+    assert payload["model"] == "deepseek-v4-flash"
+    assert payload["request_id"] == "req-revision-530"
+    assert "secret-value" not in str(payload)
+    assert "provider_detail" not in payload
+
+###############################################################################
+def test_revision_context_exposes_exact_section_offsets_and_truncation_state() -> None:
+    report = "# Summary\nSupported.\n\n## Global Conclusion\nReview required.\n\n# Follow-up\nPending."
+    context = build_revision_context(
+        session={"session_id": 10, "report": report},
+        manual_edits=[],
+        lineage=[],
+        selected_text=None,
+        instruction=None,
+        input_budget=100000,
+    )
+
+    canonical = context["review_target"]["official_report"]
+    conclusion = next(
+        section
+        for section in canonical["sections"]
+        if section["heading"] == "Global Conclusion"
+    )
+    assert canonical["editability"] == {
+        "available": True,
+        "editable": True,
+        "reason": "available",
+        "source_length": len(report),
+    }
+    assert report[conclusion["start"] : conclusion["end"]] == conclusion["text"]
+    assert report[conclusion["start"] : conclusion["end"]].startswith(
+        "## Global Conclusion"
+    )
+
+    truncated_report = "x" * 20001
+    truncated_context = build_revision_context(
+        session={"session_id": 11, "report": truncated_report},
+        manual_edits=[],
+        lineage=[],
+        selected_text=None,
+        instruction=None,
+        input_budget=100000,
+    )
+    truncated = truncated_context["review_target"]["official_report"]
+    assert truncated["editability"]["reason"] == "truncated"
+    assert truncated["editability"]["editable"] is False
+    assert truncated["source_length"] == len(truncated_report)
+
+###############################################################################
+def test_revision_runner_does_not_auto_append_when_canonical_context_is_truncated() -> None:
+    request = SessionRevisionRequest(
+        revision_instruction="Append exactly this sentence to the revised report: Human review is required."
+    )
+    draft = RevisionDraftResult(
+        revised_report_text="Canonical report.",
+        patches=[],
+    )
+
+    normalized, applied = RevisionAgentRunner._normalize_draft(
+        source_report="Canonical report.",
+        draft=draft,
+        request=request,
+        canonical_report_editability={
+            "available": True,
+            "editable": False,
+            "reason": "truncated",
+        },
+    )
+
+    assert applied == "Canonical report."
+    assert normalized.patches == []
+    assert any("not fully available" in issue for issue in normalized.unresolved_issues)
+
+###############################################################################
 def test_requested_append_sentence_is_extracted_from_explicit_instruction() -> None:
     instruction = (
         "Append exactly this sentence to the revised report: "
@@ -333,6 +470,7 @@ def test_revision_issue_scan_allows_bounded_provider_repair_retries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, object] = {}
+    provider_factory: dict[str, object] = {}
 
     ###############################################################################
     class FakeProvider:
@@ -345,7 +483,7 @@ def test_revision_issue_scan_allows_bounded_provider_repair_retries(
     monkeypatch.setattr(
         revision_agent_module,
         "select_llm_provider",
-        lambda **_: FakeProvider(),
+        lambda **kwargs: (provider_factory.update(kwargs) or FakeProvider()),
     )
     runner = object.__new__(RevisionAgentRunner)
     runner.structured_call = None
@@ -361,6 +499,8 @@ def test_revision_issue_scan_allows_bounded_provider_repair_retries(
     assert result.summary == "No issues detected."
     assert captured["max_repair_attempts"] == 3
     assert captured["purpose"] is GenerationPurpose.REVISION_SCAN
+    assert REVISION_PROVIDER_MAX_RETRIES == 2
+    assert provider_factory["max_retries"] == 2
 
 ###############################################################################
 def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> None:
@@ -548,6 +688,107 @@ def test_revision_persists_deterministic_patch_when_model_text_differs(
     assert revised_session is not None
     assert revised_session["report"] == draft["payload"]["revised_report_text"]
     assert revised_session["sections"]["drugs"] == "Amoxicillin started 2026-01-01."
+
+###############################################################################
+def test_accepted_revision_reload_and_subsequent_revision_preserve_lineage(
+    tmp_path: Path,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    original_version = serializer.session_revision_repository.get_version_record_for_session(
+        session_id
+    )
+    assert original_version is not None
+
+    first_source = "Possible DILI from amoxicillin."
+    first_replacement = "Clinician review required: Possible DILI from amoxicillin."
+    second_replacement = "Clinician review required before reuse: Possible DILI from amoxicillin."
+
+    def patch_call(source: str, replacement: str) -> Any:
+        def structured_call(**kwargs: Any) -> dict[str, Any]:
+            if kwargs["schema"].__name__ != "RevisionDraftResult":
+                return fake_issue_scan_call(**kwargs)
+            return {
+                "revised_report_text": "",
+                "patches": [
+                    {
+                        "start": 0,
+                        "end": len(source),
+                        "replacement": replacement,
+                        "expected_text": source,
+                        "evidence_references": ["dili_evidence_bundle"],
+                    }
+                ],
+                "changed_sections": ["final_report"],
+                "unchanged_sections": [],
+                "unresolved_issues": [],
+                "human_review_requirements": ["Clinical review required."],
+                "entity_change_proposals": [],
+            }
+
+        return structured_call
+
+    first_service = build_service(serializer, JobManager())
+    first_service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=patch_call(first_source, first_replacement),
+    )
+    first_started = first_service.start_revision_job(session_id, SessionRevisionRequest())
+    for _ in range(50):
+        first_status = first_service.get_revision_job_status(first_started["job_id"])
+        if first_status and first_status["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("First accepted revision did not complete")
+
+    first_result = first_status["result"]
+    assert first_result["revision_status"] == "llm_qa_passed"
+    accepted_session_id = int(first_result["revised_session_id"])
+    accepted_version = serializer.session_revision_repository.get_version_record_for_session(
+        accepted_session_id
+    )
+    assert accepted_version is not None
+    assert accepted_version["session_id"] == accepted_session_id
+    first_run = first_service.get_revision_run(first_result["pipeline_run_id"])
+    assert first_run is not None
+    assert first_run["source_version_id"] == original_version["version_id"]
+
+    reloaded_service = build_service(serializer, JobManager())
+    reloaded_session = reloaded_service.get_session_detail(accepted_session_id)
+    assert reloaded_session is not None
+    assert reloaded_session["report"] == first_replacement
+    reloaded_service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=patch_call(first_replacement, second_replacement),
+    )
+    second_started = reloaded_service.start_revision_job(
+        accepted_session_id,
+        SessionRevisionRequest(
+            revision_instruction="Clarify the report conclusion before reuse."
+        ),
+    )
+    for _ in range(50):
+        second_status = reloaded_service.get_revision_job_status(second_started["job_id"])
+        if second_status and second_status["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Subsequent accepted revision did not complete")
+
+    second_result = second_status["result"]
+    assert second_result["revision_status"] == "llm_qa_passed"
+    second_run = reloaded_service.get_revision_run(second_result["pipeline_run_id"])
+    assert second_run is not None
+    assert second_run["source_version_id"] == accepted_version["version_id"]
+    second_session = reloaded_service.get_session_detail(
+        int(second_result["revised_session_id"])
+    )
+    assert second_session is not None
+    assert second_session["report"] == second_replacement
+    original_session = reloaded_service.get_session_detail(session_id)
+    assert original_session is not None
+    assert original_session["report"] == first_source
 
 ###############################################################################
 def test_revision_safety_gate_keeps_rechallenge_draft_out_of_sessions(
@@ -790,6 +1031,57 @@ def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
     assert run["error"] == {
         "message": "Revision processing failed. Retry the revision if needed."
     }
+
+###############################################################################
+def test_revision_provider_failure_persists_sanitized_retry_metadata(
+    tmp_path: Path,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+
+    def failing_provider_call(**_: Any) -> dict[str, Any]:
+        raise LLMError(
+            "Cloud provider returned HTTP 503",
+            error_code="upstream_error",
+            retryable=True,
+            provider="opencode_go",
+            model="deepseek-v4-flash",
+            operation="structured_output",
+            status_code=503,
+            request_id="req-revision-503",
+            provider_detail="authorization=Bearer secret-value",
+        )
+
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=failing_provider_call,
+    )
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    for _ in range(50):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] == "failed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Provider failure job did not fail")
+
+    run = service.get_revision_run(started["result"]["pipeline_run_id"])
+    assert run is not None
+    assert run["error"]["error_code"] == "upstream_error"
+    assert run["error"]["retryable"] is True
+    assert run["error"]["status_code"] == 503
+    assert run["error"]["provider"] == "opencode_go"
+    assert run["error"]["model"] == "deepseek-v4-flash"
+    assert "secret-value" not in str(run["error"])
+    assert "provider_detail" not in run["error"]
+    steps = service.list_revision_steps(started["result"]["pipeline_run_id"])
+    planner_step = next(
+        step for step in steps if step["step_name"] == "revision_agent_planner"
+    )
+    assert planner_step["error"]["status_code"] == 503
+    assert planner_step["error"]["retryable"] is True
 
 ###############################################################################
 def test_cancelled_revision_finalizes_version_and_steps(tmp_path: Path) -> None:

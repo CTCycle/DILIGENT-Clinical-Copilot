@@ -793,7 +793,7 @@ class RevisionAgentTask(BaseModel):
 class RevisionAgentPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
     instruction_profile: str = Field(max_length=4000)
-    evident_issues: list[str] = Field(default_factory=list, max_length=24)
+    evident_issues: list[str] = Field(default_factory=list, max_length=32)
     tasks: list[RevisionAgentTask] = Field(default_factory=list, max_length=8)
     expected_final_output_type: Literal["revised_report", "review_only"] = (
         "revised_report"
