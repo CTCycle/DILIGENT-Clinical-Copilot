@@ -499,6 +499,31 @@ class SessionRevisionRepository:
         return None
 
     # -------------------------------------------------------------------------
+    def update_revision_version_configuration(
+        self,
+        *,
+        pipeline_run_id: str,
+        configuration: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        with self.session_factory() as db_session:
+            row = db_session.execute(
+                select(ClinicalSessionVersion).where(
+                    ClinicalSessionVersion.pipeline_run_id == str(pipeline_run_id)
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            existing_configuration = (
+                parse_session_result_payload(row.model_configuration_json) or {}
+            )
+            row.model_configuration_json = serialize_json_payload(
+                {**existing_configuration, **configuration}
+            )
+            db_session.commit()
+            db_session.refresh(row)
+            return serialize_version_row(row)
+
+    # -------------------------------------------------------------------------
     def list_revision_runs_by_status(self, status: str) -> list[dict[str, Any]]:
         with self.session_factory() as db_session:
             rows = (

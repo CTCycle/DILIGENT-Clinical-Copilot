@@ -67,6 +67,7 @@ function sessionItem(sessionId: number): InspectionSessionItem {
 function revisionVersion(
   sessionId: number,
   versionStatus: SessionVersionSummary['version_status'],
+  overrides: Partial<SessionVersionSummary> = {},
 ): SessionVersionSummary {
   return {
     version_id: 100 + sessionId,
@@ -84,6 +85,7 @@ function revisionVersion(
     created_at: '2026-09-17T08:00:00Z',
     updated_at: '2026-09-17T08:01:00Z',
     completed_at: '2026-09-17T08:01:00Z',
+    ...overrides,
   };
 }
 
@@ -191,7 +193,19 @@ describe('ClinicalSessionsPageComponent request generations', () => {
     fetchSpy.mockImplementation(async (input) => {
       const url = String(input);
       if (url.endsWith('/sessions/12/versions')) {
-        return jsonResponse({ items: [revisionVersion(12, 'cancelled')] });
+        return jsonResponse({ items: [
+          revisionVersion(12, 'cancelled', {
+            version_id: 1,
+            revision_version_id: 1,
+            session_id: 12,
+            source_version_id: null,
+            version_number: 1,
+            version_status: 'current',
+            revision_kind: 'manual_edit',
+            llm_qa_status: 'not_run',
+          }),
+          revisionVersion(12, 'cancelled'),
+        ] });
       }
       if (url.endsWith('/sessions/12/versions/112/artifacts')) {
         return jsonResponse({ items: [] });
@@ -207,5 +221,69 @@ describe('ClinicalSessionsPageComponent request generations', () => {
     expect(component.revisionReviewAvailable()).toBe(false);
     expect(component.revisionRunning()).toBe(false);
     expect(fetchSpy.mock.calls.some(([input]) => String(input).includes('/revision/jobs/'))).toBe(false);
+  });
+
+  it('restores the selected session revision instead of an unrelated newer root draft', async () => {
+    component.selected.set(sessionDetail(22));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/sessions/22/versions')) {
+        return jsonResponse({ items: [
+          revisionVersion(22, 'llm_qa_passed', {
+            version_id: 139,
+            revision_version_id: 139,
+            version_number: 6,
+            updated_at: '2026-09-16T16:49:58Z',
+          }),
+          revisionVersion(19, 'requires_human_review', {
+            version_id: 146,
+            revision_version_id: 146,
+            session_id: null,
+            source_version_id: 26,
+            root_session_id: 19,
+            version_number: 10,
+            updated_at: '2026-09-19T15:45:18Z',
+          }),
+        ] });
+      }
+      if (url.endsWith('/sessions/22/versions/139/artifacts')) {
+        return jsonResponse({ items: [] });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    await (component as unknown as {
+      loadPersistedRevision: (sessionId: number, generation: number) => Promise<void>;
+    }).loadPersistedRevision(22, 0);
+
+    expect(component.revisionVersionId()).toBe(139);
+    expect(component.revisionVersionStatus()).toBe('llm_qa_passed');
+    expect(fetchSpy.mock.calls.some(([input]) => String(input).endsWith('/versions/146/artifacts'))).toBe(false);
+  });
+
+  it('clears a stale revision draft after saving a manual report edit', async () => {
+    component.selected.set(sessionDetail(19));
+    component.editorText.set('Edited report');
+    component.revisionVersionId.set(146);
+    component.revisionVersionStatus.set('requires_human_review');
+    component.revisionDraftReport.set('Stale draft');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/sessions/19/report')) {
+        return jsonResponse({ session: sessionDetail(19), audit: {} });
+      }
+      if (url.endsWith('/sessions/19/versions')) {
+        return jsonResponse({ items: [] });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    await component.saveManualReportEdit();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(component.revisionVersionId()).toBeNull();
+    expect(component.revisionVersionStatus()).toBeNull();
+    expect(component.revisionDraftReport()).toBe('');
+    expect(fetchSpy.mock.calls.some(([input]) => String(input).endsWith('/sessions/19/versions'))).toBe(true);
   });
 });
