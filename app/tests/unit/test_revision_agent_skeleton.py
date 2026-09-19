@@ -742,6 +742,31 @@ class FailingRevisionRunner:
     def run_agentic(self, **_kwargs: Any) -> dict[str, Any]:
         raise RuntimeError("Synthetic revision failure")
 
+
+def test_running_revision_persists_job_recovery_metadata(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = SlowRevisionRunner()
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    version_id = int(started["result"]["revision_version_id"])
+    version_detail = serializer.session_revision_repository.get_session_version_detail(
+        session_id,
+        version_id=version_id,
+    )
+    assert version_detail is not None
+    configuration = version_detail["version"]["model_configuration"]
+    assert configuration["job_id"] == started["job_id"]
+    assert configuration["pipeline_run_id"] == started["result"]["pipeline_run_id"]
+
+    for _ in range(20):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] != "running":
+            break
+        time.sleep(0.05)
+
+
 ###############################################################################
 def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
