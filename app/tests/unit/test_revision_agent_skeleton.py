@@ -35,7 +35,6 @@ from services.llm.generation_policy import GenerationPurpose
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
 
-
 ###############################################################################
 def build_file_serializer(tmp_path: Path) -> Any:
     engine = create_engine(
@@ -984,6 +983,7 @@ class FailingRevisionRunner:
         raise RuntimeError("Synthetic revision failure")
 
 
+###############################################################################
 def test_running_revision_persists_job_recovery_metadata(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
@@ -1006,7 +1006,6 @@ def test_running_revision_persists_job_recovery_metadata(tmp_path: Path) -> None
         if status and status["status"] != "running":
             break
         time.sleep(0.05)
-
 
 ###############################################################################
 def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:

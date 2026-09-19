@@ -16,7 +16,6 @@ from services.retrieval.embedding_runtime import (
     EmbeddingVectorValidationError,
 )
 
-
 ###############################################################################
 class FakeTokenizer:
 

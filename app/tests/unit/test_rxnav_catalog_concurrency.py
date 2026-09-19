@@ -9,7 +9,6 @@ import httpx
 import pytest
 from services.updater.rxnav_builder import RxNavDrugCatalogBuilder
 
-
 ###############################################################################
 class RxClientStub:
 

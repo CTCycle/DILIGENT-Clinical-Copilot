@@ -7,7 +7,6 @@ from domain.documents import Document
 from repositories.serialization.document_chunker import DocumentChunker
 from repositories.serialization.document_serializer import DocumentSerializer
 
-
 ###############################################################################
 def test_textual_document_metadata_uses_heading_title_fallback(tmp_path: Path) -> None:
     file_path = tmp_path / "study.txt"

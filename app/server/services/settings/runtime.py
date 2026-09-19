@@ -22,10 +22,14 @@ from domain.settings.runtime_ui import (
 )
 
 
+###############################################################################
 class RuntimeSettingsService:
+
+    # -------------------------------------------------------------------------
     def __init__(self, config_path: str | Path | None = None) -> None:
         self.config_path = Path(config_path or CONFIGURATIONS_FILE)
 
+    # -------------------------------------------------------------------------
     def get_state(self) -> RuntimeSettingsStateResponse:
         settings = self._load_server_settings()
         return RuntimeSettingsStateResponse(
@@ -34,6 +38,7 @@ class RuntimeSettingsService:
             updated_at=self._updated_at(),
         )
 
+    # -------------------------------------------------------------------------
     def update_state(
         self,
         payload: RuntimeSettingsUpdateRequest,
@@ -52,6 +57,7 @@ class RuntimeSettingsService:
         self._persist_categories(candidate, set(updates))
         return self.get_state()
 
+    # -------------------------------------------------------------------------
     def reset_category(
         self,
         category: RuntimeSettingsCategory,
@@ -64,6 +70,7 @@ class RuntimeSettingsService:
         self._persist_categories(candidate, {category})
         return self.get_state()
 
+    # -------------------------------------------------------------------------
     def _load_server_settings(self) -> ServerSettings:
         try:
             if self.config_path.resolve() == Path(CONFIGURATIONS_FILE).resolve():
@@ -75,6 +82,7 @@ class RuntimeSettingsService:
                 retryable=True,
             ) from exc
 
+    # -------------------------------------------------------------------------
     def _persist_categories(
         self,
         values: RuntimeSettingsValues,
@@ -102,6 +110,7 @@ class RuntimeSettingsService:
                 retryable=True,
             ) from exc
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _values_from_server_settings(settings: ServerSettings) -> RuntimeSettingsValues:
         return RuntimeSettingsValues(
@@ -129,6 +138,7 @@ class RuntimeSettingsService:
             ),
         )
 
+    # -------------------------------------------------------------------------
     def _updated_at(self) -> datetime | None:
         try:
             timestamp = self.config_path.stat().st_mtime

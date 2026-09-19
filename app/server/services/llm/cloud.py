@@ -653,6 +653,7 @@ class CloudLLMClient:
             cancel_check=cancel_check,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def resolve_gemini_model_resource(model: str | None) -> str:
         model_name = (model or "").strip()

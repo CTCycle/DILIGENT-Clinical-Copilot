@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from common.embedding.manifest import build_embedding_index_manifest
 
-
 ###############################################################################
 def _manifest(*, chunk_size: int | None = None, chunk_overlap: int | None = None):
     return build_embedding_index_manifest(
