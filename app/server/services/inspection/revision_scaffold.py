@@ -5,7 +5,9 @@ from typing import Any
 
 from domain.inspection import SessionRevisionRequest
 from services.inspection.revision_agent import (
+    REVISION_PROVIDER_MAX_RETRIES,
     RevisionAgentCancelled,
+    revision_error_payload,
     resolve_revision_agent_runtime,
 )
 
@@ -53,12 +55,15 @@ class InspectionRevisionScaffoldMixin:
                 pipeline_run_id=pipeline_run_id
             )
             raise
-        except Exception:
+        except Exception as exc:
             self.session_revision_repository.fail_revision_run(
                 pipeline_run_id=pipeline_run_id,
-                error={
-                    "message": "Revision processing failed. Retry the revision if needed."
-                },
+                error=revision_error_payload(
+                    exc,
+                    fallback_message=(
+                        "Revision processing failed. Retry the revision if needed."
+                    ),
+                ),
             )
             raise
         if self.jobs.should_stop(job_id):
@@ -129,6 +134,7 @@ class InspectionRevisionScaffoldMixin:
             "model_role": "revision",
             "model_provider": runtime.provider,
             "model_name": runtime.model,
+            "provider_max_retries": REVISION_PROVIDER_MAX_RETRIES,
             "metadata": dict(revision_request.metadata or {}),
         }
         shell = self.session_revision_repository.create_revision_version_shell(

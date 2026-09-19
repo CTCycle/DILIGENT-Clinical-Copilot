@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Any
 
 from services.llm.context_budget import ContextSegment, build_context_plan
 
 UNKNOWN_CAPACITY_INPUT_BUDGET = 8192
 REVISION_REPORT_CONTEXT_LIMIT = 20000
+_REPORT_HEADING_RE = re.compile(
+    r"(?m)^(?P<marker>#{1,6})[ \t]+(?P<title>[^\r\n]+?)[ \t]*$"
+)
 
 ###############################################################################
 def _bounded(value: Any, limit: int) -> dict[str, Any]:
@@ -16,6 +20,75 @@ def _bounded(value: Any, limit: int) -> dict[str, Any]:
         "text": text[:limit],
         "truncated": len(text) > limit,
         "sha256": hashlib.sha256(text.encode()).hexdigest(),
+    }
+
+###############################################################################
+def _report_section_metadata(report_text: str) -> list[dict[str, Any]]:
+    """Return exact, zero-based edit targets for the supplied report text."""
+
+    if not report_text:
+        return []
+    headings = list(_REPORT_HEADING_RE.finditer(report_text))
+    if not headings:
+        section_text = report_text
+        return [
+            {
+                "heading": "report",
+                "level": 0,
+                "start": 0,
+                "end": len(report_text),
+                "text": section_text,
+                "sha256": hashlib.sha256(section_text.encode()).hexdigest(),
+            }
+        ]
+
+    sections: list[dict[str, Any]] = []
+    for index, heading in enumerate(headings):
+        level = len(heading.group("marker"))
+        end = len(report_text)
+        for following in headings[index + 1 :]:
+            if len(following.group("marker")) <= level:
+                end = following.start()
+                break
+        start = heading.start()
+        section_text = report_text[start:end]
+        sections.append(
+            {
+                "heading": heading.group("title").strip(),
+                "level": level,
+                "start": start,
+                "end": end,
+                "text": section_text,
+                "sha256": hashlib.sha256(section_text.encode()).hexdigest(),
+            }
+        )
+    return sections
+
+###############################################################################
+def _report_editability(
+    report: dict[str, Any],
+    *,
+    omitted: bool = False,
+) -> dict[str, Any]:
+    if omitted:
+        reason = "omitted_from_context"
+        available = False
+    elif not str(report.get("text") or ""):
+        reason = "missing"
+        available = False
+    elif report.get("truncated"):
+        reason = "truncated"
+        available = True
+    else:
+        reason = "available"
+        available = True
+    return {
+        "available": available,
+        "editable": available and reason == "available",
+        "reason": reason,
+        "source_length": int(
+            report.get("source_length") or len(str(report.get("text") or ""))
+        ),
     }
 
 ###############################################################################
@@ -56,10 +129,16 @@ def build_revision_context(
         key: _bounded(value, 8000)
         for key, value in (session.get("sections") or {}).items()
     }
+    official_report_source = str(
+        session.get("official_report_text") or session.get("report") or ""
+    )
     official_report = _bounded(
-        session.get("official_report_text") or session.get("report"),
+        official_report_source,
         REVISION_REPORT_CONTEXT_LIMIT,
     )
+    official_report["source_length"] = len(official_report_source)
+    official_report["sections"] = _report_section_metadata(official_report["text"])
+    official_report["editability"] = _report_editability(official_report)
     final_report = _bounded(
         payload.get("final_report") or payload.get("report"),
         REVISION_REPORT_CONTEXT_LIMIT,
@@ -192,6 +271,32 @@ def build_revision_context(
     for field_name, value in structured_fields.items():
         clinical_evidence[field_name] = value
 
+    selected_official_report = _selected_context_value(
+        values,
+        selected_keys,
+        "review.official_report",
+        None,
+    )
+    official_report_omitted = not isinstance(selected_official_report, dict)
+    if isinstance(selected_official_report, dict) and selected_official_report.get(
+        "omitted"
+    ):
+        official_report_omitted = True
+    if official_report_omitted:
+        selected_official_report = {
+            "omitted": True,
+            "text": "",
+            "truncated": False,
+            "sha256": official_report["sha256"],
+            "source_length": official_report["source_length"],
+            "sections": [],
+            "editability": _report_editability(official_report, omitted=True),
+        }
+    canonical_editability = selected_official_report.get(
+        "editability",
+        _report_editability(selected_official_report),
+    )
+
     return {
         "provenance": {
             "session_id": session.get("session_id"),
@@ -199,9 +304,8 @@ def build_revision_context(
         },
         "clinical_evidence": clinical_evidence,
         "review_target": {
-            "official_report": _selected_context_value(
-                values, selected_keys, "review.official_report", {"omitted": True}
-            ),
+            "official_report": selected_official_report,
+            "canonical_report_editability": canonical_editability,
             "final_report": _selected_context_value(
                 values, selected_keys, "review.final_report", {"omitted": True}
             ),

@@ -151,4 +151,4 @@ attempt against the original canonical report. A non-dry run can create an
 `agentic_revision` session only after a validated patch and blocker-free QA;
 dry runs, no-op drafts, and QA-blocked runs retain an auditable draft and do not
 replace the source session. The configured provider and model remain fixed for
-the run, with the revision transport retry budget capped at one retry.
+the run, with the revision transport retry budget capped at two transient retries.

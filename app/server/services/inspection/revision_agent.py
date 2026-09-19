@@ -54,7 +54,7 @@ REVISION_AGENT_PROMPT_VERSION = "revision-agent-issue-scan-v1"
 REVISION_AGENT_SCHEMA_NAME = "revision_issue_scan_result"
 REVISION_AGENT_SCHEMA_VERSION = "1"
 REVISION_AGENT_STEP_NAME = "revision_agent_issue_scan"
-REVISION_PROVIDER_MAX_RETRIES = 1
+REVISION_PROVIDER_MAX_RETRIES = 2
 MAX_QA_REPAIR_ATTEMPTS = 1
 
 
@@ -71,6 +71,73 @@ ProgressUpdate = Callable[[dict[str, Any]], None]
 class RevisionAgentRuntime:
     provider: str
     model: str
+
+###############################################################################
+def _sanitize_error_message(value: object) -> str:
+    text = " ".join(str(value or "").split()).strip()
+    text = re.sub(
+        r"(?i)([\"']?(?:api[-_ ]?key|authorization|bearer|token|secret|password)[\"']?\s*[:=]\s*)(?:bearer\s+\S+|[\"'][^\"']*[\"']|[^,;\s}]+)",
+        r"\1<redacted>",
+        text,
+    )
+    text = re.sub(r"(?i)\bbearer\s+\S+", "Bearer <redacted>", text)
+    return text[:320] or "Revision provider call failed."
+
+###############################################################################
+def revision_error_payload(
+    exc: BaseException,
+    *,
+    runtime: RevisionAgentRuntime | None = None,
+    fallback_message: str | None = None,
+) -> dict[str, Any]:
+    """Build persisted provider diagnostics without retaining secret-bearing detail."""
+
+    provider = getattr(exc, "provider", None) or (
+        runtime.provider if runtime is not None else None
+    )
+    model = getattr(exc, "model", None) or (
+        runtime.model if runtime is not None else None
+    )
+    operation = getattr(exc, "operation", None) or "revision_agent"
+    status_code = getattr(exc, "status_code", None)
+    if not isinstance(status_code, int):
+        response = getattr(exc, "response", None)
+        candidate = getattr(response, "status_code", None)
+        status_code = candidate if isinstance(candidate, int) else None
+    retryable = getattr(exc, "retryable", None)
+    if retryable is None:
+        retryable = bool(
+            isinstance(status_code, int)
+            and (status_code in {408, 409, 425, 429} or status_code >= 500)
+        )
+    user_message = getattr(exc, "user_message", None)
+    if callable(user_message):
+        try:
+            message = user_message()
+        except Exception:  # pragma: no cover - defensive error reporting path
+            message = str(exc)
+    else:
+        message = str(exc)
+    has_provider_metadata = any(
+        value is not None
+        for value in (provider, model, getattr(exc, "error_code", None), status_code)
+    )
+    if not has_provider_metadata and fallback_message:
+        return {"message": fallback_message}
+    payload: dict[str, Any] = {
+        "message": _sanitize_error_message(message),
+        "error_type": type(exc).__name__,
+        "error_code": str(getattr(exc, "error_code", None) or "provider_error"),
+        "retryable": bool(retryable),
+        "status_code": status_code,
+        "provider": provider,
+        "model": model,
+        "operation": operation,
+    }
+    request_id = getattr(exc, "request_id", None)
+    if request_id:
+        payload["request_id"] = _sanitize_error_message(request_id)
+    return payload
 
 ###############################################################################
 class RevisionAgentCancelled(RuntimeError):
@@ -295,7 +362,7 @@ class RevisionAgentRunner:
                 pipeline_run_id=pipeline_run_id,
                 step_name=step_name,
                 attempt_number=attempt_number,
-                error={"message": str(exc)},
+                error=revision_error_payload(exc, runtime=runtime),
                 latency_ms=latency_ms,
             )
             raise
@@ -307,6 +374,7 @@ class RevisionAgentRunner:
         source_report: str,
         draft: RevisionDraftResult,
         request: SessionRevisionRequest,
+        canonical_report_editability: dict[str, Any] | None = None,
     ) -> tuple[RevisionDraftResult, str]:
         try:
             applied_report = validate_draft_report(source_report, draft.patches)
@@ -328,38 +396,54 @@ class RevisionAgentRunner:
             applied_report = source_report
         requested_append = _requested_append_sentence(request.revision_instruction)
         if requested_append and not applied_report.rstrip().endswith(requested_append):
-            draft = draft.model_copy(
-                update={
-                    "patches": [
-                        *draft.patches,
-                        RevisionReportPatch(
-                            start=len(source_report),
-                            end=len(source_report),
-                            replacement=f"\n\n{requested_append}",
-                            expected_text="",
-                            evidence_references=["user_revision_instruction"],
-                        ),
-                    ],
-                    "changed_sections": [
-                        *draft.changed_sections,
-                        "user_requested_append",
-                    ],
-                }
-            )
-            try:
-                applied_report = validate_draft_report(source_report, draft.patches)
-            except ValueError as exc:  # pragma: no cover - deterministic append
+            if canonical_report_editability and not canonical_report_editability.get(
+                "editable", False
+            ):
                 draft = draft.model_copy(
                     update={
-                        "patches": [],
-                        "revised_report_text": source_report,
                         "unresolved_issues": [
                             *draft.unresolved_issues,
-                            f"The requested append could not be validated: {exc}",
+                            "The requested append could not be applied because the canonical report text is not fully available in the revision context.",
+                        ],
+                        "human_review_requirements": [
+                            *draft.human_review_requirements,
+                            "Restore the complete canonical report context before applying the requested append.",
                         ],
                     }
                 )
-                applied_report = source_report
+            else:
+                draft = draft.model_copy(
+                    update={
+                        "patches": [
+                            *draft.patches,
+                            RevisionReportPatch(
+                                start=len(source_report),
+                                end=len(source_report),
+                                replacement=f"\n\n{requested_append}",
+                                expected_text="",
+                                evidence_references=["user_revision_instruction"],
+                            ),
+                        ],
+                        "changed_sections": [
+                            *draft.changed_sections,
+                            "user_requested_append",
+                        ],
+                    }
+                )
+                try:
+                    applied_report = validate_draft_report(source_report, draft.patches)
+                except ValueError as exc:  # pragma: no cover - deterministic append
+                    draft = draft.model_copy(
+                        update={
+                            "patches": [],
+                            "revised_report_text": source_report,
+                            "unresolved_issues": [
+                                *draft.unresolved_issues,
+                                f"The requested append could not be validated: {exc}",
+                            ],
+                        }
+                    )
+                    applied_report = source_report
         if not draft.revised_report_text:
             draft = draft.model_copy(update={"revised_report_text": applied_report})
         elif applied_report != draft.revised_report_text:
@@ -386,8 +470,18 @@ class RevisionAgentRunner:
         session: dict[str, Any],
         applied_report: str,
         source_report: str,
+        canonical_report_editability: dict[str, Any] | None = None,
     ) -> RevisionAgentQaResult:
         blocking_issues = list(qa.blocking_issues)
+        if canonical_report_editability:
+            if not canonical_report_editability.get("available", False):
+                blocking_issues.append(
+                    "Canonical report text is unavailable or omitted from the revision context; the draft cannot be accepted."
+                )
+            elif not canonical_report_editability.get("editable", False):
+                blocking_issues.append(
+                    "Canonical report text is truncated in the revision context; the draft cannot be accepted."
+                )
         if applied_report == source_report:
             blocking_issues.append(
                 "Revision produced no validated report edits; a new session cannot be created until a verified patch is produced."
@@ -521,9 +615,9 @@ class RevisionAgentRunner:
                 "issue_scan": payload,
                 "artifacts": artifact,
             }
-        except Exception:
+        except Exception as exc:
             latency_ms = int((perf_counter() - started) * 1000)
-            error = {"message": "Revision agent issue scan failed."}
+            error = revision_error_payload(exc, runtime=runtime)
             self.session_revision_repository.fail_revision_step(
                 pipeline_run_id=pipeline_run_id,
                 step_name=REVISION_AGENT_STEP_NAME,
@@ -570,6 +664,27 @@ class RevisionAgentRunner:
             instruction=request.revision_instruction,
             input_budget=context_effective.input_budget,
         )
+        source_report = str(
+            session.get("official_report_text") or session.get("report") or ""
+        )
+        review_target = context.get("review_target")
+        official_report_target = (
+            review_target.get("official_report")
+            if isinstance(review_target, dict)
+            else None
+        )
+        canonical_report_editability = (
+            official_report_target.get("editability")
+            if isinstance(official_report_target, dict)
+            else None
+        )
+        if not isinstance(canonical_report_editability, dict):
+            canonical_report_editability = {
+                "available": bool(source_report),
+                "editable": bool(source_report),
+                "reason": "legacy_context_shape",
+                "source_length": len(source_report),
+            }
         registry = RevisionToolRegistry(
             clinical_session_repository=self.clinical_session_repository,
             session_revision_repository=self.session_revision_repository,
@@ -722,7 +837,7 @@ class RevisionAgentRunner:
                     pipeline_run_id=pipeline_run_id,
                     step_name=f"revision_agent_task_{task_index}",
                     attempt_number=attempt,
-                    error={"message": str(exc)},
+                    error=revision_error_payload(exc, runtime=runtime),
                     latency_ms=int((perf_counter() - task_started) * 1000),
                 )
                 raise
@@ -757,13 +872,11 @@ class RevisionAgentRunner:
                 "changed_section_count": len(value.changed_sections),
             },
         )
-        source_report = str(
-            session.get("official_report_text") or session.get("report") or ""
-        )
         draft, applied_report = self._normalize_draft(
             source_report=source_report,
             draft=draft,
             request=request,
+            canonical_report_editability=canonical_report_editability,
         )
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
@@ -798,6 +911,7 @@ class RevisionAgentRunner:
             session=session,
             applied_report=applied_report,
             source_report=source_report,
+            canonical_report_editability=canonical_report_editability,
         )
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
@@ -845,6 +959,7 @@ class RevisionAgentRunner:
                 source_report=source_report,
                 draft=repair_draft,
                 request=request,
+                canonical_report_editability=canonical_report_editability,
             )
             draft = repair_draft
             self.session_revision_repository.persist_revision_artifact(
@@ -890,6 +1005,7 @@ class RevisionAgentRunner:
                 session=session,
                 applied_report=applied_report,
                 source_report=source_report,
+                canonical_report_editability=canonical_report_editability,
             )
             self.session_revision_repository.persist_revision_artifact(
                 pipeline_run_id=pipeline_run_id,
