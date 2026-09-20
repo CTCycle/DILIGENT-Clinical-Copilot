@@ -1,9 +1,9 @@
 # Pre-release validation ledger
-Last updated: 2026-09-18
+Last updated: 2026-09-20
 
 ## Scope and interpretation
 
-This is the canonical feature-state register for the current DILIGENT source/development tree. It records the validation run performed on 2026-09-18 against source revision `2e434ae1b0e276b8acbab27f65a399d306c3f691` on the `develop` branch. Packaging, publication, EXE/MSI smoke tests, and clean-machine installation were intentionally outside this audit.
+This is a dated evidence register and chronological pre-release validation diary for the DILIGENT source/development tree. The high-level current operational status is canonical in [`../project_status_ledger.md`](../project_status_ledger.md); this document preserves the run-specific scope, evidence, diary, and release boundaries that explain that status. The register below records the validation run performed on 2026-09-18 against source revision `2e434ae1b0e276b8acbab27f65a399d306c3f691` on the `develop` branch. Packaging, publication, EXE/MSI smoke tests, and clean-machine installation were intentionally outside that audit.
 
 The run used synthetic patient content only. No patient-identifying data was entered, no source refresh or embedding update job was started, and no live cloud-provider clinical analysis was submitted.
 
