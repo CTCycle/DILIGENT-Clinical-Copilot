@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-09-18
+Last updated: 2026-09-20
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -25,13 +25,15 @@ branch-status record.
 - Angular page and component state uses signals/computed state in current model-configuration, access-key, clinical-session preview, and runtime-settings surfaces.
 - The primary UI navigation has four workspaces: DILI Agent, Clinical Sessions, Data Inspection, and Settings; Patient Timeline is opened from a selected session's Timeline tab. Settings contains General, Models, Data Processing, Integrations, and Advanced pages with persistent left navigation.
 - FDA DILIrank 2.0 is a structured drug-level hepatotoxicity knowledge source. Its complete source snapshot is persisted separately, only canonical or trusted LiverTox/RxNorm identity links are eligible for clinical use, and unlinked or ambiguous source rows remain inspectable without becoming patient-level causality evidence.
+- The canonical current operational status of these capabilities is maintained in [`project_status_ledger.md`](project_status_ledger.md). This index and the detailed validation documents describe the ontology and evidence that support that status; they do not replace the ledger.
 
 ## How To Navigate
 1. Start with this file only.
-2. Choose the topic branch that matches the task.
-3. Open the narrowest leaf document that answers the question.
-4. Expand to sibling files only when the task clearly crosses topic boundaries.
-5. Keep documentation updates aligned with implementation changes.
+2. Read [`project_status_ledger.md`](project_status_ledger.md) when the task concerns current capability, validation, blockers, or release readiness.
+3. Choose the topic branch that matches the task.
+4. Open the narrowest leaf document that answers the question.
+5. Expand to sibling files only when the task clearly crosses topic boundaries.
+6. Keep documentation updates aligned with implementation changes.
 
 ## Naming Rules
 - All files and folders under `assets/docs` use lower-case names.
@@ -42,6 +44,8 @@ branch-status record.
 ### Root
 - `project_index.md`
   - Entry point and master index for the full documentation tree.
+- `project_status_ledger.md`
+  - Canonical current operational status catalog for stable project components, active issues, validation debt, and resolved findings.
 
 ### Architecture
 - `architecture/system_overview.md`
@@ -89,7 +93,7 @@ branch-status record.
 - `runtime/qa_regression.md`
   - Repeatable regression slice for model configuration and app-flow validation.
 - `runtime/validation_ledger.md`
-  - Canonical feature-state register and chronological pre-release validation diary.
+  - Dated feature-state evidence register and chronological pre-release validation diary; its findings are summarized into `project_status_ledger.md` rather than serving as a second current-status authority.
 
 ### UI
 - `ui/design_tokens.md`
@@ -125,6 +129,7 @@ branch-status record.
 - Read documentation files only when required by the active task.
 - Defer reading until the task proves the file is needed.
 - Keep all affected documents updated whenever behavior, architecture, runtime, or UX changes.
+- Treat `project_status_ledger.md` as the canonical current operational status. Before substantial implementation or validation work, inspect it; after a meaningful change or test, update the affected component, active issue or validation-debt entry, and evidence links. Keep detailed reports in their existing architecture, runtime, or `assets/QA/` locations.
 - Always include a `Last updated: YYYY-MM-DD` line when modifying a document.
 - Pre-select files to read by folder structure and task intent before opening them.
 
