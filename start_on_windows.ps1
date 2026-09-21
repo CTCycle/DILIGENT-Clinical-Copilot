@@ -51,11 +51,11 @@ $script:RuffCacheDir = Join-Path $RuntimeCacheDir 'ruff'
 $script:UvCacheDir = Join-Path $RuntimeCacheDir 'uv'
 $script:EnvFile = Join-Path $RepoRoot 'settings/.env'
 $script:EnvExample = Join-Path $RepoRoot 'settings/.env.example'
-$script:PythonVersion = '3.14.2'
+$script:PythonVersion = '3.14.7'
 $script:NodeVersion = '22.13.0'
 $script:UvVersion = '0.11.30'
 $script:RustVersion = '1.95.0'
-$script:PythonArchiveSha256 = 'f05e28d161c6b15af64a7cb7f08b4a22b3a6b03eee71baee24ea557b3bdd5798'
+$script:PythonArchiveSha256 = 'd297e5ff019966817ad8502465176139f2d3d840fa4ed84b13bed399a6ab1f15'
 $script:NodeArchiveSha256 = 'b0feb09ebf41328628e7383f7a092fb7342ce1e05c867a90cf8f1379205a8429'
 $script:UvArchiveSha256 = 'be8d78c992312212e5cc05e9f9de3fa996db73b7c86a186dfb9231eb9f91d33e'
 $script:DesktopDir = Join-Path $RepoRoot 'app/desktop'
@@ -325,15 +325,50 @@ function Initialize-PortableRuntimes {
     Write-Step 'Ensuring portable Python, uv, and Node.js runtimes'
     New-Item -ItemType Directory -Path $PythonDir, $UvDir -Force | Out-Null
 
-    if (-not (Test-Path -LiteralPath $PythonExe)) {
+    $pythonNeedsInstall = -not (Test-Path -LiteralPath $PythonExe)
+    if (-not $pythonNeedsInstall) {
+        try {
+            $installedPythonVersion = (& $PythonExe -c 'import platform; print(platform.python_version())').Trim()
+        }
+        catch {
+            $installedPythonVersion = 'unknown'
+        }
+        $pythonNeedsInstall = $installedPythonVersion -ne $PythonVersion
+        if ($pythonNeedsInstall) {
+            Write-Info "Replacing unsupported portable Python $installedPythonVersion with $PythonVersion"
+        }
+    }
+
+    if ($pythonNeedsInstall) {
         $pythonZipName = "python-$PythonVersion-embed-amd64.zip"
         $pythonUrl = "https://www.python.org/ftp/python/$PythonVersion/$pythonZipName"
+        $pythonStageDir = Join-Path $RuntimesDir "python-staging-$PID"
         Write-Info "Downloading $pythonUrl"
-        Invoke-DownloadAndExtract `
-            -Uri $pythonUrl `
-            -ArchivePath (Join-Path $PythonDir $pythonZipName) `
-            -DestinationPath $PythonDir `
-            -ExpectedSha256 $PythonArchiveSha256
+        try {
+            Invoke-DownloadAndExtract `
+                -Uri $pythonUrl `
+                -ArchivePath (Join-Path $RuntimesDir $pythonZipName) `
+                -DestinationPath $pythonStageDir `
+                -ExpectedSha256 $PythonArchiveSha256
+
+            $stagedPythonExe = Join-Path $pythonStageDir 'python.exe'
+            if (-not (Test-Path -LiteralPath $stagedPythonExe)) {
+                throw 'Downloaded Python archive did not contain the expected runtime'
+            }
+            Patch-PythonPth -Path (Join-Path $pythonStageDir 'python314._pth')
+            $stagedPythonVersion = (& $stagedPythonExe -c 'import platform; print(platform.python_version())').Trim()
+            if ($stagedPythonVersion -ne $PythonVersion) {
+                throw "Downloaded Python version $stagedPythonVersion does not match the pinned $PythonVersion"
+            }
+
+            [void](Remove-LauncherPath -Path $PythonDir -Activity 'DILIGENT: replace portable Python runtime' -Strict)
+            Move-Item -LiteralPath $pythonStageDir -Destination $PythonDir
+        }
+        finally {
+            if (Test-Path -LiteralPath $pythonStageDir) {
+                [void](Remove-LauncherPath -Path $pythonStageDir -Activity 'DILIGENT: remove Python staging directory')
+            }
+        }
     }
 
     Patch-PythonPth -Path $PythonPth
@@ -482,6 +517,23 @@ function Install-ApplicationDependencies {
         Invoke-Checked -FilePath $UvExe -ArgumentList $syncArguments -WorkingDirectory $ServerDir
     }
 
+    $venvPythonVersion = 'unknown'
+    if (Test-Path -LiteralPath $VenvPython) {
+        try {
+            $venvPythonVersion = (& $VenvPython -c 'import platform; print(platform.python_version())').Trim()
+        }
+        catch {
+            $venvPythonVersion = 'unknown'
+        }
+    }
+    if ($venvPythonVersion -ne $PythonVersion) {
+        Write-Info "Recreating Python environment with $PythonVersion (found $venvPythonVersion)"
+        if (Test-Path -LiteralPath $VenvDir) {
+            [void](Remove-LauncherPath -Path $VenvDir -Activity 'DILIGENT: align Python environment version' -Strict)
+        }
+        Invoke-Checked -FilePath $UvExe -ArgumentList $syncArguments -WorkingDirectory $ServerDir
+    }
+
     Install-FrontendDependencies
 
     if ($BuildFrontend) {
@@ -557,11 +609,15 @@ function Test-DependenciesReady {
 
     & $PythonExe --version *> $null
     if ($LASTEXITCODE -ne 0) { return $false }
+    & $PythonExe -c "import platform; raise SystemExit(0 if platform.python_version() == '$PythonVersion' else 1)" *> $null
+    if ($LASTEXITCODE -ne 0) { return $false }
     & $UvExe --version *> $null
     if ($LASTEXITCODE -ne 0) { return $false }
     & $NodeExe --version *> $null
     if ($LASTEXITCODE -ne 0) { return $false }
     & $VenvPython -c 'import fastapi, uvicorn' *> $null
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & $VenvPython -c "import platform; raise SystemExit(0 if platform.python_version() == '$PythonVersion' else 1)" *> $null
     if ($LASTEXITCODE -ne 0) { return $false }
 
     return $true
