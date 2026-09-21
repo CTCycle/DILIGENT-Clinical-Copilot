@@ -76,13 +76,14 @@ and evidence-link audit are recorded in the [Tier 0 evidence report](../../QA/ti
 | Slice | Capability | Status | Executed scope and result |
 |---|---|---|---|
 | `V00` | Revision and evidence baseline | `PASS` | Recorded HEAD, branch, clean state, 713-entry tree, snapshot drift, and 109 status-ledger links; all referenced evidence paths resolved. |
-| `V01` | Source startup, migration, health, populated-data reuse, and shutdown | `PARTIAL` | Fresh and populated disposable SQLite runs passed launcher initialization, Alembic head, health, frontend readiness, read-only sessions access, integrity checks, and owned-process shutdown. Occupied-port failure behavior remains untested. |
+| `V01` | Source startup, migration, health, populated-data reuse, shutdown, and port ownership | `FAIL` | Fresh and populated disposable SQLite runs passed launcher initialization, Alembic head, health, frontend readiness, read-only sessions access, integrity checks, and owned-process shutdown. The occupied-port test reproduced unsafe behavior: a controlled foreign listener on 7690 was killed, then the launcher continued with exit code 0. The finding is tracked as `ISSUE-006` in the project ledger. |
 | `V02` | Automated baseline gates | `PASS` | `app\tests\run_tests.bat unit`: 742 passed; Angular/Vitest: 23 files and 96 tests passed; production build completed with `--progress=false`. |
 
-The disposable databases were removed after the run. Ports `7690` and `9847`
-were verified free, and no matching launcher-owned backend/frontend process
-remained. `V01` is not a product failure claim; its partial status marks only
-the unexecuted occupied-port subcase.
+The disposable databases and occupied-port run roots were removed after the
+run. Ports `7690` and `9847` were verified free, and no matching
+launcher-owned backend/frontend process remained. The fresh and populated V01
+subcases are passing, but the occupied-port ownership failure is a reproducible
+launcher defect and blocks treating V01 as complete.
 
 ## Current release assessment
 
@@ -90,7 +91,7 @@ The original populated-database migration blocker has been remediated in source.
 
 Release readiness remains blocked by the separate absence of live provider, populated-session, timeline, revision, citation, and final-report evidence. The migration remediation is not a claim that those clinical or external-provider gates passed.
 
-Post-remediation register counts: `PASS 13`, `ATTENTION 3`, `FAIL 0`, `NOT TESTED 21`, `NOT APPLICABLE 2`.
+The historical 2026-09-18 post-remediation register counts: `PASS 13`, `ATTENTION 3`, `FAIL 0`, `NOT TESTED 21`, `NOT APPLICABLE 2`.
 
 ## Feature-state register
 
