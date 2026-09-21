@@ -1,5 +1,5 @@
 # DILIGENT Clinical Copilot
-Last updated: 2026-09-13
+Last updated: 2026-09-22
 
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-GNU%20GPL%20v3-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
@@ -172,7 +172,25 @@ For later launches, you can run the launcher directly with its launch action:
 .\start_on_windows.ps1 -Action Launch
 ```
 
-The launcher can recover missing or unusable setup during launch. When source mode starts successfully, the interface is normally available at [http://127.0.0.1:9847](http://127.0.0.1:9847). If the page says that the local service is unavailable, check [http://127.0.0.1:7690/api/health](http://127.0.0.1:7690/api/health), then restart the launcher if necessary.
+The launcher can repair a missing or unusable backend/runtime environment during launch.
+It records a deterministic source-build state under `app/client/dist/`; later launches
+reuse the production output when that state still matches the source, configuration,
+dependency manifests, pinned Node version, and the canonical `npm run build` contract.
+Missing or stale output is rebuilt automatically. Changes to test-only files, the
+preview/dev-server scripts, `settings/.env`, backend Python, documentation, and QA
+files do not invalidate the Angular production build. Use option 3 or
+`-Action RebuildFrontend` when an unconditional frontend rebuild is wanted.
+
+Immediately before source-mode processes are created, the launcher checks both
+configured ports. If either port is occupied, it lists each unique owning PID and
+its port(s), including foreign processes, and asks once whether those listed PIDs
+should be terminated. A declined or noninteractive launch terminates nothing. If
+termination fails or a replacement process takes a port, launch stops with the
+current PID/port mapping. When source mode starts successfully, the interface is
+normally available at [http://127.0.0.1:9847](http://127.0.0.1:9847). If the page
+says that the local service is unavailable, check
+[http://127.0.0.1:7690/api/health](http://127.0.0.1:7690/api/health), then restart the
+launcher if necessary.
 
 ### macOS and Linux
 
@@ -314,7 +332,7 @@ Open **Data Inspection** to view available local resources, records, metadata, a
 | No saved sessions appear | The assessment may not have completed, or first-time local setup may be incomplete. | Complete the launcher's dependency and database setup options, restart the application, and confirm that a later assessment finishes successfully. |
 | A timeline shows fallback chronology | Model extraction did not complete or the available dates are uncertain. | Use it only as a navigation aid, review the warning, and retry after correcting the provider or model condition. |
 | Data Inspection is empty | Local resources have not been initialized or refreshed. | Use the launcher's setup or maintenance options, wait for them to finish, and restart DILIGENT. |
-| A source-mode port is already in use | Another local application is using one of the default development ports. | Close the conflicting application or use the local port arrangement already approved for your environment, then restart both source-mode services. |
+| A source-mode port is already in use | A process is listening on one of the configured development ports. | Run the launcher from an interactive PowerShell console and review the one-time PID/port confirmation. Decline leaves every holder running; a noninteractive launch also fails without termination. |
 
 For source mode, the default interface address is `http://127.0.0.1:9847` and the default health-check address is `http://127.0.0.1:7690/api/health`. Packaged Windows desktop startup uses its own local address, so these source-mode addresses are not a packaged-app health check.
 

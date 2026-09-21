@@ -1,5 +1,5 @@
 # Runtime Troubleshooting
-Last updated: 2026-09-21
+Last updated: 2026-09-22
 
 ## Scope
 This file covers recurring local startup and launch failures.
@@ -42,13 +42,18 @@ The canonical runtime uses only the pinned Granite 97M multilingual ONNX artifac
 - Backend: `127.0.0.1:7690`
 - Frontend: `127.0.0.1:9847`
 
-The source launcher checks both ports before starting. It never terminates a
-listener that it cannot positively identify as a DILIGENT process tree. When a
-foreign listener is found, launch exits with its PID and an instruction to
-stop the owning service or update `FASTAPI_PORT`/`UI_PORT` in `settings/.env`.
+The source launcher checks both ports immediately before creating application
+processes. It lists one entry per unique owning PID, including foreign
+processes, and includes every configured port held by that PID. An interactive
+launch asks once whether those listed PIDs should be terminated directly. A
+decline or noninteractive launch terminates nothing. If a holder exits before
+the confirmation completes, a fresh scan avoids an unnecessary termination.
+After an accepted termination request, the current listener map is authoritative:
+an access-denied PID, a replacement holder, or any remaining listener aborts
+launch with its current PID/port mapping.
 
-For stale DILIGENT processes, run the confirmed cleanup action from an
-interactive PowerShell console, then launch again:
+For stale repository-owned DILIGENT process trees, the explicit cleanup action
+remains available from an interactive PowerShell console:
 
 ```powershell
 .\start_on_windows.ps1 -Action KillApplicationProcesses
@@ -56,6 +61,22 @@ interactive PowerShell console, then launch again:
 
 If launch is redirected or noninteractive, it cannot confirm stopping owned
 processes and fails without terminating anything.
+
+## Frontend build is rebuilt during launch
+
+Source-mode launch reuses `app/client/dist/browser/index.html` only when
+`app/client/dist/.diligent-build-state.json` is valid and its deterministic
+fingerprints match the current production inputs. The marker does not use
+timestamps. A missing output, missing/corrupt marker, changed production source
+or configuration, changed dependency manifest, changed pinned Node version, or
+changed build contract causes a rebuild. Dependency-manifest changes and an
+unknown prior marker also run `npm ci` from `package-lock.json` first.
+
+Changes to `*.spec.ts`, `tsconfig.spec.json`, `vitest.config.ts`,
+`scripts/preview-server.mjs`, `scripts/ng-serve.mjs`, `settings/.env`, backend
+Python, documentation, and QA files do not cause an Angular production rebuild.
+Use `-Action RebuildFrontend` for an unconditional rebuild, or
+`-Action Install` to resynchronize all install dependencies and rebuild.
 
 ## Frontend Exits With Backend-unreachable Error
 ### Symptom
@@ -91,9 +112,9 @@ npm run preview -- --host 127.0.0.1 --port 9847 --strictPort
 ```
 
 ### Cause
-Port `7690` is already occupied, often by a stale Python process or a foreign
-service. The source launcher does not infer ownership from the port alone and
-will not terminate an unrecognized listener.
+Port `7690` is already occupied, often by a stale Python process or another
+local service. The source launcher will display the owning PID and ask once
+before attempting direct termination when the launch is interactive.
 
 ### Fix
 1. Check the current listener:
@@ -108,7 +129,10 @@ Get-NetTCPConnection -LocalPort 7690 | Select-Object LocalAddress,LocalPort,Stat
 Get-Process -Id <PID>
 ```
 
-3. If the owning process is a stale DILIGENT process tree, run the explicit cleanup action from an interactive PowerShell console:
+3. If you want the launcher to request termination, start
+   `start_on_windows.ps1 -Action Launch` from an interactive PowerShell console
+   and review the listed PID/port mapping. A `No` answer leaves the process
+   untouched. For a stale DILIGENT process tree, the explicit cleanup action is:
 
 ```powershell
 .\start_on_windows.ps1 -Action KillApplicationProcesses
@@ -121,13 +145,13 @@ Invoke-WebRequest -UseBasicParsing http://127.0.0.1:7690/api/health
 Get-Process -Id <PID> | Select-Object Id,ProcessName,Path
 ```
 
-4. Stop the stale or unrelated process only when the health probe fails or the process is not the intended backend:
+5. Stop the stale or unrelated process only when the health probe fails or the process is not the intended backend:
 
 ```powershell
 Stop-Process -Id <PID> -Force
 ```
 
-5. Restart the backend.
+6. Restart the backend.
 
 ## Backend Startup Is Inconsistent
 ### Symptom
