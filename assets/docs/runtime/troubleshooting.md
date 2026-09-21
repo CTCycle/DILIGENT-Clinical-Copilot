@@ -1,5 +1,5 @@
 # Runtime Troubleshooting
-Last updated: 2026-08-02
+Last updated: 2026-09-21
 
 ## Scope
 This file covers recurring local startup and launch failures.
@@ -42,6 +42,21 @@ The canonical runtime uses only the pinned Granite 97M multilingual ONNX artifac
 - Backend: `127.0.0.1:7690`
 - Frontend: `127.0.0.1:9847`
 
+The source launcher checks both ports before starting. It never terminates a
+listener that it cannot positively identify as a DILIGENT process tree. When a
+foreign listener is found, launch exits with its PID and an instruction to
+stop the owning service or update `FASTAPI_PORT`/`UI_PORT` in `settings/.env`.
+
+For stale DILIGENT processes, run the confirmed cleanup action from an
+interactive PowerShell console, then launch again:
+
+```powershell
+.\start_on_windows.ps1 -Action KillApplicationProcesses
+```
+
+If launch is redirected or noninteractive, it cannot confirm stopping owned
+processes and fails without terminating anything.
+
 ## Frontend Exits With Backend-unreachable Error
 ### Symptom
 Frontend preview reports:
@@ -76,7 +91,9 @@ npm run preview -- --host 127.0.0.1 --port 9847 --strictPort
 ```
 
 ### Cause
-Port `7690` is already occupied, often by a stale Python process.
+Port `7690` is already occupied, often by a stale Python process or a foreign
+service. The source launcher does not infer ownership from the port alone and
+will not terminate an unrecognized listener.
 
 ### Fix
 1. Check the current listener:
@@ -91,7 +108,13 @@ Get-NetTCPConnection -LocalPort 7690 | Select-Object LocalAddress,LocalPort,Stat
 Get-Process -Id <PID>
 ```
 
-3. If `http://127.0.0.1:7690/api/health` returns `200` and the owning process is the repository backend, reuse the existing server instead of starting a duplicate:
+3. If the owning process is a stale DILIGENT process tree, run the explicit cleanup action from an interactive PowerShell console:
+
+```powershell
+.\start_on_windows.ps1 -Action KillApplicationProcesses
+```
+
+4. If `http://127.0.0.1:7690/api/health` returns `200` and the owning process is the repository backend, reuse the existing server instead of starting a duplicate:
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing http://127.0.0.1:7690/api/health

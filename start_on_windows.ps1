@@ -632,22 +632,6 @@ function Get-ListeningProcessIds([int]$Port) {
     }
 }
 
-function Stop-PortListeners([int]$Port) {
-    $processIds = @(Get-ListeningProcessIds -Port $Port | Sort-Object -Unique)
-    foreach ($processId in $processIds) {
-        Write-Info "Releasing port $Port from PID $processId"
-        & taskkill.exe /PID $processId /F | Out-Null
-    }
-
-    for ($attempt = 1; $attempt -le 20; $attempt++) {
-        if (@(Get-ListeningProcessIds -Port $Port).Count -eq 0) {
-            return
-        }
-        Start-Sleep -Seconds 1
-    }
-    throw "Port $Port is still occupied after 20 seconds"
-}
-
 function Convert-ToCommandLineArgument([string]$Value) {
     if ($Value -notmatch '[\s"]') {
         return $Value
@@ -686,14 +670,6 @@ function Get-ApplicationProcessRecords {
         }
     }
 
-    foreach ($port in @($BackendPort, $FrontendPort)) {
-        foreach ($processId in @(Get-ListeningProcessIds -Port $port)) {
-            if ($processId -gt 0 -and $processId -ne $PID) {
-                [void]$candidateIds.Add([int]$processId)
-            }
-        }
-    }
-
     $pending = [Collections.Generic.Queue[int]]::new()
     foreach ($processId in $candidateIds) {
         $pending.Enqueue($processId)
@@ -715,11 +691,172 @@ function Get-ApplicationProcessRecords {
         }
     }
 
+    $descendantsAdded = $true
+    while ($descendantsAdded) {
+        $descendantsAdded = $false
+        foreach ($process in $processes) {
+            $processId = [int]$process.ProcessId
+            $parentId = [int]$process.ParentProcessId
+            if ($processId -eq $PID -or $candidateIds.Contains($processId)) { continue }
+            if ($parentId -gt 0 -and $candidateIds.Contains($parentId)) {
+                [void]$candidateIds.Add($processId)
+                $descendantsAdded = $true
+            }
+        }
+    }
+
     foreach ($processId in $candidateIds) {
         if ($processById.ContainsKey($processId)) {
             $processById[$processId]
         }
     }
+}
+
+function Get-LauncherPortStates {
+    param(
+        [Parameter(Mandatory = $true)][int]$BackendPort,
+        [Parameter(Mandatory = $true)][int]$FrontendPort,
+        [object[]]$ApplicationProcesses = @()
+    )
+
+    $ownedProcessIds = [Collections.Generic.HashSet[int]]::new()
+    foreach ($process in $ApplicationProcesses) {
+        $processId = [int]$process.ProcessId
+        if ($processId -gt 0 -and $processId -ne $PID) {
+            [void]$ownedProcessIds.Add($processId)
+        }
+    }
+
+    foreach ($port in @($BackendPort, $FrontendPort) | Sort-Object -Unique) {
+        $listenerIds = @(Get-ListeningProcessIds -Port $port | Sort-Object -Unique)
+        $ownedListenerIds = @($listenerIds | Where-Object { $ownedProcessIds.Contains([int]$_) })
+        $foreignListenerIds = @($listenerIds | Where-Object { -not $ownedProcessIds.Contains([int]$_) })
+        [pscustomobject]@{
+            Port = $port
+            ListenerIds = $listenerIds
+            OwnedListenerIds = $ownedListenerIds
+            ForeignListenerIds = $foreignListenerIds
+        }
+    }
+}
+
+function New-PortConflictMessage {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$PortStates,
+        [switch]$OwnedProcessesStillRunning
+    )
+
+    $occupied = @($PortStates | Where-Object { $_.ListenerIds.Count -gt 0 })
+    if ($occupied.Count -eq 0) { return $null }
+
+    $details = @($occupied | ForEach-Object {
+        $processIds = @($_.ListenerIds | ForEach-Object { [string]$_ }) -join ', '
+        "port $($_.Port) (PID(s): $processIds)"
+    }) -join '; '
+
+    if ($OwnedProcessesStillRunning) {
+        return "DILIGENT process tree(s) still occupy $details after the stop request. Run .\start_on_windows.ps1 -Action KillApplicationProcesses interactively, or change FASTAPI_PORT/UI_PORT in settings/.env, then retry."
+    }
+
+    return "Configured port conflict: $details. DILIGENT did not terminate an unowned listener. Stop the owning service or change FASTAPI_PORT/UI_PORT in settings/.env, then retry."
+}
+
+function Assert-NoForeignPortListeners {
+    param([Parameter(Mandatory = $true)][object[]]$PortStates)
+
+    $foreignStates = @($PortStates | Where-Object { $_.ForeignListenerIds.Count -gt 0 })
+    if ($foreignStates.Count -eq 0) { return }
+
+    $foreignOnlyStates = @($foreignStates | ForEach-Object {
+        [pscustomobject]@{
+            Port = $_.Port
+            ListenerIds = @($_.ForeignListenerIds)
+        }
+    })
+    $message = New-PortConflictMessage -PortStates $foreignOnlyStates
+    throw $message
+}
+
+function Wait-ForLauncherPorts {
+    param(
+        [Parameter(Mandatory = $true)][int[]]$Ports,
+        [Parameter(Mandatory = $true)][int[]]$ExpectedProcessIds
+    )
+
+    $expected = [Collections.Generic.HashSet[int]]::new()
+    foreach ($processId in $ExpectedProcessIds) {
+        if ($processId -gt 0) { [void]$expected.Add([int]$processId) }
+    }
+
+    foreach ($port in $Ports | Sort-Object -Unique) {
+        for ($attempt = 1; $attempt -le 20; $attempt++) {
+            $listenerIds = @(Get-ListeningProcessIds -Port $port | Sort-Object -Unique)
+            $foreignIds = @($listenerIds | Where-Object { -not $expected.Contains([int]$_) })
+            if ($foreignIds.Count -gt 0) {
+                $message = New-PortConflictMessage -PortStates @([pscustomobject]@{
+                    Port = $port
+                    ListenerIds = $foreignIds
+                })
+                throw $message
+            }
+            if ($listenerIds.Count -eq 0) { break }
+            if ($attempt -eq 20) {
+                $message = New-PortConflictMessage -PortStates @([pscustomobject]@{
+                    Port = $port
+                    ListenerIds = $listenerIds
+                }) -OwnedProcessesStillRunning
+                throw $message
+            }
+            Start-Sleep -Seconds 1
+        }
+    }
+}
+
+function Stop-ApplicationProcessRecords {
+    param([Parameter(Mandatory = $true)][object[]]$Processes)
+
+    $orderedProcesses = @($Processes | Sort-Object `
+        @{ Expression = { if ([string]$_.Name -match '^(?i:cmd)(?:\.exe)?$') { 0 } else { 1 } } }, `
+        @{ Expression = { [int]$_.ProcessId } })
+    $stopped = 0
+    foreach ($process in $orderedProcesses) {
+        if ([int]$process.ProcessId -eq $PID) { continue }
+        Write-Info "Stopping owned $($process.Name) (PID $($process.ProcessId))"
+        & taskkill.exe /PID $process.ProcessId /T /F 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            $stopped++
+        }
+    }
+    return $stopped
+}
+
+function Invoke-LaunchPortPreflight {
+    param(
+        [Parameter(Mandatory = $true)][int]$BackendPort,
+        [Parameter(Mandatory = $true)][int]$FrontendPort
+    )
+
+    $processes = @(Get-ApplicationProcessRecords -BackendPort $BackendPort -FrontendPort $FrontendPort)
+    $portStates = @(Get-LauncherPortStates `
+        -BackendPort $BackendPort `
+        -FrontendPort $FrontendPort `
+        -ApplicationProcesses $processes)
+    Assert-NoForeignPortListeners -PortStates $portStates
+
+    if ($processes.Count -eq 0) { return }
+    if (-not $script:LauncherInteractive) {
+        throw 'Existing DILIGENT application processes were found, but launch cannot stop them without an interactive confirmation. Run .\start_on_windows.ps1 -Action KillApplicationProcesses interactively, then retry.'
+    }
+    if (-not (Confirm-DestructiveAction 'stop existing DILIGENT application processes before launch')) {
+        throw 'Launch cancelled. Existing DILIGENT application processes were left running.'
+    }
+
+    $ownedProcessIds = @($processes | ForEach-Object { [int]$_.ProcessId })
+    $stopped = Stop-ApplicationProcessRecords -Processes $processes
+    Wait-ForLauncherPorts `
+        -Ports @($BackendPort, $FrontendPort) `
+        -ExpectedProcessIds $ownedProcessIds
+    Write-Ok "Stopped $stopped owned application process tree(s); configured ports are available"
 }
 
 function Stop-ApplicationProcesses {
@@ -729,35 +866,33 @@ function Stop-ApplicationProcesses {
     $fastApiPort = if ($env:FASTAPI_PORT) { [int]$env:FASTAPI_PORT } else { 8000 }
     $uiPort = if ($env:UI_PORT) { [int]$env:UI_PORT } else { 7861 }
     $processes = @(Get-ApplicationProcessRecords -BackendPort $fastApiPort -FrontendPort $uiPort)
+    $portStates = @(Get-LauncherPortStates `
+        -BackendPort $fastApiPort `
+        -FrontendPort $uiPort `
+        -ApplicationProcesses $processes)
+    Assert-NoForeignPortListeners -PortStates $portStates
     if ($processes.Count -eq 0) {
-        foreach ($port in @($fastApiPort, $uiPort) | Sort-Object -Unique) {
-            Stop-PortListeners -Port $port
-        }
         Write-Info 'No application processes were found'
         return
     }
 
-    $orderedProcesses = @($processes | Sort-Object `
-        @{ Expression = { if ([string]$_.Name -match '^(?i:cmd)(?:\.exe)?$') { 0 } else { 1 } } }, `
-        @{ Expression = { [int]$_.ProcessId } })
-    $stopped = 0
-    foreach ($process in $orderedProcesses) {
-        if ([int]$process.ProcessId -eq $PID) { continue }
-        Write-Info "Stopping $($process.Name) (PID $($process.ProcessId))"
-        & taskkill.exe /PID $process.ProcessId /T /F 2>$null | Out-Null
-        if ($LASTEXITCODE -eq 0) {
-            $stopped++
-        }
-    }
-
-    foreach ($port in @($fastApiPort, $uiPort) | Sort-Object -Unique) {
-        Stop-PortListeners -Port $port
-    }
-    Write-Ok "Stopped $stopped application process tree(s) and released the configured application ports"
+    $ownedProcessIds = @($processes | ForEach-Object { [int]$_.ProcessId })
+    $stopped = Stop-ApplicationProcessRecords -Processes $processes
+    Wait-ForLauncherPorts `
+        -Ports @($fastApiPort, $uiPort) `
+        -ExpectedProcessIds $ownedProcessIds
+    Write-Ok "Stopped $stopped application process tree(s) and verified the configured application ports are free"
 }
 
 function Start-Application {
     Import-DotEnv -CreateIfMissing
+    $fastApiHost = if ($env:FASTAPI_HOST) { $env:FASTAPI_HOST } else { '127.0.0.1' }
+    $fastApiPort = if ($env:FASTAPI_PORT) { [int]$env:FASTAPI_PORT } else { 8000 }
+    $uiHost = if ($env:UI_HOST) { $env:UI_HOST } else { '127.0.0.1' }
+    $uiPort = if ($env:UI_PORT) { [int]$env:UI_PORT } else { 7861 }
+    $reload = $env:RELOAD -eq 'true'
+
+    Invoke-LaunchPortPreflight -BackendPort $fastApiPort -FrontendPort $uiPort
     Set-LauncherEnvironment
     $frontendIndex = Join-Path $ClientDir 'dist/browser/index.html'
     $dependenciesReady = Test-DependenciesReady
@@ -774,18 +909,10 @@ function Start-Application {
     }
     Set-LauncherEnvironment
 
-    $fastApiHost = if ($env:FASTAPI_HOST) { $env:FASTAPI_HOST } else { '127.0.0.1' }
-    $fastApiPort = if ($env:FASTAPI_PORT) { [int]$env:FASTAPI_PORT } else { 8000 }
-    $uiHost = if ($env:UI_HOST) { $env:UI_HOST } else { '127.0.0.1' }
-    $uiPort = if ($env:UI_PORT) { [int]$env:UI_PORT } else { 7861 }
-    $reload = $env:RELOAD -eq 'true'
-
-    Stop-PortListeners -Port $fastApiPort
-    Stop-PortListeners -Port $uiPort
-
     if (-not (Test-Path -LiteralPath $VenvPython)) {
         throw "Virtual environment Python is missing: $VenvPython"
     }
+    Invoke-LaunchPortPreflight -BackendPort $fastApiPort -FrontendPort $uiPort
 
     $backendArguments = @(
         '-m', 'uvicorn', 'app:app', '--app-dir', (Join-Path $RepoRoot 'app'),
