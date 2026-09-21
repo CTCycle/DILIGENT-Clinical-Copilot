@@ -1,9 +1,9 @@
 # Pre-release validation ledger
-Last updated: 2026-09-20
+Last updated: 2026-09-21
 
 ## Scope and interpretation
 
-This is a dated evidence register and chronological pre-release validation diary for the DILIGENT source/development tree. The high-level current operational status is canonical in [`../project_status_ledger.md`](../project_status_ledger.md); this document preserves the run-specific scope, evidence, diary, and release boundaries that explain that status. The register below records the validation run performed on 2026-09-18 against source revision `2e434ae1b0e276b8acbab27f65a399d306c3f691` on the `develop` branch. Packaging, publication, EXE/MSI smoke tests, and clean-machine installation were intentionally outside that audit.
+This is a dated evidence register and chronological pre-release validation diary for the DILIGENT source/development tree. The high-level current operational status is canonical in [`../project_status_ledger.md`](../project_status_ledger.md); this document preserves the run-specific scope, evidence, diary, and release boundaries that explain that status. The historical feature-state register below records the validation run performed on 2026-09-18 against source revision `2e434ae1b0e276b8acbab27f65a399d306c3f691` on the `develop` branch. The current 2026-09-21 Tier 0 checkpoint is recorded above. Packaging, publication, EXE/MSI smoke tests, and clean-machine installation were intentionally outside the historical audit.
 
 The run used synthetic patient content only. No patient-identifying data was entered, no source refresh or embedding update job was started, and no live cloud-provider clinical analysis was submitted.
 
@@ -15,9 +15,78 @@ Status meanings:
 - `NOT TESTED`: current evidence is absent; this is not a claim that the capability is broken.
 - `NOT APPLICABLE`: deliberately outside this source-only audit.
 
+## Integrated long-term evaluation strategy
+
+The comprehensive validation roadmap is integrated into this ledger as the
+stable campaign plan. It does not create a second status authority:
+
+- [`project_status_ledger.md`](../project_status_ledger.md) remains the
+  canonical current operational state.
+- This document remains the dated, run-specific evidence register and diary.
+- `assets/QA/` remains the supporting evidence location for logs, screenshots,
+  reports, and validation notes.
+
+### Stable campaign map
+
+| Tier | Slices | Focus |
+|---|---|---|
+| Tier 0 | `V00`–`V02` | Revision/evidence baseline, source startup and migration, automated baseline gates |
+| Tier 1 | `V10`–`V13` | Shell/routing, runtime Settings, model configuration/catalog cache, access-key lifecycle |
+| Tier 2 | `V20`–`V24` | Clinical input/preflight, exact provider execution, multi-drug correctness, RAG grounding, job lifecycle |
+| Tier 3 | `V30`–`V40` | Sessions, editing/media/deletion, Data Inspection, source mutation, RAG re-indexing |
+| Tier 4 | `V41`–`V53` | Timelines, agentic revision, local Ollama, PostgreSQL, Tauri, and release lifecycle |
+| Tier 5 | `V60`–`V61` | Cross-cutting resilience, accessibility, responsive behavior, and performance-sensitive UI |
+
+The campaign order is:
+
+`V00 → V01 → V02 → V10 → V11 → V12 → V20 → V21 → V22 → V23 → V24 → V30 → V31 → V32 → V33 → V34 → V35 → V36 → V37 → V38 → V39 → V40 → V41 → V42 → V43 → V44 → V13 → V50 → V51 → V60 → V61 → V52 → V53`
+
+`V13` may wait for an approved disposable credential, and `V52`/`V53`
+remain release-end gates. The immediate high-risk follow-up after Tier 0 is
+`V21`, `V22`, `V36`–`V39`, `V42`, `V43`, and `V44`.
+
+Every slice record must include its stable ID, capability, status, exact HEAD,
+environment and preconditions, executed scenarios, `VAL-*` issues, primary
+failure class, fixes and adjacent regression, evidence links, remaining gaps,
+validation date, external dependencies, and cleanup result. A screen, HTTP
+200, or isolated mock test is never sufficient for a `PASS` claim without the
+workflow and persistence evidence required by that slice.
+
+The shared execution loop is **Inspect → Execute → Observe → Diagnose →
+Surgically Fix → Retest → Record**. Defects are classified as functional,
+frontend, backend, integration, persistence/state, performance, UX/workflow,
+configuration, or test/environment problems. External provider outages remain
+environment evidence unless routing, classification, fallback, recovery, or
+user feedback violates the product contract.
+
+Comprehensive source validation requires one exact `develop` commit, no core
+capability left `UNTESTED`, `UNKNOWN`, `FAIL`, or `BLOCKED`, current exact
+provider evidence without fallback, source-refresh safety, timeline failure and
+cancellation evidence, QA-clean revision finalization with reload persistence,
+final automated gates at that same commit, resolvable evidence links, and no
+temporary credentials or validation data left in persistent user storage.
+
+## Tier 0 execution checkpoint — 2026-09-21
+
+The checkpoint started from a clean `develop` worktree at
+`d0e8ba1809d7a79615f300403891ae2066a574a7`. The prior status snapshot was
+`ba47761aa456e78923a0df824f76ee4016ee0af6`; the exact changed-file boundary
+and evidence-link audit are recorded in the [Tier 0 evidence report](../../QA/tier0-validation-20260921.md).
+
+| Slice | Capability | Status | Executed scope and result |
+|---|---|---|---|
+| `V00` | Revision and evidence baseline | `PASS` | Recorded HEAD, branch, clean state, 713-entry tree, snapshot drift, and 109 status-ledger links; all referenced evidence paths resolved. |
+| `V01` | Source startup, migration, health, populated-data reuse, and shutdown | `PARTIAL` | Fresh and populated disposable SQLite runs passed launcher initialization, Alembic head, health, frontend readiness, read-only sessions access, integrity checks, and owned-process shutdown. Occupied-port failure behavior remains untested. |
+| `V02` | Automated baseline gates | `PASS` | `app\tests\run_tests.bat unit`: 742 passed; Angular/Vitest: 23 files and 96 tests passed; production build completed with `--progress=false`. |
+
+The disposable databases were removed after the run. Ports `7690` and `9847`
+were verified free, and no matching launcher-owned backend/frontend process
+remained. `V01` is not a product failure claim; its partial status marks only
+the unexecuted occupied-port subcase.
+
 ## Current release assessment
 
-The original populated-database migration blocker has been remediated in source. SQLite migration transactions now suspend foreign-key enforcement only while Alembic performs the atomic parent-table rebuild, run `PRAGMA foreign_key_check` before commit, and restore the connection's prior enforcement state. The fix was verified with foreign keys enabled in the migration fixture and with a task-local clone of the current populated database through `start_on_windows.ps1 -Action InitializeDatabase`; all existing clinical/revision row counts and SQLite integrity checks were preserved. The shared source database was intentionally not advanced and remains at `202609100001`.
+The original populated-database migration blocker has been remediated in source. SQLite migration transactions now suspend foreign-key enforcement only while Alembic performs the atomic parent-table rebuild, run `PRAGMA foreign_key_check` before commit, and restore the connection's prior enforcement state. In the historical 2026-09-18 audit, the fix was verified with foreign keys enabled in the migration fixture and with a task-local clone of the then-current populated database through `start_on_windows.ps1 -Action InitializeDatabase`; all existing clinical/revision row counts and SQLite integrity checks were preserved. The shared source database was intentionally not advanced by that historical run.
 
 Release readiness remains blocked by the separate absence of live provider, populated-session, timeline, revision, citation, and final-report evidence. The migration remediation is not a claim that those clinical or external-provider gates passed.
 
