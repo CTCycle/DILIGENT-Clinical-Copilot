@@ -1,9 +1,9 @@
 # Local Deployment
-Last updated: 2026-09-21
+Last updated: 2026-09-22
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
-- On Windows, `start_on_windows.ps1` prepares portable runtimes and dependencies before launching the local services; the frontend build is normally produced by install option 2, can be rebuilt independently with option 3 or `-Action RebuildFrontend`, and is rebuilt by option 1 when recovery detects missing or unusable environments or frontend output. Option 6 checks `origin/main` without changing the checkout, while option 7 updates source only from a non-detached, clean `main` checkout with `git pull --ff-only origin main`; it does not switch branches or modify local changes.
+- On Windows, `start_on_windows.ps1` prepares only the warm-launch runtime prerequisites on a normal launch; backend/runtime repair and explicit installation use the tracked `app/server/uv.lock`. The frontend build is normally produced by install option 2, can be rebuilt independently with option 3 or `-Action RebuildFrontend`, and is rebuilt by option 1 only when its deterministic build state is missing, unreadable, stale, or its output is missing. Option 6 checks `origin/main` without changing the checkout, while option 7 updates source only from a non-detached, clean `main` checkout with `git pull --ff-only origin main`; it does not switch branches or modify local changes.
 - The release frontend runtime is Node.js 22.13.0, matching the launcher and CI.
 - Desktop release builds use Rust 1.95.0 with the `x86_64-pc-windows-msvc` target, Python 3.14.7, uv 0.11.30, and PyInstaller 6.21.0.
 - RAG requires `numpy`, `onnxruntime`, and `tokenizers`; the canonical artifact is a pinned AVX2 `uint8` ONNX model. PyTorch and Sentence Transformers are not required.
@@ -14,6 +14,37 @@ Last updated: 2026-09-21
 - `app/client/package-lock.json`
 - `app/desktop/package-lock.json`
 - `app/desktop/src-tauri/Cargo.lock`
+
+## Source-mode frontend build policy
+
+The source-mode Angular output is current only when both
+`app/client/dist/browser/index.html` and
+`app/client/dist/.diligent-build-state.json` exist. The state marker records
+`schema_version`, a deterministic `build_fingerprint`, a separate
+`dependency_fingerprint`, the pinned `node_version`, and the canonical
+`build_command` (`npm run build`). Fingerprints use sorted normalized relative
+paths and SHA-256 content digests; mtimes are not used.
+
+The build fingerprint covers production files under `app/client/src/` except
+`*.spec.ts`, `app/client/public/**`, `package.json`, `package-lock.json`,
+`angular.json`, `tsconfig.json`, `tsconfig.app.json`, the pinned launcher Node
+version, and the build command. Changes to spec files, `tsconfig.spec.json`,
+`vitest.config.ts`, preview/dev-server scripts, `settings/.env`, backend
+Python, documentation, and QA files do not invalidate the production build.
+
+Automatic source-mode behavior is:
+
+- valid current marker and output: reuse exactly as-is; no Angular build or npm dependency synchronization
+- missing output, missing marker, corrupt marker, or fingerprint/contract mismatch: rebuild
+- dependency-manifest or pinned-Node change, or an unknown prior marker: run `npm ci` from the tracked lockfile before rebuilding
+- option 2 / `-Action Install`: synchronize backend and frontend dependencies and rebuild
+- option 3 / `-Action RebuildFrontend`: rebuild unconditionally
+- update/check-for-update actions: do not build the frontend
+
+The launcher calculates the source fingerprint before and after `npm run build`
+and writes the marker only when the inputs stayed stable. The marker is written
+through an atomic replacement. Desktop-release staging output keeps its
+existing output contract and does not require this source-mode marker.
 
 ## Database migrations
 

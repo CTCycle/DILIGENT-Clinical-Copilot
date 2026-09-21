@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-09-21
+Last updated: 2026-09-22
 
 ## Recommended Local Startup
 On Windows, use:
@@ -10,18 +10,18 @@ On Windows, use:
 
 The launcher:
 - creates `settings/.env` from `settings/.env.example` on first application start when the local environment file is missing
-- ensures portable Python, `uv`, and Node runtimes under `runtimes/`
-- runs `uv sync --locked` against the tracked `app/server/uv.lock`
-- installs frontend dependencies
-- rebuilds the frontend when the main-menu install option 2 or frontend rebuild option 3 is executed, or when option 1 detects missing or unusable dependencies or frontend output during recovery
-- validates that the frontend build is available before starting the preview server
+- ensures portable Python and Node runtimes for a warm launch; `uv` is prepared when backend/runtime repair or an explicit install requires it
+- runs `uv sync --locked` against the tracked `app/server/uv.lock` during backend/runtime repair and explicit installation
+- installs frontend dependencies only when an explicit install/rebuild or a stale/missing frontend build requires them
+- rebuilds the frontend when the main-menu install option 2 or frontend rebuild option 3 is executed, or when option 1 detects missing or stale source-mode build output
+- validates the deterministic frontend build-state marker before reusing an existing production build
 - starts the backend with the synchronized virtual-environment Python and `uvicorn`
 - opens a visible dedicated backend terminal for every source-mode launch
 - starts the frontend preview server
 - recreates a stale backend virtual environment when the repository has moved
 - provides grouped `APPLICATION`, `SETUP & VALIDATION`, `SOURCE CONTROL`, `BUILD & DISTRIBUTION`, and `DATA & MAINTENANCE` options, followed by a final sequential `EXIT` option; the desktop-release submenu uses the same aligned numeric rows
-- checks both configured source-mode ports before starting application processes; foreign listeners are never terminated
-- prompts interactively before stopping recognized DILIGENT process trees; redirected or declined launches fail safely and point to the explicit cleanup action
+- checks both configured source-mode ports immediately before starting application processes; every owning PID is listed, including foreign listeners
+- prompts once before directly stopping the listed unique port holders; redirected or declined launches fail safely without terminating anything
 
 All source-mode disposable runtime, application, test, and tool state is rooted
 at `runtimes/cache/`. The launcher routes uv, pip, npm, Playwright, Python
@@ -61,6 +61,38 @@ If a previous launch left backend, frontend, or launcher wrapper processes runni
 run `.\start_on_windows.ps1 -Action KillApplicationProcesses` and confirm the
 cleanup when prompted.
 
+## Source-mode frontend build freshness
+
+Source-mode production output is accompanied by
+`app/client/dist/.diligent-build-state.json`. The marker contains a schema
+version, source/build fingerprint, dependency fingerprint, pinned Node version,
+and the canonical `npm run build` command. The launcher reuses the output only
+when the marker and `dist/browser/index.html` are present and all fingerprints
+still match.
+
+The build fingerprint includes sorted, normalized paths and content digests for
+production files under `app/client/src/` (excluding `*.spec.ts`),
+`app/client/public/**`, the frontend manifests/configuration files, the pinned
+Node version, and the build command. It does not include test configuration,
+preview/dev-server scripts, `settings/.env`, backend Python, QA files, or
+documentation. A missing, corrupt, stale, or absent output marker triggers one
+source-mode rebuild. Dependency-manifest or pinned-Node changes additionally
+run `npm ci` from the tracked lockfile before that build. The marker is written
+only after a successful build whose inputs are unchanged, using an atomic
+replacement; desktop-release staging output does not require this marker.
+
+## Source-mode port conflicts
+
+Immediately before application process creation, the launcher performs one listener
+scan for both configured ports. It aggregates listeners by unique PID, resolves a process
+name when permitted, and shows one line per process with all ports it owns. An
+interactive confirmation applies to the displayed set once. A decline, a
+noninteractive invocation, or a failed termination leaves processes untouched or
+causes launch to abort; a final listener scan is authoritative if a process exits
+concurrently. A replacement holder or any remaining listener is reported with
+its current PID and port. The explicit `KillApplicationProcesses` action keeps
+its narrower repository-qualified process-tree cleanup contract.
+
 ## Packaged desktop startup
 
 The Windows portable executable and MSI use the Tauri shell. Open the verified portable EXE directly, or launch the application installed by the MSI; do not run the source launcher for packaged operation. On first launch the shell verifies the embedded runtime archive, extracts it to a versioned hash directory under `%LOCALAPPDATA%\DILIGENT\runtime`, creates persistent data directories under `%LOCALAPPDATA%\DILIGENT\data`, starts the packaged backend on a random localhost port, waits for its atomic ready file and `/api/health`, and then shows the desktop window. The backend is owned by a Windows Job Object and is terminated when the shell exits.
@@ -90,19 +122,18 @@ npm run preview -- --host 127.0.0.1 --port 9847 --strictPort
 
 ## Quick Startup Checklist
 ### Source/development mode
-1. Confirm ports `7690` and `9847` are free or intentionally used by current DILIGENT processes. The launcher reports an actionable conflict and leaves foreign listeners running.
+1. Confirm ports `7690` and `9847` are free, or start the launcher from an interactive PowerShell console so it can display and request termination of any configured-port holders.
 2. Start the backend.
 3. Verify `http://127.0.0.1:7690/docs` responds.
 4. Start the frontend on `9847`.
 5. Open `http://127.0.0.1:9847`.
 
-If an existing DILIGENT process tree is detected during an interactive launch,
-the launcher asks for confirmation before stopping it. A launch from a
-redirected or noninteractive console cannot confirm that action; run
-`.\start_on_windows.ps1 -Action KillApplicationProcesses` interactively and
-then retry. A listener that does not match the repository-qualified DILIGENT
-process identity is always treated as foreign and is never killed by the
-launcher.
+If any configured port is occupied during an interactive launch, the launcher
+lists the unique owning PIDs and asks once before stopping those PIDs directly.
+A launch from a redirected or noninteractive console cannot confirm that action
+and exits without terminating anything. If the prompt is declined, use the
+explicit `KillApplicationProcesses` action for stale repository-owned process
+trees or stop the listed service yourself, then retry.
 
 ### Packaged desktop mode
 1. Open the portable EXE or launch the installed MSI application.
