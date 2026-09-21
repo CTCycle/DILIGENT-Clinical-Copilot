@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-09-18
+Last updated: 2026-09-21
 
 ## Recommended Local Startup
 On Windows, use:
@@ -20,6 +20,8 @@ The launcher:
 - starts the frontend preview server
 - recreates a stale backend virtual environment when the repository has moved
 - provides grouped `APPLICATION`, `SETUP & VALIDATION`, `SOURCE CONTROL`, `BUILD & DISTRIBUTION`, and `DATA & MAINTENANCE` options, followed by a final sequential `EXIT` option; the desktop-release submenu uses the same aligned numeric rows
+- checks both configured source-mode ports before starting application processes; foreign listeners are never terminated
+- prompts interactively before stopping recognized DILIGENT process trees; redirected or declined launches fail safely and point to the explicit cleanup action
 
 All source-mode disposable runtime, application, test, and tool state is rooted
 at `runtimes/cache/`. The launcher routes uv, pip, npm, Playwright, Python
@@ -88,11 +90,19 @@ npm run preview -- --host 127.0.0.1 --port 9847 --strictPort
 
 ## Quick Startup Checklist
 ### Source/development mode
-1. Confirm port `7690` is free or intentionally used by the current backend.
+1. Confirm ports `7690` and `9847` are free or intentionally used by current DILIGENT processes. The launcher reports an actionable conflict and leaves foreign listeners running.
 2. Start the backend.
 3. Verify `http://127.0.0.1:7690/docs` responds.
 4. Start the frontend on `9847`.
 5. Open `http://127.0.0.1:9847`.
+
+If an existing DILIGENT process tree is detected during an interactive launch,
+the launcher asks for confirmation before stopping it. A launch from a
+redirected or noninteractive console cannot confirm that action; run
+`.\start_on_windows.ps1 -Action KillApplicationProcesses` interactively and
+then retry. A listener that does not match the repository-qualified DILIGENT
+process identity is always treated as foreign and is never killed by the
+launcher.
 
 ### Packaged desktop mode
 1. Open the portable EXE or launch the installed MSI application.

@@ -85,6 +85,25 @@ launcher-owned backend/frontend process remained. The fresh and populated V01
 subcases are passing, but the occupied-port ownership failure is a reproducible
 launcher defect and blocks treating V01 as complete.
 
+## V01 remediation revalidation — 2026-09-21
+
+The original V01 checkpoint above is retained as historical evidence. The
+follow-up remediation was validated against the checked-out `develop` source
+with the launcher changes present in the working tree. Full evidence is in
+[ISSUE-006 / V01 remediation revalidation](../../QA/issue-006-v01-revalidation-20260921.md).
+
+| Slice | Status | Evidence boundary |
+|---|---|---|
+| Foreign backend listener on `7690` | `PASS` | PID `42608` survived; launch returned nonzero with the port/PID remediation and did not start the application. |
+| Foreign frontend listener on `9847` | `PASS` | PID `18324` survived; launch returned nonzero with the port/PID remediation and did not start the application. |
+| Explicit cleanup with foreign listener | `PASS` | Confirmed `KillApplicationProcesses` returned nonzero and left PID `29992` listening. |
+| Owned-process prompt and shutdown | `PASS` | Declined launch preserved the owned runtime; accepted launch stopped only the matched process tree, restarted successfully, and explicit cleanup released both ports. |
+| Fresh disposable SQLite startup | `PASS` | Two launcher initialization runs reached `202609170001`; health, frontend readiness, empty sessions, and SQLite integrity passed. |
+| Populated disposable SQLite startup | `PASS` | Clone initialization and launch retained 18 sessions, 50 versions, 28 revision runs, 90 artifacts, `foreign_key_check=[]`, and `integrity_check=ok`. |
+
+Current V01 status is therefore `PASS` for the source-launcher scope. The
+packaged desktop and clean-machine gates remain separate.
+
 ## Current release assessment
 
 The original populated-database migration blocker has been remediated in source. SQLite migration transactions now suspend foreign-key enforcement only while Alembic performs the atomic parent-table rebuild, run `PRAGMA foreign_key_check` before commit, and restore the connection's prior enforcement state. In the historical 2026-09-18 audit, the fix was verified with foreign keys enabled in the migration fixture and with a task-local clone of the then-current populated database through `start_on_windows.ps1 -Action InitializeDatabase`; all existing clinical/revision row counts and SQLite integrity checks were preserved. The shared source database was intentionally not advanced by that historical run.
