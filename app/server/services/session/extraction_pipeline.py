@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
-from collections.abc import Callable
-from typing import Any, Protocol
+from collections.abc import Awaitable, Callable
+from typing import Any, Protocol, TypeVar
 
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
@@ -21,6 +22,34 @@ from domain.clinical.entities import (
 from domain.clinical.extras import HepatoxPreparedInputs
 from services.retrieval.query import DILIQueryBuilder
 from services.llm.runtime_config import LLMRuntimeConfig
+from services.clinical.job_progress import ClinicalJobCancelled
+
+###############################################################################
+T = TypeVar("T")
+
+
+async def _await_with_stop_check(
+    awaitable: Awaitable[T],
+    *,
+    stop_check: Callable[[], None] | None,
+) -> T:
+    """Await a stage while allowing a cooperative stop to cancel its task."""
+    if stop_check is None:
+        return await awaitable
+
+    task = asyncio.create_task(awaitable)
+    try:
+        while not task.done():
+            stop_check()
+            await asyncio.sleep(0.1)
+        return await task
+    except BaseException:
+        if not task.done():
+            task.cancel()
+        with contextlib.suppress(BaseException):
+            await task
+        raise
+
 
 ###############################################################################
 class ClinicalSessionExtractionOwner(Protocol):
@@ -70,12 +99,15 @@ class ClinicalSessionExtractionPipelineMixin:
             base_timeout_s=float(getattr(self.drugs_parser, "timeout_s", 1.0))
         )
         try:
-            therapy_drugs = await asyncio.wait_for(
-                self.drugs_parser.extract_drugs_from_therapy(
-                    cleaned_therapy_text,
-                    progress_callback=therapy_progress_callback,
+            therapy_drugs = await _await_with_stop_check(
+                asyncio.wait_for(
+                    self.drugs_parser.extract_drugs_from_therapy(
+                        cleaned_therapy_text,
+                        progress_callback=therapy_progress_callback,
+                    ),
+                    timeout=timeout_s,
                 ),
-                timeout=timeout_s,
+                stop_check=stop_check,
             )
             self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
@@ -84,6 +116,8 @@ class ClinicalSessionExtractionPipelineMixin:
             logger.info(
                 "Detected %s drugs from therapy list", len(therapy_drugs.entries)
             )
+        except ClinicalJobCancelled:
+            raise
         except Exception as exc:
             elapsed = time.perf_counter() - start_time
             self.note_stage_elapsed("therapy_extraction", elapsed)
@@ -142,12 +176,15 @@ class ClinicalSessionExtractionPipelineMixin:
             base_timeout_s=float(getattr(self.drugs_parser, "timeout_s", 1.0))
         )
         try:
-            anamnesis_drugs = await asyncio.wait_for(
-                self.drugs_parser.extract_drugs_from_anamnesis(
-                    anamnesis_text,
-                    progress_callback=anamnesis_progress_callback,
+            anamnesis_drugs = await _await_with_stop_check(
+                asyncio.wait_for(
+                    self.drugs_parser.extract_drugs_from_anamnesis(
+                        anamnesis_text,
+                        progress_callback=anamnesis_progress_callback,
+                    ),
+                    timeout=timeout_s,
                 ),
-                timeout=timeout_s,
+                stop_check=stop_check,
             )
             self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
@@ -156,6 +193,8 @@ class ClinicalSessionExtractionPipelineMixin:
             logger.info(
                 "Detected %s drugs from anamnesis", len(anamnesis_drugs.entries)
             )
+        except ClinicalJobCancelled:
+            raise
         except Exception as exc:
             elapsed = time.perf_counter() - start_time
             self.note_stage_elapsed("anamnesis_extraction", elapsed)
@@ -219,12 +258,16 @@ class ClinicalSessionExtractionPipelineMixin:
         )
         for attempt in range(1, max_attempts + 1):
             try:
-                disease_context = await asyncio.wait_for(
-                    self.disease_extractor.extract_diseases_from_anamnesis(
-                        anamnesis_text,
-                        progress_callback=disease_progress_callback,
+                disease_context = await _await_with_stop_check(
+                    asyncio.wait_for(
+                        self.disease_extractor.extract_diseases_from_anamnesis(
+                            anamnesis_text,
+                            progress_callback=disease_progress_callback,
+                            stop_check=stop_check,
+                        ),
+                        timeout=timeout_s,
                     ),
-                    timeout=timeout_s,
+                    stop_check=stop_check,
                 )
                 self.run_stop_check(stop_check)
                 elapsed = time.perf_counter() - start_time
@@ -240,6 +283,8 @@ class ClinicalSessionExtractionPipelineMixin:
                 )
                 self.run_stop_check(stop_check)
                 return disease_context
+            except ClinicalJobCancelled:
+                raise
             except TimeoutError:
                 elapsed = time.perf_counter() - start_time
                 if attempt < max_attempts:
@@ -363,23 +408,29 @@ class ClinicalSessionExtractionPipelineMixin:
         )
         try:
             if hasattr(self.lab_extractor, "extract_from_payload_with_audit"):
-                lab_audit = await asyncio.wait_for(
-                    self.lab_extractor.extract_from_payload_with_audit(
-                        payload,
-                        progress_callback=lab_progress_callback,
+                lab_audit = await _await_with_stop_check(
+                    asyncio.wait_for(
+                        self.lab_extractor.extract_from_payload_with_audit(
+                            payload,
+                            progress_callback=lab_progress_callback,
+                        ),
+                        timeout=timeout_s,
                     ),
-                    timeout=timeout_s,
+                    stop_check=stop_check,
                 )
                 self.latest_lab_extraction_audit = lab_audit
                 lab_timeline = lab_audit["lab_timeline"]
                 onset_context = lab_audit["onset_context"]
             else:
-                lab_timeline, onset_context = await asyncio.wait_for(
-                    self.lab_extractor.extract_from_payload(
-                        payload,
-                        progress_callback=lab_progress_callback,
+                lab_timeline, onset_context = await _await_with_stop_check(
+                    asyncio.wait_for(
+                        self.lab_extractor.extract_from_payload(
+                            payload,
+                            progress_callback=lab_progress_callback,
+                        ),
+                        timeout=timeout_s,
                     ),
-                    timeout=timeout_s,
+                    stop_check=stop_check,
                 )
                 self.latest_lab_extraction_audit = None
             self.run_stop_check(stop_check)
@@ -387,6 +438,8 @@ class ClinicalSessionExtractionPipelineMixin:
             self.note_stage_elapsed("anamnesis_lab_extraction", elapsed)
             logger.info("Anamnesis lab extraction required %.4f seconds", elapsed)
             logger.info("Detected %s timeline lab entries", len(lab_timeline.entries))
+        except ClinicalJobCancelled:
+            raise
         except Exception as exc:
             elapsed = time.perf_counter() - start_time
             self.note_stage_elapsed("anamnesis_lab_extraction", elapsed)

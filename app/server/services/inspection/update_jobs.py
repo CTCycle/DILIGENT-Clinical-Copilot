@@ -320,6 +320,22 @@ class DataInspectionUpdateJobRunner:
                         report_phase=False,
                     )
             except Exception:
+                if self.jobs.should_stop(job_id):
+                    source_state[target].update(
+                        status="cancelled",
+                        message="Cancellation requested.",
+                    )
+                    mark_cancelled(index + 1)
+                    patch_job(
+                        (
+                            index
+                            + source_state[target]["progress"] / 100.0
+                        )
+                        / len(targets)
+                        * 100.0,
+                        "Cancellation requested for the structured source updates.",
+                    )
+                    return {"sources": source_state, "summaries": summaries}
                 source_state[target].update(
                     status="failed",
                     message=f"{target.capitalize()} update failed.",

@@ -49,6 +49,41 @@ describe('DiliJobTrackerService', () => {
     expect(appState.state().diliAgent.isRunning).toBeTruthy();
   });
 
+  it('reconnects to a persisted active job after page reload', async () => {
+    const activeJobKey = 'dili-agent-active-job-v1';
+    localStorage.setItem(activeJobKey, JSON.stringify({
+      jobId: 'job-resume-after-reload',
+      jobStatus: 'running',
+      jobStartedAtMs: Date.now() - 2_000,
+      pollIntervalMs: 250,
+    }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({
+        job_id: 'job-resume-after-reload',
+        job_type: 'clinical',
+        status: 'completed',
+        progress: 100,
+        result: { report: 'Recovered report' },
+        error: null,
+        version: 4,
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    const tracker = TestBed.inject(DiliJobTrackerService);
+    await flushAsyncWork();
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(appState.state().diliAgent.jobId).toBe('job-resume-after-reload');
+    expect(appState.state().diliAgent.jobStatus).toBe('completed');
+    expect(appState.state().diliAgent.isRunning).toBeFalsy();
+    expect(appState.state().diliAgent.message).toBe('Recovered report');
+    expect(localStorage.getItem(activeJobKey)).toBeNull();
+    tracker.clearJobState();
+  });
+
   it('keeps a stop-requested worker active while waiting for shutdown', () => {
     const tracker = TestBed.inject(DiliJobTrackerService);
     appState.updateDiliAgent({
