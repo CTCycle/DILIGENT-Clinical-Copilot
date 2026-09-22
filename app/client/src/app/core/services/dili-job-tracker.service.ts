@@ -16,6 +16,67 @@ import { createDownloadUrl, formatErrorMessage, formatUnknownError } from '../ut
 const POLL_WATCHDOG_MIN_STALE_MS = 15_000;
 const STALE_JOB_MESSAGE =
   '[WARN] The previous background analysis is no longer available. Start a new run to continue.';
+const ACTIVE_CLINICAL_JOB_KEY = 'dili-agent-active-job-v1';
+
+type PersistedClinicalJob = {
+  jobId: string;
+  jobStatus: 'pending' | 'running';
+  jobStartedAtMs: number;
+  pollIntervalMs: number;
+};
+
+function readPersistedClinicalJob(): PersistedClinicalJob | null {
+  if (!('localStorage' in globalThis)) {
+    return null;
+  }
+
+  try {
+    const serialized = globalThis.localStorage.getItem(ACTIVE_CLINICAL_JOB_KEY);
+    if (!serialized) {
+      return null;
+    }
+    const value: unknown = JSON.parse(serialized);
+    if (typeof value !== 'object' || value === null) {
+      return null;
+    }
+    const job = value as Partial<PersistedClinicalJob>;
+    if (
+      typeof job.jobId !== 'string' ||
+      !job.jobId.trim() ||
+      (job.jobStatus !== 'pending' && job.jobStatus !== 'running') ||
+      typeof job.jobStartedAtMs !== 'number' ||
+      !Number.isFinite(job.jobStartedAtMs) ||
+      typeof job.pollIntervalMs !== 'number' ||
+      !Number.isFinite(job.pollIntervalMs) ||
+      job.pollIntervalMs <= 0
+    ) {
+      return null;
+    }
+    return {
+      jobId: job.jobId,
+      jobStatus: job.jobStatus,
+      jobStartedAtMs: job.jobStartedAtMs,
+      pollIntervalMs: Math.max(250, job.pollIntervalMs),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistClinicalJob(job: PersistedClinicalJob | null): void {
+  if (!('localStorage' in globalThis)) {
+    return;
+  }
+  try {
+    if (job) {
+      globalThis.localStorage.setItem(ACTIVE_CLINICAL_JOB_KEY, JSON.stringify(job));
+    } else {
+      globalThis.localStorage.removeItem(ACTIVE_CLINICAL_JOB_KEY);
+    }
+  } catch {
+    // Keep job tracking in memory when browser storage is unavailable.
+  }
+}
 
 function isTerminalJobStatus(status: JobStatus | null): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled';
@@ -37,6 +98,28 @@ export class DiliJobTrackerService {
   private pollRecoveryInFlight = false;
   private pollWatchdogTimer: ReturnType<typeof globalThis.setInterval> | null = null;
 
+  constructor() {
+    const persistedJob = readPersistedClinicalJob();
+    if (!persistedJob) {
+      return;
+    }
+
+    const now = Date.now();
+    this.stateService.updateDiliAgent({
+      jobId: persistedJob.jobId,
+      jobProgress: 0,
+      jobStatus: persistedJob.jobStatus,
+      jobStage: 'session_initialization',
+      jobStageMessage: 'Reconnecting to the active clinical analysis.',
+      isStarting: false,
+      isRunning: true,
+      jobStartedAtMs: persistedJob.jobStartedAtMs,
+      jobLastProgressAtMs: now,
+      pollIntervalMs: persistedJob.pollIntervalMs,
+    });
+    this.beginPolling(persistedJob.jobId, persistedJob.pollIntervalMs);
+  }
+
   async startSession(
     payload: Parameters<typeof startClinicalJob>[0],
     preflightWarningSummary: string | null,
@@ -46,6 +129,7 @@ export class DiliJobTrackerService {
       return;
     }
 
+    persistClinicalJob(null);
     this.stopPolling();
     this.revokeCurrentExportUrl();
     const now = Date.now();
@@ -79,8 +163,15 @@ export class DiliJobTrackerService {
         jobLastProgressAtMs: now,
         pollIntervalMs: intervalMs,
       });
+      persistClinicalJob({
+        jobId: startResult.job_id,
+        jobStatus: startResult.status === 'pending' ? 'pending' : 'running',
+        jobStartedAtMs: now,
+        pollIntervalMs: intervalMs,
+      });
       this.beginPolling(startResult.job_id, intervalMs);
     } catch (error) {
+      persistClinicalJob(null);
       this.stateService.updateDiliAgent({
         message: formatUnknownError(error, 'Unexpected error'),
         exportUrl: null,
@@ -111,6 +202,7 @@ export class DiliJobTrackerService {
   }
 
   clearJobState(): void {
+    persistClinicalJob(null);
     this.stopPolling();
     this.revokeCurrentExportUrl();
     this.stateService.updateDiliAgent({
@@ -248,6 +340,7 @@ export class DiliJobTrackerService {
       return;
     }
 
+    persistClinicalJob(null);
     this.stopPolling();
 
     if (status.status === 'completed') {
@@ -282,6 +375,9 @@ export class DiliJobTrackerService {
   }
 
   private handlePollingError(message: string): void {
+    if (isJobNotFoundError(message)) {
+      persistClinicalJob(null);
+    }
     this.stopPolling();
     this.revokeCurrentExportUrl();
     this.stateService.updateDiliAgent({

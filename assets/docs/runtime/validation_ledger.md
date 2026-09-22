@@ -1,11 +1,11 @@
 # Pre-release validation ledger
-Last updated: 2026-09-21
+Last updated: 2026-09-22
 
 ## Scope and interpretation
 
 This is a dated evidence register and chronological pre-release validation diary for the DILIGENT source/development tree. The high-level current operational status is canonical in [`../project_status_ledger.md`](../project_status_ledger.md); this document preserves the run-specific scope, evidence, diary, and release boundaries that explain that status. The historical feature-state register below records the validation run performed on 2026-09-18 against source revision `2e434ae1b0e276b8acbab27f65a399d306c3f691` on the `develop` branch. The current 2026-09-21 Tier 0 checkpoint is recorded above. Packaging, publication, EXE/MSI smoke tests, and clean-machine installation were intentionally outside the historical audit.
 
-The run used synthetic patient content only. No patient-identifying data was entered, no source refresh or embedding update job was started, and no live cloud-provider clinical analysis was submitted.
+The historical 2026-09-18 run used synthetic patient content only. No patient-identifying data was entered, no source refresh or embedding update job was started, and no live cloud-provider clinical analysis was submitted. The current 2026-09-22 checkpoint below separately records the exact-provider clinical and structured-source executions.
 
 Status meanings:
 
@@ -108,9 +108,32 @@ packaged desktop and clean-machine gates remain separate.
 
 The original populated-database migration blocker has been remediated in source. SQLite migration transactions now suspend foreign-key enforcement only while Alembic performs the atomic parent-table rebuild, run `PRAGMA foreign_key_check` before commit, and restore the connection's prior enforcement state. In the historical 2026-09-18 audit, the fix was verified with foreign keys enabled in the migration fixture and with a task-local clone of the then-current populated database through `start_on_windows.ps1 -Action InitializeDatabase`; all existing clinical/revision row counts and SQLite integrity checks were preserved. The shared source database was intentionally not advanced by that historical run.
 
-Release readiness remains blocked by the separate absence of live provider, populated-session, timeline, revision, citation, and final-report evidence. The migration remediation is not a claim that those clinical or external-provider gates passed.
+Release readiness remains blocked by the independent revision-acceptance, local-inference, access-key, timeline, packaging, and clean-machine gates. A current synthetic clinical workflow has passed through the exact configured OpenCode Go model with report, evidence, and restart persistence; this bounded clinical PASS does not certify every provider response or clinical adjudication.
 
 The historical 2026-09-18 post-remediation register counts: `PASS 13`, `ATTENTION 3`, `FAIL 0`, `NOT TESTED 21`, `NOT APPLICABLE 2`.
+
+## Clinical and structured-source validation checkpoint — 2026-09-22
+
+This checkpoint supplements the historical 2026-09-18 feature-state register and the 2026-09-21 Tier 0 checkpoint. The baseline was clean `develop` HEAD `c61c9e02aa14a489703fce1ed09adb5c3575be8d`; the validation itself used the current working tree after surgical remediations. Synthetic data only. Structured-source mutations ran in `runtimes/cache/clinical-source-refresh-20260922-c61c9e0`; the original database was not used for mutation. It reached Alembic head `202609170001` with `integrity_check=ok` and no foreign-key violations.
+
+The run covers the aggregate Tier 2 clinical workflow intent (`V20`–`V24`) and the structured-source portion of the Tier 3 campaign (`V30`–`V40`). It does not assign individual subtest mappings to `V21`/`V22` or `V36`–`V39` where the campaign index does not define that mapping.
+
+| Capability | Status | Current run evidence |
+|---|---|---|
+| Exact-provider clinical workflow | `PASS` | Synthetic multi-drug job `3da3b0f0` completed as session 4 on exact OpenCode Go `deepseek-v4-flash`. Seven provider calls returned HTTP 200; no retry or provider/model fallback. Preflight passed, and a deliberately invalid case was blocked without a job/session. |
+| Extraction, resolution, calculation, and report | `PASS` | Nitrofurantoin, amoxicillin/clavulanate, and atorvastatin remained separate with accepted RxNav identities, direct LiverTox matches, per-drug assessments and provenance. 17 observations were dated across four dates. Independently computed R-score `(420/40)/(160/120)=7.875`, hepatocellular, matched the rendered report. RAG audit was valid; 18 references retrieved, 11 bibliography entries, no citation outside the bibliography. |
+| Session persistence and recovery | `PASS` | Session 4 survived browser reload and a standard-launcher application restart with report, inputs, labs, assessments, citations, metadata, and successful status intact. Case C live reload recovered the same running job `1d2a0770` without a duplicate session. |
+| Post-refresh clinical regression | `PASS` | After the ordered-source failure and DILIrank retry, a RAG-on synthetic case completed as successful session 5. It resolved Nitrofurantoin with RxNav/LiverTox/DILIrank, retrieved RAG evidence, rendered citations, and independently matched R-score `(300/40)/(140/120)=6.4286`; its overall adjudication correctly remained `insufficient_data`. |
+| Clinical cancellation | `PASS` | `VAL-20260922-007`: The first live Stop attempt exposed delayed cooperative cancellation. A stop-aware await boundary now cancels in-flight async extraction tasks before fallbacks can be written; its unit regression passed, and exact-provider retest job `ec61953e` reached terminal `cancelled` with `progress_status=cancelled` within two seconds. |
+| Ordered structured-source Update All | `PARTIAL` | Job `b47e8264` visibly ran in order: RxNav completed after 21,202 records, LiverTox failed because NCBI Bookshelf returned a CAPTCHA challenge, and DILIrank was explicitly skipped. The combined job ended failed at 35%, one of three completed. |
+| Source preservation and retry | `PASS` for the exercised boundaries | SQLite retained 1,593 LiverTox monographs and 1,336 DILIrank records and metadata through the failed combined run; integrity was `ok` and foreign-key violations were zero. Standalone DILIrank retry `eace912c` completed with 1,336 persisted rows (733 linked, 286 unmatched, 317 ambiguous), and the UI returned to Completed. Full all-source success remains externally blocked. |
+| Cancellation and failure regression | `PASS` for structured-source job behavior | A live combined-source cancellation after the backend correction rendered all three sources as cancelled with zero completed. Unit coverage exercises pending cancellation, child exception during cancellation, and failure after an earlier source. The progress UI accurately reports completed source count. |
+
+The NCBI Bookshelf CAPTCHA was not solved or bypassed. The downloader now identifies human-verification pages, reports the upstream block, and does not fall through to obsolete URLs. This is an external refresh blocker, not a clinical/provider PASS or a reason to treat the local archive as fresh data.
+
+Current focused gates: backend `102 passed, 1 skipped` (PostgreSQL persistence needs `TEST_DATABASE_URL`), clinical extraction/cancellation slice `14 passed`, Angular tracker specs `2 files / 7 tests passed`, Ruff passed, and `git diff --check` passed with only line-ending notices. The detailed run, `VAL-*` findings, source counts, and visual observations are in [the QA report](../../QA/clinical-analysis-and-source-refresh-2026-09-22.md).
+
+Final cleanup for this checkpoint completed after the read-only integrity checks: the disposable source clone and task-created bytecode caches were removed, the original database remained unchanged, standard launcher cleanup found no application processes, and ports `7690` and `9847` were free. Five ignored pytest cache directories under `app/tests/runtimes/cache/pytest` rejected an explicit removal attempt with an ACL denial; permissions were not widened, so that locked-path residue remains recorded for follow-up.
 
 ## Feature-state register
 

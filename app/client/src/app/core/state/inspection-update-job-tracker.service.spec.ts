@@ -91,6 +91,7 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
     expect(postUrls.some((url) => url.includes('/rag/jobs'))).toBe(false);
     expect(tracker.updateAllState().phase).toBe('running');
     expect(tracker.updateAllState().progress).toBe(0);
+    expect(tracker.updateAllState().message).toBe('0 of 3 source updates completed.');
     expect(tracker.updateAllState().targets.livertox.started).toBe(true);
     expect(tracker.updateAllState().targets.rxnav.started).toBe(true);
     expect(tracker.updateAllState().targets.dilirank.started).toBe(true);

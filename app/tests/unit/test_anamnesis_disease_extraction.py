@@ -18,7 +18,9 @@ from domain.clinical import (
 from domain.clinical.dili import DiliHysLawAssessment
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.clinical.disease import DiseaseExtractor
+from services.clinical.job_progress import ClinicalJobCancelled
 from services.session.session_service import ClinicalSessionService
+
 
 ###############################################################################
 class FakeDiseaseClient:
@@ -62,6 +64,44 @@ class FlakyDiseaseClient:
                 )
             ]
         )
+
+###############################################################################
+class CancellationAwareDiseaseClient:
+
+    # -------------------------------------------------------------------------
+    async def llm_structured_call(self, **kwargs: Any) -> PatientDiseaseContext:
+        cancel_check = kwargs["cancel_check"]
+        assert cancel_check() is True
+        raise CancelledStructuredCallError("LLM request cancelled")
+
+
+###############################################################################
+class CancelledStructuredCallError(RuntimeError):
+    error_code = "cancelled"
+
+
+###############################################################################
+def test_extract_diseases_propagates_stop_into_cloud_structured_call() -> None:
+    extractor = DiseaseExtractor(client=CancellationAwareDiseaseClient())
+    stop_calls = 0
+
+    def stop_check() -> None:
+        nonlocal stop_calls
+        stop_calls += 1
+        if stop_calls >= 2:
+            raise ClinicalJobCancelled("stop requested")
+
+    try:
+        asyncio.run(
+            extractor.extract_diseases_from_anamnesis(
+                "History of chronic liver disease.",
+                stop_check=stop_check,
+            )
+        )
+    except ClinicalJobCancelled:
+        assert stop_calls >= 2
+    else:
+        raise AssertionError("stop request was not propagated")
 
 ###############################################################################
 def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry(

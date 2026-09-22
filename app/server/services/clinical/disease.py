@@ -25,6 +25,7 @@ from domain.clinical.extractor_contracts import (
     LocalPatientDiseaseContext,
 )
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
+from services.clinical.job_progress import ClinicalJobCancelled
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
 from common.utils.text_utils import normalize_token
@@ -337,10 +338,23 @@ class DiseaseExtractor:
         anamnesis: str | None,
         *,
         progress_callback: Callable[[float], None] | None = None,
+        stop_check: Callable[[], None] | None = None,
     ) -> PatientDiseaseContext:
         cleaned = self.clean_text(anamnesis)
         if not cleaned:
             return PatientDiseaseContext(entries=[])
+
+        if stop_check is not None:
+            stop_check()
+
+        def cancel_check() -> bool:
+            if stop_check is None:
+                return False
+            try:
+                stop_check()
+            except ClinicalJobCancelled:
+                return True
+            return False
 
         self.emit_progress(progress_callback, 0.0)
         deterministic = extract_deterministic_diseases(cleaned)
@@ -382,15 +396,20 @@ class DiseaseExtractor:
                         if use_local_schema
                         else ANAMNESIS_DISEASE_EXTRACTION_SYSTEM_PROMPT
                     )
+                    structured_call_kwargs: dict[str, Any] = {
+                        "model": self.model,
+                        "system_prompt": system_prompt,
+                        "user_prompt": user_prompt,
+                        "schema": schema,
+                        "purpose": GenerationPurpose.STRUCTURED_EXTRACTION,
+                        "use_json_mode": True,
+                        "max_repair_attempts": 1,
+                    }
+                    if stop_check is not None and not use_local_schema:
+                        structured_call_kwargs["cancel_check"] = cancel_check
                     parsed = await asyncio.wait_for(
                         self.client.llm_structured_call(
-                            model=self.model,
-                            system_prompt=system_prompt,
-                            user_prompt=user_prompt,
-                            schema=schema,
-                            purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
-                            use_json_mode=True,
-                            max_repair_attempts=1,
+                            **structured_call_kwargs,
                         ),
                         timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
                     )
@@ -454,6 +473,10 @@ class DiseaseExtractor:
                     "The model returned no valid disease entries despite disease-like source evidence."
                 ]
         except Exception as exc:  # noqa: BLE001
+            if getattr(exc, "error_code", None) == "cancelled":
+                if stop_check is not None:
+                    stop_check()
+                raise
             logger.warning(
                 "Anamnesis disease LLM extraction failed; using deterministic fallback: %s",
                 exc,

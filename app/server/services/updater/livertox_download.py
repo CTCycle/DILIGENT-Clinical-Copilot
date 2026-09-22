@@ -14,6 +14,10 @@ from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from services.updater import livertox_common, livertox_parse
 
+
+class UpstreamHumanVerificationRequired(RuntimeError):
+    """The upstream source requires interactive verification before download."""
+
 ###############################################################################
 async def download_file(
     client: httpx.AsyncClient,
@@ -201,6 +205,8 @@ async def download_master_list(
 async def resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
     try:
         return await resolve_master_list_from_bookshelf(self, client)
+    except UpstreamHumanVerificationRequired:
+        raise
     except Exception as exc:
         logger.warning("Bookshelf Excel lookup failed: %s", exc)
     try:
@@ -212,60 +218,97 @@ async def resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
 
 ###############################################################################
 async def resolve_master_list_from_bookshelf(self, client: httpx.AsyncClient) -> str:
-    report_url = "https://www.ncbi.nlm.nih.gov/books/NBK571102/?report=excel"
-    head_response: httpx.Response | None = None
-    try:
-        head_response = await client.head(report_url, follow_redirects=False)
-        head_response.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code not in (301, 302, 303, 307, 308):
-            head_response = None
-        else:
-            head_response = exc.response
-    except httpx.HTTPError:
-        head_response = None
-
+    report_urls = (
+        "https://www.ncbi.nlm.nih.gov/books/NBK571102/",
+        "https://www.ncbi.nlm.nih.gov/books/NBK571102/?report=excel",
+    )
     redirect_statuses = {301, 302, 303, 307, 308}
-    if head_response is not None:
-        if head_response.status_code in redirect_statuses and head_response.headers.get(
-            "Location"
-        ):
-            candidate = httpx.URL(report_url).join(head_response.headers["Location"])
-            return await probe_master_list_candidate(self, client, str(candidate))
-        content_type = (head_response.headers.get("Content-Type") or "").lower()
-        disposition = (head_response.headers.get("Content-Disposition") or "").lower()
-        if "excel" in content_type or ".xlsx" in disposition:
-            return await probe_master_list_candidate(
-                self, client, str(head_response.url)
+    last_error: Exception | None = None
+
+    for report_url in report_urls:
+        head_response: httpx.Response | None = None
+        try:
+            head_response = await client.head(report_url, follow_redirects=False)
+            head_response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in redirect_statuses:
+                head_response = exc.response
+            else:
+                last_error = exc
+        except httpx.HTTPError as exc:
+            last_error = exc
+
+        if head_response is not None:
+            if head_response.status_code in redirect_statuses and head_response.headers.get(
+                "Location"
+            ):
+                candidate = httpx.URL(report_url).join(head_response.headers["Location"])
+                try:
+                    return await probe_master_list_candidate(self, client, str(candidate))
+                except Exception as exc:
+                    last_error = exc
+            content_type = (head_response.headers.get("Content-Type") or "").lower()
+            disposition = (head_response.headers.get("Content-Disposition") or "").lower()
+            if "excel" in content_type or ".xlsx" in disposition:
+                try:
+                    return await probe_master_list_candidate(
+                        self, client, str(head_response.url)
+                    )
+                except Exception as exc:
+                    last_error = exc
+
+        try:
+            get_response = await client.get(report_url, follow_redirects=False)
+        except httpx.HTTPError as exc:
+            last_error = exc
+            continue
+
+        if is_human_verification_response(get_response):
+            raise UpstreamHumanVerificationRequired(
+                "NCBI Bookshelf returned a CAPTCHA challenge for the LiverTox master list."
             )
 
-    get_response = await client.get(report_url, follow_redirects=False)
-    if get_response.status_code in redirect_statuses and get_response.headers.get(
-        "Location"
-    ):
-        candidate = httpx.URL(report_url).join(get_response.headers["Location"])
-        return await probe_master_list_candidate(self, client, str(candidate))
-
-    content_type = (get_response.headers.get("Content-Type") or "").lower()
-    disposition = (get_response.headers.get("Content-Disposition") or "").lower()
-    if "excel" in content_type or ".xlsx" in disposition:
-        return await probe_master_list_candidate(self, client, str(get_response.url))
-
-    html_content = get_response.text
-    for pattern in (
-        r"url=([^\"'>]+\.xlsx)",
-        r"['\"]([^'\"]+\.xlsx)['\"]",
-    ):
-        for match in re.finditer(pattern, html_content, flags=re.IGNORECASE):
-            candidate_url = match.group(1)
-            candidate = httpx.URL(report_url).join(candidate_url)
+        if get_response.status_code in redirect_statuses and get_response.headers.get(
+            "Location"
+        ):
+            candidate = httpx.URL(report_url).join(get_response.headers["Location"])
             try:
                 return await probe_master_list_candidate(self, client, str(candidate))
-            except Exception as exc:  # pragma: no cover - network dependent
-                logger.debug("Bookshelf candidate %s failed: %s", str(candidate), exc)
+            except Exception as exc:
+                last_error = exc
                 continue
 
-    raise RuntimeError("Unable to resolve master list via Bookshelf report page")
+        try:
+            get_response.raise_for_status()
+        except httpx.HTTPError as exc:
+            last_error = exc
+            continue
+
+        content_type = (get_response.headers.get("Content-Type") or "").lower()
+        disposition = (get_response.headers.get("Content-Disposition") or "").lower()
+        if "excel" in content_type or ".xlsx" in disposition:
+            try:
+                return await probe_master_list_candidate(
+                    self, client, str(get_response.url)
+                )
+            except Exception as exc:
+                last_error = exc
+                continue
+
+        for pattern in (
+            r"url=([^\"'>]+\.xlsx)",
+            r"['\"]([^'\"]+\.xlsx)",
+        ):
+            for match in re.finditer(pattern, get_response.text, flags=re.IGNORECASE):
+                candidate_url = match.group(1)
+                candidate = httpx.URL(report_url).join(candidate_url)
+                try:
+                    return await probe_master_list_candidate(self, client, str(candidate))
+                except Exception as exc:
+                    last_error = exc
+                    logger.debug("Bookshelf candidate %s failed: %s", str(candidate), exc)
+
+    raise RuntimeError("Unable to resolve master list via Bookshelf report page") from last_error
 
 ###############################################################################
 async def resolve_master_list_from_bin(
@@ -427,6 +470,10 @@ async def probe_master_list_candidate(
         response = await fetch_candidate_with_get(self, client, candidate)
     except httpx.HTTPError:  # pragma: no cover - network dependent
         response = await fetch_candidate_with_get(self, client, candidate)
+    if is_human_verification_response(response):
+        raise UpstreamHumanVerificationRequired(
+            "NCBI Bookshelf returned a CAPTCHA challenge for the LiverTox master list."
+        )
     content_type = (response.headers.get("Content-Type") or "").lower()
     if ".xlsx" not in candidate.lower() and "excel" not in content_type:
         disposition = (response.headers.get("Content-Disposition") or "").lower()
@@ -434,6 +481,17 @@ async def probe_master_list_candidate(
             return str(response.url)
         raise RuntimeError("Candidate does not appear to be an Excel file")
     return str(response.url)
+
+
+def is_human_verification_response(response: httpx.Response) -> bool:
+    url = str(response.url).lower()
+    content_type = (response.headers.get("Content-Type") or "").lower()
+    if "recaptcha" in url or "challengepage" in url:
+        return True
+    if "html" not in content_type:
+        return False
+    body = response.text.lower()
+    return "recaptcha" in body or "challengepage" in body
 
 ###############################################################################
 async def fetch_candidate_with_get(

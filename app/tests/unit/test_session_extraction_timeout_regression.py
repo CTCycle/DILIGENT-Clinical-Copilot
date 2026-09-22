@@ -4,14 +4,14 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any
 
-from domain.clinical import PatientData
-from domain.clinical import DrugEntry, PatientDrugs
+import pytest
+from domain.clinical import DrugEntry, PatientData, PatientDrugs
 from domain.clinical.extras import LabExtractionPayload
+from services.clinical.job_progress import ClinicalJobCancelled
 from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.parser import DrugsParser
 from services.runtime.jobs import JobManager
-from services.session import extraction_pipeline
-from services.session import factory
+from services.session import extraction_pipeline, factory
 from services.session.session_service import ClinicalSessionService
 
 ITALIAN_LAB_TEXT = """
@@ -126,6 +126,35 @@ def test_runtime_timeout_resolution_does_not_apply_six_second_parser_cap() -> No
     timeout = ClinicalSessionService._resolve_runtime_timeout(base_timeout_s=120.0)
 
     assert timeout > 6.0
+
+###############################################################################
+def test_stage_stop_check_cancels_inflight_extraction_task() -> None:
+    cancelled = False
+    stop_calls = 0
+
+    async def slow_stage() -> None:
+        nonlocal cancelled
+        try:
+            await asyncio.sleep(10.0)
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
+
+    def stop_check() -> None:
+        nonlocal stop_calls
+        stop_calls += 1
+        if stop_calls >= 2:
+            raise ClinicalJobCancelled("stop requested")
+
+    with pytest.raises(ClinicalJobCancelled):
+        asyncio.run(
+            extraction_pipeline._await_with_stop_check(
+                slow_stage(),
+                stop_check=stop_check,
+            )
+        )
+
+    assert cancelled is True
 
 ###############################################################################
 def test_livertox_timeout_does_not_claim_knowledge_base_is_unavailable(
