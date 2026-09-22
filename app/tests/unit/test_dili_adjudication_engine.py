@@ -14,6 +14,7 @@ from domain.clinical.entities import (
 from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.clinical.dili_pattern import DiliPatternEngine
 
+
 ###############################################################################
 def test_r_ratio_boundary_values_follow_livertox_definitions() -> None:
     assert DiliPatternEngine.classify(5.0) == "hepatocellular"
@@ -326,6 +327,21 @@ def test_generated_narrative_safety_gate_blocks_rechallenge_permission() -> None
     )
     assert "clinical_narrative_recommends_rechallenge" not in {
         issue["code"] for issue in safe_issues
+    }
+
+    safe_historical_evidence_with_prohibition = (
+        DiliEvidenceBuilder.audit_generated_narrative(
+            clinical_narrative=(
+                "No rechallenge occurred, so no patient-level rechallenge evidence "
+                "exists; LiverTox documents recurrence on rechallenge as historical "
+                "evidence of drug-level causality, but that does not apply to this "
+                "patient's course, and rechallenge is not recommended."
+            ),
+            bundle=bundle,
+        )
+    )
+    assert "clinical_narrative_recommends_rechallenge" not in {
+        issue["code"] for issue in safe_historical_evidence_with_prohibition
     }
 
     specialist_decision_with_prohibition = DiliEvidenceBuilder.audit_generated_narrative(

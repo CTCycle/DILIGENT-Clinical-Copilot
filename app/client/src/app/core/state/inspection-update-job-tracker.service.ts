@@ -624,7 +624,7 @@ export class InspectionUpdateJobTrackerService {
         ? 'Cancellation requested for the source updates.'
         : phase === 'starting'
           ? 'Starting source updates...'
-          : `${completedCount} of ${targets.length} source updates are running or queued.`;
+          : `${completedCount} of ${targets.length} source updates completed.`;
     } else if (anyFailed) {
       phase = 'partial_failure';
       message = `${completedCount} of ${targets.length} source updates completed. One or more sources failed.`;

@@ -504,7 +504,9 @@ class ClinicalSessionRepository:
                     session_id=session_id,
                     marker_code=lab_code,
                     observation_at=session_result_data.parse_datetime(
-                        item.get("observation_at") or item.get("date")
+                        item.get("observation_at")
+                        or item.get("date")
+                        or item.get("sample_date")
                     ),
                     value_numeric=repository_values.to_float(value_raw),
                     value_text=value_raw,

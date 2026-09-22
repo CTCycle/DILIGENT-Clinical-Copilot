@@ -422,6 +422,7 @@ class CloudLLMClient:
         timeline_complexity: str = "moderate",
         operation: RequestOperation = "chat",
         json_schema: dict[str, Any] | None = None,
+        cancel_check: Any | None = None,
     ) -> dict[str, Any] | str:
         result = await self.chat_result(
             model=model,
@@ -432,6 +433,7 @@ class CloudLLMClient:
             timeline_complexity=timeline_complexity,
             operation=operation,
             json_schema=json_schema,
+            cancel_check=cancel_check,
         )
         return self._normalize_content(result.content)
 
@@ -955,6 +957,7 @@ class CloudLLMClient:
         use_json_mode: bool = True,
         max_repair_attempts: int = 2,
         timeline_complexity: str = "moderate",
+        cancel_check: Any | None = None,
     ) -> T:
         parser = StructuredOutputParser(schema=schema)
         format_instructions = parser.get_format_instructions()
@@ -973,6 +976,7 @@ class CloudLLMClient:
             timeline_complexity=timeline_complexity,
             operation="structured_output",
             json_schema=schema.model_json_schema() if use_json_mode else None,
+            cancel_check=cancel_check,
         )
         text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
         return await self.parse_with_repairs(
@@ -983,6 +987,7 @@ class CloudLLMClient:
             format_instructions=format_instructions,
             use_json_mode=use_json_mode,
             max_repair_attempts=max_repair_attempts,
+            cancel_check=cancel_check,
         )
 
     # -------------------------------------------------------------------------
@@ -1044,6 +1049,7 @@ class CloudLLMClient:
         format_instructions: str,
         use_json_mode: bool,
         max_repair_attempts: int,
+        cancel_check: Any | None = None,
     ) -> T:
         for attempt in range(max_repair_attempts + 1):
             try:
@@ -1076,6 +1082,7 @@ class CloudLLMClient:
                     json_schema=parser.schema.model_json_schema()
                     if use_json_mode
                     else None,
+                    cancel_check=cancel_check,
                 )
                 text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
 

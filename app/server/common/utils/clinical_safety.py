@@ -20,6 +20,7 @@ _PERMISSIVE_RE = re.compile(
     rf"\b{_RECHALLENGE_TERM}\b[^.!?;]{{0,140}}\b{_PERMISSIVE_ACTION}\b)",
     re.IGNORECASE,
 )
+_PERMISSIVE_ACTION_RE = re.compile(rf"\b{_PERMISSIVE_ACTION}\b", re.IGNORECASE)
 _NEGATIVE_RE = re.compile(
     r"\b(?:no|not|never|without|avoid\w*|contraindicat\w*|"
     r"prohibit\w*|must\s+not|should\s+not|do\s+not|don't)\b",
@@ -74,12 +75,28 @@ def contains_rechallenge_recommendation(text: str | None) -> bool:
             context = sentence[max(0, match.start() - 18) : match.end() + 40]
             if _NEGATIVE_RE.search(context):
                 connector = re.search(r"\b(?:but|however|yet|although)\b", clause)
-                if connector and re.search(
-                    rf"\b{_PERMISSIVE_ACTION}\b",
-                    clause[connector.end() :],
-                    re.IGNORECASE,
-                ):
-                    return True
+                if connector:
+                    for action in _PERMISSIVE_ACTION_RE.finditer(
+                        clause[connector.end() :]
+                    ):
+                        action_start = (
+                            match.start() + connector.end() + action.start()
+                        )
+                        prefix = sentence[max(0, action_start - 32) : action_start]
+                        suffix = sentence[
+                            action_start + len(action.group(0)) :
+                            action_start + len(action.group(0)) + 24
+                        ]
+                        directly_negated = bool(
+                            re.search(
+                                r"\b(?:not|never|no)\b[^.!?;]{0,24}$",
+                                prefix,
+                                re.IGNORECASE,
+                            )
+                            or re.match(r"\s+(?:not|never)\b", suffix, re.IGNORECASE)
+                        )
+                        if not directly_negated:
+                            return True
                 continue
             return True
     return False
