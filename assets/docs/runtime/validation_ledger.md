@@ -164,6 +164,36 @@ synthetic development scope. The automated regression component is `PARTIAL`
 for this checkpoint because its focused test slices passed but the requested
 production build did not complete.
 
+## Production frontend build host comparison — 2026-09-22
+
+This follow-up used `develop` HEAD
+`7d797e8a7bae10e86fa28f4e53409f8f81ccbb26`, the documentation-only successor
+to the revision-acceptance checkpoint above. The worktree was clean at task
+start. Windows reported build host `10.0.26200.0`, PowerShell `7.6.6`, and the
+launcher-provisioned Node.js `v22.13.0` / npm `10.9.2`. No application source
+or test files changed.
+
+| Gate | Result |
+|---|---|
+| Fresh frontend install | `npm ci --ignore-scripts --no-audit --no-fund` against a new isolated cache first failed because sandboxed registry fetches returned `EACCES`; rerunning with network access installed 471 packages successfully. |
+| Frontend tests | `npm run test -- --no-watch`: 23 files, 97 tests passed, exit code 0. |
+| Direct production build | `npm run build -- --progress=false` terminated with `-1073741819` (`0xC0000005`) before Angular emitted build output or a diagnostic. |
+| Launcher rebuild | `start_on_windows.ps1 -Action RebuildFrontend` recognized Node `22.13.0` and reused installed dependencies, then failed on the same `0xC0000005` from `npm.cmd run build`. |
+| Exact-SHA Windows CI | [Run 35764186160](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35764186160) used this exact SHA. `Setup Node`, frontend install, frontend tests, and `Build frontend` passed. The overall CI run failed later at the full browser E2E step; `security-scan` and `backend-quality` also failed, `persistence-contract` passed, and live-provider E2E was skipped. |
+| Existing build reuse | Two standard launcher starts reported the build marker current and skipped frontend dependency synchronization and Angular build. `/api/health` and `/` returned HTTP 200, with page title `DILIGENT Clinical Copilot`; the served index SHA-256 was `8085087A6FFFD895D7B181377C37D369B2729AF7C88C44D29EAF063DEE6F1353`. The launcher action exited 1 only when the sandbox denied opening the default browser after both services were serving. This verifies current marker reuse, not fresh local build generation. |
+| Crash diagnostics and cleanup | No matching recent Application log event 1000/1001 or user-local `node.exe` crash dump/WER report was found. The native faulting module remains unknown. Task-owned listener PIDs and executable paths were rechecked before stop; both configured ports were free after cleanup. |
+
+The direct and launcher build failures are classified as specific to this
+isolated validation host because the exact SHA passed the production build on
+hosted Windows CI with Node `22.13.0`. No repository-owned cause was reproduced
+and no application workaround was introduced. Keep `test.automated-regression`
+`PARTIAL` until a fresh pinned local build succeeds or host-level diagnostics
+resolve the native failure. The overall hosted CI run was not green, and its
+other failure gates remain independent.
+
+The focused report and raw logs are under
+[`assets/QA/frontend-build-validation-2026-09-22/`](../../QA/frontend-build-validation-2026-09-22/report.md).
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
