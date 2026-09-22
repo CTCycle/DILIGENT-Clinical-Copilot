@@ -135,6 +135,35 @@ Current focused gates: backend `102 passed, 1 skipped` (PostgreSQL persistence n
 
 Final cleanup for this checkpoint completed after the read-only integrity checks: the disposable source clone and task-created bytecode caches were removed, the original database remained unchanged, standard launcher cleanup found no application processes, and ports `7690` and `9847` were free. Five ignored pytest cache directories under `app/tests/runtimes/cache/pytest` rejected an explicit removal attempt with an ACL denial; permissions were not widened, so that locked-path residue remains recorded for follow-up.
 
+## Revision acceptance validation — 2026-09-22
+
+This checkpoint continues the revision acceptance plan on local `develop` HEAD
+`5960fe29d4f6b6b41dc235d5dd177cb420a9487b` in the development app.
+Only synthetic session 22 (`Synthetic Case C`, source version 39) was used.
+The configured Revision role remained exactly `opencode_go /
+deepseek-v4-flash`; all recorded steps used that pair, with no fallback.
+No application source or test code changed. Detailed run IDs, draft hashes,
+QA findings, and cleanup are in the [revision acceptance report](../../QA/revision-acceptance-2026-09-22.md).
+
+| Capability | Status | Current run evidence |
+|---|---|---|
+| Exact-provider revision route | `PASS` for observed routing | Runs 30–35 used exact OpenCode Go `deepseek-v4-flash` steps with no fallback. Run 29 stopped at planning with `network_unavailable` and no HTTP status. Run 34 completed the accepted path; run 35 confirmed a subsequent request selected accepted source version 61 before deliberate cancellation. Latency remained variable, so the broader provider component stays partial. |
+| Deterministic edit and QA | `PASS` for the accepted path | Runs 30, 31, and 33 exercised failed and fail-closed edits. Run 32 reached the correct insertion position but was cancelled while QA remained active. Run 34 applied the unique anchored patch before `## Bibliography`; deterministic validation passed and LLM QA reported zero blocking issues. |
+| QA-blocked draft persistence | `PASS` for the exercised failure path | Run 30 retained its draft and both failed QA artifacts. After navigating away and reloading, the UI still showed the QA-blocked state, 13 steps, 7 artifacts, and that the current report remained unchanged. Source report hash and synthetic session fields matched their pre-run values. |
+| Accepted child and subsequent lineage | `PASS` for the synthetic development path | Run 34 created child session 24/version 61 from source version 39 with `version_status=llm_qa_passed`, `llm_qa_status=passed`, `revision_kind=llm_assisted_revision`, and the exact pipeline ID. The child report exactly matched the 9,272-character persisted draft. Navigation away, full browser reload, source-session reopen, and child-session reopen all preserved the accepted result and the source report. Run 35 then persisted `source_version_id=61` from session 24 before UI cancellation, proving current-version selection without creating a second child. |
+| Focused backend/frontend regressions | `PASS` | Backend revision/provider and repository persistence suite: 88 passed, 1 skipped, 1 deprecation warning. Angular revision spec: 1 file, 4 tests passed. |
+| Production frontend build | `ATTENTION` | Both `npm.cmd run build -- --progress=false` under system Node 22.23.1 and the Angular CLI build under bundled Node 22.13.0 exited `0xC0000005` before producing build output. This host did not verify a production build; no application-code diagnostic was emitted. |
+
+The development database remained at Alembic head `202609170001`, with
+`integrity_check=ok` and no foreign-key violations after the attempts. The
+task-started processes were stopped and ports `7690` and `9847` verified free.
+`model.provider.opencode-go` remains `PARTIAL` because its broader provider
+matrix and variability requirements exceed one successful revision.
+`revision.accepted-session-finalization` is `VALIDATED` for the stated
+synthetic development scope. The automated regression component is `PARTIAL`
+for this checkpoint because its focused test slices passed but the requested
+production build did not complete.
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
