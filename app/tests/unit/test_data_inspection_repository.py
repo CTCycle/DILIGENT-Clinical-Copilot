@@ -8,7 +8,6 @@ from threading import Event
 from typing import Any
 
 import pytest
-
 from domain.patient_timeline import (
     PatientTimeline,
     PatientTimelineEvent,
@@ -33,6 +32,7 @@ from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+
 
 ###############################################################################
 def build_repository_graph_for_test() -> tuple[Any, Any]:
@@ -869,6 +869,54 @@ def test_timeline_generation_passes_persisted_opencode_go_settings_to_extractor(
     assert extractor.last_runtime_settings["use_cloud_services"] is True
     assert extractor.last_runtime_settings["llm_provider"] == "opencode_go"
     assert extractor.last_runtime_settings["cloud_model"] == "deepseek-v4-flash"
+    assert generated.source_kind == "cloud"
+    assert generated.model_provider == "opencode_go"
+
+
+###############################################################################
+def test_timeline_generation_records_effective_local_provider_provenance() -> None:
+    repository_graph, _ = build_repository_graph_for_test()
+    persisted_runtime_settings = {
+        "use_cloud_services": False,
+        "llm_provider": "openai",
+        "cloud_model": "gpt-4.1-mini",
+        "timeline_model": "qwen3.5:2b",
+    }
+    save_session(
+        repository_graph,
+        patient_name="Local Ollama Timeline Patient",
+        timestamp=datetime(2025, 1, 1, 8, 30, tzinfo=timezone.utc),
+        status="successful",
+        report="Local Ollama timeline report",
+        anamnesis="Local Ollama timeline context.",
+        payload={
+            "report": "Local Ollama timeline report",
+            "issues": [],
+            "runtime_settings": persisted_runtime_settings,
+        },
+    )
+    session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
+        search="Local Ollama Timeline Patient",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(session_rows[0]["session_id"])
+    service = build_service(
+        repository_graph, timeline_extractor=FakeTimelineExtractor(), jobs=JobManager()
+    )
+
+    generated = service.generate_session_timeline(session_id, force_regenerate=True)
+
+    assert generated is not None
+    assert generated.source_kind == "local"
+    assert generated.source_model == "qwen3.5:2b"
+    assert generated.model_provider == "ollama"
+    persisted = service.get_session_timeline(session_id)
+    assert persisted is not None
+    assert persisted.model_provider == "ollama"
 
 ###############################################################################
 def test_session_payload_timeline_is_not_read_as_history_record() -> None:

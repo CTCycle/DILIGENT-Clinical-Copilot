@@ -269,6 +269,36 @@ provide a disk-export path, so the report records the rendered text and state
 without claiming a screenshot artifact. This is controlled local evidence,
 not live-provider validation.
 
+## Configured live Ollama timeline lane — 2026-09-23
+
+This checkpoint started from `develop` HEAD
+`7c75e51b9910a0db85ea87f225b4d542e2a76518`. The official launcher ran against
+a synthetic session and a disposable SQLite database under
+`runtimes/cache/qa/timeline-live-revalidation-20260923/`. Settings and the
+Timeline panel both showed the configured `Local (Ollama)` / `qwen3.5:2b`
+lane; the loaded Ollama catalog marked that model installed. The shared
+database, `.env`, runtime model settings, and credentials were not changed.
+
+| Gate | Result |
+|---|---|
+| Pre-fix live output | Two same-lane generations both persisted an unsupported `Onset of Hepatitis B infection` event dated `2022-05-18`. Its alleged acute-care/HBV evidence did not occur in the synthetic source. Both rows were incorrectly attributed to `model_provider=openai` despite `source_kind=local` and `source_model=qwen3.5:2b`. |
+| Evidence guard and provenance fix | Nonempty model evidence is now required to occur within one source text field after case folding and whitespace normalization. Unsupported evidence follows `invalid_response` and the existing deterministic fallback. The prompt requests a verbatim quote; local history metadata records `ollama`. No public API or type contracts changed. |
+| Focused backend regressions | Six selected tests passed, including unsupported evidence rejection, valid grounded extraction, fallback handling, and local/cloud provenance assertions. |
+| Ruff and whitespace | Ruff passed for the changed Python files with pre-existing `DTZ001` naive-datetime findings ignored; the new test timestamp uses UTC. `git diff --check` passed. |
+| Official launcher and preflight | `/api/health` returned `ok`. In Settings and Timeline, the effective source was Local (Ollama) and the assigned Timeline model was `qwen3.5:2b`; no fallback lane was selected. |
+| In-app Browser live generation | Generate and one Regenerate ran on the same configured lane. Both saved entries showed `Fallback chronology` with `Invalid structured provider response`; no unsupported event was saved. The fallback showed therapy at `2025-01` month precision and symptoms and ALT at `2025-01-17` day precision, each with source evidence. |
+| Read-only SQLite and reload | Two rows persisted, both `fallback` / `invalid_response`, model `qwen3.5:2b`, source kind `local`, provider `ollama`. After navigating away and reloading, Browser history still showed timelines #2 and #1 with three evidence-backed events each. |
+| Gate boundary | No source-grounded `llm_generated` result was obtained. Timeout, authentication, and rate-limit paths were not tested or manufactured. `sessions.timeline` remains `PARTIAL`. |
+| Cleanup | Both disposable databases and the focused test cache are temporary under `runtimes/cache/qa/`. Launcher cleanup misclassified its own listeners; exact DILIGENT process paths, commands, and PIDs were verified before stopping only task-started app processes. Ports 7690/9847 were verified free; the user-started Ollama process remained running. |
+
+Browser observations and the read-only database evidence are recorded in
+[`assets/QA/timeline-live-validation-20260923/report.md`](../../QA/timeline-live-validation-20260923/report.md).
+The rendered fallback chronology and history list were visually inspected in
+the in-app Browser. Its screenshot surface did not provide a disk-export path,
+so no screenshot artifact is claimed. The post-fix error category is recorded
+as exposed by the Browser/database; no timeout, authentication, or rate-limit
+failure was simulated.
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
@@ -278,7 +308,7 @@ not live-provider validation.
 | 3 | Application shell and primary workspace navigation | UI | `PASS` | In-app Browser rendered DILI Agent, Clinical Sessions, Data Inspection, and Settings. | Browser smoke at one desktop viewport; no provider call. |
 | 4 | General runtime settings persistence | Settings | `PASS` | Changed polling interval `1 -> 2`, saved, navigated, reloaded, and restored `2 -> 1`; value and persisted timestamp remained visible. | `settings/configurations.json` is back at baseline `1.0`; `.env` remained excluded. |
 | 5 | Settings section surfaces | Settings | `PASS` | General, Models, Data Processing, Integrations, and Advanced routes rendered with source labels and controls. | Surface validation only for sections other than General persistence. |
-| 6 | Local/cloud model configuration and access-key UX | Settings / external | `ATTENTION` | Local catalog load returned 48 models but Ollama was unavailable; cloud selection correctly reported no active OpenCode access key without accepting a secret. | Exact live provider lane was not exercised; graceful dependency failure observed. |
+| 6 | Local/cloud model configuration and access-key UX | Settings / external | `ATTENTION` | Settings showed `Local (Ollama)` with `qwen3.5:2b` assigned to Timeline; the local catalog marked the model installed and two live timeline requests reached the configured lane. | Both live timeline results fell back as `invalid_response`; a grounded `llm_generated` response and cloud credential lifecycle remain unvalidated. [Live timeline report](../../QA/timeline-live-validation-20260923/report.md) |
 | 7 | Clinical input validation and preflight | Clinical workflow | `PASS` | Empty input showed four blocking reasons; synthetic valid input showed the two unavailable structured-source blockers before execution. | No analysis job was submitted because the preflight correctly blocked it. |
 | 8 | Clinical analysis submission, progress, terminal state, and recovery | Clinical workflow | `NOT TESTED` | Not reached in the current browser run. | Requires populated source catalogs and a usable model lane. |
 | 9 | Session creation and persisted result | Sessions / persistence | `NOT TESTED` | Not reached because clinical execution was blocked. | Existing shared rows were inspected read-only; current UI could not start on that DB. |
@@ -297,7 +327,7 @@ not live-provider validation.
 | 22 | RAG retrieval inside a clinical analysis | RAG / clinical workflow | `NOT TESTED` | No clinical analysis was allowed past preflight. | Requires a completed analysis with persisted citations. |
 | 23 | Bibliography and source provenance in the final report | Reporting | `NOT TESTED` | No final report was generated in the current live run. | Must be rechecked with structured sources and RAG enabled. |
 | 24 | Final conclusion coherence and uncertainty presentation | Reporting | `NOT TESTED` | No final report was generated in the current live run. | Must be reviewed against the rendered report and persisted result. |
-| 25 | Patient timeline generation, rendering, and persistence | Sessions / timeline | `NOT TESTED` | No selected populated session was available in the current runtime. | Requires a completed session and timeline job. |
+| 25 | Patient timeline generation, rendering, and persistence | Sessions / timeline | `PARTIAL` | In-app Browser exercised the exact local `qwen3.5:2b` lane twice; both attempts saved deterministic fallback chronology, preserved source date precision/evidence, and remained visible in history after navigation and reload. | No acceptable `llm_generated` result was obtained; broader provider-error classes remain open. [Live timeline report](../../QA/timeline-live-validation-20260923/report.md) |
 | 26 | Agentic revision workflow, trace, artifacts, and persisted version | Revision | `NOT TESTED` | No revision was started in the current live run. | Shared DB contains historical revision rows, but the current app cannot start on it. |
 | 27 | Manual report editing and version/history behavior | Revision / UI | `NOT TESTED` | Not reached in the current live run. | Requires a completed report and persisted version transition. |
 | 28 | Human-review escalation and `requires_human_review` state | Revision / clinical safety | `NOT TESTED` | Not reached in the current live run. | Unit paths exist; rendered and persisted current-run evidence is absent. |
