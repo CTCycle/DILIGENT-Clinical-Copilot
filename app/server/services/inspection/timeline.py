@@ -14,6 +14,7 @@ from domain.patient_timeline import (
     PatientTimelineEvent,
     PatientTimelineGenerationErrorCode,
 )
+from domain.timeline_dates import extract_single_explicit_timeline_date
 from services.inspection.normalization import (
     extract_lab_marker,
     normalize_text,
@@ -185,6 +186,24 @@ def _timeline_fallback_note(
     )
     return f"Local timeline extraction did not complete. {message} Retry when ready."
 
+
+###############################################################################
+def _fallback_event_context(source_text: str) -> tuple[str, dict[str, Any]]:
+    interval = extract_single_explicit_timeline_date(source_text)
+    source_evidence = source_text[:1000]
+    if interval is None:
+        return source_evidence, {}
+    if interval.value not in source_evidence:
+        token_start = source_text.find(interval.value)
+        source_evidence = source_text[max(0, token_start - 400) : token_start + 600]
+    return source_evidence, {
+        "timing_type": "explicit_date",
+        "event_date": interval.value,
+        "date_precision": interval.precision,
+        "date_certainty": "explicit",
+        "extracted_timing_text": interval.value,
+    }
+
 ###############################################################################
 class InspectionTimelineMixin:
     session_timeline_repository: Any
@@ -290,53 +309,50 @@ class InspectionTimelineMixin:
 
         drugs_text = normalize_text(source.get("drugs"))
         if drugs_text:
+            source_evidence, date_fields = _fallback_event_context(drugs_text)
             events.append(
                 PatientTimelineEvent(
                     event_id="therapy-1",
                     title="Therapy context",
                     description=drugs_text[:450],
                     event_type="therapy",
-                    timing_type="uncertain",
-                    event_date=None,
-                    extracted_timing_text=None,
                     source="fallback_parser",
-                    source_evidence=drugs_text[:1000],
+                    source_evidence=source_evidence,
                     sort_order=10,
+                    **date_fields,
                 )
             )
 
         anamnesis_text = normalize_text(source.get("anamnesis"))
         if anamnesis_text:
+            source_evidence, date_fields = _fallback_event_context(anamnesis_text)
             events.append(
                 PatientTimelineEvent(
                     event_id="disease-1",
                     title="Clinical symptom context",
                     description=anamnesis_text[:450],
                     event_type="disease",
-                    timing_type="uncertain",
-                    event_date=None,
-                    extracted_timing_text=None,
                     source="fallback_parser",
-                    source_evidence=anamnesis_text[:1000],
+                    source_evidence=source_evidence,
                     sort_order=20,
+                    **date_fields,
                 )
             )
 
         labs_text = normalize_text(source.get("laboratory_analysis"))
         if labs_text:
             marker = extract_lab_marker(labs_text)
+            source_evidence, date_fields = _fallback_event_context(labs_text)
             events.append(
                 PatientTimelineEvent(
                     event_id="lab-1",
                     title=marker or "Laboratory findings",
                     description=labs_text[:450],
                     event_type="lab",
-                    timing_type="uncertain",
-                    event_date=None,
-                    extracted_timing_text=None,
                     source="fallback_parser",
-                    source_evidence=labs_text[:1000],
+                    source_evidence=source_evidence,
                     sort_order=30,
+                    **date_fields,
                 )
             )
 
