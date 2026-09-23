@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
@@ -18,6 +19,44 @@ from services.inspection.normalization import (
     normalize_text,
 )
 from services.inspection.runtime import coerce_optional_str
+
+###############################################################################
+T = TypeVar("T")
+
+
+class TimelineGenerationCancelled(Exception):
+    """Raised when a timeline job is stopped before its result is persisted."""
+
+
+async def _await_with_stop_check(
+    awaitable: Awaitable[T],
+    *,
+    stop_check: Callable[[], bool] | None,
+) -> T:
+    if stop_check is None:
+        return await awaitable
+
+    task = asyncio.create_task(awaitable)
+    try:
+        while not task.done():
+            if stop_check():
+                raise TimelineGenerationCancelled("Timeline generation stopped.")
+            await asyncio.sleep(0.1)
+        if stop_check():
+            raise TimelineGenerationCancelled("Timeline generation stopped.")
+        return await task
+    except BaseException:
+        if not task.done():
+            task.cancel()
+        with suppress(BaseException):
+            await task
+        raise
+
+
+def _raise_if_stopped(stop_check: Callable[[], bool] | None) -> None:
+    if stop_check is not None and stop_check():
+        raise TimelineGenerationCancelled("Timeline generation stopped.")
+
 
 ###############################################################################
 def _report_progress(
@@ -333,7 +372,9 @@ class InspectionTimelineMixin:
         force_regenerate: bool = False,
         source: dict[str, Any] | None = None,
         progress_callback: Callable[[float, str], None] | None = None,
+        stop_check: Callable[[], bool] | None = None,
     ) -> PatientTimeline | None:
+        _raise_if_stopped(stop_check)
         safe_session_id = int(session_id)
         now = time.monotonic()
         with self.timeline_generation_lock:
@@ -352,17 +393,20 @@ class InspectionTimelineMixin:
         if not force_regenerate:
             cached = self.get_session_timeline(session_id)
             if cached is not None:
+                _raise_if_stopped(stop_check)
                 with self.timeline_generation_lock:
                     self.timeline_generation_inflight.discard(safe_session_id)
                 return cached
         try:
             _report_progress(progress_callback, 5, "Preparing session timeline source")
+            _raise_if_stopped(stop_check)
             if source is None:
                 source = self.session_timeline_repository.get_session_timeline_source(
                     session_id
                 )
                 if source is None:
                     return None
+            _raise_if_stopped(stop_check)
             timeline_timeout_s = max(
                 20.0,
                 min(
@@ -387,10 +431,13 @@ class InspectionTimelineMixin:
                 with LLMRuntimeConfig.override_for_run(requested_runtime_settings):
                     timeline = asyncio.run(
                         asyncio.wait_for(
-                            self.timeline_extractor.extract_timeline(
-                                session_id=session_id,
-                                source_payload=source,
-                                runtime_settings=requested_runtime_settings,
+                            _await_with_stop_check(
+                                self.timeline_extractor.extract_timeline(
+                                    session_id=session_id,
+                                    source_payload=source,
+                                    runtime_settings=requested_runtime_settings,
+                                ),
+                                stop_check=stop_check,
                             ),
                             timeout=timeline_timeout_s,
                         )
@@ -408,7 +455,10 @@ class InspectionTimelineMixin:
                         "model_provider": requested_runtime_settings["llm_provider"],
                     }
                 )
+            except TimelineGenerationCancelled:
+                raise
             except Exception as exc:  # noqa: BLE001
+                _raise_if_stopped(stop_check)
                 error_code = _timeline_error_code(exc)
                 logger.warning(
                     "Timeline extraction unavailable for session_id=%s, using deterministic fallback "
@@ -455,6 +505,7 @@ class InspectionTimelineMixin:
                 )
             else:
                 _report_progress(progress_callback, 82, "Timeline events extracted")
+            _raise_if_stopped(stop_check)
             _report_progress(progress_callback, 92, "Saving generated timeline")
             persisted = self.session_timeline_repository.create_session_timeline_record(
                 session_id,

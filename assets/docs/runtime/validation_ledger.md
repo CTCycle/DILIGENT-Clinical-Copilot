@@ -1,5 +1,5 @@
 # Pre-release validation ledger
-Last updated: 2026-09-22
+Last updated: 2026-09-23
 
 ## Scope and interpretation
 
@@ -193,6 +193,41 @@ other failure gates remain independent.
 
 The focused report and raw logs are under
 [`assets/QA/frontend-build-validation-2026-09-22/`](../../QA/frontend-build-validation-2026-09-22/report.md).
+
+## Timeline cancellation validation — 2026-09-23
+
+This checkpoint started from clean `develop` HEAD
+`91404256dce1aa1d538727c80822719699576df4`. It covers the cancellation
+subgate only. The overall `sessions.timeline` status remains `PARTIAL` because
+dated fallback fidelity, browser retry, and controlled persistence-failure
+behavior remain unverified.
+
+The official `start_on_windows.ps1 -Action Launch` rebuilt and started the
+application on ports 7690/9847 using a disposable SQLite database in the QA
+folder. The Browser used synthetic session 1, `Synthetic Timeline Cancellation
+QA`; the visible Timeline page showed the configured role label `qwen3.5:2b`.
+A temporary environment-gated QA hook replaced the asynchronous timeline
+extractor with a local awaitable that blocks until cancelled. The hook was
+loaded before backend startup and removed from the source tree afterward, so
+the run did not contact a provider or modify provider/model settings or
+credentials. The disposable database was removed after the evidence check.
+
+| Gate | Result |
+|---|---|
+| Backend cancellation and retry regression | `app/tests/unit/test_data_inspection_repository.py -k timeline_job`: 2 passed, including interruption during extraction, terminal `cancelled`, zero persistence, and a later successful generation. |
+| Frontend API/component regressions | 2 focused Angular spec files, 6 tests passed; includes the typed `DELETE` request, visible Stop/stopping/terminal states, request failure, and completion-race reconciliation. |
+| Ruff | Passed for the changed backend service, timeline module, and repository test. |
+| Official launcher build and health | Fresh production frontend build completed; backend `/api/health` returned `{"status":"ok"}`. |
+| In-app Browser cancellation flow | Stop was visible while status was `In progress`; after click the UI showed `Stopping…` while polling; the terminal view showed `Timeline generation cancelled.` and the enabled Generate Timeline control. |
+| Timeline history and storage | The terminal Browser view showed `No generated timelines yet`; a read-only SQLite check while the runtime was active found 0 rows in `clinical_session_timelines`, then the disposable database was removed after shutdown. |
+| Cleanup | Launcher-owned backend/frontend process trees were identity-checked and stopped; ports 7690 and 9847 were confirmed free. |
+
+The Browser accessibility-state excerpts and reproduction details are in
+[`assets/QA/timeline-cancellation-20260923/report.md`](../../QA/timeline-cancellation-20260923/report.md).
+The in-app Browser screenshot was inspected inline; this Browser surface did
+not expose a disk-export path, so the report preserves the observed rendered
+text and state without claiming a screenshot file. This is controlled local
+evidence, not live-provider validation.
 
 ## Feature-state register
 

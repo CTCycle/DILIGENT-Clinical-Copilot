@@ -40,7 +40,14 @@
             <p class="timeline-row-title">{{ generationProgressMessage() || 'Preparing timeline…' }}</p>
             <progress class="timeline-progress" max="100" [value]="generationProgress()" aria-label="Timeline generation progress"></progress>
           </div>
-          <div class="timeline-actions"><span class="timeline-progress-status">In progress</span></div>
+          <div class="timeline-actions">
+            @if (generationCancellationState() === 'idle') {
+              <span class="timeline-progress-status">In progress</span>
+              <button type="button" class="btn btn-secondary" (click)="cancelTimelineGeneration()" aria-label="Stop timeline generation">Stop</button>
+            } @else {
+              <span class="timeline-progress-status" aria-live="polite">Stopping…</span>
+            }
+          </div>
         </article>
       }
       @if (sortedTimelinePreviews().length) {

@@ -762,6 +762,7 @@ class DataInspectionService(
             session_id,
             force_regenerate=force_regenerate,
             source=source,
+            stop_check=lambda: self.jobs.should_stop(job_id),
             progress_callback=lambda p, m: self._report_timeline_progress(
                 job_id, session_id, p, m
             ),
