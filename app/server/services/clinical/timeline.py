@@ -31,6 +31,11 @@ DATE_SHORT_RE = re.compile(r"^\d{4}-\d{2}$")
 DATE_YEAR_RE = re.compile(r"^\d{4}$")
 ISO_DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 ISO_PARTIAL_DATE_RE = re.compile(r"\b\d{4}(?:-\d{2}(?:-\d{2})?)?\b")
+CANONICAL_TIMELINE_SOURCE_FIELDS = (
+    "anamnesis",
+    "drugs",
+    "laboratory_analysis",
+)
 
 
 class _UnsupportedTimelineEvidenceError(ValueError):
@@ -61,6 +66,47 @@ def _has_source_evidence(source_payload: dict[str, Any], evidence: str) -> bool:
         normalized_evidence in _normalize_evidence_text(source_text)
         for source_text in _iter_source_text_values(source_payload)
     )
+
+
+def _canonical_source_text_fields(
+    source_payload: dict[str, Any],
+) -> dict[str, list[str]]:
+    """Return the named clinical source fields, collapsing section duplicates."""
+    fields: dict[str, list[str]] = {}
+    for field_name in CANONICAL_TIMELINE_SOURCE_FIELDS:
+        value = source_payload.get(field_name)
+        if isinstance(value, str) and value.strip():
+            fields[field_name] = [value]
+
+    sections = source_payload.get("sections")
+    if isinstance(sections, dict):
+        for raw_name, value in sections.items():
+            field_name = str(raw_name).strip()
+            if not field_name or len(field_name) > 80:
+                continue
+            if isinstance(value, str) and value.strip():
+                fields.setdefault(field_name, []).append(value)
+    return fields
+
+
+def _source_field_for_evidence(
+    source_payload: dict[str, Any], evidence: str | None
+) -> str | None:
+    """Resolve provenance only when evidence identifies one named source field."""
+    if not evidence or not evidence.strip():
+        return None
+    normalized_evidence = _normalize_evidence_text(evidence)
+    matches = [
+        field_name
+        for field_name, source_texts in _canonical_source_text_fields(
+            source_payload
+        ).items()
+        if any(
+            normalized_evidence in _normalize_evidence_text(source_text)
+            for source_text in source_texts
+        )
+    ]
+    return matches[0] if len(matches) == 1 else None
 
 
 ###############################################################################
@@ -355,7 +401,17 @@ class PatientTimelineExtractor:
                 "Timeline event evidence is not supported by the session source."
             )
 
-        normalized_events = self.normalize_events(parsed.events)
+        events_with_verified_sources = [
+            event.model_copy(
+                update={
+                    "source": _source_field_for_evidence(
+                        source_payload, event.source_evidence
+                    )
+                }
+            )
+            for event in parsed.events
+        ]
+        normalized_events = self.normalize_events(events_with_verified_sources)
         return PatientTimeline(
             session_id=int(session_id),
             generated_at=datetime.now(UTC),
