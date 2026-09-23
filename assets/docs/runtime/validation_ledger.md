@@ -329,6 +329,43 @@ The Browser screenshot was inspected inline. The Browser surface did not
 provide a disk-export path, so no screenshot file is claimed. No API, public
 type, or database schema changes were made.
 
+## Timeline source attribution validation — 2026-09-23
+
+This slice started from clean `develop` HEAD
+`309ad24558b0bafa68cd4c2827581431499b037d`. The official launcher used the
+isolated SQLite database in
+[`assets/QA/timeline-source-attribution-20260923/`](../../QA/timeline-source-attribution-20260923/)
+and synthetic sessions 1 and 2, which had identical anamnesis, medication,
+and laboratory input. The shared database, saved model settings, and
+credentials were not changed. The Timeline role was switched from 2B to 9B
+only inside the isolated QA database.
+
+The prompt now asks for the canonical field containing each verbatim evidence
+quote. The extractor derives the existing `source` field only after the
+evidence passes validation. Direct fields and same-name copies in `sections`
+count as one field; quotes missing from source text or present in multiple
+distinct fields do not receive a label. Conflicting model-supplied labels are
+overwritten. The fail-closed `invalid_response` guard remains intact; API,
+schema, and database contracts did not change.
+
+| Gate | Result |
+|---|---|
+| Focused backend timeline/retry/diagnostic/repository regressions | 56 passed, 7 deselected. Existing warnings: pytest `cache_dir` config option is unknown and Google GenAI emits a deprecation warning. |
+| Timeline component specs | 12 passed. |
+| Ruff and whitespace | All changed Python files passed `ruff check --no-cache`; `git diff --check` passed. |
+| `qwen3.5:2b` live lane | Two generations both saved fallback / `invalid_response`; each retained three evidence-backed fallback events. Each row stored `source_kind=local`, `model_provider=ollama`, `source_model=qwen3.5:2b`. The fallback retained `2025-01` month precision for medication and `2025-01-17` day precision for symptoms and ALT. |
+| `qwen3.5:9b` live lane | Two generations both saved `llm_generated` with three evidence-backed events. Each row stored `source_kind=local`, `model_provider=ollama`, `source_model=qwen3.5:9b`. The evidence mapped to `drugs`, `laboratory_analysis`, and `anamnesis`; medication remained at month precision and symptoms/ALT at day precision. All Source values rendered in the event cards and details. |
+| Confidence | The 9B model omitted confidence and rationale. Both persisted as null and the UI showed “Not scored” / “Not reported”; no confidence was invented. |
+| Persistence and input parity | All four timeline rows persisted in the isolated DB; each generation survived reload in history. The synthetic direct source fields for sessions 1 and 2 were equal. SQLite `integrity_check` returned `ok`; `foreign_key_check` had zero violations. |
+| Browser console | The in-app Browser provided accessible UI state and screenshots but no console-log reader. The DevTools shortcut did not open a console. Errors and warnings remain unverified and are not claimed empty. |
+| Gate boundary | `sessions.timeline` and `model.provider.local-ollama` remain `PARTIAL` because both exact 2B runs still returned `invalid_response`. The 9B source-label gap is resolved for the exercised synthetic case. Broader OpenCode Go and revision gates remain partial; source catalog/refresh remain partial while NCBI presents a browser verification challenge; automated regression remains partial pending host/build diagnostics and a full green run; access-key management and desktop release remain blocked on prerequisites. The RAG duplicate-file policy still needs a product decision. |
+| Cleanup | Verified task-started DILIGENT processes were stopped; ports 7690/9847 were free. The user-started Ollama process remained running. The isolated DB and focused pytest basetemp were removed after evidence capture. |
+
+The full evidence and limitations are recorded in
+[`assets/QA/timeline-source-attribution-20260923/report.md`](../../QA/timeline-source-attribution-20260923/report.md).
+The Browser-rendered Source values were inspected inline; no screenshot file
+is claimed because the Browser surface did not export one.
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
@@ -338,7 +375,7 @@ type, or database schema changes were made.
 | 3 | Application shell and primary workspace navigation | UI | `PASS` | In-app Browser rendered DILI Agent, Clinical Sessions, Data Inspection, and Settings. | Browser smoke at one desktop viewport; no provider call. |
 | 4 | General runtime settings persistence | Settings | `PASS` | Changed polling interval `1 -> 2`, saved, navigated, reloaded, and restored `2 -> 1`; value and persisted timestamp remained visible. | `settings/configurations.json` is back at baseline `1.0`; `.env` remained excluded. |
 | 5 | Settings section surfaces | Settings | `PASS` | General, Models, Data Processing, Integrations, and Advanced routes rendered with source labels and controls. | Surface validation only for sections other than General persistence. |
-| 6 | Local/cloud model configuration and access-key UX | Settings / external | `ATTENTION` | In the isolated QA database, Settings saved the Timeline role as `qwen3.5:2b` and `qwen3.5:9b` in turn; the refreshed Ollama catalog showed both installed, and the configured OpenCode Go route remained `deepseek-v4-flash`. | The 2B run fell back as `invalid_response`; 9B and DeepSeek produced source-matching evidence, while 9B event Source labels were not reported. Cloud credential lifecycle remains unvalidated. [Timeline model matrix](../../QA/timeline-model-matrix-20260923/report.md) |
+| 6 | Local/cloud model configuration and access-key UX | Settings / external | `ATTENTION` | In the isolated QA database, Settings saved the Timeline role as `qwen3.5:2b` and `qwen3.5:9b` in turn; the refreshed Ollama catalog showed both installed, and the configured OpenCode Go route remained `deepseek-v4-flash`. Two 9B timeline runs now show evidence-derived Source labels; both 2B runs fell back as `invalid_response`. Cloud credential lifecycle remains unvalidated. [Timeline source attribution validation](../../QA/timeline-source-attribution-20260923/report.md); [Timeline model matrix](../../QA/timeline-model-matrix-20260923/report.md) |
 | 7 | Clinical input validation and preflight | Clinical workflow | `PASS` | Empty input showed four blocking reasons; synthetic valid input showed the two unavailable structured-source blockers before execution. | No analysis job was submitted because the preflight correctly blocked it. |
 | 8 | Clinical analysis submission, progress, terminal state, and recovery | Clinical workflow | `NOT TESTED` | Not reached in the current browser run. | Requires populated source catalogs and a usable model lane. |
 | 9 | Session creation and persisted result | Sessions / persistence | `NOT TESTED` | Not reached because clinical execution was blocked. | Existing shared rows were inspected read-only; current UI could not start on that DB. |
@@ -357,7 +394,7 @@ type, or database schema changes were made.
 | 22 | RAG retrieval inside a clinical analysis | RAG / clinical workflow | `NOT TESTED` | No clinical analysis was allowed past preflight. | Requires a completed analysis with persisted citations. |
 | 23 | Bibliography and source provenance in the final report | Reporting | `NOT TESTED` | No final report was generated in the current live run. | Must be rechecked with structured sources and RAG enabled. |
 | 24 | Final conclusion coherence and uncertainty presentation | Reporting | `NOT TESTED` | No final report was generated in the current live run. | Must be reviewed against the rendered report and persisted result. |
-| 25 | Patient timeline generation, rendering, and persistence | Sessions / timeline | `PARTIAL` | In-app Browser exercised qwen3.5:2b, qwen3.5:9b, and OpenCode Go deepseek-v4-flash against isolated synthetic sessions. The 2B lane saved fallback/invalid_response; 9B and DeepSeek saved LLM timelines with exact source-evidence quotes. Date precision and each model/provider were visible, and all three history entries survived reload. | The 2B lane still lacks grounded LLM output, and the 9B event Source labels were not reported. Controlled timeout, authentication, and rate-limit regressions now pass. [Timeline model matrix](../../QA/timeline-model-matrix-20260923/report.md) |
+| 25 | Patient timeline generation, rendering, and persistence | Sessions / timeline | `PARTIAL` | The latest in-app Browser run exercised both exact Ollama models twice against identical isolated synthetic inputs. Both 2B attempts saved fallback/invalid_response; both 9B attempts saved LLM timelines with exact evidence, evidence-derived Source labels, correct date precision, and local/Ollama/model provenance. All four history entries survived reload. | The 2B lane still lacks grounded LLM output. Confidence remained unscored when omitted. Console diagnostics were unavailable through the current in-app Browser surface. Controlled timeout, authentication, and rate-limit regressions pass. [Timeline source attribution validation](../../QA/timeline-source-attribution-20260923/report.md); [Timeline model matrix](../../QA/timeline-model-matrix-20260923/report.md) |
 | 26 | Agentic revision workflow, trace, artifacts, and persisted version | Revision | `NOT TESTED` | No revision was started in the current live run. | Shared DB contains historical revision rows, but the current app cannot start on it. |
 | 27 | Manual report editing and version/history behavior | Revision / UI | `NOT TESTED` | Not reached in the current live run. | Requires a completed report and persisted version transition. |
 | 28 | Human-review escalation and `requires_human_review` state | Revision / clinical safety | `NOT TESTED` | Not reached in the current live run. | Unit paths exist; rendered and persisted current-run evidence is absent. |

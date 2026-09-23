@@ -156,6 +156,109 @@ def test_timeline_extractor_rejects_unsupported_source_evidence() -> None:
     assert exc.value.error_code == "invalid_response"
     assert exc.value.retryable is False
 
+
+###############################################################################
+def test_timeline_source_is_derived_from_the_matching_canonical_field() -> None:
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(
+            PatientTimelineExtraction(
+                events=[
+                    PatientTimelineEvent(
+                        event_id="alt",
+                        title="ALT result",
+                        event_type="lab",
+                        source="anamnesis",
+                        source_evidence="ALT was 75 U/L on 2025-01-17.",
+                    )
+                ]
+            )
+        )
+    )
+
+    result = asyncio.run(
+        extractor.extract_timeline(
+            session_id=13,
+            source_payload={
+                "anamnesis": "Symptoms started on 2025-01-17.",
+                "drugs": "Acetaminophen was taken in 2025-01.",
+                "laboratory_analysis": "ALT was 75 U/L on 2025-01-17.",
+                "sections": {
+                    "anamnesis": "Symptoms started on 2025-01-17.",
+                    "laboratory_analysis": "ALT was 75 U/L on 2025-01-17.",
+                },
+            },
+        )
+    )
+
+    assert result.events[0].source == "laboratory_analysis"
+
+
+###############################################################################
+def test_timeline_source_is_cleared_when_evidence_matches_distinct_fields() -> None:
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(
+            PatientTimelineExtraction(
+                events=[
+                    PatientTimelineEvent(
+                        event_id="shared",
+                        title="Shared source statement",
+                        source="anamnesis",
+                        source_evidence="The patient improved.",
+                    )
+                ]
+            )
+        )
+    )
+
+    result = asyncio.run(
+        extractor.extract_timeline(
+            session_id=14,
+            source_payload={
+                "anamnesis": "The patient improved.",
+                "drugs": "The patient improved.",
+            },
+        )
+    )
+
+    assert result.events[0].source is None
+
+
+###############################################################################
+def test_timeline_source_resolution_returns_none_when_evidence_is_missing() -> None:
+    class CapturingTimelineExtractor(PatientTimelineExtractor):
+        events_before_normalize: list[PatientTimelineEvent]
+
+        def normalize_events(
+            self, events: list[PatientTimelineEvent]
+        ) -> list[PatientTimelineEvent]:
+            self.events_before_normalize = events
+            return super().normalize_events(events)
+
+    extractor = CapturingTimelineExtractor(
+        client=FakeTimelineClient(
+            PatientTimelineExtraction(
+                events=[
+                    PatientTimelineEvent(
+                        event_id="unquoted",
+                        title="Unquoted event",
+                        source="laboratory_analysis",
+                        source_evidence=None,
+                    )
+                ]
+            )
+        )
+    )
+
+    result = asyncio.run(
+        extractor.extract_timeline(
+            session_id=15,
+            source_payload={"laboratory_analysis": "ALT was 75 U/L."},
+        )
+    )
+
+    assert extractor.events_before_normalize[0].source is None
+    assert result.events == []
+
 ###############################################################################
 def test_normalize_date_token_keeps_month_precision_without_promoting_day() -> None:
     assert PatientTimelineExtractor.normalize_date_token("2025-02") == "2025-02"
@@ -296,6 +399,9 @@ def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
     assert "'a':" not in prompt
     assert client.last_kwargs["purpose"].value == "timeline_extraction"
     assert client.last_kwargs["timeline_complexity"] == "simple"
+    assert "exact canonical field or section name" in client.last_kwargs[
+        "system_prompt"
+    ]
 
 ###############################################################################
 def test_timeline_complexity_is_deterministic_and_escalates_for_large_payloads() -> (
