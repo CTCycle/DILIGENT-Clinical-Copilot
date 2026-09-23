@@ -299,6 +299,36 @@ so no screenshot artifact is claimed. The post-fix error category is recorded
 as exposed by the Browser/database; no timeout, authentication, or rate-limit
 failure was simulated.
 
+## Tier 4 timeline model and recovery validation — 2026-09-23
+
+This campaign started at develop HEAD e933d3008a5773e52b21a676bd8d9b10964ca75d.
+The official launcher ran on ports 7690/9847 against the isolated SQLite
+backup at runtimes/cache/qa/timeline-model-matrix-20260923/timeline-model-matrix.db.
+Synthetic sessions 25, 26, and 27 used identical anamnesis, medication, and
+laboratory text; the seed helper and full report are in
+[the timeline model matrix QA folder](../../QA/timeline-model-matrix-20260923/report.md).
+The shared database and saved settings were not modified. The local catalog
+refresh confirmed qwen3.5:2b and qwen3.5:9b installed. The configured
+OpenCode Go route was deepseek-v4-flash, whose catalog identity is DeepSeek
+V4.1 Flash. No credential value was output or changed.
+
+| Gate | Result |
+|---|---|
+| Focused backend timeline regressions | 45 passed across timeline retry behavior, error diagnostics, and repository persistence tests. Synthetic timeout and rate-limit errors retried successfully; authentication did not retry; timeout, authentication, and rate-limit fallback codes persisted. No real authentication failure or rate limit was triggered. |
+| Timeline component specs | 12 passed, including the timeout, authentication, and rate-limit fallback labels. |
+| Ruff | All changed Python files passed with pre-existing DTZ001 findings ignored; the two focused retry/diagnostic files passed without ignores. The repository test file has 14 untouched naive-datetime findings. |
+| Official launcher and browser | Launcher readiness returned backend health status ok. Settings and each Timeline panel showed the selected role model. Browser error/warning logs were empty, and the rendered timeline was visually inspected inline. |
+| qwen3.5:2b | Session 25 reached local Ollama and stored source_model qwen3.5:2b, source_kind local, and model_provider ollama. It saved Fallback chronology / invalid_response with three fallback_parser events. The UI showed the failure class and retained month precision for medication and day precision for symptoms and ALT. History survived reload. |
+| qwen3.5:9b | Session 26 stored the exact local Ollama provenance and an LLM-generated three-event timeline. Symptom and ALT evidence exactly matched the source at explicit day precision. The medication evidence matched the source at month precision and was marked inferred with a review note. The event Source field was Not reported and confidence was Not scored for all three events. History survived reload. |
+| DeepSeek V4.1 Flash | Session 27 used cloud / opencode_go / deepseek-v4-flash and stored three LLM-generated events with exact evidence and displayed sources from anamnesis, laboratory_analysis, and drugs. The symptom and ALT dates were day-precision; medication was month-precision. History survived reload. |
+| Read-only SQLite | Exactly one saved timeline was present per synthetic session. Session 25 persisted fallback / invalid_response and fallback_parser sources; session 26 persisted llm_generated with null event-level Source fields; session 27 persisted llm_generated with provider opencode_go and the three expected source fields. |
+| Gate boundary | sessions.timeline remains PARTIAL because qwen3.5:2b still produced no grounded LLM timeline. The local Ollama gate remains PARTIAL. This single timeline route does not promote the broader OpenCode Go provider gate. |
+| Cleanup | Task-started app processes and the isolated database/test basetemp folders were removed; ports 7690/9847 were verified free. The user-started Ollama service remained running. |
+
+The Browser screenshot was inspected inline. The Browser surface did not
+provide a disk-export path, so no screenshot file is claimed. No API, public
+type, or database schema changes were made.
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
@@ -308,7 +338,7 @@ failure was simulated.
 | 3 | Application shell and primary workspace navigation | UI | `PASS` | In-app Browser rendered DILI Agent, Clinical Sessions, Data Inspection, and Settings. | Browser smoke at one desktop viewport; no provider call. |
 | 4 | General runtime settings persistence | Settings | `PASS` | Changed polling interval `1 -> 2`, saved, navigated, reloaded, and restored `2 -> 1`; value and persisted timestamp remained visible. | `settings/configurations.json` is back at baseline `1.0`; `.env` remained excluded. |
 | 5 | Settings section surfaces | Settings | `PASS` | General, Models, Data Processing, Integrations, and Advanced routes rendered with source labels and controls. | Surface validation only for sections other than General persistence. |
-| 6 | Local/cloud model configuration and access-key UX | Settings / external | `ATTENTION` | Settings showed `Local (Ollama)` with `qwen3.5:2b` assigned to Timeline; the local catalog marked the model installed and two live timeline requests reached the configured lane. | Both live timeline results fell back as `invalid_response`; a grounded `llm_generated` response and cloud credential lifecycle remain unvalidated. [Live timeline report](../../QA/timeline-live-validation-20260923/report.md) |
+| 6 | Local/cloud model configuration and access-key UX | Settings / external | `ATTENTION` | In the isolated QA database, Settings saved the Timeline role as `qwen3.5:2b` and `qwen3.5:9b` in turn; the refreshed Ollama catalog showed both installed, and the configured OpenCode Go route remained `deepseek-v4-flash`. | The 2B run fell back as `invalid_response`; 9B and DeepSeek produced source-matching evidence, while 9B event Source labels were not reported. Cloud credential lifecycle remains unvalidated. [Timeline model matrix](../../QA/timeline-model-matrix-20260923/report.md) |
 | 7 | Clinical input validation and preflight | Clinical workflow | `PASS` | Empty input showed four blocking reasons; synthetic valid input showed the two unavailable structured-source blockers before execution. | No analysis job was submitted because the preflight correctly blocked it. |
 | 8 | Clinical analysis submission, progress, terminal state, and recovery | Clinical workflow | `NOT TESTED` | Not reached in the current browser run. | Requires populated source catalogs and a usable model lane. |
 | 9 | Session creation and persisted result | Sessions / persistence | `NOT TESTED` | Not reached because clinical execution was blocked. | Existing shared rows were inspected read-only; current UI could not start on that DB. |
@@ -327,7 +357,7 @@ failure was simulated.
 | 22 | RAG retrieval inside a clinical analysis | RAG / clinical workflow | `NOT TESTED` | No clinical analysis was allowed past preflight. | Requires a completed analysis with persisted citations. |
 | 23 | Bibliography and source provenance in the final report | Reporting | `NOT TESTED` | No final report was generated in the current live run. | Must be rechecked with structured sources and RAG enabled. |
 | 24 | Final conclusion coherence and uncertainty presentation | Reporting | `NOT TESTED` | No final report was generated in the current live run. | Must be reviewed against the rendered report and persisted result. |
-| 25 | Patient timeline generation, rendering, and persistence | Sessions / timeline | `PARTIAL` | In-app Browser exercised the exact local `qwen3.5:2b` lane twice; both attempts saved deterministic fallback chronology, preserved source date precision/evidence, and remained visible in history after navigation and reload. | No acceptable `llm_generated` result was obtained; broader provider-error classes remain open. [Live timeline report](../../QA/timeline-live-validation-20260923/report.md) |
+| 25 | Patient timeline generation, rendering, and persistence | Sessions / timeline | `PARTIAL` | In-app Browser exercised qwen3.5:2b, qwen3.5:9b, and OpenCode Go deepseek-v4-flash against isolated synthetic sessions. The 2B lane saved fallback/invalid_response; 9B and DeepSeek saved LLM timelines with exact source-evidence quotes. Date precision and each model/provider were visible, and all three history entries survived reload. | The 2B lane still lacks grounded LLM output, and the 9B event Source labels were not reported. Controlled timeout, authentication, and rate-limit regressions now pass. [Timeline model matrix](../../QA/timeline-model-matrix-20260923/report.md) |
 | 26 | Agentic revision workflow, trace, artifacts, and persisted version | Revision | `NOT TESTED` | No revision was started in the current live run. | Shared DB contains historical revision rows, but the current app cannot start on it. |
 | 27 | Manual report editing and version/history behavior | Revision / UI | `NOT TESTED` | Not reached in the current live run. | Requires a completed report and persisted version transition. |
 | 28 | Human-review escalation and `requires_human_review` state | Revision / clinical safety | `NOT TESTED` | Not reached in the current live run. | Unit paths exist; rendered and persisted current-run evidence is absent. |

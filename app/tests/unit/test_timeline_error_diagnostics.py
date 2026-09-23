@@ -1,6 +1,33 @@
 from __future__ import annotations
 
-from services.inspection.timeline import _timeline_fallback_note
+import pytest
+from domain.patient_timeline import PatientTimelineGenerationErrorCode
+from services.inspection.timeline import _timeline_error_code, _timeline_fallback_note
+from services.llm.cloud import LLMError
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (TimeoutError("Provider request timed out"), "timeout"),
+        (
+            LLMError("HTTP 401: API key rejected", error_code="authentication"),
+            "authentication",
+        ),
+        (
+            LLMError("HTTP 429: provider rate limit", error_code="rate_limited"),
+            "rate_limited",
+        ),
+    ],
+)
+def test_timeline_error_code_classifies_timeout_authentication_and_rate_limit(
+    error: BaseException, expected: PatientTimelineGenerationErrorCode
+) -> None:
+    wrapped = RuntimeError("timeline extraction failed")
+    wrapped.__cause__ = error
+
+    assert _timeline_error_code(wrapped) == expected
 
 ###############################################################################
 def test_timeline_fallback_note_includes_provider_contract_detail() -> None:
@@ -31,3 +58,25 @@ def test_timeline_fallback_note_truncates_long_diagnostics() -> None:
     )
 
     assert len(note) == 500
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("error_code", "expected"),
+    [
+        ("timeout", "did not respond before the configured timeout"),
+        ("authentication", "provider rejected authentication"),
+        ("rate_limited", "provider rate-limited the request"),
+    ],
+)
+def test_cloud_timeline_fallback_note_explains_provider_failure(
+    error_code: PatientTimelineGenerationErrorCode, expected: str
+) -> None:
+    note = _timeline_fallback_note(
+        use_cloud_services=True,
+        provider="opencode_go",
+        model="deepseek-v4-flash",
+        error_code=error_code,
+    )
+
+    assert expected in note
