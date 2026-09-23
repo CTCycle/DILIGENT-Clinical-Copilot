@@ -505,13 +505,17 @@ def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
         page.unroute("**/api/clinical/jobs", start_navigation_resume_job)
 
 ###############################################################################
-def test_dili_running_job_state_is_not_restored_after_refresh(
+def test_dili_running_job_state_resumes_after_refresh(
     page: Page, base_url: str
 ):
     page.goto(base_url)
     _fill_required_dili_fields(page)
 
+    start_call_count = 0
+
     def start_refresh_resume_job(route: Route) -> None:
+        nonlocal start_call_count
+        start_call_count += 1
         route.fulfill(
             status=202,
             content_type="application/json",
@@ -557,11 +561,20 @@ def test_dili_running_job_state_is_not_restored_after_refresh(
         expect(page.locator(".spinner-label")).to_contain_text(
             "Extracting therapy and medication data"
         )
+        assert page.evaluate(
+            "() => JSON.parse(localStorage.getItem('dili-agent-active-job-v1') || 'null').jobId"
+        ) == "refresh-resume"
         status_calls_before_refresh = status_call_count
         page.reload()
-        expect(page.locator(".spinner-label")).to_have_count(0)
-        expect(page.get_by_role("button", name="Run DILI analysis")).to_be_visible()
-        assert status_call_count == status_calls_before_refresh
+        expect(page.locator(".inspection-excerpt-text")).to_contain_text(
+            "Refresh recovery completed."
+        )
+        expect(page.get_by_role("button", name="Run DILI analysis")).to_be_enabled()
+        assert status_call_count > status_calls_before_refresh
+        assert page.evaluate(
+            "() => localStorage.getItem('dili-agent-active-job-v1')"
+        ) is None
+        assert start_call_count == 1
     finally:
         page.unroute(
             "**/api/clinical/jobs/refresh-resume**", serve_refresh_resume_status
