@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import re
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
 
@@ -30,6 +31,37 @@ DATE_SHORT_RE = re.compile(r"^\d{4}-\d{2}$")
 DATE_YEAR_RE = re.compile(r"^\d{4}$")
 ISO_DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 ISO_PARTIAL_DATE_RE = re.compile(r"\b\d{4}(?:-\d{2}(?:-\d{2})?)?\b")
+
+
+class _UnsupportedTimelineEvidenceError(ValueError):
+    """Raised when a model's quoted timeline evidence is absent from the source."""
+
+    error_code = "invalid_response"
+    retryable = False
+
+
+def _iter_source_text_values(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for nested_value in value.values():
+            yield from _iter_source_text_values(nested_value)
+    elif isinstance(value, (list, tuple)):
+        for nested_value in value:
+            yield from _iter_source_text_values(nested_value)
+
+
+def _normalize_evidence_text(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
+def _has_source_evidence(source_payload: dict[str, Any], evidence: str) -> bool:
+    normalized_evidence = _normalize_evidence_text(evidence)
+    return bool(normalized_evidence) and any(
+        normalized_evidence in _normalize_evidence_text(source_text)
+        for source_text in _iter_source_text_values(source_payload)
+    )
+
 
 ###############################################################################
 class PatientTimelineExtractor:
@@ -311,6 +343,17 @@ class PatientTimelineExtractor:
 
         if parsed is None:
             raise RuntimeError("Failed to extract patient timeline")
+
+        has_unsupported_evidence = any(
+            event.source_evidence
+            and event.source_evidence.strip()
+            and not _has_source_evidence(source_payload, event.source_evidence)
+            for event in parsed.events
+        )
+        if has_unsupported_evidence:
+            raise _UnsupportedTimelineEvidenceError(
+                "Timeline event evidence is not supported by the session source."
+            )
 
         normalized_events = self.normalize_events(parsed.events)
         return PatientTimeline(
