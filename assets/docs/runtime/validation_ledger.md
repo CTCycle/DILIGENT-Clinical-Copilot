@@ -388,7 +388,7 @@ credentials were not changed.
 | Focused backend suite | 70 passed, 7 deselected across patient/lab timeline extraction, retry, diagnostics, and timeline repository tests. Pytest emitted the existing unknown `cache_dir` option warning and a Google GenAI deprecation warning. |
 | Full Angular/Vitest suite | 24 test files and 105 tests passed with `npm run test -- --no-watch`. |
 | Ruff and SQLite | The synthetic seeder passed `ruff check --no-cache`; SQLite `integrity_check=ok`, with zero `foreign_key_check` rows. |
-| `test.automated-regression` | Remains `PARTIAL`: these current suites pass, while the fresh local production build's `0xC0000005` and independent hosted-CI browser E2E/security/migration failures remain unresolved. |
+| `test.automated-regression` | Remains `PARTIAL`: hosted run [35895672146](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35895672146) on validation commit `a004078879fbf3ce4da1b4350f893ad1403f2a3d` passed frontend tests/build and the SQLite/PostgreSQL persistence contract, but failed Alembic drift validation, Python dependency audit, and Windows browser E2E; live-provider E2E was skipped. The local fresh production build's `0xC0000005` also remains unresolved. |
 
 The detailed evidence is in
 [`assets/QA/timeline-local-gate-20260923/report.md`](../../QA/timeline-local-gate-20260923/report.md).
