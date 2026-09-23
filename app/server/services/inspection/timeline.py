@@ -37,7 +37,10 @@ async def _await_with_stop_check(
     if stop_check is None:
         return await awaitable
 
-    task = asyncio.create_task(awaitable)
+    async def run_awaitable() -> T:
+        return await awaitable
+
+    task = asyncio.create_task(run_awaitable())
     try:
         while not task.done():
             if stop_check():
