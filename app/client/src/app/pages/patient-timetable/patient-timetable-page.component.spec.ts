@@ -89,6 +89,30 @@ describe('PatientTimetablePageComponent', () => {
     expect(component.generationNote()).toContain('provider could not be reached');
   });
 
+  it.each([
+    ['timeout', 'Provider timeout'],
+    ['authentication', 'Provider authentication rejected'],
+    ['rate_limited', 'Provider rate limit reached'],
+  ] as const)(
+    'labels the %s fallback reason',
+    (generation_error_code, expectedLabel) => {
+      component.timeline.set({
+        timeline_id: 12,
+        session_id: 12,
+        generated_at: '2026-07-09T08:00:00Z',
+        generation_status: 'fallback',
+        generation_note: 'Controlled provider failure for timeline recovery QA.',
+        generation_error_code,
+        source_model: 'deepseek-v4-flash',
+        source_kind: 'cloud',
+        model_provider: 'opencode_go',
+        events: [],
+      });
+
+      expect(component.generationErrorLabel()).toBe(expectedLabel);
+    },
+  );
+
   it('renders a warning when source evidence is missing', () => {
     const timeline: InspectionSessionTimeline = {
       timeline_id: 8,

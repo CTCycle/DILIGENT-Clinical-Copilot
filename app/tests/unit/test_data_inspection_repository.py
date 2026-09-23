@@ -559,8 +559,12 @@ class FakeTimelineExtractor:
 class FailingTimelineExtractor:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        error_code: str = "invalid_response",
+    ) -> None:
         self.timeout_s = 1.0
+        self.error_code = error_code
 
     # -------------------------------------------------------------------------
     async def extract_timeline(
@@ -571,7 +575,10 @@ class FailingTimelineExtractor:
         runtime_settings: dict[str, Any] | None = None,
     ) -> PatientTimeline:
         _ = session_id, source_payload, runtime_settings
-        raise LLMError("structured extraction failed", error_code="invalid_response")
+        raise LLMError(
+            f"structured extraction failed: {self.error_code}",
+            error_code=self.error_code,
+        )
 
 ###############################################################################
 def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced() -> (
@@ -709,6 +716,52 @@ def test_timeline_generation_marks_fallback_payload() -> None:
         event.timing_type == "explicit_date" if event is dated_event else event.timing_type == "uncertain"
         for event in generated.events
     )
+
+
+###############################################################################
+@pytest.mark.parametrize("error_code", ["timeout", "authentication", "rate_limited"])
+def test_timeline_generation_persists_classified_provider_fallback(
+    error_code: str,
+) -> None:
+    repository_graph, _ = build_repository_graph_for_test()
+    save_session(
+        repository_graph,
+        patient_name="Classified Failure Timeline Patient",
+        timestamp=datetime(2025, 1, 1, 8, 30, tzinfo=timezone.utc),
+        status="successful",
+        report="Synthetic fallback test report",
+        anamnesis="Symptoms started on 2025-01-17.",
+    )
+    session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
+        search="Classified Failure Timeline Patient",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(session_rows[0]["session_id"])
+    service = build_service(
+        repository_graph,
+        timeline_extractor=FailingTimelineExtractor(error_code=error_code),
+        jobs=JobManager(),
+    )
+
+    generated = service.generate_session_timeline(session_id, force_regenerate=True)
+
+    assert generated is not None
+    assert generated.generation_status == "fallback"
+    assert generated.generation_error_code == error_code
+    assert generated.generation_note
+    assert generated.events
+    assert all(event.source == "fallback_parser" for event in generated.events)
+
+    history = repository_graph.session_timeline_repository.list_session_timelines(
+        session_id
+    )
+    assert len(history) == 1
+    assert history[0]["generation_status"] == "fallback"
+    assert history[0]["generation_error_code"] == error_code
 
 
 @pytest.mark.parametrize(
