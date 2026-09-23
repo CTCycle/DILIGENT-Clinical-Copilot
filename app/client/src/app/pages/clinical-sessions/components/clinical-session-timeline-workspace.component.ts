@@ -4,7 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import { ModalShellComponent } from '../../../components/modal-shell/modal-shell.component';
 import { ClinicalSessionDetail, InspectionSessionTimelinePreview } from '../../../core/models/inspection-types';
-import { deleteInspectionSessionTimeline, fetchInspectionSessionTimelineJobStatus, fetchInspectionSessionTimelineList, startInspectionSessionTimelineJob } from '../../../core/services/session-timeline-api';
+import { cancelInspectionSessionTimelineJob, deleteInspectionSessionTimeline, fetchInspectionSessionTimelineJobStatus, fetchInspectionSessionTimelineList, startInspectionSessionTimelineJob } from '../../../core/services/session-timeline-api';
 import { JobPollingService } from '../../../core/services/job-polling.service';
 import { ModelConfigStateService } from '../../../core/state/model-config-state.service';
 import { formatUnknownError } from '../../../core/utils';
@@ -38,6 +38,7 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
   readonly generationJobId = signal<string | null>(null);
   readonly generationProgress = signal(0);
   readonly generationProgressMessage = signal<string | null>(null);
+  readonly generationCancellationState = signal<'idle' | 'requesting' | 'requested'>('idle');
   readonly timelinePendingDeletion = signal<InspectionSessionTimelinePreview | null>(null);
   readonly deletingTimelineId = signal<number | null>(null);
   readonly deleteError = signal<string | null>(null);
@@ -57,7 +58,7 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
     const sessionId = this.session?.session_id;
     this.stopTimelinePolling();
     this.timelinePreviews.set([]); this.timelineListError.set(null); this.generationError.set(null); this.generationStatus.set(null);
-    this.generationJobId.set(null); this.generationProgress.set(0); this.generationProgressMessage.set(null); this.generationRunning.set(false);
+    this.generationJobId.set(null); this.generationProgress.set(0); this.generationProgressMessage.set(null); this.generationRunning.set(false); this.generationCancellationState.set('idle');
     void this.loadModelConfiguration();
     void this.loadTimelineHistory(sessionId, loadGeneration);
   }
@@ -108,8 +109,44 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
       }
     } catch (error) {
       if (isCurrentGeneration()) {
-        this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(formatUnknownError(error, 'Unable to start timeline generation.'));
+        this.generationRunning.set(false); this.generationStatus.set(null); this.generationCancellationState.set('idle'); this.generationError.set(formatUnknownError(error, 'Unable to start timeline generation.'));
       }
+    }
+  }
+
+  async cancelTimelineGeneration(): Promise<void> {
+    const jobId = this.generationJobId();
+    const sessionId = this.session?.session_id;
+    const loadGeneration = this.timelineLoadGeneration;
+    if (!jobId || !sessionId || this.generationCancellationState() !== 'idle') return;
+
+    const isCurrentJob = (): boolean => (
+      loadGeneration === this.timelineLoadGeneration
+      && this.session?.session_id === sessionId
+      && this.generationJobId() === jobId
+    );
+    this.generationCancellationState.set('requesting');
+    this.generationError.set(null);
+    this.generationStatus.set('Requesting timeline cancellation…');
+    try {
+      const response = await cancelInspectionSessionTimelineJob(sessionId, jobId);
+      if (!isCurrentJob()) return;
+      if (!response.success) throw new Error(response.message || 'Cancellation was not accepted.');
+      this.generationCancellationState.set('requested');
+      this.generationStatus.set('Stopping timeline generation…');
+    } catch (error) {
+      if (!isCurrentJob()) return;
+      try {
+        const job = await fetchInspectionSessionTimelineJobStatus(sessionId, jobId);
+        if (!isCurrentJob()) return;
+        if (this.applyTerminalTimelineJobStatus(job, sessionId, jobId, loadGeneration)) return;
+      } catch {
+        // Keep the original cancellation error; the polling loop remains active.
+      }
+      if (!isCurrentJob()) return;
+      this.generationCancellationState.set('idle');
+      this.generationStatus.set('Generating timeline…');
+      this.generationError.set(formatUnknownError(error, 'Unable to stop timeline generation.'));
     }
   }
 
@@ -119,7 +156,7 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
     sessionId: number,
     loadGeneration: number,
   ): void {
-    this.stopTimelinePolling(); this.generationJobId.set(jobId); this.generationRunning.set(true);
+    this.stopTimelinePolling(); this.generationJobId.set(jobId); this.generationRunning.set(true); this.generationCancellationState.set('idle');
     this.generationStatus.set('Generating timeline…');
     void this.pollTimelineJob(jobId, pollIntervalSeconds, sessionId, loadGeneration);
   }
@@ -149,21 +186,55 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
           consecutiveErrors = 0; this.generationProgress.set(Math.max(0, Math.min(100, Number(job.progress) || 0)));
           const message = job.result?.progress_message;
           if (typeof message === 'string' && message) this.generationProgressMessage.set(message);
-          if (job.status === 'completed') {
-            this.generationProgress.set(100); this.generationRunning.set(false); this.generationStatus.set('Timeline generated and saved.'); this.generationJobId.set(null); await this.loadTimelineHistory(sessionId, loadGeneration); return false;
-          }
-          if (job.status === 'failed' || job.status === 'cancelled') {
-            if (!isCurrentGeneration()) return false;
-            this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(job.error || 'Timeline generation did not complete.'); this.generationJobId.set(null); return false;
-          }
+          if (this.applyTerminalTimelineJobStatus(job, sessionId, jobId, loadGeneration)) return false;
         } catch (error) {
           if (!isCurrentGeneration()) return false;
           consecutiveErrors += 1;
-          if (consecutiveErrors >= 5) { this.generationRunning.set(false); this.generationStatus.set(null); this.generationError.set(formatUnknownError(error, 'Unable to load timeline generation status.')); this.generationJobId.set(null); return false; }
+          if (consecutiveErrors >= 5) { this.generationRunning.set(false); this.generationStatus.set(null); this.generationCancellationState.set('idle'); this.generationError.set(formatUnknownError(error, 'Unable to load timeline generation status.')); this.generationJobId.set(null); return false; }
         }
         return true;
       },
     });
+  }
+
+  private applyTerminalTimelineJobStatus(
+    job: Awaited<ReturnType<typeof fetchInspectionSessionTimelineJobStatus>>,
+    sessionId: number,
+    jobId: string,
+    loadGeneration: number,
+  ): boolean {
+    if (
+      this.generationJobId() !== jobId
+      || loadGeneration !== this.timelineLoadGeneration
+      || this.session?.session_id !== sessionId
+    ) return true;
+    if (job.status === 'completed') {
+      this.generationProgress.set(100);
+      this.generationRunning.set(false);
+      this.generationStatus.set('Timeline generated and saved.');
+      this.generationError.set(null);
+      this.generationCancellationState.set('idle');
+      this.generationJobId.set(null);
+      void this.loadTimelineHistory(sessionId, loadGeneration);
+      return true;
+    }
+    if (job.status === 'cancelled') {
+      this.generationRunning.set(false);
+      this.generationStatus.set('Timeline generation cancelled.');
+      this.generationError.set(null);
+      this.generationCancellationState.set('idle');
+      this.generationJobId.set(null);
+      return true;
+    }
+    if (job.status === 'failed') {
+      this.generationRunning.set(false);
+      this.generationStatus.set(null);
+      this.generationError.set(job.error || 'Timeline generation did not complete.');
+      this.generationCancellationState.set('idle');
+      this.generationJobId.set(null);
+      return true;
+    }
+    return false;
   }
 
   openTimeline(preview: InspectionSessionTimelinePreview): void { if (preview.timeline_id) void this.router.navigate(['/sessions', this.session.session_id, 'timetable', preview.timeline_id]); }

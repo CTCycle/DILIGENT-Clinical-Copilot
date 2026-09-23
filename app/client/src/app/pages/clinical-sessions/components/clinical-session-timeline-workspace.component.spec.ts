@@ -71,6 +71,37 @@ describe('ClinicalSessionTimelineWorkspaceComponent request generations', () => 
   let fixture: ComponentFixture<ClinicalSessionTimelineWorkspaceComponent>;
   let component: ClinicalSessionTimelineWorkspaceComponent;
 
+  function attachActiveJob(): { pollStep: () => Promise<boolean> } {
+    component.ngOnInit = () => undefined;
+    fixture.componentRef.setInput('session', session(1));
+    fixture.detectChanges();
+    component.generationJobId.set('job-1');
+    component.generationRunning.set(true);
+    component.generationStatus.set('Generating timeline…');
+
+    let pollStep: (() => Promise<boolean>) | undefined;
+    vi.spyOn(TestBed.inject(JobPollingService), 'run').mockImplementation(async (options) => {
+      pollStep = options.pollStep;
+    });
+    const attachToTimelineJob = (component as unknown as {
+      attachToTimelineJob: (
+        jobId: string,
+        pollIntervalSeconds: number,
+        sessionId: number,
+        loadGeneration: number,
+      ) => void;
+    }).attachToTimelineJob.bind(component);
+    const loadGeneration = (component as unknown as { timelineLoadGeneration: number }).timelineLoadGeneration;
+    attachToTimelineJob('job-1', 1, 1, loadGeneration);
+    fixture.detectChanges();
+    return {
+      get pollStep() {
+        if (!pollStep) throw new Error('Timeline job polling was not attached.');
+        return pollStep;
+      },
+    };
+  }
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ClinicalSessionTimelineWorkspaceComponent],
@@ -158,5 +189,132 @@ describe('ClinicalSessionTimelineWorkspaceComponent request generations', () => 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(component.generationStatus()).toBe('New session is active.');
     expect(component.generationRunning()).toBe(false);
+  });
+
+  it('shows Stop, requests cancellation, and waits for the cancelled job state', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      if (init?.method === 'DELETE') {
+        return jsonResponse({ job_id: 'job-1', success: true, message: 'Cancellation requested' });
+      }
+      if (String(input).includes('/sessions/1/timeline-jobs/job-1')) {
+        return jsonResponse({
+          job_id: 'job-1',
+          job_type: 'session_timeline',
+          status: 'cancelled',
+          progress: 30,
+          result: null,
+          error: null,
+        });
+      }
+      if (String(input).includes('/sessions/1/timelines')) return jsonResponse({ items: [] });
+      return jsonResponse({
+        items: [],
+      });
+    });
+    const { pollStep } = attachActiveJob();
+    const stopButton = fixture.nativeElement.querySelector(
+      'button[aria-label="Stop timeline generation"]',
+    ) as HTMLButtonElement | null;
+
+    expect(stopButton).not.toBeNull();
+    stopButton?.click();
+    stopButton?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fetchSpy.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1);
+    expect(component.generationCancellationState()).toBe('requested');
+    expect(fixture.nativeElement.textContent).toContain('Stopping…');
+    expect(fixture.nativeElement.querySelector('button[aria-label="Stop timeline generation"]')).toBeNull();
+
+    await pollStep();
+    fixture.detectChanges();
+
+    expect(component.generationRunning()).toBe(false);
+    expect(component.generationJobId()).toBeNull();
+    expect(component.generationStatus()).toBe('Timeline generation cancelled.');
+    expect(component.generationError()).toBeNull();
+  });
+
+  it('reconciles a cancellation race when the job completed before DELETE arrived', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      if (init?.method === 'DELETE') {
+        return new Response(JSON.stringify({ detail: 'Job not found.' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (String(input).includes('/sessions/1/timelines')) {
+        return jsonResponse({ items: [preview(1, 11)] });
+      }
+      return jsonResponse({
+        job_id: 'job-1',
+        job_type: 'session_timeline',
+        status: 'completed',
+        progress: 100,
+        result: { progress_message: 'Timeline saved.' },
+        error: null,
+      });
+    });
+    attachActiveJob();
+    const stopButton = fixture.nativeElement.querySelector(
+      'button[aria-label="Stop timeline generation"]',
+    ) as HTMLButtonElement | null;
+
+    stopButton?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fetchSpy.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1);
+    expect(component.generationJobId()).toBeNull();
+    expect(component.generationStatus()).toBe('Timeline generated and saved.');
+    expect(component.generationError()).toBeNull();
+  });
+
+  it('keeps polling and re-enables Stop after a cancellation request fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      if (init?.method === 'DELETE') {
+        return new Response(JSON.stringify({ detail: 'Service unavailable.' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (String(input).includes('/sessions/1/timeline-jobs/job-1')) {
+        return jsonResponse({
+          job_id: 'job-1',
+          job_type: 'session_timeline',
+          status: 'running',
+          progress: 30,
+          result: null,
+          error: null,
+        });
+      }
+      if (String(input).includes('/sessions/1/timelines')) return jsonResponse({ items: [] });
+      return jsonResponse({
+        job_id: 'job-1',
+        job_type: 'session_timeline',
+        status: 'running',
+        progress: 30,
+        result: null,
+        error: null,
+      });
+    });
+    const { pollStep } = attachActiveJob();
+    const stopButton = fixture.nativeElement.querySelector(
+      'button[aria-label="Stop timeline generation"]',
+    ) as HTMLButtonElement | null;
+
+    stopButton?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.generationRunning()).toBe(true);
+    expect(component.generationJobId()).toBe('job-1');
+    expect(component.generationCancellationState()).toBe('idle');
+    expect(component.generationError()).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('button[aria-label="Stop timeline generation"]')).not.toBeNull();
+
+    await pollStep();
+    expect(component.generationRunning()).toBe(true);
   });
 });
