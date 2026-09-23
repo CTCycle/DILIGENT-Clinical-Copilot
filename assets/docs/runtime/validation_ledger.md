@@ -366,6 +366,40 @@ The full evidence and limitations are recorded in
 The Browser-rendered Source values were inspected inline; no screenshot file
 is claimed because the Browser surface did not export one.
 
+## Local timeline model gate revalidation — 2026-09-23
+
+Revalidated from clean `develop` HEAD
+`07f7bba7908b202d3cc8683a7c1b6db79c45dd40`, equal to `origin/develop` at
+start. The official launcher started the backend and frontend against the
+isolated database in
+`runtimes/cache/qa/timeline-local-gate-20260923/`; health and frontend HTTP
+checks returned 200. The launcher's automatic default-browser open failed
+with access denied. The embedded Browser panel was 559 pixels wide and showed
+the application's 1100-pixel minimum-width message, so the rendered workflow
+was inspected in the Codex-controlled full-width Chrome surface. Only
+synthetic sessions were used; shared data, saved runtime configuration, and
+credentials were not changed.
+
+| Gate | Result |
+|---|---|
+| `qwen3.5:2b` live lane | Two generations persisted as fallback / `invalid_response`, each with three evidence-backed `fallback_parser` events. Both rows stored local / Ollama / `qwen3.5:2b` provenance; medication stayed at month precision and symptoms and ALT at day precision. The server log classified both failures as `_UnsupportedTimelineEvidenceError` after structured response parsing, at source-evidence validation. |
+| `qwen3.5:9b` live lane | Two generations persisted as `llm_generated`, each with three events and local / Ollama / `qwen3.5:9b` provenance. Exact quotes mapped to `drugs`, `laboratory_analysis`, and `anamnesis`; medication stayed at month precision and symptoms and ALT at day precision. The rendered Source values matched evidence-derived fields. Confidence and rationale remained unset when omitted. |
+| Browser and persistence | The rendered chronology and event inspector showed the correct model, evidence, source labels, and timing. Reload retained both 2B fallbacks and both 9B timelines. |
+| Focused backend suite | 70 passed, 7 deselected across patient/lab timeline extraction, retry, diagnostics, and timeline repository tests. Pytest emitted the existing unknown `cache_dir` option warning and a Google GenAI deprecation warning. |
+| Full Angular/Vitest suite | 24 test files and 105 tests passed with `npm run test -- --no-watch`. |
+| Ruff and SQLite | The synthetic seeder passed `ruff check --no-cache`; SQLite `integrity_check=ok`, with zero `foreign_key_check` rows. |
+| `test.automated-regression` | Remains `PARTIAL`: these current suites pass, while the fresh local production build's `0xC0000005` and independent hosted-CI browser E2E/security/migration failures remain unresolved. |
+
+The detailed evidence is in
+[`assets/QA/timeline-local-gate-20260923/report.md`](../../QA/timeline-local-gate-20260923/report.md).
+The 2B guard correctly rejected unsupported model evidence; no prompt or
+extractor defect was found, so no implementation change or guard weakening was
+made. `sessions.timeline` and `model.provider.local-ollama` remain `PARTIAL`
+until grounded 2B output and broader model coverage are demonstrated. NCBI
+catalog/refresh, OpenCode Go, API-route, RAG duplicate-file, accessibility,
+access-key, and desktop release work remain separate; access-key and release
+gates remain `BLOCKED` on their documented prerequisites.
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
