@@ -8,6 +8,10 @@ import re
 _DATE_TOKEN_RE = re.compile(
     r"^(?P<year>\d{4})(?:-(?P<month>\d{2})(?:-(?P<day>\d{2}))?)?$"
 )
+_DATE_TOKEN_IN_TEXT_RE = re.compile(r"\b\d{4}(?:-\d{2}(?:-\d{2})?)?\b")
+_YEAR_DATE_CONTEXT_RE = re.compile(
+    r"\b(?:in|during|since|from|on|dated|year)\s*$", re.IGNORECASE
+)
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -72,6 +76,31 @@ def normalize_timeline_interval(
         end_day=end.toordinal(),
         precision=precision,
     )
+
+
+###############################################################################
+def extract_single_explicit_timeline_date(
+    text: str | None,
+) -> TimelineDateInterval | None:
+    """Return one unambiguous, valid ISO date token from source text."""
+    if not text:
+        return None
+
+    tokens: set[str] = set()
+    for match in _DATE_TOKEN_IN_TEXT_RE.finditer(text):
+        token = match.group(0)
+        if len(token) == 4:
+            prefix = text[: match.start()].rstrip()
+            suffix = text[match.end() :].strip(" \t\r\n.,;:!?)]}'\"")
+            whole_field = not prefix and not suffix
+            contextual_year = bool(_YEAR_DATE_CONTEXT_RE.search(prefix)) and not suffix
+            if not whole_field and not contextual_year:
+                continue
+        tokens.add(token)
+
+    if len(tokens) != 1:
+        return None
+    return normalize_timeline_interval(tokens.pop())
 
 ###############################################################################
 def timeline_date_sort_key(value: str | None) -> tuple[int, str]:

@@ -229,6 +229,46 @@ not expose a disk-export path, so the report preserves the observed rendered
 text and state without claiming a screenshot file. This is controlled local
 evidence, not live-provider validation.
 
+## Timeline fallback date fidelity and recovery — 2026-09-23
+
+This checkpoint started from clean `develop` HEAD
+`7ceacb5919e35a7a018e985be7c60fb65b4b7afd`. It covers source-date
+preservation, retry after a fallback, and persistence-failure recovery. The
+overall `sessions.timeline` gate remains `PARTIAL`: the Browser run used
+test-injected faults and a controlled extractor, so it does not establish live
+provider behavior.
+
+The official `start_on_windows.ps1 -Action Launch` ran against a disposable
+SQLite database under `runtimes/cache/qa/timeline-recovery-20260923/` on ports
+7690/9847. The seeded session contained synthetic symptom, medication, and ALT
+text. The Timeline page displayed the assigned `qwen3.5:2b` local model. A
+temporary, environment-gated `sitecustomize.py` hook was loaded into the
+backend process only; it replaced extractor call 1 with a controlled
+`network_unavailable` failure, returned a synthetic event on retry calls, and
+raised a one-time persistence exception on save call 2. The hook's event log
+confirmed the sequence. Provider settings, credentials, and the shared
+database were not changed, and no model request was sent.
+
+| Gate | Result |
+|---|---|
+| Backend date and transaction coverage | `app/tests/unit/test_data_inspection_repository.py -k "timeline or fallback_date_extraction"`: 21 passed, 7 deselected. Covers day/month/year precision, duplicate same-date tokens, missing/relative/invalid/ambiguous sources remaining undated and uncertain, no visit-timestamp inference, SQLite failure rollback, and successful retry. |
+| Frontend retry coverage | Full Angular/Vitest suite: 24 files and 102 tests passed; includes Generate re-enabled after fallback and persistence failure, followed by a successful retry. |
+| Ruff and whitespace | Ruff passed for all changed Python files, including the source, backend test, synthetic-session seed, and controlled fault hook; `git diff --check` passed. |
+| Official launcher | Launch reused the current frontend build, started backend/frontend, and passed its `/api/health` readiness check. |
+| In-app Browser fallback | After injected provider failure, the saved fallback showed 3 events: therapy `2025-01` at month precision, and symptoms and ALT at `2025-01-17` at day precision. Each event showed explicit placement and its source text. |
+| In-app Browser persistence error | Generate was enabled after fallback. The second attempt showed `Controlled QA timeline persistence failure.`; Generate became enabled again and history still showed only fallback timeline #1. |
+| In-app Browser successful retry | The third attempt showed `Timeline generated and saved.` and a second saved timeline. Reopening it showed the controlled synthetic event on `17 Jan 2025`. The app's `LLM generated` label reflects the exercised application success path only; the event came from the test hook, not an LLM. |
+| Read-only SQLite check | Exactly two rows remained after the sequence: fallback #1 and successful retry #2. The failed save did not add history. The focused backend trigger test separately confirmed history stayed empty after a failed first save before its retry. |
+| Cleanup | Launcher-owned backend/frontend trees were identity-checked and stopped; ports 7690/9847 were verified free. The disposable database, hook log, and test basetemp were removed. |
+
+Browser accessibility-state excerpts, hook setup, seed data, and reproduction
+details are in
+[`assets/QA/timeline-recovery-20260923/report.md`](../../QA/timeline-recovery-20260923/report.md).
+The Browser screenshot was inspected inline; the Browser surface did not
+provide a disk-export path, so the report records the rendered text and state
+without claiming a screenshot artifact. This is controlled local evidence,
+not live-provider validation.
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
