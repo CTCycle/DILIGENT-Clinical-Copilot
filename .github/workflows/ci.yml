@@ -72,6 +72,7 @@ jobs:
           EMBEDDED_DATABASE: "true"
           DILIGENT_SQLITE_PATH: ${{ github.workspace }}/runtimes/cache/pytest/ci/alembic-check.sqlite3
         run: |
+          mkdir -p "$(dirname "$DILIGENT_SQLITE_PATH")"
           python -m alembic -c alembic.ini upgrade head
           python -m alembic -c alembic.ini current --check-heads
           python -m alembic -c alembic.ini check
