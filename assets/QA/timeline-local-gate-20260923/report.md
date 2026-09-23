@@ -66,12 +66,13 @@ returned zero violations.
 | Full Angular/Vitest suite | `24` test files and `105` tests passed with `npm run test -- --no-watch`. |
 | Ruff | The synthetic seed helper passed `ruff check --no-cache`. No production Python files changed. |
 | SQLite | `integrity_check=ok`; `foreign_key_check` returned zero violations. |
-| Hosted CI | Post-push status for the resulting commit is recorded in the completion update below when available. |
+| Hosted CI | [Run 35895672146](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35895672146) on commit `a004078879fbf3ce4da1b4350f893ad1403f2a3d` failed overall. Backend-quality failed `Validate Alembic migrations and metadata drift`; security-scan failed `Audit Python dependencies`; Windows regression passed frontend tests and production build, then failed `Run full browser E2E suite`. SQLite/PostgreSQL persistence contract passed; live-provider E2E was skipped. |
 
 The local frontend suite pass does not close `test.automated-regression`.
-The previously reproduced fresh-build `0xC0000005` and independent hosted-CI
-browser E2E, security-scan, and migration-check failures remain separate
-unresolved gates.
+This exact-SHA hosted run confirms independent migration-drift, dependency
+audit, and browser E2E failures; the previous fresh-build `0xC0000005` also
+remains unresolved. Passing frontend tests/build and the persistence contract
+do not supersede those failures.
 
 ## Gate status and remaining limits
 
