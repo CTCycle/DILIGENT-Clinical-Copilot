@@ -7,10 +7,13 @@ from inspect import signature
 from threading import Event
 from typing import Any
 
+import pytest
+
 from domain.patient_timeline import (
     PatientTimeline,
     PatientTimelineEvent,
 )
+from domain.timeline_dates import extract_single_explicit_timeline_date
 from repositories.schemas.base import Base
 from repositories.schemas.clinical import ClinicalDrugMention, ClinicalSession
 from repositories.schemas.knowledge import (
@@ -24,6 +27,7 @@ from repository_fixtures import build_repository_graph
 from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.inspection import DataInspectionService
+from services.inspection.timeline import InspectionTimelineMixin
 from services.llm.cloud import LLMError
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine, select
@@ -653,7 +657,7 @@ def test_timeline_generation_marks_fallback_payload() -> None:
         timestamp=datetime(2025, 1, 1, 8, 30),
         status="successful",
         report="Fallback timeline report",
-        anamnesis="Symptoms started in January 2025.",
+        anamnesis="Symptoms started on 2025-01-17.",
     )
     session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
         search="Fallback Timeline Patient",
@@ -692,9 +696,84 @@ def test_timeline_generation_marks_fallback_payload() -> None:
     assert history[0]["timeline_id"] == generated.timeline_id
     assert history[0]["generation_status"] == "fallback"
     assert history[0]["generation_error_code"] == "invalid_response"
-    assert all(event.event_date is None for event in generated.events)
-    assert all(event.extracted_timing_text is None for event in generated.events)
-    assert all(event.timing_type == "uncertain" for event in generated.events)
+    dated_event = next(event for event in generated.events if event.event_type == "disease")
+    assert dated_event.event_date == "2025-01-17"
+    assert dated_event.date_precision == "day"
+    assert dated_event.date_certainty == "explicit"
+    assert dated_event.extracted_timing_text == "2025-01-17"
+    assert all(
+        event.event_date == "2025-01-17" if event is dated_event else event.event_date is None
+        for event in generated.events
+    )
+    assert all(
+        event.timing_type == "explicit_date" if event is dated_event else event.timing_type == "uncertain"
+        for event in generated.events
+    )
+
+
+@pytest.mark.parametrize(
+    ("source_text", "expected_date", "expected_precision"),
+    [
+        ("Therapy started on 2025-01-17.", "2025-01-17", "day"),
+        ("Therapy was active in 2025-01.", "2025-01", "month"),
+        ("Symptoms began in 2025.", "2025", "year"),
+        (
+            "Symptoms began on 2025-01-17 and were reviewed on 2025-01-17.",
+            "2025-01-17",
+            "day",
+        ),
+    ],
+)
+def test_fallback_date_extraction_preserves_source_precision(
+    source_text: str,
+    expected_date: str,
+    expected_precision: str,
+) -> None:
+    interval = extract_single_explicit_timeline_date(source_text)
+
+    assert interval is not None
+    assert interval.value == expected_date
+    assert interval.precision == expected_precision
+
+
+@pytest.mark.parametrize(
+    "source_text",
+    [
+        "Symptoms were reported without a date.",
+        "Symptoms developed over the following month.",
+        "Symptoms started on 2025-02-30.",
+        "Symptoms started on 2025-01-10 and worsened on 2025-01-17.",
+        "Medication was taken at a dose of 1000 mg.",
+    ],
+)
+def test_fallback_date_extraction_leaves_relative_invalid_or_ambiguous_sources_undated(
+    source_text: str,
+) -> None:
+    assert extract_single_explicit_timeline_date(source_text) is None
+
+
+@pytest.mark.parametrize(
+    "source_text",
+    [
+        "Symptoms were reported without a date.",
+        "Symptoms developed over the following month.",
+        "Symptoms started on 2025-02-30.",
+        "Symptoms started on 2025-01-10 and worsened on 2025-01-17.",
+    ],
+)
+def test_fallback_timeline_keeps_non_explicit_dates_undated_and_uncertain(
+    source_text: str,
+) -> None:
+    timeline = InspectionTimelineMixin().build_fallback_timeline(
+        session_id=1,
+        source={"anamnesis": source_text},
+    )
+
+    event = timeline.events[0]
+    assert event.event_date is None
+    assert event.timing_type == "uncertain"
+    assert event.date_certainty == "uncertain"
+    assert event.extracted_timing_text is None
 
 ###############################################################################
 def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> None:
@@ -992,4 +1071,114 @@ def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None
             )
         ) == 1
     finally:
+        jobs.shutdown(timeout=1.0)
+
+
+###############################################################################
+def test_timeline_persistence_failure_keeps_history_unchanged_and_can_retry() -> None:
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        future=True,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    repository_graph = build_repository_graph(engine=engine)
+    save_session(
+        repository_graph,
+        patient_name="Synthetic Timeline Persistence Failure",
+        timestamp=datetime(2025, 1, 17, 9, 0, tzinfo=timezone.utc),
+        status="successful",
+        report="Synthetic persistence failure report",
+        anamnesis="Symptoms began on 2025-01-17.",
+    )
+    rows, _ = repository_graph.clinical_session_repository.list_sessions(
+        search="Synthetic Timeline Persistence Failure",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(rows[0]["session_id"])
+    jobs = JobManager()
+    service = build_service(
+        repository_graph,
+        timeline_extractor=FakeTimelineExtractor(),
+        jobs=jobs,
+    )
+
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                """
+                CREATE TRIGGER fail_timeline_persistence
+                BEFORE INSERT ON clinical_session_timelines
+                BEGIN
+                    SELECT RAISE(ABORT, 'controlled timeline persistence failure');
+                END
+                """
+            )
+
+        started = service.start_session_timeline_job(
+            session_id,
+            force_regenerate=True,
+        )
+        failed_job_id = str(started["job_id"])
+        failed_status = None
+        for _ in range(500):
+            failed_status = service.get_session_timeline_job_status(
+                session_id,
+                failed_job_id,
+            )
+            if failed_status and failed_status["status"] in {
+                "completed",
+                "failed",
+                "cancelled",
+            }:
+                break
+            time.sleep(0.01)
+
+        assert failed_status is not None
+        assert failed_status["status"] == "failed"
+        assert repository_graph.session_timeline_repository.list_session_timelines(
+            session_id
+        ) == []
+
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "DROP TRIGGER fail_timeline_persistence"
+            )
+
+        retry = service.start_session_timeline_job(
+            session_id,
+            force_regenerate=True,
+        )
+        retry_job_id = str(retry["job_id"])
+        retry_status = None
+        for _ in range(500):
+            retry_status = service.get_session_timeline_job_status(
+                session_id,
+                retry_job_id,
+            )
+            if retry_status and retry_status["status"] in {
+                "completed",
+                "failed",
+                "cancelled",
+            }:
+                break
+            time.sleep(0.01)
+
+        assert retry_status is not None
+        assert retry_status["status"] == "completed"
+        history = repository_graph.session_timeline_repository.list_session_timelines(
+            session_id
+        )
+        assert len(history) == 1
+        assert history[0]["generation_status"] == "llm_generated"
+    finally:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "DROP TRIGGER IF EXISTS fail_timeline_persistence"
+            )
         jobs.shutdown(timeout=1.0)

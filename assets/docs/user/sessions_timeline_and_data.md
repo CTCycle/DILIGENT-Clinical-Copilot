@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-09-10
+Last updated: 2026-09-23
 
 ## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -78,7 +78,9 @@ _Event inspector with timing, confidence, and source evidence for a synthetic la
 
 Use the help popover beside **Review controls** when the filter names need context. Evidence filters describe source support, density changes reading comfort, uncertain timing keeps approximate events visible, and **Inspect details** opens the event's source and confidence rationale. These controls do not alter the saved timeline.
 
-Timeline generation may show a fallback notice when model extraction does not complete. For an explicitly selected OpenCode Go model, a temporary model-catalog outage does not prevent the known routed request from being attempted. The notice now identifies the failure class, such as provider network unavailable, provider timeout, authentication rejected, rate limited, upstream error, invalid structured response, or incomplete configuration. Transient network, timeout, rate-limit, and upstream failures are retried with bounded backoff before fallback. In that case, the timetable is built deterministically from persisted session fields with uncertain timing and no invented exact dates. Treat fallback events as navigation aids rather than model-extracted chronology, then retry after correcting the reported condition.
+Timeline generation may show a fallback notice when model extraction does not complete. For an explicitly selected OpenCode Go model, a temporary model-catalog outage does not prevent the known routed request from being attempted. The notice identifies the failure class, such as provider network unavailable, provider timeout, authentication rejected, rate limited, upstream error, invalid structured response, or incomplete configuration. Transient network, timeout, rate-limit, and upstream failures are retried with bounded backoff before fallback.
+
+Fallback events are built deterministically from persisted session fields. A source field contributes a date only when it contains exactly one distinct, valid ISO day, month, or year token; the fallback preserves that token's original precision and marks it explicit. Missing, invalid, relative, or ambiguous dates remain undated and uncertain. Fallback never infers an event date from the visit timestamp. Treat fallback events as navigation aids rather than model-extracted chronology, then retry after correcting the reported condition.
 
 For LLM-generated timelines, events without preserved source evidence are not part of the persisted clinical chronology contract. In the UI, missing source evidence should be treated as a warning rather than as clinically grounded support.
 

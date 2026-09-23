@@ -1,9 +1,11 @@
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ClinicalSessionDetail, InspectionSessionTimelinePreview } from '../../../core/models/inspection-types';
 import { JobPollingService } from '../../../core/services/job-polling.service';
+import { ModelConfigStateService } from '../../../core/state/model-config-state.service';
 import { ClinicalSessionTimelineWorkspaceComponent } from './clinical-session-timeline-workspace.component';
 
 type Deferred<T> = {
@@ -105,7 +107,19 @@ describe('ClinicalSessionTimelineWorkspaceComponent request generations', () => 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ClinicalSessionTimelineWorkspaceComponent],
-      providers: [provideRouter([])],
+      providers: [
+        provideRouter([]),
+        {
+          provide: ModelConfigStateService,
+          useValue: {
+            data: signal(null),
+            status: signal('ready'),
+            settings: signal({ timelineModel: 'timeline-model' }),
+            error: signal(null),
+            load: vi.fn().mockResolvedValue(null),
+          },
+        },
+      ],
     }).compileComponents();
     fixture = TestBed.createComponent(ClinicalSessionTimelineWorkspaceComponent);
     component = fixture.componentInstance;
@@ -316,5 +330,84 @@ describe('ClinicalSessionTimelineWorkspaceComponent request generations', () => 
 
     await pollStep();
     expect(component.generationRunning()).toBe(true);
+  });
+
+  it('allows retry after a fallback and after a persistence failure', async () => {
+    const fallbackPreview: InspectionSessionTimelinePreview = {
+      ...preview(1, 11),
+      generation_status: 'fallback',
+      generation_note: 'The provider could not be reached.',
+      event_count: 1,
+      start_date: '2025-01-17',
+      end_date: '2025-01-17',
+      undated_event_count: 0,
+    };
+    let startCount = 0;
+    const pollRuns: Promise<void>[] = [];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/sessions/1/timelines')) {
+        const items = startCount >= 3
+          ? [fallbackPreview, preview(1, 13)]
+          : [fallbackPreview];
+        return jsonResponse({ items });
+      }
+      if (url.includes('/sessions/1/timeline-jobs') && init?.method === 'POST') {
+        startCount += 1;
+        return jsonResponse({ job_id: `job-${startCount}`, status: 'pending', poll_interval: 0 });
+      }
+      const jobId = url.match(/timeline-jobs\/(job-\d+)/)?.[1];
+      if (jobId) {
+        const failed = jobId === 'job-2';
+        return jsonResponse({
+          job_id: jobId,
+          job_type: 'session_timeline',
+          status: failed ? 'failed' : 'completed',
+          progress: failed ? 92 : 100,
+          result: failed ? null : { timeline_id: jobId === 'job-1' ? 11 : 13 },
+          error: failed ? 'Controlled timeline persistence failure.' : null,
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.spyOn(TestBed.inject(JobPollingService), 'run').mockImplementation((options) => {
+      const run = (async () => {
+        while (await options.pollStep()) {
+          // Continue only while the controlled job remains active.
+        }
+      })();
+      pollRuns.push(run);
+      return run;
+    });
+
+    component.ngOnInit = () => undefined;
+    fixture.componentRef.setInput('session', session(1));
+    fixture.detectChanges();
+
+    const generateButton = (): HTMLButtonElement => (
+      fixture.nativeElement.querySelector('button.btn-primary') as HTMLButtonElement
+    );
+    const clickGenerate = async (jobNumber: number): Promise<void> => {
+      expect(generateButton().disabled).toBe(false);
+      generateButton().click();
+      await vi.waitFor(() => expect(startCount).toBe(jobNumber));
+      await vi.waitFor(() => expect(pollRuns).toHaveLength(jobNumber));
+      await pollRuns[jobNumber - 1];
+      fixture.detectChanges();
+    };
+
+    await clickGenerate(1);
+    await vi.waitFor(() => expect(component.timelinePreviews()).toHaveLength(1));
+    expect(fixture.nativeElement.textContent).toContain('Fallback chronology');
+    expect(generateButton().disabled).toBe(false);
+
+    await clickGenerate(2);
+    expect(component.generationError()).toBe('Controlled timeline persistence failure.');
+    expect(generateButton().disabled).toBe(false);
+
+    await clickGenerate(3);
+    await vi.waitFor(() => expect(component.timelinePreviews()).toHaveLength(2));
+    expect(fetchSpy.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(3);
+    expect(component.generationStatus()).toBe('Timeline generated and saved.');
   });
 });
