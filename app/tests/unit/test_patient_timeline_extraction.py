@@ -16,6 +16,7 @@ from repositories.serialization.session_timelines import build_timeline_preview_
 from services.clinical import timeline as timeline_service
 from services.clinical.timeline import PatientTimelineExtractor
 
+
 ###############################################################################
 class FakeTimelineClient:
 
@@ -69,7 +70,10 @@ def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
     result = asyncio.run(
         extractor.extract_timeline(
             session_id=7,
-            source_payload={"anamnesis": "timeline source"},
+            source_payload={
+                "anamnesis": "Therapy started on 2025-01-10.",
+                "laboratory_analysis": "ALT reached 450 U/L on 2025-03-01.",
+            },
         )
     )
 
@@ -114,6 +118,43 @@ def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
     )
 
     assert [event.event_id for event in result.events] == ["grounded"]
+
+
+###############################################################################
+def test_timeline_extractor_rejects_unsupported_source_evidence() -> None:
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(
+            PatientTimelineExtraction(
+                events=[
+                    PatientTimelineEvent(
+                        event_id="fabricated-hepatitis-event",
+                        title="Onset of Hepatitis B infection",
+                        event_type="disease",
+                        event_date="2022-05-18",
+                        source_evidence=(
+                            "The patient acquired HBV during a procedure on 2022-05-18."
+                        ),
+                    )
+                ]
+            )
+        )
+    )
+
+    with pytest.raises(ValueError, match="not supported by the session source") as exc:
+        asyncio.run(
+            extractor.extract_timeline(
+                session_id=12,
+                source_payload={
+                    "report": "Synthetic report for timeline recovery validation.",
+                    "anamnesis": "Symptoms began on 2025-01-17.",
+                    "drugs": "Acetaminophen was taken in 2025-01.",
+                    "laboratory_analysis": "ALT was 75 U/L on 2025-01-17.",
+                },
+            )
+        )
+
+    assert exc.value.error_code == "invalid_response"
+    assert exc.value.retryable is False
 
 ###############################################################################
 def test_normalize_date_token_keeps_month_precision_without_promoting_day() -> None:

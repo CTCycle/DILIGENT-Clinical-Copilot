@@ -439,6 +439,11 @@ class InspectionTimelineMixin:
                 or requested_runtime_settings["cloud_model"]
                 or requested_runtime_settings["text_extraction_model"]
             )
+            model_provider = (
+                requested_runtime_settings["llm_provider"]
+                if requested_runtime_settings["use_cloud_services"]
+                else "ollama"
+            )
 
             try:
                 _report_progress(
@@ -468,7 +473,7 @@ class InspectionTimelineMixin:
                             if requested_runtime_settings["use_cloud_services"]
                             else "local"
                         ),
-                        "model_provider": requested_runtime_settings["llm_provider"],
+                        "model_provider": model_provider,
                     }
                 )
             except TimelineGenerationCancelled:
@@ -513,7 +518,7 @@ class InspectionTimelineMixin:
                             if requested_runtime_settings["use_cloud_services"]
                             else "local"
                         ),
-                        "model_provider": requested_runtime_settings["llm_provider"],
+                        "model_provider": model_provider,
                     }
                 )
                 _report_progress(
