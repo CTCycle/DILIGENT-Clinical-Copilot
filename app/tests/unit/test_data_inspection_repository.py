@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import date, datetime, timezone
 from inspect import signature
+from threading import Event
 from typing import Any
 
 from domain.patient_timeline import (
@@ -883,3 +885,111 @@ def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
     assert status is not None
     assert status["status"] == "completed"
     assert source_reads == 1
+
+
+def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None:
+    engine = create_engine(
+        "sqlite+pysqlite://",
+        future=True,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    repository_graph = build_repository_graph(engine=engine)
+    save_session(
+        repository_graph,
+        patient_name="Synthetic Timeline Cancellation",
+        timestamp=datetime(2025, 1, 1, 8, 30, tzinfo=timezone.utc),
+        status="successful",
+        report="Synthetic cancellation report",
+        anamnesis="Synthetic timeline extraction is cancellable.",
+    )
+    rows, _ = repository_graph.clinical_session_repository.list_sessions(
+        search="Synthetic Timeline Cancellation",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(rows[0]["session_id"])
+
+    class BlockingTimelineExtractor:
+        def __init__(self) -> None:
+            self.started = Event()
+            self.cancelled = Event()
+            self.timeout_s = 60.0
+
+        async def extract_timeline(
+            self,
+            *,
+            session_id: int,
+            source_payload: dict[str, Any],
+            runtime_settings: dict[str, Any] | None = None,
+        ) -> PatientTimeline:
+            _ = session_id, source_payload, runtime_settings
+            self.started.set()
+            try:
+                await asyncio.sleep(60.0)
+            except asyncio.CancelledError:
+                self.cancelled.set()
+                raise
+            raise AssertionError("The controlled extractor should be cancelled.")
+
+    jobs = JobManager()
+    blocking_extractor = BlockingTimelineExtractor()
+    service = build_service(
+        repository_graph,
+        timeline_extractor=blocking_extractor,
+        jobs=jobs,
+    )
+    try:
+        started = service.start_session_timeline_job(
+            session_id,
+            force_regenerate=True,
+        )
+        job_id = str(started["job_id"])
+        assert blocking_extractor.started.wait(timeout=2.0)
+        assert service.cancel_job(
+            job_id,
+            expected_type=service.SESSION_TIMELINE_JOB_TYPE,
+        ) is True
+
+        for _ in range(500):
+            status = service.get_session_timeline_job_status(session_id, job_id)
+            if status and status["status"] in {"completed", "failed", "cancelled"}:
+                break
+            time.sleep(0.01)
+
+        assert status is not None
+        assert status["status"] == "cancelled"
+        assert blocking_extractor.cancelled.wait(timeout=1.0)
+        assert repository_graph.session_timeline_repository.list_session_timelines(
+            session_id
+        ) == []
+
+        service.timeline_extractor = FakeTimelineExtractor()
+        retry = service.start_session_timeline_job(session_id, force_regenerate=True)
+        retry_job_id = str(retry["job_id"])
+        for _ in range(500):
+            retry_status = service.get_session_timeline_job_status(
+                session_id,
+                retry_job_id,
+            )
+            if retry_status and retry_status["status"] in {
+                "completed",
+                "failed",
+                "cancelled",
+            }:
+                break
+            time.sleep(0.01)
+
+        assert retry_status is not None
+        assert retry_status["status"] == "completed"
+        assert len(
+            repository_graph.session_timeline_repository.list_session_timelines(
+                session_id
+            )
+        ) == 1
+    finally:
+        jobs.shutdown(timeout=1.0)

@@ -6,7 +6,7 @@ import {
   InspectionSessionTimelineRequest,
   InspectionTimelineJobStatusResponse,
 } from "../models/inspection-types";
-import { JobStartResponse } from "../models/types";
+import { JobCancelResponse, JobStartResponse } from "../models/types";
 import { requestJson } from "./http-api";
 
 const TIMELINE_REQUEST_TIMEOUT_SECONDS = 360;
@@ -55,6 +55,16 @@ export async function fetchInspectionSessionTimelineJobStatus(
     `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timeline-jobs/${encodeURIComponent(jobId)}`,
     { method: "GET", headers: { "Cache-Control": "no-store" } },
     INSPECTION_JOB_STATUS_TIMEOUT_SECONDS,
+  );
+}
+
+export async function cancelInspectionSessionTimelineJob(
+  sessionId: number,
+  jobId: string,
+): Promise<JobCancelResponse> {
+  return requestJson<JobCancelResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timeline-jobs/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
   );
 }
 
