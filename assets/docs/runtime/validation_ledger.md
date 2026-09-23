@@ -400,6 +400,42 @@ catalog/refresh, OpenCode Go, API-route, RAG duplicate-file, accessibility,
 access-key, and desktop release work remain separate; access-key and release
 gates remain `BLOCKED` on their documented prerequisites.
 
+## Automated regression gate revalidation — 2026-09-23
+
+This scope started from clean `develop` HEAD `f61a9ff6`, equal to
+`origin/develop`. It rechecked the current regression implementation after
+hosted run [35895672146](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35895672146)
+reported migration drift, dependency-audit findings, and a browser E2E
+failure. All runtime and test data used a disposable SQLite database; no
+shared database, saved model settings, or credentials were changed.
+
+The audit identified two CVEs in the direct `anyio==4.9.0` pin
+(`CVE-2026-63374` and `CVE-2026-64847`), with `4.14.2` listed as the fixed
+version. The direct pin and `uv.lock` now use `anyio==4.14.2`. The hosted E2E
+failure was an obsolete test expectation: `DiliJobTrackerService` persists an
+active job in `dili-agent-active-job-v1` and reconnects after reload, while
+the test expected the job to disappear. The test now checks that the saved
+job resumes, completes without a duplicate submission, renders its report,
+and clears the persisted marker. The reported migration drift did not
+reproduce on a fresh local SQLite database.
+
+| Gate | Result |
+|---|---|
+| Locked dependency install | `uv sync --locked --project app/server --all-extras` installed `anyio 4.14.2` into the existing server venv. |
+| Python dependency audit | CI-equivalent export and strict `pip-audit` completed with `No known vulnerabilities found`. |
+| Fresh SQLite migration and metadata check | `upgrade head`, `current --check-heads`, and `check` passed at `202609170001`; Alembic reported no new operations. |
+| Backend tests | Full unit suite: `789 passed`, with 7 existing deprecation warnings. Model-config focused suite: `40 passed`, with one Google GenAI deprecation warning. |
+| Browser E2E | Before the assertion fix, the full suite reproduced the single hosted failure (`40 passed, 5 skipped`). Afterward the focused recovery test passed and the full suite passed (`41 passed, 5 skipped`). |
+| In-app Browser smoke | The isolated source runtime rendered the DILI Agent shell, primary navigation, clinical input, and empty report state. No analysis was submitted. |
+| Build boundary | The official launcher verified the stored frontend fingerprint and reused the existing output. A fresh local production build was not generated; the separate `0xC0000005` host failure remains open. The prior hosted run passed its frontend build, but this updated commit still needs exact-SHA hosted confirmation. |
+
+The automated regression gate remains `PARTIAL` until the post-push hosted
+run confirms the fixes and the isolated-host production-build crash is
+resolved or diagnosed. Five E2E tests were skipped, including live-provider
+coverage; no provider call, access-key mutation, package, or release gate is
+claimed here. The disposable database and test caches were removed, and
+ports `7690` and `9847` had no listeners after validation.
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
@@ -437,12 +473,13 @@ gates remain `BLOCKED` on their documented prerequisites.
 | 31 | Ordered structured-source update and reconciliation jobs | Data Inspection / jobs | `NOT TESTED` | No source update job was started. | Deliberately excluded to avoid mutating source caches during validation. |
 | 32 | Health and inspection API boundaries on a fresh runtime | API | `PASS` | `/api/health`, sessions, RxNav, LiverTox, DILIrank, RAG documents/vector-store, model-config, and settings requests returned expected 2xx responses. | Fresh disposable DB only. |
 | 33 | Browser smoke, visible error handling, and console diagnostics | UI / QA | `PASS` | DILI Agent, Settings, Clinical Sessions, and Data Inspection rendered; browser error/warn diagnostics were empty; blocking dialogs were visible and actionable. | One viewport and smoke coverage; not a full accessibility audit. |
-| 34 | Backend unit and supported model-config gates | Automated QA | `PASS` | `731 passed` unit tests; model-config slice `40 passed`; isolated app/API slice `10 passed`; migration slice now runs with SQLite foreign keys enabled. | Default test cache hit an ACL error and was rerouted to a writable QA cache. |
-| 35 | Frontend test and production build gates | Automated QA | `PASS` | Angular/Vitest `23 files, 94 tests passed`; `npm run build` completed successfully. | No packaging assertion. |
+| 34 | Backend unit and supported model-config gates | Automated QA | `PASS` | Current full unit suite `789 passed`; model-config slice `40 passed`; fresh SQLite Alembic head and metadata-drift checks passed. | Seven existing deprecation warnings; this does not certify live-provider behavior. |
+| 35 | Frontend test and production build gates | Automated QA | `ATTENTION` | Angular/Vitest `24 files, 105 tests passed` in the current timeline validation; hosted Windows run 35895672146 passed frontend tests/build. The local launcher reused fingerprint-current output. | Fresh local production builds still terminate with `0xC0000005`; new hosted exact-SHA confirmation is pending. |
 | 36 | Exact OpenCode Go / DeepSeek end-to-end clinical provider lane | External provider | `NOT TESTED` | No live cloud clinical call was made; disposable DB had no active OpenCode key, and the shared runtime was blocked before provider resolution. | Must be validated without fallback before release. |
 | 37 | Restart and reuse of existing persisted clinical data | Persistence / release | `ATTENTION` | The populated clone reopened through the launcher database-initialization path after migration, preserving 18 sessions, 45 drug mentions, 228 lab observations, 18 results, and SQLite integrity. | The shared source database was intentionally not advanced; rendered populated-session reuse remains untested. |
 | 38 | EXE/MSI packaging, installer, checksum, and publication | Release packaging | `NOT APPLICABLE` | Explicitly outside this source/development audit. | Separate release gate. |
 | 39 | Clean-machine install and Windows host smoke | Release packaging | `NOT APPLICABLE` | Explicitly outside this source/development audit. | Separate release gate. |
+| 40 | Full browser E2E and persisted clinical-job recovery | Automated QA | `PASS` | Current local Chromium suite `41 passed, 5 skipped`; persisted-job recovery now completes and clears its saved marker after reload. | Local source runtime and existing fingerprint-current dist; hosted exact-SHA confirmation pending, live-provider E2E skipped. |
 
 ## Release blockers and required remediation
 
