@@ -479,8 +479,8 @@ dependency fingerprints and Node 22.13.0. The [focused report](../../QA/frontend
 contains the command logs and the reviewed incomplete gates.
 
 After this checkpoint was pushed as commit
-1d1cfa8f068fe4e81717e59e11af27d55aaf5721, exact-SHA hosted CI run
-[35966513019](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35966513019)
+d1dc431df277a4d06e3acd745cbc25facb93ecf2, exact-SHA hosted CI run
+[35967078491](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35967078491)
 completed successfully on that commit. Security scan, backend quality, Windows
 regression, and persistence passed. The live-provider job was skipped because
 the push event does not satisfy its workflow-dispatch and run_provider_e2e
