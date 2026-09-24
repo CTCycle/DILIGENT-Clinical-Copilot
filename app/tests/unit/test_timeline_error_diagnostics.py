@@ -10,6 +10,7 @@ from services.llm.cloud import LLMError
 @pytest.mark.parametrize(
     ("error", "expected"),
     [
+        (TimeoutError(), "timeout"),
         (TimeoutError("Provider request timed out"), "timeout"),
         (
             LLMError("HTTP 401: API key rejected", error_code="authentication"),

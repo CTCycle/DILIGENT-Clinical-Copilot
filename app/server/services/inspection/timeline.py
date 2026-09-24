@@ -97,6 +97,8 @@ def _timeline_error_code(exc: BaseException) -> PatientTimelineGenerationErrorCo
         if candidate in _TIMELINE_ERROR_CODES and candidate != "provider_error":
             return cast(PatientTimelineGenerationErrorCode, candidate)
         provider_error_seen = provider_error_seen or candidate == "provider_error"
+        if isinstance(current, TimeoutError):
+            return "timeout"
         text = " ".join(str(current).split()).casefold()
         if any(
             token in text
