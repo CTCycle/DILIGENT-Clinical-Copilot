@@ -478,14 +478,22 @@ seconds. The resulting build-state marker records the current build and
 dependency fingerprints and Node 22.13.0. The [focused report](../../QA/frontend-build-validation-2026-09-24/report.md)
 contains the command logs and the reviewed incomplete gates.
 
+After this checkpoint was pushed as commit
+1d1cfa8f068fe4e81717e59e11af27d55aaf5721, exact-SHA hosted CI run
+[35966513019](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35966513019)
+completed successfully on that commit. Security scan, backend quality, Windows
+regression, and persistence passed. The live-provider job was skipped because
+the push event does not satisfy its workflow-dispatch and run_provider_e2e
+conditions. This leaves the live-provider lane unrun.
+
 The earlier local 0xC0000005 build failure did not reproduce on this run. Its
 native cause remains unknown, so this is evidence of a successful current
 build, not a diagnosis of the older fault. Keep test.automated-regression
 PARTIAL because the hosted live-provider lane and conditional E2E cases remain
 unrun; their credential, opt-in, model-availability, and persisted-session
-preconditions are unchanged. No backend, database, provider, or application
-server was started or changed, and ports 7690 and 9847 were free after the
-checks.
+preconditions are unchanged. No local backend, database, provider, or
+application server was started or changed; ports 7690 and 9847 were free
+after the checks.
 
 The next coherent validation slice is the isolated local timeline pair:
 sessions.timeline and model.provider.local-ollama. Recheck qwen3.5:2b
