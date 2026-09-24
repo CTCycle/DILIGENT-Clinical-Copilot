@@ -1,5 +1,5 @@
 # Pre-release validation ledger
-Last updated: 2026-09-23
+Last updated: 2026-09-24
 
 ## Scope and interpretation
 
@@ -459,6 +459,42 @@ persisted-session coverage remains unrun. No provider call, access-key
 mutation, package, or release gate is claimed here. The disposable database
 and test caches were removed, and ports `7690` and `9847` had no listeners
 after validation.
+
+## Automated regression local-build follow-up — 2026-09-24
+
+This follow-up started from clean develop HEAD
+13f6c7a079122934e4c614452421dd1ef8792e54, equal to origin/develop. The HEAD is
+a documentation-only successor to application source commit
+3e73082f619024140cfdb92340831f450c6a3e13, which passed hosted CI run
+35908957190. The status ledger named the fresh local production frontend build
+as the next action for test.automated-regression.
+
+On Windows NT 10.0.26200.0 with PowerShell 7.6.6, the official launcher used
+Node.js 22.13.0 and npm 10.9.2. From app/client, npm run test -- --no-watch
+passed with 24 test files and 105 tests. Then start_on_windows.ps1
+-Action RebuildFrontend reused the installed dependencies and completed npm
+run build with exit code 0. Angular generated the production bundle in 9.894
+seconds. The resulting build-state marker records the current build and
+dependency fingerprints and Node 22.13.0. The [focused report](../../QA/frontend-build-validation-2026-09-24/report.md)
+contains the command logs and the reviewed incomplete gates.
+
+The earlier local 0xC0000005 build failure did not reproduce on this run. Its
+native cause remains unknown, so this is evidence of a successful current
+build, not a diagnosis of the older fault. Keep test.automated-regression
+PARTIAL because the hosted live-provider lane and conditional E2E cases remain
+unrun; their credential, opt-in, model-availability, and persisted-session
+preconditions are unchanged. No backend, database, provider, or application
+server was started or changed, and ports 7690 and 9847 were free after the
+checks.
+
+The next coherent validation slice is the isolated local timeline pair:
+sessions.timeline and model.provider.local-ollama. Recheck qwen3.5:2b
+grounding alongside the qwen3.5:9b comparison, with evidence, source
+attribution, date precision, provenance, rendering, and reload checks. Keep
+the pair PARTIAL until grounded 2B output is observed. The other active
+partial and blocked gates are recorded in the focused report and remain
+separate because they depend on provider credentials, upstream NCBI
+availability, release prerequisites, or different workflow scope.
 
 ## Feature-state register
 
