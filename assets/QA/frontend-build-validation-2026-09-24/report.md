@@ -25,7 +25,7 @@ Host: Windows NT 10.0.26200.0, PowerShell 7.6.6. The launcher used Node.js
 | Frontend unit suite | From app/client, npm run test -- --no-watch passed with exit code 0: 24 test files and 105 tests. |
 | Official fresh production build | start_on_windows.ps1 -Action RebuildFrontend passed with exit code 0. It reused installed dependencies and ran npm run build. Angular completed production bundle generation in 9.894 seconds and wrote app/client/dist. |
 | Build-state marker | Present after the successful forced rebuild. It records build fingerprint 4edd07b8da14d6a099c9e5c9484a2091d5368c666ceef3befa0c9b9b2f446f5e, dependency fingerprint 559eff725b1f551222e2ffe3624a7fa70769fdc6182192fb81df30ff1d95cc22, and Node 22.13.0. |
-| Exact-SHA hosted CI | [Run 35966513019](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35966513019) completed successfully on commit 1d1cfa8f068fe4e81717e59e11af27d55aaf5721. Security scan, backend quality, Windows regression, and persistence passed. The live-provider job was skipped because the run event was push; the workflow requires workflow_dispatch with run_provider_e2e enabled. |
+| Exact-SHA hosted CI | [Run 35967078491](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35967078491) completed successfully on commit d1dc431df277a4d06e3acd745cbc25facb93ecf2. Security scan, backend quality, Windows regression, and persistence passed. The live-provider job was skipped because the run event was push; the workflow requires workflow_dispatch with run_provider_e2e enabled. |
 | Launcher log | [launcher-rebuild.log](launcher-rebuild.log) records the action and successful Angular output. |
 | Frontend test log | [frontend-test.log](frontend-test.log) records the 24-file, 105-test pass. |
 | Cleanup | No application server was started. Ports 7690 and 9847 were free after the checks; no task-owned build or test process remained. |
@@ -39,9 +39,11 @@ earlier native fault or prove it cannot recur.
 test.automated-regression remains PARTIAL. The previously missing fresh local
 build now passes, as do the current local frontend tests. Hosted run 35908957190
 passed its configured jobs on the same application source commit. The
-subsequent exact-SHA run 35966513019 passed all configured jobs on the commit
-that carries this report. Its live-provider job was skipped because it ran on
-push rather than workflow_dispatch with run_provider_e2e enabled. Seven
+subsequent exact-SHA run 35967078491 passed all configured jobs on commit
+d1dc431df277a4d06e3acd745cbc25facb93ecf2, which contains only documentation
+updates beyond the application code in this report. Its live-provider job was
+skipped because it ran on push rather than workflow_dispatch with
+run_provider_e2e enabled. Seven
 browser E2E cases were conditionally skipped in the prior detailed report for
 live-provider and embedding opt-in, unavailable Ollama models, or absent
 persisted CI sessions. Those provider, embedding, model-availability, and
