@@ -1,0 +1,7 @@
+{
+  "job_id": "36c085d4",
+  "job_type": "session_timeline",
+  "status": "running",
+  "message": "Timeline generation started.",
+  "poll_interval": 1.0
+}

@@ -1,0 +1,24 @@
+{
+  "items": [
+    {
+      "timeline_id": 1,
+      "session_id": 1,
+      "generated_at": "2026-09-24T21:08:12.546296",
+      "generation_status": "fallback",
+      "generation_note": "Local timeline extraction did not complete. The local model returned invalid structured data. Retry when ready.",
+      "generation_error_code": "invalid_response",
+      "source_model": "qwen3.5:2b",
+      "source_kind": "local",
+      "model_provider": "ollama",
+      "source_payload_hash": null,
+      "event_count": 3,
+      "start_date": "2025-01",
+      "end_date": "2025-01-17",
+      "title": "Therapy context",
+      "source_evidence_event_count": 3,
+      "missing_evidence_event_count": 0,
+      "uncertain_event_count": 0,
+      "undated_event_count": 0
+    }
+  ]
+}

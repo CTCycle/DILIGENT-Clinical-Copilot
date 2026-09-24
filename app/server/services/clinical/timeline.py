@@ -45,6 +45,13 @@ class _UnsupportedTimelineEvidenceError(ValueError):
     retryable = False
 
 
+class _EmptyTimelineExtractionError(ValueError):
+    """Raised when clinical source fields yield no usable timeline events."""
+
+    error_code = "invalid_response"
+    retryable = False
+
+
 def _iter_source_text_values(value: Any) -> Iterator[str]:
     if isinstance(value, str):
         yield value
@@ -412,6 +419,16 @@ class PatientTimelineExtractor:
             for event in parsed.events
         ]
         normalized_events = self.normalize_events(events_with_verified_sources)
+        has_clinical_source_text = any(
+            isinstance(source_payload.get(field_name), str)
+            and source_payload[field_name].strip()
+            for field_name in CANONICAL_TIMELINE_SOURCE_FIELDS
+        )
+        if not normalized_events and has_clinical_source_text:
+            raise _EmptyTimelineExtractionError(
+                "Timeline extraction produced no evidence-backed events despite "
+                "populated clinical source fields."
+            )
         return PatientTimeline(
             session_id=int(session_id),
             generated_at=datetime.now(UTC),

@@ -1,0 +1,8 @@
+{
+  "use_cloud_services": false,
+  "llm_provider": "openai",
+  "timeline_model": "qwen3.5:2b",
+  "text_extraction_model": "qwen3.5:2b",
+  "local_catalog_status": "available",
+  "model_2b_digest": "324d162be6ca5629ae4517c8710434d0bd2d665bc94dbad46e9af8fbf8a2f0df"
+}

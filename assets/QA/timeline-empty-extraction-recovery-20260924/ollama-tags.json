@@ -1,0 +1,34 @@
+[
+  {
+    "name": "huihui_ai/gpt-oss-abliterated:20b",
+    "digest": "81c701845c4945940852ba02e3fda8b919cd513da988eec9e3b4cd7bde243b4c"
+  },
+  {
+    "name": "huihui_ai/Qwen3.6-abliterated:27b",
+    "digest": "418838acbea7dad6eca43e2f74519307235e62b584e08ab7a6e7d6916cff7507"
+  },
+  {
+    "name": "qwen3.5:9b",
+    "digest": "6488c96fa5faab64bb65cbd30d4289e20e6130ef535a93ef9a49f42eda893ea7"
+  },
+  {
+    "name": "qwen3.5:2b",
+    "digest": "324d162be6ca5629ae4517c8710434d0bd2d665bc94dbad46e9af8fbf8a2f0df"
+  },
+  {
+    "name": "qwen3.6:27b",
+    "digest": "a50eda8ed977ab48a12431878896b27ffd5cef552c17af3317d9623b939a7f1e"
+  },
+  {
+    "name": "alibayram/medgemma:27b",
+    "digest": "391385363ee95e4fece74782a4ceffdf53954d6c18b231253ba0bc26b3c039a6"
+  },
+  {
+    "name": "gpt-oss:20b",
+    "digest": "17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7"
+  },
+  {
+    "name": "nomic-embed-text:latest",
+    "digest": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f"
+  }
+]

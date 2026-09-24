@@ -1,0 +1,16 @@
+{
+  "job_id": "36c085d4",
+  "job_type": "session_timeline",
+  "status": "completed",
+  "progress": 100.0,
+  "result": {
+    "session_id": 1,
+    "progress_message": "Timeline saved.",
+    "timeline_id": 1
+  },
+  "error": null,
+  "created_at": 198778.5494983,
+  "completed_at": 198887.7701072,
+  "version": 20,
+  "stop_requested": false
+}
