@@ -47,6 +47,18 @@ The official launcher initialization attempt failed while accessing the protecte
 
 `ISSUE-005` (RAG duplicate-file policy), the full API route catalog, provider failure and RAG-off clinical cases, and the accessibility audit remain separate decisions or validation debt; this run made no claim about them. Statuses above preserve prior evidence and do not imply a fresh validation of the independent gates.
 
+## Next-session handoff
+
+Re-run the timeline UI check in the Codex in-app Browser with an actual viewport at least 1100 pixels wide. Page zoom did not clear the app's desktop-width gate in this run. The previous isolated database was removed, so use a fresh task-owned runtime and synthetic session with the same three dated source facts described above; do not use the shared database or settings.
+
+1. Confirm the in-app Browser reports a supported viewport and the "Widen application window to continue" gate is gone.
+2. Select the exact local `ollama / qwen3.5:2b` route, generate the synthetic session timeline, then open **Clinical Sessions → selected session → Timeline**.
+3. Inspect the rendered fallback status, error/provenance labels, all three events, source evidence, and month/day precision. Reload the page and verify the same persisted timeline remains visible.
+4. Retain a `qwen3.5:9b` control and record its exact route and whether its events are source-grounded. A successful fallback is safe degradation evidence, not grounded model acceptance.
+5. Save browser captures and sanitized API/persistence evidence under a new dated `assets/QA/` directory; update the `sessions.timeline` and `model.provider.local-ollama` gates separately.
+
+Rendered fallback and reload evidence will close the current UI-evidence gap only. Keep both gates `PARTIAL` until the timeline acceptance criteria are met, including repeatable grounded output on the exact 2B route for the provider gate. If the in-app Browser cannot expose a supported viewport, record the observed viewport and retain the gates as `PARTIAL`.
+
 ## Cleanup
 
 The app and Ollama listeners were task-owned PIDs 6848, 5172, and 3788 on ports 7690, 9847, and 11434. After verifying their executable paths and listeners, all three were stopped and the ports were confirmed clear. The isolated database, runtime cache, pytest scratch directories, and Ollama profile were removed. Raw Ollama logs containing a generated public-key line and temporary browser screenshots were discarded; only the filtered runtime evidence and small API/test records listed above remain.
