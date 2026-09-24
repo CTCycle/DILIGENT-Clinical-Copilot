@@ -1,0 +1,6 @@
+warning: in the working copy of 'app/server/services/clinical/timeline.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/tests/conftest.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/tests/unit/test_data_inspection_repository.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/tests/unit/test_patient_timeline_extraction.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'assets/docs/project_status_ledger.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'assets/docs/runtime/validation_ledger.md', LF will be replaced by CRLF the next time Git touches it

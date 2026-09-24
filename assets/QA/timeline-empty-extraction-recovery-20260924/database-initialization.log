@@ -1,0 +1,2 @@
+error: Failed to initialize cache at `runtimes\cache\uv`
+  Caused by: failed to open file `G:\Projects\Repositories\Active projects\DILIGENT Clinical Copilot\runtimes\cache\uv\sdists-v9\.git`: Accesso negato. (os error 5)

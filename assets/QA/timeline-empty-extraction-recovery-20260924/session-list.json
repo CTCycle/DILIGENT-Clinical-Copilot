@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "session_id": 3,
+      "patient_name": "Synthetic Timeline Repeatability 9B Control",
+      "session_timestamp": "2025-01-17T09:00:00",
+      "version": 1,
+      "status": "successful",
+      "total_duration": null,
+      "has_report": true,
+      "has_timeline": false,
+      "can_generate_timeline": true
+    },
+    {
+      "session_id": 2,
+      "patient_name": "Synthetic Timeline Repeatability 2B B",
+      "session_timestamp": "2025-01-17T09:00:00",
+      "version": 1,
+      "status": "successful",
+      "total_duration": null,
+      "has_report": true,
+      "has_timeline": false,
+      "can_generate_timeline": true
+    },
+    {
+      "session_id": 1,
+      "patient_name": "Synthetic Timeline Repeatability 2B A",
+      "session_timestamp": "2025-01-17T09:00:00",
+      "version": 1,
+      "status": "successful",
+      "total_duration": null,
+      "has_report": true,
+      "has_timeline": true,
+      "can_generate_timeline": true
+    }
+  ],
+  "total": 3,
+  "offset": 0,
+  "limit": 10
+}

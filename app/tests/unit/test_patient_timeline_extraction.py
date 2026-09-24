@@ -249,14 +249,62 @@ def test_timeline_source_resolution_returns_none_when_evidence_is_missing() -> N
         )
     )
 
+    with pytest.raises(
+        ValueError, match="no evidence-backed events despite populated clinical"
+    ) as exc:
+        asyncio.run(
+            extractor.extract_timeline(
+                session_id=15,
+                source_payload={"laboratory_analysis": "ALT was 75 U/L."},
+            )
+        )
+
+    assert extractor.events_before_normalize[0].source is None
+    assert exc.value.error_code == "invalid_response"
+    assert exc.value.retryable is False
+
+
+###############################################################################
+def test_timeline_extractor_rejects_empty_result_with_clinical_source_text() -> None:
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(PatientTimelineExtraction())
+    )
+
+    with pytest.raises(
+        ValueError, match="no evidence-backed events despite populated clinical"
+    ) as exc:
+        asyncio.run(
+            extractor.extract_timeline(
+                session_id=16,
+                source_payload={
+                    "anamnesis": "Symptoms began on 2025-01-17.",
+                    "drugs": "Acetaminophen was taken in 2025-01.",
+                    "laboratory_analysis": "ALT was 75 U/L on 2025-01-17.",
+                },
+            )
+        )
+
+    assert exc.value.error_code == "invalid_response"
+    assert exc.value.retryable is False
+
+
+###############################################################################
+def test_timeline_extractor_allows_empty_result_without_clinical_source_text() -> None:
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(PatientTimelineExtraction())
+    )
+
     result = asyncio.run(
         extractor.extract_timeline(
-            session_id=15,
-            source_payload={"laboratory_analysis": "ALT was 75 U/L."},
+            session_id=17,
+            source_payload={
+                "anamnesis": "",
+                "drugs": " ",
+                "laboratory_analysis": None,
+            },
         )
     )
 
-    assert extractor.events_before_normalize[0].source is None
     assert result.events == []
 
 ###############################################################################
