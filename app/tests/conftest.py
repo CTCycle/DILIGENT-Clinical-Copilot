@@ -24,7 +24,9 @@ from services.catalogs.runtime import initialize_reference_catalog_provider
 ###############################################################################
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CACHE_ROOT = REPO_ROOT / "runtimes" / "cache"
-PYTEST_CACHE_ROOT = CACHE_ROOT / "pytest"
+PYTEST_CACHE_ROOT = Path(
+    os.getenv("DILIGENT_PYTEST_CACHE_ROOT") or CACHE_ROOT / "pytest"
+).resolve()
 
 ###############################################################################
 def _configure_test_embedded_database_path() -> None:

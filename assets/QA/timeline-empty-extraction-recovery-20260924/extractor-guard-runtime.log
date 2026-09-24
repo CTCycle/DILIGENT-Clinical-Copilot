@@ -1,0 +1,2 @@
+[WARNING] Timeline extraction unavailable for session_id=1, using deterministic fallback error_code=invalid_response error_type=_EmptyTimelineExtractionError
+services.clinical.timeline._EmptyTimelineExtractionError: Timeline extraction produced no evidence-backed events despite populated clinical source fields.

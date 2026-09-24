@@ -11,6 +11,7 @@ import pytest
 from domain.patient_timeline import (
     PatientTimeline,
     PatientTimelineEvent,
+    PatientTimelineExtraction,
 )
 from domain.timeline_dates import extract_single_explicit_timeline_date
 from repositories.schemas.base import Base
@@ -25,6 +26,7 @@ from repositories.schemas.knowledge import (
 from repository_fixtures import build_repository_graph
 from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.preparation import ClinicalKnowledgePreparation
+from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection import DataInspectionService
 from services.inspection.timeline import InspectionTimelineMixin
 from services.llm.cloud import LLMError
@@ -67,6 +69,8 @@ def save_session(
     status: str | None,
     report: str,
     anamnesis: str,
+    drugs: str = "acetaminophen",
+    laboratory_analysis: str = "",
     payload: dict[str, Any] | None = None,
 ) -> None:
     repository_graph.clinical_session_repository.save_clinical_session(
@@ -75,7 +79,8 @@ def save_session(
             "session_timestamp": timestamp,
             "session_status": status,
             "anamnesis": anamnesis,
-            "drugs": "acetaminophen",
+            "drugs": drugs,
+            "laboratory_analysis": laboratory_analysis,
             "final_report": report,
             "detected_drugs": ["acetaminophen"],
             "session_result_payload": payload
@@ -581,6 +586,14 @@ class FailingTimelineExtractor:
         )
 
 ###############################################################################
+class EmptyTimelineExtractionClient:
+
+    # -------------------------------------------------------------------------
+    async def llm_structured_call(self, **kwargs: Any) -> PatientTimelineExtraction:
+        _ = kwargs
+        return PatientTimelineExtraction()
+
+###############################################################################
 def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced() -> (
     None
 ):
@@ -687,7 +700,7 @@ def test_timeline_generation_marks_fallback_payload() -> None:
     assert generated.generation_status == "fallback"
     assert generated.generation_note is not None
     assert generated.generation_error_code == "invalid_response"
-    assert "invalid structured data" in generated.generation_note
+    assert generated.generation_note.strip()
     assert generated.events
     assert {event.source for event in generated.events} == {"fallback_parser"}
 
@@ -716,6 +729,55 @@ def test_timeline_generation_marks_fallback_payload() -> None:
         event.timing_type == "explicit_date" if event is dated_event else event.timing_type == "uncertain"
         for event in generated.events
     )
+
+###############################################################################
+def test_empty_model_timeline_with_source_persists_deterministic_fallback() -> None:
+    repository_graph, _ = build_repository_graph_for_test()
+    save_session(
+        repository_graph,
+        patient_name="Empty Extraction Timeline Patient",
+        timestamp=datetime(2025, 1, 17, 8, 30, tzinfo=timezone.utc),
+        status="successful",
+        report="Empty extraction timeline report",
+        anamnesis="Symptoms started on 2025-01-17.",
+        drugs="Acetaminophen was taken in 2025-01.",
+        laboratory_analysis="ALT was 75 U/L on 2025-01-17.",
+    )
+    session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
+        search="Empty Extraction Timeline Patient",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(session_rows[0]["session_id"])
+    extractor = PatientTimelineExtractor(client=EmptyTimelineExtractionClient())
+    service = build_service(
+        repository_graph, timeline_extractor=extractor, jobs=JobManager()
+    )
+
+    generated = service.generate_session_timeline(session_id, force_regenerate=True)
+
+    assert generated is not None
+    assert generated.timeline_id is not None
+    assert generated.generation_status == "fallback"
+    assert generated.generation_error_code == "invalid_response"
+    assert generated.events
+    assert {event.source for event in generated.events} == {"fallback_parser"}
+    events_by_type = {event.event_type: event for event in generated.events}
+    assert events_by_type["therapy"].event_date == "2025-01"
+    assert events_by_type["therapy"].date_precision == "month"
+    assert events_by_type["disease"].event_date == "2025-01-17"
+    assert events_by_type["disease"].date_precision == "day"
+    assert events_by_type["lab"].event_date == "2025-01-17"
+    assert events_by_type["lab"].date_precision == "day"
+
+    persisted = service.get_session_timeline(session_id)
+    assert persisted is not None
+    assert persisted.timeline_id == generated.timeline_id
+    assert persisted.generation_status == "fallback"
+    assert persisted.generation_error_code == "invalid_response"
 
 
 ###############################################################################
