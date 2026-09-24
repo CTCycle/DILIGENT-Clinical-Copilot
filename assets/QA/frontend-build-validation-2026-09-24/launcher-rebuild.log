@@ -1,0 +1,25 @@
+[STEP] Starting action RebuildFrontend
+[OK] Node.js ready: v22.13.0
+[STEP] Installing frontend dependencies
+[INFO] Reusing existing frontend dependencies
+[STEP] Building frontend
+[STEP] Running G:\Projects\Repositories\Active projects\DILIGENT Clinical Copilot\runtimes\nodejs\npm.cmd run build
+
+> diligent-client@3.4.0 build
+> ng build
+
+> Building...
+√ Building...
+Initial chunk files | Names         |  Raw size | Estimated transfer size
+main-UK3VZRKK.js    | main          | 839.25 kB |               173.34 kB
+styles-NRKOB5DE.css | styles        | 115.69 kB |                15.80 kB
+
+                    | Initial total | 954.93 kB |               189.15 kB
+
+Application bundle generation complete. [9.894 seconds] - 2026-09-24T06:42:26.163Z
+
+Output location: G:\Projects\Repositories\Active projects\DILIGENT Clinical Copilot\app\client\dist
+
+[OK] Completed G:\Projects\Repositories\Active projects\DILIGENT Clinical Copilot\runtimes\nodejs\npm.cmd run build
+[OK] Frontend rebuild completed
+[OK] action RebuildFrontend completed
