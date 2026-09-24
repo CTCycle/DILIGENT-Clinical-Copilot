@@ -504,6 +504,50 @@ partial and blocked gates are recorded in the focused report and remain
 separate because they depend on provider credentials, upstream NCBI
 availability, release prerequisites, or different workflow scope.
 
+## Isolated local timeline pair revalidation — 2026-09-24
+
+This slice followed the next action above and started on `develop` at clean
+HEAD `85cdf3515c3d054a6aee7fc06d64816e02252e4e`, equal to `origin/develop`.
+The official Windows launcher used a disposable SQLite database and isolated
+data root. Two synthetic sessions contained a symptom date, medication month,
+and lab date. The exact `ollama / qwen3.5:2b` and
+`ollama / qwen3.5:9b` routes were exercised in the in-app Browser.
+
+Both runs saved a fallback chronology: timeline 1 for 2B and timeline 2 for
+9B, each with `generation_error_code=unknown`, exact local/Ollama/model
+provenance, and three evidence-backed `fallback_parser` events. The medication
+remained month precision (`2025-01`); symptom and lab remained day precision
+(`2025-01-17`). The rendered history and event evidence were inspected, and
+both records survived reload. No model-generated timeline succeeded in this
+pair. The exact request exceptions were not captured, so the `unknown` records
+cannot be attributed to model quality, provider failure, or timeout.
+
+The isolated parser timeout setting was 3,600 seconds, but the timeline
+service caps its outer wait at 300 seconds. Separate short non-clinical direct
+Ollama probes took about 127 seconds for cold 9B and 96 seconds for 2B; they
+are runtime-performance context only and do not establish timeline quality.
+Cold-start and local throughput are plausible contributors to the long
+browser runs, but remain inference without the original exception. The
+in-progress browser view remained at 25% until reload; the job terminal state
+was not captured, so a progress-display defect is not confirmed.
+
+The classifier previously mapped a bare `TimeoutError()` with no message to
+`unknown`. It now recognizes the exception type, and the focused diagnostics
+suite passed **9 tests with 1 existing Google GenAI deprecation warning**.
+This corrects a proven classification gap but is not claimed to explain either
+of the two observed persisted failures. The detailed evidence, environment,
+limitations, open gates, and cleanup record are in the
+[local timeline pair report](../../QA/timeline-pair-validation-20260924/report.md).
+
+Final status: `sessions.timeline` and `model.provider.local-ollama` remain
+`PARTIAL`; exact-lane grounded output and request-specific failure attribution
+are still required. `test.automated-regression` remains `PARTIAL` despite the
+focused test passing because hosted live-provider and conditional E2E lanes
+remain unrun. Catalog/source refresh, credential, OpenCode, revision, RAG,
+accessibility, API catalog, and release leftovers remain separate as documented
+in the focused report. The disposable runtime and test cache/data were removed;
+the shared settings and database were not changed.
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
