@@ -548,6 +548,58 @@ accessibility, API catalog, and release leftovers remain separate as documented
 in the focused report. The disposable runtime and test cache/data were removed;
 the shared settings and database were not changed.
 
+## Focused local timeline failure attribution — 2026-09-24
+
+This follow-up started on `develop` at `a0566a6a77a5744c90e534c520ff94cd7d444184`,
+equal to `origin/develop`, and revisited the timeline/provider leftovers from
+the pair above. The official Windows launcher used a task-owned SQLite runtime
+with two synthetic sessions and exact local routes `ollama / qwen3.5:2b` and
+`ollama / qwen3.5:9b`.
+
+The 2B run persisted a fallback with `generation_error_code=invalid_response`.
+Its server trace records eight Pydantic validation errors for
+`PatientTimelineExtraction`: the response had JSON-Schema-shaped fields rather
+than a timeline instance. This is a model-response structured-output failure
+for that request. It was not a timeout, API transport, job polling, or rendering
+failure; the UI displayed the invalid-response classification and retained
+three evidence-backed fallback events with month/day precision. A single run
+does not prove that model size or performance caused the output defect.
+
+The 9B run persisted `llm_generated`, with three source-backed events and no
+generation error. The rendered detail identified evidence from the synthetic
+drug, laboratory, and anamnesis inputs, preserved month/day precision, and
+survived reload. Both persisted rows retained exact local/Ollama/model
+provenance. Read-only SQLite checks returned `integrity_check=ok` and zero
+foreign-key violations.
+
+A first PowerShell timing wrapper exited `0xC0000005` without request output;
+the following endpoint check found Ollama unavailable. That attempt is
+classified as a harness/runner failure with unknown failing stage and supplies
+no model-quality evidence. A Python standard-library client then completed
+four direct non-clinical requests (`Reply exactly OK.`, four-token limit):
+`qwen3.5:2b` cold 14.98 s / warm 0.079 s and `qwen3.5:9b` cold 39.22 s / warm
+0.605 s. These timings characterize local API latency only and cannot establish
+timeline schema conformance or grounding. They also do not back-attribute the
+prior pair's `unknown` fallbacks.
+
+The focused diagnostics suite passed **9 tests, 1 existing Google GenAI
+deprecation warning**; Ruff passed for the timeline service and focused test.
+The detailed evidence, exact failure classes, remaining independent gates, and
+cleanup record are in the [local timeline diagnostics report](../../QA/timeline-local-model-diagnostics-20260924/report.md).
+
+Final status: `sessions.timeline` and `model.provider.local-ollama` remain
+`PARTIAL`: the current 9B lane generated a grounded timeline, while the current
+2B lane failed the structured-output contract; the earlier pair's `unknown`
+errors remain unattributed, and repeatability is not established.
+`test.automated-regression` remains `PARTIAL`; hosted live-provider dispatch
+and conditional E2E prerequisites are still outstanding. The separate
+OpenCode/revision, NCBI source refresh, credential, API catalog, RAG policy,
+accessibility, container, and release gates retain their documented statuses
+and blockers.
+
+The disposable runtime and its synthetic data were removed after listener
+ownership checks. The shared settings and database were not changed.
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
