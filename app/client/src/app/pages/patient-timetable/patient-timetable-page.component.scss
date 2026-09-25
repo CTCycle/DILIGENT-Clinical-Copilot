@@ -1,18 +1,18 @@
 :host {
   display: block;
-  min-height: 100vh;
+  min-height: 0;
   color: var(--color-text-primary);
   background: var(--app-background);
 }
 
 .timetable-page {
-  min-height: 100vh;
+  min-height: calc(100dvh - var(--app-top-nav-height));
 }
 
 .timetable-shell {
-  width: min(100%, var(--container-max));
-  margin: 0 auto;
-  padding: var(--space-2xl) var(--space-2xl) var(--space-3xl);
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .timetable-header,

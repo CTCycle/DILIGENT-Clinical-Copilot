@@ -5,6 +5,7 @@
       <router-outlet></router-outlet>
     </div>
   </div>
+  <app-notification-toast></app-notification-toast>
   <app-tips-and-tricks [isOpen]="tipsOpen()" (closed)="tipsOpen.set(false)"></app-tips-and-tricks>
   <app-guided-tour></app-guided-tour>
 </div>

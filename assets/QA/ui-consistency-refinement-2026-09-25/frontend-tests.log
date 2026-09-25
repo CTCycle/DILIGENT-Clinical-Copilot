@@ -1,0 +1,74 @@
+
+> diligent-client@3.4.0 test
+> ng test --watch=false --progress=false
+
+Initial chunk files                                                                          | Names                                                                                     |  Raw size
+spec-app-pages-clinical-sessions-clinical-sessions-page.component.js                         | spec-app-pages-clinical-sessions-clinical-sessions-page.component                         | 244.65 kB |
+spec-app-pages-model-config-model-config-page.component.js                                   | spec-app-pages-model-config-model-config-page.component                                   | 240.06 kB |
+spec-app-pages-data-inspection-data-inspection-page.component.js                             | spec-app-pages-data-inspection-data-inspection-page.component                             | 160.81 kB |
+spec-app-pages-patient-timetable-patient-timetable-page.component.js                         | spec-app-pages-patient-timetable-patient-timetable-page.component                         | 143.15 kB |
+styles.css                                                                                   | styles                                                                                    | 137.45 kB |
+spec-app-pages-dili-agent-dili-agent-page.component.js                                       | spec-app-pages-dili-agent-dili-agent-page.component                                       |  91.77 kB |
+chunk-7DUBHT7O.js                                                                            | -                                                                                         |  51.26 kB |
+spec-app-pages-settings-components-operational-settings-page.component.js                    | spec-app-pages-settings-components-operational-settings-page.component                    |  42.09 kB |
+chunk-ZYUTCNNT.js                                                                            | -                                                                                         |  34.93 kB |
+chunk-YZCVDBEV.js                                                                            | -                                                                                         |  31.62 kB |
+chunk-5FLTB5E5.js                                                                            | -                                                                                         |  26.29 kB |
+chunk-NWBBSVX4.js                                                                            | -                                                                                         |  20.04 kB |
+chunk-E36CJZ7K.js                                                                            | -                                                                                         |  18.05 kB |
+chunk-NG3TMZGF.js                                                                            | -                                                                                         |  17.62 kB |
+chunk-4HS5DTMN.js                                                                            | -                                                                                         |  15.66 kB |
+spec-app-pages-clinical-sessions-components-clinical-session-timeline-workspace.component.js | spec-app-pages-clinical-sessions-components-clinical-session-timeline-workspace.component |  14.41 kB |
+chunk-EDIWEQSB.js                                                                            | -                                                                                         |  14.32 kB |
+chunk-4VOIAXDY.js                                                                            | -                                                                                         |  13.80 kB |
+spec-app-pages-settings-settings-page.component.js                                           | spec-app-pages-settings-settings-page.component                                           |  11.48 kB |
+spec-app-core-state-inspection-update-job-resource.js                                        | spec-app-core-state-inspection-update-job-resource                                        |   8.52 kB |
+spec-app-core-state-inspection-update-job-tracker.service.js                                 | spec-app-core-state-inspection-update-job-tracker.service                                 |   8.27 kB |
+chunk-EX5IIU7H.js                                                                            | -                                                                                         |   6.32 kB |
+chunk-SJS4LADI.js                                                                            | -                                                                                         |   6.24 kB |
+chunk-HZXEPMDQ.js                                                                            | -                                                                                         |   5.27 kB |
+spec-app-pages-data-inspection-components-inspection-update-all-modal.component.js           | spec-app-pages-data-inspection-components-inspection-update-all-modal.component           |   4.62 kB |
+chunk-GDPN7ETC.js                                                                            | -                                                                                         |   4.47 kB |
+chunk-4XN7PMYC.js                                                                            | -                                                                                         |   4.28 kB |
+chunk-2ASEZENS.js                                                                            | -                                                                                         |   4.23 kB |
+spec-app-core-services-dili-job-tracker.service.js                                           | spec-app-core-services-dili-job-tracker.service                                           |   4.03 kB |
+spec-app-pages-clinical-sessions-clinical-session-revision-display.js                        | spec-app-pages-clinical-sessions-clinical-session-revision-display                        |   3.64 kB |
+spec-app-core-model-config.js                                                                | spec-app-core-model-config                                                                |   3.53 kB |
+spec-app-pages-clinical-sessions-clinical-session-preview.js                                 | spec-app-pages-clinical-sessions-clinical-session-preview                                 |   3.42 kB |
+spec-app-core-state-model-config-state.service.js                                            | spec-app-core-state-model-config-state.service                                            |   3.38 kB |
+chunk-X3BCRF44.js                                                                            | -                                                                                         |   3.35 kB |
+chunk-4GMCYBSZ.js                                                                            | -                                                                                         |   3.25 kB |
+spec-app-pages-model-config-components-access-key-modal.component.js                         | spec-app-pages-model-config-components-access-key-modal.component                         |   3.10 kB |
+chunk-A63OFSMY.js                                                                            | -                                                                                         |   3.05 kB |
+chunk-AB7Z7EXG.js                                                                            | -                                                                                         |   2.90 kB |
+chunk-UR7ARCIA.js                                                                            | -                                                                                         |   2.81 kB |
+spec-app-core-state-app-state.service.js                                                     | spec-app-core-state-app-state.service                                                     |   2.59 kB |
+chunk-CV6VTU52.js                                                                            | -                                                                                         |   2.17 kB |
+spec-app-core-services-desktop-dialog.service.js                                             | spec-app-core-services-desktop-dialog.service                                             |   2.03 kB |
+chunk-62KT453O.js                                                                            | -                                                                                         |   1.95 kB |
+spec-app-core-utils.js                                                                       | spec-app-core-utils                                                                       |   1.78 kB |
+chunk-VWMZIBTD.js                                                                            | -                                                                                         |   1.75 kB |
+spec-app-pages-data-inspection-components-inspection-update-controls.component.js            | spec-app-pages-data-inspection-components-inspection-update-controls.component            |   1.65 kB |
+spec-app-core-services-notification.service.js                                               | spec-app-core-services-notification.service                                               |   1.39 kB |
+chunk-ESGMWZQP.js                                                                            | -                                                                                         |   1.35 kB |
+init-testbed.js                                                                              | init-testbed                                                                              |   1.21 kB |
+chunk-NULLBVH3.js                                                                            | -                                                                                         |   1.21 kB |
+spec-app-core-services-session-timeline-api.js                                               | spec-app-core-services-session-timeline-api                                               |   1.17 kB |
+chunk-VMDTKKHK.js                                                                            | -                                                                                         |   1.13 kB |
+vitest-mock-patch.js                                                                         | vitest-mock-patch                                                                         | 974 bytes |
+spec-app-core-services-markdown-renderer.service.js                                          | spec-app-core-services-markdown-renderer.service                                          | 948 bytes |
+chunk-GX5HAOMM.js                                                                            | -                                                                                         | 455 bytes |
+chunk-5XV3NGRE.js                                                                            | -                                                                                         | 210 bytes |
+
+                                                                                             | Initial total                                                                             |   1.44 MB
+
+Application bundle generation complete. [20.891 seconds] - 2026-09-25T07:46:00.352Z
+
+
+ RUN  v4.1.11 G:/Projects/Repositories/Active projects/DILIGENT Clinical Copilot/app/client
+
+
+ Test Files  24 passed (24)
+      Tests  105 passed (105)
+   Start at  09:46:02
+   Duration  45.27s (transform 28.34s, setup 32.24s, import 134.53s, tests 11.88s, environment 252.09s)

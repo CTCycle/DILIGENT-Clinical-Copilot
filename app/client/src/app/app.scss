@@ -1,12 +1,15 @@
 .app-runtime {
   min-width: var(--app-min-viewport-width);
+  height: 100%;
   min-height: 100%;
 }
 
 @media (max-width: 1099.99px) {
   .app-runtime {
+    min-width: 0;
     visibility: hidden;
     pointer-events: none;
+    overflow-x: hidden;
   }
 }
 

@@ -195,25 +195,20 @@ app-root {
    ============================================ */
 .app-shell {
   height: 100%;
-  min-height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .page-container {
   width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 28px 24px 32px;
-}
-
-.page-container.stitch-dili-page {
-  padding: 0;
+  max-width: var(--container-max);
+  min-width: 0;
+  margin-inline: auto;
+  padding: var(--space-2xl);
 }
 
 .stitch-dili-page {
-  max-width: none;
-  margin: 0;
   background: var(--app-background);
   border: 0;
   border-radius: 0;
@@ -249,7 +244,7 @@ app-root {
   gap: 0;
   align-items: stretch;
   background: var(--color-surface-alt);
-  min-height: calc(100vh - var(--app-top-nav-height) - 92px);
+  min-height: calc(100dvh - var(--app-top-nav-height) - (2 * var(--space-2xl)));
 }
 
 .stitch-dili-main,
@@ -1820,7 +1815,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .app-header {
-  padding: 0 24px;
+  padding: 0 var(--space-2xl);
   border-bottom: 1px solid rgba(172, 179, 178, 0.2);
   background: color-mix(in srgb, var(--color-surface) 92%, #f8faf9);
   height: var(--app-top-nav-height);
@@ -1850,13 +1845,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-lg);
 }
 
 .app-header-brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-md);
   justify-self: start;
   white-space: nowrap;
 }
@@ -1874,13 +1869,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .app-header-actions {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   justify-self: end;
 }
 
 .app-header-icon-btn {
-  width: 36px;
-  height: 36px;
+  width: var(--icon-action-size);
+  height: var(--icon-action-size);
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.4);
   background: rgba(255, 255, 255, 0.72);
@@ -1947,7 +1942,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   flex-wrap: nowrap;
   height: 100%;
   width: fit-content;
-  gap: 20px;
+  gap: var(--space-xl);
   margin: 0;
 }
 
@@ -1956,8 +1951,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
-  min-height: 36px;
+  gap: var(--space-sm);
+  min-height: var(--control-height-sm);
   border: none;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -2017,12 +2012,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   width: 100%;
   max-width: none;
   min-height: 0;
+  min-width: 0;
   height: 100%;
   background: var(--app-background);
   display: flex;
   flex-direction: column;
   flex: 1;
   padding-top: var(--app-top-nav-height);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 /* ============================================
@@ -2777,7 +2776,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   max-height: calc(100dvh - var(--app-top-nav-height));
   overflow: hidden;
   scrollbar-gutter: stable;
-  padding: var(--space-md) var(--space-lg) var(--space-md);
+  padding: var(--space-2xl);
 }
 
 .inspection-page-report {
@@ -3250,33 +3249,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   margin-top: 2px;
   padding-top: 2px;
   border-top: 1px solid rgba(148, 163, 184, 0.24);
-}
-
-.inspection-page-workbench.is-page-scroll {
-  height: auto;
-  max-height: none;
-  overflow: auto;
-  min-height: calc(100dvh - var(--app-top-nav-height) + 140px);
-  scrollbar-width: none;
-}
-
-.inspection-page-workbench.is-page-scroll::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-.inspection-page-workbench.is-page-scroll .inspection-layout {
-  overflow: visible;
-  min-height: auto;
-  min-block-size: calc(100dvh - var(--app-top-nav-height) + 120px);
-}
-
-.inspection-active-view.is-page-scroll {
-  overflow: visible;
-}
-
-.inspection-page-workbench.is-page-scroll .inspection-view-stage {
-  overflow: visible;
 }
 
 .inspection-pager-range {
@@ -5284,22 +5256,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* Final Preview A overrides for the redesigned model configuration page. */
 .model-config-page {
-  max-width: none;
-  margin-right: 0;
-  margin-left: 0;
+  padding: 0;
+  max-width: var(--container-max);
+  margin-inline: auto;
   background:
     radial-gradient(72% 58% at 92% 24%, rgba(196, 235, 221, 0.28), rgba(196, 235, 221, 0) 58%),
     linear-gradient(180deg, #fbfdfc 0%, #f7fbf9 100%);
 }
 
-.model-config-page .model-config-hero,
-.model-config-page .model-config-preview-a-layout {
+.model-config-page .model-config-hero {
   width: min(100%, 1280px);
   margin-right: auto;
   margin-left: auto;
 }
 
 .model-config-page .model-config-preview-a-layout {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
   grid-template-columns: minmax(0, 1fr) 286px;
   gap: 16px;
   align-items: stretch;
@@ -6104,4 +6078,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border: 1px solid var(--color-border-subtle);
   background: var(--color-surface);
   color: var(--color-text-secondary);
+}
+
+@media (max-width: 1500px) {
+  .app-main .model-config-page .model-config-preview-a-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-main .model-config-page .model-config-preview-a-layout .model-config-summary-panel {
+    position: static;
+  }
+
+  .app-main .model-config-page .model-config-summary-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-xl);
+  }
+}
+
+@media (max-width: 1200px) {
+  .app-main .model-config-page .model-config-control-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-main .model-config-page .model-config-control-rail > app-model-config-toggle-card {
+    grid-column: 1 / -1;
+  }
 }
