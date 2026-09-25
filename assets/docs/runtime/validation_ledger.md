@@ -1,5 +1,5 @@
 # Pre-release validation ledger
-Last updated: 2026-09-24
+Last updated: 2026-09-25
 
 ## Scope and interpretation
 
@@ -635,6 +635,60 @@ The focused timeline/extraction and inspection persistence suite passed 53 tests
 Other reviewed leftovers remain separate: `model.provider.opencode-go` and `revision.agentic-lifecycle` are `PARTIAL`; `data.inspection.catalogs` and `data.sources.refresh` are `PARTIAL` while NCBI presents a human-verification challenge; `auth.access-key-management` is `BLOCKED` pending an approved disposable credential and cleanup authorization; `release.desktop.v3-4-0` is `BLOCKED` pending signed/tagged, hosted packaging, and clean-machine prerequisites; and `runtime.containerized` is `NOT_IMPLEMENTED`. `ISSUE-005`, the accessibility audit, the remaining API route catalog, clinical provider-failure/RAG-off cases, and broader timeline-provider coverage remain separate.
 
 After evidence collection, task-owned listeners 6848, 5172, and 3788 were stopped and ports 7690, 9847, and 11434 were verified clear. The isolated database, runtime/cache files, pytest scratch paths, Ollama profile, temporary screenshots, and raw logs were removed; filtered logs and compact synthetic API/test records remain in the linked QA directory. The shared database, settings, and protected caches were left untouched.
+
+## Timeline Browser validation — 2026-09-25
+
+This slice followed the 2026-09-24 timeline handoff. It started on clean
+`develop` HEAD `11dd344970371a75173ec961d3b99d50af7f3aee`, equal to
+`origin/develop`, and used the official Windows launcher with a task-owned
+SQLite database. Three synthetic sessions contained identical source facts:
+acetaminophen in `2025-01`, symptoms on `2025-01-17`, and ALT 75 U/L on
+`2025-01-17`. The installed Ollama tags were verified without download or
+provider/model substitution.
+
+The current Codex in-app Browser rendered at `1280 × 720`, so the prior
+desktop-width gate was absent. Settings showed Local Ollama and the exact
+installed `qwen3.5:2b`/`qwen3.5:9b` models. Session 1 generated timeline 1
+with `qwen3.5:2b`; the UI and persisted API record showed
+`generation_status=fallback`, `generation_error_code=invalid_response`,
+local/Ollama provenance, three source-backed fallback events, and month/day
+date precision. The event inspector showed the source quote and normalized
+date. Reload retained the same record.
+
+The Timeline role was then changed and saved as `qwen3.5:9b` in the isolated
+database. Session 3 generated timeline 2 with `generation_status=llm_generated`,
+three source-backed events, exact local/Ollama/model provenance, and source
+fields `drugs`, `laboratory_analysis`, and `anamnesis`. The month/day date
+precision and event evidence survived reload. This is a grounded control for
+the synthetic fixture only.
+
+The focused backend suite passed **67 tests** with one existing Google GenAI
+deprecation warning. Targeted Ruff passed, Angular/Vitest passed **24 files and
+105 tests**, and the current production frontend build completed successfully.
+Read-only API checks returned HTTP 200 for health, model configuration, and
+both persisted timeline records. SQLite returned `integrity_check=ok` and no
+foreign-key violations. Detailed sanitized evidence is in the
+[2026-09-25 Browser report](../../QA/timeline-browser-validation-20260925/report.md),
+[browser capture notes](../../QA/timeline-browser-validation-20260925/browser-capture-notes.md),
+and [API/persistence evidence](../../QA/timeline-browser-validation-20260925/api-persistence-evidence.md).
+
+The acceptance boundary is deliberately scoped to the supported local route
+and safe fallback behavior. The exact `qwen3.5:2b` structured-output failure
+is a model/task compatibility limitation, not an unfinished application gate;
+the fail-closed fallback is the expected behavior for that unsupported result.
+No further 2B retry loop is scheduled unless the model, prompt contract, or
+timeline implementation changes.
+
+| Gate | Final status | Remaining limitation |
+|---|---|---|
+| `sessions.timeline` | `VALIDATED` for supported scope | Rendered fallback, source evidence, date precision, reload, and grounded output on the exact `qwen3.5:9b` local route passed. The `qwen3.5:2b` compatibility limitation is recorded but is not a pending application gate. |
+| `model.provider.local-ollama` | `VALIDATED` for supported scope | Local Ollama discovery, exact provenance, fail-closed fallback, and the grounded 9B control passed. The 2B route is not accepted as a grounded model for this task under the tested conditions. |
+| `api.local-boundaries` | `WORKING` | Exercised endpoints and persisted reads passed; the complete route catalog and all error variants remain open. |
+| `test.automated-regression` | `PARTIAL` | Current local backend/frontend tests, Ruff, and build passed; no hosted result exists for this final tree, and live-provider/conditional E2E lanes remain unrun. |
+
+Independent provider/revision, NCBI source-refresh, credential, desktop-release,
+RAG-policy, accessibility, API-catalog, and container-runtime boundaries remain
+as documented above and were not promoted by this slice.
 
 ## Feature-state register
 
