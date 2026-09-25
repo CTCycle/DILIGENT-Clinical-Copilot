@@ -690,6 +690,42 @@ Independent provider/revision, NCBI source-refresh, credential, desktop-release,
 RAG-policy, accessibility, API-catalog, and container-runtime boundaries remain
 as documented above and were not promoted by this slice.
 
+## Automated regression and live-provider validation — 2026-09-25
+
+This slice revisited the next actionable incomplete gates from the current
+ledger: `test.automated-regression` and the explicit live-provider boundary of
+`model.provider.opencode-go`. It started from clean `develop` HEAD
+`2081a076a0b02d13bc6305939c13658b1fe80494`, equal to `origin/develop`.
+
+The current implementation passed the local backend unit suite (`793 passed`,
+seven existing dependency/framework deprecation warnings), the exact CI Ruff
+target (`app/server` plus `app/tests`), Pyright (`0 errors, 0 warnings, 0
+informations`), Angular/Vitest (`24 files, 105 tests`), and the frontend
+production build. The hosted core jobs in [push run 36151424087](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36151424087)
+and [dispatch run 36153314442](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36153314442)
+passed backend quality (`793 passed`, Alembic head/drift, Ruff, and Pyright),
+the SQLite/PostgreSQL persistence contract (`29 passed`), Python/Angular/
+desktop/Rust security audits, Windows frontend tests/build, and the full browser
+E2E gate (`39 passed, 7 skipped`).
+
+The explicit provider dispatch reached `live-provider-e2e` setup, frontend
+build, and Playwright installation, then failed at the test's prerequisite
+check because the masked `OPENCODE_GO_API_KEY` workflow secret was empty:
+`DILIGENT_LIVE_PROVIDER_E2E=1 requires the OPENCODE_GO_API_KEY secret.` No
+OpenCode Go request was made, so no current live provider/model/latency/output
+acceptance can be claimed. This is an external credential blocker, not an
+application defect. The broader provider matrix and conditional model/
+embedding/persisted-session lanes remain incomplete.
+
+| Gate | Final status | Remaining limitation |
+|---|---|---|
+| `test.automated-regression` | `PARTIAL` | Current local and hosted core regression gates pass. Live-provider E2E is blocked before request by the missing repository secret, and conditional browser cases remain skipped. |
+| `model.provider.opencode-go` | `PARTIAL` | Historical exact-provider evidence remains bounded; current dispatch has no provider result until an approved `OPENCODE_GO_API_KEY` secret is available. |
+| `runtime.database.sqlite-migrations` | `VALIDATED` for the exercised CI path | Alembic and SQLite/PostgreSQL persistence checks passed; deployment-specific and clean-machine upgrade evidence remain separate. |
+
+No application code change was needed. The task-owned pytest workspace was
+removed after validation; pre-existing protected cache residue was preserved.
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
