@@ -12,12 +12,13 @@ import {
 import { DiliJobTrackerService } from './core/services/dili-job-tracker.service';
 import { InspectionUpdateJobTrackerService } from './core/state/inspection-update-job-tracker.service';
 import { NavSidebarComponent } from './components/nav-sidebar/nav-sidebar.component';
+import { NotificationToastComponent } from './components/notification-toast/notification-toast.component';
 import { GuidedTourComponent } from './core/guidance/guided-tour.component';
 import { TipsAndTricksComponent } from './core/guidance/tips-and-tricks.component';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, NavSidebarComponent, GuidedTourComponent, TipsAndTricksComponent],
+  imports: [RouterOutlet, NavSidebarComponent, NotificationToastComponent, GuidedTourComponent, TipsAndTricksComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })

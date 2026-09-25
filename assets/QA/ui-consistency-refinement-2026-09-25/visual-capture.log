@@ -1,0 +1,23 @@
+Captured 22 screenshots at the requested desktop viewports.
+dili-agent-1366-light.png: / 1366x900 header=59px frame=(0,59) frame-width=1356px document-overflow=(False, False) notice=none toast=none
+dili-agent-1366-dark.png: / 1366x900 header=59px frame=(0,59) frame-width=1356px document-overflow=(False, False) notice=none toast=none
+dili-agent-1100.png: / 1100x900 header=59px frame=(0,59) frame-width=1090px document-overflow=(False, False) notice=none toast=none
+narrow-window-1099.png: / 1099x900 header=59px frame=(0,59) frame-width=1089px document-overflow=(False, False) notice=grid toast=none
+clinical-sessions-1366.png: /clinical-sessions 1366x900 header=59px frame=(0,59) frame-width=1356px document-overflow=(False, False) notice=none toast=none
+data-inspection-1366.png: /data 1366x900 header=59px frame=(0,59) frame-width=1356px document-overflow=(False, False) notice=none toast=none
+patient-timeline-1366.png: /sessions/42/timetable 1366x900 header=59px frame=(0,59) frame-width=1356px document-overflow=(False, False) notice=none toast=none
+settings-general-1366.png: /settings/general 1366x900 header=59px frame=(0,59) frame-width=1356px document-overflow=(False, False) notice=none toast=none
+settings-models-1366.png: /settings/models 1366x900 header=59px frame=(0,59) frame-width=1356px document-overflow=(False, False) notice=none toast=(453,836)
+settings-data-1366.png: /settings/data 1366x900 header=59px frame=(0,59) frame-width=1356px document-overflow=(False, False) notice=none toast=none
+settings-integrations-1366.png: /settings/integrations 1366x900 header=59px frame=(0,59) frame-width=1356px document-overflow=(False, False) notice=none toast=none
+settings-advanced-1366.png: /settings/advanced 1366x900 header=59px frame=(0,59) frame-width=1356px document-overflow=(False, False) notice=none toast=none
+clinical-sessions-1100.png: /clinical-sessions 1100x900 header=59px frame=(0,59) frame-width=1090px document-overflow=(False, False) notice=none toast=none
+data-inspection-1100.png: /data 1100x900 header=59px frame=(0,59) frame-width=1090px document-overflow=(False, False) notice=none toast=none
+patient-timeline-1100.png: /sessions/42/timetable 1100x900 header=59px frame=(0,59) frame-width=1090px document-overflow=(False, False) notice=none toast=none
+settings-general-1100.png: /settings/general 1100x900 header=59px frame=(0,59) frame-width=1090px document-overflow=(False, False) notice=none toast=none
+settings-models-1100.png: /settings/models 1100x900 header=59px frame=(0,59) frame-width=1090px document-overflow=(False, False) notice=none toast=(320,836)
+settings-data-1100.png: /settings/data 1100x900 header=59px frame=(0,59) frame-width=1090px document-overflow=(False, False) notice=none toast=none
+settings-integrations-1100.png: /settings/integrations 1100x900 header=59px frame=(0,59) frame-width=1090px document-overflow=(False, False) notice=none toast=none
+settings-advanced-1100.png: /settings/advanced 1100x900 header=59px frame=(0,59) frame-width=1090px document-overflow=(False, False) notice=none toast=none
+data-inspection-1920.png: /data 1920x1080 header=59px frame=(187,59) frame-width=1536px document-overflow=(False, False) notice=none toast=none
+patient-timeline-1920.png: /sessions/42/timetable 1920x1080 header=59px frame=(187,59) frame-width=1536px document-overflow=(False, False) notice=none toast=none

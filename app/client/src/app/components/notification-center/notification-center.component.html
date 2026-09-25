@@ -49,17 +49,3 @@
     </section>
   }
 </div>
-
-@if (notifications.active(); as item) {
-  <aside
-    class="notification-toast"
-    [class.is-success]="item.tone === 'success'"
-    [class.is-error]="item.tone === 'error'"
-    [attr.role]="item.tone === 'error' ? 'alert' : 'status'"
-    [attr.aria-live]="item.tone === 'error' ? 'assertive' : 'polite'"
-  >
-    <span class="notification-toast-indicator" aria-hidden="true"></span>
-    <p>{{ item.message }}</p>
-    <button type="button" (click)="notifications.dismiss(item.id)" aria-label="Dismiss notification">Close</button>
-  </aside>
-}

@@ -1,0 +1,876 @@
+[
+  {
+    "image": "dili-agent-1366-light.png",
+    "route": "/",
+    "theme": "light",
+    "viewport": {
+      "width": 1366,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1366,
+      "clientHeight": 900,
+      "scrollWidth": 1366,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1356,
+      "height": 1155
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\nClinical Input\nU\nUnnamed patient\n\nRecorded: Not set\n\nPatient Name\nVisit Date\nUse RAG evidence\nRetrieve indexed source documents and include compact bibliography references.\nRu"
+  },
+  {
+    "image": "dili-agent-1366-dark.png",
+    "route": "/",
+    "theme": "dark",
+    "viewport": {
+      "width": 1366,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1366,
+      "clientHeight": 900,
+      "scrollWidth": 1366,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1356,
+      "height": 1155
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\nClinical Input\nU\nUnnamed patient\n\nRecorded: Not set\n\nPatient Name\nVisit Date\nUse RAG evidence\nRetrieve indexed source documents and include compact bibliography references.\nRu"
+  },
+  {
+    "image": "dili-agent-1100.png",
+    "route": "/",
+    "theme": "light",
+    "viewport": {
+      "width": 1100,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1100,
+      "clientHeight": 900,
+      "scrollWidth": 1100,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1090,
+      "height": 1155
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\nClinical Input\nU\nUnnamed patient\n\nRecorded: Not set\n\nPatient Name\nVisit Date\nUse RAG evidence\nRetrieve indexed source documents and include compact bibliography references.\nRu"
+  },
+  {
+    "image": "narrow-window-1099.png",
+    "route": "/",
+    "theme": "light",
+    "viewport": {
+      "width": 1099,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1099,
+      "clientHeight": 900,
+      "scrollWidth": 1099,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1099,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1099,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1089,
+      "height": 1155
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "grid",
+    "visibleText": "DESKTOP WINDOW REQUIRED\nWiden the application window to continue\n\nDILIGENT Clinical Copilot is designed for desktop browser windows at least 1100 pixels wide."
+  },
+  {
+    "image": "clinical-sessions-1366.png",
+    "route": "/clinical-sessions",
+    "theme": "light",
+    "viewport": {
+      "width": 1366,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1366,
+      "clientHeight": 900,
+      "scrollWidth": 1366,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1356,
+      "height": 841
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\n\n[ERROR] Service is temporarily unavailable. Please retry.\n\nSearch\nAll\nSuccessful\nFailed\nAny date\nAfter\nBefore\nOn date\n\nNo clinical sessions found.\n\nSelect a session to begin."
+  },
+  {
+    "image": "data-inspection-1366.png",
+    "route": "/data",
+    "theme": "light",
+    "viewport": {
+      "width": 1366,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1366,
+      "clientHeight": 900,
+      "scrollWidth": 1366,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1356,
+      "height": 841
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\n\nVIEWS\n\nDrug Catalog\nLiverTox\nDILIrank\nRAG\n\nMAINTENANCE\n\nUpdate all\nUpdate Catalog\nDRUG\tLAST UPDATE\t\nNo RxNav rows found.\n\n[ERROR] Service is temporarily unavailable. Please r"
+  },
+  {
+    "image": "patient-timeline-1366.png",
+    "route": "/sessions/42/timetable",
+    "theme": "light",
+    "viewport": {
+      "width": 1366,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1366,
+      "clientHeight": 900,
+      "scrollWidth": 1366,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1356,
+      "height": 1120.078125
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\n\nClinical sessions\n\nSESSION 42\n\nPatient timeline\n\nReview clinically relevant events in date order, with source evidence and timing confidence.\n\nRegenerate\nTIMELINE PROVENANCE\n"
+  },
+  {
+    "image": "settings-general-1366.png",
+    "route": "/settings/general",
+    "theme": "light",
+    "viewport": {
+      "width": 1366,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1366,
+      "clientHeight": 900,
+      "scrollWidth": 1366,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1356,
+      "height": 526.328125
+    },
+    "settingsContent": {
+      "x": 294,
+      "y": 83,
+      "width": 1038,
+      "height": 321.296875
+    },
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\nAPPLICATION\nSettings\n\nRuntime controls backed by the application settings configuration.\n\nGeneral\nApplication runtime behavior\nModels\nProviders, roles, reasoning, and RAG\nData"
+  },
+  {
+    "image": "settings-models-1366.png",
+    "route": "/settings/models",
+    "theme": "light",
+    "viewport": {
+      "width": 1366,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1366,
+      "clientHeight": 900,
+      "scrollWidth": 1366,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1356,
+      "height": 1625.296875
+    },
+    "settingsContent": {
+      "x": 294,
+      "y": 83,
+      "width": 1038,
+      "height": 1577.296875
+    },
+    "notificationToast": {
+      "x": 453,
+      "y": 835.5,
+      "width": 460,
+      "height": 44.5
+    },
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\n1\nHelp\nAPPLICATION\nSettings\n\nRuntime controls backed by the application settings configuration.\n\nGeneral\nApplication runtime behavior\nModels\nProviders, roles, reasoning, and RAG\nDa"
+  },
+  {
+    "image": "settings-data-1366.png",
+    "route": "/settings/data",
+    "theme": "light",
+    "viewport": {
+      "width": 1366,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1366,
+      "clientHeight": 900,
+      "scrollWidth": 1366,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1356,
+      "height": 589.890625
+    },
+    "settingsContent": {
+      "x": 294,
+      "y": 83,
+      "width": 1038,
+      "height": 541.890625
+    },
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\nAPPLICATION\nSettings\n\nRuntime controls backed by the application settings configuration.\n\nGeneral\nApplication runtime behavior\nModels\nProviders, roles, reasoning, and RAG\nData"
+  },
+  {
+    "image": "settings-integrations-1366.png",
+    "route": "/settings/integrations",
+    "theme": "light",
+    "viewport": {
+      "width": 1366,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1366,
+      "clientHeight": 900,
+      "scrollWidth": 1366,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1356,
+      "height": 559.890625
+    },
+    "settingsContent": {
+      "x": 294,
+      "y": 83,
+      "width": 1038,
+      "height": 511.890625
+    },
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\nAPPLICATION\nSettings\n\nRuntime controls backed by the application settings configuration.\n\nGeneral\nApplication runtime behavior\nModels\nProviders, roles, reasoning, and RAG\nData"
+  },
+  {
+    "image": "settings-advanced-1366.png",
+    "route": "/settings/advanced",
+    "theme": "light",
+    "viewport": {
+      "width": 1366,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1366,
+      "clientHeight": 900,
+      "scrollWidth": 1366,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1356,
+      "height": 941.078125
+    },
+    "settingsContent": {
+      "x": 294,
+      "y": 83,
+      "width": 1038,
+      "height": 893.078125
+    },
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\nAPPLICATION\nSettings\n\nRuntime controls backed by the application settings configuration.\n\nGeneral\nApplication runtime behavior\nModels\nProviders, roles, reasoning, and RAG\nData"
+  },
+  {
+    "image": "clinical-sessions-1100.png",
+    "route": "/clinical-sessions",
+    "theme": "light",
+    "viewport": {
+      "width": 1100,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1100,
+      "clientHeight": 900,
+      "scrollWidth": 1100,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1090,
+      "height": 841
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\n\n[ERROR] Service is temporarily unavailable. Please retry.\n\nSearch\nAll\nSuccessful\nFailed\nAny date\nAfter\nBefore\nOn date\n\nNo clinical sessions found.\n\nSelect a session to begin."
+  },
+  {
+    "image": "data-inspection-1100.png",
+    "route": "/data",
+    "theme": "light",
+    "viewport": {
+      "width": 1100,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1100,
+      "clientHeight": 900,
+      "scrollWidth": 1100,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1090,
+      "height": 841
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\n\nVIEWS\n\nDrug Catalog\nLiverTox\nDILIrank\nRAG\n\nMAINTENANCE\n\nUpdate all\nUpdate Catalog\nDRUG\tLAST UPDATE\t\nNo RxNav rows found.\n\n[ERROR] Service is temporarily unavailable. Please r"
+  },
+  {
+    "image": "patient-timeline-1100.png",
+    "route": "/sessions/42/timetable",
+    "theme": "light",
+    "viewport": {
+      "width": 1100,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1100,
+      "clientHeight": 900,
+      "scrollWidth": 1100,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1090,
+      "height": 1182.078125
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\n\nClinical sessions\n\nSESSION 42\n\nPatient timeline\n\nReview clinically relevant events in date order, with source evidence and timing confidence.\n\nRegenerate\nTIMELINE PROVENANCE\n"
+  },
+  {
+    "image": "settings-general-1100.png",
+    "route": "/settings/general",
+    "theme": "light",
+    "viewport": {
+      "width": 1100,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1100,
+      "clientHeight": 900,
+      "scrollWidth": 1100,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1090,
+      "height": 526.328125
+    },
+    "settingsContent": {
+      "x": 294,
+      "y": 83,
+      "width": 772,
+      "height": 339.296875
+    },
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\nAPPLICATION\nSettings\n\nRuntime controls backed by the application settings configuration.\n\nGeneral\nApplication runtime behavior\nModels\nProviders, roles, reasoning, and RAG\nData"
+  },
+  {
+    "image": "settings-models-1100.png",
+    "route": "/settings/models",
+    "theme": "light",
+    "viewport": {
+      "width": 1100,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1100,
+      "clientHeight": 900,
+      "scrollWidth": 1100,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1090,
+      "height": 1768.546875
+    },
+    "settingsContent": {
+      "x": 294,
+      "y": 83,
+      "width": 772,
+      "height": 1720.546875
+    },
+    "notificationToast": {
+      "x": 320,
+      "y": 835.5,
+      "width": 460,
+      "height": 44.5
+    },
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\n1\nHelp\nAPPLICATION\nSettings\n\nRuntime controls backed by the application settings configuration.\n\nGeneral\nApplication runtime behavior\nModels\nProviders, roles, reasoning, and RAG\nDa"
+  },
+  {
+    "image": "settings-data-1100.png",
+    "route": "/settings/data",
+    "theme": "light",
+    "viewport": {
+      "width": 1100,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1100,
+      "clientHeight": 900,
+      "scrollWidth": 1100,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1090,
+      "height": 607.890625
+    },
+    "settingsContent": {
+      "x": 294,
+      "y": 83,
+      "width": 772,
+      "height": 559.890625
+    },
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\nAPPLICATION\nSettings\n\nRuntime controls backed by the application settings configuration.\n\nGeneral\nApplication runtime behavior\nModels\nProviders, roles, reasoning, and RAG\nData"
+  },
+  {
+    "image": "settings-integrations-1100.png",
+    "route": "/settings/integrations",
+    "theme": "light",
+    "viewport": {
+      "width": 1100,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1100,
+      "clientHeight": 900,
+      "scrollWidth": 1100,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1090,
+      "height": 577.890625
+    },
+    "settingsContent": {
+      "x": 294,
+      "y": 83,
+      "width": 772,
+      "height": 529.890625
+    },
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\nAPPLICATION\nSettings\n\nRuntime controls backed by the application settings configuration.\n\nGeneral\nApplication runtime behavior\nModels\nProviders, roles, reasoning, and RAG\nData"
+  },
+  {
+    "image": "settings-advanced-1100.png",
+    "route": "/settings/advanced",
+    "theme": "light",
+    "viewport": {
+      "width": 1100,
+      "height": 900
+    },
+    "document": {
+      "clientWidth": 1100,
+      "clientHeight": 900,
+      "scrollWidth": 1100,
+      "scrollHeight": 900
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 900
+    },
+    "pageFrame": {
+      "x": 0,
+      "y": 59,
+      "width": 1090,
+      "height": 959.078125
+    },
+    "settingsContent": {
+      "x": 294,
+      "y": 83,
+      "width": 772,
+      "height": 911.078125
+    },
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\nAPPLICATION\nSettings\n\nRuntime controls backed by the application settings configuration.\n\nGeneral\nApplication runtime behavior\nModels\nProviders, roles, reasoning, and RAG\nData"
+  },
+  {
+    "image": "data-inspection-1920.png",
+    "route": "/data",
+    "theme": "light",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "document": {
+      "clientWidth": 1920,
+      "clientHeight": 1080,
+      "scrollWidth": 1920,
+      "scrollHeight": 1080
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080
+    },
+    "pageFrame": {
+      "x": 187,
+      "y": 59,
+      "width": 1536,
+      "height": 1021
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\n\nVIEWS\n\nDrug Catalog\nLiverTox\nDILIrank\nRAG\n\nMAINTENANCE\n\nUpdate all\nUpdate Catalog\nDRUG\tLAST UPDATE\t\nNo RxNav rows found.\n\n[ERROR] Service is temporarily unavailable. Please r"
+  },
+  {
+    "image": "patient-timeline-1920.png",
+    "route": "/sessions/42/timetable",
+    "theme": "light",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "document": {
+      "clientWidth": 1920,
+      "clientHeight": 1080,
+      "scrollWidth": 1920,
+      "scrollHeight": 1080
+    },
+    "header": {
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 59
+    },
+    "shellContent": {
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080
+    },
+    "pageFrame": {
+      "x": 187,
+      "y": 59,
+      "width": 1536,
+      "height": 1120.078125
+    },
+    "settingsContent": null,
+    "notificationToast": null,
+    "notice": "none",
+    "visibleText": "DILIGENT Clinical Copilot\nDILI Agent\nClinical Sessions\nData Inspection\nSettings\nHelp\n\nClinical sessions\n\nSESSION 42\n\nPatient timeline\n\nReview clinically relevant events in date order, with source evidence and timing confidence.\n\nRegenerate\nTIMELINE PROVENANCE\n"
+  }
+]

@@ -13,6 +13,7 @@
           [routerLink]="item.path"
           routerLinkActive="is-active"
           [routerLinkActiveOptions]="{ exact: true }"
+          [ariaCurrentWhenActive]="'page'"
         >
           <span>{{ item.label }}</span>
           <small>{{ item.description }}</small>

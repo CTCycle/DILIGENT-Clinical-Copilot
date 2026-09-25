@@ -66,7 +66,7 @@
         <div class="operational-settings-buttons">
           <button
             type="button"
-            class="settings-secondary-button"
+            class="btn btn-secondary settings-secondary-button"
             (click)="resetToDefaults()"
             [disabled]="isSaving() || isResetting()"
           >
@@ -74,7 +74,7 @@
           </button>
           <button
             type="button"
-            class="settings-secondary-button"
+            class="btn btn-secondary settings-secondary-button"
             (click)="discardChanges()"
             [disabled]="!isDirty() || isSaving() || isResetting()"
           >
@@ -82,7 +82,7 @@
           </button>
           <button
             type="submit"
-            class="settings-primary-button"
+            class="btn btn-primary settings-primary-button"
             [disabled]="!canSave()"
           >
             {{ isSaving() ? 'Saving...' : 'Save changes' }}

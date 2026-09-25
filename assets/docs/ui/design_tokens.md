@@ -1,5 +1,5 @@
 # Design Tokens
-Last updated: 2026-08-02
+Last updated: 2026-09-25
 
 ## Scope
 Frontend styling guidance applies to `app/client/src`.
@@ -28,6 +28,11 @@ Frontend styling guidance applies to `app/client/src`.
   - `--control-height-sm: 36px`
   - `--control-height-md: 40px`
   - `--control-height-lg: 44px`
+- Shared desktop layout:
+  - `--app-top-nav-height: 59px`
+  - `--app-min-viewport-width: 1100px`
+  - `--container-max: 1536px`
+- Route pages use the shared `.page-container` frame, with `--space-2xl` gutters and the existing maximum width. Page-local wrappers should not add a second outer gutter or width constraint.
 
 ## Color System
 - Theme model:
