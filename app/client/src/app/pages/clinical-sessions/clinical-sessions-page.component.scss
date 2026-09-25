@@ -26,11 +26,9 @@
   height: calc(100dvh - var(--app-top-nav-height));
   max-height: calc(100dvh - var(--app-top-nav-height));
   min-height: 0;
-  padding-top: var(--space-xl);
-  padding-bottom: var(--space-xl);
+  padding: var(--space-2xl);
   background: var(--app-background);
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow-x: clip;
 }
 
 .clinical-session-link-field {

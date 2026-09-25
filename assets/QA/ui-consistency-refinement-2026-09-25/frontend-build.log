@@ -1,0 +1,13 @@
+
+> diligent-client@3.4.0 build
+> ng build --no-progress
+
+Initial chunk files | Names         |  Raw size | Estimated transfer size
+main-OVW4U3RS.js    | main          | 838.83 kB |               172.93 kB
+styles-J62KVZI2.css | styles        | 115.92 kB |                15.83 kB
+
+                    | Initial total | 954.75 kB |               188.76 kB
+
+Application bundle generation complete. [29.297 seconds] - 2026-09-25T07:45:18.421Z
+
+Output location: G:\Projects\Repositories\Active projects\DILIGENT Clinical Copilot\app\client\dist

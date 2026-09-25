@@ -1,4 +1,4 @@
-<main class="timetable-page">
+<main class="page-container timetable-page">
   <p class="sr-only" aria-live="polite">{{ selectionAnnouncement() }}</p>
   <section class="timetable-shell">
     <header class="timetable-header">
@@ -9,7 +9,6 @@
         <p class="page-intro">Review clinically relevant events in date order, with source evidence and timing confidence.</p>
       </div>
       <div class="timetable-actions">
-        <button type="button" class="btn-secondary" routerLink="/clinical-sessions">Back</button>
         <button type="button" class="btn-primary" (click)="regenerate()" [disabled]="loading()">
           {{ loading() ? 'Generating…' : 'Regenerate' }}
         </button>

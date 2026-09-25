@@ -13,29 +13,23 @@
   --mc-brand: var(--color-brand);
   --mc-brand-2: var(--color-brand-light);
   --mc-brand-soft: var(--color-brand-bg);
-  --mc-shadow: 0 20px 54px -44px rgba(12, 84, 62, 0.65);
+  --mc-shadow: var(--shadow-sm);
 }
 
-:host ::ng-deep .model-config-page {
-  gap: 16px;
+.model-config-page {
+  gap: var(--space-lg);
   color: var(--mc-text);
-  overflow-x: clip;
-  max-width: none;
-  margin-inline: 0;
   background: var(--app-background);
 }
 
-:host ::ng-deep .model-config-page h1,
-:host ::ng-deep .model-config-page h2,
-:host ::ng-deep .model-config-page h3,
-:host ::ng-deep .model-config-page p {
+.model-config-page :is(h1, h2, h3, p) {
   letter-spacing: 0;
 }
 
 .model-config-preview-a-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 344px;
-  gap: 16px;
+  gap: var(--space-lg);
   align-items: stretch;
   width: 100%;
   margin-inline: 0;
@@ -44,14 +38,14 @@
 .model-config-workspace {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-xl);
   min-width: 0;
 }
 
 .model-config-control-rail {
   display: grid;
   grid-template-columns: minmax(0, 1.32fr) repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: var(--space-md);
   align-items: stretch;
 }
 
@@ -65,7 +59,7 @@
 .model-config-summary-panel {
   min-width: 0;
   border: 1px solid var(--mc-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--mc-surface) 94%, transparent);
   box-shadow: var(--mc-shadow);
 }
@@ -73,17 +67,17 @@
 .model-config-runtime-card {
   display: grid;
   grid-template-rows: auto 1fr;
-  padding: 10px 12px;
+  padding: var(--space-md);
   min-height: 158px;
 }
 
 .model-config-rag-settings-card {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  gap: 12px;
+  gap: var(--space-md);
   min-width: 0;
   min-height: 128px;
-  padding: 10px 14px 14px;
+  padding: var(--space-md) var(--space-lg);
   border: 1px solid var(--mc-border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--mc-surface) 94%, transparent);
@@ -94,17 +88,17 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-md);
   min-height: 28px;
 }
 
 .model-config-rag-settings-card-body {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--space-md);
   align-items: start;
   color: var(--mc-muted);
-  font-size: 12px;
+  font-size: var(--font-sm);
   line-height: 1.35;
 }
 
@@ -129,7 +123,7 @@
   width: 34px;
   height: 34px;
   border: 1px solid var(--mc-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--mc-surface-soft);
   color: var(--mc-text);
   cursor: pointer;
@@ -162,7 +156,7 @@
 .model-config-summary-panel h2 {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
 }
 
 .model-config-section-kicker h2,
@@ -174,7 +168,7 @@
   margin: 0;
   color: var(--mc-text);
   font-family: "Manrope", "Inter", sans-serif;
-  font-size: 14px;
+  font-size: var(--font-base);
   font-weight: 760;
   line-height: 1.2;
 }

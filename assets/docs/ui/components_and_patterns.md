@@ -1,7 +1,9 @@
 # Components And Patterns
-Last updated: 2026-08-20
+Last updated: 2026-09-25
 
 ## Page Layout Patterns
+- Primary route pages render inside the shared `.page-container` frame under the root shell. Keep the 59px navigation header and shared content origin stable; route components should not add duplicate outer gutters or independent page-width limits.
+- Assign bounded internal scrolling only to intentional workspaces such as session lists, dense inspection views, and long timeline content. Avoid full-viewport sizing on a page that already sits below the fixed header.
 - DILI page uses a desktop split grid through `.stitch-dili-grid` with a persistent sidebar.
 - Model configuration uses a desktop multi-column layout through `.model-config-layout`.
 - Clinical Sessions uses a list-detail workspace with AI preview, session editing, metadata summaries, revision actions, and timeline actions.
