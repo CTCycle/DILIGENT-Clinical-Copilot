@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-09-16
+Last updated: 2026-09-26
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -61,10 +61,22 @@ are non-cacheable so model selectors and their Retry actions always observe the
 latest saved configuration and provider-catalog state.
 
 ## Access Key Routes
-- `GET /api/access-keys?provider={openai|gemini|deepseek|anthropic|opencode|brave}`
+- `GET /api/access-keys`
 - `POST /api/access-keys`
 - `PUT /api/access-keys/{key_id}/activate`
 - `DELETE /api/access-keys/{key_id}`
+
+`GET /api/access-keys` accepts the optional `provider` query parameter with
+one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
+
+## Runtime Settings Routes
+- `GET /api/settings`
+- `PATCH /api/settings`
+- `POST /api/settings/reset/{category}`
+
+## Desktop Runtime Routes
+- `POST /api/desktop/bootstrap`
+- `POST /api/desktop/shutdown`
 
 ## Inspection Routes
 - `GET /api/inspection/jobs`
@@ -122,6 +134,7 @@ latest saved configuration and provider-catalog state.
 - `GET /api/inspection/rag/update-config`
 - `GET /api/inspection/rag/documents`
 - `GET /api/inspection/rag/vector-store`
+- `GET /api/inspection/rag/browse`
 - `POST /api/inspection/rag/jobs`
 - `GET /api/inspection/rag/jobs/{job_id}`
 - `DELETE /api/inspection/rag/jobs/{job_id}`
