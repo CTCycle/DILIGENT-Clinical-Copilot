@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Output, inject } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Output, QueryList, ViewChildren, inject } from '@angular/core';
 
 import { AppStateService, PageId } from '../../core/state/app-state.service';
 import { NotificationCenterComponent } from '../notification-center/notification-center.component';
@@ -15,6 +15,8 @@ export class NavSidebarComponent {
   @Output() helpRequested = new EventEmitter<void>();
 
   readonly stateService = inject(AppStateService);
+
+  @ViewChildren('navTab') private readonly navTabs!: QueryList<ElementRef<HTMLButtonElement>>;
 
   readonly navItems: Array<{ pageId: PageId; label: string }> = [
     { pageId: 'dili-agent', label: 'DILI Agent' },
@@ -62,6 +64,7 @@ export class NavSidebarComponent {
     }
     event.preventDefault();
     this.onNavigate(this.navItems[nextIndex].pageId);
+    queueMicrotask(() => this.navTabs.get(nextIndex)?.nativeElement.focus());
   }
 
   toggleTheme(): void {
