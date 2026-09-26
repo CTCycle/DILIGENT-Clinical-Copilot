@@ -1,5 +1,5 @@
 # Pre-release validation ledger
-Last updated: 2026-09-25
+Last updated: 2026-09-26
 
 ## Scope and interpretation
 
@@ -725,6 +725,56 @@ embedding/persisted-session lanes remain incomplete.
 
 No application code change was needed. The task-owned pytest workspace was
 removed after validation; pre-existing protected cache residue was preserved.
+
+## Clinical/API resilience and blocker revalidation — 2026-09-26
+
+This slice revisited the locally actionable clinical/API resilience boundary
+and the incomplete provider, credential, and LiverTox gates. It started from
+clean `develop` HEAD `6083c27d454e6a0ff974453b1c454364c2ef3c12`, equal to
+`origin/develop`, and used a task-owned SQLite database, access-key material
+file, and pytest cache. The backend ran at `127.0.0.1:7690`; shared settings,
+databases, source caches, vectors, and credentials were not mutated.
+
+The focused backend contract, provider-safety, preflight, job, access-key, RAG,
+and workflow suite passed **102 tests** with six existing dependency/framework
+deprecation warnings. The live HTTP model, model-config, clinical, and
+access-key suite passed **15 tests**. Direct probes returned `200` for health,
+settings, model listing, inspection jobs/sessions, and RAG browsing; the empty
+clinical latest-job lookup correctly returned `404`. The live OpenAPI document
+contained **68 API paths**, and the API catalog now matches all 68 paths after
+the documentation correction recorded in
+[the QA report](../../QA/clinical-api-resilience-20260926/report.md).
+
+The selected tests covered provider 401/429/503/530, timeout and network
+classification, bounded retries, sanitized provider details, direct OpenCode
+Go routing, RAG-off and RAG-readiness preflight behavior, clinical job
+terminal/cancellation semantics, report/bibliography safeguards, metadata-only
+access-key CRUD, and structured-source ordering/cancellation/failure
+preservation. The isolated database ended with zero access keys and zero
+clinical sessions after cleanup; `PRAGMA integrity_check` returned `ok` and
+`PRAGMA foreign_key_check` returned no rows.
+
+`VAL-20260926-001` found that `assets/docs/architecture/api_surface.md` was
+stale: five current paths were absent and the access-key provider query was
+embedded incorrectly in the path. The documentation now includes settings,
+desktop bootstrap/shutdown, RAG browsing, and the separate optional provider
+query parameter. No application API or schema change was needed.
+
+The live OpenCode Go prerequisite remained unavailable because
+`OPENCODE_GO_API_KEY` was absent, so no provider request or live clinical result
+was claimed. A read-only NCBI master-list preflight returned HTTP 200 HTML with
+a human-verification/CAPTCHA marker; no source update was started or bypassed.
+Therefore `api.local-boundaries` remains `WORKING` for its selected route scope,
+`clinical.analysis.pipeline` remains `VALIDATED` for its existing exact
+RAG-on scope, `model.provider.opencode-go` and `test.automated-regression`
+remain `PARTIAL`, `auth.access-key-management` remains `BLOCKED`, and
+`data.inspection.catalogs`/`data.sources.refresh` remain `PARTIAL`. The broader
+revision lifecycle, desktop release, and container boundaries remain unchanged.
+
+The exact backend process was stopped, ports `7690` and `9847` were free, and
+the task-owned database, key material, pytest workspace, and temporary runtime
+were removed. Protected pre-existing pytest cache residue was preserved. No
+rendered UI or screen-reader claim is made by this API-focused slice.
 
 ## Feature-state register
 
