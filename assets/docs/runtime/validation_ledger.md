@@ -776,13 +776,58 @@ the task-owned database, key material, pytest workspace, and temporary runtime
 were removed. Protected pre-existing pytest cache residue was preserved. No
 rendered UI or screen-reader claim is made by this API-focused slice.
 
+## UI shell keyboard and responsive validation — 2026-09-26
+
+This slice revisited the `ui.application-shell` validation debt for keyboard
+operation and responsive desktop rendering. It started on `develop` at
+`e3a8fcf07adccecec66ae0cd430a382f568558ac` with the working-tree navigation
+focus fix. No LLM provider request, credential mutation, source refresh, or
+clinical analysis was performed.
+
+The official launcher was attempted first with a task-owned SQLite path. It
+stopped before application startup when the local Angular production build
+exited with `-1073741819` (`0xC0000005`). A listener was observed on source
+port `9847` during fallback, so the current source build used an isolated
+Angular cache and port `9848` while ownership was checked. The listener was
+verified as task-created and stopped during cleanup. The backend then ran
+against an isolated SQLite database on `7690`.
+
+`VAL-20260926-002` found that primary navigation handled Arrow/Home/End
+selection and `tabindex` updates but did not move focus to the newly selected
+tab. The navigation component now focuses the target button in a microtask
+after emitting the route change, and the browser regression asserts both
+selection and focus.
+
+| Check | Result |
+|---|---|
+| Isolated backend startup | Fresh task-owned SQLite migration completed; `/api/health` returned `200`. |
+| Angular/Vitest | `24` files and `105` tests passed. |
+| Production frontend build | Passed with the Angular cache isolated under the QA directory; the normal protected cache path was restored after validation. |
+| Selected browser E2E | `8 passed, 17 deselected`, including keyboard traversal, ArrowRight focus, form focus/labels, Settings routes, legacy redirect, scroll restoration, and Data Inspection navigation. |
+| Browser rendering | Current source rendered at `1280 × 720`, `1100 × 900`, and `1920 × 1080`; all four primary workspace tabs and the exercised controls were present in the AX tree. |
+| Minimum viewport guard | At `1099 × 900`, the accessible `Widen the application window to continue` alert was shown with the documented 1100-pixel requirement. |
+
+The Browser screenshots and AX observations were inspected live. No Narrator or
+Speech Recap observation was performed, so spoken screen-reader output remains
+unvalidated.
+
+| Gate | Final status | Remaining limitation |
+|---|---|---|
+| `ui.application-shell` | `PASS` for the exercised keyboard, rendered-shell, and responsive desktop scope | Spoken screen-reader output and broader component-level accessibility remain open. |
+| `test.automated-regression` | `PARTIAL` | The local frontend suite/build and selected browser slice passed; provider-key-dependent E2E and conditional hosted lanes remain independent. |
+| `runtime.startup.source-launcher` | `PASS` for its previously established source-launcher contract | This run reproduced the host-specific local Angular build failure before launch; isolated-cache build succeeded, so no launcher regression is inferred. |
+
+Provider, credential, NCBI LiverTox, desktop-release, revision-matrix,
+duplicate-file policy, and container-runtime dispositions remain unchanged.
+The exact local Ollama 2B compatibility result was not retried.
+
 ## Feature-state register
 
 | # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
 |---:|---|---|---|---|---|
 | 1 | Standard source launcher against the populated database | Runtime / migration | `PASS` | A task-local clone of the current populated database migrated through `202609170001` via `start_on_windows.ps1 -Action InitializeDatabase`; the same 18 sessions, 38 versions, 17 revision runs, and 54 artifacts remained available. | The shared `app/resources/database.db` was intentionally not advanced; the clone retained `PRAGMA foreign_key_check=[]` and `PRAGMA integrity_check=ok`. |
 | 2 | Fresh SQLite bootstrap and Alembic head | Runtime / migration | `PASS` | Disposable source DB migrated through `202609170001`; `/api/health` returned 200. | Fresh DB evidence is complemented by the populated-clone remediation below. |
-| 3 | Application shell and primary workspace navigation | UI | `PASS` | In-app Browser rendered DILI Agent, Clinical Sessions, Data Inspection, and Settings. | Browser smoke at one desktop viewport; no provider call. |
+| 3 | Application shell and primary workspace navigation | UI | `PASS` | Current source rendered DILI Agent, Clinical Sessions, Data Inspection, and Settings; keyboard-only tab traversal and ArrowRight focus were revalidated. | Spoken screen-reader output remains unvalidated; no provider call. [UI shell report](../../QA/ui-accessibility-validation-20260926/report.md) |
 | 4 | General runtime settings persistence | Settings | `PASS` | Changed polling interval `1 -> 2`, saved, navigated, reloaded, and restored `2 -> 1`; value and persisted timestamp remained visible. | `settings/configurations.json` is back at baseline `1.0`; `.env` remained excluded. |
 | 5 | Settings section surfaces | Settings | `PASS` | General, Models, Data Processing, Integrations, and Advanced routes rendered with source labels and controls. | Surface validation only for sections other than General persistence. |
 | 6 | Local/cloud model configuration and access-key UX | Settings / external | `ATTENTION` | In the isolated QA database, Settings saved the Timeline role as `qwen3.5:2b` and `qwen3.5:9b` in turn; the refreshed Ollama catalog showed both installed, and the configured OpenCode Go route remained `deepseek-v4-flash`. Two 9B timeline runs now show evidence-derived Source labels; both 2B runs fell back as `invalid_response`. Cloud credential lifecycle remains unvalidated. [Timeline source attribution validation](../../QA/timeline-source-attribution-20260923/report.md); [Timeline model matrix](../../QA/timeline-model-matrix-20260923/report.md) |
@@ -804,7 +849,7 @@ rendered UI or screen-reader claim is made by this API-focused slice.
 | 22 | RAG retrieval inside a clinical analysis | RAG / clinical workflow | `NOT TESTED` | No clinical analysis was allowed past preflight. | Requires a completed analysis with persisted citations. |
 | 23 | Bibliography and source provenance in the final report | Reporting | `NOT TESTED` | No final report was generated in the current live run. | Must be rechecked with structured sources and RAG enabled. |
 | 24 | Final conclusion coherence and uncertainty presentation | Reporting | `NOT TESTED` | No final report was generated in the current live run. | Must be reviewed against the rendered report and persisted result. |
-| 25 | Patient timeline generation, rendering, and persistence | Sessions / timeline | PARTIAL | Current exact `qwen3.5:2b` extraction normalized to no evidence-backed events despite populated source fields; `_EmptyTimelineExtractionError` fired, the job persisted a deterministic `invalid_response` fallback with three events at month/day precision, and the same record returned on GET. The prior exact 9B browser control remains historical. [Recovery report](../../QA/timeline-empty-extraction-recovery-20260924/report.md); [repeatability report](../../QA/timeline-local-model-repeatability-20260924/report.md) | This run did not render or reload the timeline page: Codex in-app Browser was 672 px wide against the 1100 px minimum. Grounded 2B output and current UI evidence remain open. |
+| 25 | Patient timeline generation, rendering, and persistence | Sessions / timeline | `PASS` for supported local scope | The 2026-09-25 Browser run rendered exact 2B fail-closed fallback and exact 9B grounded events with source evidence, date precision, provenance, and reload persistence. [Timeline Browser report](../../QA/timeline-browser-validation-20260925/report.md) | Broader providers, clinical cases, and event families remain outside the supported local scope; the exact 2B compatibility limitation is not a pending product gate. |
 | 26 | Agentic revision workflow, trace, artifacts, and persisted version | Revision | `NOT TESTED` | No revision was started in the current live run. | Shared DB contains historical revision rows, but the current app cannot start on it. |
 | 27 | Manual report editing and version/history behavior | Revision / UI | `NOT TESTED` | Not reached in the current live run. | Requires a completed report and persisted version transition. |
 | 28 | Human-review escalation and `requires_human_review` state | Revision / clinical safety | `NOT TESTED` | Not reached in the current live run. | Unit paths exist; rendered and persisted current-run evidence is absent. |
@@ -814,7 +859,7 @@ rendered UI or screen-reader claim is made by this API-focused slice.
 | 32 | Health and inspection API boundaries on a fresh runtime | API | PASS | This isolated run returned 200/202 for health, model config, session listing, timeline job start/poll, and timeline read; OpenAPI contained the expected timeline routes. Read-only SQLite integrity and FK checks passed. [Recovery report](../../QA/timeline-empty-extraction-recovery-20260924/report.md) | Complete API route catalog and error variants remain outside this focused run. |
 | 33 | Browser smoke, visible error handling, and console diagnostics | UI / QA | `PASS` | DILI Agent, Settings, Clinical Sessions, and Data Inspection rendered; browser error/warn diagnostics were empty; blocking dialogs were visible and actionable. | One viewport and smoke coverage; not a full accessibility audit. |
 | 34 | Backend unit and supported model-config gates | Automated QA | PASS | Exact-SHA hosted run `35908957190` remains prior evidence. The current focused timeline/extraction and inspection persistence suite passed 53 tests with one existing deprecation warning; Ruff passed on the touched core files, and the inspection test passed with pre-existing `DTZ001` findings ignored. | This does not replace the full backend suite, hosted CI for this working tree, or live-provider E2E. [Recovery report](../../QA/timeline-empty-extraction-recovery-20260924/report.md) |
-| 35 | Frontend test and production build gates | Automated QA | `ATTENTION` | Exact-SHA hosted Windows run `35908957190` passed Angular/Vitest (`24 files, 105 tests`) and production build. The official local launcher reused fingerprint-current output. | A fresh local production build still terminates with `0xC0000005`; the failure is host-specific and unresolved. |
+| 35 | Frontend test and production build gates | Automated QA | `PASS` | Current source Angular/Vitest passed `24 files, 105 tests`; production build passed with an isolated writable Angular cache; the selected current browser E2E slice passed `8/8`. Exact-SHA hosted Windows run `35908957190` also passed the frontend suite/build. | The default local launcher cache path remains protected on this host and reproduced `0xC0000005` before startup; provider-key and conditional browser lanes remain separate. |
 | 36 | Exact OpenCode Go / DeepSeek end-to-end clinical provider lane | External provider | `NOT TESTED` | No live cloud clinical call was made; disposable DB had no active OpenCode key, and the shared runtime was blocked before provider resolution. | Must be validated without fallback before release. |
 | 37 | Restart and reuse of existing persisted clinical data | Persistence / release | `ATTENTION` | The populated clone reopened through the launcher database-initialization path after migration, preserving 18 sessions, 45 drug mentions, 228 lab observations, 18 results, and SQLite integrity. | The shared source database was intentionally not advanced; rendered populated-session reuse remains untested. |
 | 38 | EXE/MSI packaging, installer, checksum, and publication | Release packaging | `NOT APPLICABLE` | Explicitly outside this source/development audit. | Separate release gate. |

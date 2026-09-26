@@ -11,6 +11,7 @@
         <div class="tab-items" role="tablist" aria-label="Main navigation tabs">
           @for (item of navItems; track item.pageId) {
             <button
+              #navTab
               type="button"
               class="tab-item"
               [class.active]="stateService.state().activePage === item.pageId"
