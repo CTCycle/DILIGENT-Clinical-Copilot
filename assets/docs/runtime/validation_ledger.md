@@ -900,6 +900,60 @@ The root pytest fixture previously hardcoded its embedded database and temp file
 3. Migrated a clone of the source database through `start_on_windows.ps1 -Action InitializeDatabase`; the clone reached `202609170001` with 18 sessions, 38 versions, 17 revision runs, 54 artifacts, `foreign_key_check=[]`, and `integrity_check=ok`.
 4. Confirmed the source database remained at `202609100001` with its original counts and `integrity_check=ok`. The provider and live clinical workflow gates remain untested.
 
+### 2026-09-26, rendered local RAG-off clinical resilience
+
+1. Reviewed the current status ledger and selected the locally actionable
+   clinical resilience boundary: populated-source preflight, a real rendered
+   RAG-off clinical run, terminal report generation, and persisted session
+   selection. The run used synthetic content only and did not require or use a
+   cloud credential.
+2. Attempted the official launcher first with a task-owned fresh database. The
+   Angular production build exited with Windows status `-1073741819`
+   (`0xC0000005`) before application startup. Redirecting only the Angular
+   cache to the task QA directory made the source build pass; the repository
+   configuration was restored before continuing. This is retained as a
+   host-specific startup limitation, not an application regression.
+3. Started a manual source fallback on a disposable clone of the populated
+   database. Ollama catalog refresh discovered exact `qwen3.5:2b` and
+   `qwen3.5:9b` models. The runtime was configured with cloud services disabled
+   and exact local `qwen3.5:9b` parser/clinical roles. The populated preflight
+   returned `ready=true` with `rag_readiness.requested=false`.
+4. In the in-app Browser, submitted job `b7b404c4` from the DILI Agent page.
+   The RAG control was visibly unchecked and disabled during execution, the
+   status advanced through the pipeline, and the job completed at 100% after
+   approximately 921 seconds. The rendered report showed the synthetic patient,
+   mixed pattern/R-score 4.85, one detected Amoxicillin, laboratory values,
+   source text, explicit clinical limitations, and no RAG bibliography.
+5. The completed result recorded `session_id=25`, `use_rag=false`, zero RAG
+   references, no raw retrieved text, `contract_valid=true`, and a faithful
+   audit with no discrepancies. The Browser then showed
+   `Synthetic Resilience Subject — Session 25 · Version 1 — Successful` in
+   Clinical Sessions, and selecting the row rendered the persisted report and
+   evidence tables.
+6. The local model emitted no semantically valid anamnesis enrichment and
+   laboratory LLM extraction also failed; both paths retained or merged
+   deterministic candidates and the clinical job still completed. This is
+   recorded as safe degradation and model-quality limitation, not as a silent
+   provider fallback. The report itself still requires clinical review and
+   carries unresolved competing-cause limitations.
+7. The focused existing backend/persistence slice passed **42 tests** with one
+   skip. No application source defect required an in-scope fix. The task-owned
+   runtime, databases, process logs, and caches were removed after evidence
+   capture; the protected repository caches and shared database were preserved.
+
+| Gate | Final status | Remaining limitation |
+|---|---|---|
+| `clinical.input-preflight` | `PASS` for this slice | Fresh empty data still blocks safely; populated no-RAG preflight is now current. |
+| `clinical.analysis.pipeline` | `PASS` for the supported local RAG-off boundary | Synthetic/local qwen3.5:9b only; cloud-provider, broader RAG, and broader clinical variants remain open. |
+| `model.provider.local-ollama` | `PASS` for the exercised local boundary | Exact 9B provenance is current; slow/degraded extraction and broader model/provider matrices remain bounded limitations. |
+| `sessions.crud-persistence` | `PASS` for creation/list/selection | Deletion, image bytes, and file-picker bridge were not revalidated here. |
+| `test.automated-regression` | `PARTIAL` | Focused local suite passed; live provider and conditional lanes remain incomplete. |
+| `model.provider.opencode-go` | `PARTIAL` | `OPENCODE_GO_API_KEY` remains absent; no new cloud request was made. |
+| `auth.access-key-management` | `BLOCKED` | Approved disposable credential lifecycle is unavailable. |
+| `data.inspection.catalogs` / `data.sources.refresh` | `PARTIAL` | NCBI LiverTox human-verification blocker remains; no refresh was attempted. |
+| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged/hosted/clean-machine/publication gates remain separate. |
+| `runtime.containerized` | `NOT IMPLEMENTED` | No supported container runtime exists. |
+
 ## Evidence register
 
 - `app/server/services/clinical/timeline.py:48,422-430` — populated clinical source with no normalized evidence-backed event now raises non-retryable `invalid_response`.
