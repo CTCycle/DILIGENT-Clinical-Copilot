@@ -286,6 +286,19 @@ def test_keyboard_navigation_reaches_primary_tabs(page: Page, base_url: str):
     )
 
 ###############################################################################
+def test_primary_tab_arrow_navigation_moves_focus_with_selection(
+    page: Page, base_url: str
+):
+    page.goto(base_url)
+
+    page.focus('[role="tab"][aria-selected="true"]')
+    page.keyboard.press("ArrowRight")
+
+    clinical_sessions = page.get_by_role("tab", name="Clinical Sessions")
+    expect(clinical_sessions).to_have_attribute("aria-selected", "true")
+    expect(clinical_sessions).to_be_focused()
+
+###############################################################################
 def test_home_form_labels_are_associated_with_inputs(page: Page, base_url: str):
     page.goto(base_url)
 
