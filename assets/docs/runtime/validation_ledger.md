@@ -1,5 +1,5 @@
 # Pre-release validation ledger
-Last updated: 2026-09-26
+Last updated: 2026-09-27
 
 ## Scope and interpretation
 
@@ -970,3 +970,69 @@ The root pytest fixture previously hardcoded its embedded database and temp file
 - `assets/QA/release-blocker-remediation-20260918.md` — current FK-safe migration remediation evidence.
 
 The in-app Browser captures from this run were inspected inline for DILI Agent, Settings, Clinical Sessions, and Data Inspection/RAG. The browser tool did not expose a disk-export path for those captures, so this ledger records the visual assertions and the reproducible routes rather than inventing screenshot filenames.
+
+## Revision lifecycle and current-tree revalidation — 2026-09-27
+
+1. Reviewed the current status ledger and selected the coherent locally actionable
+   revision slice: current revision-agent/API contracts, persisted accepted and
+   cancelled lineage, reload/reopen behavior, rendered audit state, and adjacent
+   frontend/backend regression coverage. The provider, credential, source-refresh,
+   release, and container blockers were kept separate rather than being inferred
+   as resolved by this slice.
+2. The checked-out `develop` tree was at
+   `f68ab5cfc86c27d9c40329a1b452d5339568aaa8`, equal to `origin/develop` at the
+   start of validation. A copy of the existing synthetic revision database was
+   used under the task QA directory; the shared database, settings, credentials,
+   and provider caches were not mutated.
+3. The current backend/API contracts passed the focused suites: revision-agent
+   and persistence **31 passed**; adjacent context, generation, transport, job,
+   repository, and session-contract tests **71 passed, 1 skipped**; and clinical
+   safety/OpenAPI/revision-route tests **18 passed**. The canonical Angular runner
+   passed **24 files / 105 tests**. Existing warnings were retained as warnings.
+   A first direct Vitest invocation was invalid because it omitted Angular's test
+   environment; its failures were not used as product evidence.
+4. A manual source runtime on the cloned database returned healthy backend status
+   at port `7690`; the OpenAPI catalog exposed `68` paths. SQLite returned
+   `integrity_check=ok` and no foreign-key violations. The official launcher was
+   attempted first and failed closed before process creation because a pre-existing
+   listener occupied UI port `9847` during a noninteractive invocation. An isolated
+   preview on `9848` was used for rendered evidence; no launcher defect is inferred.
+5. Read-only API and SQLite inspection agreed on the persisted records. Accepted
+   version `61` belongs to source session `22` through child session `24`, has
+   `version_status=llm_qa_passed`, `llm_qa_status=passed`, and
+   `clinical_review_status=not_reviewed`. Its completed run
+   `3c2f2186c2d443759ff1ce871dc7f91e` retains exact historical
+   `opencode_go / deepseek-v4-flash` provenance, seven completed steps, and five
+   artifacts including passed quality review. Follow-on version `62` has
+   `source_version_id=61`, no child session, `version_status=cancelled`, and
+   `llm_qa_status=not_run`; run `886026e90e37416b9a9188947b6be9e4` remains
+   cancelled.
+6. At `1280 × 720`, the in-app Browser rendered the Revision surface with the
+   configured model, unchanged-current-report notice, accepted trace, five
+   artifacts, passed quality review, and the separate terminal cancellation state.
+   Reloading and manually reopening the source session retained the accepted
+   trace, artifacts, and review state. No approve/reject action was performed:
+   the persisted version remains subject to an authorized clinical reviewer.
+   These are rendered UI observations, not spoken screen-reader evidence; the
+   Browser exposed no durable screenshot export path.
+
+| Gate | Final status | Evidence boundary and remaining limitation |
+|---|---|---|
+| `revision.agentic-lifecycle` | `PARTIAL` | Current contracts, accepted/cancelled persistence, lineage, reload/reopen, manual-review boundary, and audit rendering are revalidated. Fresh current provider execution, broader model variability, timeout/tool-failure/backend-restart injection, and every lifecycle branch remain incomplete. |
+| `revision.accepted-session-finalization` | `VALIDATED` for the exact synthetic accepted path | Version `61` remains QA-clean, linked to child session `24`, and reloadable without replacing the source. Broader provider coverage remains separate. |
+| `api.local-boundaries` | `WORKING` for the exercised revision route scope | Revision version/run/step/artifact/review reads and the 68-path catalog passed; all response/error variants and mutating route groups remain outside this slice. |
+| `test.automated-regression` | `PARTIAL` | Focused current-tree backend, API, and frontend suites passed. Live-provider and conditional hosted/browser lanes remain incomplete. |
+| `model.provider.opencode-go` | `PARTIAL` | Exact historical provider identity is preserved and visible; no current provider request can be claimed while `OPENCODE_GO_API_KEY` is absent. |
+| `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available; no credential material was entered or mutated. |
+| `data.sources.refresh` | `PARTIAL` | The NCBI LiverTox human-verification blocker remains independent; no refresh was attempted. |
+| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged artifact, hosted packaging, clean-machine, and publication gates were not part of this source-mode slice. |
+| `ui.application-shell` | `VALIDATED` for previously stated scope | The revision surface rendered without a regression at the tested desktop viewport; spoken screen-reader output remains unvalidated. |
+
+No application source defect was found in this slice, so no product-code fix was
+required. The task-owned backend, preview, cloned database, logs, and pytest
+workspace were removed after evidence capture; the shared database and protected
+repository residue were preserved. The next actionable revision work requires an
+approved provider secret or an explicitly configured working local Ollama service,
+followed by one fresh non-dry accepted or fail-closed run plus retry/recovery
+coverage. Do not approve the persisted revision without an authorized clinical
+reviewer.
