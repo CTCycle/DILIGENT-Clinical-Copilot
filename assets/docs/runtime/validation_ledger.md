@@ -1022,7 +1022,7 @@ The in-app Browser captures from this run were inspected inline for DILI Agent, 
 | `revision.accepted-session-finalization` | `VALIDATED` for the exact synthetic accepted path | Version `61` remains QA-clean, linked to child session `24`, and reloadable without replacing the source. Broader provider coverage remains separate. |
 | `api.local-boundaries` | `WORKING` for the exercised revision route scope | Revision version/run/step/artifact/review reads and the 68-path catalog passed; all response/error variants and mutating route groups remain outside this slice. |
 | `test.automated-regression` | `PARTIAL` | Focused current-tree backend, API, and frontend suites passed. Live-provider and conditional hosted/browser lanes remain incomplete. |
-| `model.provider.opencode-go` | `PARTIAL` | Exact historical provider identity is preserved and visible; no current provider request can be claimed while `OPENCODE_GO_API_KEY` is absent. |
+| `model.provider.opencode-go` | `PARTIAL` | Exact historical provider identity is preserved and visible; this local run made no current provider request because the key was not injected into the local process. A hosted or explicitly injected live-provider run is still required. |
 | `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available; no credential material was entered or mutated. |
 | `data.sources.refresh` | `PARTIAL` | The NCBI LiverTox human-verification blocker remains independent; no refresh was attempted. |
 | `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged artifact, hosted packaging, clean-machine, and publication gates were not part of this source-mode slice. |

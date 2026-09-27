@@ -5,7 +5,7 @@
 - Repository: `develop`, source revision `f68ab5cfc86c27d9c40329a1b452d5339568aaa8`, equal to `origin/develop` at validation start.
 - Scope: current-tree revision-agent contracts, revision API/OpenAPI boundaries, persisted accepted and cancelled revision lineage, reload/reopen behavior, rendered Revision audit UI, and adjacent focused regression coverage.
 - Data: a copy of the existing synthetic revision database was used at task-local runtime scope. The shared `app/resources/database.db`, settings, credentials, and provider caches were not mutated.
-- Provider boundary: no new cloud or local LLM request was made. The persisted accepted run exposes the exact historical route `opencode_go / deepseek-v4-flash`; its current live prerequisite `OPENCODE_GO_API_KEY` remains absent. The installed Ollama client was not substituted for that route and no Ollama service was available for a fresh revision run.
+- Provider boundary: no new cloud or local LLM request was made. The persisted accepted run exposes the exact historical route `opencode_go / deepseek-v4-flash`. The local validation process did not receive `OPENCODE_GO_API_KEY`; repository/GitHub secret availability was not independently inspected, and a repository secret is not automatically injected into a local PowerShell or manually launched runtime. The installed Ollama client was not substituted for that route and no Ollama service was available for a fresh revision run.
 - The official launcher was attempted first. It stopped safely before process creation because a pre-existing listener occupied source UI port `9847` and the invocation was noninteractive, so it could not request termination. The isolated manual source fallback used backend port `7690` and preview port `9848`; no launcher defect is inferred.
 
 ## Current implementation checks
@@ -52,7 +52,7 @@ These observations are rendered UI evidence, not a claim of spoken screen-reader
 | `revision.accepted-session-finalization` | `VALIDATED` for the exact synthetic accepted path | Version `61` remains QA-clean, linked to child session `24`, and reloadable without replacing the source. Broader provider coverage remains under `model.provider.opencode-go`. |
 | `api.local-boundaries` | `WORKING` for the exercised revision route scope | Revision version/run/step/artifact/review reads and the 68-path OpenAPI catalog passed; all response/error variants and mutating route groups remain outside this slice. |
 | `test.automated-regression` | `PARTIAL` | The focused current-tree backend/frontend/API suites passed. Live-provider and conditional hosted/browser lanes remain separate. |
-| `model.provider.opencode-go` | `PARTIAL` | Exact historical provider identity is preserved and visible; no current provider request can be claimed while `OPENCODE_GO_API_KEY` is absent. |
+| `model.provider.opencode-go` | `PARTIAL` | Exact historical provider identity is preserved and visible; this local run made no current provider request because the key was not injected into the local process. A hosted or explicitly injected live-provider run is still required. |
 | `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available; no credential material was entered or mutated. |
 | `data.sources.refresh` | `PARTIAL` | NCBI LiverTox human-verification remains an independent upstream blocker; no refresh was attempted. |
 | `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged artifact, hosted packaging, clean-machine, and publication gates were not part of this source-mode slice. |
@@ -60,4 +60,4 @@ These observations are rendered UI evidence, not a claim of spoken screen-reader
 
 ## Cleanup and next action
 
-The task-owned backend, preview, cloned database, logs, and pytest workspace were stopped or removed after evidence capture. The next actionable revision slice requires either an approved provider secret for a fresh non-dry run or a working local Ollama service configured explicitly for the Revision role; then cover one fresh accepted or fail-closed run plus retry/recovery behavior. Do not approve the persisted revision without an authorized clinical reviewer.
+The task-owned backend, preview, cloned database, logs, and pytest workspace were stopped or removed after evidence capture. The next actionable revision slice is a fresh non-dry run using the approved repository secret through its hosted workflow or an explicitly injected local process, followed by retry/recovery coverage; a working local Ollama service configured explicitly for the Revision role is the alternative. Do not approve the persisted revision without an authorized clinical reviewer.
