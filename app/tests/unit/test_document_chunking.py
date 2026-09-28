@@ -64,6 +64,46 @@ def test_document_serializer_lists_all_files_but_ingests_only_supported_formats(
     ]
 
 ###############################################################################
+def test_document_serializer_returns_no_documents_for_empty_or_unsupported_folders(
+    tmp_path: Path,
+) -> None:
+    empty_serializer = DocumentSerializer(tmp_path / "empty")
+    (tmp_path / "empty").mkdir()
+
+    assert empty_serializer.collect_file_paths() == []
+    assert empty_serializer.collect_document_paths() == []
+    assert empty_serializer.load_documents() == []
+
+    unsupported_path = tmp_path / "unsupported" / "legacy.doc"
+    unsupported_path.parent.mkdir()
+    unsupported_path.write_bytes(b"legacy binary Word document")
+    (unsupported_path.parent / "image.png").write_bytes(b"not a document")
+    unsupported_serializer = DocumentSerializer(unsupported_path.parent)
+
+    assert set(unsupported_serializer.collect_file_paths()) == {
+        str(unsupported_path),
+        str(unsupported_path.parent / "image.png"),
+    }
+    assert unsupported_serializer.collect_document_paths() == []
+    assert unsupported_serializer.load_documents() == []
+
+###############################################################################
+def test_document_serializer_ignores_empty_and_malformed_supported_files(
+    tmp_path: Path,
+) -> None:
+    empty_text = tmp_path / "empty.txt"
+    empty_text.write_text("", encoding="utf-8")
+    malformed_docx = tmp_path / "malformed.docx"
+    malformed_docx.write_bytes(b"not a zip archive")
+    serializer = DocumentSerializer(tmp_path)
+
+    assert set(serializer.collect_document_paths()) == {
+        str(empty_text),
+        str(malformed_docx),
+    }
+    assert serializer.load_documents() == []
+
+###############################################################################
 def test_duplicate_content_keeps_distinct_relative_document_ids(tmp_path: Path) -> None:
     first_path = tmp_path / "first" / "guide.txt"
     second_path = tmp_path / "second" / "guide.txt"
