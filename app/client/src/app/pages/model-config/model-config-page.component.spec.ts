@@ -198,6 +198,8 @@ describe('ModelConfigPageComponent', () => {
       .mockResolvedValue();
 
     const draftWithRuntimeOnlyDevice = {
+      allow_local_filesystem_access: true,
+      vector_collection_name: 'documents',
       chunk_size: 1024,
       chunk_overlap: 128,
       embedding_batch_size: 64,
@@ -208,6 +210,8 @@ describe('ModelConfigPageComponent', () => {
       reranker_model: 'lightweight-balanced-v1',
       hybrid_vector_weight: 0.65,
       hybrid_text_weight: 0.35,
+      vector_index_metric: 'cosine',
+      vector_index_type: 'IVF_FLAT',
       vector_stream_batch_size: 250,
       embedding_offline_mode: false,
       embedding_device: 'cuda',
@@ -220,6 +224,8 @@ describe('ModelConfigPageComponent', () => {
     expect(persistSpy).toHaveBeenCalledWith(
       {
         rag_settings: {
+          allow_local_filesystem_access: true,
+          vector_collection_name: 'documents',
           chunk_size: 1024,
           chunk_overlap: 128,
           embedding_batch_size: 64,
@@ -230,6 +236,8 @@ describe('ModelConfigPageComponent', () => {
           reranker_model: 'lightweight-balanced-v1',
           hybrid_vector_weight: 0.65,
           hybrid_text_weight: 0.35,
+          vector_index_metric: 'cosine',
+          vector_index_type: 'IVF_FLAT',
           vector_stream_batch_size: 250,
           embedding_offline_mode: false,
         },

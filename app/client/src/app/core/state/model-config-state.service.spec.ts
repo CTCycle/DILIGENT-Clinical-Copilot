@@ -19,6 +19,8 @@ function modelConfigPayload(): ModelConfigStateResponse {
     reasoning_level: 'medium',
     ollama_seed: 42,
     rag_settings: {
+      allow_local_filesystem_access: true,
+      vector_collection_name: 'documents',
       chunk_size: 1024,
       chunk_overlap: 128,
       embedding_batch_size: 64,
@@ -29,6 +31,8 @@ function modelConfigPayload(): ModelConfigStateResponse {
       reranker_model: 'balanced',
       hybrid_vector_weight: 0.7,
       hybrid_text_weight: 0.3,
+      vector_index_metric: 'cosine',
+      vector_index_type: 'IVF_FLAT',
       vector_stream_batch_size: 250,
       embedding_offline_mode: false,
     },

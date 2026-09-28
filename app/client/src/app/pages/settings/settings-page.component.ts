@@ -14,6 +14,7 @@ export class SettingsPageComponent {
     { path: '/settings/models', label: 'Models', description: 'Providers, roles, reasoning, and RAG' },
     { path: '/settings/data', label: 'Data Processing', description: 'Drug-name ingestion limits' },
     { path: '/settings/integrations', label: 'Integrations', description: 'LiverTox and RxNav runtime controls' },
+    { path: '/settings/matching', label: 'Drug Matching', description: 'Confidence, cache, and spelling controls' },
     { path: '/settings/advanced', label: 'Advanced', description: 'Runtime timeouts and limits' },
   ] as const;
 }

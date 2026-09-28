@@ -69,23 +69,29 @@ class ModelCatalogOperationResponse(BaseModel):
 ###############################################################################
 class RagSettingsUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    chunk_size: int | None = None
-    chunk_overlap: int | None = None
-    embedding_batch_size: int | None = None
+    allow_local_filesystem_access: bool | None = None
+    vector_collection_name: str | None = Field(default=None, min_length=1, max_length=255)
+    chunk_size: int | None = Field(default=None, ge=1, le=100000)
+    chunk_overlap: int | None = Field(default=None, ge=0, le=100000)
+    embedding_batch_size: int | None = Field(default=None, ge=1, le=4096)
     use_hybrid_search: bool | None = None
     use_reranking: bool | None = None
-    retrieval_candidate_count: int | None = None
-    retrieval_selected_count: int | None = None
-    reranker_model: str | None = None
-    hybrid_vector_weight: float | None = None
-    hybrid_text_weight: float | None = None
-    vector_stream_batch_size: int | None = None
+    retrieval_candidate_count: int | None = Field(default=None, ge=1, le=10000)
+    retrieval_selected_count: int | None = Field(default=None, ge=1, le=10000)
+    reranker_model: str | None = Field(default=None, min_length=1, max_length=255)
+    hybrid_vector_weight: float | None = Field(default=None, ge=0.0, le=1.0)
+    hybrid_text_weight: float | None = Field(default=None, ge=0.0, le=1.0)
+    vector_index_metric: str | None = Field(default=None, min_length=1, max_length=32)
+    vector_index_type: str | None = Field(default=None, min_length=1, max_length=64)
+    vector_stream_batch_size: int | None = Field(default=None, ge=1, le=100000)
     embedding_offline_mode: bool | None = None
 
 ###############################################################################
 class RagSettingsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    allow_local_filesystem_access: bool
+    vector_collection_name: str
     chunk_size: int
     chunk_overlap: int
     embedding_batch_size: int
@@ -96,6 +102,8 @@ class RagSettingsResponse(BaseModel):
     reranker_model: str
     hybrid_vector_weight: float
     hybrid_text_weight: float
+    vector_index_metric: str
+    vector_index_type: str
     vector_stream_batch_size: int
     embedding_offline_mode: bool
 

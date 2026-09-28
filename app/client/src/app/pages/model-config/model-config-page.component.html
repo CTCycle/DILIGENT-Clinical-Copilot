@@ -671,6 +671,42 @@
         <section class="model-config-rag-settings-section">
           <h3>Index & Storage</h3>
           <div class="model-config-rag-setting-row">
+            <label for="rag-collection-name">
+              Vector collection name
+              <small>Database collection used for the canonical document index</small>
+            </label>
+            <input id="rag-collection-name" type="text" [ngModel]="draftRagSettings().vector_collection_name" (ngModelChange)="setDraftRagText('vector_collection_name', $event)" />
+          </div>
+          <div class="model-config-rag-setting-row">
+            <label for="rag-index-metric">
+              Index metric
+              <small>Similarity metric used by the vector index</small>
+            </label>
+            <select id="rag-index-metric" [ngModel]="draftRagSettings().vector_index_metric" (ngModelChange)="setDraftRagText('vector_index_metric', $event)">
+              @for (option of ragIndexMetricOptions; track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="model-config-rag-setting-row">
+            <label for="rag-index-type">
+              Index type
+              <small>Vector index structure used for retrieval</small>
+            </label>
+            <select id="rag-index-type" [ngModel]="draftRagSettings().vector_index_type" (ngModelChange)="setDraftRagText('vector_index_type', $event)">
+              @for (option of ragIndexTypeOptions; track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="model-config-rag-setting-row">
+            <label for="rag-local-filesystem">
+              Allow local filesystem access
+              <small>Permit retrieval workflows to read approved local source files</small>
+            </label>
+            <input id="rag-local-filesystem" type="checkbox" class="model-config-rag-checkbox" [ngModel]="draftRagSettings().allow_local_filesystem_access" (ngModelChange)="setDraftRagBoolean('allow_local_filesystem_access', $event)" />
+          </div>
+          <div class="model-config-rag-setting-row">
             <label for="rag-stream-batch">
               Vector stream batch
               <small>Records streamed per vector write batch</small>

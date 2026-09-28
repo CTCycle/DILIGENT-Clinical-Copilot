@@ -93,10 +93,14 @@ class DrugsParser(DrugLlmExtractionMixin, DrugRulesMixin):
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = get_server_settings().runtime.parser_llm_timeout,
+        timeout_s: float | None = None,
     ) -> None:
         self.temperature = float(temperature)
-        self.timeout_s = float(timeout_s)
+        self.timeout_s = float(
+            get_server_settings().runtime.parser_llm_timeout
+            if timeout_s is None
+            else timeout_s
+        )
         self.client: Any | None = client
         self.model: str = ""
         self.client_lock = asyncio.Lock()

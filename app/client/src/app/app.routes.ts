@@ -43,6 +43,12 @@ export const routes: Routes = [
         title: 'Integration Settings | DILIGENT',
       },
       {
+        path: 'matching',
+        component: OperationalSettingsPageComponent,
+        data: { settingsSection: 'matching' },
+        title: 'Drug Matching Settings | DILIGENT',
+      },
+      {
         path: 'advanced',
         component: OperationalSettingsPageComponent,
         data: { settingsSection: 'advanced' },

@@ -7,7 +7,7 @@
     </div>
     <div class="operational-settings-source" title="Authoritative runtime settings source">
       <span>Source</span>
-      <code>settings/configurations.json</code>
+      <code>Database / Settings UI</code>
     </div>
   </header>
 
@@ -26,20 +26,52 @@
             <span class="operational-setting-copy">
               <strong>{{ field.label }}</strong>
               <span>{{ field.help }}</span>
-              <code>{{ field.jsonPath }}</code>
+              <small>{{ field.scope }}</small>
             </span>
             <span class="operational-setting-control">
-              <input
-                type="number"
-                [attr.min]="field.min"
-                [attr.max]="field.max"
-                [attr.step]="field.step"
-                [ngModel]="fieldValue(field)"
-                (ngModelChange)="updateField(field, $event)"
-                [name]="field.key"
-                [disabled]="isSaving() || isResetting()"
-                [attr.aria-label]="field.label"
-              />
+              @if (field.kind === 'number') {
+                <input
+                  type="number"
+                  [attr.min]="field.min"
+                  [attr.max]="field.max"
+                  [attr.step]="field.step"
+                  [ngModel]="fieldValue(field)"
+                  (ngModelChange)="updateField(field, $event)"
+                  [name]="field.key"
+                  [disabled]="isSaving() || isResetting()"
+                  [attr.aria-label]="field.label"
+                />
+              } @else if (field.kind === 'boolean') {
+                <input
+                  type="checkbox"
+                  [ngModel]="fieldValue(field)"
+                  (ngModelChange)="updateField(field, $event)"
+                  [name]="field.key"
+                  [disabled]="isSaving() || isResetting()"
+                  [attr.aria-label]="field.label"
+                />
+              } @else if (field.kind === 'select') {
+                <select
+                  [ngModel]="fieldValue(field)"
+                  (ngModelChange)="updateField(field, $event)"
+                  [name]="field.key"
+                  [disabled]="isSaving() || isResetting()"
+                  [attr.aria-label]="field.label"
+                >
+                  @for (option of field.options || []; track option.value) {
+                    <option [value]="option.value">{{ option.label }}</option>
+                  }
+                </select>
+              } @else {
+                <input
+                  type="text"
+                  [ngModel]="fieldValue(field)"
+                  (ngModelChange)="updateField(field, $event)"
+                  [name]="field.key"
+                  [disabled]="isSaving() || isResetting()"
+                  [attr.aria-label]="field.label"
+                />
+              }
               @if (field.unit) {
                 <span>{{ field.unit }}</span>
               }

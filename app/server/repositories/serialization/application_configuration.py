@@ -36,11 +36,16 @@ class ApplicationConfigurationSerializer:
 
     # -------------------------------------------------------------------------
     def load(self) -> dict[str, Any] | None:
+        payload, _ = self.load_with_metadata()
+        return payload
+
+    # -------------------------------------------------------------------------
+    def load_with_metadata(self) -> tuple[dict[str, Any] | None, Any]:
         with self.session_factory() as db_session:
             row = db_session.get(ApplicationConfiguration, 1)
             if row is None:
-                return None
-            return dict(row.payload)
+                return None, None
+            return dict(row.payload), row.updated_at
 
     # -------------------------------------------------------------------------
     @overload

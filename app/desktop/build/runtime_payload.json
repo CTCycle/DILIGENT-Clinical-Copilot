@@ -13,8 +13,7 @@
     { "source": "resources/catalogs/local_models.json", "destination": "resources/catalogs/local_models.json", "required": true },
     { "source": "resources/catalogs/security_text_filters.json", "destination": "resources/catalogs/security_text_filters.json", "required": true },
     { "source": "resources/catalogs/text_normalization.json", "destination": "resources/catalogs/text_normalization.json", "required": true },
-    { "source": "settings/.env.example", "destination": "settings/.env.example", "required": true },
-    { "source": "settings/configurations.json", "destination": "settings/configurations.json", "required": true }
+    { "source": "settings/.env.example", "destination": "settings/.env.example", "required": true }
   ],
   "forbidden_extensions": [".env", ".db", ".log", ".pyc", ".pyo", ".h", ".hpp", ".lib", ".pyx", ".pxd", ".pyi", ".c", ".cpp", ".map"],
   "forbidden_directories": [".git", ".github", "assets", "node_modules", ".venv", "runtimes", "release", "target", "__pycache__", ".pytest_cache", ".angular"]
