@@ -4,7 +4,7 @@
 
 - Repository: `develop`, source revision `f68ab5cfc86c27d9c40329a1b452d5339568aaa8`, equal to `origin/develop` at validation start.
 - Scope: current-tree revision-agent contracts, revision API/OpenAPI boundaries, persisted accepted and cancelled revision lineage, reload/reopen behavior, rendered Revision audit UI, and adjacent focused regression coverage.
-- Data: a copy of the existing synthetic revision database was used at task-local runtime scope. The shared `app/resources/database.db`, settings, credentials, and provider caches were not mutated.
+- Data: a copy of the existing synthetic revision database was used at task-local runtime scope. The shared `resources/database.db`, settings, credentials, and provider caches were not mutated.
 - Provider boundary: no new cloud or local LLM request was made. The persisted accepted run exposes the exact historical route `opencode_go / deepseek-v4-flash`. The local validation process did not receive `OPENCODE_GO_API_KEY`; repository/GitHub secret availability was not independently inspected, and a repository secret is not automatically injected into a local PowerShell or manually launched runtime. The installed Ollama client was not substituted for that route and no Ollama service was available for a fresh revision run.
 - The official launcher was attempted first. It stopped safely before process creation because a pre-existing listener occupied source UI port `9847` and the invocation was noninteractive, so it could not request termination. The isolated manual source fallback used backend port `7690` and preview port `9848`; no launcher defect is inferred.
 

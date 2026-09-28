@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-09-18
+Last updated: 2026-09-28
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
@@ -50,7 +50,7 @@ The Tauri shell sets these desktop-only variables when it starts the frozen back
 
 ## Source-mode Resource Location
 
-- `DILIGENT_RESOURCES_PATH=app/resources`
+- `DILIGENT_RESOURCES_PATH=resources`
 
 This optional path relocates the source-mode resource tree. Relative paths are
 resolved from the repository root. The embedded SQLite database defaults to
@@ -67,7 +67,7 @@ precedence. Packaged desktop mode uses `DILIGENT_RUNTIME_ROOT` and
   - RAG and ingestion settings
   - external timeout and concurrency settings
   - excludes all database mode and connection settings
-- `app/resources/catalogs/*.json`
+- `resources/catalogs/*.json`
   - canonical deterministic reference catalogs for text normalization, extraction, matching, DILI behavior, language, security filters, generation policy, and model capabilities
 
 ## LLM Time Budgets

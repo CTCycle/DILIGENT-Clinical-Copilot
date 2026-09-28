@@ -32,7 +32,7 @@ FORBIDDEN_PARTS = {
 }
 REQUIRED_FILES = {
     "app/client/dist/browser/index.html",
-    "app/resources/catalogs/llm_model_capabilities.json",
+    "resources/catalogs/llm_model_capabilities.json",
     "backend/DILIGENTBackend.exe",
 }
 

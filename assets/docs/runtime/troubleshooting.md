@@ -1,5 +1,5 @@
 # Runtime Troubleshooting
-Last updated: 2026-09-22
+Last updated: 2026-09-28
 
 ## Scope
 This file covers recurring local startup and launch failures.
@@ -171,10 +171,10 @@ app/server/.venv/Scripts/python.exe -m uvicorn app:app --app-dir app --host 127.
 sqlite3.OperationalError: disk I/O error
 ```
 
-This can occur on startup while loading `reference_catalog_entries`, or during direct `sqlite3` reads against `app/resources/database.db`.
+This can occur on startup while loading `reference_catalog_entries`, or during direct `sqlite3` reads against `resources/database.db`.
 
 ### Cause
-A stale `app/resources/database.db-journal` can remain after an interrupted write or failed process shutdown. If direct reads fail on `database.db` but a copied database file opens successfully, the live file and journal state are the likely cause.
+A stale `resources/database.db-journal` can remain after an interrupted write or failed process shutdown. If direct reads fail on `database.db` but a copied database file opens successfully, the live file and journal state are the likely cause.
 
 ### Fix
 1. Confirm no backend process is using the embedded database:
@@ -187,11 +187,11 @@ Get-NetTCPConnection -LocalPort 7690 -ErrorAction SilentlyContinue
 2. Validate whether the database copy is readable before replacing anything:
 
 ```powershell
-Copy-Item -LiteralPath app/resources/database.db -Destination assets/QA/database-recovery-check.db -Force
+Copy-Item -LiteralPath resources/database.db -Destination assets/QA/database-recovery-check.db -Force
 app/server/.venv/Scripts/python.exe -c "import sqlite3; c=sqlite3.connect('assets/QA/database-recovery-check.db'); print(c.execute('select count(*) from sqlite_master').fetchone()[0]); c.close()"
 ```
 
-3. If a reset is acceptable, remove `app/resources/database.db` and `app/resources/database.db-journal`, then let startup recreate the embedded SQLite database or restore a known-readable copy.
+3. If a reset is acceptable, remove `resources/database.db` and `resources/database.db-journal`, then let startup recreate the embedded SQLite database or restore a known-readable copy.
 
 4. Restart the backend and verify health:
 

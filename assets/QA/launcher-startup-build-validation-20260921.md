@@ -92,7 +92,7 @@ source-mode marker.
 - Final ordinary source launch returned `/api/health` HTTP `200` with
   `{"status":"ok"}`.
 - Final frontend root returned HTTP `200` with `text/html; charset=utf-8`.
-- Existing `app/resources/database.db` remained intact: 74,063,872 bytes,
+- Existing `resources/database.db` remained intact: 74,063,872 bytes,
   SQLite `pragma integrity_check=ok`, and 18 persisted `clinical_sessions`.
 - Fresh/disposable SQLite migration and seeding paths passed in the required
   unit suite, including `test_sqlite_startup_initializes_and_seeds_when_database_file_is_missing`

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import unicodedata
-from pathlib import Path
 from typing import Any
+
+from common.paths import CATALOGS_PATH
 
 ###############################################################################
 class SeedTermCatalog(tuple):
@@ -36,12 +37,7 @@ def _normalize(text: str) -> str:
 
 ###############################################################################
 def load_seed_term_catalog() -> SeedTermCatalog:
-    path = (
-        Path(__file__).resolve().parents[3]
-        / "resources"
-        / "catalogs"
-        / "text_normalization.json"
-    )
+    path = CATALOGS_PATH / "text_normalization.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     entries = payload.get("entries", [])
     keywords: set[str] = set()

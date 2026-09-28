@@ -1,5 +1,5 @@
 # QA Regression
-Last updated: 2026-08-20
+Last updated: 2026-09-28
 
 ## Scope
 This file captures the repeatable regression slice for model configuration and app-flow validation.
@@ -52,7 +52,7 @@ Regression scripts set a per-run temporary database path through:
 
 - `DILIGENT_SQLITE_PATH=app\tests\cache\pytest\<per-run database>`
 
-This avoids accidental writes to a shared `app/resources/database.db` and prevents readonly-state failures during concurrent or constrained runs.
+This avoids accidental writes to a shared `resources/database.db` and prevents readonly-state failures during concurrent or constrained runs.
 
 ## Local-first Test Execution
 - If `pytest` and `pytest-playwright` are installed in `app/server/.venv`, the scripts run `python -m pytest` directly.
