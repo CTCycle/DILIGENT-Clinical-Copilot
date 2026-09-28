@@ -1083,6 +1083,90 @@ def test_revision_provider_failure_persists_sanitized_retry_metadata(
     assert planner_step["error"]["retryable"] is True
 
 ###############################################################################
+def test_missing_revision_worker_is_recoverable_and_retry_preserves_source(
+    tmp_path: Path,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    source_version = serializer.session_revision_repository.get_version_record_for_session(
+        session_id
+    )
+    assert source_version is not None
+
+    pipeline_run_id = "orphaned-revision-run"
+    job_id = "orphaned-revision-job"
+    configuration = {
+        "job_id": job_id,
+        "pipeline_run_id": pipeline_run_id,
+        "model_provider": "ollama",
+        "model_name": "qwen3.5:9b",
+        "metadata": {"origin": "recovery-test"},
+    }
+    shell = serializer.session_revision_repository.create_revision_version_shell(
+        session_id,
+        reviewer_note="Recover an interrupted revision.",
+        configuration=configuration,
+        pipeline_run_id=pipeline_run_id,
+        source_version_id=int(source_version["version_id"]),
+    )
+    assert shell is not None
+    serializer.session_revision_repository.create_or_update_revision_run(
+        pipeline_run_id=pipeline_run_id,
+        session_id=session_id,
+        root_session_id=int(source_version["root_session_id"]),
+        source_version_id=int(source_version["version_id"]),
+        target_revision_version_id=int(shell["revision_version_id"]),
+        revision_mode="agentic_revision",
+        revision_kind="llm_assisted_revision",
+        configuration=configuration,
+        reviewer_note="Recover an interrupted revision.",
+        status="running",
+        initiated_by="revision_agent",
+        actor_source="system",
+        actor_confidence="system",
+    )
+
+    service = build_service(serializer, JobManager())
+    missing_worker = service.get_revision_job_status(job_id)
+
+    assert missing_worker is not None
+    assert missing_worker["status"] == "failed"
+    assert missing_worker["result"] == {
+        "recoverable": True,
+        "pipeline_run_id": pipeline_run_id,
+        "revision_version_id": shell["revision_version_id"],
+    }
+    assert "worker is no longer available" in missing_worker["error"]
+    failed_run = service.get_revision_run(pipeline_run_id)
+    assert failed_run is not None
+    assert failed_run["status"] == "failed"
+    assert failed_run["error"] == {
+        "message": "Revision job worker is no longer available. Reload the persisted revision run and retry if needed."
+    }
+
+    source_before_retry = service.get_session_detail(session_id)
+    assert source_before_retry is not None
+    service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=fake_mismatched_patch_call,
+    )
+    retry_started = service.retry_revision_job(pipeline_run_id)
+    for _ in range(50):
+        retry_status = service.get_revision_job_status(retry_started["job_id"])
+        if retry_status and retry_status["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision retry did not complete")
+
+    assert retry_status is not None
+    assert retry_status["result"]["revision_status"] == "llm_qa_passed"
+    assert retry_status["result"]["pipeline_run_id"] != pipeline_run_id
+    source_after_retry = service.get_session_detail(session_id)
+    assert source_after_retry is not None
+    assert source_after_retry["report"] == source_before_retry["report"]
+
+###############################################################################
 def test_cancelled_revision_finalizes_version_and_steps(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
