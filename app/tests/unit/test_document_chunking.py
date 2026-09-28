@@ -7,6 +7,7 @@ from domain.documents import Document
 from repositories.serialization.document_chunker import DocumentChunker
 from repositories.serialization.document_serializer import DocumentSerializer
 
+
 ###############################################################################
 def test_textual_document_metadata_uses_heading_title_fallback(tmp_path: Path) -> None:
     file_path = tmp_path / "study.txt"
@@ -34,6 +35,48 @@ def test_document_serializer_accepts_path_objects_and_collects_relative_ids(tmp_
     expected_relative = Path("nested") / "study.txt"
     expected_id = hashlib.sha256(str(expected_relative).encode("utf-8")).hexdigest()
     assert serializer.compute_document_id(file_path) == expected_id
+
+###############################################################################
+def test_document_serializer_lists_all_files_but_ingests_only_supported_formats(
+    tmp_path: Path,
+) -> None:
+    nested_dir = tmp_path / "nested"
+    nested_dir.mkdir()
+    supported_path = nested_dir / "study.TXT"
+    supported_path.write_text("TITLE\n\nBody text.", encoding="utf-8")
+    legacy_word_path = nested_dir / "legacy.doc"
+    legacy_word_path.write_bytes(b"legacy binary Word document")
+    ignored_path = nested_dir / "image.png"
+    ignored_path.write_bytes(b"not a document")
+    serializer = DocumentSerializer(tmp_path)
+
+    assert set(serializer.collect_file_paths()) == {
+        str(supported_path),
+        str(legacy_word_path),
+        str(ignored_path),
+    }
+    assert serializer.collect_document_paths() == [str(supported_path)]
+    assert serializer.build_listing_metadata(legacy_word_path)[
+        "supported_for_ingestion"
+    ] is False
+    assert [document.metadata["file_name"] for document in serializer.load_documents()] == [
+        "study.TXT"
+    ]
+
+###############################################################################
+def test_duplicate_content_keeps_distinct_relative_document_ids(tmp_path: Path) -> None:
+    first_path = tmp_path / "first" / "guide.txt"
+    second_path = tmp_path / "second" / "guide.txt"
+    first_path.parent.mkdir()
+    second_path.parent.mkdir()
+    first_path.write_text("Identical source content.", encoding="utf-8")
+    second_path.write_text("Identical source content.", encoding="utf-8")
+    serializer = DocumentSerializer(tmp_path)
+    collected_paths = serializer.collect_document_paths()
+
+    assert len(collected_paths) == 2
+    assert {Path(path).name for path in collected_paths} == {"guide.txt"}
+    assert len({serializer.compute_document_id(path) for path in collected_paths}) == 2
 
 ###############################################################################
 def test_structure_aware_chunking_preserves_heading_metadata() -> None:
