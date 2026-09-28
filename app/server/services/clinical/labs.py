@@ -90,11 +90,13 @@ class ClinicalLabExtractor:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = get_server_settings().runtime.parser_llm_timeout,
+        timeout_s: float | None = None,
     ) -> None:
         runtime_settings = get_server_settings().runtime
         self.temperature = float(temperature)
-        self.timeout_s = float(timeout_s)
+        self.timeout_s = float(
+            runtime_settings.parser_llm_timeout if timeout_s is None else timeout_s
+        )
         self.minimum_timeout_floor_s = float(
             getattr(runtime_settings, "minimum_llm_timeout", 1.0)
         )

@@ -42,7 +42,9 @@ class HepatoxConsultation:
             timeout_s = get_server_settings().runtime.clinical_llm_timeout
         self.timeout_s = timeout_s
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
-        runtime_settings = get_server_settings().runtime
+        settings = get_server_settings()
+        runtime_settings = settings.runtime
+        pipeline_settings = settings.session_pipeline
         self.MAX_EXCERPT_LENGTH = runtime_settings.max_excerpt_length
         self.patient_name = (patient_name or "").strip() or None
         provider, model_candidate = LLMRuntimeConfig.resolve_provider_and_model(
@@ -61,13 +63,25 @@ class HepatoxConsultation:
         default_parallel_analyses = 3 if provider == "ollama" else 1
         self.max_parallel_analyses = max(
             1,
-            int(
-                getattr(
-                    runtime_settings,
-                    "clinical_llm_max_concurrency",
-                    default_parallel_analyses,
-                )
+            min(
+                int(
+                    getattr(
+                        runtime_settings,
+                        "clinical_llm_max_concurrency",
+                        default_parallel_analyses,
+                    )
+                ),
+                int(pipeline_settings.clinical_assessment_max_concurrency),
             ),
+        )
+        self.retrieval_batch_size = max(
+            int(pipeline_settings.retrieval_batch_size), 1
+        )
+        self.retrieval_max_concurrency = max(
+            int(pipeline_settings.retrieval_max_concurrency), 1
+        )
+        self.clinical_assessment_batch_size = max(
+            int(pipeline_settings.clinical_assessment_batch_size), 1
         )
         default_retry_attempts = 1
         configured_retry_attempts = int(
@@ -108,6 +122,9 @@ class HepatoxConsultation:
             pipeline_issues=self.pipeline_issues,
             resolve_livertox_data_for_entry=resolve_livertox_data_for_entry,
             emit_progress=emit_progress,
+            retrieval_batch_size=self.retrieval_batch_size,
+            retrieval_max_concurrency=self.retrieval_max_concurrency,
+            clinical_assessment_batch_size=self.clinical_assessment_batch_size,
         )
 
     # -------------------------------------------------------------------------

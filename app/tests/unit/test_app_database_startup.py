@@ -14,6 +14,11 @@ def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ign
     monkeypatch.setattr(server_app_module, "get_server_settings", lambda: settings)
     monkeypatch.setattr(
         server_app_module,
+        "reload_persisted_settings",
+        lambda: events.append("configuration") or settings,
+    )
+    monkeypatch.setattr(
+        server_app_module,
         "ensure_database_ready",
         lambda _database: events.append("database"),
     )
@@ -24,13 +29,21 @@ def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ign
     )
     monkeypatch.setattr(
         server_app_module,
+        "get_job_manager",
+        lambda: SimpleNamespace(
+            begin_startup=lambda: events.append("jobs"),
+            shutdown=lambda timeout: events.append("close"),
+        ),
+    )
+    monkeypatch.setattr(
+        server_app_module,
         "run_startup_validations",
         lambda _settings: events.append("validation"),
     )
     monkeypatch.setattr(
         server_app_module,
         "close_embedding_runtime",
-        lambda: events.append("close"),
+        lambda: None,
     )
 
     async def exercise() -> None:
@@ -44,6 +57,8 @@ def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ign
 def test_application_startup_synchronizes_sqlite_before_validation(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     assert _run_lifespan("sqlite", monkeypatch) == [
         "database",
+        "configuration",
+        "jobs",
         "provider",
         "validation",
         "running",
@@ -56,6 +71,8 @@ def test_application_startup_synchronizes_postgresql_before_validation(
 ) -> None:  # type: ignore[no-untyped-def]
     assert _run_lifespan("postgresql", monkeypatch) == [
         "database",
+        "configuration",
+        "jobs",
         "provider",
         "validation",
         "running",

@@ -5,7 +5,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from domain.settings.configuration import DatabaseSettings
+from domain.settings.configuration import DEFAULT_RAG_SETTINGS, DatabaseSettings
 from repositories.database.initializer import initialize_sqlite_database
 from repositories.database.sqlite import SQLiteRepository
 from repositories.schemas.base import Base
@@ -126,3 +126,82 @@ def test_sqlite_repository_exposes_orm_session_factory(
 
     assert len(loaded) == 1
     assert loaded[0].payload["clinical_model"] == "llama3.1:8b"
+
+###############################################################################
+def test_sqlite_initializer_seeds_complete_application_configuration(
+    monkeypatch, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    database_path = tmp_path / "complete-config.db"
+    monkeypatch.setattr(
+        "repositories.database.sqlite.DATABASE_FILE_PATH",
+        database_path,
+    )
+
+    initialize_sqlite_database(_build_settings(), seed_catalogs=False)
+    repository = SQLiteRepository(_build_settings())
+    try:
+        with repository.session_factory() as db_session:
+            configuration = db_session.get(ApplicationConfiguration, 1)
+            assert configuration is not None
+            payload = dict(configuration.payload)
+    finally:
+        repository.engine.dispose()
+
+    assert {
+        "jobs",
+        "rag_settings",
+        "runtime",
+        "ingestion",
+        "session_pipeline",
+        "clinical_language_detection",
+        "drugs_matcher",
+    }.issubset(payload)
+    assert set(payload["rag_settings"]) == set(DEFAULT_RAG_SETTINGS)
+    assert "rag" not in payload
+
+###############################################################################
+def test_existing_model_configuration_receives_missing_defaults_without_replacement(
+    monkeypatch, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    database_path = tmp_path / "merge-config.db"
+    monkeypatch.setattr(
+        "repositories.database.sqlite.DATABASE_FILE_PATH",
+        database_path,
+    )
+    settings = _build_settings()
+    initialize_sqlite_database(settings, seed_catalogs=False)
+
+    repository = SQLiteRepository(settings)
+    with repository.session_factory() as db_session:
+        configuration = db_session.get(ApplicationConfiguration, 1)
+        assert configuration is not None
+        configuration.payload = {
+            "clinical_model": "custom-clinical",
+            "text_extraction_model": "custom-parser",
+            "revision_model": "custom-revision",
+            "timeline_model": "custom-timeline",
+            "use_cloud_models": True,
+            "cloud_provider": "openai",
+            "cloud_model": "custom-cloud",
+        }
+        db_session.add(configuration)
+        db_session.commit()
+    repository.engine.dispose()
+
+    initialize_sqlite_database(settings, seed_catalogs=False)
+    repository = SQLiteRepository(settings)
+    try:
+        with repository.session_factory() as db_session:
+            configuration = db_session.get(ApplicationConfiguration, 1)
+            assert configuration is not None
+            payload = dict(configuration.payload)
+    finally:
+        repository.engine.dispose()
+
+    assert payload["clinical_model"] == "custom-clinical"
+    assert payload["text_extraction_model"] == "custom-parser"
+    assert payload["revision_model"] == "custom-revision"
+    assert payload["timeline_model"] == "custom-timeline"
+    assert payload["use_cloud_models"] is True
+    assert payload["rag_settings"] == DEFAULT_RAG_SETTINGS
+    assert payload["runtime"]["cloud_llm_timeout_cap"] == 1800.0

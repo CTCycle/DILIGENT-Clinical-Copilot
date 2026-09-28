@@ -126,6 +126,15 @@ class SessionPipelineSettings(BaseModel):
     clinical_assessment_max_concurrency: int
 
 ###############################################################################
+class ClinicalLanguageDetectionSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    min_best_score: float
+    high_confidence_min_score: float
+    high_confidence_min_margin: float
+    moderate_confidence_min_score: float
+    moderate_confidence_min_margin: float
+
+###############################################################################
 class ServerSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     fastapi: FastAPISettings
@@ -136,4 +145,25 @@ class ServerSettings(BaseModel):
     runtime: RuntimeSettings
     ingestion: IngestionSettings
     session_pipeline: SessionPipelineSettings
+    clinical_language_detection: ClinicalLanguageDetectionSettings
     llm_defaults: LLMRuntimeDefaults
+
+
+DEFAULT_RAG_SETTINGS = {
+    "allow_local_filesystem_access": True,
+    "vector_collection_name": "documents",
+    "chunk_size": 512,
+    "chunk_overlap": 64,
+    "embedding_batch_size": 64,
+    "use_hybrid_search": True,
+    "use_reranking": True,
+    "retrieval_candidate_count": 40,
+    "retrieval_selected_count": 6,
+    "reranker_model": "lightweight-balanced-v1",
+    "hybrid_vector_weight": 0.65,
+    "hybrid_text_weight": 0.35,
+    "vector_index_metric": "cosine",
+    "vector_index_type": "IVF_FLAT",
+    "vector_stream_batch_size": 1024,
+    "embedding_offline_mode": False,
+}

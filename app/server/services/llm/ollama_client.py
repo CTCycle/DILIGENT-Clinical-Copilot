@@ -54,11 +54,17 @@ class OllamaClient:
     def __init__(
         self,
         base_url: str | None = None,
-        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
+        timeout_s: float | None = None,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
         default_model: str | None = None,
     ) -> None:
+        runtime_settings = get_server_settings()
+        timeout_s = (
+            runtime_settings.runtime.default_llm_timeout
+            if timeout_s is None
+            else timeout_s
+        )
         self.base_url = (
             base_url or get_server_settings().llm_defaults.ollama_host_default
         ).rstrip("/")
@@ -497,8 +503,8 @@ class OllamaClient:
     async def start_server(
         self,
         *,
-        wait_timeout_s: float = get_server_settings().runtime.ollama_server_start_timeout,
-        poll_interval_s: float = get_server_settings().jobs.polling_interval,
+        wait_timeout_s: float | None = None,
+        poll_interval_s: float | None = None,
     ) -> Literal["started", "already_running"]:
         return await ollama_chat.start_server(
             self, wait_timeout_s=wait_timeout_s, poll_interval_s=poll_interval_s

@@ -214,7 +214,9 @@ sequenceDiagram
 
 ## Architectural Constraints
 - `/api` is the stable frontend-backend boundary and maps to frontend `API_BASE_URL="/api"`.
-- Runtime settings come from `settings/.env` and `settings/configurations.json`.
+- Environment-only settings come from `settings/.env`; operator-editable
+  runtime settings come from the database `application_configuration` singleton
+  and are managed through the Settings UI/API.
 - Database connection and database-mode values are sourced from `settings/.env`.
 - Runtime settings are accessed through `get_server_settings()`.
 - Runtime and security helpers use canonical service modules.

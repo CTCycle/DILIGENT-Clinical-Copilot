@@ -7,6 +7,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from domain.model_configs import ModelConfigSnapshot, ReasoningLevel
+from domain.settings.configuration import DEFAULT_RAG_SETTINGS
 from repositories.database.session import resolve_engine, resolve_session_factory
 from repositories.schemas.configuration import ApplicationConfiguration
 from repositories.serialization.application_configuration import (
@@ -27,20 +28,7 @@ class ModelConfigSerializer:
     )
 
     RAG_OPERATIONAL_FIELDS = frozenset(
-        {
-            "chunk_size",
-            "chunk_overlap",
-            "embedding_batch_size",
-            "use_hybrid_search",
-            "use_reranking",
-            "retrieval_candidate_count",
-            "retrieval_selected_count",
-            "reranker_model",
-            "hybrid_vector_weight",
-            "hybrid_text_weight",
-            "vector_stream_batch_size",
-            "embedding_offline_mode",
-        }
+        DEFAULT_RAG_SETTINGS
     )
     DEFAULT_REASONING_LEVEL = ReasoningLevel.OFF
     DEFAULT_OLLAMA_SEED = 42
@@ -93,6 +81,66 @@ class ModelConfigSerializer:
             normalized_payload.get("rag_settings")
         )
         return self.application_configuration.save_if_missing(normalized_payload)
+
+    # -------------------------------------------------------------------------
+    def ensure_defaults(self, payload: dict[str, object]) -> bool:
+        """Fill missing singleton defaults while preserving saved selections."""
+        self._require_required_roles(payload)
+        defaults = dict(payload)
+        defaults["reasoning_level"] = self.reasoning_level_from_payload(
+            defaults
+        ).value
+        defaults["ollama_seed"] = self.normalize_optional_seed(
+            defaults.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
+        )
+        defaults["rag_settings"] = self.normalize_rag_settings(
+            defaults.get("rag_settings")
+        )
+
+        current, _ = self.application_configuration.load_with_metadata()
+        if current is None:
+            return self.application_configuration.save_if_missing(defaults)
+
+        merged = dict(defaults)
+        merged.update(current)
+        for block_name in (
+            "jobs",
+            "runtime",
+            "ingestion",
+            "session_pipeline",
+            "clinical_language_detection",
+            "drugs_matcher",
+        ):
+            default_block = defaults.get(block_name)
+            current_block = current.get(block_name)
+            if isinstance(default_block, dict):
+                merged[block_name] = {
+                    **default_block,
+                    **(
+                        current_block
+                        if isinstance(current_block, dict)
+                        else {}
+                    ),
+                }
+
+        merged["rag_settings"] = {
+            **self.normalize_rag_settings(defaults.get("rag_settings")),
+            **self.normalize_rag_settings(current.get("rag_settings")),
+        }
+        for field_name in self.REQUIRED_ROLE_FIELDS:
+            if self.normalize_optional_text(current.get(field_name)) is None:
+                merged[field_name] = defaults[field_name]
+        merged["reasoning_level"] = self.reasoning_level_from_payload(
+            current
+        ).value
+        merged["ollama_seed"] = self.normalize_optional_seed(
+            current.get("ollama_seed", defaults["ollama_seed"])
+        )
+        merged.pop("rag", None)
+        if merged == current:
+            return False
+        self.application_configuration.save(merged)
+        return True
 
     # -------------------------------------------------------------------------
     def save_snapshot(
@@ -204,7 +252,10 @@ class ModelConfigSerializer:
     @classmethod
     def normalize_rag_settings(cls, value: object) -> dict[str, object]:
         source = value if isinstance(value, dict) else {}
-        return {key: source[key] for key in cls.RAG_OPERATIONAL_FIELDS if key in source}
+        return {
+            key: source.get(key, default)
+            for key, default in DEFAULT_RAG_SETTINGS.items()
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod

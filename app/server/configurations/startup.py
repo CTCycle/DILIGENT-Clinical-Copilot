@@ -4,7 +4,6 @@ from functools import lru_cache
 from threading import RLock
 from typing import Any
 
-from common import paths
 from common.utils.logger import configure_logging
 from configurations.environment import ensure_environment_loaded
 from configurations.management import ConfigurationManager
@@ -24,25 +23,23 @@ def _runtime_state() -> _ConfigurationRuntimeState:
     return _ConfigurationRuntimeState()
 
 ###############################################################################
-def _build_settings_manager(config_path: str | None = None) -> ConfigurationManager:
+def _build_settings_manager(
+    persisted_payload: dict[str, Any] | None = None,
+) -> ConfigurationManager:
     ensure_environment_loaded()
-    return ConfigurationManager(config_path=config_path)
+    return ConfigurationManager(persisted_payload=persisted_payload)
 
 ###############################################################################
-def get_configuration_manager(config_path: str | None = None) -> ConfigurationManager:
-    if config_path:
-        return _build_settings_manager(config_path=config_path)
-
+def get_configuration_manager() -> ConfigurationManager:
     state = _runtime_state()
-    default_path = paths.CONFIGURATIONS_FILE
     with state.lock:
-        if state.manager is None or state.manager.config_path != default_path:
-            state.manager = _build_settings_manager(config_path=str(default_path))
+        if state.manager is None:
+            state.manager = _build_settings_manager()
         return state.manager
 
 ###############################################################################
-def get_server_settings(config_path: str | None = None) -> ServerSettings:
-    manager = get_configuration_manager(config_path=config_path)
+def get_server_settings() -> ServerSettings:
+    manager = get_configuration_manager()
     return manager.server_settings
 
 ###############################################################################
@@ -54,10 +51,16 @@ def get_configuration_value(block_name: str, key: str, default: Any = None) -> A
     return get_configuration_manager().get_value(block_name, key, default)
 
 ###############################################################################
-def reload_settings_for_tests(config_path: str | None = None) -> ServerSettings:
-    if config_path is None:
-        reset_app_settings_cache()
-    return get_server_settings(config_path=config_path)
+def reload_persisted_settings() -> ServerSettings:
+    manager = get_configuration_manager()
+    return manager.reload_from_database()
+
+###############################################################################
+def reload_settings_for_tests(
+    persisted_payload: dict[str, Any] | None = None,
+) -> ServerSettings:
+    reset_app_settings_cache()
+    return _build_settings_manager(persisted_payload=persisted_payload).server_settings
 
 ###############################################################################
 def reset_app_settings_cache() -> None:
@@ -72,13 +75,13 @@ def initialize_settings() -> None:
 
 
 __all__ = [
-    "paths",
     "ensure_environment_loaded",
     "get_configuration_manager",
     "get_configuration_block",
     "get_configuration_value",
     "get_server_settings",
     "initialize_settings",
+    "reload_persisted_settings",
     "reload_settings_for_tests",
     "reset_app_settings_cache",
 ]

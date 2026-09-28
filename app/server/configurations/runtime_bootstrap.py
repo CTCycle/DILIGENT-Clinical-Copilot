@@ -74,10 +74,6 @@ def ensure_runtime_data_layout() -> None:
         layout.settings_template_root / ".env.example",
         layout.settings_root / ".env",
     )
-    copy_initial_file_if_missing(
-        layout.settings_template_root / "configurations.json",
-        layout.settings_root / "configurations.json",
-    )
     create_mutable_resource_directories()
 
 

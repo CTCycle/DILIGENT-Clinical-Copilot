@@ -19,12 +19,13 @@ describe('SettingsPageComponent', () => {
     const links = Array.from(
       fixture.nativeElement.querySelectorAll('.settings-navigation-link') as NodeListOf<HTMLAnchorElement>,
     );
-    expect(links).toHaveLength(5);
+    expect(links).toHaveLength(6);
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       expect.stringContaining('General'),
       expect.stringContaining('Models'),
       expect.stringContaining('Data Processing'),
       expect.stringContaining('Integrations'),
+      expect.stringContaining('Drug Matching'),
       expect.stringContaining('Advanced'),
     ]);
     expect(fixture.nativeElement.textContent).toContain('.env');

@@ -20,7 +20,8 @@ operation and sanitized upstream detail when available.
 ## Primary Runtime Files
 - Active env file: `settings/.env`
 - Env template: `settings/.env.example`
-- Structured operational settings: `settings/configurations.json`
+- Database-backed operational settings: the singleton `application_configuration`
+  row, edited through the Settings UI and typed `/api/settings` endpoints
 
 ## Desktop-only environment variables
 
@@ -62,19 +63,24 @@ precedence. Packaged desktop mode uses `DILIGENT_RUNTIME_ROOT` and
 - `settings/.env`
   - database mode and connection settings
   - local host and port values
-- `settings/configurations.json`
+  - resource paths, Ollama endpoints, deployment values, and secrets
+- `application_configuration` database singleton
   - job polling interval
-  - RAG and ingestion settings
-  - external timeout and concurrency settings
-  - excludes all database mode and connection settings
+  - model/provider selections and access-key references
+  - complete RAG settings
+  - ingestion, session pipeline, language detection, matcher, integration,
+    timeout, and evidence settings
 - `resources/catalogs/*.json`
-  - canonical deterministic reference catalogs for text normalization, extraction, matching, DILI behavior, language, security filters, generation policy, and model capabilities
+  - canonical immutable reference catalogs for text normalization, extraction,
+    matching, DILI behavior, language, security filters, generation policy, and
+    model capabilities
 
 ## LLM Time Budgets
 
-`settings/configurations.json` sets the clinical cloud-model ceiling through
-`runtime.cloud_llm_timeout_cap`. It is `1800` seconds (30 minutes) so a
-full clinical synthesis is not prematurely replaced with a fallback report.
+The Settings UI sets the clinical cloud-model ceiling through the persisted
+`runtime.cloud_llm_timeout_cap` value. Its typed default is `1800` seconds (30
+minutes) so a full clinical synthesis is not prematurely replaced with a
+fallback report.
 This limit does not make an unreachable provider available: connectivity,
 authentication, and provider-side errors still fail promptly.
 

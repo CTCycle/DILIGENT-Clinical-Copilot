@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import json
 import math
-from functools import lru_cache
 from typing import Any
 
-from common.paths import CONFIGURATIONS_FILE
 from common.utils.languages import (
     DETECTABLE_REPORT_LANGUAGES,
     TOKEN_PATTERN,
@@ -17,6 +14,7 @@ from common.utils.languages import (
 )
 from domain.clinical.entities import PatientData
 from domain.clinical.language import LanguageDetectionResult
+from configurations.startup import get_server_settings
 
 ###############################################################################
 class ClinicalLanguageDetector:
@@ -77,24 +75,17 @@ class ClinicalLanguageDetector:
 
     # -------------------------------------------------------------------------
     @classmethod
-    @lru_cache(maxsize=1)
     def load_thresholds(cls) -> dict[str, float]:
-        thresholds = dict(cls.DEFAULT_THRESHOLDS)
-        try:
-            with CONFIGURATIONS_FILE.open("r", encoding="utf-8") as handle:
-                payload = json.load(handle)
-        except OSError, TypeError, ValueError:
-            return thresholds
-
-        config = payload.get("clinical_language_detection")
-        if not isinstance(config, dict):
-            return thresholds
-        for key, default_value in cls.DEFAULT_THRESHOLDS.items():
-            thresholds[key] = cls.coerce_non_negative_float(
-                config.get(key),
+        configured = get_server_settings().clinical_language_detection.model_dump(
+            mode="python"
+        )
+        return {
+            key: cls.coerce_non_negative_float(
+                configured.get(key),
                 default=default_value,
             )
-        return thresholds
+            for key, default_value in cls.DEFAULT_THRESHOLDS.items()
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod

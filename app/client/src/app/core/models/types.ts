@@ -36,6 +36,8 @@ export type LocalCatalogMetadata = {
 };
 
 export type RagSettings = {
+    allow_local_filesystem_access: boolean;
+    vector_collection_name: string;
   chunk_size: number;
   chunk_overlap: number;
   embedding_batch_size: number;
@@ -46,6 +48,8 @@ export type RagSettings = {
   reranker_model: string;
   hybrid_vector_weight: number;
   hybrid_text_weight: number;
+    vector_index_metric: string;
+    vector_index_type: string;
   vector_stream_batch_size: number;
   embedding_offline_mode: boolean;
 };

@@ -45,10 +45,13 @@ class DiseaseExtractor:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = get_server_settings().runtime.disease_llm_timeout,
+        timeout_s: float | None = None,
     ) -> None:
         self.temperature = float(temperature)
-        self.timeout_s = float(timeout_s)
+        runtime_settings = get_server_settings().runtime
+        self.timeout_s = float(
+            runtime_settings.disease_llm_timeout if timeout_s is None else timeout_s
+        )
         self.client: Any | None = client
         self.model: str = ""
         # Prefer fast deterministic fallback over long retry loops.

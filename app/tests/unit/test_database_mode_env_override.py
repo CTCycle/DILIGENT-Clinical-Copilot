@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import json
-
 from configurations.management import (
-    build_settings_payload_from_json,
+    build_settings_payload,
     environment_snapshot_from_os_env,
-    load_configuration_data,
 )
 from domain.settings.environment import (
     DatabaseEnvironmentSnapshot,
@@ -13,9 +10,6 @@ from domain.settings.environment import (
 )
 
 ###############################################################################
-def _write_config(path, payload) -> None:
-    path.write_text(json.dumps(payload), encoding="utf-8")
-
 ###############################################################################
 def _base_payload() -> dict:
     return {
@@ -37,11 +31,7 @@ def _base_payload() -> dict:
     }
 
 ###############################################################################
-def test_database_settings_ignore_json_values_and_use_environment_snapshot(
-    tmp_path,
-) -> None:
-    config_path = tmp_path / "configurations.json"
-    _write_config(config_path, _base_payload())
+def test_database_settings_ignore_ui_values_and_use_environment_snapshot() -> None:
     environment = EnvironmentSnapshot(
         ollama_url=None,
         ollama_host=None,
@@ -55,10 +45,7 @@ def test_database_settings_ignore_json_values_and_use_environment_snapshot(
         ),
     )
 
-    payload = build_settings_payload_from_json(
-        load_configuration_data(config_path),
-        environment,
-    )
+    payload = build_settings_payload(_base_payload(), environment)
 
     assert payload["database"] == {
         "backend": "postgresql",
@@ -88,7 +75,7 @@ def test_canonical_sqlite_database_environment_contract(monkeypatch) -> None:  #
     monkeypatch.setenv("DATABASE_WRITE_BATCH_SIZE", "250")
     monkeypatch.setenv("DATABASE_READ_PAGE_SIZE", "500")
 
-    payload = build_settings_payload_from_json(
+    payload = build_settings_payload(
         {},
         environment_snapshot_from_os_env(),
     )
@@ -159,7 +146,7 @@ def test_explicit_postgres_environment_fields_override_database_url(
     monkeypatch.setenv("DATABASE_SSL_CA", "C:/certs/ca.crt")
     monkeypatch.setenv("DATABASE_CONNECT_TIMEOUT", "10")
 
-    payload = build_settings_payload_from_json(
+    payload = build_settings_payload(
         {},
         environment_snapshot_from_os_env(),
     )

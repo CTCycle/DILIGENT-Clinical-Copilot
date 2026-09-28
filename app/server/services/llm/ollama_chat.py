@@ -512,9 +512,20 @@ async def is_server_online(self) -> bool:
 async def start_server(
     self,
     *,
-    wait_timeout_s: float = get_server_settings().runtime.ollama_server_start_timeout,
-    poll_interval_s: float = get_server_settings().jobs.polling_interval,
+    wait_timeout_s: float | None = None,
+    poll_interval_s: float | None = None,
 ) -> Literal["started", "already_running"]:
+    runtime_settings = get_server_settings()
+    wait_timeout_s = (
+        runtime_settings.runtime.ollama_server_start_timeout
+        if wait_timeout_s is None
+        else wait_timeout_s
+    )
+    poll_interval_s = (
+        runtime_settings.jobs.polling_interval
+        if poll_interval_s is None
+        else poll_interval_s
+    )
     if await self.is_server_online():
         return "already_running"
 

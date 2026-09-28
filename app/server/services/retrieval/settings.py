@@ -47,6 +47,13 @@ def build_effective_rag_settings(
 
     return base.model_copy(
         update={
+            "allow_local_filesystem_access": coerce_bool(
+                data.get("allow_local_filesystem_access"),
+                base.allow_local_filesystem_access,
+            ),
+            "vector_collection_name": coerce_str(
+                data.get("vector_collection_name"), base.vector_collection_name
+            ),
             "chunk_size": coerce_positive_int(data.get("chunk_size"), base.chunk_size),
             "chunk_overlap": coerce_positive_int(
                 data.get("chunk_overlap"), base.chunk_overlap
@@ -72,6 +79,12 @@ def build_effective_rag_settings(
             "hybrid_text_weight": max(
                 coerce_float(data.get("hybrid_text_weight"), base.hybrid_text_weight),
                 0.0,
+            ),
+            "vector_index_metric": coerce_str(
+                data.get("vector_index_metric"), base.vector_index_metric
+            ),
+            "vector_index_type": coerce_str(
+                data.get("vector_index_type"), base.vector_index_type
             ),
             "vector_stream_batch_size": coerce_positive_int(
                 data.get("vector_stream_batch_size"), base.vector_stream_batch_size
@@ -118,6 +131,8 @@ def normalize_rag_settings_patch(
 def rag_settings_payload(settings: RagSettings | None = None) -> RagSettingsResponse:
     resolved = settings or build_effective_rag_settings()
     return RagSettingsResponse(
+        allow_local_filesystem_access=resolved.allow_local_filesystem_access,
+        vector_collection_name=resolved.vector_collection_name,
         chunk_size=resolved.chunk_size,
         chunk_overlap=resolved.chunk_overlap,
         embedding_batch_size=resolved.embedding_batch_size,
@@ -128,6 +143,8 @@ def rag_settings_payload(settings: RagSettings | None = None) -> RagSettingsResp
         reranker_model=resolved.reranker_model,
         hybrid_vector_weight=resolved.hybrid_vector_weight,
         hybrid_text_weight=resolved.hybrid_text_weight,
+        vector_index_metric=resolved.vector_index_metric,
+        vector_index_type=resolved.vector_index_type,
         vector_stream_batch_size=resolved.vector_stream_batch_size,
         embedding_offline_mode=resolved.embedding_offline_mode,
     )

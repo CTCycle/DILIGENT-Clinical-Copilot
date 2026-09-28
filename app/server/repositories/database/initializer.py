@@ -14,6 +14,10 @@ from common.catalogs.manifest_loader import (
 )
 from common.catalogs.provider import get_catalog_provider
 from common.utils.logger import logger
+from configurations.management import (
+    build_default_application_configuration_payload,
+    environment_snapshot_from_os_env,
+)
 from configurations.startup import get_server_settings
 from domain.catalogs import CatalogSeedResult
 from domain.settings.configuration import DatabaseSettings
@@ -133,27 +137,9 @@ def _seed_repository_catalogs(
 
 ###############################################################################
 def _default_model_configuration_payload() -> dict[str, object]:
-    defaults = get_server_settings().llm_defaults
-    return {
-        "use_cloud_models": defaults.use_cloud_services,
-        "cloud_provider": defaults.llm_provider,
-        "cloud_model": defaults.cloud_model or None,
-        "clinical_model": defaults.clinical_model,
-        "text_extraction_model": defaults.text_extraction_model,
-        "revision_model": (
-            defaults.cloud_model
-            if defaults.use_cloud_services
-            else defaults.clinical_model
-        ),
-        "timeline_model": (
-            defaults.cloud_model
-            if defaults.use_cloud_services
-            else defaults.text_extraction_model
-        ),
-        "reasoning_level": defaults.reasoning_level,
-        "ollama_seed": 42,
-        "rag_settings": {},
-    }
+    return build_default_application_configuration_payload(
+        environment_snapshot_from_os_env()
+    )
 
 ###############################################################################
 def _seed_model_configuration(
@@ -163,11 +149,11 @@ def _seed_model_configuration(
         engine=repository.engine,
         session_factory=repository.session_factory,
     )
-    inserted = serializer.seed_if_missing(_default_model_configuration_payload())
+    changed = serializer.ensure_defaults(_default_model_configuration_payload())
     logger.info(
         "Model configuration initialization completed for %s: seeded=%s",
         "SQLite" if isinstance(repository, SQLiteRepository) else "PostgreSQL",
-        inserted,
+        changed,
     )
 
 ###############################################################################
