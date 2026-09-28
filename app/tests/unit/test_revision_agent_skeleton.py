@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -31,7 +32,7 @@ from services.inspection.revision_context import build_revision_context
 from services.inspection.revision_recovery import reconcile_interrupted_revision_jobs
 from services.inspection.revision_scaffold import SessionRevisionConflictError
 from services.inspection.service import DataInspectionService
-from services.llm.cloud import LLMError
+from services.llm.cloud import LLMError, LLMTimeout
 from services.llm.generation_policy import GenerationPurpose
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
@@ -1139,6 +1140,142 @@ def test_revision_provider_failure_persists_sanitized_retry_metadata(
     )
     assert planner_step["error"]["status_code"] == 503
     assert planner_step["error"]["retryable"] is True
+
+###############################################################################
+def test_revision_timeout_persists_retryable_provider_metadata(
+    tmp_path: Path,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+
+    def timed_out_provider_call(**_: Any) -> dict[str, Any]:
+        raise LLMTimeout(
+            provider="ollama",
+            model="qwen3.5:9b",
+            operation="revision_agent_planner",
+        )
+
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=timed_out_provider_call,
+    )
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    for _ in range(50):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] == "failed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision timeout job did not fail")
+
+    pipeline_run_id = started["result"]["pipeline_run_id"]
+    run = service.get_revision_run(pipeline_run_id)
+    assert run is not None
+    assert run["error"] == {
+        "message": (
+            "Check the provider connection, credentials, rate limits, or "
+            "transient service status. Detail: ollama failed qwen3.5:9b "
+            "during revision_agent_planner"
+        ),
+        "error_type": "LLMTimeout",
+        "error_code": "timeout",
+        "retryable": True,
+        "status_code": None,
+        "provider": "ollama",
+        "model": "qwen3.5:9b",
+        "operation": "revision_agent_planner",
+    }
+    planner_step = next(
+        step
+        for step in service.list_revision_steps(pipeline_run_id)
+        if step["step_name"] == "revision_agent_planner"
+    )
+    assert planner_step["error"] == run["error"]
+    source = serializer.clinical_session_repository.get_session_detail(session_id)
+    assert source is not None
+    assert source["report"] == "Possible DILI from amoxicillin."
+
+###############################################################################
+def test_service_cancellation_preserves_source_and_allows_retry_after_worker_exit(
+    tmp_path: Path,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    planner_started = threading.Event()
+    release_planner = threading.Event()
+
+    def blocking_provider_call(**kwargs: Any) -> dict[str, Any]:
+        if kwargs["schema"].__name__ == "RevisionAgentPlan":
+            planner_started.set()
+            if not release_planner.wait(timeout=5):
+                raise RuntimeError("Synthetic planner release was not signalled")
+        return fake_issue_scan_call(**kwargs)
+
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=blocking_provider_call,
+    )
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    pipeline_run_id = started["result"]["pipeline_run_id"]
+    assert planner_started.wait(timeout=2)
+
+    running = service.get_revision_job_status(started["job_id"])
+    assert running is not None
+    assert running["status"] == "running"
+    assert service.cancel_revision_job(started["job_id"]) is True
+
+    cancellation_snapshot = service.get_revision_job_status(started["job_id"])
+    assert cancellation_snapshot is not None
+    assert cancellation_snapshot["status"] == "running"
+    assert cancellation_snapshot["stop_requested"] is True
+    cancelled_run = service.get_revision_run(pipeline_run_id)
+    assert cancelled_run is not None
+    assert cancelled_run["status"] == "cancelled"
+
+    with pytest.raises(SessionRevisionConflictError):
+        service.retry_revision_job(pipeline_run_id)
+
+    source_before_retry = service.get_session_detail(session_id)
+    assert source_before_retry is not None
+    release_planner.set()
+    try:
+        for _ in range(50):
+            terminal = service.get_revision_job_status(started["job_id"])
+            if terminal and terminal["status"] in {"cancelled", "failed", "completed"}:
+                break
+            time.sleep(0.05)
+        else:
+            raise AssertionError("Cancelled revision worker did not exit")
+
+        assert terminal is not None
+        assert terminal["status"] == "cancelled"
+        steps = service.list_revision_steps(pipeline_run_id)
+        planner_step = next(
+            step for step in steps if step["step_name"] == "revision_agent_planner"
+        )
+        assert planner_step["status"] == "cancelled"
+
+        retry_started = service.retry_revision_job(pipeline_run_id)
+        assert retry_started["result"]["pipeline_run_id"] != pipeline_run_id
+        for _ in range(50):
+            retry_status = service.get_revision_job_status(retry_started["job_id"])
+            if retry_status and retry_status["status"] == "completed":
+                break
+            time.sleep(0.05)
+        else:
+            raise AssertionError("Revision retry after cancellation did not complete")
+        assert retry_status is not None
+        assert retry_status["result"]["revision_status"] == "requires_human_review"
+    finally:
+        release_planner.set()
+
+    source_after_retry = service.get_session_detail(session_id)
+    assert source_after_retry is not None
+    assert source_after_retry["report"] == source_before_retry["report"]
 
 ###############################################################################
 def test_missing_revision_worker_is_recoverable_and_retry_preserves_source(
