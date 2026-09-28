@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+import services.inspection.service as inspection_service_module
 from api import data_inspection
 from domain.inspection import (
     MAX_SEARCH_LENGTH,
@@ -18,8 +19,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from repositories.drug_catalog_repository import _build_search_pattern
-import services.inspection.service as inspection_service_module
 from services.inspection import DataInspectionService
+
 
 ###############################################################################
 def get_route_owner(router: Any, route_path: str) -> Any:
@@ -325,6 +326,62 @@ def test_rag_directory_browse_route_sanitizes_filesystem_errors(
     assert response.status_code == expected_status
     assert response.json() == {"detail": expected_detail}
     assert "C:\\private" not in response.text
+
+###############################################################################
+def test_rag_document_listing_exposes_unsupported_files_as_not_ingestible(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    supported_path = tmp_path / "nested" / "study.txt"
+    supported_path.parent.mkdir()
+    supported_path.write_text("TITLE\n\nBody text.", encoding="utf-8")
+    unsupported_path = tmp_path / "nested" / "legacy.doc"
+    unsupported_path.write_bytes(b"legacy binary Word document")
+
+    class FakeVectorDatabase:
+
+        # -------------------------------------------------------------------------
+        def __init__(self, **_: object) -> None:
+            pass
+
+        # -------------------------------------------------------------------------
+        def has_collection(self) -> bool:
+            return False
+
+    service = object.__new__(DataInspectionService)
+    monkeypatch.setattr(
+        service,
+        "get_effective_rag_documents_path",
+        lambda: str(tmp_path),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        inspection_service_module,
+        "build_effective_rag_settings",
+        lambda: SimpleNamespace(
+            vector_collection_name="documents",
+            vector_index_metric="cosine",
+            vector_index_type="IVF_FLAT",
+            vector_stream_batch_size=16,
+        ),
+    )
+    monkeypatch.setattr(
+        inspection_service_module,
+        "read_active_collection_name",
+        lambda value: value,
+    )
+    monkeypatch.setattr(
+        inspection_service_module,
+        "LanceVectorDatabase",
+        FakeVectorDatabase,
+    )
+
+    payload = service.list_rag_documents(search=None, offset=0, limit=10)
+
+    rows = {item["file_name"]: item for item in payload["items"]}
+    assert payload["total"] == 2
+    assert rows["study.txt"]["supported_for_ingestion"] is True
+    assert rows["legacy.doc"]["supported_for_ingestion"] is False
 
 ###############################################################################
 def test_rag_cancel_route_uses_delete_only() -> None:
