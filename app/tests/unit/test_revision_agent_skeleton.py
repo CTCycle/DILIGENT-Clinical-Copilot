@@ -28,12 +28,14 @@ from services.inspection.revision_agent import (
     revision_error_payload,
 )
 from services.inspection.revision_context import build_revision_context
+from services.inspection.revision_recovery import reconcile_interrupted_revision_jobs
 from services.inspection.revision_scaffold import SessionRevisionConflictError
 from services.inspection.service import DataInspectionService
 from services.llm.cloud import LLMError
 from services.llm.generation_policy import GenerationPurpose
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
+
 
 ###############################################################################
 def build_file_serializer(tmp_path: Path) -> Any:
@@ -1221,6 +1223,158 @@ def test_missing_revision_worker_is_recoverable_and_retry_preserves_source(
     source_after_retry = service.get_session_detail(session_id)
     assert source_after_retry is not None
     assert source_after_retry["report"] == source_before_retry["report"]
+
+###############################################################################
+def test_startup_reconciles_orphaned_revision_after_process_restart(
+    tmp_path: Path,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    source_version = serializer.session_revision_repository.get_version_record_for_session(
+        session_id
+    )
+    assert source_version is not None
+
+    pipeline_run_id = "restart-revision-run"
+    job_id = "restart-job"
+    configuration = {
+        "job_id": job_id,
+        "pipeline_run_id": pipeline_run_id,
+        "model_provider": "ollama",
+        "model_name": "qwen3.5:9b",
+        "metadata": {"origin": "process-restart-test"},
+    }
+    shell = serializer.session_revision_repository.create_revision_version_shell(
+        session_id,
+        reviewer_note="Recover after a backend restart.",
+        configuration=configuration,
+        pipeline_run_id=pipeline_run_id,
+        source_version_id=int(source_version["version_id"]),
+    )
+    assert shell is not None
+    serializer.session_revision_repository.create_or_update_revision_run(
+        pipeline_run_id=pipeline_run_id,
+        session_id=session_id,
+        root_session_id=int(source_version["root_session_id"]),
+        source_version_id=int(source_version["version_id"]),
+        target_revision_version_id=int(shell["revision_version_id"]),
+        revision_mode="agentic_revision",
+        revision_kind="llm_assisted_revision",
+        configuration=configuration,
+        reviewer_note="Recover after a backend restart.",
+        status="running",
+        initiated_by="revision_agent",
+        actor_source="system",
+        actor_confidence="system",
+    )
+    serializer.session_revision_repository.start_revision_step(
+        pipeline_run_id=pipeline_run_id,
+        step_name="revision_agent_planner",
+        step_index=1,
+        step_count=3,
+    )
+
+    recovered = reconcile_interrupted_revision_jobs(
+        JobManager(),
+        repository=serializer.session_revision_repository,
+    )
+
+    assert [item["pipeline_run_id"] for item in recovered] == [pipeline_run_id]
+    recovered_run = serializer.session_revision_repository.get_revision_run(
+        pipeline_run_id
+    )
+    assert recovered_run is not None
+    assert recovered_run["status"] == "failed"
+    assert recovered_run["error"] == {
+        "message": "Revision job worker is no longer available. Reload the persisted revision run and retry if needed."
+    }
+    steps = serializer.session_revision_repository.list_revision_steps(pipeline_run_id)
+    assert [step["status"] for step in steps] == ["failed"]
+    assert steps[0]["error"] == recovered_run["error"]
+
+    source_before_retry = serializer.clinical_session_repository.get_session_detail(
+        session_id
+    )
+    assert source_before_retry is not None
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=fake_mismatched_patch_call,
+    )
+    retry_started = service.retry_revision_job(pipeline_run_id)
+    for _ in range(50):
+        retry_status = service.get_revision_job_status(retry_started["job_id"])
+        if retry_status and retry_status["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision retry after process restart did not complete")
+
+    assert retry_status is not None
+    assert retry_status["result"]["revision_status"] == "llm_qa_passed"
+    source_after_retry = serializer.clinical_session_repository.get_session_detail(
+        session_id
+    )
+    assert source_after_retry is not None
+    assert source_after_retry["report"] == source_before_retry["report"]
+
+###############################################################################
+def test_revision_tool_failure_fails_closed_without_leaking_detail(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+
+    def failing_tool(*_: Any, **__: Any) -> object:
+        raise RuntimeError("Tool backend failed: secret=tool-secret")
+
+    monkeypatch.setattr(
+        revision_agent_module.RevisionToolRegistry,
+        "execute",
+        failing_tool,
+    )
+
+    def structured_call(**kwargs: Any) -> dict[str, Any]:
+        if kwargs["schema"].__name__ == "RevisionAgentToolCall":
+            return {
+                "tool_name": "read_session_context",
+                "arguments": {},
+                "rationale": "Read the session evidence before editing.",
+                "task_complete": False,
+            }
+        return fake_issue_scan_call(**kwargs)
+
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=structured_call,
+    )
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    for _ in range(50):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] == "failed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision tool failure did not fail closed")
+
+    pipeline_run_id = started["result"]["pipeline_run_id"]
+    run = service.get_revision_run(pipeline_run_id)
+    assert run is not None
+    assert run["status"] == "failed"
+    assert run["error"] == {
+        "message": "Revision processing failed. Retry the revision if needed."
+    }
+    steps = service.list_revision_steps(pipeline_run_id)
+    task_step = next(
+        step for step in steps if step["step_name"] == "revision_agent_task_1"
+    )
+    assert task_step["status"] == "failed"
+    assert "tool-secret" not in str(task_step["error"])
+    source = serializer.clinical_session_repository.get_session_detail(session_id)
+    assert source is not None
+    assert source["report"] == "Possible DILI from amoxicillin."
 
 ###############################################################################
 def test_cancelled_revision_finalizes_version_and_steps(tmp_path: Path) -> None:

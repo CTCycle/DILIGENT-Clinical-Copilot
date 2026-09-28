@@ -10,10 +10,8 @@ from services.inspection.revision_agent import (
     revision_error_payload,
     resolve_revision_agent_runtime,
 )
-
-REVISION_JOB_MISSING_STATUS_MESSAGE = (
-    "Revision job worker is no longer available. Reload the persisted revision run "
-    "and retry if needed."
+from services.inspection.revision_recovery import (
+    REVISION_JOB_MISSING_STATUS_MESSAGE,
 )
 
 ###############################################################################
@@ -224,6 +222,7 @@ class InspectionRevisionScaffoldMixin:
         self.session_revision_repository.fail_revision_run(
             pipeline_run_id=str(run["pipeline_run_id"]),
             error={"message": REVISION_JOB_MISSING_STATUS_MESSAGE},
+            mark_active_steps=True,
         )
         return {
             "job_id": job_id,

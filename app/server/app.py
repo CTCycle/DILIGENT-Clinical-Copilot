@@ -42,6 +42,7 @@ from configurations.startup import (
 )
 from repositories.database.initializer import ensure_database_ready
 from services.catalogs.runtime import initialize_reference_catalog_provider
+from services.inspection.revision_recovery import reconcile_interrupted_revision_jobs
 from services.retrieval.embedding_runtime import close_embedding_runtime
 from services.runtime.desktop import get_desktop_runtime_service
 from services.runtime.jobs import get_job_manager
@@ -82,7 +83,9 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     bootstrap_settings = get_server_settings()
     ensure_database_ready(bootstrap_settings.database)
     settings = reload_persisted_settings()
-    get_job_manager().begin_startup()
+    job_manager = get_job_manager()
+    job_manager.begin_startup()
+    reconcile_interrupted_revision_jobs(job_manager)
     initialize_reference_catalog_provider()
     run_startup_validations(settings)
     application.state.server_settings = settings
