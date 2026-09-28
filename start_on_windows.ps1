@@ -1785,7 +1785,7 @@ function Remove-AllData {
     Import-DotEnv
     if (-not (Confirm-DestructiveAction 'remove all local user data')) { return }
 
-    $resourceRootValue = if ($env:DILIGENT_RESOURCES_PATH) { $env:DILIGENT_RESOURCES_PATH } else { 'app/resources' }
+    $resourceRootValue = if ($env:DILIGENT_RESOURCES_PATH) { $env:DILIGENT_RESOURCES_PATH } else { 'resources' }
     $resourceRoot = Resolve-LauncherPath -Path $resourceRootValue
     $databasePath = if ($env:DILIGENT_SQLITE_PATH) {
         Resolve-LauncherPath -Path $env:DILIGENT_SQLITE_PATH
@@ -2023,7 +2023,7 @@ function Test-FrozenBackend {
     foreach ($pair in @{
         DILIGENT_DESKTOP='true'; DILIGENT_DESKTOP_SESSION_SECRET=$sessionSecret; DILIGENT_RELEASE_VERSION=$Version; DILIGENT_RUNTIME_ROOT=(Join-Path $StageRoot 'runtime-stage')
         DILIGENT_DATA_ROOT=$dataRoot; DILIGENT_SQLITE_PATH=(Join-Path $dataRoot 'resources/database.db')
-        DILIGENT_ACCESS_KEY_MATERIAL_FILE=(Join-Path $dataRoot 'resources/access-key-material.json'); DILIGENT_RESOURCES_PATH=(Join-Path $StageRoot 'runtime-stage/app/resources'); RELOAD='false'
+        DILIGENT_ACCESS_KEY_MATERIAL_FILE=(Join-Path $dataRoot 'resources/access-key-material.json'); DILIGENT_RESOURCES_PATH=(Join-Path $StageRoot 'runtime-stage/resources'); RELOAD='false'
     }.GetEnumerator()) { $psi.Environment[$pair.Key] = [string]$pair.Value }
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $psi
@@ -2086,12 +2086,12 @@ function New-DesktopRuntimeArchive {
     $payloadRoot = Join-Path $StageRoot 'runtime-stage'
     New-Item -ItemType Directory -Path $payloadRoot -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $StageRoot 'backend') -Destination (Join-Path $payloadRoot 'backend') -Recurse
-    foreach ($relative in @('app/client/dist/browser', 'app/resources/catalogs', 'settings')) {
+    foreach ($relative in @('app/client/dist/browser', 'resources/catalogs', 'settings')) {
         New-Item -ItemType Directory -Path (Join-Path $payloadRoot $relative) -Force | Out-Null
     }
     $frontendOutputRoot = if ($script:DesktopFrontendOutputDir) { Join-Path $script:DesktopFrontendOutputDir 'browser' } else { Join-Path $ClientDir 'dist/browser' }
     Copy-Item -Path (Join-Path $frontendOutputRoot '*') -Destination (Join-Path $payloadRoot 'app/client/dist/browser') -Recurse -Force
-    Copy-Item -Path (Join-Path $RepoRoot 'app/resources/catalogs/*') -Destination (Join-Path $payloadRoot 'app/resources/catalogs') -Recurse -Force
+    Copy-Item -Path (Join-Path $RepoRoot 'resources/catalogs/*') -Destination (Join-Path $payloadRoot 'resources/catalogs') -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'settings/.env.example') -Destination (Join-Path $payloadRoot 'settings/.env.example')
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'settings/configurations.json') -Destination (Join-Path $payloadRoot 'settings/configurations.json')
     $runtimeOutput = Join-Path $StageRoot 'runtime/diligent-runtime.zip'

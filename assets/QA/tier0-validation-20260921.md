@@ -60,7 +60,7 @@ developer database were not edited.
 
 ### Populated disposable clone
 
-The current `app/resources/database.db` was read-only inspected before the
+The current `resources/database.db` was read-only inspected before the
 clone: Alembic `202609170001`, 18 sessions, 50 versions, 28 revision runs, 90
 artifacts, `foreign_key_check=[]`, and `integrity_check=ok`. A byte copy was
 made below the disposable validation root and passed through:

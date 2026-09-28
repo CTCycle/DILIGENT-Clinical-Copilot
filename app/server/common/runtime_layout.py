@@ -56,7 +56,7 @@ def _resolve_source_layout() -> RuntimeLayout:
     repository_root = Path(__file__).resolve().parents[3]
     application_root = repository_root / "app"
     resources_root = _resolve_source_resources_root(
-        repository_root, application_root / "resources"
+        repository_root, repository_root / "resources"
     )
     return RuntimeLayout(
         packaged=False,
@@ -81,7 +81,7 @@ def _resolve_packaged_layout() -> RuntimeLayout:
         application_root=application_root,
         settings_template_root=runtime_root / "settings",
         settings_root=data_root / "settings",
-        immutable_resources_root=application_root / "resources",
+        immutable_resources_root=runtime_root / "resources",
         mutable_resources_root=data_root / "resources",
         cache_root=data_root / "cache",
         client_dist_root=application_root / "client" / "dist" / "browser",

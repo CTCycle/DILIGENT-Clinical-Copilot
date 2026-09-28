@@ -1,11 +1,11 @@
 # Persistence
-Last updated: 2026-09-13
+Last updated: 2026-09-28
 
 ## Relational Database
 
 - SQLAlchemy-backed storage.
 - Database mode and connection settings are sourced from `settings/.env`.
-- SQLite uses `<resource-root>/database.db` when `database.embedded_database=true`; the source-mode resource root defaults to `app/resources` and can be overridden with `DILIGENT_RESOURCES_PATH`. PostgreSQL is used in external database mode.
+- SQLite uses `<resource-root>/database.db` when `database.embedded_database=true`; the source-mode resource root defaults to `resources` and can be overridden with `DILIGENT_RESOURCES_PATH`. PostgreSQL is used in external database mode.
 
 ## Relational Model
 
@@ -250,7 +250,7 @@ erDiagram
 
 ## Reference Catalog Persistence
 
-- Canonical manifests live in `app/resources/catalogs/*.json` and are seeded into database tables.
+- Canonical manifests live in `resources/catalogs/*.json` and are seeded into database tables.
 - RxNorm persistence uses `drug_rxnorm_codes` as the canonical RxCUI mapping table.
 - Explicit database initialization seeds the canonical manifests after Alembic
   reaches head.
@@ -264,15 +264,15 @@ erDiagram
 
 ## Vector Persistence
 
-- LanceDB collections live under `app/resources/sources/vectors`.
+- LanceDB collections live under `resources/sources/vectors`.
 - RAG uses the immutable Granite embedding contract in `common/embedding/config.py`; index generations carry a versioned manifest and exact embedding fingerprint.
 
 ## Filesystem Resources
 
-- In development, `app/resources/sources` contains persistent source catalogs, documents, archives, and vectors. Disposable embeddings and logs are stored under `runtimes/cache`.
+- In development, `resources/sources` contains persistent source catalogs, documents, archives, and vectors. Disposable embeddings and logs are stored under `runtimes/cache`.
 - The validated FDA DILIrank workbook and its HTTP metadata cache live in the existing source archives location. New downloads are written to a candidate file and promoted only after workbook validation; failed or cancelled candidate refreshes do not replace the last-known-good cache.
 - In packaged desktop mode, immutable catalogs and Angular assets live under the extracted runtime; databases, source documents, vectors, exports, state, and access-key material live under `%LOCALAPPDATA%\DILIGENT\data`, while disposable logs and embeddings live under `%LOCALAPPDATA%\DILIGENT\data\cache`.
-- `app/resources/catalogs` contains JSON seed manifests for database-backed reference catalogs and is copied to the immutable packaged runtime.
+- `resources/catalogs` contains JSON seed manifests for database-backed reference catalogs and is copied to the immutable packaged runtime.
 
 The extracted runtime is versioned and hash-addressed so it can be replaced during upgrades. The persistent data root is intentionally outside the runtime and is not removed by desktop artifact cleanup or MSI uninstall.
 

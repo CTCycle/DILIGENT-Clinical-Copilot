@@ -89,7 +89,7 @@ include = [
 exclude = [
     ".venv",
     "**/__pycache__",
-    "app/resources",
+    "../../resources",
     "pytest-cache-files",
 ]
 pythonVersion = "3.14"
