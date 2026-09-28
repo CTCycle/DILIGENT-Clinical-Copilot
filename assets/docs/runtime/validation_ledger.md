@@ -1036,3 +1036,54 @@ approved provider secret or an explicitly configured working local Ollama servic
 followed by one fresh non-dry accepted or fail-closed run plus retry/recovery
 coverage. Do not approve the persisted revision without an authorized clinical
 reviewer.
+
+## RAG error boundaries and revision worker recovery — 2026-09-28
+
+1. Reviewed the current status ledger and selected the coherent local follow-up:
+   RAG inventory/update error boundaries and persisted revision recovery after
+   an in-memory worker disappears. The duplicate-file policy (`ISSUE-005`) was
+   revisited and intentionally left unchanged. Provider-backed execution,
+   access-key mutation, NCBI refresh, desktop publication, and spoken
+   Narrator/Speech Recap output remained separate gates.
+2. The checked-out `develop` tree was at
+   `e8ab2eeadf89247be9bb1f3fac3fff7e598f5f61`, equal to `origin/develop` before
+   this validation. RAG fixtures, pytest temporary databases, and caches were
+   isolated under task QA paths; no shared database or provider cache was
+   changed.
+3. RAG inventory and update boundaries were tested with empty, unsupported-only,
+   empty-supported, malformed-supported, missing, and non-directory fixtures.
+   The current contracts enumerate all files for inspection, filter ingestion
+   to active loaders, ignore empty/malformed documents, reject invalid roots
+   before vector setup, and fail closed before manifest replacement when zero
+   supported files or zero chunks are produced. Inspection browse/listing
+   responses retained sanitized 403/404/422 behavior and explicit unsupported
+   flags.
+4. The revision recovery test persisted a running revision in disposable
+   SQLite, queried it through a fresh `JobManager`, observed a sanitized
+   recoverable failure, confirmed persisted failed metadata and unchanged source
+   content, then retried with a deterministic runner and observed successful
+   `llm_qa_passed` completion under a new run/job identity. No provider request
+   was made.
+5. The focused RAG/revision suite passed **44 tests**. The affected backend/API
+   regression passed **129 tests** with three dependency/deprecation warnings.
+   Ruff lint passed, Pyright reported `0 errors, 0 warnings, 0 informations`,
+   and `git diff --check` passed. No frontend files changed, so the canonical
+   Angular suite was not rerun for this slice.
+
+| Gate | Final status | Evidence boundary and remaining limitation |
+|---|---|---|
+| `rag.ingestion-retrieval` | `VALIDATED` for the expanded local boundary | Recursive inventory, unsupported visibility, empty/malformed input handling, invalid-root preflight, zero-supported/zero-chunk fail-closed updates, and affected API errors are covered. Duplicate policy, filesystem ACL failures, and fresh provider-backed vector execution remain outside scope. |
+| `revision.agentic-lifecycle` | `PARTIAL` | Missing-worker recovery, sanitized status, persisted metadata, source preservation, and deterministic retry are covered. Fresh provider execution, timeout/tool-failure injection, true process restart, and all lifecycle branches remain open. |
+| `api.local-boundaries` | `WORKING` for the affected RAG/revision contracts | The selected browse/listing/update/recovery contracts passed; the full 68-path response/error and mutating-route matrix is not certified by this slice. |
+| `test.automated-regression` | `PARTIAL` | The affected local backend/API suites are green; live-provider and conditional browser/hosted lanes remain incomplete. |
+| `model.provider.opencode-go` | `PARTIAL` | No local `OPENCODE_GO_API_KEY` was available and no live request was made. |
+| `data.inspection.catalogs` / `data.sources.refresh` | `PARTIAL` | NCBI Bookshelf still serves the human-verification challenge for LiverTox. |
+| `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available or mutated. |
+| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged/hosted/clean-machine publication prerequisites remain separate. |
+| spoken Narrator/Speech Recap output | `UNVALIDATED` | Rendered/keyboard/AX evidence does not establish audible screen-reader output. |
+
+Detailed evidence: [RAG edge validation and gate triage](../QA/rag-edge-validation-20260928/report.md) and [revision recovery validation](../QA/revision-recovery-validation-20260928/report.md).
+
+Task-owned pytest caches, temporary databases, fixtures, and generated Python
+bytecode were cleaned after validation. No task-owned server, browser, watcher,
+or helper process remained running.
