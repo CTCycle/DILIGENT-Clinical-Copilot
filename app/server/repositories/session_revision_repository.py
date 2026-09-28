@@ -538,8 +538,36 @@ class SessionRevisionRepository:
             return [serialize_revision_run_row(row) for row in rows]
 
     # -------------------------------------------------------------------------
+    def reconcile_running_revision_runs(
+        self,
+        *,
+        active_job_ids: set[str] | None = None,
+        error: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        active_ids = {str(job_id).strip() for job_id in (active_job_ids or set())}
+        recovered: list[dict[str, Any]] = []
+        for run in self.list_revision_runs_by_status("running"):
+            configuration = run.get("configuration")
+            configuration = configuration if isinstance(configuration, dict) else {}
+            job_id = str(configuration.get("job_id") or "").strip()
+            if job_id and job_id in active_ids:
+                continue
+            updated = self.fail_revision_run(
+                pipeline_run_id=str(run["pipeline_run_id"]),
+                error=error,
+                mark_active_steps=True,
+            )
+            if updated is not None and updated.get("status") == "failed":
+                recovered.append(updated)
+        return recovered
+
+    # -------------------------------------------------------------------------
     def fail_revision_run(
-        self, *, pipeline_run_id: str, error: dict[str, Any] | None = None
+        self,
+        *,
+        pipeline_run_id: str,
+        error: dict[str, Any] | None = None,
+        mark_active_steps: bool = False,
     ) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             row = db_session.execute(
@@ -550,9 +578,26 @@ class SessionRevisionRepository:
             if row is None:
                 return None
             if row.status not in {"completed", "failed", "cancelled"}:
+                completed_at = datetime.now(UTC)
                 row.status = "failed"
-                row.completed_at = datetime.now(UTC)
+                row.completed_at = completed_at
                 row.error_json = serialize_json_payload(error)
+                if mark_active_steps:
+                    db_session.execute(
+                        update(ClinicalSessionRevisionStep)
+                        .where(
+                            ClinicalSessionRevisionStep.pipeline_run_id
+                            == str(pipeline_run_id),
+                            ClinicalSessionRevisionStep.status.notin_(
+                                ("completed", "failed", "cancelled")
+                            ),
+                        )
+                        .values(
+                            status="failed",
+                            error_json=serialize_json_payload(error),
+                            completed_at=completed_at,
+                        )
+                    )
             db_session.commit()
             db_session.refresh(row)
             return serialize_revision_run_row(row)
