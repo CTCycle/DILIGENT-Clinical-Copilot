@@ -404,7 +404,7 @@ class DataInspectionService(
             )
             vector_model_by_file = {}
         items: list[dict[str, Any]] = []
-        for path in serializer.collect_document_paths():
+        for path in serializer.collect_file_paths():
             metadata = serializer.build_listing_metadata(path)
             items.append(
                 {

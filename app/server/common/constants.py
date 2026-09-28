@@ -99,7 +99,7 @@ LIVERTOX_MASTER_COLUMNS = [
 ###############################################################################
 ATC_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
 LIVERTOX_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/pub/litarch/29/31/"
-DOCUMENT_SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".xml", ".docx", ".doc"}
+DOCUMENT_SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".xml", ".docx"}
 TEXT_FILE_FALLBACK_ENCODINGS = ("utf-8", "utf-16", "latin-1", "iso-8859-1")
 DRUG_NAME_ALLOWED_PATTERN = r"[A-Za-z0-9\s\-/(),'+\.]+"
 DEFAULT_EMBEDDING_BATCH_SIZE = 64

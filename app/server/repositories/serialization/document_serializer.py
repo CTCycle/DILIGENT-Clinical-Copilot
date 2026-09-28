@@ -26,16 +26,23 @@ class DocumentSerializer:
         self.documents_path = Path(documents_path)
 
     # -------------------------------------------------------------------------
-    def collect_document_paths(self) -> list[str]:
+    def collect_file_paths(self) -> list[str]:
         collected: list[str] = []
         for candidate in self.documents_path.rglob("*"):
             if not candidate.is_file():
                 continue
-            if candidate.suffix.lower() in self.SUPPORTED_EXTENSIONS:
-                collected.append(str(candidate))
-            else:
-                logger.debug("Skipping unsupported document '%s'", candidate.name)
+            collected.append(str(candidate))
         collected.sort()
+        return collected
+
+    # -------------------------------------------------------------------------
+    def collect_document_paths(self) -> list[str]:
+        collected: list[str] = []
+        for path in self.collect_file_paths():
+            if Path(path).suffix.lower() in self.SUPPORTED_EXTENSIONS:
+                collected.append(path)
+            else:
+                logger.debug("Skipping unsupported document '%s'", Path(path).name)
         return collected
 
     # -------------------------------------------------------------------------
@@ -67,11 +74,6 @@ class DocumentSerializer:
                 documents.extend(self.load_pdf(file_path))
             elif extension == ".docx":
                 documents.extend(self.load_docx(file_path))
-            elif extension == ".doc":
-                logger.warning(
-                    "Unsupported .doc Word document '%s' is not supported; skipping",
-                    file_path,
-                )
             elif extension in {".txt", ".xml"}:
                 documents.extend(self.load_textual_file(file_path, extension))
         return documents
