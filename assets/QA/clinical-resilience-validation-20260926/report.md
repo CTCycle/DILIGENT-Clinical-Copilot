@@ -23,7 +23,7 @@ refresh, release, revision-matrix, or container gates.
 - The source client then built successfully with the Angular cache redirected to
   the task QA directory and the repository configuration was restored exactly.
 - A manual source backend/frontend fallback used a disposable clone of
-  `app/resources/database.db` on `127.0.0.1:7691` and `127.0.0.1:9849`.
+  `resources/database.db` on `127.0.0.1:7691` and `127.0.0.1:9849`.
   The clone contained the local LiverTox, RxNav, and DILIrank snapshots needed
   for the clinical preflight; the shared database and settings were not
   modified.

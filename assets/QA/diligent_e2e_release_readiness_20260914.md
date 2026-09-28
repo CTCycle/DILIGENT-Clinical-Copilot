@@ -257,7 +257,7 @@ The FDA DILIrank 2.0 source page reports 1,336 drugs in the four published conce
 
 Browser path: `Data Inspection` -> `RAG`.
 
-The UI displayed the configured documents path but showed `No RAG documents found`. The configured `app/resources/sources/documents` directory does not exist in the workspace and the vectors directory contains only `.gitkeep`.
+The UI displayed the configured documents path but showed `No RAG documents found`. The configured `resources/sources/documents` directory does not exist in the workspace and the vectors directory contains only `.gitkeep`.
 
 Individual `Update Embeddings` was started through the visible modal using the displayed chunk/overlap/batch settings. The UI and backend job failed immediately at 4% with:
 

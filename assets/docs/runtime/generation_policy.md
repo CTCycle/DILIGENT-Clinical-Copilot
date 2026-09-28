@@ -1,6 +1,6 @@
 # Effective LLM inference policy
 
-Last updated: 2026-09-07
+Last updated: 2026-09-28
 
 DILIGENT resolves an effective inference configuration immediately before each
 LLM request. Operators choose the provider, model, and one global reasoning
@@ -29,7 +29,7 @@ coercion reason when a model cannot honor the request.
 
 ## Sampling and output budgets
 
-The catalog at `app/resources/catalogs/llm_generation_policies.json` defines
+The catalog at `resources/catalogs/llm_generation_policies.json` defines
 the deterministic base temperatures: clinical synthesis `0.2`; extraction,
 timeline, revision, and faithful rewrite `0.0`; JSON repair and connectivity
 omit temperature. Capability rules may omit temperature when the selected
@@ -38,7 +38,7 @@ provider parameter invalid. Caller options cannot override the effective
 configuration.
 
 The capability catalog at
-`app/resources/catalogs/llm_model_capabilities.json` resolves exact model,
+`resources/catalogs/llm_model_capabilities.json` resolves exact model,
 longest family prefix, provider, then conservative fallback. Context capacity
 is the intersection of catalog/model capacity and live local runtime capacity.
 The input budget is that capacity less visible output, reasoning reserve, and

@@ -1,7 +1,7 @@
 # Project-specific generated/runtime artifacts
-app/resources/sources/archives/**
-app/resources/sources/documents/**
-app/resources/sources/vectors/**
+resources/sources/archives/**
+resources/sources/documents/**
+resources/sources/vectors/**
 app/client/node_modules/
 app/client/dist/
 app/client/dist-ssr/
