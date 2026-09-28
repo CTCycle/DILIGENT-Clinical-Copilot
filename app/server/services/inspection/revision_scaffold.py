@@ -123,8 +123,10 @@ class InspectionRevisionScaffoldMixin:
             )
 
         pipeline_run_id = uuid.uuid4().hex
+        job_id = uuid.uuid4().hex[:8]
         runtime = resolve_revision_agent_runtime()
         model_configuration = {
+            "job_id": job_id,
             "pipeline_run_id": pipeline_run_id,
             "revision_agent": "single_model_agentic_revision",
             "revision_mode": "agentic_revision",
@@ -151,6 +153,11 @@ class InspectionRevisionScaffoldMixin:
             )
         revision_version_id = int(shell["revision_version_id"])
         model_configuration["revision_version_id"] = revision_version_id
+        if self.session_revision_repository.update_revision_version_configuration(
+            pipeline_run_id=pipeline_run_id,
+            configuration=model_configuration,
+        ) is None:
+            raise RuntimeError("Failed to persist revision job recovery metadata.")
         self.session_revision_repository.create_or_update_revision_run(
             pipeline_run_id=pipeline_run_id,
             session_id=int(session_id),
@@ -178,28 +185,7 @@ class InspectionRevisionScaffoldMixin:
                 "model_configuration": model_configuration,
             },
             scope_key=scope_key,
-        )
-        model_configuration["job_id"] = job_id
-        if self.session_revision_repository.update_revision_version_configuration(
-            pipeline_run_id=pipeline_run_id,
-            configuration=model_configuration,
-        ) is None:
-            self.jobs.cancel_job(job_id)
-            raise RuntimeError("Failed to persist revision job recovery metadata.")
-        self.session_revision_repository.create_or_update_revision_run(
-            pipeline_run_id=pipeline_run_id,
-            session_id=int(session_id),
-            root_session_id=root_session_id,
-            source_version_id=int(source_version["version_id"]),
-            target_revision_version_id=revision_version_id,
-            revision_mode="agentic_revision",
-            revision_kind="llm_assisted_revision",
-            configuration=model_configuration,
-            reviewer_note=revision_request.revision_instruction,
-            status="running",
-            initiated_by="revision_agent",
-            actor_source="system",
-            actor_confidence="system",
+            job_id=job_id,
         )
         status_payload = self.jobs.get_job_status(job_id)
         if status_payload is None:

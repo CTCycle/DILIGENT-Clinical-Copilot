@@ -42,6 +42,7 @@ The older validation reports use run-specific terms such as `PASS`, `ATTENTION`,
 ## Current operational summary
 
 - **Completed validation slice — 2026-09-28 follow-up:** The current RAG boundary now covers empty, unsupported-only, empty/malformed supported, missing, and non-directory inputs, fail-closed zero-supported/zero-chunk updates, and sanitized inspection error contracts. A disposable-SQLite revision test also validated recoverable missing-worker status, persisted failure metadata, unchanged source content, and deterministic retry. The affected backend/API suite passed 129 tests; RAG is `VALIDATED` for this expanded local boundary, while revision remains `PARTIAL` because fresh provider and broader lifecycle faults remain untested. See the [RAG edge validation report](../QA/rag-edge-validation-20260928/report.md) and [revision recovery report](../QA/revision-recovery-validation-20260928/report.md).
+- **Completed validation slice — 2026-09-28 revision/local-provider follow-up:** The current revision worker now persists its job identity, version identity, and recovery configuration before launch, closing a reproducible SQLite-lock race. Final-code disposable runs rechecked the live Ollama catalog, exercised unavailable-service and available-service timeout boundaries, and created a sanitized retry without changing the source report. Focused revision/runtime/API checks passed 53 tests; revision remains `PARTIAL` because no accepted local revision completed and tool-failure, true process-restart, broader lifecycle, and current cloud-provider branches remain open. See the [local Ollama revision validation report](../QA/revision-local-ollama-validation-20260928/report.md).
 
 - **Completed validation slice — 2026-09-25:** From an isolated official-launcher runtime, the in-app Browser at 1280×720 exercised exact Ollama `qwen3.5:2b` fallback and exact `qwen3.5:9b` grounded generation, including visible status, evidence, provenance, date precision, and reload persistence. The supported timeline/local-Ollama boundary is now `VALIDATED`; `qwen3.5:2b` remains documented as a non-blocking model/task compatibility limitation, with no further retry loop unless the model, prompt, or timeline code changes. See the [timeline Browser validation report](../QA/timeline-browser-validation-20260925/report.md).
 - Source-mode startup, the populated SQLite migration path, the application shell, runtime/model settings, one complete current synthetic clinical workflow, the tested RAG fixture, safety guardrails, and the current automated regression slices have meaningful validation evidence.
@@ -101,6 +102,26 @@ their status: OpenCode Go `PARTIAL`, LiverTox refresh/catalogs `PARTIAL` behind
 the NCBI challenge, access-key lifecycle `BLOCKED`, desktop `v3.4.0` release
 `BLOCKED`, and spoken Narrator/Speech Recap output `UNVALIDATED`.
 
+### Revision worker launch ordering and local Ollama boundary — 2026-09-28
+
+The current implementation was revalidated after the RAG/recovery slice. A
+real disposable-SQLite run reproduced a SQLite lock when the revision worker
+could start before its recovery metadata was persisted. The worker now receives
+a preallocated job identifier and starts only after the version and pipeline
+run contain the job/version recovery fields. The focused regression and the
+isolated live-provider attempts below are the authoritative evidence for this
+follow-up.
+
+| Gate | Final status | Latest evidence and remaining limitation |
+|---|---|---|
+| `revision.agentic-lifecycle` | `PARTIAL` | Worker-start ordering, persisted recovery metadata, fresh local-provider unavailable/timeout boundaries, sanitized errors, retry creation, and source preservation passed. No accepted revision completed in the current local model lane; tool-failure injection beyond provider timeout, true process restart, broader provider/model variance, and every lifecycle branch remain incomplete. Evidence: [local Ollama revision validation](../QA/revision-local-ollama-validation-20260928/report.md). |
+| `revision.accepted-session-finalization` | `VALIDATED` for the previously accepted synthetic path only | This follow-up did not create a new accepted child session. The existing exact-provider accepted record remains bounded to its recorded provider/model and authorized review state. |
+| `api.local-boundaries` | `WORKING` for the exercised revision start/status/retry persistence boundary | Disposable SQLite records for start, status, retry, run, step, and version were checked across unavailable-provider and timeout outcomes. The complete 68-path response/error and mutating-route matrix remains outside scope. |
+| `test.automated-regression` | `PARTIAL` | Final-code focused checks passed 33 revision-agent tests and 53 combined revision/runtime/API tests. Frontend, hosted live-provider, and conditional browser lanes were not rerun because no frontend code changed and no cloud-provider secret was injected. |
+| `model.provider.local-ollama` | `VALIDATED` for the existing timeline scope; revision scope remains partial | The live `/api/tags` catalog was rechecked and still contained `qwen3.5:9b` with digest `6488c96fa5faab64bb65cbd30d4289e20e6130ef535a93ef9a49f42eda893ea7` on Ollama `0.34.0`. The revision planner then exceeded the configured 45-second local cap; this does not establish local revision acceptance or change the supported timeline evidence. |
+
+Detailed evidence: [local Ollama revision validation](../QA/revision-local-ollama-validation-20260928/report.md) and [runtime validation ledger](runtime/validation_ledger.md).
+
 ## Open Issues
 
 Severity describes impact and release risk. It is independent of the functional `Status` in the component ledger.
@@ -118,6 +139,7 @@ Validation debt is missing or stale evidence, not an automatic defect claim.
 | Component | Current Confidence | Missing Validation | Priority |
 |---|---|---|---|
 | `clinical.analysis.pipeline` | `VALIDATED` | Additional live provider failure/retry variants, broader clinical fixtures, and rendered RAG modes beyond the completed exact-provider and local RAG-off lanes. Local RAG-off, provider-failure, and job/error contracts are covered by the 2026-09-26 resilience slices. | `MEDIUM` |
+| `revision.agentic-lifecycle` | `PARTIAL` | Accepted current-provider finalization, tool-failure/backend-restart branches, broader provider/model variance, and lifecycle coverage beyond the validated worker-start, unavailable-provider, timeout, recovery, and retry boundaries. | `MEDIUM` |
 | `test.automated-regression` | `PARTIAL` | Local backend/frontend/static/build checks and hosted core CI are current and green; the selected 2026-09-26 focused backend/API slice passed. The explicit live-provider dispatch failed before any provider request because `OPENCODE_GO_API_KEY` was absent; conditional browser coverage remains open. | `MEDIUM` |
 | `data.sources.refresh` | `PARTIAL` | Successful ordered all-source refresh and retry after the external LiverTox CAPTCHA clears; current failure preservation, cancellation, and DILIrank recovery evidence is linked in the report. The 2026-09-28 live NCBI preflight reconfirmed the `recaptcha`/`challengepage` blocker. | `HIGH` |
 | `sessions.timeline` | `VALIDATED` | Supported local timeline boundary is now covered by exact 2B fail-closed fallback and exact 9B grounded Browser/API/reload evidence. Remaining debt is broader clinical/provider/event-family coverage, not another unchanged 2B retry. See the [timeline Browser validation report](../QA/timeline-browser-validation-20260925/report.md). | `MEDIUM` |
@@ -133,6 +155,7 @@ These entries document provenance only. They are not active issues and must not 
 
 | Finding | Component | Resolution evidence | Current state |
 |---|---|---|---|
+| `RESOLVED-008` — revision worker startup could race the persistence of its job/revision recovery metadata and hit a SQLite lock. | `revision.agentic-lifecycle`, `api.local-boundaries` | [Local Ollama revision validation](../QA/revision-local-ollama-validation-20260928/report.md) records the reproduction, preallocated job identity, pre-launch version/run persistence, duplicate-ID guard, 33-test regression, and final-code live fail-closed/retry revalidation. | Remediated and revalidated; accepted revision, true process restart, and broader lifecycle coverage remain separate partial gates. |
 | `RESOLVED-006` — `ISSUE-001`: exact configured revision finalization was previously unproven. | `model.provider.opencode-go`, `revision.accepted-session-finalization` | [2026-09-22 revision acceptance](../QA/revision-acceptance-2026-09-22.md) records run 34 producing a validated patch, passing deterministic and LLM QA, creating child session 24/version 61, surviving navigation and reload, and run 35 selecting version 61 as the subsequent source before deliberate cancellation. | Removed from active issues; the broader OpenCode Go provider matrix remains `PARTIAL`. |
 | `RESOLVED-007` — `ISSUE-004`: source-backed empty/invalid local timeline results now fail closed with evidence-preserving fallback, and the supported timeline boundary is revalidated. | `sessions.timeline`, `model.provider.local-ollama` | [Timeline Browser validation](../QA/timeline-browser-validation-20260925/report.md) records exact 2B fallback, exact 9B grounded output, rendered provenance/evidence/date precision, reload persistence, API responses, SQLite integrity, and focused test/build evidence. | Removed from active issues; `qwen3.5:2b` structured-output incompatibility is a documented non-blocking model limitation, not an unresolved application gate. |
 | `RESOLVED-001` — populated SQLite migration rejected a parent-table rebuild while child rows existed. | `runtime.database.sqlite-migrations` | [Migration remediation](../QA/release-blocker-remediation-20260918.md) added FK-safe transaction coordination, `foreign_key_check`, and populated-clone verification; the launcher then reopened the database in the [2026-09-19 E2E run](../QA/agentic-revision-e2e-20260919.md). | Removed from active issues; keep migration regression coverage. |

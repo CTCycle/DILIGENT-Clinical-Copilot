@@ -1,5 +1,5 @@
 # Pre-release validation ledger
-Last updated: 2026-09-27
+Last updated: 2026-09-28
 
 ## Scope and interpretation
 
@@ -1087,3 +1087,66 @@ Detailed evidence: [RAG edge validation and gate triage](../QA/rag-edge-validati
 Task-owned pytest caches, temporary databases, fixtures, and generated Python
 bytecode were cleaned after validation. No task-owned server, browser, watcher,
 or helper process remained running.
+
+## Revision worker launch ordering and local Ollama boundary — 2026-09-28
+
+1. Reviewed the current component ledger after the RAG/recovery follow-up and
+   selected the next coherent local slice: revision worker-start ordering,
+   persisted recovery metadata, fresh local-provider failure/timeout behavior,
+   and retry/source-preservation evidence. OpenCode Go, access-key mutation,
+   NCBI refresh, desktop publication, and spoken screen-reader output remain
+   independent gates.
+2. The checked-out `develop` tree was at `84ac223e`, equal to `origin/develop`
+   before this working-tree change. A disposable clone of the existing
+   database was used for every live revision attempt. The shared database,
+   settings, credentials, and provider caches were not mutated.
+3. The first live attempt against the pre-fix implementation reproduced
+   `sqlite3.OperationalError: database is locked` while the caller persisted
+   revision-run configuration after the worker had already started. The fix
+   preallocates the job identifier, persists the job/version recovery fields
+   before launch, passes that identifier into `JobManager.start_job`, and
+   rejects duplicate identifiers under the job-manager lock. A regression now
+   reads both persisted records before allowing the worker to start.
+4. The local Ollama catalog was re-discovered from the live `/api/tags`
+   endpoint after the model-update concern. Ollama `0.34.0` returned seven
+   models and still contained the exact selected `qwen3.5:9b` model with
+   parameter size `9.7B` and digest
+   `6488c96fa5faab64bb65cbd30d4289e20e6130ef535a93ef9a49f42eda893ea7`. This
+   evidence is catalog- and digest-scoped; it is not a claim that the model
+   name will remain installed in a later catalog.
+5. Final-code live validation used resolved `ollama / qwen3.5:9b` with cloud
+   services disabled and the source report `Possible drug-induced liver injury
+   from amoxicillin. Clinical review is required.` The fresh attempt failed
+   closed while Ollama was unavailable (`95e38fb4`, pipeline
+   `178faacb7fbc4454a6f06907575c5a8c`); retry produced a new failed job
+   (`c80ac3d6`, pipeline `4a42a7d71e18471895ba53bf75b45900`). After the local
+   server was started, a retry against the persisted failed run created
+   `cd7d4faa` / pipeline `ce5b911c275c438c9faade1fe31a4652`, version `66`, and
+   reached the configured 45-second local inference cap at
+   `revision_agent_planner`. User-facing errors were sanitized; bounded step
+   diagnostics retained only provider/model/operation context, and the source
+   report remained unchanged in every attempt.
+6. The final-code focused revision suite passed **33 tests** and the combined
+   revision/runtime/API regression passed **53 tests** with two existing
+   dependency/deprecation warnings. Ruff passed, Pyright reported `0 errors,
+   0 warnings, 0 informations`, and `git diff --check` passed. No frontend
+   files changed, so the canonical Angular suite was not rerun.
+
+| Gate | Final status | Evidence boundary and remaining limitation |
+|---|---|---|
+| `revision.agentic-lifecycle` | `PARTIAL` | Worker-start ordering, recovery metadata, unavailable-provider and timeout fail-closed boundaries, sanitized errors, retry creation, and source preservation are validated. No accepted revision completed in the current local model lane; tool-failure injection beyond provider timeout, true process restart, broader provider/model variance, and every lifecycle branch remain incomplete. |
+| `revision.accepted-session-finalization` | `VALIDATED` for the previously accepted synthetic path only | This slice did not create a new accepted child session. Existing accepted evidence remains bounded to its recorded provider/model and authorized clinical-review state. |
+| `api.local-boundaries` | `WORKING` for the exercised revision start/status/retry persistence boundary | Start, status, retry, run, step, and version records were checked in disposable SQLite. The complete 68-path response/error and mutating-route matrix remains outside scope. |
+| `test.automated-regression` | `PARTIAL` | The affected final-code backend/API regression is green. Frontend, hosted live-provider, and conditional browser lanes were not rerun. |
+| `model.provider.local-ollama` | `VALIDATED` for the existing timeline scope; revision scope remains partial | The current catalog still contains `qwen3.5:9b`, but revision planning exceeded the 45-second local cap. This does not establish local revision acceptance or change the supported timeline evidence. |
+| `model.provider.opencode-go` | `PARTIAL` | No current OpenCode Go request was made because the local process had no approved key. |
+| `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available or mutated. |
+| `data.sources.refresh` | `PARTIAL` | NCBI LiverTox remains behind the upstream human-verification challenge. |
+| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged/hosted/clean-machine publication evidence remains separate. |
+| spoken Narrator/Speech Recap output | `UNVALIDATED` | Rendered and keyboard evidence does not establish audible screen-reader output. |
+
+Detailed evidence: [local Ollama revision validation](../QA/revision-local-ollama-validation-20260928/report.md).
+
+Task-owned disposable databases, pytest caches, generated bytecode, and the
+direct Ollama server were removed or stopped after capture. Protected cache
+residue was preserved.

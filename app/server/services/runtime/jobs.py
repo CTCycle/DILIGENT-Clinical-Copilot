@@ -122,8 +122,11 @@ class JobManager:
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
         scope_key: str | None = None,
+        job_id: str | None = None,
     ) -> str:
-        job_id = str(uuid.uuid4())[:8]
+        job_id = str(job_id or uuid.uuid4()).strip()[:8]
+        if not job_id:
+            raise ValueError("Job id must not be empty")
         state = JobState(
             job_id=job_id,
             job_type=job_type,
@@ -144,6 +147,8 @@ class JobManager:
         with self.lock:
             if not self.accepting_jobs:
                 raise RuntimeError("Job manager is shutting down")
+            if job_id in self.jobs:
+                raise RuntimeError(f"Job id '{job_id}' is already in use")
             self.jobs[job_id] = state
             self.threads[job_id] = thread
             state.update(status="running")
