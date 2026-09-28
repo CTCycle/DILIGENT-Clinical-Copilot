@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 import app as server_app_module
 
+
 ###############################################################################
 def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ignore[no-untyped-def]
     events: list[str] = []
@@ -37,6 +38,11 @@ def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ign
     )
     monkeypatch.setattr(
         server_app_module,
+        "reconcile_interrupted_revision_jobs",
+        lambda _jobs: events.append("revision-recovery"),
+    )
+    monkeypatch.setattr(
+        server_app_module,
         "run_startup_validations",
         lambda _settings: events.append("validation"),
     )
@@ -59,6 +65,7 @@ def test_application_startup_synchronizes_sqlite_before_validation(monkeypatch) 
         "database",
         "configuration",
         "jobs",
+        "revision-recovery",
         "provider",
         "validation",
         "running",
@@ -73,6 +80,7 @@ def test_application_startup_synchronizes_postgresql_before_validation(
         "database",
         "configuration",
         "jobs",
+        "revision-recovery",
         "provider",
         "validation",
         "running",
