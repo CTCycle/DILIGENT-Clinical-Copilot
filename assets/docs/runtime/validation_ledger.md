@@ -1251,3 +1251,41 @@ were checked offline. Protected repository cache residue was preserved.
 | spoken Narrator/Speech Recap output | `UNVALIDATED` | Rendered, keyboard, and accessibility-tree evidence does not establish audible output. |
 
 Detailed evidence: [revision restart/tool-failure validation](../../QA/revision-restart-recovery-validation-20260928/report.md).
+
+## Revision cancellation and timeout follow-up — 2026-09-28
+
+The next credential-free revision slice exercised the public service
+cancellation path while a deterministic planner call was held open. The
+in-memory job remained `running` with `stop_requested=true` until the worker
+observed the cooperative stop; the persisted run and planner step became
+`cancelled`, the same-root retry stayed blocked during worker unwind, and a
+new retry was admitted after exit. The retry completed its deterministic no-op
+path as `requires_human_review`, and the source report was unchanged throughout.
+
+A second test raised the real `LLMTimeout` contract for `ollama /
+qwen3.5:9b`. The persisted run and planner step retained exact provider,
+model, operation, `error_code=timeout`, and `retryable=true` metadata without
+raw provider detail or secret-shaped content.
+
+The selected revision/runtime/startup/API/cloud-error/clinical-route suite
+passed **79 tests** with two existing dependency/deprecation warnings. The
+revision subset contained **50 passing tests** after adding the two regression
+checks. Targeted Ruff, Pyright from `app/server` (`0 errors, 0 warnings, 0
+informations`), and `git diff --check` passed. No application source defect
+was found, so the implementation was unchanged; the cancellation and timeout
+tests remain as regression evidence.
+
+| Gate | Final status | Evidence boundary and remaining limitation |
+|---|---|---|
+| `revision.agentic-lifecycle` | `PARTIAL` | Cooperative service cancellation, same-root admission, timeout diagnostics, source preservation, startup recovery, tool failure, unavailable-provider failure, and deterministic retry are validated. Fresh accepted current-provider execution, broader provider/model variance, and every lifecycle branch remain incomplete. |
+| `revision.accepted-session-finalization` | `VALIDATED` for the exact previous synthetic accepted path | This slice cancelled before finalization and did not create a new accepted child session. The prior accepted record remains bounded to its recorded provider/model and review state. |
+| `api.local-boundaries` | `WORKING` for the exercised revision cancellation/status/retry boundary | The service-level cancellation and retry contracts passed; the complete 68-path response/error and mutating-route matrix remains outside scope. |
+| `test.automated-regression` | `PARTIAL` | The selected local backend/API/static checks are green. Hosted live-provider, conditional browser, and hosted exact-commit lanes remain incomplete. |
+| `model.provider.opencode-go` | `PARTIAL` | No approved current key was available and no cloud request was made. Historical exact-provider evidence remains bounded. |
+| `model.provider.local-ollama` | `VALIDATED` for the existing timeline scope; revision scope remains partial | The timeout contract is validated without changing the supported timeline boundary. No accepted local revision was produced. |
+| `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available or mutated. |
+| `data.inspection.catalogs` / `data.sources.refresh` | `PARTIAL` | The NCBI Bookshelf human-verification blocker remains. |
+| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged, hosted packaging, clean-machine, and publication prerequisites remain separate. |
+| spoken Narrator/Speech Recap output | `UNVALIDATED` | Rendered, keyboard, and accessibility-tree evidence does not establish audible output. |
+
+Detailed evidence: [revision cancellation and timeout validation](../../QA/revision-cancellation-timeout-validation-20260928/report.md).
