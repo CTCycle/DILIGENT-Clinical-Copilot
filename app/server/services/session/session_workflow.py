@@ -69,6 +69,7 @@ from services.session.workflow_shared import (
     emit_progress as _emit_progress,
     resolve_rucam_source as _resolve_rucam_source,
 )
+from services.runtime.async_batches import run_batched_in_order
 
 ###############################################################################
 def _report_contains_rag_bibliography(
@@ -264,21 +265,36 @@ async def process_single_patient_workflow(
         _PROGRESS_SEQUENCE[3][0],
     )
 
-    preflight = await check_parser_batch_capacity(task_count=2)
+    pipeline_settings = get_server_settings().session_pipeline
+    extraction_batch_size = max(
+        int(pipeline_settings.text_extraction_batch_size), 1
+    )
+    extraction_max_concurrency = max(
+        int(pipeline_settings.text_extraction_max_concurrency), 1
+    )
+    parser_task_count = min(2, extraction_batch_size, extraction_max_concurrency)
+    preflight = await check_parser_batch_capacity(task_count=parser_task_count)
     if preflight.concurrency_allowed:
-        anamnesis_drugs, therapy_drugs = await asyncio.gather(
-            service.extract_anamnesis_drugs(
-                anamnesis_text=cleaned_anamnesis_text,
-                issues=issues,
-                progress_callback=progress_callback,
-                stop_check=stop_check,
-            ),
-            service.extract_therapy_drugs(
+        async def extract_drug_group(group: str) -> PatientDrugs:
+            if group == "anamnesis":
+                return await service.extract_anamnesis_drugs(
+                    anamnesis_text=cleaned_anamnesis_text,
+                    issues=issues,
+                    progress_callback=progress_callback,
+                    stop_check=stop_check,
+                )
+            return await service.extract_therapy_drugs(
                 cleaned_therapy_text=cleaned_therapy_text,
                 issues=issues,
                 progress_callback=progress_callback,
                 stop_check=stop_check,
-            ),
+            )
+
+        anamnesis_drugs, therapy_drugs = await run_batched_in_order(
+            ["anamnesis", "therapy"],
+            batch_size=extraction_batch_size,
+            max_concurrency=extraction_max_concurrency,
+            worker=extract_drug_group,
         )
     else:
         logger.info(

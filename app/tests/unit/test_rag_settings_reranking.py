@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from configurations.management import (
     EnvironmentSnapshot,
-    build_settings_payload_from_json,
+    build_settings_payload,
 )
 
 ###############################################################################
@@ -15,9 +15,9 @@ def _env() -> EnvironmentSnapshot:
 
 ###############################################################################
 def test_build_rag_settings_reads_retrieval_counts() -> None:
-    payload = build_settings_payload_from_json(
+    payload = build_settings_payload(
         {
-            "rag": {
+            "rag_settings": {
                 "use_reranking": True,
                 "retrieval_candidate_count": 100,
                 "retrieval_selected_count": 10,
@@ -46,8 +46,8 @@ def test_build_rag_settings_reads_retrieval_counts() -> None:
 
 ###############################################################################
 def test_build_rag_settings_enforces_candidate_floor() -> None:
-    payload = build_settings_payload_from_json(
-        {"rag": {"retrieval_candidate_count": 3, "retrieval_selected_count": 10}},
+    payload = build_settings_payload(
+        {"rag_settings": {"retrieval_candidate_count": 3, "retrieval_selected_count": 10}},
         _env(),
     )
     settings = payload["rag"]
@@ -56,7 +56,7 @@ def test_build_rag_settings_enforces_candidate_floor() -> None:
 
 ###############################################################################
 def test_build_rag_settings_defaults_to_lightweight_reranker_profile() -> None:
-    payload = build_settings_payload_from_json({"rag": {}}, _env())
+    payload = build_settings_payload({"rag_settings": {}}, _env())
     settings = payload["rag"]
 
     assert settings["reranker_model"] == "lightweight-balanced-v1"
@@ -69,8 +69,8 @@ def test_build_rag_settings_defaults_to_lightweight_reranker_profile() -> None:
 
 ###############################################################################
 def test_build_rag_settings_can_disable_local_filesystem_access() -> None:
-    payload = build_settings_payload_from_json(
-        {"rag": {"allow_local_filesystem_access": False}},
+    payload = build_settings_payload(
+        {"rag_settings": {"allow_local_filesystem_access": False}},
         _env(),
     )
 

@@ -216,7 +216,7 @@ class CloudEmbeddingGenerator:
         *,
         provider: ProviderName,
         model: str,
-        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
+        timeout_s: float | None = None,
     ) -> None:
         normalized_provider = (provider or "").strip().lower()
         if normalized_provider not in {"openai", "gemini"}:
@@ -228,7 +228,11 @@ class CloudEmbeddingGenerator:
             Literal["openai", "gemini"], normalized_provider
         )
         self.model = resolved_model
-        self.timeout_s = float(timeout_s)
+        self.timeout_s = float(
+            get_server_settings().runtime.default_llm_timeout
+            if timeout_s is None
+            else timeout_s
+        )
         self.api_key = self.resolve_provider_access_key(self.provider)
 
     # -------------------------------------------------------------------------
@@ -290,16 +294,21 @@ class OllamaEmbeddingGenerator:
         *,
         model: str,
         base_url: str | None = None,
-        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
+        timeout_s: float | None = None,
     ) -> None:
         resolved_model = (model or "").strip()
         if not resolved_model:
             raise ValueError("Ollama embedding model is required")
         self.model = resolved_model
+        runtime_settings = get_server_settings()
         self.base_url = (
-            base_url or get_server_settings().llm_defaults.ollama_host_default
+            base_url or runtime_settings.llm_defaults.ollama_host_default
         ).rstrip("/")
-        self.timeout_s = float(timeout_s)
+        self.timeout_s = float(
+            runtime_settings.runtime.default_llm_timeout
+            if timeout_s is None
+            else timeout_s
+        )
 
     # -------------------------------------------------------------------------
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
@@ -349,8 +358,13 @@ def select_embedding_provider(
     use_cloud_embeddings: bool = False,
     cloud_provider: str | None = None,
     cloud_embedding_model: str | None = None,
-    timeout_s: float = get_server_settings().runtime.default_llm_timeout,
+    timeout_s: float | None = None,
 ) -> CloudEmbeddingGenerator | OllamaEmbeddingGenerator:
+    resolved_timeout_s = (
+        get_server_settings().runtime.default_llm_timeout
+        if timeout_s is None
+        else timeout_s
+    )
     normalized_backend = backend.lower().strip() if backend else "ollama"
     if use_cloud_embeddings:
         normalized_backend = "cloud"
@@ -369,14 +383,14 @@ def select_embedding_provider(
         return CloudEmbeddingGenerator(
             provider=cast(ProviderName, provider_normalized),
             model=cloud_embedding_model,
-            timeout_s=timeout_s,
+            timeout_s=resolved_timeout_s,
         )
 
     if normalized_backend == "ollama":
         return OllamaEmbeddingGenerator(
             model=(ollama_model or "").strip(),
             base_url=ollama_base_url,
-            timeout_s=timeout_s,
+            timeout_s=resolved_timeout_s,
         )
 
     raise ValueError(f"Unsupported embedding backend: {backend}")

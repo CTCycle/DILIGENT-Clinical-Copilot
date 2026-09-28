@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from configurations.management import (
     EnvironmentSnapshot,
-    build_settings_payload_from_json,
+    build_settings_payload,
 )
 
 ###############################################################################
@@ -15,7 +15,7 @@ def _env() -> EnvironmentSnapshot:
 
 ###############################################################################
 def test_runtime_timeouts_respect_values_and_minimums() -> None:
-    payload = build_settings_payload_from_json(
+    payload = build_settings_payload(
         {
             "runtime": {
                 "default_llm_timeout": 120.0,
@@ -47,7 +47,7 @@ def test_runtime_timeouts_respect_values_and_minimums() -> None:
 
 ###############################################################################
 def test_runtime_timeouts_floor_to_positive_values() -> None:
-    payload = build_settings_payload_from_json(
+    payload = build_settings_payload(
         {
             "runtime": {
                 "default_llm_timeout": -100.0,
@@ -79,7 +79,7 @@ def test_runtime_timeouts_floor_to_positive_values() -> None:
 
 ###############################################################################
 def test_runtime_timeouts_allow_long_clinical_budget_without_legacy_cap() -> None:
-    payload = build_settings_payload_from_json(
+    payload = build_settings_payload(
         {
             "runtime": {
                 "default_llm_timeout": 7200.0,
@@ -95,7 +95,7 @@ def test_runtime_timeouts_allow_long_clinical_budget_without_legacy_cap() -> Non
 
 ###############################################################################
 def test_runtime_timeout_caps_floor_to_minimum_llm_timeout() -> None:
-    payload = build_settings_payload_from_json(
+    payload = build_settings_payload(
         {
             "runtime": {
                 "minimum_llm_timeout": 8.0,

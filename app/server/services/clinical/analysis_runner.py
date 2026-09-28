@@ -22,6 +22,7 @@ from services.clinical.drug_analysis import DrugAnalysisService
 from services.clinical.exposure_timeline import ExposureTimelineService
 from services.clinical.rag_support import RagSupportService
 from services.clinical.report_finalizer import ReportFinalizer
+from services.runtime.async_batches import run_batched_in_order
 from services.text.normalization import normalize_drug_query_name
 
 CLAIM_EVIDENCE_QUOTE_MAX_LENGTH = 1000
@@ -163,6 +164,9 @@ class AnalysisRunner:
         pipeline_issues: list[PipelineIssue],
         resolve_livertox_data_for_entry: Callable[..., dict[str, Any]],
         emit_progress: Callable[..., None],
+        retrieval_batch_size: int = 8,
+        retrieval_max_concurrency: int = 4,
+        clinical_assessment_batch_size: int = 2,
     ) -> None:
         self.drugs = drugs
         self.exposure_timeline = exposure_timeline
@@ -173,6 +177,11 @@ class AnalysisRunner:
         self.pipeline_issues = pipeline_issues
         self.resolve_livertox_data_for_entry = resolve_livertox_data_for_entry
         self.emit_progress = emit_progress
+        self.retrieval_batch_size = max(int(retrieval_batch_size), 1)
+        self.retrieval_max_concurrency = max(int(retrieval_max_concurrency), 1)
+        self.clinical_assessment_batch_size = max(
+            int(clinical_assessment_batch_size), 1
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -372,8 +381,11 @@ class AnalysisRunner:
                 if normalized_key:
                     rucam_by_key[normalized_key] = item
 
-        for idx, drug_entry in enumerate(self.drugs.entries):
-            entry, job = await prepare_fn(
+        async def prepare_item(
+            item: tuple[int, Any],
+        ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
+            idx, drug_entry = item
+            return await prepare_fn(
                 idx=idx,
                 drug_entry=drug_entry,
                 resolved_drugs=resolved_drugs,
@@ -384,21 +396,35 @@ class AnalysisRunner:
                 rag_query=rag_query,
                 rucam_by_key=rucam_by_key,
             )
+
+        prepared_items = await run_batched_in_order(
+            list(enumerate(self.drugs.entries)),
+            batch_size=self.retrieval_batch_size,
+            max_concurrency=self.retrieval_max_concurrency,
+            worker=prepare_item,
+        )
+        for entry, job in prepared_items:
             entries.append(entry)
             if job:
                 llm_jobs.append(job)
 
         self.emit_progress(progress_callback, stage="llm_analysis", fraction=0.0)
         if llm_jobs:
-            semaphore = asyncio.Semaphore(self.max_parallel_analyses)
-            pending_tasks = [
-                asyncio.create_task(self.execute_bounded_job(idx, task, semaphore))
-                for idx, task in llm_jobs
-            ]
+            async def run_assessment_job(
+                item: tuple[int, Any],
+            ) -> tuple[int, Any]:
+                idx, task = item
+                return await self.execute_indexed_job(idx, task)
+
+            completed_results = await run_batched_in_order(
+                llm_jobs,
+                batch_size=self.clinical_assessment_batch_size,
+                max_concurrency=self.max_parallel_analyses,
+                worker=run_assessment_job,
+            )
             completed = 0
-            total = len(pending_tasks)
-            for task in asyncio.as_completed(pending_tasks):
-                idx, outcome = await task
+            total = len(completed_results)
+            for idx, outcome in completed_results:
                 entry = entries[idx]
                 if isinstance(outcome, Exception):
                     logger.error(

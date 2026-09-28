@@ -27,36 +27,29 @@ def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
 
 ###############################################################################
 class DrugsLookup:
-    DIRECT_CONFIDENCE = get_server_settings().drugs_matcher.direct_confidence
-    MASTER_CONFIDENCE = get_server_settings().drugs_matcher.master_confidence
-    SYNONYM_CONFIDENCE = get_server_settings().drugs_matcher.synonym_confidence
-    MIN_CONFIDENCE = get_server_settings().drugs_matcher.min_confidence
-    NORMALIZATION_CACHE_LIMIT = (
-        get_server_settings().drugs_matcher.normalization_cache_limit
-    )
-    MATCH_CACHE_LIMIT = get_server_settings().drugs_matcher.match_cache_limit
-    ALIAS_CACHE_LIMIT = get_server_settings().drugs_matcher.alias_cache_limit
-    TOKEN_MIN_LENGTH = get_server_settings().drugs_matcher.token_min_length
     CATALOG_EXCLUDED_TERM_SUFFIXES: tuple[str, ...] = ()
-    CATALOG_INDEX_LIMIT = get_server_settings().drugs_matcher.catalog_index_limit
-    SPELLING_CONFIDENCE = get_server_settings().drugs_matcher.spelling_confidence
-    SPELLING_MIN_QUERY_LENGTH = (
-        get_server_settings().drugs_matcher.spelling_min_query_length
-    )
-    SPELLING_SHORT_NAME_LENGTH = (
-        get_server_settings().drugs_matcher.spelling_short_name_length
-    )
-    SPELLING_SHORT_MAX_DISTANCE = (
-        get_server_settings().drugs_matcher.spelling_short_max_distance
-    )
-    SPELLING_LONG_MAX_DISTANCE = (
-        get_server_settings().drugs_matcher.spelling_long_max_distance
-    )
     REGIMEN_SPLIT_RE = re.compile(r"(?:\s*\+\s*|\s*/\s*|\s+\bplus\b\s+)", re.IGNORECASE)
     BRAND_COMBO_PREFERENCES: dict[str, str] = {}
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
+        matcher_settings = get_server_settings().drugs_matcher
+        self.DIRECT_CONFIDENCE = matcher_settings.direct_confidence
+        self.MASTER_CONFIDENCE = matcher_settings.master_confidence
+        self.SYNONYM_CONFIDENCE = matcher_settings.synonym_confidence
+        self.MIN_CONFIDENCE = matcher_settings.min_confidence
+        self.NORMALIZATION_CACHE_LIMIT = matcher_settings.normalization_cache_limit
+        self.MATCH_CACHE_LIMIT = matcher_settings.match_cache_limit
+        self.ALIAS_CACHE_LIMIT = matcher_settings.alias_cache_limit
+        self.TOKEN_MIN_LENGTH = matcher_settings.token_min_length
+        self.CATALOG_INDEX_LIMIT = matcher_settings.catalog_index_limit
+        self.SPELLING_CONFIDENCE = matcher_settings.spelling_confidence
+        self.SPELLING_MIN_QUERY_LENGTH = matcher_settings.spelling_min_query_length
+        self.SPELLING_SHORT_NAME_LENGTH = matcher_settings.spelling_short_name_length
+        self.SPELLING_SHORT_MAX_DISTANCE = (
+            matcher_settings.spelling_short_max_distance
+        )
+        self.SPELLING_LONG_MAX_DISTANCE = matcher_settings.spelling_long_max_distance
         self.CATALOG_EXCLUDED_TERM_SUFFIXES = _catalog_excluded_term_suffixes()
         self.data: LiverToxData | None = None
         self.match_cache: BoundedCache[str, LiverToxMatch] = BoundedCache(

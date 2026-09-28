@@ -81,7 +81,7 @@ Maintained source-level structure, with build and cache artifacts omitted:
 |-- settings/
 |   |-- .env
 |   |-- .env.example
-|   `-- configurations.json
+|   `-- (operator settings live in application_configuration)
 |-- app/
 |   |-- resources/
 |   |   |-- catalogs/

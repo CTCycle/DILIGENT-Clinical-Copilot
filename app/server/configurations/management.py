@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import os
-from pathlib import Path
 from threading import RLock
 from typing import Any
 from urllib.parse import urlparse
@@ -15,9 +13,7 @@ from common.constants import (
     DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
     DEFAULT_DRUG_MATCH_SPELLING_MIN_QUERY_LENGTH,
     DEFAULT_DRUG_MATCH_SPELLING_SHORT_MAX_DISTANCE,
-    DEFAULT_DRUG_MATCH_SPELLING_SHORT_NAME_LENGTH,
     DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH,
-    DEFAULT_EMBEDDING_BATCH_SIZE,
     FASTAPI_DESCRIPTION,
     FASTAPI_TITLE,
     OLLAMA_DEFAULT_HOST,
@@ -29,7 +25,6 @@ from common.catalogs.model_choices import (
     get_clinical_model_choices,
     get_text_extraction_model_choices,
 )
-from common.paths import CONFIGURATIONS_FILE
 from common.version import resolve_application_version
 from common.utils.types import (
     coerce_bool,
@@ -42,6 +37,8 @@ from common.utils.types import (
 from domain.model_configs import ReasoningLevel
 from domain.settings.configuration import (
     DatabaseSettings,
+    ClinicalLanguageDetectionSettings,
+    DEFAULT_RAG_SETTINGS,
     DrugsMatcherSettings,
     FastAPISettings,
     IngestionSettings,
@@ -63,35 +60,15 @@ def ensure_mapping(value: Any) -> dict[str, Any]:
         return value
     return {}
 
-###############################################################################
-def load_configuration_data(path: str | Path) -> dict[str, Any]:
-    config_path = Path(path)
-    if not config_path.exists():
-        raise RuntimeError(f"Configuration file not found: {config_path}")
-    try:
-        with config_path.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"Unable to load configuration from {config_path}") from exc
-    if not isinstance(data, dict):
-        raise RuntimeError("Configuration must be a JSON object.")
-    return data
-
-###############################################################################
 class ConfigurationManager:
 
     # -------------------------------------------------------------------------
-    def __init__(self, config_path: str | None = None) -> None:
-        self._config_path = Path(config_path or CONFIGURATIONS_FILE)
+    def __init__(self, persisted_payload: dict[str, Any] | None = None) -> None:
         self._lock = RLock()
+        self._persisted_payload = ensure_mapping(persisted_payload).copy()
         self._raw_data: dict[str, Any] = {}
         self._settings: ServerSettings | None = None
         self.reload()
-
-    # -------------------------------------------------------------------------
-    @property
-    def config_path(self) -> Path:
-        return self._config_path
 
     # -------------------------------------------------------------------------
     @property
@@ -104,10 +81,12 @@ class ConfigurationManager:
             return self._settings
 
     # -------------------------------------------------------------------------
-    def reload(self) -> ServerSettings:
+    def reload(self, persisted_payload: dict[str, Any] | None = None) -> ServerSettings:
         with self._lock:
-            loaded = load_configuration_data(self._config_path)
-            payload = build_settings_payload_from_json(
+            if persisted_payload is not None:
+                self._persisted_payload = ensure_mapping(persisted_payload).copy()
+            loaded = self._persisted_payload
+            payload = build_settings_payload(
                 loaded,
                 environment_snapshot_from_os_env(),
             )
@@ -115,13 +94,32 @@ class ConfigurationManager:
                 settings = ServerSettings.model_validate(payload)
             except ValidationError as exc:
                 raise RuntimeError(f"Invalid configuration settings: {exc}") from exc
-            self._raw_data = loaded
+            self._raw_data = {
+                **loaded,
+                "rag": payload["rag"],
+                "clinical_language_detection": payload[
+                    "clinical_language_detection"
+                ],
+            }
             self._settings = settings
             return settings
 
     # -------------------------------------------------------------------------
+    def reload_from_database(self) -> ServerSettings:
+        from repositories.serialization.application_configuration import (
+            ApplicationConfigurationSerializer,
+        )
+
+        payload = ApplicationConfigurationSerializer().load() or {}
+        return self.reload(payload)
+
+    # -------------------------------------------------------------------------
     def get_block(self, block_name: str) -> dict[str, Any]:
         with self._lock:
+            if self._settings is not None and hasattr(self._settings, block_name):
+                value = getattr(self._settings, block_name)
+                if hasattr(value, "model_dump"):
+                    return value.model_dump(mode="python")
             return ensure_mapping(self._raw_data.get(block_name)).copy()
 
     # -------------------------------------------------------------------------
@@ -387,7 +385,7 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
         ),
         spelling_short_name_length=coerce_positive_int(
             data.get("spelling_short_name_length"),
-            DEFAULT_DRUG_MATCH_SPELLING_SHORT_NAME_LENGTH,
+            8,
         ),
         spelling_short_max_distance=coerce_positive_int(
             data.get("spelling_short_max_distance"),
@@ -403,40 +401,74 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
 def _build_rag_settings(
     data: dict[str, Any], defaults: LLMRuntimeDefaults
 ) -> RagSettings:
-    selected_count = coerce_positive_int(data.get("retrieval_selected_count"), 6)
-    candidate_count = coerce_positive_int(data.get("retrieval_candidate_count"), 40)
+    selected_count = coerce_positive_int(
+        data.get("retrieval_selected_count"),
+        DEFAULT_RAG_SETTINGS["retrieval_selected_count"],
+    )
+    candidate_count = coerce_positive_int(
+        data.get("retrieval_candidate_count"),
+        DEFAULT_RAG_SETTINGS["retrieval_candidate_count"],
+    )
     if candidate_count < selected_count:
         candidate_count = selected_count
     return RagSettings(
         allow_local_filesystem_access=coerce_bool(
-            data.get("allow_local_filesystem_access"), True
+            data.get("allow_local_filesystem_access"),
+            DEFAULT_RAG_SETTINGS["allow_local_filesystem_access"],
         ),
         vector_collection_name=coerce_str(
-            data.get("vector_collection_name"), "documents"
+            data.get("vector_collection_name"),
+            DEFAULT_RAG_SETTINGS["vector_collection_name"],
         ),
-        chunk_size=coerce_positive_int(data.get("chunk_size"), 512),
-        chunk_overlap=coerce_positive_int(data.get("chunk_overlap"), 64),
+        chunk_size=coerce_positive_int(
+            data.get("chunk_size"), DEFAULT_RAG_SETTINGS["chunk_size"]
+        ),
+        chunk_overlap=coerce_positive_int(
+            data.get("chunk_overlap"), DEFAULT_RAG_SETTINGS["chunk_overlap"]
+        ),
         embedding_batch_size=coerce_positive_int(
             data.get("embedding_batch_size"),
-            DEFAULT_EMBEDDING_BATCH_SIZE,
+            DEFAULT_RAG_SETTINGS["embedding_batch_size"],
         ),
-        use_hybrid_search=coerce_bool(data.get("use_hybrid_search"), True),
-        use_reranking=coerce_bool(data.get("use_reranking"), True),
+        use_hybrid_search=coerce_bool(
+            data.get("use_hybrid_search"), DEFAULT_RAG_SETTINGS["use_hybrid_search"]
+        ),
+        use_reranking=coerce_bool(
+            data.get("use_reranking"), DEFAULT_RAG_SETTINGS["use_reranking"]
+        ),
         retrieval_candidate_count=candidate_count,
         retrieval_selected_count=selected_count,
         reranker_model=coerce_str(
-            data.get("reranker_model"), "lightweight-balanced-v1"
+            data.get("reranker_model"), DEFAULT_RAG_SETTINGS["reranker_model"]
         ),
         hybrid_vector_weight=max(
-            coerce_float(data.get("hybrid_vector_weight"), 0.65), 0.0
+            coerce_float(
+                data.get("hybrid_vector_weight"),
+                DEFAULT_RAG_SETTINGS["hybrid_vector_weight"],
+            ),
+            0.0,
         ),
-        hybrid_text_weight=max(coerce_float(data.get("hybrid_text_weight"), 0.35), 0.0),
-        vector_index_metric=coerce_str(data.get("vector_index_metric"), "cosine"),
-        vector_index_type=coerce_str(data.get("vector_index_type"), "IVF_FLAT"),
+        hybrid_text_weight=max(
+            coerce_float(
+                data.get("hybrid_text_weight"),
+                DEFAULT_RAG_SETTINGS["hybrid_text_weight"],
+            ),
+            0.0,
+        ),
+        vector_index_metric=coerce_str(
+            data.get("vector_index_metric"), DEFAULT_RAG_SETTINGS["vector_index_metric"]
+        ),
+        vector_index_type=coerce_str(
+            data.get("vector_index_type"), DEFAULT_RAG_SETTINGS["vector_index_type"]
+        ),
         vector_stream_batch_size=coerce_positive_int(
-            data.get("vector_stream_batch_size"), 1024
+            data.get("vector_stream_batch_size"),
+            DEFAULT_RAG_SETTINGS["vector_stream_batch_size"],
         ),
-        embedding_offline_mode=coerce_bool(data.get("embedding_offline_mode"), False),
+        embedding_offline_mode=coerce_bool(
+            data.get("embedding_offline_mode"),
+            DEFAULT_RAG_SETTINGS["embedding_offline_mode"],
+        ),
     )
 
 ###############################################################################
@@ -467,7 +499,7 @@ def _build_runtime_settings(
         1.0,
     )
     cloud_llm_timeout_cap = max(
-        coerce_float(data.get("cloud_llm_timeout_cap"), 30.0),
+        coerce_float(data.get("cloud_llm_timeout_cap"), 1800.0),
         minimum_llm_timeout,
     )
     local_llm_timeout_cap = max(
@@ -505,7 +537,7 @@ def _build_runtime_settings(
         max_excerpt_length=coerce_positive_int(data.get("max_excerpt_length"), 8000),
         rxnav_request_timeout=coerce_float(data.get("rxnav_request_timeout"), 12.0),
         rxnav_max_concurrency=coerce_positive_int(
-            data.get("rxnav_max_concurrency"), 16
+            data.get("rxnav_max_concurrency"), 10
         ),
     )
 
@@ -549,7 +581,27 @@ def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSet
     )
 
 ###############################################################################
-def build_settings_payload_from_json(
+def _build_clinical_language_detection_settings(
+    data: dict[str, Any],
+) -> ClinicalLanguageDetectionSettings:
+    return ClinicalLanguageDetectionSettings(
+        min_best_score=coerce_float(data.get("min_best_score"), 2.0),
+        high_confidence_min_score=coerce_float(
+            data.get("high_confidence_min_score"), 8.0
+        ),
+        high_confidence_min_margin=coerce_float(
+            data.get("high_confidence_min_margin"), 3.0
+        ),
+        moderate_confidence_min_score=coerce_float(
+            data.get("moderate_confidence_min_score"), 4.0
+        ),
+        moderate_confidence_min_margin=coerce_float(
+            data.get("moderate_confidence_min_margin"), 1.0
+        ),
+    )
+
+###############################################################################
+def build_settings_payload(
     config: dict[str, Any], env: EnvironmentSnapshot
 ) -> dict[str, Any]:
     payload = ensure_mapping(config)
@@ -562,10 +614,11 @@ def build_settings_payload_from_json(
     )
     jobs_payload = ensure_mapping(payload.get("jobs"))
     drugs_matcher_payload = ensure_mapping(payload.get("drugs_matcher"))
-    rag_payload = ensure_mapping(payload.get("rag"))
+    rag_payload = ensure_mapping(payload.get("rag_settings"))
     runtime_payload = ensure_mapping(payload.get("runtime"))
     ingestion_payload = ensure_mapping(payload.get("ingestion"))
     session_pipeline_payload = ensure_mapping(payload.get("session_pipeline"))
+    language_payload = ensure_mapping(payload.get("clinical_language_detection"))
     return {
         "fastapi": _build_fastapi_settings().model_dump(),
         "jobs": _build_jobs_settings(jobs_payload).model_dump(),
@@ -576,11 +629,48 @@ def build_settings_payload_from_json(
         "rag": _build_rag_settings(rag_payload, llm_defaults).model_dump(),
         "runtime": _build_runtime_settings(
             runtime_payload,
-            fallback_timeout=30.0,
+            fallback_timeout=3600.0,
         ).model_dump(),
         "ingestion": _build_ingestion_settings(ingestion_payload).model_dump(),
         "session_pipeline": _build_session_pipeline_settings(
             session_pipeline_payload
         ).model_dump(),
+        "clinical_language_detection": _build_clinical_language_detection_settings(
+            language_payload
+        ).model_dump(),
         "llm_defaults": llm_defaults.model_dump(),
+    }
+
+###############################################################################
+def build_default_application_configuration_payload(
+    env: EnvironmentSnapshot,
+) -> dict[str, Any]:
+    """Return the complete database seed without reading legacy file state."""
+    llm_defaults = _default_llm_runtime_defaults(env)
+    payload = build_settings_payload({}, env)
+    return {
+        "clinical_model": llm_defaults.clinical_model,
+        "text_extraction_model": llm_defaults.text_extraction_model,
+        "revision_model": (
+            llm_defaults.cloud_model
+            if llm_defaults.use_cloud_services
+            else llm_defaults.clinical_model
+        ),
+        "timeline_model": (
+            llm_defaults.cloud_model
+            if llm_defaults.use_cloud_services
+            else llm_defaults.text_extraction_model
+        ),
+        "use_cloud_models": llm_defaults.use_cloud_services,
+        "cloud_provider": llm_defaults.llm_provider,
+        "cloud_model": llm_defaults.cloud_model,
+        "reasoning_level": llm_defaults.reasoning_level.value,
+        "ollama_seed": 42,
+        "rag_settings": payload["rag"],
+        "jobs": payload["jobs"],
+        "runtime": payload["runtime"],
+        "ingestion": payload["ingestion"],
+        "session_pipeline": payload["session_pipeline"],
+        "clinical_language_detection": payload["clinical_language_detection"],
+        "drugs_matcher": payload["drugs_matcher"],
     }

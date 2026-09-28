@@ -45,9 +45,13 @@ class ClinicalInputExtractor:
         self,
         *,
         client: Any | None = None,
-        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
+        timeout_s: float | None = None,
     ) -> None:
-        self.timeout_s = float(timeout_s)
+        self.timeout_s = float(
+            get_server_settings().runtime.default_llm_timeout
+            if timeout_s is None
+            else timeout_s
+        )
         self.client: Any | None = client
         self.model: str = ""
         self.client_lock = asyncio.Lock()

@@ -2093,7 +2093,6 @@ function New-DesktopRuntimeArchive {
     Copy-Item -Path (Join-Path $frontendOutputRoot '*') -Destination (Join-Path $payloadRoot 'app/client/dist/browser') -Recurse -Force
     Copy-Item -Path (Join-Path $RepoRoot 'resources/catalogs/*') -Destination (Join-Path $payloadRoot 'resources/catalogs') -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'settings/.env.example') -Destination (Join-Path $payloadRoot 'settings/.env.example')
-    Copy-Item -LiteralPath (Join-Path $RepoRoot 'settings/configurations.json') -Destination (Join-Path $payloadRoot 'settings/configurations.json')
     $runtimeOutput = Join-Path $StageRoot 'runtime/diligent-runtime.zip'
     $manifestOutput = Join-Path $StageRoot 'runtime/runtime-manifest.json'
     New-Item -ItemType Directory -Path (Split-Path -Parent $runtimeOutput) -Force | Out-Null

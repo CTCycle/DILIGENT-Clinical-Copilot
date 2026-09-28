@@ -73,19 +73,35 @@ const RERANKER_PROFILE_OPTIONS = [
 ] as const;
 
 const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
-  chunk_size: 1024,
-  chunk_overlap: 128,
+  allow_local_filesystem_access: true,
+  vector_collection_name: 'documents',
+  chunk_size: 512,
+  chunk_overlap: 64,
   embedding_batch_size: 64,
   use_hybrid_search: true,
   use_reranking: true,
   retrieval_candidate_count: 40,
   retrieval_selected_count: 6,
   reranker_model: 'lightweight-balanced-v1',
-  hybrid_vector_weight: 0.7,
-  hybrid_text_weight: 0.3,
-  vector_stream_batch_size: 250,
+  hybrid_vector_weight: 0.65,
+  hybrid_text_weight: 0.35,
+  vector_index_metric: 'cosine',
+  vector_index_type: 'IVF_FLAT',
+  vector_stream_batch_size: 1024,
   embedding_offline_mode: false,
 };
+
+const RAG_INDEX_METRIC_OPTIONS = [
+  { value: 'cosine', label: 'Cosine' },
+  { value: 'euclidean', label: 'Euclidean' },
+  { value: 'dot', label: 'Dot product' },
+] as const;
+
+const RAG_INDEX_TYPE_OPTIONS = [
+  { value: 'IVF_FLAT', label: 'IVF flat' },
+  { value: 'HNSW', label: 'HNSW' },
+  { value: 'FLAT', label: 'Flat' },
+] as const;
 
 const EMPTY_LOCAL_CATALOG: ModelConfigStateResponse['local_catalog'] = {
   status: 'not_loaded',
@@ -127,6 +143,8 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
 
   readonly modelFilters = MODEL_FILTERS;
   readonly rerankerProfileOptions = RERANKER_PROFILE_OPTIONS;
+  readonly ragIndexMetricOptions = RAG_INDEX_METRIC_OPTIONS;
+  readonly ragIndexTypeOptions = RAG_INDEX_TYPE_OPTIONS;
 
   readonly isLoading = signal(true);
   readonly savingOperations = signal<ReadonlySet<SaveOperation>>(new Set());
@@ -615,10 +633,17 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     const rerankerModel = typeof settings?.reranker_model === 'string'
       ? settings.reranker_model.trim()
       : '';
+    const collectionName = typeof settings?.vector_collection_name === 'string'
+      ? settings.vector_collection_name.trim()
+      : '';
     return {
       ...DEFAULT_RAG_SETTINGS,
       ...(settings || {}),
+      allow_local_filesystem_access: settings?.allow_local_filesystem_access ?? DEFAULT_RAG_SETTINGS.allow_local_filesystem_access,
+      vector_collection_name: collectionName || DEFAULT_RAG_SETTINGS.vector_collection_name,
       reranker_model: rerankerModel || DEFAULT_RAG_SETTINGS.reranker_model,
+      vector_index_metric: settings?.vector_index_metric || DEFAULT_RAG_SETTINGS.vector_index_metric,
+      vector_index_type: settings?.vector_index_type || DEFAULT_RAG_SETTINGS.vector_index_type,
       retrieval_candidate_count: this.coercePositiveInteger(
         settings?.retrieval_candidate_count,
         DEFAULT_RAG_SETTINGS.retrieval_candidate_count,
@@ -756,7 +781,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   }
 
   setDraftRagText(
-    key: keyof Pick<DraftRagSettings, 'reranker_model'>,
+    key: keyof Pick<DraftRagSettings, 'reranker_model' | 'vector_collection_name' | 'vector_index_metric' | 'vector_index_type'>,
     value: string,
   ): void {
     this.draftRagSettings.update((previous) => ({
@@ -768,7 +793,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   setDraftRagBoolean(
     key: keyof Pick<
       DraftRagSettings,
-      'use_hybrid_search' | 'use_reranking' | 'embedding_offline_mode'
+      'allow_local_filesystem_access' | 'use_hybrid_search' | 'use_reranking' | 'embedding_offline_mode'
     >,
     value: boolean,
   ): void {

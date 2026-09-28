@@ -38,6 +38,7 @@ from common.version import resolve_application_version
 from configurations.startup import (
     get_server_settings,
     initialize_settings,
+    reload_persisted_settings,
 )
 from repositories.database.initializer import ensure_database_ready
 from services.catalogs.runtime import initialize_reference_catalog_provider
@@ -78,9 +79,10 @@ def redirect_root_to_docs() -> RedirectResponse:
 ###############################################################################
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
-    settings = get_server_settings()
+    bootstrap_settings = get_server_settings()
+    ensure_database_ready(bootstrap_settings.database)
+    settings = reload_persisted_settings()
     get_job_manager().begin_startup()
-    ensure_database_ready(settings.database)
     initialize_reference_catalog_provider()
     run_startup_validations(settings)
     application.state.server_settings = settings

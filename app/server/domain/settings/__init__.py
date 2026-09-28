@@ -1,5 +1,6 @@
 from domain.settings.configuration import (
     DatabaseSettings,
+    ClinicalLanguageDetectionSettings,
     DrugsMatcherSettings,
     FastAPISettings,
     IngestionSettings,
@@ -18,6 +19,7 @@ from domain.settings.runtime import LLMRuntimeState
 __all__ = [
     "DatabaseEnvironmentSnapshot",
     "DatabaseSettings",
+    "ClinicalLanguageDetectionSettings",
     "DrugsMatcherSettings",
     "EnvironmentSnapshot",
     "RuntimeSettings",
