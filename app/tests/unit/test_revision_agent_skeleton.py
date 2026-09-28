@@ -564,6 +564,62 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
     }
 
 ###############################################################################
+def test_revision_job_persists_job_identity_before_worker_start(
+    tmp_path: Path,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    observed: dict[str, Any] = {}
+
+    class ObservingJobManager(JobManager):
+
+        # -------------------------------------------------------------------------
+        def start_job(self, *args: Any, **kwargs: Any) -> str:
+            pipeline_run_id = str(kwargs["kwargs"]["pipeline_run_id"])
+            run = serializer.session_revision_repository.get_revision_run(
+                pipeline_run_id
+            )
+            assert run is not None
+            observed["run_job_id"] = run["configuration"].get("job_id")
+            version_id = int(kwargs["kwargs"]["revision_version_id"])
+            version = serializer.session_revision_repository.get_session_version_detail(
+                session_id,
+                version_id=version_id,
+            )
+            assert version is not None
+            observed["version_job_id"] = version["version"]["model_configuration"].get(
+                "job_id"
+            )
+            observed["version_revision_id"] = version["version"][
+                "model_configuration"
+            ].get("revision_version_id")
+            observed["requested_job_id"] = kwargs.get("job_id")
+            return super().start_job(*args, **kwargs)
+
+    jobs = ObservingJobManager()
+    service = build_service(serializer, jobs)
+    service.revision_agent_runner = build_runner(
+        serializer,
+        structured_call=fake_issue_scan_call,
+    )
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    for _ in range(50):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision job did not complete")
+
+    assert observed == {
+        "run_job_id": started["job_id"],
+        "version_job_id": started["job_id"],
+        "version_revision_id": started["result"]["revision_version_id"],
+        "requested_job_id": started["job_id"],
+    }
+
+###############################################################################
 def test_revision_repairs_noop_draft_once_before_accepting_validated_patch(
     tmp_path: Path,
 ) -> None:
