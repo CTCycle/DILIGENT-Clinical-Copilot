@@ -1,5 +1,5 @@
 # Pre-release validation ledger
-Last updated: 2026-09-28
+Last updated: 2026-09-29
 
 ## Scope and interpretation
 
@@ -1332,3 +1332,50 @@ Detailed evidence: [revision cancellation and timeout validation](../../QA/revis
 | `test.automated-regression` | `PARTIAL` | Local backend/frontend/static/build checks are green; live archive/catalog, hosted provider, and ordered refresh gates remain outside scope. |
 
 Evidence: [NCBI LiverTox machine-access validation](../../QA/ncbi-livertox-machine-access-validation-20260929/report.md).
+
+## Hosted OpenCode Go fresh revision attempt — 2026-09-29
+
+The existing opt-in `live-provider-e2e` path was extended at commit
+`37691d5512245a6bde29e8a125683b40046cbcc5` on `develop` to retain the new
+synthetic clinical session, start a non-dry revision through the public API,
+poll the job to terminal state, and re-query the persisted run, steps, version,
+artifacts, QA result, and lineage. The test asserts the exact
+`opencode_go / deepseek-v4-flash` route, no fallback, sanitized errors and
+logs, source preservation, and one bounded retry only when a first revision
+failure is explicitly retryable. The harness passes the isolated backend log
+directory to the test. Existing deterministic cancellation, timeout,
+startup-recovery, tool-failure, and retry evidence was retained rather than
+replayed against the external provider.
+
+The hosted dispatch was [Actions run
+36568880619](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36568880619)
+with `run_provider_e2e=true`. The workflow wiring was confirmed: it sets both
+SQLite variables to the isolated
+`runtimes/cache/pytest/live-provider.sqlite3` path and maps
+`OPENCODE_GO_API_KEY` from the approved repository secret expression. On the
+runner, however, that environment value was empty. The live test stopped at
+its explicit credential guard before access-key creation, connectivity, the
+clinical request, or revision launch. No provider request, revision result, or
+credential-bearing output was produced. The authenticated local secret-name
+query also returned no repository secret names; no secret value was read or
+recorded.
+
+The local focused backend/provider/API slice passed **131 tests** with two
+existing dependency/deprecation warnings. The opt-in live test skipped without
+the live flag; Ruff/format, Pyright (`0 errors, 0 warnings, 0 informations`),
+and `git diff --check` passed. Hosted persistence-contract, backend-quality,
+security-scan, and windows-regression jobs passed; only the live-provider job
+failed at the missing/empty secret preflight.
+
+| Gate | Status after this attempt | Current boundary |
+|---|---|---|
+| `model.provider.opencode-go` | `PARTIAL` | Exact-route configuration and fail-closed secret handling are covered by the new test, but no current hosted provider request occurred. Historical exact-route records remain supporting evidence only. |
+| `revision.agentic-lifecycle` | `PARTIAL` | Existing deterministic persistence, accepted-finalization, cancellation, timeout, startup-recovery, tool-failure, retry, and UI evidence remains current. The fresh live revision lifecycle was not reached because of the infrastructure failure. |
+
+Outcome classification for this run is **infrastructure failure**. Accepted,
+QA-blocked, and retryable-provider-failure outcomes were not observed and were
+not inferred. Configure the approved repository secret without recording its
+value, then rerun the existing workflow; only a fresh run that reaches the
+revision request can extend either gate's live-provider boundary.
+
+Evidence: [OpenCode Go live revision validation](../../QA/revision-live-provider-validation-20260929/report.md).
