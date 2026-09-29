@@ -1421,3 +1421,46 @@ terminal revision lifecycle; no retryable provider failure was reported in the
 retained hosted output; and the accepted-versus-QA-blocked sub-branch is not
 separately observable from the current test log. Evidence: [OpenCode Go live
 revision validation](../../QA/revision-live-provider-validation-20260929/report.md).
+
+## Access-key lifecycle and deterministic automated regression — 2026-09-29
+
+This current-tree validation corrected the boundary between DILIGENT credential
+storage and provider credential acceptance. The access-key component was tested
+with synthetic format-valid values only; no synthetic value was sent to an
+external provider and no additional real key was acquired.
+
+The API lifecycle created two same-provider keys, confirmed inactive creation,
+activated A then B with exactly one active row after each transition, listed
+metadata-only fingerprints, asserted plaintext redaction, rejected activation
+and deletion through the wrong provider boundary, deleted both keys, and
+explicitly asserted the final provider list was empty. The file-backed SQLite
+unit contract reopened the same database and encryption material through fresh
+serializer/engine instances, preserved metadata and active state, confirmed
+ciphertext did not contain plaintext, decrypted internally, deleted the key,
+and verified cleanup after another reopen. Rendered Chromium coverage added a
+synthetic key from Settings → Models, displayed only its fingerprint, activated
+it, reloaded/reopened the dialog, verified active state, deleted it, and
+asserted the plaintext never appeared in `document.body.innerText`.
+
+The canonical Windows harness now owns seed, fake-Ollama, startup, readiness,
+suite selection, JUnit skip accounting, diagnostics, and cleanup. The Full
+suite excludes the live-provider and heavyweight multilingual embedding files.
+Its JUnit result was **46 passed, 0 failed, 0 errors, 0 skipped**. The complete
+backend unit suite was **833 passed**; local SQLite persistence was **15 passed
+and 14 intentionally skipped PostgreSQL parameterizations** without
+`TEST_DATABASE_URL`. The hosted `persistence-contract` job remains the
+mandatory PostgreSQL execution. Angular/Vitest was **24 files / 105 tests
+passed**, the production build passed, Pyright reported **0 errors, 0 warnings,
+0 informations**, and Alembic upgrade/current-head/drift passed. Pip-audit
+reported no known vulnerabilities, both npm audits reported **0
+vulnerabilities**, and cargo-audit passed with six allowed unmaintained-crate
+warnings.
+
+| Gate | Current status | Evidence boundary |
+|---|---|---|
+| `auth.access-key-management` | `VALIDATED` | DILIGENT secure lifecycle only: encryption, persistence/reopen, metadata-only responses, activation/rotation, provider scope, deletion, and redaction. Provider-side key validity belongs to `model.provider.*`. |
+| `test.automated-regression` | `VALIDATED` | Mandatory deterministic matrix is green with zero Full-suite skips. Local PostgreSQL convenience skips do not replace the hosted two-engine contract. |
+| `model.provider.opencode-go` | `VALIDATED` for the exact hosted route | Existing hosted run `36574845168` remains the real-key connectivity/clinical/revision evidence. A new hosted dispatch is appropriate after a final implementation commit because this task changed the harness. |
+| `release.desktop.v3-4-0` | Not a validation component | v3.4.0 delivery checks remain in `runtime/desktop_release.md` as release-readiness procedures. |
+
+Evidence: [access-key and automated regression report](../../QA/access-key-automated-regression-20260929/report.md).

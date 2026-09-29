@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-09-20
+Last updated: 2026-09-29
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -13,7 +13,7 @@ branch-status record.
 
 - Backend, frontend, and desktop source manifests report synchronized candidate version `3.4.0`.
 - Release versions use strict `major.minor.patch` SemVer and must remain synchronized across the frontend, backend, and desktop manifests; the backend exposes the frontend package version unless `DILIGENT_RELEASE_VERSION` is explicitly set for packaging.
-- The latest published desktop release is `v3.3.0`; `3.4.0` is an unpublished release candidate. Its portable EXE, MSI, checksum manifest, synchronized source/tag state, hosted CI, full browser/provider E2E, vulnerability review, and Windows host smoke evidence are independent gates.
+- The latest published desktop release is `v3.3.0`; `3.4.0` is an unpublished release candidate. Its portable EXE, MSI, checksum manifest, synchronized source/tag state, hosted CI, vulnerability review, and Windows host smoke evidence are release-readiness checks tracked separately from product validation components.
 - Model configuration reads are cache-only and non-cacheable. Provider contact is limited to explicit catalog load/refresh operations, and catalog attempts persist in `provider_model_catalog_cache`.
 - Runtime-manageable values are persisted in the database `application_configuration`
   singleton and exposed through the centralized Settings area and typed
@@ -22,9 +22,10 @@ branch-status record.
 - The revision workflow is a bounded, persisted agentic workflow with context, planning, allow-listed tool traces, deterministic patch validation, QA, artifacts, and optional `agentic_revision` session finalization.
 - Running job cancellation is cooperative: pending jobs can become terminal immediately, while a running stop-requested worker remains active and occupies its concurrency scope until it exits.
 - The standard CI workflow runs the existing Angular/Vitest suite with `npm run test -- --no-watch` in addition to the frontend build.
+- The mandatory regression matrix uses the shared deterministic Windows browser harness (`run_browser_e2e.ps1 -Suite Full`), including seeded session/timeline prerequisites, a fake Ollama protocol fixture, and the synthetic access-key lifecycle; the real OpenCode Go path is a separate `LiveProvider` integration lane.
 - Deterministic hepatic injury-pattern calculation is shared by the clinical workflow and DILI evidence; nonqualifying laboratory pairs remain indeterminate rather than being promoted to a qualifying anchor.
 - Combined structured-source updates are backend-owned and ordered RxNav -> LiverTox -> DILIrank; RAG has a separate job and control. RxNav and LiverTox source-owned records are reconciled only after a complete successful snapshot is prepared.
-- Desktop tag publication is gated by a preflight that requires the tag SHA to equal `origin/main` and passes backend, frontend, full browser/provider E2E, vulnerability review, packaging, and Windows EXE/MSI smoke checks before publication.
+- Desktop tag publication has a preflight that requires the tag SHA to equal `origin/main` and checks backend, frontend, browser/provider E2E, vulnerability review, packaging, and Windows EXE/MSI smoke readiness before publication. These are release prerequisites, not product validation gates.
 - Angular page and component state uses signals/computed state in current model-configuration, access-key, clinical-session preview, and runtime-settings surfaces.
 - The primary UI navigation has four workspaces: DILI Agent, Clinical Sessions, Data Inspection, and Settings; Patient Timeline is opened from a selected session's Timeline tab. Settings contains General, Models, Data Processing, Integrations, Drug Matching, and Advanced pages with persistent left navigation.
 - FDA DILIrank 2.0 is a structured drug-level hepatotoxicity knowledge source. Its complete source snapshot is persisted separately, only canonical or trusted LiverTox/RxNorm identity links are eligible for clinical use, and unlinked or ambiguous source rows remain inspectable without becoming patient-level causality evidence.
