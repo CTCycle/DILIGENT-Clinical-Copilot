@@ -1,5 +1,5 @@
 # Runtime Settings UI
-Last updated: 2026-09-28
+Last updated: 2026-09-29
 
 ## Scope
 
@@ -47,7 +47,7 @@ are defined by typed application models.
 | General | Jobs | Polling interval |
 | Models | Application configuration | Provider, access-key workflow, model roles, reasoning, and the complete RAG payload |
 | Data Processing | Ingestion, session pipeline, language detection | Drug-name limits, batch/concurrency limits, and clinical language thresholds |
-| Integrations | Runtime integrations | LiverTox download/archive/worker controls and RxNav timeout/concurrency |
+| Integrations | Runtime integrations | NCBI/LiverTox contact and download/archive/worker controls, plus RxNav timeout/concurrency |
 | Drug Matching | Matcher runtime | Confidence thresholds, cache sizes, catalog index size, token limits, and spelling distances |
 | Advanced | LLM/evidence runtime | Role-specific timeouts, timeout floors/caps, Ollama startup timeout, and excerpt length |
 
@@ -72,10 +72,19 @@ model API, which writes the same `application_configuration` row.
 
 ## Validation and persistence
 
-Controls are typed numeric, boolean, text, or select inputs. Backend models
+Controls are typed numeric, boolean, email, text, or select inputs. Backend models
 enforce bounds and relationships such as drug-name minimum/maximum lengths,
 language confidence ordering, selected retrieval documents not exceeding
 candidate documents, and timeout caps not falling below the minimum timeout.
+
+The Integrations category includes `ncbi_contact_email`. The value is trimmed
+and validated as a basic developer email address, then persisted in the
+`application_configuration` payload with the other runtime settings. Older
+payloads and blank values resolve to the compatibility default
+`clinical-copilot@pharmagent.local`, which is also restored by an Integrations
+reset. The UI shows the effective value and recommends a real developer or
+organization address registered with NCBI for production use; this field is a
+contact identity, not an API key or credential.
 
 Every successful update returns the database `updated_at` timestamp. Reset and
 reload use the same singleton, so persistence is observable after navigation

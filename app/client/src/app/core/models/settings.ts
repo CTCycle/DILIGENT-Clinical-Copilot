@@ -27,6 +27,7 @@ export interface DataRuntimeSettings {
 }
 
 export interface IntegrationRuntimeSettings {
+  ncbi_contact_email: string;
   livertox_download_timeout: number;
   livertox_archive: string;
   livertox_yield_interval: number;

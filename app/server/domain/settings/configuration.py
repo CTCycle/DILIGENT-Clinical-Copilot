@@ -1,8 +1,31 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated
+
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from domain.model_configs import ReasoningLevel
+
+
+###############################################################################
+def normalize_ncbi_contact_email(value: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError("NCBI contact email must be a string")
+    normalized = value.strip()
+    if len(normalized) > 254:
+        raise ValueError("NCBI contact email must be 254 characters or fewer.")
+    if not normalized or any(character.isspace() for character in normalized):
+        raise ValueError("NCBI contact email must not contain whitespace.")
+    if normalized.count("@") != 1:
+        raise ValueError("NCBI contact email must contain one @ separator.")
+    local_part, domain = normalized.split("@")
+    if not local_part or not domain:
+        raise ValueError("NCBI contact email must contain a local part and domain.")
+    return normalized
+
+
+NCBIContactEmail = Annotated[str, BeforeValidator(normalize_ncbi_contact_email)]
+
 
 ###############################################################################
 class FastAPISettings(BaseModel):
@@ -11,10 +34,12 @@ class FastAPISettings(BaseModel):
     description: str
     version: str
 
+
 ###############################################################################
 class JobsSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     polling_interval: float = Field(gt=0)
+
 
 ###############################################################################
 class DatabaseSettings(BaseModel):
@@ -38,6 +63,7 @@ class DatabaseSettings(BaseModel):
     insert_commit_interval: int
     select_page_size: int
 
+
 ###############################################################################
 class DrugsMatcherSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -55,6 +81,7 @@ class DrugsMatcherSettings(BaseModel):
     spelling_short_name_length: int
     spelling_short_max_distance: int
     spelling_long_max_distance: int
+
 
 ###############################################################################
 class RagSettings(BaseModel):
@@ -76,6 +103,7 @@ class RagSettings(BaseModel):
     vector_stream_batch_size: int
     embedding_offline_mode: bool
 
+
 ###############################################################################
 class RuntimeSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -88,6 +116,7 @@ class RuntimeSettings(BaseModel):
     cloud_llm_timeout_cap: float
     local_llm_timeout_cap: float
     ollama_server_start_timeout: float
+    ncbi_contact_email: NCBIContactEmail
     livertox_download_timeout: float
     livertox_archive: str
     livertox_yield_interval: int
@@ -97,12 +126,14 @@ class RuntimeSettings(BaseModel):
     rxnav_request_timeout: float
     rxnav_max_concurrency: int
 
+
 ###############################################################################
 class IngestionSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     drug_name_min_length: int
     drug_name_max_length: int
     drug_name_max_tokens: int
+
 
 ###############################################################################
 class LLMRuntimeDefaults(BaseModel):
@@ -115,6 +146,7 @@ class LLMRuntimeDefaults(BaseModel):
     reasoning_level: ReasoningLevel
     ollama_host_default: str
 
+
 ###############################################################################
 class SessionPipelineSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -125,6 +157,7 @@ class SessionPipelineSettings(BaseModel):
     clinical_assessment_batch_size: int
     clinical_assessment_max_concurrency: int
 
+
 ###############################################################################
 class ClinicalLanguageDetectionSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -133,6 +166,7 @@ class ClinicalLanguageDetectionSettings(BaseModel):
     high_confidence_min_margin: float
     moderate_confidence_min_score: float
     moderate_confidence_min_margin: float
+
 
 ###############################################################################
 class ServerSettings(BaseModel):

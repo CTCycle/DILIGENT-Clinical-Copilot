@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-09-28
+Last updated: 2026-09-29
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
@@ -74,6 +74,36 @@ precedence. Packaged desktop mode uses `DILIGENT_RUNTIME_ROOT` and
   - canonical immutable reference catalogs for text normalization, extraction,
     matching, DILI behavior, language, security filters, generation policy, and
     model capabilities
+
+## NCBI machine access and LiverTox refresh
+
+The LiverTox updater uses NCBI's documented machine-access services. It does
+not retrieve the interactive Bookshelf HTML pages for automated discovery and
+does not solve or bypass human-verification challenges.
+
+- E-utilities identify the master-list record in `db=books` using the fixed
+  tool name `DILIGENTClinicalCopilot` and the effective
+  `ncbi_contact_email` value. The calls use
+  `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi` and
+  `esummary.fcgi`.
+- Books-OAI uses the stable identifier
+  `oai:books.ncbi.nlm.nih.gov:571102` and the `nbk_ftext` metadata format to
+  discover a validated `masterlist*.xlsx` link when one is exposed, through
+  `https://api.ncbi.nlm.nih.gov/lit/oai/books/`.
+- LitArch `file_list.csv` resolves the current
+  `livertox_NBK547852.tar.gz` archive path. The updater never assumes the
+  randomly assigned two-level directory or an annual master-list filename;
+  the index is `https://ftp.ncbi.nlm.nih.gov/pub/litarch/file_list.csv`.
+- If Books-OAI does not expose a usable spreadsheet, the updater extracts one
+  unambiguous safe `masterlist*.xlsx` member from that official archive.
+
+`ncbi_contact_email` defaults to
+`clinical-copilot@pharmagent.local` when it is missing from an older payload or
+blank. Configure a complete developer or organization email registered with
+NCBI for production use. The value is sent only as request identity, is not a
+credential, and is excluded from update results, source metadata, clinical
+artifacts, and ordinary logs. Requests remain sequential and no NCBI API key
+is required for this low-volume workflow.
 
 ## LLM Time Budgets
 

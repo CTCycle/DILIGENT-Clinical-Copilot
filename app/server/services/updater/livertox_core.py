@@ -5,7 +5,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from common.constants import LIVERTOX_BASE_URL
 from common.paths import ARCHIVES_PATH
 from configurations.startup import get_server_settings
 from repositories.knowledge_repository import KnowledgeRepository
@@ -17,9 +16,9 @@ from services.updater import (
 )
 from services.updater.sanitizer import LiverToxExcerptSanitizer
 
+
 ###############################################################################
 class LiverToxUpdater:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -30,8 +29,12 @@ class LiverToxUpdater:
         monograph_max_workers: int | None = None,
         knowledge_repository: KnowledgeRepository,
     ) -> None:
+        settings = get_server_settings()
         self.supported_extensions = livertox_common.SUPPORTED_MONOGRAPH_EXTENSIONS
-        self.http_headers = dict(livertox_common.DEFAULT_HTTP_HEADERS)
+        self.ncbi_contact_email = settings.runtime.ncbi_contact_email
+        self.http_headers = livertox_common.build_ncbi_http_headers(
+            self.ncbi_contact_email
+        )
         self.delay = 0.5
         self.chunk_size = livertox_common.DOWNLOAD_CHUNK_SIZE
         self.sources_path = str(Path(sources_path).resolve())
@@ -39,10 +42,7 @@ class LiverToxUpdater:
         self.knowledge_repository = knowledge_repository
         self.excerpt_sanitizer = LiverToxExcerptSanitizer()
         self.header_row = 1
-        self.base_url = LIVERTOX_BASE_URL
-        self.file_name = (
-            archive_name or get_server_settings().runtime.livertox_archive
-        ).strip()
+        self.file_name = (archive_name or settings.runtime.livertox_archive).strip()
         self.monograph_max_workers = max(
             1,
             int(
@@ -60,6 +60,7 @@ class LiverToxUpdater:
         self.archive_metadata_path = str(
             archives_path / "livertox_archive.metadata.json"
         )
+        self.resolved_archive_url: str | None = None
 
     # -------------------------------------------------------------------------
     def update_from_livertox(

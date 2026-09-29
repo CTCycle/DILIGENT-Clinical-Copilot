@@ -62,6 +62,16 @@
                     <option [value]="option.value">{{ option.label }}</option>
                   }
                 </select>
+              } @else if (field.kind === 'email') {
+                <input
+                  type="email"
+                  autocomplete="email"
+                  [ngModel]="fieldValue(field)"
+                  (ngModelChange)="updateField(field, $event)"
+                  [name]="field.key"
+                  [disabled]="isSaving() || isResetting()"
+                  [attr.aria-label]="field.label"
+                />
               } @else {
                 <input
                   type="text"
