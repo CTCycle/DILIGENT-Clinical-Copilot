@@ -1464,3 +1464,41 @@ warnings.
 | `release.desktop.v3-4-0` | Not a validation component | v3.4.0 delivery checks remain in `runtime/desktop_release.md` as release-readiness procedures. |
 
 Evidence: [access-key and automated regression report](../../QA/access-key-automated-regression-20260929/report.md).
+
+## Session and revision API local-boundary follow-up — 2026-09-29
+
+The current component ledger identified the session/revision HTTP boundary as
+the next locally actionable slice after the hosted provider, source-refresh,
+access-key, and deterministic regression follow-ups. This run deliberately
+left the RAG duplicate-file decision, broader route matrix, provider/model
+variance, spoken screen-reader output, desktop delivery, and container runtime
+as independent boundaries.
+
+The selected live HTTP checks ran through the canonical Windows `Full` harness
+against a task-owned SQLite database seeded with one synthetic session and one
+persisted timeline. They covered session list/detail/version/manual-edit reads,
+metadata and report-audit mutations, timeline reads and missing-record errors,
+revision validation and missing-record errors, and cleanup of the edited report
+back to its original text. The final run passed **48 tests** with **zero
+skips**.
+
+The first live attempt exposed one implementation defect: a report mutation for
+a missing session raised the repository's "no persisted version" error before
+checking session existence, and the API returned a sanitized `500`. The
+repository now checks the session first, returns `None` for a missing session,
+and retains the explicit runtime error for an existing session without a
+persisted version. The final live run returned the expected `404`, and the
+focused repository/API/revision/settings/access-key suite passed **113 tests**.
+
+Changed-file Ruff checks, full-server Pyright (`0 errors, 0 warnings, 0
+informations`), and `git diff --check` passed. The harness stopped its owned
+process trees and ports `7690`, `9847`, and `11435` were free afterward.
+
+| Gate | Final status | Evidence boundary |
+|---|---|---|
+| `api.local-boundaries` | `WORKING` for the exercised session/revision slice | Live success, mutation, validation, and not-found contracts passed. The complete 68-path response/error and mutating-route matrix remains open. |
+| `sessions.crud-persistence` | `VALIDATED` for the exercised session update/manual-audit boundary | Metadata and manual report persistence were checked on the disposable seed; binary image storage and Chrome-specific file-picker behavior remain outside scope. |
+| `revision.agentic-lifecycle` | `VALIDATED` for the existing exact-provider synthetic scope; API error boundary rechecked here | No provider-backed revision was started in this credential-free local slice, so provider/model or lifecycle permutation coverage is unchanged. |
+| `test.automated-regression` | `VALIDATED` for the current local deterministic Full suite | The current local Full suite is green with zero skips; hosted exact-commit CI remains the authoritative PostgreSQL/Windows/security confirmation after push. |
+
+Evidence: [session and revision API validation](../../QA/api-local-boundaries-20260929/report.md).
