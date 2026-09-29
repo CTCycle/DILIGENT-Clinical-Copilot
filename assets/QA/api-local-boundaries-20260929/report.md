@@ -47,6 +47,10 @@ deterministic browser suite together with `test_api_local_boundaries.py`.
 - `git diff --check`: PASS.
 - The harness stopped its backend, frontend, and fake-Ollama process trees;
   ports `7690`, `9847`, and `11435` were free after the run.
+- Hosted commit CI [36620242445](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36620242445)
+  passed on `ba5a722afa4fe0f6f8332fc012e1c69e781fb972`: `backend-quality`,
+  `persistence-contract`, `windows-regression`, and `security-scan` all passed.
+  `live-provider-e2e` was intentionally skipped with `run_provider_e2e=false`.
 
 ## Final gate disposition
 
@@ -55,7 +59,7 @@ deterministic browser suite together with `test_api_local_boundaries.py`.
 | `api.local-boundaries` | `WORKING` for the exercised session/revision slice | Live success, mutation, validation, and not-found contracts passed. The complete 68-path response/error and mutating-route matrix remains open. |
 | `sessions.crud-persistence` | `VALIDATED` for the exercised session update/manual-audit boundary | Metadata and manual report persistence/reload were checked on the disposable seeded session; binary image storage and Chrome-specific file-picker behavior remain outside scope. |
 | `revision.agentic-lifecycle` | `VALIDATED` for its existing exact-provider synthetic scope; API error boundary rechecked here | This run did not start a provider-backed revision and does not expand provider/model or lifecycle permutation coverage. |
-| `test.automated-regression` | `VALIDATED` for the local deterministic Full suite | The current local Full suite is green with zero skips; hosted exact-commit CI remains the authoritative PostgreSQL/Windows/security confirmation after push. |
+| `test.automated-regression` | `VALIDATED` for the deterministic local and hosted mandatory matrix | The current local Full suite is green with zero skips, and hosted commit CI passed the PostgreSQL, Windows, backend-quality, and security jobs. The live-provider job was intentionally skipped. |
 
 ## Remaining limitations
 
