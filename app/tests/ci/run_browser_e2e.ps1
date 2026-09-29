@@ -75,6 +75,7 @@ $env:MYPY_CACHE_DIR = Join-Path $cacheRoot 'mypy'
 $env:COVERAGE_FILE = Join-Path $cacheRoot 'coverage/.coverage'
 $env:PYTHONPYCACHEPREFIX = Join-Path $cacheRoot 'python'
 $env:CARGO_TARGET_DIR = Join-Path $cacheRoot 'cargo/target'
+$env:DILIGENT_LIVE_PROVIDER_LOG_DIR = $logDir
 $env:PYTEST_ADDOPTS = "--basetemp=$pytestCacheDir/basetemp -o cache_dir=$pytestCacheDir"
 $backend = Start-Process -FilePath $python -ArgumentList '-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '7690' -WorkingDirectory $serverDir -RedirectStandardOutput $backendOut -RedirectStandardError $backendErr -WindowStyle Hidden -PassThru
 try {
