@@ -5,7 +5,6 @@ E2E tests for UI navigation and key UI workflows.
 import json
 import re
 
-import pytest
 from playwright.sync_api import Page, Route, expect
 
 ###############################################################################
@@ -236,8 +235,10 @@ def test_timetable_initial_load_has_no_console_errors_or_failed_requests(
             if timeline_response is not None and timeline_response.status == 200:
                 session_id = candidate_id
                 break
-    if session_id is None:
-        pytest.skip("No persisted session with a generated timetable is available.")
+    assert session_id is not None, (
+        "The browser regression seed must provide a persisted session with a "
+        "generated timetable."
+    )
 
     console_errors: list[str] = []
     failed_requests: list[str] = []
@@ -684,8 +685,9 @@ def test_timetable_route_load_does_not_autogenerate_timeline(
     items = (
         sessions_payload.get("items") if isinstance(sessions_payload, dict) else None
     )
-    if not isinstance(items, list) or not items:
-        pytest.skip("No persisted sessions in the isolated test database.")
+    assert isinstance(items, list) and items, (
+        "The browser regression seed must provide a persisted session."
+    )
     session_id = items[0].get("session_id")
     assert isinstance(session_id, int) and session_id > 0
 
@@ -885,8 +887,9 @@ def test_clinical_sessions_row_selection_loads_matching_detail(
     items = (
         sessions_payload.get("items") if isinstance(sessions_payload, dict) else None
     )
-    if not isinstance(items, list) or not items:
-        pytest.skip("No persisted sessions in the isolated test database.")
+    assert isinstance(items, list) and items, (
+        "The browser regression seed must provide a persisted session."
+    )
 
     detail_request_urls: list[str] = []
 

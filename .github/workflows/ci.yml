@@ -133,7 +133,6 @@ jobs:
         run: python -m pytest ../tests/persistence -q
 
   windows-regression:
-    if: github.event_name != 'pull_request'
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -181,115 +180,7 @@ jobs:
 
       - name: Run full browser E2E suite
         shell: pwsh
-        run: |
-          $env:APP_TEST_FRONTEND_URL = "http://127.0.0.1:9847"
-          $env:APP_TEST_BACKEND_URL = "http://127.0.0.1:7690"
-          $ciArtifactDir = Join-Path $env:GITHUB_WORKSPACE "runtimes/cache/pytest/ci/modelconfig"
-          $pytestArtifactDir = Join-Path $env:GITHUB_WORKSPACE "runtimes/cache/pytest/ci"
-          New-Item -ItemType Directory -Path $ciArtifactDir, $pytestArtifactDir -Force | Out-Null
-          $ciRuntimeDir = Join-Path $env:GITHUB_WORKSPACE "runtimes/cache/pytest/ci/modelconfig-runtime"
-          New-Item -ItemType Directory -Path $ciRuntimeDir -Force | Out-Null
-          $env:DATABASE_BACKEND = "sqlite"
-          $env:DATABASE_SQLITE_PATH = Join-Path $ciRuntimeDir "modelconfig.sqlite3"
-          $env:DILIGENT_SQLITE_PATH = $env:DATABASE_SQLITE_PATH
-          $backendOut = Join-Path $ciArtifactDir "backend.out.log"
-          $backendErr = Join-Path $ciArtifactDir "backend.err.log"
-          $frontendOut = Join-Path $ciArtifactDir "frontend.out.log"
-          $frontendErr = Join-Path $ciArtifactDir "frontend.err.log"
-          function Write-ProcessDiagnostics($label, $process, $stdoutPath, $stderrPath) {
-            Write-Output "[$label] process diagnostics"
-            if ($null -eq $process) {
-              Write-Output "Process was not created."
-            } else {
-              $process.Refresh()
-              Write-Output "PID=$($process.Id) HasExited=$($process.HasExited)"
-              if ($process.HasExited) {
-                Write-Output "ExitCode=$($process.ExitCode)"
-              }
-            }
-            foreach ($log in @(@("stdout", $stdoutPath), @("stderr", $stderrPath))) {
-              Write-Output "--- $($label) $($log[0]) ---"
-              if (Test-Path -LiteralPath $log[1]) {
-                Get-Content -LiteralPath $log[1] -Tail 200
-              } else {
-                Write-Output "Log file not created: $($log[1])"
-              }
-            }
-          }
-          $backend = Start-Process -FilePath "python" -ArgumentList "-m","uvicorn","app:app","--host","127.0.0.1","--port","7690" -WorkingDirectory "app/server" -RedirectStandardOutput $backendOut -RedirectStandardError $backendErr -WindowStyle Hidden -PassThru
-          try {
-            $backendReady = $false
-            $backendDeadline = (Get-Date).AddMinutes(3)
-            $lastBackendError = "No response received."
-            while ((Get-Date) -lt $backendDeadline) {
-              try {
-                $backendHealth = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7690/api/health" -TimeoutSec 3
-                $backendConfig = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7690/api/model-config" -TimeoutSec 3
-                if ($backendHealth.StatusCode -eq 200 -and $backendConfig.StatusCode -eq 200) {
-                  $backendReady = $true
-                  break
-                }
-              } catch {
-                $lastBackendError = $_.Exception.Message
-                $backend.Refresh()
-                if ($backend.HasExited) {
-                  break
-                }
-              }
-              Start-Sleep -Milliseconds 500
-            }
-            if (-not $backendReady) {
-              Write-ProcessDiagnostics "backend readiness failure" $backend $backendOut $backendErr
-              throw "Backend readiness check failed before deadline. Last probe error: $lastBackendError"
-            }
-
-            $frontend = Start-Process -FilePath "npm.cmd" -ArgumentList "run","preview","--","--host","127.0.0.1","--port","9847","--strictPort" -WorkingDirectory "app/client" -RedirectStandardOutput $frontendOut -RedirectStandardError $frontendErr -WindowStyle Hidden -PassThru
-            $frontendReady = $false
-            $frontendDeadline = (Get-Date).AddMinutes(3)
-            $lastFrontendError = "No response received."
-            while ((Get-Date) -lt $frontendDeadline) {
-              try {
-                $frontendHealth = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:9847/" -TimeoutSec 3
-                if ($frontendHealth.StatusCode -lt 500) {
-                  $frontendReady = $true
-                  break
-                }
-              } catch {
-                $lastFrontendError = $_.Exception.Message
-                $frontend.Refresh()
-                if ($frontend.HasExited) {
-                  break
-                }
-              }
-              Start-Sleep -Milliseconds 500
-            }
-            if (-not $frontendReady) {
-              Write-ProcessDiagnostics "frontend readiness failure" $frontend $frontendOut $frontendErr
-              throw "Frontend readiness check failed before deadline. Last probe error: $lastFrontendError"
-            }
-
-            $unitJunit = Join-Path $pytestArtifactDir "modelconfig-unit-junit.xml"
-            $e2eJunit = Join-Path $pytestArtifactDir "full-browser-e2e-junit.xml"
-            python -m pytest app/tests/unit/test_model_config_persistence.py -q --junitxml $unitJunit
-            if ($LASTEXITCODE -ne 0) {
-              throw "Model-config unit test failed with exit code $LASTEXITCODE."
-            }
-
-            python -m pytest app/tests/e2e -q --junitxml $e2eJunit
-            if ($LASTEXITCODE -ne 0) {
-              throw "Full browser E2E suite failed with exit code $LASTEXITCODE."
-            }
-          } finally {
-            if (-not $backendReady -or -not $frontendReady) {
-              Write-ProcessDiagnostics "regression cleanup" $backend $backendOut $backendErr
-              Write-ProcessDiagnostics "regression cleanup" $frontend $frontendOut $frontendErr
-            }
-            foreach ($process in @($backend, $frontend)) {
-              if ($null -ne $process -and -not $process.HasExited) {
-                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-              }
-            }
-          }
+        run: .\app\tests\ci\run_browser_e2e.ps1 -Suite Full
 
       - name: Upload regression artifacts on failure
         if: failure()
@@ -299,7 +190,7 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
           path: |
-            runtimes/cache/pytest/ci/modelconfig/**
+            runtimes/cache/pytest/browser-e2e-logs/**
             runtimes/cache/pytest/ci/**
 
   live-provider-e2e:

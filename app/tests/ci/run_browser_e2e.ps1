@@ -8,18 +8,34 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../..')).Path
 $serverDir = Join-Path $repoRoot 'app/server'
 $clientDir = Join-Path $repoRoot 'app/client'
-$cacheRoot = Join-Path $repoRoot 'runtimes/cache'
+$cacheRoot = if ([string]::IsNullOrWhiteSpace($env:DILIGENT_BROWSER_E2E_CACHE_ROOT)) {
+    Join-Path $repoRoot 'runtimes/cache'
+}
+else {
+    $env:DILIGENT_BROWSER_E2E_CACHE_ROOT
+}
 $pytestCacheDir = Join-Path $cacheRoot 'pytest'
+$playwrightBrowsersPath = if ([string]::IsNullOrWhiteSpace($env:PLAYWRIGHT_BROWSERS_PATH)) {
+    Join-Path $repoRoot 'runtimes/cache/playwright'
+}
+else {
+    $env:PLAYWRIGHT_BROWSERS_PATH
+}
 $python = Join-Path $serverDir '.venv/Scripts/python.exe'
 $logDir = Join-Path $pytestCacheDir 'browser-e2e-logs'
 $backendOut = Join-Path $logDir 'backend.out.log'
 $backendErr = Join-Path $logDir 'backend.err.log'
 $frontendOut = Join-Path $logDir 'frontend.out.log'
 $frontendErr = Join-Path $logDir 'frontend.err.log'
+$ollamaOut = Join-Path $logDir 'ollama.out.log'
+$ollamaErr = Join-Path $logDir 'ollama.err.log'
+$junitPath = Join-Path $logDir "$($Suite.ToLowerInvariant())-junit.xml"
 $backend = $null
 $frontend = $null
+$fakeOllama = $null
 $backendReady = $false
 $frontendReady = $false
+$fakeOllamaReady = $false
 
 function Write-Diagnostics([string]$label, $process, [string]$stdoutPath, [string]$stderrPath) {
     Write-Output "[$label]"
@@ -62,10 +78,32 @@ function Stop-ProcessTree($process) {
 }
 
 New-Item -ItemType Directory -Path @($cacheRoot, $pytestCacheDir, $logDir) -Force | Out-Null
+$runRoot = Join-Path $pytestCacheDir "browser-e2e-$Suite"
+New-Item -ItemType Directory -Path $runRoot -Force | Out-Null
+$databasePath = $env:DILIGENT_SQLITE_PATH
+if ([string]::IsNullOrWhiteSpace($databasePath)) {
+    $databasePath = Join-Path $runRoot 'diligent.sqlite3'
+}
+$databaseParent = Split-Path -Parent $databasePath
+if ([string]::IsNullOrWhiteSpace($databaseParent)) {
+    $databaseParent = $runRoot
+}
+New-Item -ItemType Directory -Path $databaseParent -Force | Out-Null
+$env:DATABASE_BACKEND = 'sqlite'
+$env:EMBEDDED_DATABASE = 'true'
+$env:DATABASE_SQLITE_PATH = $databasePath
+$env:DILIGENT_SQLITE_PATH = $databasePath
+$env:DILIGENT_ACCESS_KEY_MATERIAL_FILE = Join-Path $runRoot 'access-key-material.json'
+$env:APP_TEST_FRONTEND_URL = 'http://127.0.0.1:9847'
+$env:APP_TEST_BACKEND_URL = 'http://127.0.0.1:7690'
+$env:FASTAPI_HOST = '127.0.0.1'
+$env:FASTAPI_PORT = '7690'
+$env:UI_HOST = '127.0.0.1'
+$env:UI_PORT = '9847'
 $env:UV_CACHE_DIR = Join-Path $cacheRoot 'uv'
 $env:PIP_CACHE_DIR = Join-Path $cacheRoot 'pip'
 $env:NPM_CONFIG_CACHE = Join-Path $cacheRoot 'npm'
-$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $cacheRoot 'playwright'
+$env:PLAYWRIGHT_BROWSERS_PATH = $playwrightBrowsersPath
 $env:HF_HOME = Join-Path $cacheRoot 'huggingface'
 $env:HF_HUB_CACHE = Join-Path $env:HF_HOME 'hub'
 $env:HF_ASSETS_CACHE = Join-Path $env:HF_HOME 'assets'
@@ -76,9 +114,32 @@ $env:COVERAGE_FILE = Join-Path $cacheRoot 'coverage/.coverage'
 $env:PYTHONPYCACHEPREFIX = Join-Path $cacheRoot 'python'
 $env:CARGO_TARGET_DIR = Join-Path $cacheRoot 'cargo/target'
 $env:DILIGENT_LIVE_PROVIDER_LOG_DIR = $logDir
-$env:PYTEST_ADDOPTS = "--basetemp=$pytestCacheDir/basetemp -o cache_dir=$pytestCacheDir"
-$backend = Start-Process -FilePath $python -ArgumentList '-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '7690' -WorkingDirectory $serverDir -RedirectStandardOutput $backendOut -RedirectStandardError $backendErr -WindowStyle Hidden -PassThru
+$env:DILIGENT_PYTEST_CACHE_ROOT = $pytestCacheDir
+$env:PYTEST_ADDOPTS = "--basetemp=`"$(Join-Path $pytestCacheDir 'basetemp')`" -o cache_dir=`"$pytestCacheDir`""
 try {
+    if ($Suite -eq 'Full') {
+        $fakeOllamaPort = 11435
+        $env:OLLAMA_URL = "http://127.0.0.1:$fakeOllamaPort"
+        $seedScript = Join-Path $repoRoot 'app/tests/ci/seed_browser_regression_database.py'
+        & $python $seedScript
+        if ($LASTEXITCODE -ne 0) {
+            throw "Browser regression database seed failed with exit code $LASTEXITCODE."
+        }
+        $fakeOllamaScript = Join-Path $repoRoot 'app/tests/ci/fake_ollama.py'
+        $fakeOllamaArguments = @(
+            "`"$fakeOllamaScript`"",
+            '--port',
+            "$fakeOllamaPort"
+        )
+        $fakeOllama = Start-Process -FilePath $python -ArgumentList $fakeOllamaArguments -WorkingDirectory $serverDir -RedirectStandardOutput $ollamaOut -RedirectStandardError $ollamaErr -WindowStyle Hidden -PassThru
+        if (-not (Wait-HttpReady "http://127.0.0.1:$fakeOllamaPort/api/tags" -timeoutSeconds 30)) {
+            Write-Diagnostics 'fake Ollama readiness failure' $fakeOllama $ollamaOut $ollamaErr
+            throw 'Fake Ollama did not become ready before the browser E2E deadline.'
+        }
+        $fakeOllamaReady = $true
+    }
+
+    $backend = Start-Process -FilePath $python -ArgumentList '-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '7690' -WorkingDirectory $serverDir -RedirectStandardOutput $backendOut -RedirectStandardError $backendErr -WindowStyle Hidden -PassThru
     if (-not (Wait-HttpReady 'http://127.0.0.1:7690/api/health') -or -not (Wait-HttpReady 'http://127.0.0.1:7690/api/model-config')) {
         Write-Diagnostics 'backend readiness failure' $backend $backendOut $backendErr
         throw 'Backend did not become ready before the browser E2E deadline.'
@@ -93,22 +154,55 @@ try {
     $frontendReady = $true
 
     $testArguments = if ($Suite -eq 'LiveProvider') {
-        @('app/tests/e2e/test_live_provider_flow.py', '-q')
+        @(
+            (Join-Path $repoRoot 'app/tests/e2e/test_live_provider_flow.py'),
+            '-q',
+            '-rs',
+            '--junitxml',
+            $junitPath
+        )
     }
     else {
-        @('app/tests/e2e', '-q')
+        @(
+            (Join-Path $repoRoot 'app/tests/e2e'),
+            '-q',
+            '-rs',
+            '--ignore',
+            (Join-Path $repoRoot 'app/tests/e2e/test_live_provider_flow.py'),
+            '--ignore',
+            (Join-Path $repoRoot 'app/tests/e2e/test_multilingual_embedding_runtime.py'),
+            '--junitxml',
+            $junitPath
+        )
     }
     & $python -m pytest @testArguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Suite browser E2E suite failed with exit code $LASTEXITCODE."
+    $pytestExitCode = $LASTEXITCODE
+    if ($pytestExitCode -ne 0) {
+        throw "$Suite browser E2E suite failed with exit code $pytestExitCode."
+    }
+    if ($Suite -eq 'Full') {
+        if (-not (Test-Path -LiteralPath $junitPath)) {
+            throw "Mandatory browser E2E did not write its JUnit result: $junitPath"
+        }
+        [xml]$junit = Get-Content -LiteralPath $junitPath -Raw
+        $suiteNodes = @($junit.SelectNodes('//testsuite'))
+        $skippedCount = (
+            $suiteNodes |
+                ForEach-Object { [int]($_.GetAttribute('skipped')) } |
+                Measure-Object -Sum
+        ).Sum
+        if ($skippedCount -ne 0) {
+            throw "Mandatory browser E2E reported $skippedCount skipped test(s); optional integrations must be selected outside Suite Full."
+        }
     }
 }
 finally {
-    if (-not $backendReady -or -not $frontendReady) {
+    if (-not $backendReady -or -not $frontendReady -or ($Suite -eq 'Full' -and -not $fakeOllamaReady)) {
         Write-Diagnostics 'browser E2E cleanup' $backend $backendOut $backendErr
         Write-Diagnostics 'browser E2E cleanup' $frontend $frontendOut $frontendErr
+        Write-Diagnostics 'browser E2E cleanup' $fakeOllama $ollamaOut $ollamaErr
     }
-    foreach ($process in @($backend, $frontend)) {
+    foreach ($process in @($backend, $frontend, $fakeOllama)) {
         if ($null -ne $process) {
             Stop-ProcessTree $process
             $process.Dispose()

@@ -1,122 +1,87 @@
 # QA Regression
-Last updated: 2026-09-28
+Last updated: 2026-09-29
 
 ## Scope
-This file captures the repeatable regression slice for model configuration and app-flow validation.
+
+The mandatory regression path is the deterministic product matrix described in
+[`coding/testing_and_quality.md`](../coding/testing_and_quality.md). It covers
+backend/static/frontend/build checks, SQLite and hosted PostgreSQL persistence,
+the synthetic access-key lifecycle, security audits, and the Windows browser
+slice. External provider and heavyweight embedding checks are named integration
+lanes, not unexplained skips in the core result.
+
+## Canonical Windows browser harness
+
+From the repository root, run:
+
+```powershell
+.\app\tests\ci\run_browser_e2e.ps1 -Suite Full
+```
+
+`Full` creates an isolated SQLite path and access-key encryption-material path,
+seeds reference catalogs plus the smallest repository-backed clinical session
+and persisted timeline fixture, starts the deterministic fake Ollama service,
+starts backend and frontend, runs the E2E directory, writes a JUnit result, and
+cleans up all owned process trees. The Full collection explicitly excludes:
+
+- `test_live_provider_flow.py`, which is run only by the provider lane;
+- `test_multilingual_embedding_runtime.py`, which remains an explicit optional
+  embedding integration path.
+
+The harness fails if the mandatory JUnit result contains any skipped test. It
+does not infer skip counts by grepping console output. Read the generated
+backend/frontend/Ollama logs when readiness or collection fails.
+
+The external provider lane is:
+
+```powershell
+.\app\tests\ci\run_browser_e2e.ps1 -Suite LiveProvider
+```
+
+It runs only `test_live_provider_flow.py` and requires
+`DILIGENT_LIVE_PROVIDER_E2E=1` plus the hosted `OPENCODE_GO_API_KEY`. A real
+provider key is not required for access-key lifecycle validation; provider-side
+credential acceptance belongs to the provider component.
+
+## Persistence boundary
+
+The local persistence command is useful for SQLite-only work:
+
+```powershell
+Set-Location .\app\server
+.\.venv\Scripts\python.exe -m pytest ..\tests\persistence -q
+```
+
+Without `TEST_DATABASE_URL`, PostgreSQL parameterizations are intentionally
+skipped. The mandatory hosted `persistence-contract` job supplies PostgreSQL
+and executes the same contract against both engines; a local zero-skip number
+is not the acceptance criterion.
 
 ## Packaged desktop smoke test
 
-After a Windows desktop release build, validate the built portable artifact separately from source-mode tests:
+After a Windows desktop release build, validate the built portable artifact
+through the separate release-readiness procedure:
 
-1. Verify `release\DILIGENT-v<version>-windows-x64-portable.exe` and the matching `.sha256` entry.
-2. Open the portable EXE and confirm a responding window titled `DILIGENT Clinical Copilot`.
+1. Verify `release\DILIGENT-v<version>-windows-x64-portable.exe` and its
+   matching `.sha256` entry.
+2. Open the portable EXE and confirm a responding window titled `DILIGENT
+   Clinical Copilot`.
 3. Confirm `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>\extraction.complete` exists.
-4. Read `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json` and request `/api/health` on its recorded port.
-5. Confirm `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log` contains successful startup and static-asset requests.
-6. Open Model Configurations twice and confirm the second read uses the persisted provider catalog without a provider request. Click **Refresh** once and confirm only that action replaces the catalog. Repeat with a freshly initialized database to verify the cold-load path.
+4. Read `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json` and
+   request `/api/health` on its recorded port.
+5. Confirm the desktop backend log contains successful startup and
+   static-asset requests.
 
-This smoke test does not replace MSI install/upgrade/uninstall, offline WebView2, code-signing, or clean-machine distribution testing. Packaged desktop uses a random backend port and should not be tested through the source-mode `7690`/`9847` URLs.
+This is a release-readiness procedure, not a validation-component gate. It
+does not replace MSI install/upgrade/uninstall, offline WebView2, code-signing,
+or clean-machine distribution checks. Packaged desktop uses a random backend
+port and is not tested through source-mode `7690`/`9847` URLs.
 
-## Recommended Runner
+## Quality and cleanup
 
-```cmd
-app\tests\run_tests.bat modelconfig
-```
-
-This runner performs startup, health checks, focused unit and E2E commands, and cleanup.
-Pytest state, fixture databases, and runner temporaries are placed below
-`app\tests\cache\pytest`; Playwright browser files are placed below
-`runtimes\cache\playwright`.
-
-## Full Regression Variant
-
-```cmd
-app\tests\run_tests.bat modelconfigfull
-```
-
-Use this when validating the full `test_app_flow.py` suite plus `test_model_config_api.py`.
-
-## `run_tests.bat` Shortcuts
-
-Both variants are available through `run_tests.bat`:
-
-```cmd
-app\tests\run_tests.bat modelconfig
-app\tests\run_tests.bat modelconfigfull
-```
-
-These set `DILIGENT_SQLITE_PATH` to a temporary database, override ports 7690/9847, and propagate non-zero exit codes on failure.
-
-## SQLite Writeability Hardening
-Regression scripts set a per-run temporary database path through:
-
-- `DILIGENT_SQLITE_PATH=app\tests\cache\pytest\<per-run database>`
-
-This avoids accidental writes to a shared `resources/database.db` and prevents readonly-state failures during concurrent or constrained runs.
-
-## Local-first Test Execution
-- If `pytest` and `pytest-playwright` are installed in `app/server/.venv`, the scripts run `python -m pytest` directly.
-- Otherwise they fall back to `uv run --with ...`.
-- The focused E2E step uses `uv --with pytest-playwright`.
-- If package metadata is not cached locally, first-run success may require outbound package access.
-
-The launcher and CI keep runtime/dependency caches under `runtimes\cache\`
-(including uv, pip, npm, Playwright, Python bytecode, and Cargo) and test/tool
-caches under `app\tests\cache\` (including pytest, Ruff, Mypy, Angular, and
-coverage) instead of creating caches in unrelated application directories.
-
-## Manual Validation Sequence
-### 1. Start Backend And Frontend
-
-```powershell
-Start-Process -FilePath '.\app\server\.venv\Scripts\python.exe' -ArgumentList '-m','uvicorn','app:app','--host','127.0.0.1','--port','7690' -WorkingDirectory '.\app\server' -WindowStyle Hidden
-Start-Process -FilePath 'npm.cmd' -ArgumentList 'run','start' -WorkingDirectory '.\app\client' -WindowStyle Hidden
-```
-
-### 2. Confirm Backend Health
-
-```powershell
-Invoke-WebRequest -UseBasicParsing http://127.0.0.1:7690/api/health
-```
-
-### 3. Run Model-config Unit Tests
-
-```powershell
-.\runtimes\uv\uv.exe run --directory app/server --with pytest pytest ..\tests\unit\test_model_config_persistence.py -q
-```
-
-### 4. Run Focused E2E Slice
-
-```powershell
-$env:APP_TEST_FRONTEND_URL='http://127.0.0.1:9847'
-$env:APP_TEST_BACKEND_URL='http://127.0.0.1:7690'
-.\runtimes\uv\uv.exe run --directory app/server --with pytest --with pytest-playwright pytest ..\tests\e2e\test_model_config_api.py ..\tests\e2e\test_app_flow.py -k "runtime_toggle_enables_save_and_submits_put or model_config or dili_run_burst_click_submits_single_job or dili_run_conflict_surfaces_clear_error_message" -q
-```
-
-### 5. Optional Full App-flow Pass
-
-```powershell
-$env:APP_TEST_FRONTEND_URL='http://127.0.0.1:9847'
-$env:APP_TEST_BACKEND_URL='http://127.0.0.1:7690'
-.\runtimes\uv\uv.exe run --directory app/server --with pytest --with pytest-playwright pytest ..\tests\e2e\test_model_config_api.py ..\tests\e2e\test_app_flow.py -q
-```
-
-## Expected pass criteria
-
-- The selected unit, API, and app-flow tests complete with exit code `0`.
-- Model-configuration tests cover persisted state, provider catalog cache reuse, explicit refresh behavior, and save validation.
-- The UI remains usable after the provider catalog is unavailable; a cached valid catalog remains visible and an empty Ollama catalog is treated as a valid result.
-
-Test counts are intentionally not fixed here because the repository adds and removes focused cases as contracts evolve. If a current run fails:
-- Re-check backend and frontend health and port listeners.
-- Confirm `PLAYWRIGHT_NODEJS_PATH` is set by `app/tests/conftest.py` and points to `runtimes/nodejs/node.exe`.
-- If toggle or save tests fail, remove stale persisted runtime state and rerun once after cleanup.
-
-## Cleanup
-
-```powershell
-$ports=7690,9847
-$conns=Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in $ports }
-$ids=@($conns | Select-Object -ExpandProperty OwningProcess -Unique)
-foreach($id in $ids){ Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
-```
+The backend quality job runs compilation, Alembic upgrade/head/drift checks,
+Ruff, Pyright, and the complete unit suite. The Windows job runs Angular/Vitest,
+the production build, Playwright installation, and the canonical Full harness.
+The security job runs pip-audit, Angular and desktop npm audits, and
+cargo-audit. Stop task-owned backend/frontend/fake-Ollama processes after local
+runs and verify ports `7690`, `9847`, and `11435` are free.
