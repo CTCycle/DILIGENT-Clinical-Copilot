@@ -256,10 +256,10 @@ class SessionRevisionRepository:
                 .limit(1)
             ).scalar_one_or_none()
             existing_session = db_session.get(ClinicalSession, safe_session_id)
-            if current is None:
-                raise RuntimeError("No persisted version exists for manual report edit")
             if existing_session is None:
                 return None
+            if current is None:
+                raise RuntimeError("No persisted version exists for manual report edit")
             if metadata is not None:
                 existing_session.metadata_json = serialize_json_payload(metadata or {})
             result_row = db_session.execute(
