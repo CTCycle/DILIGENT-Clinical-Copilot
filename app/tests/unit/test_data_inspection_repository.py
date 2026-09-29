@@ -315,6 +315,21 @@ def test_inspection_detail_exposes_persisted_manual_edit_history() -> None:
         == detail["manual_edit_history"]
     )
 
+
+def test_manual_report_edit_missing_session_returns_none() -> None:
+    repository_graph, _ = build_repository_graph_for_test()
+
+    updated = repository_graph.session_revision_repository.update_current_report_text_with_manual_audit(
+        999999,
+        report_text="Missing session report",
+        edited_fields=["report_text"],
+        reviewer_note=None,
+        edited_by=None,
+        metadata=None,
+    )
+
+    assert updated is None
+
 ###############################################################################
 def test_catalog_search_and_drug_delete_cleanup() -> None:
     repository_graph, engine = build_repository_graph_for_test()
