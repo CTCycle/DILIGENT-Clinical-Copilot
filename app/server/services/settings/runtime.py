@@ -185,6 +185,7 @@ class RuntimeSettingsService:
                 moderate_confidence_min_margin=settings.clinical_language_detection.moderate_confidence_min_margin,
             ),
             integrations=IntegrationRuntimeSettings(
+                ncbi_contact_email=settings.runtime.ncbi_contact_email,
                 livertox_download_timeout=settings.runtime.livertox_download_timeout,
                 livertox_archive=settings.runtime.livertox_archive,
                 livertox_yield_interval=settings.runtime.livertox_yield_interval,

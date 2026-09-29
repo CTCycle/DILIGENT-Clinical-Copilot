@@ -29,7 +29,7 @@ type RuntimeCategorySettings =
   | MatchingRuntimeSettings
   | AdvancedRuntimeSettings;
 
-type SettingFieldKind = 'number' | 'boolean' | 'text' | 'select';
+type SettingFieldKind = 'number' | 'boolean' | 'email' | 'text' | 'select';
 
 type SettingOption = {
   value: string;
@@ -100,6 +100,7 @@ export const SETTINGS_SECTION_DEFINITIONS: Record<
     title: 'Integrations',
     description: 'Non-secret runtime controls for LiverTox and RxNav operations.',
     fields: [
+      { key: 'ncbi_contact_email', label: 'NCBI developer contact email', help: 'Contact address sent with NCBI automated requests. Use a valid developer or organization email registered with NCBI for production use. The bundled .local value is only a compatibility fallback.', scope: 'NCBI / LiverTox', kind: 'email' },
       { key: 'livertox_download_timeout', label: 'LiverTox download timeout', help: 'Maximum wait for a LiverTox download request.', scope: 'LiverTox', kind: 'number', min: 1, max: 3600, step: 1, unit: 'seconds' },
       { key: 'livertox_archive', label: 'LiverTox archive name', help: 'Archive filename used for the LiverTox source bundle.', scope: 'LiverTox', kind: 'text' },
       { key: 'livertox_yield_interval', label: 'LiverTox yield interval', help: 'Progress interval used while processing LiverTox records.', scope: 'LiverTox', kind: 'number', min: 1, max: 10000, step: 1, unit: 'records' },
@@ -162,6 +163,15 @@ function categoryRecord(
   return values[category] as unknown as Record<string, number | string | boolean>;
 }
 
+function isValidContactEmail(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim();
+  if (normalized.length === 0 || normalized.length > 254 || /\s/.test(normalized)) return false;
+  if (normalized.indexOf('@') !== normalized.lastIndexOf('@')) return false;
+  const separator = normalized.indexOf('@');
+  return separator > 0 && separator < normalized.length - 1;
+}
+
 function cloneValues(values: RuntimeSettingsValues): RuntimeSettingsValues {
   return {
     general: { ...values.general },
@@ -184,6 +194,8 @@ export function validateRuntimeSettingsSection(
       if ((field.min !== undefined && value < field.min) || (field.max !== undefined && value > field.max)) {
         return `${field.label} is outside its allowed range.`;
       }
+    } else if (field.kind === 'email' && !isValidContactEmail(value)) {
+      return `${field.label} must be a valid email address.`;
     } else if (field.kind === 'text' && (typeof value !== 'string' || !value.trim())) {
       return `${field.label} cannot be empty.`;
     }

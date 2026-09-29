@@ -25,6 +25,7 @@ const VALUES: RuntimeSettingsValues = {
     moderate_confidence_min_margin: 1,
   },
   integrations: {
+    ncbi_contact_email: 'clinical-copilot@pharmagent.local',
     livertox_download_timeout: 30,
     livertox_archive: 'livertox_NBK547852.tar.gz',
     livertox_yield_interval: 25,
@@ -77,6 +78,12 @@ describe('operational settings definitions', () => {
     expect(fields.map((field) => field.key)).toContain('clinical_assessment_batch_size');
     expect(fields.map((field) => field.key)).toContain('spelling_long_max_distance');
     expect(fields.map((field) => field.kind)).toContain('text');
+    expect(fields.map((field) => field.key)).toContain('ncbi_contact_email');
+    const ncbiField = SETTINGS_SECTION_DEFINITIONS.integrations.fields.find(
+      (field) => field.key === 'ncbi_contact_email',
+    );
+    expect(ncbiField?.kind).toBe('email');
+    expect(ncbiField?.scope).toBe('NCBI / LiverTox');
     expect(fields.map((field) => field.kind)).not.toContain('boolean');
     expect(fields.every((field) => !field.scope.toLowerCase().includes('env'))).toBe(true);
   });
@@ -99,5 +106,17 @@ describe('operational settings definitions', () => {
       },
     };
     expect(validateRuntimeSettingsSection('advanced', invalidAdvanced)).toContain('Local LLM timeout cap');
+
+    const invalidEmail: RuntimeSettingsValues = {
+      ...VALUES,
+      integrations: { ...VALUES.integrations, ncbi_contact_email: 'not-an-email' },
+    };
+    expect(validateRuntimeSettingsSection('integrations', invalidEmail)).toContain('valid email');
+
+    const validEmail: RuntimeSettingsValues = {
+      ...VALUES,
+      integrations: { ...VALUES.integrations, ncbi_contact_email: 'developer@example.org' },
+    };
+    expect(validateRuntimeSettingsSection('integrations', validEmail)).toBe('');
   });
 });

@@ -1289,3 +1289,46 @@ tests remain as regression evidence.
 | spoken Narrator/Speech Recap output | `UNVALIDATED` | Rendered, keyboard, and accessibility-tree evidence does not establish audible output. |
 
 Detailed evidence: [revision cancellation and timeout validation](../../QA/revision-cancellation-timeout-validation-20260928/report.md).
+
+## NCBI LiverTox machine-access implementation — 2026-09-29
+
+1. Replaced the automated LiverTox Bookshelf HTML discovery path with a
+   sequential official-service chain: E-utilities exact-RID identity lookup,
+   Books-OAI `nbk_ftext` metadata discovery, LitArch `file_list.csv` archive
+   resolution, and safe archive-member master-list fallback. No runtime request
+   to the normal Bookshelf HTML page remains in the discovery path.
+2. Added the database-backed `ncbi_contact_email` Integration setting with a
+   reusable backend/frontend structural validator, deterministic legacy/blank
+   fallback, Settings API persistence/reload/reset mapping, and email input
+   guidance. The contact is request identity, not a credential, and is not
+   emitted in update results, source metadata, clinical artifacts, or ordinary
+   logs.
+3. Hardened XLSX and tarball downloads with `.part` staging, source validation,
+   safe tar-member checks, and replacement only after validation. A temporary
+   extension-related validator defect found by the fallback test was fixed by
+   validating staged XLSX bytes through memory buffers.
+4. The focused updater/settings/timeout suite passed **33 tests**. The full
+   backend unit suite passed **832 tests**. Ruff passed, Pyright reported
+   `0 errors, 0 warnings, 0 informations`, the Angular suite passed **24 files
+   / 105 tests**, and `npm run build` passed. The synchronized OpenAPI document
+   parses with **68 paths / 104 schemas** and contains the new Integration
+   field in both read and patch schemas.
+5. A read-only live NCBI preflight identified the expected E-utilities record,
+   OAI metadata format, and dynamic LitArch archive path. The current OAI
+   spreadsheet response was challenge HTML; the resolved archive metadata
+   reported **195,497,807 bytes**. The archive was intentionally not downloaded
+   during this run.
+6. A disposable backend plus in-app Browser at 1280×720 rendered the
+   Integrations contact field, effective fallback, email semantics, production
+   guidance, and malformed-email Save guard. The temporary services were
+   stopped after capture.
+
+| Gate | Final status | Evidence boundary and remaining limitation |
+|---|---|---|
+| `data.inspection.catalogs` | `PARTIAL` | Discovery and fallback contracts are implemented and tested; no live catalog replacement was completed. |
+| `data.sources.refresh` | `PARTIAL` | The new machine-access chain passed deterministic tests and metadata preflight; full archive refresh and ordered Update All remain unvalidated. |
+| `settings.runtime-model-configuration` | `VALIDATED` for the NCBI contact field | Missing/blank fallback, custom persistence/reload/reset, malformed API rejection, Angular rendering, and browser validation passed. |
+| `ui.application-shell` | `VALIDATED` for the exercised Integrations scope | The rendered contact field, help copy, effective default, and invalid-email guard were observed in the in-app Browser. |
+| `test.automated-regression` | `PARTIAL` | Local backend/frontend/static/build checks are green; live archive/catalog, hosted provider, and ordered refresh gates remain outside scope. |
+
+Evidence: [NCBI LiverTox machine-access validation](../../QA/ncbi-livertox-machine-access-validation-20260929/report.md).
