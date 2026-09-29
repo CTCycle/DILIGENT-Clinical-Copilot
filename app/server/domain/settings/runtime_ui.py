@@ -5,6 +5,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from common.constants import DEFAULT_NCBI_CONTACT_EMAIL
+from domain.settings.configuration import NCBIContactEmail
+
 RuntimeSettingsCategory = Literal[
     "general", "data", "integrations", "matching", "advanced"
 ]
@@ -92,6 +95,7 @@ class DataRuntimeSettingsPatch(_PatchModel):
 
 ###############################################################################
 class IntegrationRuntimeSettings(_StrictModel):
+    ncbi_contact_email: NCBIContactEmail
     livertox_download_timeout: float = Field(gt=0.0, le=3600.0)
     livertox_archive: str = Field(min_length=1, max_length=255)
     livertox_yield_interval: int = Field(ge=1, le=10000)
@@ -102,9 +106,8 @@ class IntegrationRuntimeSettings(_StrictModel):
 
 
 class IntegrationRuntimeSettingsPatch(_PatchModel):
-    livertox_download_timeout: float | None = Field(
-        default=None, gt=0.0, le=3600.0
-    )
+    ncbi_contact_email: NCBIContactEmail | None = None
+    livertox_download_timeout: float | None = Field(default=None, gt=0.0, le=3600.0)
     livertox_archive: str | None = Field(default=None, min_length=1, max_length=255)
     livertox_yield_interval: int | None = Field(default=None, ge=1, le=10000)
     livertox_skip_deterministic_ratio: float | None = Field(
@@ -137,9 +140,7 @@ class MatchingRuntimeSettingsPatch(_PatchModel):
     direct_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     master_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     synonym_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
-    normalization_cache_limit: int | None = Field(
-        default=None, ge=1, le=2_000_000
-    )
+    normalization_cache_limit: int | None = Field(default=None, ge=1, le=2_000_000)
     match_cache_limit: int | None = Field(default=None, ge=1, le=2_000_000)
     alias_cache_limit: int | None = Field(default=None, ge=1, le=2_000_000)
     min_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
@@ -188,9 +189,7 @@ class AdvancedRuntimeSettingsPatch(_PatchModel):
     minimum_llm_timeout: float | None = Field(default=None, gt=0.0, le=3600.0)
     cloud_llm_timeout_cap: float | None = Field(default=None, gt=0.0, le=86400.0)
     local_llm_timeout_cap: float | None = Field(default=None, gt=0.0, le=86400.0)
-    ollama_server_start_timeout: float | None = Field(
-        default=None, gt=0.0, le=3600.0
-    )
+    ollama_server_start_timeout: float | None = Field(default=None, gt=0.0, le=3600.0)
     max_excerpt_length: int | None = Field(default=None, ge=500, le=100000)
 
 
@@ -250,6 +249,7 @@ RUNTIME_SETTINGS_DEFAULTS = RuntimeSettingsValues(
         moderate_confidence_min_margin=1.0,
     ),
     integrations=IntegrationRuntimeSettings(
+        ncbi_contact_email=DEFAULT_NCBI_CONTACT_EMAIL,
         livertox_download_timeout=30.0,
         livertox_archive="livertox_NBK547852.tar.gz",
         livertox_yield_interval=25,

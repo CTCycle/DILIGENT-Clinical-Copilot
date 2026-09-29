@@ -99,6 +99,40 @@ def test_runtime_settings_partial_update_persists_all_mapped_blocks(monkeypatch)
     assert serializer.payload["drugs_matcher"]["spelling_short_name_length"] == 10
 
 
+def test_runtime_settings_persist_reload_and_reset_ncbi_contact(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    service, serializer = _service(monkeypatch)
+    updated = service.update_state(
+        RuntimeSettingsUpdateRequest.model_validate(
+            {"integrations": {"ncbi_contact_email": " developer@example.org "}}
+        )
+    )
+
+    assert updated.values.integrations.ncbi_contact_email == "developer@example.org"
+    assert serializer.payload["runtime"]["ncbi_contact_email"] == "developer@example.org"
+
+    reloaded_manager = ConfigurationManager(persisted_payload=serializer.payload)
+    monkeypatch.setattr(runtime_module, "get_server_settings", lambda: reloaded_manager.server_settings)
+    monkeypatch.setattr(runtime_module, "get_configuration_manager", lambda: reloaded_manager)
+    reloaded_service = RuntimeSettingsService(serializer=serializer)
+    reloaded = reloaded_service.get_state()
+    assert reloaded.values.integrations.ncbi_contact_email == "developer@example.org"
+
+    reset = reloaded_service.reset_category("integrations")
+    assert reset.values.integrations.ncbi_contact_email == "clinical-copilot@pharmagent.local"
+    assert serializer.payload["runtime"]["ncbi_contact_email"] == "clinical-copilot@pharmagent.local"
+
+
+def test_runtime_settings_old_payload_uses_ncbi_default(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    service, serializer = _service(monkeypatch)
+    serializer.payload["runtime"].pop("ncbi_contact_email", None)
+    manager = ConfigurationManager(persisted_payload=serializer.payload)
+    monkeypatch.setattr(runtime_module, "get_server_settings", lambda: manager.server_settings)
+
+    state = RuntimeSettingsService(serializer=serializer).get_state()
+
+    assert state.values.integrations.ncbi_contact_email == "clinical-copilot@pharmagent.local"
+
+
 def test_runtime_settings_reload_observes_persisted_update(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     service, serializer = _service(monkeypatch)
     service.update_state(

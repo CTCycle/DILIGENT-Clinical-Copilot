@@ -2104,6 +2104,136 @@
         }
       }
     },
+    "/api/inspection/structured-sources/jobs": {
+      "post": {
+        "tags": [
+          "inspection"
+        ],
+        "summary": "Start Structured Sources Update Job",
+        "operationId": "start_structured_sources_update_job_api_inspection_structured_sources_jobs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/InspectionStructuredSourcesUpdateRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStartResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspection/structured-sources/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "inspection"
+        ],
+        "summary": "Get Structured Sources Update Job Status",
+        "operationId": "get_structured_sources_update_job_status_api_inspection_structured_sources_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "inspection"
+        ],
+        "summary": "Cancel Structured Sources Update Job",
+        "operationId": "cancel_structured_sources_update_job_api_inspection_structured_sources_jobs__job_id__delete",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobCancelResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inspection/reference-catalogs/runtime-observations": {
       "get": {
         "tags": [
@@ -2283,6 +2413,271 @@
         }
       }
     },
+    "/api/inspection/dilirank": {
+      "get": {
+        "tags": [
+          "inspection"
+        ],
+        "summary": "List Catalog",
+        "operationId": "list_catalog_api_inspection_dilirank_get",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiliRankCatalogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspection/dilirank/update-config": {
+      "get": {
+        "tags": [
+          "inspection"
+        ],
+        "summary": "Get Update Config",
+        "operationId": "get_update_config_api_inspection_dilirank_update_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiliRankUpdateConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspection/dilirank/jobs": {
+      "post": {
+        "tags": [
+          "inspection"
+        ],
+        "summary": "Start Dilirank Update Job",
+        "operationId": "start_dilirank_update_job_api_inspection_dilirank_jobs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DiliRankUpdateRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStartResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspection/dilirank/{drug_id}": {
+      "get": {
+        "tags": [
+          "inspection"
+        ],
+        "summary": "Get Drug Records",
+        "operationId": "get_drug_records_api_inspection_dilirank__drug_id__get",
+        "parameters": [
+          {
+            "name": "drug_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Drug Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiliRankDrugResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspection/dilirank/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "inspection"
+        ],
+        "summary": "Get Dilirank Update Job Status",
+        "operationId": "get_dilirank_update_job_status_api_inspection_dilirank_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "inspection"
+        ],
+        "summary": "Cancel Dilirank Update Job",
+        "operationId": "cancel_dilirank_update_job_api_inspection_dilirank_jobs__job_id__delete",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobCancelResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inspection/rag/update-config": {
       "get": {
         "tags": [
@@ -2390,6 +2785,50 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LanceVectorStoreSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspection/rag/browse": {
+      "get": {
+        "tags": [
+          "inspection"
+        ],
+        "summary": "Browse Rag Directories",
+        "operationId": "browse_rag_directories_api_inspection_rag_browse_get",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024,
+              "default": "",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RagDirectoryBrowseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2954,6 +3393,115 @@
         }
       }
     },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get State",
+        "operationId": "get_state_api_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeSettingsStateResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update State",
+        "operationId": "update_state_api_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuntimeSettingsUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeSettingsStateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/reset/{category}": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Reset Category",
+        "operationId": "reset_category_api_settings_reset__category__post",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "general",
+                "data",
+                "integrations",
+                "matching",
+                "advanced"
+              ],
+              "type": "string",
+              "title": "Category"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeSettingsStateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/access-keys": {
       "get": {
         "tags": [
@@ -3172,6 +3720,61 @@
           }
         }
       }
+    },
+    "/api/desktop/bootstrap": {
+      "post": {
+        "tags": [
+          "desktop"
+        ],
+        "summary": "Bootstrap Desktop Session",
+        "operationId": "bootstrap_desktop_session_api_desktop_bootstrap_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesktopBootstrapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desktop/shutdown": {
+      "post": {
+        "tags": [
+          "desktop"
+        ],
+        "summary": "Request Desktop Shutdown",
+        "operationId": "request_desktop_shutdown_api_desktop_shutdown_post",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesktopShutdownResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3293,6 +3896,222 @@
           "fingerprint"
         ],
         "title": "AccessKeyResponse"
+      },
+      "AdvancedRuntimeSettings": {
+        "properties": {
+          "default_llm_timeout": {
+            "type": "number",
+            "maximum": 86400.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Default Llm Timeout"
+          },
+          "parser_llm_timeout": {
+            "type": "number",
+            "maximum": 86400.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Parser Llm Timeout"
+          },
+          "disease_llm_timeout": {
+            "type": "number",
+            "maximum": 86400.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Disease Llm Timeout"
+          },
+          "clinical_llm_timeout": {
+            "type": "number",
+            "maximum": 86400.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Clinical Llm Timeout"
+          },
+          "livertox_llm_timeout": {
+            "type": "number",
+            "maximum": 86400.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Livertox Llm Timeout"
+          },
+          "minimum_llm_timeout": {
+            "type": "number",
+            "maximum": 3600.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Minimum Llm Timeout"
+          },
+          "cloud_llm_timeout_cap": {
+            "type": "number",
+            "maximum": 86400.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Cloud Llm Timeout Cap"
+          },
+          "local_llm_timeout_cap": {
+            "type": "number",
+            "maximum": 86400.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Local Llm Timeout Cap"
+          },
+          "ollama_server_start_timeout": {
+            "type": "number",
+            "maximum": 3600.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Ollama Server Start Timeout"
+          },
+          "max_excerpt_length": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 500.0,
+            "title": "Max Excerpt Length"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "default_llm_timeout",
+          "parser_llm_timeout",
+          "disease_llm_timeout",
+          "clinical_llm_timeout",
+          "livertox_llm_timeout",
+          "minimum_llm_timeout",
+          "cloud_llm_timeout_cap",
+          "local_llm_timeout_cap",
+          "ollama_server_start_timeout",
+          "max_excerpt_length"
+        ],
+        "title": "AdvancedRuntimeSettings"
+      },
+      "AdvancedRuntimeSettingsPatch": {
+        "properties": {
+          "default_llm_timeout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 86400.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Llm Timeout"
+          },
+          "parser_llm_timeout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 86400.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parser Llm Timeout"
+          },
+          "disease_llm_timeout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 86400.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disease Llm Timeout"
+          },
+          "clinical_llm_timeout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 86400.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Llm Timeout"
+          },
+          "livertox_llm_timeout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 86400.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Livertox Llm Timeout"
+          },
+          "minimum_llm_timeout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 3600.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Llm Timeout"
+          },
+          "cloud_llm_timeout_cap": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 86400.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cloud Llm Timeout Cap"
+          },
+          "local_llm_timeout_cap": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 86400.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Llm Timeout Cap"
+          },
+          "ollama_server_start_timeout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 3600.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ollama Server Start Timeout"
+          },
+          "max_excerpt_length": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 500.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Excerpt Length"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AdvancedRuntimeSettingsPatch"
       },
       "ClinicalInputPreflightIssue": {
         "properties": {
@@ -3587,6 +4406,9 @@
               }
             ]
           },
+          "model_capabilities": {
+            "$ref": "#/components/schemas/ModelCapabilityMetadata"
+          },
           "input_token_limit": {
             "anyOf": [
               {
@@ -3632,6 +4454,28 @@
               }
             ],
             "title": "Supports Temperature"
+          },
+          "supports_json_mode": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Json Mode"
+          },
+          "supports_native_json_schema": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Native Json Schema"
           }
         },
         "additionalProperties": false,
@@ -3809,6 +4653,302 @@
         ],
         "title": "ConnectivityCheckResponse"
       },
+      "DataRuntimeSettings": {
+        "properties": {
+          "drug_name_min_length": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Drug Name Min Length"
+          },
+          "drug_name_max_length": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Drug Name Max Length"
+          },
+          "drug_name_max_tokens": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Drug Name Max Tokens"
+          },
+          "text_extraction_batch_size": {
+            "type": "integer",
+            "maximum": 128.0,
+            "minimum": 1.0,
+            "title": "Text Extraction Batch Size"
+          },
+          "text_extraction_max_concurrency": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Text Extraction Max Concurrency"
+          },
+          "retrieval_batch_size": {
+            "type": "integer",
+            "maximum": 128.0,
+            "minimum": 1.0,
+            "title": "Retrieval Batch Size"
+          },
+          "retrieval_max_concurrency": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Retrieval Max Concurrency"
+          },
+          "clinical_assessment_batch_size": {
+            "type": "integer",
+            "maximum": 128.0,
+            "minimum": 1.0,
+            "title": "Clinical Assessment Batch Size"
+          },
+          "clinical_assessment_max_concurrency": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Clinical Assessment Max Concurrency"
+          },
+          "min_best_score": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Min Best Score"
+          },
+          "high_confidence_min_score": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "High Confidence Min Score"
+          },
+          "high_confidence_min_margin": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "High Confidence Min Margin"
+          },
+          "moderate_confidence_min_score": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Moderate Confidence Min Score"
+          },
+          "moderate_confidence_min_margin": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Moderate Confidence Min Margin"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "drug_name_min_length",
+          "drug_name_max_length",
+          "drug_name_max_tokens",
+          "text_extraction_batch_size",
+          "text_extraction_max_concurrency",
+          "retrieval_batch_size",
+          "retrieval_max_concurrency",
+          "clinical_assessment_batch_size",
+          "clinical_assessment_max_concurrency",
+          "min_best_score",
+          "high_confidence_min_score",
+          "high_confidence_min_margin",
+          "moderate_confidence_min_score",
+          "moderate_confidence_min_margin"
+        ],
+        "title": "DataRuntimeSettings"
+      },
+      "DataRuntimeSettingsPatch": {
+        "properties": {
+          "drug_name_min_length": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 200.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drug Name Min Length"
+          },
+          "drug_name_max_length": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drug Name Max Length"
+          },
+          "drug_name_max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 64.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drug Name Max Tokens"
+          },
+          "text_extraction_batch_size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 128.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Extraction Batch Size"
+          },
+          "text_extraction_max_concurrency": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 64.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Extraction Max Concurrency"
+          },
+          "retrieval_batch_size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 128.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Batch Size"
+          },
+          "retrieval_max_concurrency": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 64.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Max Concurrency"
+          },
+          "clinical_assessment_batch_size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 128.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Assessment Batch Size"
+          },
+          "clinical_assessment_max_concurrency": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 64.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Assessment Max Concurrency"
+          },
+          "min_best_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Best Score"
+          },
+          "high_confidence_min_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Confidence Min Score"
+          },
+          "high_confidence_min_margin": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Confidence Min Margin"
+          },
+          "moderate_confidence_min_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moderate Confidence Min Score"
+          },
+          "moderate_confidence_min_margin": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moderate Confidence Min Margin"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DataRuntimeSettingsPatch"
+      },
       "DeleteEntityResponse": {
         "properties": {
           "deleted": {
@@ -3822,6 +4962,239 @@
           "deleted"
         ],
         "title": "DeleteEntityResponse"
+      },
+      "DesktopBootstrapRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "DesktopBootstrapRequest"
+      },
+      "DesktopShutdownResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "shutting-down",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "DesktopShutdownResponse"
+      },
+      "DiliRankCatalogItem": {
+        "properties": {
+          "drug_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drug Id"
+          },
+          "drug_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drug Name"
+          },
+          "ltkb_id": {
+            "type": "string",
+            "title": "Ltkb Id"
+          },
+          "compound_name": {
+            "type": "string",
+            "title": "Compound Name"
+          },
+          "severity_class": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity Class"
+          },
+          "label_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Section"
+          },
+          "dili_concern": {
+            "type": "string",
+            "title": "Dili Concern"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "source_last_modified": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Last Modified"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ltkb_id",
+          "compound_name",
+          "dili_concern"
+        ],
+        "title": "DiliRankCatalogItem"
+      },
+      "DiliRankCatalogResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DiliRankCatalogItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "DiliRankCatalogResponse"
+      },
+      "DiliRankDrugResponse": {
+        "properties": {
+          "drug_id": {
+            "type": "integer",
+            "title": "Drug Id"
+          },
+          "drug_name": {
+            "type": "string",
+            "title": "Drug Name"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/DiliRankCatalogItem"
+            },
+            "type": "array",
+            "title": "Records"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "drug_id",
+          "drug_name"
+        ],
+        "title": "DiliRankDrugResponse"
+      },
+      "DiliRankUpdateConfigResponse": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "const": "dilirank",
+            "title": "Target",
+            "default": "dilirank"
+          },
+          "defaults": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Defaults"
+          },
+          "allowed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Fields"
+          },
+          "summary": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Summary"
+          },
+          "read_only": {
+            "type": "boolean",
+            "title": "Read Only",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DiliRankUpdateConfigResponse"
+      },
+      "DiliRankUpdateRequest": {
+        "properties": {
+          "redownload": {
+            "type": "boolean",
+            "title": "Redownload",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DiliRankUpdateRequest"
       },
       "DrugAliasEntry": {
         "properties": {
@@ -3985,6 +5358,42 @@
         ],
         "title": "EmbeddingStatusResponse"
       },
+      "GeneralRuntimeSettings": {
+        "properties": {
+          "polling_interval": {
+            "type": "number",
+            "maximum": 60.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Polling Interval"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "polling_interval"
+        ],
+        "title": "GeneralRuntimeSettings"
+      },
+      "GeneralRuntimeSettingsPatch": {
+        "properties": {
+          "polling_interval": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 60.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Polling Interval"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GeneralRuntimeSettingsPatch"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4011,6 +5420,24 @@
           "status"
         ],
         "title": "HealthResponse"
+      },
+      "InspectionDiliRankOverrideRequest": {
+        "properties": {
+          "redownload": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redownload"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "InspectionDiliRankOverrideRequest"
       },
       "InspectionLiverToxOverrideRequest": {
         "properties": {
@@ -4107,6 +5534,22 @@
         "type": "object",
         "title": "InspectionRxNavOverrideRequest"
       },
+      "InspectionStructuredSourcesUpdateRequest": {
+        "properties": {
+          "rxnav": {
+            "$ref": "#/components/schemas/InspectionRxNavOverrideRequest"
+          },
+          "livertox": {
+            "$ref": "#/components/schemas/InspectionLiverToxOverrideRequest"
+          },
+          "dilirank": {
+            "$ref": "#/components/schemas/InspectionDiliRankOverrideRequest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "InspectionStructuredSourcesUpdateRequest"
+      },
       "InspectionUpdateConfigResponse": {
         "properties": {
           "target": {
@@ -4114,6 +5557,7 @@
             "enum": [
               "rxnav",
               "livertox",
+              "dilirank",
               "rag"
             ],
             "title": "Target"
@@ -4147,6 +5591,178 @@
           "target"
         ],
         "title": "InspectionUpdateConfigResponse"
+      },
+      "IntegrationRuntimeSettings": {
+        "properties": {
+          "ncbi_contact_email": {
+            "type": "string",
+            "title": "Ncbi Contact Email"
+          },
+          "livertox_download_timeout": {
+            "type": "number",
+            "maximum": 3600.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Livertox Download Timeout"
+          },
+          "livertox_archive": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Livertox Archive"
+          },
+          "livertox_yield_interval": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Livertox Yield Interval"
+          },
+          "livertox_skip_deterministic_ratio": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Livertox Skip Deterministic Ratio"
+          },
+          "livertox_monograph_max_workers": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Livertox Monograph Max Workers"
+          },
+          "rxnav_request_timeout": {
+            "type": "number",
+            "maximum": 120.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Rxnav Request Timeout"
+          },
+          "rxnav_max_concurrency": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Rxnav Max Concurrency"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ncbi_contact_email",
+          "livertox_download_timeout",
+          "livertox_archive",
+          "livertox_yield_interval",
+          "livertox_skip_deterministic_ratio",
+          "livertox_monograph_max_workers",
+          "rxnav_request_timeout",
+          "rxnav_max_concurrency"
+        ],
+        "title": "IntegrationRuntimeSettings"
+      },
+      "IntegrationRuntimeSettingsPatch": {
+        "properties": {
+          "ncbi_contact_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncbi Contact Email"
+          },
+          "livertox_download_timeout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 3600.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Livertox Download Timeout"
+          },
+          "livertox_archive": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Livertox Archive"
+          },
+          "livertox_yield_interval": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Livertox Yield Interval"
+          },
+          "livertox_skip_deterministic_ratio": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Livertox Skip Deterministic Ratio"
+          },
+          "livertox_monograph_max_workers": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 64.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Livertox Monograph Max Workers"
+          },
+          "rxnav_request_timeout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 120.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rxnav Request Timeout"
+          },
+          "rxnav_max_concurrency": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 64.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rxnav Max Concurrency"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "IntegrationRuntimeSettingsPatch"
       },
       "JobCancelResponse": {
         "properties": {
@@ -4792,6 +6408,602 @@
           "audit"
         ],
         "title": "ManualReportEditResponse"
+      },
+      "MatchingRuntimeSettings": {
+        "properties": {
+          "direct_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Direct Confidence"
+          },
+          "master_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Master Confidence"
+          },
+          "synonym_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Synonym Confidence"
+          },
+          "normalization_cache_limit": {
+            "type": "integer",
+            "maximum": 2000000.0,
+            "minimum": 1.0,
+            "title": "Normalization Cache Limit"
+          },
+          "match_cache_limit": {
+            "type": "integer",
+            "maximum": 2000000.0,
+            "minimum": 1.0,
+            "title": "Match Cache Limit"
+          },
+          "alias_cache_limit": {
+            "type": "integer",
+            "maximum": 2000000.0,
+            "minimum": 1.0,
+            "title": "Alias Cache Limit"
+          },
+          "min_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Min Confidence"
+          },
+          "token_min_length": {
+            "type": "integer",
+            "maximum": 128.0,
+            "minimum": 1.0,
+            "title": "Token Min Length"
+          },
+          "catalog_index_limit": {
+            "type": "integer",
+            "maximum": 2000000.0,
+            "minimum": 1.0,
+            "title": "Catalog Index Limit"
+          },
+          "spelling_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Spelling Confidence"
+          },
+          "spelling_min_query_length": {
+            "type": "integer",
+            "maximum": 128.0,
+            "minimum": 1.0,
+            "title": "Spelling Min Query Length"
+          },
+          "spelling_short_name_length": {
+            "type": "integer",
+            "maximum": 128.0,
+            "minimum": 1.0,
+            "title": "Spelling Short Name Length"
+          },
+          "spelling_short_max_distance": {
+            "type": "integer",
+            "maximum": 16.0,
+            "minimum": 0.0,
+            "title": "Spelling Short Max Distance"
+          },
+          "spelling_long_max_distance": {
+            "type": "integer",
+            "maximum": 16.0,
+            "minimum": 0.0,
+            "title": "Spelling Long Max Distance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "direct_confidence",
+          "master_confidence",
+          "synonym_confidence",
+          "normalization_cache_limit",
+          "match_cache_limit",
+          "alias_cache_limit",
+          "min_confidence",
+          "token_min_length",
+          "catalog_index_limit",
+          "spelling_confidence",
+          "spelling_min_query_length",
+          "spelling_short_name_length",
+          "spelling_short_max_distance",
+          "spelling_long_max_distance"
+        ],
+        "title": "MatchingRuntimeSettings"
+      },
+      "MatchingRuntimeSettingsPatch": {
+        "properties": {
+          "direct_confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direct Confidence"
+          },
+          "master_confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Master Confidence"
+          },
+          "synonym_confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synonym Confidence"
+          },
+          "normalization_cache_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2000000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalization Cache Limit"
+          },
+          "match_cache_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2000000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Cache Limit"
+          },
+          "alias_cache_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2000000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias Cache Limit"
+          },
+          "min_confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Confidence"
+          },
+          "token_min_length": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 128.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Min Length"
+          },
+          "catalog_index_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2000000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Index Limit"
+          },
+          "spelling_confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spelling Confidence"
+          },
+          "spelling_min_query_length": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 128.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spelling Min Query Length"
+          },
+          "spelling_short_name_length": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 128.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spelling Short Name Length"
+          },
+          "spelling_short_max_distance": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 16.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spelling Short Max Distance"
+          },
+          "spelling_long_max_distance": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 16.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spelling Long Max Distance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MatchingRuntimeSettingsPatch"
+      },
+      "ModelCapabilityMetadata": {
+        "properties": {
+          "semantic_model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semantic Model Id"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases",
+            "default": []
+          },
+          "endpoint_family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint Family"
+          },
+          "context_window_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window Tokens"
+          },
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Output Tokens"
+          },
+          "supports_chat": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Chat"
+          },
+          "supports_streaming": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Streaming"
+          },
+          "supports_tools": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Tools"
+          },
+          "tool_call_mode": {
+            "type": "string",
+            "enum": [
+              "native",
+              "structured",
+              "unsupported"
+            ],
+            "title": "Tool Call Mode",
+            "default": "unsupported"
+          },
+          "supports_tool_choice": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Tool Choice"
+          },
+          "supports_parallel_tool_calls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Parallel Tool Calls"
+          },
+          "supports_structured_output": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Structured Output"
+          },
+          "supports_json_mode": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Json Mode"
+          },
+          "supports_native_json_schema": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Native Json Schema"
+          },
+          "supports_reasoning": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Reasoning"
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels",
+            "default": []
+          },
+          "reasoning_parameter": {
+            "type": "string",
+            "enum": [
+              "none",
+              "boolean",
+              "level",
+              "effort",
+              "budget_tokens",
+              "adaptive"
+            ],
+            "title": "Reasoning Parameter",
+            "default": "none"
+          },
+          "reasoning_toggle_parameter": {
+            "type": "string",
+            "enum": [
+              "none",
+              "thinking",
+              "reasoning",
+              "provider_default"
+            ],
+            "title": "Reasoning Toggle Parameter",
+            "default": "provider_default"
+          },
+          "reasoning_counts_toward_output_limit": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Counts Toward Output Limit"
+          },
+          "reasoning_unsupported_parameters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Unsupported Parameters",
+            "default": []
+          },
+          "requires_reasoning_content_for_tool_calls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires Reasoning Content For Tool Calls"
+          },
+          "requires_assistant_content_for_tool_calls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires Assistant Content For Tool Calls"
+          },
+          "supports_temperature": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Temperature"
+          },
+          "supports_top_p": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Top P"
+          },
+          "supports_usage_metadata": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Usage Metadata"
+          },
+          "supports_finish_reason": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Finish Reason"
+          },
+          "evidence": {
+            "type": "string",
+            "enum": [
+              "catalog",
+              "documented",
+              "probe",
+              "provider",
+              "fallback"
+            ],
+            "title": "Evidence",
+            "default": "fallback"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ModelCapabilityMetadata",
+        "description": "Canonical capability metadata for one provider model.\n\nProvider-level capabilities describe what a provider can do in general.  This\nmodel describes the selected model and is the only metadata source used when\nconstructing an inference request."
       },
       "ModelCatalogOperationResponse": {
         "properties": {
@@ -5582,6 +7794,69 @@
         ],
         "title": "ProviderCapabilities"
       },
+      "RagDirectoryBrowseResponse": {
+        "properties": {
+          "current_path": {
+            "type": "string",
+            "title": "Current Path"
+          },
+          "parent_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Path"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RagDirectoryItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "drives": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Drives"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "current_path"
+        ],
+        "title": "RagDirectoryBrowseResponse"
+      },
+      "RagDirectoryItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "is_dir": {
+            "type": "boolean",
+            "title": "Is Dir",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "path"
+        ],
+        "title": "RagDirectoryItem"
+      },
       "RagDocumentListItem": {
         "properties": {
           "path": {
@@ -5722,6 +7997,14 @@
       },
       "RagSettingsResponse": {
         "properties": {
+          "allow_local_filesystem_access": {
+            "type": "boolean",
+            "title": "Allow Local Filesystem Access"
+          },
+          "vector_collection_name": {
+            "type": "string",
+            "title": "Vector Collection Name"
+          },
           "chunk_size": {
             "type": "integer",
             "title": "Chunk Size"
@@ -5762,6 +8045,14 @@
             "type": "number",
             "title": "Hybrid Text Weight"
           },
+          "vector_index_metric": {
+            "type": "string",
+            "title": "Vector Index Metric"
+          },
+          "vector_index_type": {
+            "type": "string",
+            "title": "Vector Index Type"
+          },
           "vector_stream_batch_size": {
             "type": "integer",
             "title": "Vector Stream Batch Size"
@@ -5774,6 +8065,8 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "allow_local_filesystem_access",
+          "vector_collection_name",
           "chunk_size",
           "chunk_overlap",
           "embedding_batch_size",
@@ -5784,6 +8077,8 @@
           "reranker_model",
           "hybrid_vector_weight",
           "hybrid_text_weight",
+          "vector_index_metric",
+          "vector_index_type",
           "vector_stream_batch_size",
           "embedding_offline_mode"
         ],
@@ -5791,10 +8086,36 @@
       },
       "RagSettingsUpdateRequest": {
         "properties": {
+          "allow_local_filesystem_access": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Local Filesystem Access"
+          },
+          "vector_collection_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Collection Name"
+          },
           "chunk_size": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -5805,7 +8126,9 @@
           "chunk_overlap": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -5816,7 +8139,9 @@
           "embedding_batch_size": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 4096.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -5849,7 +8174,9 @@
           "retrieval_candidate_count": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -5860,7 +8187,9 @@
           "retrieval_selected_count": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -5871,7 +8200,9 @@
           "reranker_model": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
               },
               {
                 "type": "null"
@@ -5882,7 +8213,9 @@
           "hybrid_vector_weight": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -5893,7 +8226,9 @@
           "hybrid_text_weight": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -5901,10 +8236,38 @@
             ],
             "title": "Hybrid Text Weight"
           },
+          "vector_index_metric": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Index Metric"
+          },
+          "vector_index_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Index Type"
+          },
           "vector_stream_batch_size": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -7087,6 +9450,133 @@
         ],
         "title": "RevisionPipelineStepResponse"
       },
+      "RuntimeSettingsStateResponse": {
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/RuntimeSettingsValues"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/RuntimeSettingsValues"
+          },
+          "source": {
+            "type": "string",
+            "const": "database",
+            "title": "Source",
+            "default": "database"
+          },
+          "environment_editable": {
+            "type": "boolean",
+            "const": false,
+            "title": "Environment Editable",
+            "default": false
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "values",
+          "defaults"
+        ],
+        "title": "RuntimeSettingsStateResponse"
+      },
+      "RuntimeSettingsUpdateRequest": {
+        "properties": {
+          "general": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeneralRuntimeSettingsPatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataRuntimeSettingsPatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "integrations": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntegrationRuntimeSettingsPatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matching": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchingRuntimeSettingsPatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "advanced": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdvancedRuntimeSettingsPatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RuntimeSettingsUpdateRequest"
+      },
+      "RuntimeSettingsValues": {
+        "properties": {
+          "general": {
+            "$ref": "#/components/schemas/GeneralRuntimeSettings"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DataRuntimeSettings"
+          },
+          "integrations": {
+            "$ref": "#/components/schemas/IntegrationRuntimeSettings"
+          },
+          "matching": {
+            "$ref": "#/components/schemas/MatchingRuntimeSettings"
+          },
+          "advanced": {
+            "$ref": "#/components/schemas/AdvancedRuntimeSettings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "general",
+          "data",
+          "integrations",
+          "matching",
+          "advanced"
+        ],
+        "title": "RuntimeSettingsValues"
+      },
       "RxNavCatalogItem": {
         "properties": {
           "drug_id": {
@@ -7989,6 +10479,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -8001,4 +10498,4 @@
       }
     }
   }
-}\n
+}
