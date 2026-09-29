@@ -557,16 +557,15 @@ def test_live_opencode_go_provider_and_browser_clinical_flow(
         assert isinstance(draft_payload, dict)
         assert draft_payload["patches"]
         assert REVISION_APPEND_SENTENCE in draft_payload["revised_report_text"]
-        qa_payload = qa_artifacts[-1]["payload"]
+        qa_artifact = qa_artifacts[-1]
+        assert qa_artifact["status"] in {"passed", "qa_failed"}
+        qa_payload = qa_artifact["payload"]
         assert isinstance(qa_payload, dict)
-        assert qa_payload["status"] in {
-            "passed",
-            "passed_with_warnings",
-            "failed",
-            "requires_human_review",
-        }
         assert isinstance(qa_payload.get("blocking_issues"), list)
         assert isinstance(qa_payload.get("warnings"), list)
+        assert qa_artifact["status"] == (
+            "qa_failed" if qa_payload["blocking_issues"] else "passed"
+        )
         assert final_version["version_status"] in {
             "llm_qa_passed",
             "qa_failed",
