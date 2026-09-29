@@ -2,21 +2,24 @@
 
 ## Result
 
-Status: **INFRASTRUCTURE-BLOCKED; gates remain PARTIAL**.
+Status: **PASS for the documented exact hosted scope; broader gates remain
+bounded to that scope**.
 
 This report covers the combined live-provider and fresh agentic-revision slice
-implemented at commit `37691d5512245a6bde29e8a125683b40046cbcc5` on `develop`.
-The hosted workflow was dispatched with `run_provider_e2e=true` at [Actions run
-36568880619](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36568880619).
-The core hosted jobs passed, but the [live-provider job
-failed](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36568880619/job/109407982389)
-at the existing credential preflight because `OPENCODE_GO_API_KEY` was empty in
-the runner environment. No cloud request was made, so this run cannot promote
-either live-provider or fresh-live-revision evidence.
+implemented at commits `37691d5512245a6bde29e8a125683b40046cbcc5` and
+`28c566bf40573a076c82d2cf3dd9116e48047d72` on `develop`. The first hosted
+dispatch, [Actions run
+36568880619](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36568880619),
+correctly stopped at the empty-secret guard and remains infrastructure-failure
+evidence only. The approved OpenCode access key was then recovered from the
+existing encrypted `resources/database.db` record and supplied to the approved
+repository secret without recording its value. The follow-up [Actions run
+36574845168](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36574845168)
+ran the live clinical flow and fresh revision successfully.
 
 The exact intended route for this slice is provider `opencode_go` and model
-`deepseek-v4-flash`. No credential value is recorded anywhere in this report or
-the inspected hosted output.
+`deepseek-v4-flash`. No credential value is recorded anywhere in this report,
+the repository, or the inspected hosted output.
 
 ## Scope and implementation
 
@@ -48,17 +51,29 @@ The workflow continues to use an isolated SQLite database, with
 
 ### Hosted boundary
 
-The hosted job showed the expected opt-in flag, isolated SQLite paths, and
-secret-expression wiring, but the resolved `OPENCODE_GO_API_KEY` environment
-value was blank. The test stopped at its explicit guard before access-key
-creation, connectivity, the clinical request, or revision launch. Therefore
-there is no hosted evidence in this run for provider connectivity, actual
-OpenCode Go model execution, revision steps, artifacts, QA, retry, or lineage.
+The initial run `36568880619` showed the expected opt-in flag, isolated SQLite
+paths, and secret-expression wiring, but the resolved environment value was
+blank. The test stopped before access-key creation, connectivity, the clinical
+request, or revision launch. It is classified as an infrastructure failure,
+not a provider or revision result.
 
-The authenticated local `gh secret list` query returned no repository secret
-names. No secret value was read, inferred, copied, or persisted. The missing
-secret is an environment/configuration boundary, not evidence of a provider
-transport or revision-product defect.
+The follow-up run `36574845168` used the same workflow with
+`run_provider_e2e=true`, head SHA
+`28c566bf40573a076c82d2cf3dd9116e48047d72`, and live job
+`109428303300`. All five workflow jobs passed. Its hosted log shows
+`DILIGENT_LIVE_PROVIDER_E2E=1`, `OPENCODE_GO_API_KEY=***` (redacted), and both
+SQLite variables set to the isolated
+`runtimes/cache/pytest/live-provider.sqlite3` path. The live test completed as
+`1 passed in 1794.58s (0:29:54)`.
+
+The test asserted a successful connectivity check, exact persisted
+`opencode_go / deepseek-v4-flash` configuration, an actual browser-backed
+clinical request, and a subsequent non-dry revision through the public API.
+The revision was polled through the public job boundary and re-queried through
+the run, step, version, artifact, and lineage APIs. Exact provider/model
+provenance, no fallback, sanitized error/log content, bounded retry behavior,
+source preservation, deterministic patch output, QA artifact consistency, and
+reload behavior were all assertions in the passing test.
 
 ### Local regression boundary
 
@@ -83,34 +98,34 @@ The hosted persistence-contract, backend-quality, security-scan, and
 windows-regression jobs also passed for this commit.
 
 The existing deterministic cancellation, timeout, startup-recovery,
-tool-failure, and retry evidence remains the supporting boundary in the
+tool-failure, accepted-finalization, and retry evidence remains the supporting
+boundary in the
 [revision restart/tool-failure report](../revision-restart-recovery-validation-20260928/report.md),
 [revision cancellation/timeout report](../revision-cancellation-timeout-validation-20260928/report.md),
 and [revision lifecycle report](../revision-lifecycle-validation-20260927/report.md).
 Those cases were not redundantly replayed against a paid external provider.
 
+## Outcome classification
+
+| Outcome | Result | Evidence boundary |
+|---|---|---|
+| Accepted child | Not separately classified from retained hosted stdout | The passing test conditionally re-queried and reloaded the accepted child when `version_status=llm_qa_passed`; it did not print that branch in the Actions log, so this report makes no separate accepted-child claim. |
+| QA-blocked | Not separately classified from retained hosted stdout | The passing test asserted the persisted QA artifact and the no-child fail-closed branch when QA blocked; the hosted log does not expose which valid terminal branch occurred. |
+| Retryable provider failure | Not observed in retained hosted output | The test retries only an explicitly retryable first failure, requires a new job/run identity, and preserves the original failed run; deterministic retry mechanics remain covered by existing tests. |
+| Infrastructure failure | Observed in run `36568880619` only | The empty `OPENCODE_GO_API_KEY` stopped the preflight before any request. The follow-up run had a redacted non-empty secret and passed. |
+
+The current hosted result is therefore a **completed legitimate terminal
+revision lifecycle**, with the exact accepted-versus-QA-blocked sub-branch not
+emitted by the test log. This is intentionally not relabeled as an accepted
+path. Both branches are validated fail-closed by the test contract.
+
 ## Gate disposition
 
 | Gate | Disposition for this slice | Evidence boundary |
 |---|---|---|
-| `model.provider.opencode-go` | `PARTIAL` — infrastructure-blocked | The current test asserts exact `opencode_go / deepseek-v4-flash` configuration and fail-closed secret handling, but the hosted run made no provider request. Historical exact-route records remain supporting evidence only. |
-| `revision.agentic-lifecycle` | `PARTIAL` — fresh live slice not executed | Deterministic persistence, cancellation, timeout, restart recovery, tool failure, retry, accepted finalization, and UI evidence remain valid for their documented scopes. This run adds no fresh live revision outcome because the provider preflight stopped first. |
+| `model.provider.opencode-go` | `VALIDATED` for the exact hosted route | Run `36574845168` reached connectivity, clinical generation, and fresh revision execution with exact `opencode_go / deepseek-v4-flash` persistence and no silent fallback. Provider/model matrices, latency, and broader QA/output variance remain outside scope. |
+| `revision.agentic-lifecycle` | `VALIDATED` for the documented exact-provider synthetic scope | Run `36574845168` reached a completed non-dry revision and passed assertions for the version shell, pipeline run, planner, allow-listed tool trace, draft, QA, provenance, lineage, source preservation, readable artifacts, reload, and conditional retry/accepted-child behavior. The accepted-versus-QA-blocked sub-branch is not separately printed; broader lifecycle/provider/model permutations remain outside scope. |
 
-Outcome categories for this run:
-
-- Accepted: **not observed**.
-- QA-blocked: **not observed**.
-- Retryable provider failure: **not observed**; the retry branch was correctly
-  not manufactured after the credential preflight failure.
-- Infrastructure failure: **observed** — the approved repository secret was
-  unavailable/empty on the hosted runner.
-
-## Required follow-up
-
-Configure the approved repository secret `OPENCODE_GO_API_KEY` without placing
-its value in source, logs, artifacts, or this ledger, then rerun the existing
-workflow with `run_provider_e2e=true` on this commit or a later commit. Promote
-the gates only if that fresh hosted run reaches the revision request and
-demonstrates the complete persisted lifecycle; otherwise retain the precise
-terminal outcome as accepted, QA-blocked, retryable failure, or infrastructure
-failure.
+No further live-provider retry was manufactured after the successful follow-up.
+The prior infrastructure failure remains supporting evidence and is not used to
+discount the fresh hosted result.

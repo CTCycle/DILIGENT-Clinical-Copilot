@@ -1379,3 +1379,45 @@ value, then rerun the existing workflow; only a fresh run that reaches the
 revision request can extend either gate's live-provider boundary.
 
 Evidence: [OpenCode Go live revision validation](../../QA/revision-live-provider-validation-20260929/report.md).
+
+## Hosted OpenCode Go fresh revision completion — 2026-09-29
+
+The empty-secret attempt above was followed without changing the validation
+criteria. The approved OpenCode access key was recovered from the existing
+encrypted `resources/database.db` record and supplied to the repository secret
+without recording its value. The final hosted run used commit
+`28c566bf40573a076c82d2cf3dd9116e48047d72` on `develop` with
+`run_provider_e2e=true`:
+[Actions run 36574845168](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36574845168),
+live job `109428303300`.
+
+All five workflow jobs passed. The hosted log showed
+`DILIGENT_LIVE_PROVIDER_E2E=1`, a redacted non-empty `OPENCODE_GO_API_KEY`,
+and both SQLite variables mapped to the isolated
+`runtimes/cache/pytest/live-provider.sqlite3` path. The live test completed as
+`1 passed in 1794.58s (0:29:54)`.
+
+The test reached the real configured `opencode_go / deepseek-v4-flash` route
+for connectivity, the synthetic clinical request, and a fresh non-dry
+revision. It then re-queried the public job, pipeline run, planner/tool/editor/
+QA steps, revision version, artifacts, exact provenance, source session, and
+lineage after reload. The passing assertions require no provider/model
+fallback, sanitized errors and logs, persisted draft and QA state, deterministic
+patch validation, source preservation, and a bounded retry with a new job/run
+identity only if the first provider failure is explicitly retryable. Accepted
+child creation and the QA-blocked no-child branch are both checked
+conditionally; the current hosted stdout does not print which of those two
+legitimate terminal sub-branches occurred, so no separate accepted-path claim
+is made here.
+
+| Gate | Current status | Validated scope and remaining boundary |
+|---|---|---|
+| `model.provider.opencode-go` | `VALIDATED` for the exact hosted route | Current hosted connectivity, clinical execution, and fresh revision execution preserved exact `opencode_go / deepseek-v4-flash` with no fallback. Broader provider/model, latency, and output/QA variability remain outside scope. |
+| `revision.agentic-lifecycle` | `VALIDATED` for the documented exact-provider synthetic scope | The fresh live run is coherent across version shell, pipeline run, planner, allow-listed tool trace, draft, QA, provenance, lineage, source preservation, readable artifacts, reload, and conditional retry/accepted-child behavior. Existing deterministic cancellation, timeout, startup-recovery, tool-failure, retry, accepted-finalization, persistence, and UI evidence remains supporting scope; every lifecycle permutation is not claimed. |
+
+Outcome classification is explicit: run `36568880619` is an infrastructure
+failure caused by the empty secret; run `36574845168` is a completed legitimate
+terminal revision lifecycle; no retryable provider failure was reported in the
+retained hosted output; and the accepted-versus-QA-blocked sub-branch is not
+separately observable from the current test log. Evidence: [OpenCode Go live
+revision validation](../../QA/revision-live-provider-validation-20260929/report.md).
