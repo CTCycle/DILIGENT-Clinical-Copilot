@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from repositories.schemas.base import Base
 from repositories.schemas.security import AccessKey
 from repositories.serialization.access_key_encryption import (
@@ -95,6 +97,82 @@ def test_decrypt_key_row_uses_db_seeded_material() -> None:
     restored = serializer.decrypt_key_row(loaded)
 
     assert restored == plaintext
+
+###############################################################################
+def test_file_backed_access_key_survives_serializer_reopen(
+    tmp_path: Path, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    database_path = tmp_path / "access-keys.sqlite3"
+    material_path = tmp_path / "access-key-material.json"
+    plaintext = "sk-proj-reopen-persistence-20260929"
+    monkeypatch.setenv("DILIGENT_ACCESS_KEY_MATERIAL_FILE", str(material_path))
+
+    first_engine = create_engine(
+        f"sqlite+pysqlite:///{database_path}", future=True
+    )
+    Base.metadata.create_all(first_engine)
+    first_factory = sessionmaker(
+        bind=first_engine, future=True, expire_on_commit=False
+    )
+    AccessKeyEncryptionMaterialSerializer(
+        engine=first_engine,
+        session_factory=first_factory,
+    ).ensure_seeded()
+    first_serializer = AccessKeySerializer(
+        engine=first_engine,
+        session_factory=first_factory,
+    )
+    created = first_serializer.create_key("openai", plaintext)
+    activated = first_serializer.activate_key(created.id, provider="openai")
+    assert activated.is_active is True
+
+    with first_factory() as db_session:
+        stored_before_reopen = db_session.get(AccessKey, created.id)
+        assert stored_before_reopen is not None
+        encrypted_value = stored_before_reopen.encrypted_value
+        assert plaintext not in encrypted_value
+
+    first_engine.dispose()
+
+    second_engine = create_engine(
+        f"sqlite+pysqlite:///{database_path}", future=True
+    )
+    second_factory = sessionmaker(
+        bind=second_engine, future=True, expire_on_commit=False
+    )
+    second_serializer = AccessKeySerializer(
+        engine=second_engine,
+        session_factory=second_factory,
+    )
+    reopened = second_serializer.get_active_key("openai")
+    assert reopened is not None
+    assert reopened.id == created.id
+    assert reopened.provider == "openai"
+    assert reopened.is_active is True
+
+    with second_factory() as db_session:
+        stored_after_reopen = db_session.get(AccessKey, created.id)
+        assert stored_after_reopen is not None
+        assert stored_after_reopen.encrypted_value == encrypted_value
+        assert plaintext not in stored_after_reopen.encrypted_value
+        assert second_serializer.decrypt_key_row(stored_after_reopen) == plaintext
+
+    assert second_serializer.delete_key(created.id, provider="openai") is True
+    second_engine.dispose()
+
+    third_engine = create_engine(
+        f"sqlite+pysqlite:///{database_path}", future=True
+    )
+    third_factory = sessionmaker(
+        bind=third_engine, future=True, expire_on_commit=False
+    )
+    third_serializer = AccessKeySerializer(
+        engine=third_engine,
+        session_factory=third_factory,
+    )
+    assert third_serializer.list_keys("openai") == []
+    assert third_serializer.get_active_key("openai") is None
+    third_engine.dispose()
 
 ###############################################################################
 def test_rejects_too_short_access_key() -> None:
