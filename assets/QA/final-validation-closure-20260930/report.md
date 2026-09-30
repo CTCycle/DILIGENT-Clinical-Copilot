@@ -2,7 +2,7 @@
 
 Date: 2026-09-30
 Branch: `develop`
-Final commit: `0150ecfede7acfb580a5bc38561ff0aa5a6a4ad7`
+Final source/closure commit: `35f064fda07761499c6c7d97f794e93942623a01`
 Scope: required local source validation, deterministic RAG ingestion/retrieval,
 and locally produced Windows 3.4.0 packaging
 

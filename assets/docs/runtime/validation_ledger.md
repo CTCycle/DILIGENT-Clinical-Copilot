@@ -1507,7 +1507,7 @@ Evidence: [session and revision API validation](../../QA/api-local-boundaries-20
 
 This entry is the consolidated local closure record for the defined DILIGENT
 scope. The final closure source and evidence are committed on `develop` as
-`0150ecfede7acfb580a5bc38561ff0aa5a6a4ad7`; validation began from base
+`35f064fda07761499c6c7d97f794e93942623a01`; validation began from base
 revision `c52119d7` and completed against the closure working tree.
 
 ### API local-boundaries
