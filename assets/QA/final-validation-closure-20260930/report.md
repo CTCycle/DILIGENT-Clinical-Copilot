@@ -99,6 +99,31 @@ missing-table cascades; the CI-style default-database rerun above is the
 authoritative result. The npm lockfile remediation changed transitive versions
 only. The Rust build used the repository-required pinned `1.95.0` toolchain.
 
+## Current-source revalidation — 2026-09-30
+
+The closure implementation was rechecked from current `develop` before this
+report update. The checkout was clean at `91b0a1349e686ff2ba82bb87ba72b181363c0947`
+before the harness-only repair. The host was Windows NT 10.0.26200.0 with
+PowerShell 7.6.6, Python 3.14.7, Node.js 22.23.1, and the repository Chromium
+runtime.
+
+The changed RAG/API unit paths passed **40 tests** with three dependency or
+framework deprecation warnings. The first attempt exposed only a host ACL
+problem: `runtimes/cache` is not writable in this session. The rerun used a
+new disposable `assets/QA/.scratch-*` root and an explicit pytest cache path;
+no source or user data was used.
+
+The same canonical Full browser command then passed **53 tests, 0 failures,
+0 errors, and 0 skips**, wrote a matching JUnit result, returned shell
+`EXIT=0`, and left ports `7690`, `9847`, and `11435` free.
+
+That rerun reproduced and isolated a harness defect: before the repair,
+`taskkill.exe` used during normal process cleanup could overwrite a successful
+pytest result with a race-dependent nonzero shell status. The narrow fix in
+`app/tests/ci/run_browser_e2e.ps1` preserves the suite result and keeps failure
+paths nonzero; the post-fix Full rerun is the regression evidence. No product
+behavior was changed.
+
 ## Packaged Windows validation
 
 Build command:

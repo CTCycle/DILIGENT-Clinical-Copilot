@@ -1578,6 +1578,24 @@ The following checks passed on the final source state:
 - npm audits: 0 vulnerabilities after the lockfile-only remediation.
 - cargo-audit: passed with six allowed unmaintained-crate warnings; no denied unsound finding.
 
+### Current-source revalidation and harness repair — 2026-09-30
+
+The current `develop` source was rechecked on Windows NT 10.0.26200.0 with
+PowerShell 7.6.6, Python 3.14.7, Node.js 22.23.1, and the repository Chromium
+runtime. The four changed RAG/API unit modules passed **40 tests** with three
+dependency/framework deprecation warnings. The host could not write the
+repository `runtimes/cache` subtree, so the disposable test root and explicit
+pytest cache were placed under a new ignored `assets/QA/.scratch-*` directory;
+the initial setup-only failure was not a product result.
+
+The canonical Full browser harness then passed **53 tests, 0 failures, 0
+errors, 0 skips**, returned shell exit code `0`, and left ports `7690`, `9847`,
+and `11435` free. The first run had exposed a cleanup-race defect in
+`app/tests/ci/run_browser_e2e.ps1`: a benign `taskkill.exe` status could mask a
+successful pytest run. The harness now preserves the test result explicitly;
+the post-fix Full run is the regression evidence. This is a harness-only fix;
+no product behavior or validation boundary changed.
+
 ### Packaged Windows evidence
 
 The pinned `1.95.0` Rust toolchain built the local 3.4.0 candidate with:

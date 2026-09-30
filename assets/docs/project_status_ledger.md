@@ -66,6 +66,12 @@ The older validation reports use run-specific terms such as `PASS`, `ATTENTION`,
 This is the current disposition for the defined local validation scope. The
 evidence is consolidated in the [final validation-closure report](../QA/final-validation-closure-20260930/report.md).
 
+The current-source follow-up reran the changed RAG/API unit paths (**40
+passed**) and the canonical Full browser harness (**53 passed, 0 failures, 0
+errors, 0 skips, shell exit 0**) on Windows. It also repaired a cleanup-race
+in the harness that could mask a successful pytest result with a nonzero
+`taskkill.exe` status; no product behavior or component boundary changed.
+
 | Gate | Final state | Evidence and boundary |
 |---|---|---|
 | `api.local-boundaries` | `VALIDATED` | The canonical Full harness classifies every live OpenAPI operation: 68 paths and 85 method/path operations. Deterministic success, validation, not-found, cancellation, and already-validated external-boundary references cover the complete matrix. |
