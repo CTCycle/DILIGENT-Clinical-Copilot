@@ -160,11 +160,33 @@ function Wait-HttpStatus([string]$uri, [int]$expectedStatus, [int]$timeoutSecond
     $lastError = $null
     while ((Get-Date) -lt $deadline) {
         try {
-            $response = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Uri $uri -TimeoutSec 5
+            # Windows PowerShell 5.1 does not expose -SkipHttpErrorCheck. A
+            # non-2xx response is surfaced through the exception response in
+            # that host, while PowerShell 7 can return it normally.
+            $invokeArguments = @{
+                UseBasicParsing = $true
+                Uri = $uri
+                TimeoutSec = 5
+            }
+            if ((Get-Command Invoke-WebRequest).Parameters.ContainsKey('SkipHttpErrorCheck')) {
+                $invokeArguments.SkipHttpErrorCheck = $true
+            }
+            $response = Invoke-WebRequest @invokeArguments
             $lastStatus = [int]$response.StatusCode
             if ($lastStatus -eq $expectedStatus) { return $response }
         }
         catch {
+            $errorResponse = $_.Exception.Response
+            if ($null -ne $errorResponse) {
+                try {
+                    $lastStatus = [int]$errorResponse.StatusCode
+                    if ($lastStatus -eq $expectedStatus) {
+                        return [pscustomobject]@{ StatusCode = $lastStatus }
+                    }
+                }
+                catch {
+                }
+            }
             $lastError = $_.Exception.Message
         }
         Start-Sleep -Milliseconds 500
