@@ -1,6 +1,6 @@
 {
   "entries": [
-    { "source": "backend", "destination": "backend", "required": true },
+    { "source": "backend", "destination": "b", "required": true },
     { "source": "app/client/dist/browser", "destination": "app/client/dist/browser", "required": true },
     { "source": "resources/catalogs/clinical_extraction.json", "destination": "resources/catalogs/clinical_extraction.json", "required": true },
     { "source": "resources/catalogs/cloud_providers.json", "destination": "resources/catalogs/cloud_providers.json", "required": true },

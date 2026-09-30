@@ -87,10 +87,14 @@ The required portable smoke passed twice with the branded native title
 clean backend/port shutdown, and stale-ready-file replacement. Additional
 packaged-process checks passed warm restart, forced termination recovery,
 concurrent launch handling, space paths, non-ASCII paths, and a short second
-location. A deep repository path produced a ready payload and window but its
-backend did not answer loopback HTTP; that unresolved boundary keeps Portable
-at **PARTIAL** rather than PASS. Computer Use reported no native app/window
-surface, so the full packaged UI workflow and failure suite remains BLOCKED.
+location. The original deep-path candidate produced a ready payload and window
+but its backend did not answer loopback HTTP; the traceback identified a
+Windows filename-length failure while importing the ONNX Runtime extension.
+The [deep-path remediation evidence](../../QA/desktop-release-validation-20260930/deep-path-remediation.md)
+records the compact-layout correction and two successful exact-boundary repair
+launches. A clean exact-source rebuild is still required before promoting the
+repair. Computer Use reported no native app/window surface, so the full
+packaged UI workflow and failure suite remains BLOCKED.
 
 The published remote `v3.3.0` MSI and checksum were downloaded and verified,
 and the workflow/static upgrade contracts passed. MSI installation, upgrade,
@@ -146,10 +150,10 @@ tagged commit for each release.
 At launch, Tauri verifies the embedded archive digest and extracts immutable content to:
 
 ```text
-%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>
+%LOCALAPPDATA%\DILIGENT\rt\<version>\<payload-sha256>
 ```
 
-The shell shows a loading window immediately, extracts the runtime and starts `backend\DILIGENTBackend.exe` on a random localhost port off the UI-critical path, waits for `state\desktop-backend-ready.json` and `/api/health`, then navigates to the authenticated local interface. The backend is attached to a Windows Job Object and is asked to shut down cooperatively when the shell exits, with a bounded hard-kill fallback.
+The shell shows a loading window immediately, extracts the runtime and starts `b\DILIGENTBackend.exe` on a random localhost port off the UI-critical path, waits for `state\desktop-backend-ready.json` and `/api/health`, then navigates to the authenticated local interface. The compact runtime directory names keep native-extension paths below Windows' DLL-loading boundary on deep user paths. The backend is attached to a Windows Job Object and is asked to shut down cooperatively when the shell exits, with a bounded hard-kill fallback.
 
 Mutable user data is kept outside the extracted runtime:
 
