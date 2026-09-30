@@ -336,7 +336,7 @@ function Invoke-PortableSmoke(
                 throw "$label window title was '$windowTitle', expected 'DILIGENT Clinical Copilot'."
             }
             if ($launchIndex -eq 1) {
-                $runtimeRoot = Join-Path $isolatedRoot "DILIGENT/runtime/$expectedVersion"
+                $runtimeRoot = Join-Path $isolatedRoot "DILIGENT/rt/$expectedVersion"
                 $extractionMarker = Get-ChildItem -LiteralPath $runtimeRoot -Filter 'extraction.complete' -File -Recurse -ErrorAction SilentlyContinue |
                     Select-Object -First 1
                 if ($null -eq $extractionMarker) {
