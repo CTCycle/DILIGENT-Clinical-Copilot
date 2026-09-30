@@ -12,7 +12,9 @@ The required source validation scope is closed. `api.local-boundaries` is
 validated across the complete current OpenAPI operation set,
 `rag.ingestion-retrieval` is validated with deterministic byte-identical
 deduplication, `ISSUE-005` is resolved, and the final automated regression
-matrix is green. Portable 3.4.0 packaging passed locally.
+matrix is green. Earlier local evidence recorded a portable 3.4.0 packaging
+pass; the current desktop revalidation below does not reproduce that result,
+so release approval remains blocked.
 
 The MSI artifact itself passed checksum and metadata inspection, but MSI
 install/upgrade/uninstall could not be executed on this host because the
@@ -167,6 +169,34 @@ attempts remained idle and were stopped after confirmation. No DILIGENT process,
 partial registration, installed executable, or listening packaged backend port
 remained afterward. This evidence is **BLOCKED BY HOST PREREQUISITE**, not an
 observed MSI defect.
+
+## Current desktop revalidation follow-up — 2026-09-30
+
+The current checkout was `9f88c85af5572d15035e03aa2fe87a6eaae5efad` with the
+desktop smoke/workflow corrections uncommitted. The pre-existing 3.4.0
+portable artifact was re-run with:
+
+```powershell
+.\app\desktop\build\smoke_release.ps1 -Version 3.4.0 -DesktopTarget Portable
+```
+
+Checksum, PE/AMD64, packaged ready-file/version, health, representative API,
+and process startup reached the smoke assertion, but the run failed because
+the native process window title was `io.github.ctcycle.diligent-siw`, not the
+required `DILIGENT Clinical Copilot`. The artifact hash remained
+`29bc8e69cbbb0e8dc8446103c2d8526bf02130b724d9916c2dae68901f2ba61a`.
+
+A rebuild using the exact Rust `1.95.0-x86_64-pc-windows-msvc` toolchain could
+not complete: the launcher first encountered the protected canonical uv cache
+and then could not remove 61 protected files while recreating the project
+environment. The existing environment was restored with the pinned Python/uv
+runtime and an isolated temporary cache, but no replacement artifact was
+produced. Native CUA application inventory was also unavailable, so no
+screen-level packaged workflow pass is claimed.
+
+This follow-up supersedes the earlier portable PASS for the current local
+artifact. The release decision remains **PENDING — PORTABLE FAIL; MSI INSTALL,
+UPGRADE, AND UNINSTALL BLOCKED BY ADMINISTRATOR HOST PREREQUISITE**.
 
 ## Explicitly deferred boundaries
 
