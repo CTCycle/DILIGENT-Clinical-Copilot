@@ -134,6 +134,9 @@ authentication, and provider-side errors still fail promptly.
 ## RAG Defaults
 - RAG uses `ibm-granite/granite-embedding-97m-multilingual-r2` at the pinned revision and AVX2 quantized ONNX artifact declared in `app/server/common/embedding/config.py`.
 - `reset_vector_collection` defaults to `false` and should only be enabled for explicit maintenance or rebuild operations.
+- Supported inputs are fingerprinted with SHA-256 over raw bytes. Only byte-identical files deduplicate; semantic or normalized-text deduplication is not performed.
+- The canonical duplicate source is selected deterministically by normalized relative-path ordering and retains the existing path-derived `document_id`. Duplicate paths remain visible in Data Inspection and are retained as canonical/alias metadata for citations and audit.
+- RAG manifests report physical supported-file count, unique ingested-document count, and duplicate-file count separately. Embedding and chunking occur once per canonical source.
 ## Database configuration
 
 Use one canonical database contract:

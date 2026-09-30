@@ -411,11 +411,19 @@ export type InspectionRagUpdateRequest = {
 
 export type InspectionRagDocumentRow = {
   path: string;
+  source_relative_path: string;
   file_name: string;
   extension: string;
   file_size: number;
   last_modified: string;
   supported_for_ingestion: boolean;
+  content_fingerprint?: string | null;
+  canonical_source_relative_path?: string | null;
+  is_canonical_source: boolean;
+  is_duplicate: boolean;
+  duplicate_of?: string | null;
+  duplicate_source_paths: string[];
+  duplicate_alias_paths: string[];
   vector_model?: string | null;
 };
 
@@ -455,4 +463,7 @@ export type InspectionRagVectorStoreSummary = {
   index_status: string;
   embedding_fingerprint: string | null;
   built_at: string | null;
+  physical_supported_file_count: number;
+  unique_ingested_document_count: number;
+  duplicate_file_count: number;
 };

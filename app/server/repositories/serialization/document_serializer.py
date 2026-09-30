@@ -46,8 +46,113 @@ class DocumentSerializer:
         return collected
 
     # -------------------------------------------------------------------------
-    def build_listing_metadata(self, file_path: str | Path) -> dict[str, Any]:
+    def build_content_deduplication_index(
+        self,
+        file_paths: list[str] | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Return deterministic duplicate/canonical metadata for supported files.
+
+        Duplicate identity is intentionally byte-based.  Relative paths only
+        choose the canonical representative and remain the stable provenance
+        key; they never participate in the content fingerprint itself.
+        """
+        paths = [
+            str(Path(path).resolve())
+            for path in (file_paths or self.collect_document_paths())
+        ]
+        ordered_paths = sorted(
+            set(paths),
+            key=lambda path: (
+                self.normalized_relative_path(path),
+                self.relative_path(path),
+            ),
+        )
+        grouped_paths: dict[str, list[str]] = {}
+        fingerprints: dict[str, str] = {}
+        for path in ordered_paths:
+            try:
+                fingerprint = self.compute_content_fingerprint(path)
+            except OSError as exc:
+                logger.warning(
+                    "Unable to fingerprint supported RAG file '%s': %s", path, exc
+                )
+                fingerprint = ""
+            fingerprints[path] = fingerprint
+            grouping_key = fingerprint or f"unreadable:{self.relative_path(path)}"
+            grouped_paths.setdefault(grouping_key, []).append(path)
+
+        index: dict[str, dict[str, Any]] = {}
+        for group in grouped_paths.values():
+            ordered_group = sorted(
+                group,
+                key=lambda path: (
+                    self.normalized_relative_path(path),
+                    self.relative_path(path),
+                ),
+            )
+            canonical_path = ordered_group[0]
+            relative_paths = [self.relative_path(path) for path in ordered_group]
+            canonical_relative_path = self.relative_path(canonical_path)
+            alias_paths = [
+                relative_path
+                for relative_path in relative_paths
+                if relative_path != canonical_relative_path
+            ]
+            for path in ordered_group:
+                relative_path = self.relative_path(path)
+                is_duplicate = path != canonical_path
+                index[path] = {
+                    "content_fingerprint": fingerprints[path] or None,
+                    "canonical_source_path": canonical_path,
+                    "canonical_source_relative_path": canonical_relative_path,
+                    "is_canonical_source": not is_duplicate,
+                    "is_duplicate": is_duplicate,
+                    "duplicate_of": canonical_relative_path if is_duplicate else None,
+                    "duplicate_source_paths": relative_paths,
+                    "duplicate_alias_paths": alias_paths,
+                    "source_relative_path": relative_path,
+                }
+        return index
+
+    # -------------------------------------------------------------------------
+    def compute_content_fingerprint(self, file_path: str | Path) -> str:
+        digest = hashlib.sha256()
+        with Path(file_path).open("rb") as handle:
+            for block in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(block)
+        return digest.hexdigest()
+
+    # -------------------------------------------------------------------------
+    def canonical_document_paths(
+        self,
+        file_paths: list[str] | None = None,
+        *,
+        deduplication_index: dict[str, dict[str, Any]] | None = None,
+    ) -> list[str]:
+        paths = file_paths or self.collect_document_paths()
+        index = deduplication_index or self.build_content_deduplication_index(paths)
+        canonical_paths = {
+            str(metadata["canonical_source_path"])
+            for path, metadata in index.items()
+            if path in {str(Path(candidate).resolve()) for candidate in paths}
+        }
+        return sorted(
+            canonical_paths,
+            key=lambda path: (
+                self.normalized_relative_path(path),
+                self.relative_path(path),
+            ),
+        )
+
+    # -------------------------------------------------------------------------
+    def build_listing_metadata(
+        self,
+        file_path: str | Path,
+        *,
+        deduplication_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         path = Path(file_path)
+        absolute_path = str(path.resolve())
         try:
             stat = path.stat()
             file_size = int(stat.st_size)
@@ -56,30 +161,99 @@ class DocumentSerializer:
             file_size = 0
             modified = datetime.fromtimestamp(0, UTC).isoformat()
         extension = path.suffix.lower()
-        return {
+        metadata: dict[str, Any] = {
             "path": str(path),
+            "source_relative_path": self.relative_path(path),
             "file_name": path.name,
             "extension": extension,
             "file_size": file_size,
             "last_modified": modified,
             "supported_for_ingestion": extension in self.SUPPORTED_EXTENSIONS,
         }
+        if extension in self.SUPPORTED_EXTENSIONS:
+            deduplication_metadata = deduplication_metadata or (
+                self.build_content_deduplication_index([absolute_path]).get(
+                    absolute_path, {}
+                )
+            )
+            metadata.update(
+                {
+                    "content_fingerprint": deduplication_metadata.get(
+                        "content_fingerprint"
+                    ),
+                    "canonical_source_relative_path": deduplication_metadata.get(
+                        "canonical_source_relative_path"
+                    ),
+                    "is_canonical_source": bool(
+                        deduplication_metadata.get("is_canonical_source", False)
+                    ),
+                    "is_duplicate": bool(
+                        deduplication_metadata.get("is_duplicate", False)
+                    ),
+                    "duplicate_of": deduplication_metadata.get("duplicate_of"),
+                    "duplicate_source_paths": list(
+                        deduplication_metadata.get("duplicate_source_paths", [])
+                    ),
+                    "duplicate_alias_paths": list(
+                        deduplication_metadata.get("duplicate_alias_paths", [])
+                    ),
+                }
+            )
+        else:
+            metadata.update(
+                {
+                    "content_fingerprint": None,
+                    "canonical_source_relative_path": None,
+                    "is_canonical_source": False,
+                    "is_duplicate": False,
+                    "duplicate_of": None,
+                    "duplicate_source_paths": [],
+                    "duplicate_alias_paths": [],
+                }
+            )
+        return metadata
 
     # -------------------------------------------------------------------------
-    def load_documents(self) -> list[Document]:
+    def load_documents(
+        self,
+        *,
+        deduplication_index: dict[str, dict[str, Any]] | None = None,
+    ) -> list[Document]:
         documents: list[Document] = []
-        for file_path in self.collect_document_paths():
+        available_paths = self.collect_document_paths()
+        index = deduplication_index or self.build_content_deduplication_index(
+            available_paths
+        )
+        for file_path in self.canonical_document_paths(
+            available_paths, deduplication_index=index
+        ):
+            metadata = index.get(str(Path(file_path).resolve()), {})
             extension = Path(file_path).suffix.lower()
             if extension == ".pdf":
-                documents.extend(self.load_pdf(file_path))
+                documents.extend(
+                    self.load_pdf(file_path, deduplication_metadata=metadata)
+                )
             elif extension == ".docx":
-                documents.extend(self.load_docx(file_path))
+                documents.extend(
+                    self.load_docx(file_path, deduplication_metadata=metadata)
+                )
             elif extension in {".txt", ".xml"}:
-                documents.extend(self.load_textual_file(file_path, extension))
+                documents.extend(
+                    self.load_textual_file(
+                        file_path,
+                        extension,
+                        deduplication_metadata=metadata,
+                    )
+                )
         return documents
 
     # -------------------------------------------------------------------------
-    def load_pdf(self, file_path: str) -> list[Document]:
+    def load_pdf(
+        self,
+        file_path: str,
+        *,
+        deduplication_metadata: dict[str, Any] | None = None,
+    ) -> list[Document]:
         try:
             reader = PdfReader(file_path)
         except Exception as exc:  # noqa: BLE001
@@ -90,6 +264,7 @@ class DocumentSerializer:
             file_path,
             content_type="pdf",
             document_title=self.resolve_pdf_title(reader, file_path),
+            deduplication_metadata=deduplication_metadata,
         )
         metadata["total_pages"] = len(reader.pages)
         pages: list[Document] = []
@@ -113,7 +288,12 @@ class DocumentSerializer:
         return pages
 
     # -------------------------------------------------------------------------
-    def load_docx(self, file_path: str) -> list[Document]:
+    def load_docx(
+        self,
+        file_path: str,
+        *,
+        deduplication_metadata: dict[str, Any] | None = None,
+    ) -> list[Document]:
         try:
             with zipfile.ZipFile(file_path) as archive:
                 xml_content = archive.read("word/document.xml")
@@ -143,12 +323,19 @@ class DocumentSerializer:
             file_path,
             content_type="docx",
             document_title=title or self.extract_first_heading(content),
+            deduplication_metadata=deduplication_metadata,
         )
         document = Document(page_content=content, metadata=metadata)
         return [document]
 
     # -------------------------------------------------------------------------
-    def load_textual_file(self, file_path: str, extension: str) -> list[Document]:
+    def load_textual_file(
+        self,
+        file_path: str,
+        extension: str,
+        *,
+        deduplication_metadata: dict[str, Any] | None = None,
+    ) -> list[Document]:
         text = self.read_text_content(file_path, extension)
         if not text:
             return []
@@ -158,6 +345,7 @@ class DocumentSerializer:
                 file_path,
                 content_type=extension.lstrip("."),
                 document_title=self.extract_first_heading(text),
+                deduplication_metadata=deduplication_metadata,
             ),
         )
         return [document]
@@ -195,19 +383,18 @@ class DocumentSerializer:
         *,
         content_type: str,
         document_title: str | None = None,
+        deduplication_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         path = Path(file_path)
         document_id = self.compute_document_id(file_path)
         resolved_title = self.normalize_title(document_title) or path.stem
-        return {
+        metadata: dict[str, Any] = {
             "document_id": document_id,
             "source": str(path),
             "file_name": path.name,
             "document_title": resolved_title,
             "content_type": content_type,
-            "source_relative_path": str(
-                path.resolve().relative_to(self.documents_path.resolve())
-            ).replace("\\", "/"),
+            "source_relative_path": self.relative_path(path),
             "source_file_size": path.stat().st_size if path.exists() else 0,
             "source_last_modified": (
                 datetime.fromtimestamp(path.stat().st_mtime).isoformat()
@@ -216,13 +403,31 @@ class DocumentSerializer:
             ),
             "total_pages": 1,
         }
+        if deduplication_metadata:
+            metadata.update(
+                {
+                    key: value
+                    for key, value in deduplication_metadata.items()
+                    if key != "canonical_source_path"
+                }
+            )
+        return metadata
 
     # -------------------------------------------------------------------------
     def compute_document_id(self, file_path: str | Path) -> str:
-        relative_path = (
-            Path(file_path).resolve().relative_to(self.documents_path.resolve())
+        relative_path = Path(file_path).resolve().relative_to(
+            self.documents_path.resolve()
         )
         return hashlib.sha256(str(relative_path).encode("utf-8")).hexdigest()
+
+    # -------------------------------------------------------------------------
+    def relative_path(self, file_path: str | Path) -> str:
+        relative = Path(file_path).resolve().relative_to(self.documents_path.resolve())
+        return str(relative).replace("\\", "/")
+
+    # -------------------------------------------------------------------------
+    def normalized_relative_path(self, file_path: str | Path) -> str:
+        return self.relative_path(file_path).casefold()
 
     # -------------------------------------------------------------------------
     def resolve_pdf_title(self, reader: PdfReader, file_path: str) -> str:

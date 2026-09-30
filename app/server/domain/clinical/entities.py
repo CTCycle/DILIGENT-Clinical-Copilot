@@ -769,6 +769,8 @@ def create_drug_suspension_context() -> DrugSuspensionContext:
 ###############################################################################
 class RagDocumentReference(BaseModel):
     file_name: str = Field(..., min_length=1, max_length=500)
+    canonical_source_path: str | None = Field(default=None, max_length=500)
+    duplicate_source_paths: list[str] = Field(default_factory=list, max_length=100)
     page_start: int | None = Field(default=None, ge=1)
     page_end: int | None = Field(default=None, ge=1)
     line_start: int | None = Field(default=None, ge=1)

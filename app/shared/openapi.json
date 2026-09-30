@@ -6024,6 +6024,21 @@
               }
             ],
             "title": "Built At"
+          },
+          "physical_supported_file_count": {
+            "type": "integer",
+            "title": "Physical Supported File Count",
+            "default": 0
+          },
+          "unique_ingested_document_count": {
+            "type": "integer",
+            "title": "Unique Ingested Document Count",
+            "default": 0
+          },
+          "duplicate_file_count": {
+            "type": "integer",
+            "title": "Duplicate File Count",
+            "default": 0
           }
         },
         "additionalProperties": false,
@@ -7863,6 +7878,10 @@
             "type": "string",
             "title": "Path"
           },
+          "source_relative_path": {
+            "type": "string",
+            "title": "Source Relative Path"
+          },
           "file_name": {
             "type": "string",
             "title": "File Name"
@@ -7883,6 +7902,63 @@
             "type": "boolean",
             "title": "Supported For Ingestion"
           },
+          "content_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Fingerprint"
+          },
+          "canonical_source_relative_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Source Relative Path"
+          },
+          "is_canonical_source": {
+            "type": "boolean",
+            "title": "Is Canonical Source",
+            "default": false
+          },
+          "is_duplicate": {
+            "type": "boolean",
+            "title": "Is Duplicate",
+            "default": false
+          },
+          "duplicate_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Of"
+          },
+          "duplicate_source_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Duplicate Source Paths"
+          },
+          "duplicate_alias_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Duplicate Alias Paths"
+          },
           "vector_model": {
             "anyOf": [
               {
@@ -7899,6 +7975,7 @@
         "type": "object",
         "required": [
           "path",
+          "source_relative_path",
           "file_name",
           "extension",
           "file_size",

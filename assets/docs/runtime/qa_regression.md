@@ -85,3 +85,36 @@ the production build, Playwright installation, and the canonical Full harness.
 The security job runs pip-audit, Angular and desktop npm audits, and
 cargo-audit. Stop task-owned backend/frontend/fake-Ollama processes after local
 runs and verify ports `7690`, `9847`, and `11435` are free.
+
+## Final source closure — 2026-09-30
+
+The final local source matrix passed after the API matrix and RAG duplicate
+policy changes:
+
+- backend compilation, Alembic head/drift, Ruff, and Pyright passed;
+- the complete backend unit suite passed **838 tests**;
+- SQLite persistence passed **15 tests**, with 14 PostgreSQL parameterizations
+  intentionally skipped because no local `TEST_DATABASE_URL` was configured;
+- Angular/Vitest passed **24 files / 105 tests**, and the production build passed;
+- pip-audit reported no known vulnerabilities, both npm audits reported zero
+  vulnerabilities, and cargo-audit passed with six allowed unmaintained-crate
+  warnings;
+- the canonical command `.\app\tests\ci\run_browser_e2e.ps1 -Suite Full`
+  recorded **53 passed, 0 failed, 0 errors, 0 skipped** in the final JUnit.
+
+The local client lockfile was refreshed with `npm audit fix --package-lock-only`
+only; the audit remediation changed transitive versions and did not change the
+declared package manifest. The API suite now fails on an unclassified OpenAPI
+operation, so adding a public route requires an explicit validation disposition.
+
+The real local RAG fixture verified raw-byte duplicate handling: 3 physical
+supported files became 2 unique ingested documents, 2 chunks, 1 duplicate, and
+2 vector documents. Both physical paths remained in Data Inspection, and
+retrieval returned one canonical citation. This is the required byte-identical
+policy; semantic deduplication is not implied.
+
+The portable 3.4.0 smoke test passed. MSI checksum and metadata passed, but
+install/upgrade/uninstall remain host-blocked on a non-administrator Windows
+session because the package is `ALLUSERS=1`. This is recorded as an environment
+prerequisite for the separate MSI release-readiness procedure, not converted
+into a false PASS.

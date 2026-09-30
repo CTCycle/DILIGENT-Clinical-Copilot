@@ -1502,3 +1502,113 @@ process trees and ports `7690`, `9847`, and `11435` were free afterward.
 | `test.automated-regression` | `VALIDATED` for the deterministic local and hosted mandatory matrix | The current local Full suite is green with zero skips, and hosted commit CI [36620242445](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36620242445) passed `backend-quality`, `persistence-contract`, `windows-regression`, and `security-scan` on `ba5a722a`. `live-provider-e2e` was intentionally skipped with `run_provider_e2e=false`. |
 
 Evidence: [session and revision API validation](../../QA/api-local-boundaries-20260929/report.md).
+
+## Final validation-closure campaign — 2026-09-30
+
+This entry is the consolidated local closure record for the defined DILIGENT
+scope. The final closure source and evidence are committed on `develop` as
+`0150ecfede7acfb580a5bc38561ff0aa5a6a4ad7`; validation began from base
+revision `c52119d7` and completed against the closure working tree.
+
+### API local-boundaries
+
+`app/tests/e2e/test_api_local_boundaries.py` now owns an explicit contract
+matrix derived from `/openapi.json`. The live application reported 68 paths and
+85 method/path operations, and the matrix failed unless the current operation
+set matched exactly. The Full harness covered root/runtime, clinical,
+model/configuration, access-key, session/timeline/revision,
+inspection/catalog, runtime-observation, structured-source, and RAG route
+families with deterministic success, validation, not-found, cancellation,
+persistence, or already-validated external integration boundary evidence. No
+uncontrolled network refresh was introduced into this local gate.
+
+The final canonical command was:
+
+```powershell
+$env:DILIGENT_BROWSER_E2E_CACHE_ROOT='G:\Projects\Repositories\Active projects\DILIGENT Clinical Copilot\assets\QA\.scratch-final-browser-e2e-final'
+$env:PLAYWRIGHT_BROWSERS_PATH='G:\Projects\Repositories\Active projects\DILIGENT Clinical Copilot\runtimes\cache\playwright'
+.\app\tests\ci\run_browser_e2e.ps1 -Suite Full
+```
+
+The transient JUnit `assets/QA/.scratch-final-browser-e2e-final/pytest/browser-e2e-logs/full-junit.xml` recorded **53 passed, 0 failures, 0 errors, 0 skipped** before the disposable scratch root was removed after verification.
+
+### ISSUE-005 / RAG duplicate policy
+
+Supported input files now receive a raw-byte SHA-256 fingerprint. Only
+byte-identical files group together; semantic or normalized-text deduplication
+is not attempted. The canonical source is selected by normalized relative-path
+ordering, retains the existing path-derived `document_id`, and carries every
+duplicate relative path in metadata. Data Inspection keeps every physical file
+visible and labels canonical, duplicate, and unsupported rows.
+
+The disposable real-embedding fixture contained two identical files and one
+different file. A fresh generation rebuild reported:
+
+| Metric | Result |
+|---|---:|
+| Physical supported files | 3 |
+| Unique ingested documents | 2 |
+| Chunks | 2 |
+| Duplicate files | 1 |
+| Vector documents | 2 |
+| Retrieved duplicated evidence | 1 canonical result |
+
+The source manifest hash was
+`29d94eca3b43e35a8f5e765e30e3fa80b8186978fd8b91fbfa00994cb305a1ac`. Inspection
+showed the canonical path with alias `z-copy.txt`, the duplicate row pointing
+to that canonical path, and the distinct file as a second canonical document.
+Retrieval and bibliography provenance used the canonical path. Repeating the
+fresh-generation build preserved the same canonical selection and counts;
+append behavior in an already-populated collection remains an explicit
+maintenance concern rather than being misrepresented as fresh-generation
+idempotence.
+
+### Final source matrix
+
+The following checks passed on the final source state:
+
+- Python compilation with an isolated bytecode root.
+- Alembic upgrade to `202609170001 (head)` and `alembic check` with no drift.
+- Ruff, Pyright (`0 errors, 0 warnings, 0 informations`), and `git diff --check`.
+- Backend unit suite: **838 passed, 7 warnings**.
+- SQLite persistence contract: **15 passed, 14 intentional PostgreSQL skips** without `TEST_DATABASE_URL`.
+- Angular/Vitest: **24 files, 105 tests passed**.
+- Angular production build.
+- pip-audit: no known vulnerabilities.
+- npm audits: 0 vulnerabilities after the lockfile-only remediation.
+- cargo-audit: passed with six allowed unmaintained-crate warnings; no denied unsound finding.
+
+### Packaged Windows evidence
+
+The pinned `1.95.0` Rust toolchain built the local 3.4.0 candidate with:
+
+```powershell
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.4.0 -DesktopTarget All -AllowDirtyTree
+```
+
+| Artifact | SHA-256 | Evidence |
+|---|---|---|
+| `release/DILIGENT-v3.4.0-windows-x64-portable.exe` | `29BC8E69CBBB0E8DC8446103C2D8526BF02130B724D9916C2DAE68901F2BA61A` | PE/AMD64, checksum, extraction, ready payload, version, health, API, window title, clean close, port closure, and second launch passed. |
+| `release/DILIGENT-v3.4.0-windows-x64.msi` | `B8AA3E9734ECDE0FD2DD80573C463CEFD7674E6B9E0CEACDA395C19EAEC1A263` | Checksum and ProductName/ProductVersion/UpgradeCode metadata passed. |
+
+Portable smoke ran twice from one data root. Both launches reported
+`DILIGENT Clinical Copilot`, `release_version=3.4.0`, `/api/health` 200, clean
+backend termination, closed random ports, and a fresh ready file; the second
+launch replaced the stale ready-file state. Representative secured endpoints
+returned their intended unauthenticated desktop boundary (401) to an external
+probe, while the shell bootstrap and root/health endpoints succeeded.
+
+The published 3.3.0 MSI checksum and metadata were verified. Actual 3.3.0
+install, 3.4.0 upgrade, and uninstall could not be executed because this host
+is not an administrator and the MSI is `ALLUSERS=1`; both controlled
+`msiexec` attempts remained idle and were terminated after confirmation. No
+partial registration, DILIGENT process, or listening packaged backend port
+remained. MSI install/upgrade is therefore **BLOCKED BY HOST PREREQUISITE**, not
+claimed as a product PASS. A real administrator-host run is still required for
+that release-readiness procedure.
+
+Narrator/Speech Recap and broad screen-reader certification are optional,
+deferred, and non-blocking. Containerized runtime remains
+`NOT_IMPLEMENTED` and out of scope. Tagging, GitHub Release publication,
+signing, offline WebView2 packaging, and clean-machine certification remain
+separate publication/distribution procedures.

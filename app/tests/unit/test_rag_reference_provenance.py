@@ -26,6 +26,28 @@ def test_line_metadata_is_propagated() -> None:
         file_name="alpha.pdf", page_start=2, page_end=3, line_start=18, line_end=54
     )
 
+
+def test_duplicate_metadata_keeps_canonical_citation_path() -> None:
+    reference = RagSupportService.build_document_reference(
+        {
+            "file_name": "guide.txt",
+            "metadata": {
+                "source_relative_path": "first/guide.txt",
+                "canonical_source_relative_path": "first/guide.txt",
+                "duplicate_source_paths": [
+                    "first/guide.txt",
+                    "second/guide.txt",
+                ],
+            },
+        }
+    )
+
+    assert reference == RagDocumentReference(
+        file_name="first/guide.txt",
+        canonical_source_path="first/guide.txt",
+        duplicate_source_paths=["first/guide.txt", "second/guide.txt"],
+    )
+
 ###############################################################################
 @pytest.mark.parametrize(
     "kwargs",
