@@ -1,5 +1,5 @@
 # QA Regression
-Last updated: 2026-09-29
+Last updated: 2026-09-30
 
 ## Scope
 
@@ -113,8 +113,10 @@ supported files became 2 unique ingested documents, 2 chunks, 1 duplicate, and
 retrieval returned one canonical citation. This is the required byte-identical
 policy; semantic deduplication is not implied.
 
-The portable 3.4.0 smoke test passed. MSI checksum and metadata passed, but
-install/upgrade/uninstall remain host-blocked on a non-administrator Windows
-session because the package is `ALLUSERS=1`. This is recorded as an environment
-prerequisite for the separate MSI release-readiness procedure, not converted
-into a false PASS.
+Earlier portable 3.4.0 smoke evidence passed, but the current re-run failed
+the native window-title assertion: `io.github.ctcycle.diligent-siw` was
+reported instead of `DILIGENT Clinical Copilot`. MSI checksum and metadata
+passed, but install/upgrade/uninstall remain host-blocked on a
+non-administrator Windows session because the package is `ALLUSERS=1`. The
+current result is not converted into a release PASS; see the consolidated
+[desktop revalidation follow-up](../../QA/final-validation-closure-20260930/report.md).

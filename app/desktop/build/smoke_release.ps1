@@ -476,6 +476,7 @@ function Invoke-MsiUpgradeSmoke {
     if ($DesktopTarget -notin @('Msi', 'All')) {
         throw 'MSI upgrade smoke requires -DesktopTarget Msi or All.'
     }
+    $metadata = Get-MsiMetadata -path $msiPath
     $previousMsiPath = (Resolve-Path -LiteralPath $previousMsiPath).Path
     $previousChecksumPath = (Resolve-Path -LiteralPath $previousChecksumPath).Path
     $previousHash = Assert-Checksum -artifactPath $previousMsiPath -manifestPath $previousChecksumPath

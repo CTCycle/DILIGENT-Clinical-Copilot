@@ -649,6 +649,39 @@ jobs:
             }
           }
 
+      - name: Download published MSI for upgrade validation
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $previousVersion = '3.3.0'
+          $upgradeDir = Join-Path $env:RUNNER_TEMP "diligent-upgrade-from-$previousVersion"
+          New-Item -ItemType Directory -Path $upgradeDir -Force | Out-Null
+          gh release download "v$previousVersion" --repo $env:GITHUB_REPOSITORY `
+            --pattern "DILIGENT-v$previousVersion-windows-x64.msi" `
+            --pattern "DILIGENT-v$previousVersion-windows-x64.sha256" `
+            --dir $upgradeDir --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not download the published v$previousVersion MSI upgrade inputs."
+          }
+          $previousMsi = Join-Path $upgradeDir "DILIGENT-v$previousVersion-windows-x64.msi"
+          $previousChecksum = Join-Path $upgradeDir "DILIGENT-v$previousVersion-windows-x64.sha256"
+          foreach ($path in @($previousMsi, $previousChecksum)) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Missing published MSI upgrade input: $path"
+            }
+          }
+          $checksumText = Get-Content -LiteralPath $previousChecksum -Raw
+          $name = Split-Path -Leaf $previousMsi
+          $hash = (Get-FileHash -LiteralPath $previousMsi -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($checksumText -notmatch [regex]::Escape("$hash  $name")) {
+            throw "Published v$previousVersion MSI checksum does not match $name"
+          }
+          "DILIGENT_UPGRADE_MSI=$previousMsi" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "DILIGENT_UPGRADE_CHECKSUM=$previousChecksum" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output "Published v$previousVersion MSI upgrade inputs verified."
+
       - name: Smoke test Windows EXE and MSI
         shell: pwsh
         env:
@@ -656,7 +689,14 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = $env:RELEASE_TAG.Substring(1)
-          .\app\desktop\build\smoke_release.ps1 -Version $version -DesktopTarget All -InstallMsi
+          .\app\desktop\build\smoke_release.ps1 `
+            -Version $version `
+            -DesktopTarget All `
+            -InstallMsi `
+            -TestUpgrade `
+            -UpgradeFromVersion 3.3.0 `
+            -PreviousMsiPath $env:DILIGENT_UPGRADE_MSI `
+            -PreviousChecksumPath $env:DILIGENT_UPGRADE_CHECKSUM
 
       - name: Create or update GitHub Release
         shell: pwsh
