@@ -1,5 +1,11 @@
 # QA Regression
-Last updated: 2026-09-30
+Last updated: 2026-10-01
+
+The exact v3.4.0 candidate preparation evidence is recorded in
+assets/QA/desktop-release-validation-20261001/report.md. It preserves the
+distinction between green source/hosted gates and the administrator,
+native-interactive, signing, and external-auth boundaries that cannot be
+proven on this workstation.
 
 ## Scope
 

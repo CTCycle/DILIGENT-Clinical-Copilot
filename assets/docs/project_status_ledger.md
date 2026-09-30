@@ -1,5 +1,5 @@
 # Project Status Ledger
-Last updated: 2026-09-30
+Last updated: 2026-10-01
 
 ## Purpose and authority
 
@@ -80,8 +80,23 @@ in the harness that could mask a successful pytest result with a nonzero
 | `test.automated-regression` | `VALIDATED` | Final source gates include 838 backend unit tests, 53 Full browser tests with 0 failures/errors/skips, 105 Angular tests, production build, persistence, static checks, and dependency audits. |
 | `ui.application-shell` | `VALIDATED` for required scope | Existing rendered, keyboard, focus, viewport, and application-shell accessibility evidence remains valid. Narrator/Speech Recap and broad component screen-reader certification are optional future enhancement work, explicitly outside required closure scope. |
 | `runtime.containerized` | `NOT_IMPLEMENTED` and out of scope | No container deployment requirement exists for this campaign. |
-| `release.desktop.v3-4-0` | `PORTABLE PARTIAL; MSI/UPGRADE BLOCKED; DISTRIBUTION BLOCKED` | The clean candidate at `2fadf0f22410665a814efc24b316cf68753e1cd6` includes the surgical runtime/backend path correction. Its clean pinned-toolchain build passed the former 230-character executable / 107-character `%LOCALAPPDATA%` boundary twice with health `200`, settings `401`, branded title, backend cleanup, port closure, and no ONNX DLL path error. Native UI workflows remain unavailable; MSI metadata/checksum and published `v3.3.0` input verification passed, but ALLUSERS installation, genuine upgrade, uninstall, database-preservation checks, signing, and distribution certification remain open. See the [desktop release validation report](../QA/desktop-release-validation-20260930/report.md), [deep-path remediation](../QA/desktop-release-validation-20260930/deep-path-remediation.md), and [D01–D14 matrix](../QA/desktop-release-validation-20260930/D01-D14-matrix.md). |
+| `release.desktop.v3-4-0` | `PORTABLE VALIDATED; MSI/UPGRADE PENDING ON SUITABLE TEST HOST; DISTRIBUTION PENDING` | Exact candidate `2f804d251769f4e01375d02459e41dd9970ec8eb` has fresh portable/MSI/checksum outputs, standard portable smoke, and the exact 230-character executable / 107-character `%LOCALAPPDATA%` deep-path replay passing twice. Exact-SHA hosted CI is green for backend quality, PostgreSQL persistence, Windows regression, and security; the live-provider dispatch remains pending because the available GitHub CLI credential returned HTTP 401. Native UI interaction, administrator MSI lifecycle, signing, and clean-machine distribution remain host/procedure boundaries. See [current candidate evidence](../QA/desktop-release-validation-20261001/report.md) and the [desktop release procedure](runtime/desktop_release.md). |
 | Publication/distribution procedures | Deferred and separate | Tagging, GitHub Release publication, signing, offline WebView2 packaging, and clean-machine certification remain publication/release procedures, not source validation debt. |
+
+## Exact v3.4.0 candidate preparation — 2026-10-01
+
+The prepared product candidate is 2f804d251769f4e01375d02459e41dd9970ec8eb on
+develop, with origin/develop at the same SHA. Fresh portable, MSI, and
+checksum artifacts are present locally. The exact-SHA hosted CI run is green
+for backend quality, PostgreSQL persistence, Windows regression, and security.
+The live-provider dispatch remains pending because the available GitHub CLI
+credential returned HTTP 401 before a workflow run was created.
+
+The portable smoke and exact 230-character executable / 107-character
+LOCALAPPDATA deep-path replay passed twice. MSI install/upgrade, native
+packaged UI interaction, signing, and clean-machine distribution remain
+pending on a suitable host or release procedure. See the
+desktop-release-validation-20261001 report for the complete boundary.
 
 ## Component ledger
 
