@@ -91,10 +91,11 @@ location. The original deep-path candidate produced a ready payload and window
 but its backend did not answer loopback HTTP; the traceback identified a
 Windows filename-length failure while importing the ONNX Runtime extension.
 The [deep-path remediation evidence](../../QA/desktop-release-validation-20260930/deep-path-remediation.md)
-records the compact-layout correction and two successful exact-boundary repair
-launches. A clean exact-source rebuild is still required before promoting the
-repair. Computer Use reported no native app/window surface, so the full
-packaged UI workflow and failure suite remains BLOCKED.
+records the compact-layout correction, a clean rebuild at repair commit
+`2fadf0f22410665a814efc24b316cf68753e1cd6`, and two successful exact-boundary
+launches at the formerly failing path lengths. Computer Use reported no native
+app/window surface, so the full packaged UI workflow and failure suite remains
+BLOCKED.
 
 The published remote `v3.3.0` MSI and checksum were downloaded and verified,
 and the workflow/static upgrade contracts passed. MSI installation, upgrade,
