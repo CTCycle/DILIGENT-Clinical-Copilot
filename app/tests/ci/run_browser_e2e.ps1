@@ -36,6 +36,7 @@ $fakeOllama = $null
 $backendReady = $false
 $frontendReady = $false
 $fakeOllamaReady = $false
+$suiteExitCode = 1
 
 function Write-Diagnostics([string]$label, $process, [string]$stdoutPath, [string]$stderrPath) {
     Write-Output "[$label]"
@@ -195,6 +196,7 @@ try {
             throw "Mandatory browser E2E reported $skippedCount skipped test(s); optional integrations must be selected outside Suite Full."
         }
     }
+    $suiteExitCode = 0
 }
 finally {
     if (-not $backendReady -or -not $frontendReady -or ($Suite -eq 'Full' -and -not $fakeOllamaReady)) {
@@ -209,3 +211,5 @@ finally {
         }
     }
 }
+
+exit $suiteExitCode
