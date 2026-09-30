@@ -61,9 +61,33 @@ The final log scan found no `onnxruntime_pybind11_state`, import, or
 filename-length error. Temporary executable/data roots were removed after the
 replay.
 
+## Clean candidate revalidation
+
+A clean pinned-toolchain rebuild was then completed from repair commit
+`2fadf0f22410665a814efc24b316cf68753e1cd6` with `dirty_tree=false`.
+
+- Runtime archive SHA-256: `b1f20b52b4cc211b3da4aa5a4a2aa796f61216a571b5bf66acd1d049ad3fc433`
+- Runtime files: `1108`
+- Archive-required backend: `b/DILIGENTBackend.exe`
+- Portable SHA-256: `b525df274191b3a6e7f04bd0ff070d853100a177e2b094bc6e72d0067b7c5da5`
+- MSI SHA-256: `7708cb8b5e7495c3e29193780a0434d952011d5e699e3b2319e25534bf9f7759`
+
+The standard portable smoke passed with two health-200 launches, the branded
+title, clean backend/port shutdown, extraction under `DILIGENT\\rt`, and
+stale-ready-file replacement. The exact formerly failing boundary was replayed
+twice with executable path length `230` and isolated `%LOCALAPPDATA%` length
+`107`:
+
+| Launch | Backend PID | Port | Health | Settings | Title | Backend gone | Port closed | ONNX path error |
+|---:|---:|---:|---:|---:|---|---|---|---|
+| 1 | 36652 | 65336 | 200 | 401 | `DILIGENT Clinical Copilot` | yes | yes | no |
+| 2 | 15316 | 58501 | 200 | 401 | `DILIGENT Clinical Copilot` | yes | yes | no |
+
+The clean candidate therefore closes the deep-path portable gate. Temporary
+executable/data roots were removed after the clean replay.
+
 ## Boundary
 
-This is repair-build evidence with `dirty_tree=true`; a clean exact-source
-rebuild and replay are still required before promoting the candidate. Native
+The deep-path portable gate is now validated for the clean candidate. Native
 packaged UI interaction, MSI installation/upgrade/uninstall, signing, and
 clean-machine distribution certification remain separate open gates.
