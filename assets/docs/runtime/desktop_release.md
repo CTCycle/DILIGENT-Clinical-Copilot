@@ -1,5 +1,5 @@
 # DILIGENT Desktop Release
-Last updated: 2026-09-13
+Last updated: 2026-09-30
 
 ## Packaging architecture
 
@@ -34,9 +34,32 @@ release/DILIGENT-v3.4.0-windows-x64.sha256
 
 The portable executable is a single distribution file for no-install use. The MSI installs the same Tauri shell and packaged runtime. The `.sha256` file contains one SHA-256 entry per built artifact and must be checked before distribution. Publication requires separate tag, remote-release, and download/hash evidence.
 
+### Local 2026-09-30 validation-closure result
+
+The local pinned-toolchain build produced the 3.4.0 candidate. The portable
+EXE passed checksum, PE/AMD64 validation, first launch, runtime extraction,
+fresh `desktop-backend-ready.json`, `release_version=3.4.0`, `/api/health`,
+root and representative packaged API probes, the actual process window title,
+clean close, backend termination, port closure, and a second launch from the
+same data root that replaced the stale-ready-file state.
+
+| Artifact | SHA-256 |
+|---|---|
+| `DILIGENT-v3.4.0-windows-x64-portable.exe` | `29BC8E69CBBB0E8DC8446103C2D8526BF02130B724D9916C2DAE68901F2BA61A` |
+| `DILIGENT-v3.4.0-windows-x64.msi` | `B8AA3E9734ECDE0FD2DD80573C463CEFD7674E6B9E0CEACDA395C19EAEC1A263` |
+
+The MSI checksum, ProductName, ProductVersion, Manufacturer, and UpgradeCode
+metadata passed. Actual MSI install, 3.3.0-to-3.4.0 upgrade, launch, and
+uninstall are **blocked on this host** because the package is `ALLUSERS=1` and
+the validation session is not an administrator. The controlled Windows
+Installer attempts were stopped after remaining idle; no partial registration,
+packaged process, or packaged port remained. Run the MSI procedure on an
+administrator host before publication. This host limitation is not evidence of
+an MSI product failure.
+
 ### v3.4.0 release-candidate gate
 
-Status: **NOT READY**. The source and lock manifests are synchronized to strict
+Status: **LOCAL PORTABLE PASS; MSI INSTALL/UPGRADE HOST-BLOCKED**. The source and lock manifests are synchronized to strict
 SemVer `3.4.0`, but the candidate must remain unpublished until all of these
 independent gates have current evidence:
 

@@ -410,6 +410,8 @@ def test_workflow_does_not_recreate_bibliography_outside_report_finalizer() -> N
         "Paracetamolo": [
             {
                 "file_name": "paracetamol-dili.pdf",
+                "canonical_source_path": None,
+                "duplicate_source_paths": [],
                 "page_start": 4,
                 "page_end": 5,
                 "line_start": None,

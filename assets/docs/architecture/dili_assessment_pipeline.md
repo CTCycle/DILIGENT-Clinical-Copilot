@@ -198,6 +198,17 @@ If retrieval becomes unavailable after a job starts, the report continues safely
 
 When RAG is enabled, retrieved text is used only as hidden model context. The final report bibliography lists compact references to retrieved documents by filename and page number only.
 
+RAG ingestion computes a SHA-256 fingerprint over the raw bytes of each
+supported input file. Only byte-identical files are grouped; semantic or
+normalized-text deduplication is not performed. The canonical source is chosen
+deterministically by normalized relative-path ordering and keeps the existing
+path-derived `document_id`. Duplicate relative paths remain visible in Data
+Inspection and are carried as alias metadata on the canonical document.
+Embedding and chunking run once for the canonical source, while manifests
+report physical supported files separately from unique ingested documents and
+duplicate files. Citations use the canonical source and retain duplicate-source
+metadata for auditability.
+
 LiverTox input preparation is bounded for cloud and local providers. A timeout
 produces an explicit pipeline warning and safe evidence-free continuation instead
 of leaving the job indefinitely in Step 12. Progress text distinguishes

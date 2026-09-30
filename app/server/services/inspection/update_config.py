@@ -80,6 +80,15 @@ class InspectionUpdateConfigMixin:
                 if isinstance(summary.get("chunk_overlap"), int | float)
                 else None
             ),
+            physical_supported_file_count=int(
+                summary.get("physical_supported_files", summary.get("supported_files", 0))
+                or 0
+            ),
+            unique_ingested_document_count=int(
+                summary.get("unique_ingested_documents", summary.get("documents", 0))
+                or 0
+            ),
+            duplicate_file_count=int(summary.get("duplicate_file_count", 0) or 0),
         )
         payload = manifest.to_dict()
         manifest_path.write_text(

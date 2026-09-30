@@ -704,11 +704,19 @@ class InspectionRagUpdateRequest(BaseModel):
 class RagDocumentListItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     path: str
+    source_relative_path: str
     file_name: str
     extension: str
     file_size: int
     last_modified: str
     supported_for_ingestion: bool
+    content_fingerprint: str | None = None
+    canonical_source_relative_path: str | None = None
+    is_canonical_source: bool = False
+    is_duplicate: bool = False
+    duplicate_of: str | None = None
+    duplicate_source_paths: list[str] = Field(default_factory=list)
+    duplicate_alias_paths: list[str] = Field(default_factory=list)
     vector_model: str | None = None
 
 ###############################################################################
@@ -752,6 +760,9 @@ class LanceVectorStoreSummaryResponse(BaseModel):
     index_status: str = "reindex_required"
     embedding_fingerprint: str | None = None
     built_at: str | None = None
+    physical_supported_file_count: int = 0
+    unique_ingested_document_count: int = 0
+    duplicate_file_count: int = 0
 
 ###############################################################################
 class RagUpdateJobSummary(BaseModel):
