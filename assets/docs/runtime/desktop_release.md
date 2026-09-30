@@ -69,13 +69,42 @@ portable SHA-256 was
 
 The exact-toolchain rebuild was blocked by the host's protected canonical uv
 cache and protected project-environment files; no replacement artifact was
-produced. Treat the earlier portable PASS as superseded until a fresh build
-passes the smoke harness. The release-candidate status is therefore **portable
-FAIL; MSI install/upgrade/uninstall host-blocked**.
+produced. Treat the earlier portable PASS as superseded. The fresh-candidate
+continuation below is the current desktop status.
+
+### Fresh candidate rebuild and portable continuation — 2026-09-30
+
+The stale artifacts were retained under
+[`assets/QA/desktop-release-validation-20260930/prebuild-stale-artifacts/`](../../QA/desktop-release-validation-20260930/prebuild-stale-artifacts/)
+and a clean pinned-toolchain build was completed at candidate commit
+`ce5df0c65fb432a42b2be622789e11f5c5283a43`. The fresh portable SHA-256 is
+`27edd72ea371a4f9794e649108d379e4d4049d4e0aa4b838f374b66eea32924c`; the fresh
+MSI SHA-256 is
+`ac2c4cbe924d402900b37c39c12fc1b5f72615dd648e9e7a57bdcc859306466f`.
+
+The required portable smoke passed twice with the branded native title
+`DILIGENT Clinical Copilot`, HTTP health, authenticated-local API boundary,
+clean backend/port shutdown, and stale-ready-file replacement. Additional
+packaged-process checks passed warm restart, forced termination recovery,
+concurrent launch handling, space paths, non-ASCII paths, and a short second
+location. A deep repository path produced a ready payload and window but its
+backend did not answer loopback HTTP; that unresolved boundary keeps Portable
+at **PARTIAL** rather than PASS. Computer Use reported no native app/window
+surface, so the full packaged UI workflow and failure suite remains BLOCKED.
+
+The published remote `v3.3.0` MSI and checksum were downloaded and verified,
+and the workflow/static upgrade contracts passed. MSI installation, upgrade,
+uninstall, database-preservation comparisons, verbose logs, and reinstall
+remain **BLOCKED** by the non-administrator token. Fresh local EXE and MSI
+signatures are `NotSigned`, so Distribution is **BLOCKED** and the candidate
+is not distribution-ready.
+
+Evidence: [desktop-release-validation-20260930](../../QA/desktop-release-validation-20260930/report.md),
+including the [D01–D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md).
 
 ### v3.4.0 release-candidate gate
 
-Status: **LOCAL PORTABLE REVALIDATION FAILED; MSI INSTALL/UPGRADE HOST-BLOCKED**. The source and lock manifests are synchronized to strict
+Status: **PORTABLE PARTIAL; MSI/UPGRADE BLOCKED; DISTRIBUTION BLOCKED**. The source and lock manifests are synchronized to strict
 SemVer `3.4.0`, but the candidate must remain unpublished until all of these
 independent gates have current evidence:
 
