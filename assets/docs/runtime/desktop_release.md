@@ -1,5 +1,30 @@
 # DILIGENT Desktop Release
-Last updated: 2026-09-30
+Last updated: 2026-10-01
+
+## Exact candidate preparation — 2026-10-01
+
+The prepared product candidate is
+2f804d251769f4e01375d02459e41dd9970ec8eb on develop, with origin/develop at
+the same SHA. Fresh local artifacts are present under release/:
+
+| Artifact | SHA-256 |
+|---|---|
+| DILIGENT-v3.4.0-windows-x64-portable.exe | 0209cf25a8acf3a39762ffeec48488c28103e1b96c7c5a57ed8beb813574e167 |
+| DILIGENT-v3.4.0-windows-x64.msi | 1df49329361b600edb2e0c07949fe00bc113b25122d55af9ba93cb52f67fd508 |
+
+The portable smoke and exact 230-character executable / 107-character
+LOCALAPPDATA deep-path replay passed twice. Exact-SHA CI run 36786345174 is
+green for backend quality, PostgreSQL persistence, Windows regression, and
+security. The live-provider job was skipped on push and its exact-SHA dispatch
+is pending because the available GitHub CLI credential returned HTTP 401.
+
+Current preparation status is PORTABLE VALIDATED; MSI/UPGRADE PENDING ON
+SUITABLE TEST HOST; DISTRIBUTION PENDING. The current workstation is not
+administrator-capable, native Computer Use exposes no desktop app/window, and
+the local EXE/MSI are NotSigned. See the current candidate evidence at
+assets/QA/desktop-release-validation-20261001/report.md.
+This preparation record does not create a tag, GitHub release, upload, or
+distribution publication.
 
 ## Packaging architecture
 
@@ -109,7 +134,7 @@ including the [D01–D14 matrix](../../QA/desktop-release-validation-20260930/D0
 
 ### v3.4.0 release-candidate gate
 
-Status: **PORTABLE PARTIAL; MSI/UPGRADE BLOCKED; DISTRIBUTION BLOCKED**. The source and lock manifests are synchronized to strict
+Status: **PORTABLE VALIDATED; MSI/UPGRADE PENDING ON SUITABLE TEST HOST; DISTRIBUTION PENDING**. The source and lock manifests are synchronized to strict
 SemVer `3.4.0`, but the candidate must remain unpublished until all of these
 independent gates have current evidence:
 
@@ -124,8 +149,10 @@ independent gates have current evidence:
 - `develop` and `main` are intentionally synchronized before an annotated
   `v3.4.0` tag is created.
 
-The local work in this session does not create a tag, publish a GitHub release,
-upload assets, or push branches.
+This preparation record does not create a tag, publish a GitHub release, or
+upload assets. The candidate remains on origin/develop without a v3.4.0 tag or
+release; branch synchronization to main is intentionally deferred to the later
+release session.
 
 The GitHub release attaches the portable EXE, MSI, and `.sha256` manifest. Existing remote assets are never replaced unless the local and remote bytes are identical.
 
