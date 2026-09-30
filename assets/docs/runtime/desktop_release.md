@@ -57,9 +57,25 @@ packaged process, or packaged port remained. Run the MSI procedure on an
 administrator host before publication. This host limitation is not evidence of
 an MSI product failure.
 
+### Current desktop revalidation follow-up — 2026-09-30
+
+The pre-existing portable artifact was re-run from the current checkout with
+`smoke_release.ps1 -Version 3.4.0 -DesktopTarget Portable`. It reached the
+packaged ready-file, health, representative API, and native-process checks but
+failed the required title assertion: the observed title was
+`io.github.ctcycle.diligent-siw`, not `DILIGENT Clinical Copilot`. The observed
+portable SHA-256 was
+`29bc8e69cbbb0e8dc8446103c2d8526bf02130b724d9916c2dae68901f2ba61a`.
+
+The exact-toolchain rebuild was blocked by the host's protected canonical uv
+cache and protected project-environment files; no replacement artifact was
+produced. Treat the earlier portable PASS as superseded until a fresh build
+passes the smoke harness. The release-candidate status is therefore **portable
+FAIL; MSI install/upgrade/uninstall host-blocked**.
+
 ### v3.4.0 release-candidate gate
 
-Status: **LOCAL PORTABLE PASS; MSI INSTALL/UPGRADE HOST-BLOCKED**. The source and lock manifests are synchronized to strict
+Status: **LOCAL PORTABLE REVALIDATION FAILED; MSI INSTALL/UPGRADE HOST-BLOCKED**. The source and lock manifests are synchronized to strict
 SemVer `3.4.0`, but the candidate must remain unpublished until all of these
 independent gates have current evidence:
 
