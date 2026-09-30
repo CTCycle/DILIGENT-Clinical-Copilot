@@ -269,8 +269,15 @@ class RagSupportService:
     def build_document_reference(record: dict[str, Any]) -> RagDocumentReference | None:
         metadata = record.get("metadata")
         metadata_dict = metadata if isinstance(metadata, dict) else {}
+        canonical_source_path = RagSupportService._coerce_optional_text(
+            record.get("canonical_source_relative_path")
+            or metadata_dict.get("canonical_source_relative_path")
+            or record.get("source_relative_path")
+            or metadata_dict.get("source_relative_path")
+        )
         file_name = str(
-            record.get("file_name")
+            canonical_source_path
+            or record.get("file_name")
             or metadata_dict.get("source_file_name")
             or metadata_dict.get("file_name")
             or metadata_dict.get("source_relative_path")
@@ -279,6 +286,13 @@ class RagSupportService:
         ).strip()
         if not file_name:
             return None
+
+        duplicate_source_paths = metadata_dict.get("duplicate_source_paths")
+        if not isinstance(duplicate_source_paths, list):
+            duplicate_source_paths = []
+        duplicate_source_paths = [
+            str(path).strip() for path in duplicate_source_paths if str(path).strip()
+        ]
 
         page_number = RagSupportService._coerce_page_number(record.get("page_number"))
         page_start = RagSupportService._coerce_page_number(
@@ -297,6 +311,8 @@ class RagSupportService:
 
         return RagDocumentReference(
             file_name=file_name,
+            canonical_source_path=canonical_source_path,
+            duplicate_source_paths=duplicate_source_paths,
             page_start=page_start,
             page_end=page_end,
             line_start=line_start,

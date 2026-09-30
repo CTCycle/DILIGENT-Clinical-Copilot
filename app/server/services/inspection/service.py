@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from datetime import date
 from functools import partial
@@ -373,7 +374,17 @@ class DataInspectionService(
         limit: int,
     ) -> dict[str, Any]:
         serializer = DocumentSerializer(self.get_effective_rag_documents_path())
+        available_paths = serializer.collect_file_paths()
+        supported_paths = [
+            path
+            for path in available_paths
+            if Path(path).suffix.lower() in serializer.SUPPORTED_EXTENSIONS
+        ]
+        deduplication_index = serializer.build_content_deduplication_index(
+            supported_paths
+        )
         vector_model_by_file: dict[str, str] = {}
+        vector_model_by_path: dict[str, str] = {}
         try:
             rag_settings = build_effective_rag_settings()
             vector_db = LanceVectorDatabase(
@@ -388,14 +399,32 @@ class DataInspectionService(
             if vector_db.has_collection():
                 for row in vector_db.load_embeddings():
                     file_name = str(row.get("file_name") or "")
+                    relative_path = ""
+                    metadata = row.get("metadata")
+                    if isinstance(metadata, str):
+                        try:
+                            parsed_metadata = json.loads(metadata)
+                        except json.JSONDecodeError:
+                            parsed_metadata = {}
+                        if isinstance(parsed_metadata, dict):
+                            relative_path = str(
+                                parsed_metadata.get("source_relative_path") or ""
+                            ).strip()
                     provider = str(row.get("vector_model_provider") or "").strip()
                     model_name = str(row.get("vector_model_name") or "").strip()
-                    if not file_name:
+                    if not file_name and not relative_path:
                         continue
+                    model = ""
                     if provider and model_name:
-                        vector_model_by_file[file_name] = f"{provider}:{model_name}"
+                        model = f"{provider}:{model_name}"
                     elif model_name:
-                        vector_model_by_file[file_name] = model_name
+                        model = model_name
+                    if not model:
+                        continue
+                    if file_name:
+                        vector_model_by_file[file_name.casefold()] = model
+                    if relative_path:
+                        vector_model_by_path[relative_path.casefold()] = model
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Unable to load vector metadata for inspection listing (%s): %s",
@@ -404,12 +433,20 @@ class DataInspectionService(
             )
             vector_model_by_file = {}
         items: list[dict[str, Any]] = []
-        for path in serializer.collect_file_paths():
-            metadata = serializer.build_listing_metadata(path)
+        for path in available_paths:
+            metadata = serializer.build_listing_metadata(
+                path,
+                deduplication_metadata=deduplication_index.get(str(Path(path).resolve())),
+            )
             items.append(
                 {
                     **metadata,
-                    "vector_model": vector_model_by_file.get(metadata["file_name"]),
+                    "vector_model": vector_model_by_path.get(
+                        str(metadata["source_relative_path"]).casefold()
+                    )
+                    or vector_model_by_file.get(
+                        str(metadata["file_name"]).casefold()
+                    ),
                 }
             )
         items.sort(key=lambda item: str(item["path"]).casefold())
@@ -520,6 +557,10 @@ class DataInspectionService(
             stream_batch_size=rag_settings.vector_stream_batch_size,
         )
         exists = vector_db.has_collection()
+        manifest = self.read_rag_manifest()
+        manifest_source = manifest.get("source")
+        if not isinstance(manifest_source, dict):
+            manifest_source = {}
         embedding_count = 0
         distinct_document_count = 0
         embedding_dimension: int | None = None
@@ -546,13 +587,18 @@ class DataInspectionService(
             "configured_index_type": rag_settings.vector_index_type,
             "embedding_model": CANONICAL_EMBEDDING_CONFIG.model_id,
             "embedding_revision": CANONICAL_EMBEDDING_CONFIG.revision,
-            "index_status": str(
-                self.read_rag_manifest().get("status") or "reindex_required"
+            "index_status": str(manifest.get("status") or "reindex_required"),
+            "embedding_fingerprint": manifest.get("embedding_fingerprint"),
+            "built_at": manifest.get("built_at"),
+            "physical_supported_file_count": int(
+                manifest_source.get("physical_supported_file_count", 0) or 0
             ),
-            "embedding_fingerprint": self.read_rag_manifest().get(
-                "embedding_fingerprint"
+            "unique_ingested_document_count": int(
+                manifest_source.get("unique_ingested_document_count", 0) or 0
             ),
-            "built_at": self.read_rag_manifest().get("built_at"),
+            "duplicate_file_count": int(
+                manifest_source.get("duplicate_file_count", 0) or 0
+            ),
         }
 
     # -------------------------------------------------------------------------

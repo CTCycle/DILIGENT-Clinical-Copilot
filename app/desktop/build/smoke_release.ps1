@@ -5,7 +5,12 @@ param(
     [string]$Version,
     [ValidateSet('Portable', 'Msi', 'All')]
     [string]$DesktopTarget = 'All',
-    [switch]$InstallMsi
+    [switch]$InstallMsi,
+    [switch]$TestUpgrade,
+    [ValidatePattern('^\d+\.\d+\.\d+$')]
+    [string]$UpgradeFromVersion = '3.3.0',
+    [string]$PreviousMsiPath,
+    [string]$PreviousChecksumPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,6 +19,18 @@ $artifactRoot = Join-Path $repoRoot 'release'
 $portablePath = Join-Path $artifactRoot "DILIGENT-v$Version-windows-x64-portable.exe"
 $msiPath = Join-Path $artifactRoot "DILIGENT-v$Version-windows-x64.msi"
 $checksumPath = Join-Path $artifactRoot "DILIGENT-v$Version-windows-x64.sha256"
+$previousMsiPath = if ($PreviousMsiPath) {
+    $PreviousMsiPath
+}
+else {
+    Join-Path $artifactRoot "DILIGENT-v$UpgradeFromVersion-windows-x64.msi"
+}
+$previousChecksumPath = if ($PreviousChecksumPath) {
+    $PreviousChecksumPath
+}
+else {
+    Join-Path $artifactRoot "DILIGENT-v$UpgradeFromVersion-windows-x64.sha256"
+}
 $tempParent = if ($env:RUNNER_TEMP) {
     $env:RUNNER_TEMP
 }
@@ -42,6 +59,24 @@ function Assert-File([string]$path, [long]$minimumBytes) {
     }
 }
 
+function Assert-Checksum([string]$artifactPath, [string]$manifestPath) {
+    Assert-File -path $artifactPath -minimumBytes 1
+    Assert-File -path $manifestPath -minimumBytes 1
+    $artifactName = [IO.Path]::GetFileName($artifactPath)
+    $record = Get-Content -LiteralPath $manifestPath |
+        Where-Object { $_ -match "^(?<hash>[0-9a-fA-F]{64})\s+\*?(?<name>.+?)\s*$" -and $Matches.name.Trim() -eq $artifactName } |
+        Select-Object -First 1
+    if (-not $record) {
+        throw "Checksum manifest does not contain an entry for $artifactName."
+    }
+    $expected = [regex]::Match($record, '^(?<hash>[0-9a-fA-F]{64})').Groups['hash'].Value.ToLowerInvariant()
+    $actual = (Get-FileHash -LiteralPath $artifactPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actual -ne $expected) {
+        throw "Checksum mismatch for ${artifactName}: expected $expected, found $actual."
+    }
+    return $actual
+}
+
 function Assert-PortablePe([string]$path) {
     $stream = [IO.File]::OpenRead($path)
     try {
@@ -63,10 +98,11 @@ function Get-MsiProperty($database, [string]$name) {
     $record = $null
     try {
         $view = $database.OpenView("SELECT `Value` FROM `Property` WHERE `Property`='$name'")
-        $view.Execute()
+        [void]$view.Execute()
         $record = $view.Fetch()
         if ($null -eq $record) { return '' }
-        return [string]$record.StringData(1)
+        $value = [string]$record.StringData(1)
+        return $value
     }
     finally {
         if ($record) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record) }
@@ -116,6 +152,86 @@ function Wait-Http([string]$uri, [int]$timeoutSeconds = 60) {
         Start-Sleep -Milliseconds 500
     }
     throw "Timed out waiting for $uri. Last error: $lastError"
+}
+
+function Wait-HttpStatus([string]$uri, [int]$expectedStatus, [int]$timeoutSeconds = 60) {
+    $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+    $lastStatus = $null
+    $lastError = $null
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $response = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Uri $uri -TimeoutSec 5
+            $lastStatus = [int]$response.StatusCode
+            if ($lastStatus -eq $expectedStatus) { return $response }
+        }
+        catch {
+            $lastError = $_.Exception.Message
+        }
+        Start-Sleep -Milliseconds 500
+    }
+    $observed = if ($null -ne $lastStatus) { "HTTP $lastStatus" } else { $lastError }
+    throw "Timed out waiting for $uri to return HTTP $expectedStatus. Last result: $observed"
+}
+
+function Wait-ReadyPayload(
+    [string]$readyPath,
+    [string]$expectedVersion,
+    [datetime]$previousWriteTimeUtc,
+    [int]$previousPid,
+    [int]$timeoutSeconds = 180
+) {
+    $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path -LiteralPath $readyPath -PathType Leaf) {
+            try {
+                $file = Get-Item -LiteralPath $readyPath
+                $ready = Get-Content -LiteralPath $readyPath -Raw | ConvertFrom-Json
+                $changed = $previousWriteTimeUtc -eq [datetime]::MinValue -or
+                    $file.LastWriteTimeUtc -gt $previousWriteTimeUtc -or
+                    [int]$ready.pid -ne $previousPid
+                if ($changed -and
+                    [string]$ready.release_version -eq $expectedVersion -and
+                    [int]$ready.port -gt 0 -and
+                    [int]$ready.pid -gt 0) {
+                    return [pscustomobject]@{
+                        Ready = $ready
+                        LastWriteTimeUtc = $file.LastWriteTimeUtc
+                    }
+                }
+            }
+            catch {
+                # The backend can replace the JSON atomically while it starts.
+            }
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    throw "Timed out waiting for a fresh ready payload at $readyPath."
+}
+
+function Assert-PackagedApiSurface([string]$baseUri) {
+    $publicPaths = @(
+        '/',
+        '/api/health'
+    )
+    foreach ($path in $publicPaths) {
+        $response = Wait-Http ($baseUri.TrimEnd('/') + $path)
+        if ($response.StatusCode -ne 200) {
+            throw "Packaged API $path returned HTTP $($response.StatusCode), expected 200."
+        }
+    }
+    $desktopProtectedPaths = @(
+        '/api/settings',
+        '/api/model-config',
+        '/api/inspection/sessions',
+        '/api/inspection/rag/documents',
+        '/api/inspection/rag/vector-store'
+    )
+    foreach ($path in $desktopProtectedPaths) {
+        $response = Wait-HttpStatus ($baseUri.TrimEnd('/') + $path) 401
+        if ($response.StatusCode -ne 401) {
+            throw "Packaged API $path returned HTTP $($response.StatusCode), expected the unauthenticated desktop boundary HTTP 401."
+        }
+    }
 }
 
 function Wait-ProcessGone([int]$processId, [int]$timeoutSeconds = 20) {
@@ -169,51 +285,92 @@ function Stop-DesktopProcess([Diagnostics.Process]$process, [int]$backendPid, [i
     }
 }
 
-function Invoke-PortableSmoke([string]$executable, [string]$label) {
-    $isolatedRoot = Join-Path $smokeRoot $label
+function Invoke-PortableSmoke(
+    [string]$executable,
+    [string]$label,
+    [string]$expectedVersion = $Version,
+    [string]$isolatedRoot
+) {
+    if ([string]::IsNullOrWhiteSpace($isolatedRoot)) {
+        $isolatedRoot = Join-Path $smokeRoot $label
+    }
     $readyPath = Join-Path $isolatedRoot 'DILIGENT/data/state/desktop-backend-ready.json'
     $process = $null
+    $launches = [System.Collections.Generic.List[object]]::new()
+    $extractionMarker = $null
+    $secondLaunchReplacedReadyFile = $false
     try {
         New-Item -ItemType Directory -Path $isolatedRoot -Force | Out-Null
-        $process = Start-DesktopProcess -executable $executable -isolatedRoot $isolatedRoot
-        $deadline = (Get-Date).AddSeconds(180)
-        while ((Get-Date) -lt $deadline -and -not (Test-Path -LiteralPath $readyPath)) {
-            $process.Refresh()
-            if ($process.HasExited) {
-                throw "$label desktop process exited before the backend ready file appeared (exit $($process.ExitCode))."
+        for ($launchIndex = 1; $launchIndex -le 2; $launchIndex++) {
+            $previousWriteTimeUtc = [datetime]::MinValue
+            $previousPid = 0
+            if (Test-Path -LiteralPath $readyPath -PathType Leaf) {
+                $previousWriteTimeUtc = (Get-Item -LiteralPath $readyPath).LastWriteTimeUtc
+                try {
+                    $previousPid = [int](Get-Content -LiteralPath $readyPath -Raw | ConvertFrom-Json).pid
+                }
+                catch {
+                    $previousPid = 0
+                }
             }
-            Start-Sleep -Milliseconds 250
+            $process = Start-DesktopProcess -executable $executable -isolatedRoot $isolatedRoot
+            $readyResult = Wait-ReadyPayload `
+                -readyPath $readyPath `
+                -expectedVersion $expectedVersion `
+                -previousWriteTimeUtc $previousWriteTimeUtc `
+                -previousPid $previousPid
+            $ready = $readyResult.Ready
+            $port = [int]$ready.port
+            $backendPid = [int]$ready.pid
+            Wait-Http "http://127.0.0.1:$port/api/health" | Out-Null
+            Assert-PackagedApiSurface -baseUri "http://127.0.0.1:$port"
+            $windowTitle = ''
+            $titleDeadline = (Get-Date).AddSeconds(30)
+            while ((Get-Date) -lt $titleDeadline) {
+                $process.Refresh()
+                $windowTitle = $process.MainWindowTitle
+                if ($windowTitle -eq 'DILIGENT Clinical Copilot') { break }
+                Start-Sleep -Milliseconds 250
+            }
+            if ($windowTitle -ne 'DILIGENT Clinical Copilot') {
+                throw "$label window title was '$windowTitle', expected 'DILIGENT Clinical Copilot'."
+            }
+            if ($launchIndex -eq 1) {
+                $runtimeRoot = Join-Path $isolatedRoot "DILIGENT/runtime/$expectedVersion"
+                $extractionMarker = Get-ChildItem -LiteralPath $runtimeRoot -Filter 'extraction.complete' -File -Recurse -ErrorAction SilentlyContinue |
+                    Select-Object -First 1
+                if ($null -eq $extractionMarker) {
+                    throw "$label runtime extraction marker was not found under $runtimeRoot."
+                }
+            }
+            Stop-DesktopProcess -process $process -backendPid $backendPid -port $port
+            $launches.Add([ordered]@{
+                launch = $launchIndex
+                health = 200
+                ready_release_version = [string]$ready.release_version
+                ready_pid = $backendPid
+                ready_port = $port
+                window_title = $windowTitle
+                backend_stopped = $true
+                port_closed = $true
+            })
+            if ($launchIndex -eq 2) {
+                $secondLaunchReplacedReadyFile = $previousPid -ne $backendPid -or
+                    $readyResult.LastWriteTimeUtc -gt $previousWriteTimeUtc
+            }
+            $process.Dispose()
+            $process = $null
         }
-        if (-not (Test-Path -LiteralPath $readyPath)) {
-            throw "$label desktop backend ready-file timeout."
+        if (-not $secondLaunchReplacedReadyFile) {
+            throw "$label second launch did not replace the stale ready-file payload."
         }
-        $ready = Get-Content -LiteralPath $readyPath -Raw | ConvertFrom-Json
-        $port = [int]$ready.port
-        $backendPid = [int]$ready.pid
-        if ($port -le 0 -or $backendPid -le 0) { throw "$label ready-file payload is invalid." }
-        if ([string]$ready.release_version -ne $Version) {
-            throw "$label ready-file version is $($ready.release_version), expected $Version."
-        }
-        Wait-Http "http://127.0.0.1:$port/api/health" | Out-Null
-        $windowTitle = ''
-        $titleDeadline = (Get-Date).AddSeconds(30)
-        while ((Get-Date) -lt $titleDeadline) {
-            $process.Refresh()
-            $windowTitle = $process.MainWindowTitle
-            if ($windowTitle -eq 'DILIGENT Clinical Copilot') { break }
-            Start-Sleep -Milliseconds 250
-        }
-        if ($windowTitle -ne 'DILIGENT Clinical Copilot') {
-            throw "$label window title was '$windowTitle', expected 'DILIGENT Clinical Copilot'."
-        }
-        Stop-DesktopProcess -process $process -backendPid $backendPid -port $port
         $report[$label] = [ordered]@{
-            health = 200
-            ready_release_version = [string]$ready.release_version
-            window_title = $windowTitle
-            backend_stopped = $true
-            port_closed = $true
+            launches = @($launches)
+            extraction_complete = $true
+            extraction_marker = $extractionMarker.FullName
+            second_launch_replaced_stale_ready_file = $secondLaunchReplacedReadyFile
         }
+        return $isolatedRoot
     }
     finally {
         if ($null -ne $process) {
@@ -311,17 +468,112 @@ function Invoke-MsiSmoke {
     }
 }
 
+function Invoke-MsiUpgradeSmoke {
+    if (-not $TestUpgrade) { return }
+    if (-not $InstallMsi) {
+        throw 'MSI upgrade smoke requires the explicit -InstallMsi switch.'
+    }
+    if ($DesktopTarget -notin @('Msi', 'All')) {
+        throw 'MSI upgrade smoke requires -DesktopTarget Msi or All.'
+    }
+    $previousMsiPath = (Resolve-Path -LiteralPath $previousMsiPath).Path
+    $previousChecksumPath = (Resolve-Path -LiteralPath $previousChecksumPath).Path
+    $previousHash = Assert-Checksum -artifactPath $previousMsiPath -manifestPath $previousChecksumPath
+    $previousMetadata = Get-MsiMetadata -path $previousMsiPath
+    if ($previousMetadata.ProductVersion -ne $UpgradeFromVersion) {
+        throw "Previous MSI ProductVersion $($previousMetadata.ProductVersion) does not match $UpgradeFromVersion."
+    }
+    if ($previousMetadata.UpgradeCode.Trim('{}').ToUpperInvariant() -ne '2CF8EF35-4160-59EB-89D8-01EC7D19A887') {
+        throw "Previous MSI UpgradeCode did not preserve the release identity: $($previousMetadata.UpgradeCode)"
+    }
+    $upgradeRoot = Join-Path $smokeRoot 'msi_upgrade'
+    New-Item -ItemType Directory -Path $upgradeRoot -Force | Out-Null
+    $installedPrevious = $false
+    $uninstallAttempted = $false
+    $installedExecutable = $null
+    $markerPath = Join-Path $upgradeRoot 'DILIGENT/data/state/upgrade-survival-marker.txt'
+    try {
+        $installPrevious = Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', $previousMsiPath, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden
+        if ($installPrevious.ExitCode -notin @(0, 3010)) {
+            throw "Previous MSI install failed with exit code $($installPrevious.ExitCode)."
+        }
+        $previousEntry = Find-InstalledProduct -productCode $previousMetadata.ProductCode -productName $previousMetadata.ProductName
+        if ($null -eq $previousEntry) { throw 'Previous MSI product was not found after installation.' }
+        $previousExecutable = Resolve-InstalledExecutable $previousEntry
+        if (-not $previousExecutable) { throw 'Previous MSI executable was not found.' }
+        $installedPrevious = $true
+        Invoke-PortableSmoke -executable $previousExecutable -label 'msi_upgrade_previous' -expectedVersion $UpgradeFromVersion -isolatedRoot $upgradeRoot | Out-Null
+        New-Item -ItemType Directory -Path (Split-Path -Parent $markerPath) -Force | Out-Null
+        Set-Content -LiteralPath $markerPath -Value 'persistent user-data marker' -Encoding UTF8
+
+        $upgrade = Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', $msiPath, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden
+        if ($upgrade.ExitCode -notin @(0, 3010)) {
+            throw "MSI upgrade to $Version failed with exit code $($upgrade.ExitCode)."
+        }
+        $currentEntry = Find-InstalledProduct -productCode $metadata.ProductCode -productName $metadata.ProductName
+        if ($null -eq $currentEntry) { throw 'Current MSI product was not found after upgrade.' }
+        if ([string]$currentEntry.DisplayVersion -ne $Version) {
+            throw "Current MSI metadata does not report version $Version after upgrade."
+        }
+        $installedExecutable = Resolve-InstalledExecutable $currentEntry
+        if (-not $installedExecutable) { throw 'Upgraded MSI executable was not found.' }
+        Invoke-PortableSmoke -executable $installedExecutable -label 'msi_upgrade_current' -expectedVersion $Version -isolatedRoot $upgradeRoot | Out-Null
+        if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
+            throw 'Persistent user-data marker did not survive the MSI upgrade.'
+        }
+        $uninstall = Start-Process -FilePath 'msiexec.exe' -ArgumentList '/x', $metadata.ProductCode, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden
+        $uninstallAttempted = $true
+        if ($uninstall.ExitCode -notin @(0, 3010)) { throw "MSI upgrade uninstall failed with exit code $($uninstall.ExitCode)." }
+        $remaining = Find-InstalledProduct -productCode $metadata.ProductCode -productName $metadata.ProductName
+        if ($null -ne $remaining -or ($installedExecutable -and (Test-Path -LiteralPath $installedExecutable -PathType Leaf))) {
+            throw 'MSI upgrade uninstall left the product registered or executable on disk.'
+        }
+        if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
+            throw 'Persistent user data was removed by MSI uninstall.'
+        }
+        $report.msi_upgrade = [ordered]@{
+            previous_version = $UpgradeFromVersion
+            previous_msi_sha256 = $previousHash
+            upgraded_version = $Version
+            launched_previous = $true
+            marker_survived_upgrade = $true
+            launched_current = $true
+            uninstalled_current = $true
+            binaries_and_registration_removed = $true
+            user_data_survived_uninstall = $true
+        }
+    }
+    finally {
+        if ($installedPrevious -and -not $uninstallAttempted) {
+            try {
+                Start-Process -FilePath 'msiexec.exe' -ArgumentList '/x', $metadata.ProductCode, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden | Out-Null
+            }
+            catch {
+            }
+            try {
+                Start-Process -FilePath 'msiexec.exe' -ArgumentList '/x', $previousMetadata.ProductCode, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden | Out-Null
+            }
+            catch {
+            }
+        }
+    }
+}
+
 try {
     New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
     if ($DesktopTarget -in @('Portable', 'All')) {
         Assert-File -path $portablePath -minimumBytes 1MB
         Assert-PortablePe -path $portablePath
+        $portableHash = Assert-Checksum -artifactPath $portablePath -manifestPath $checksumPath
         Invoke-PortableSmoke -executable $portablePath -label 'portable_launch'
+        $report.portable_sha256 = $portableHash
     }
     if ($DesktopTarget -in @('Msi', 'All')) {
         Assert-File -path $msiPath -minimumBytes 1KB
-        Assert-File -path $checksumPath -minimumBytes 1
+        $msiHash = Assert-Checksum -artifactPath $msiPath -manifestPath $checksumPath
         Invoke-MsiSmoke
+        Invoke-MsiUpgradeSmoke
+        $report.msi_sha256 = $msiHash
     }
     $report.success = $true
 }

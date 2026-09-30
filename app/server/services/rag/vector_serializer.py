@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -55,20 +56,37 @@ class VectorSerializer:
         self.vector_database.initialize()
         self.vector_database.get_table()
         available_paths = self.document_serializer.collect_document_paths()
+        deduplication_index = self.document_serializer.build_content_deduplication_index(
+            available_paths
+        )
+        canonical_paths = self.document_serializer.canonical_document_paths(
+            available_paths,
+            deduplication_index=deduplication_index,
+        )
         total_supported_files = len(available_paths)
+        unique_supported_files = len(canonical_paths)
+        duplicate_file_count = total_supported_files - unique_supported_files
+        source_manifest_hash = self._source_manifest_hash(deduplication_index)
         diagnostic_paths = [path for path in available_paths[:5]]
         self.report_progress(
             18.0,
             f"Loading text from {total_supported_files} supported files",
         )
-        documents = self.document_serializer.load_documents()
+        documents = self.document_serializer.load_documents(
+            deduplication_index=deduplication_index
+        )
         if not documents:
             logger.warning("No documents available for embedding serialization")
             return {
                 "documents": 0,
                 "chunks": 0,
                 "supported_files": total_supported_files,
+                "physical_supported_files": total_supported_files,
+                "unique_supported_files": unique_supported_files,
+                "unique_ingested_documents": 0,
+                "duplicate_file_count": duplicate_file_count,
                 "loaded_documents": 0,
+                "source_manifest_hash": source_manifest_hash,
                 "sample_supported_paths": diagnostic_paths,
             }
         self.report_progress(
@@ -82,7 +100,12 @@ class VectorSerializer:
                 "documents": 0,
                 "chunks": 0,
                 "supported_files": total_supported_files,
+                "physical_supported_files": total_supported_files,
+                "unique_supported_files": unique_supported_files,
+                "unique_ingested_documents": 0,
+                "duplicate_file_count": duplicate_file_count,
                 "loaded_documents": len(documents),
+                "source_manifest_hash": source_manifest_hash,
                 "sample_supported_paths": diagnostic_paths,
             }
         self.report_progress(
@@ -127,9 +150,36 @@ class VectorSerializer:
             "documents": len(document_ids),
             "chunks": total_records,
             "supported_files": total_supported_files,
+            "physical_supported_files": total_supported_files,
+            "unique_supported_files": unique_supported_files,
+            "unique_ingested_documents": len(document_ids),
+            "duplicate_file_count": duplicate_file_count,
             "loaded_documents": len(documents),
+            "source_manifest_hash": source_manifest_hash,
             "sample_supported_paths": diagnostic_paths,
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _source_manifest_hash(
+        deduplication_index: dict[str, dict[str, Any]],
+    ) -> str:
+        entries = [
+            {
+                "path": str(metadata.get("source_relative_path") or ""),
+                "content_fingerprint": str(
+                    metadata.get("content_fingerprint") or ""
+                ),
+            }
+            for metadata in deduplication_index.values()
+        ]
+        payload = json.dumps(
+            sorted(entries, key=lambda item: item["path"].casefold()),
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
 
     # -------------------------------------------------------------------------
     def report_progress(self, progress: float, message: str) -> None:
@@ -265,7 +315,7 @@ class VectorSerializer:
         for key, value in metadata.items():
             if key == "chunk_index":
                 continue
-            if isinstance(value, (str, int, float, bool)) or value is None:
+            if isinstance(value, (str, int, float, bool, list, dict)) or value is None:
                 serialized[key] = value
             else:
                 serialized[key] = str(value)

@@ -58,6 +58,9 @@ def build_embedding_index_manifest(
     libraries: dict[str, str],
     chunk_size: int | None = None,
     chunk_overlap: int | None = None,
+    physical_supported_file_count: int = 0,
+    unique_ingested_document_count: int | None = None,
+    duplicate_file_count: int = 0,
     config: CanonicalEmbeddingConfig = CANONICAL_EMBEDDING_CONFIG,
 ) -> EmbeddingIndexManifest:
     effective_chunk_size = (
@@ -108,6 +111,13 @@ def build_embedding_index_manifest(
             "document_count": document_count,
             "chunk_count": chunk_count,
             "source_manifest_hash": source_manifest_hash,
+            "physical_supported_file_count": physical_supported_file_count,
+            "unique_ingested_document_count": (
+                document_count
+                if unique_ingested_document_count is None
+                else unique_ingested_document_count
+            ),
+            "duplicate_file_count": duplicate_file_count,
         },
         built_at=datetime.now(UTC).isoformat(),
     )

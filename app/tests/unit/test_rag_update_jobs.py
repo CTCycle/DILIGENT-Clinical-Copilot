@@ -120,7 +120,12 @@ def test_rag_update_writes_manifest_only_after_chunks_exist(
         "documents": 1,
         "chunks": 2,
         "supported_files": 1,
+        "physical_supported_files": 2,
+        "unique_supported_files": 1,
+        "unique_ingested_documents": 1,
+        "duplicate_file_count": 1,
         "loaded_documents": 1,
+        "source_manifest_hash": "duplicate-fixture-hash",
         "sample_supported_paths": ["C:/rag/guide.txt"],
     }
     monkeypatch.setattr(
@@ -135,6 +140,10 @@ def test_rag_update_writes_manifest_only_after_chunks_exist(
     assert len(manifest_calls) == 1
     manifest_summary, manifest_path = manifest_calls[0]
     assert manifest_summary["chunks"] == 2
+    assert manifest_summary["physical_supported_files"] == 2
+    assert manifest_summary["unique_ingested_documents"] == 1
+    assert manifest_summary["duplicate_file_count"] == 1
+    assert manifest_summary["source_manifest_hash"] == "duplicate-fixture-hash"
     assert "backend" not in manifest_summary
     assert manifest_path == str(tmp_path)
 

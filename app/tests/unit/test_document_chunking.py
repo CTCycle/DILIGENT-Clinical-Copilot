@@ -104,7 +104,9 @@ def test_document_serializer_ignores_empty_and_malformed_supported_files(
     assert serializer.load_documents() == []
 
 ###############################################################################
-def test_duplicate_content_keeps_distinct_relative_document_ids(tmp_path: Path) -> None:
+def test_duplicate_content_is_deduplicated_with_stable_canonical_provenance(
+    tmp_path: Path,
+) -> None:
     first_path = tmp_path / "first" / "guide.txt"
     second_path = tmp_path / "second" / "guide.txt"
     first_path.parent.mkdir()
@@ -113,10 +115,81 @@ def test_duplicate_content_keeps_distinct_relative_document_ids(tmp_path: Path) 
     second_path.write_text("Identical source content.", encoding="utf-8")
     serializer = DocumentSerializer(tmp_path)
     collected_paths = serializer.collect_document_paths()
+    reversed_index = serializer.build_content_deduplication_index(
+        list(reversed(collected_paths))
+    )
 
     assert len(collected_paths) == 2
     assert {Path(path).name for path in collected_paths} == {"guide.txt"}
-    assert len({serializer.compute_document_id(path) for path in collected_paths}) == 2
+    assert serializer.canonical_document_paths(
+        list(reversed(collected_paths)), deduplication_index=reversed_index
+    ) == [str(first_path)]
+    assert len(serializer.load_documents(deduplication_index=reversed_index)) == 1
+    metadata = serializer.load_documents(deduplication_index=reversed_index)[0].metadata
+    assert metadata["source_relative_path"] == "first/guide.txt"
+    assert metadata["is_canonical_source"] is True
+    assert metadata["is_duplicate"] is False
+    assert metadata["duplicate_source_paths"] == [
+        "first/guide.txt",
+        "second/guide.txt",
+    ]
+    assert metadata["duplicate_alias_paths"] == ["second/guide.txt"]
+    assert metadata["content_fingerprint"] == serializer.compute_content_fingerprint(
+        first_path
+    )
+
+
+def test_same_filename_with_different_bytes_remains_two_documents(
+    tmp_path: Path,
+) -> None:
+    first_path = tmp_path / "first" / "guide.txt"
+    second_path = tmp_path / "second" / "guide.txt"
+    first_path.parent.mkdir()
+    second_path.parent.mkdir()
+    first_path.write_bytes(b"same filename, first bytes")
+    second_path.write_bytes(b"same filename, second bytes")
+
+    documents = DocumentSerializer(tmp_path).load_documents()
+
+    assert len(documents) == 2
+    assert {document.metadata["source_relative_path"] for document in documents} == {
+        "first/guide.txt",
+        "second/guide.txt",
+    }
+
+
+def test_different_filenames_with_identical_bytes_are_deduplicated(
+    tmp_path: Path,
+) -> None:
+    first_path = tmp_path / "alpha.txt"
+    second_path = tmp_path / "beta.txt"
+    first_path.write_bytes(b"byte-identical source")
+    second_path.write_bytes(b"byte-identical source")
+
+    documents = DocumentSerializer(tmp_path).load_documents()
+
+    assert len(documents) == 1
+    assert documents[0].metadata["source_relative_path"] == "alpha.txt"
+    assert documents[0].metadata["duplicate_source_paths"] == [
+        "alpha.txt",
+        "beta.txt",
+    ]
+
+
+def test_modified_content_stops_being_considered_a_duplicate(tmp_path: Path) -> None:
+    first_path = tmp_path / "first.txt"
+    second_path = tmp_path / "second.txt"
+    first_path.write_bytes(b"same source")
+    second_path.write_bytes(b"same source")
+    serializer = DocumentSerializer(tmp_path)
+
+    assert len(serializer.load_documents()) == 1
+    second_path.write_bytes(b"modified source")
+
+    documents = serializer.load_documents()
+
+    assert len(documents) == 2
+    assert all(document.metadata["is_duplicate"] is False for document in documents)
 
 ###############################################################################
 def test_structure_aware_chunking_preserves_heading_metadata() -> None:

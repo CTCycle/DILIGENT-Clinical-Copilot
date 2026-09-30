@@ -335,6 +335,8 @@ def test_rag_document_listing_exposes_unsupported_files_as_not_ingestible(
     supported_path = tmp_path / "nested" / "study.txt"
     supported_path.parent.mkdir()
     supported_path.write_text("TITLE\n\nBody text.", encoding="utf-8")
+    duplicate_path = tmp_path / "nested" / "z-copy.txt"
+    duplicate_path.write_bytes(supported_path.read_bytes())
     unsupported_path = tmp_path / "nested" / "legacy.doc"
     unsupported_path.write_bytes(b"legacy binary Word document")
 
@@ -379,8 +381,15 @@ def test_rag_document_listing_exposes_unsupported_files_as_not_ingestible(
     payload = service.list_rag_documents(search=None, offset=0, limit=10)
 
     rows = {item["file_name"]: item for item in payload["items"]}
-    assert payload["total"] == 2
+    assert payload["total"] == 3
     assert rows["study.txt"]["supported_for_ingestion"] is True
+    assert rows["study.txt"]["is_canonical_source"] is True
+    assert rows["z-copy.txt"]["is_duplicate"] is True
+    assert rows["z-copy.txt"]["duplicate_of"] == "nested/study.txt"
+    assert rows["study.txt"]["duplicate_source_paths"] == [
+        "nested/study.txt",
+        "nested/z-copy.txt",
+    ]
     assert rows["legacy.doc"]["supported_for_ingestion"] is False
 
 ###############################################################################
