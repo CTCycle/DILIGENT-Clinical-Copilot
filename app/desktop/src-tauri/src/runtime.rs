@@ -14,6 +14,12 @@ use zip::ZipArchive;
 const EMBEDDED_ARCHIVE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/diligent-runtime.zip"));
 const EMBEDDED_DIGEST: &str = include_str!(concat!(env!("OUT_DIR"), "/diligent-runtime.sha256"));
 
+// Keep native-extension paths short. Windows DLL resolution still has a
+// MAX_PATH-sensitive boundary even when the rest of the application uses
+// longer paths successfully.
+const RUNTIME_CACHE_DIR_NAME: &str = "rt";
+const BACKEND_DIR_NAME: &str = "b";
+
 #[derive(Debug, Clone)]
 pub struct RuntimePaths {
     pub root: PathBuf,
@@ -119,7 +125,11 @@ fn validate_manifest_entries(
             .checked_add(file.size)
             .ok_or_else(|| "runtime manifest size overflow".to_string())?;
     }
-    if !root.join("backend").join("DILIGENTBackend.exe").is_file() {
+    if !root
+        .join(BACKEND_DIR_NAME)
+        .join("DILIGENTBackend.exe")
+        .is_file()
+    {
         return Err("packaged backend executable is missing".into());
     }
     Ok((manifest.files.len(), total_size))
@@ -181,7 +191,7 @@ pub fn prepare_runtime(version: &str) -> Result<RuntimePaths, String> {
         return Err("embedded runtime digest mismatch".into());
     }
     let app_root = local_app_root()?.join("DILIGENT");
-    let runtime_base = app_root.join("runtime");
+    let runtime_base = app_root.join(RUNTIME_CACHE_DIR_NAME);
     let runtime_parent = runtime_base.join(version);
     let runtime_root = runtime_parent.join(&actual_digest);
     fs::create_dir_all(&runtime_base).map_err(|error| error.to_string())?;
@@ -249,10 +259,11 @@ pub fn prepare_runtime(version: &str) -> Result<RuntimePaths, String> {
     }
     let data_root = app_root.join("data");
     fs::create_dir_all(data_root.join("settings")).map_err(|error| error.to_string())?;
-    fs::create_dir_all(data_root.join("cache").join("logs"))
-        .map_err(|error| error.to_string())?;
+    fs::create_dir_all(data_root.join("cache").join("logs")).map_err(|error| error.to_string())?;
     Ok(RuntimePaths {
-        backend: runtime_root.join("backend").join("DILIGENTBackend.exe"),
+        backend: runtime_root
+            .join(BACKEND_DIR_NAME)
+            .join("DILIGENTBackend.exe"),
         root: runtime_root,
         data_root,
     })
@@ -262,7 +273,7 @@ pub fn prune_runtime_cache(version: &str) {
     let Ok(app_root) = local_app_root().map(|path| path.join("DILIGENT")) else {
         return;
     };
-    let runtime_base = app_root.join("runtime");
+    let runtime_base = app_root.join(RUNTIME_CACHE_DIR_NAME);
     let Ok(entries) = fs::read_dir(&runtime_base) else {
         return;
     };
