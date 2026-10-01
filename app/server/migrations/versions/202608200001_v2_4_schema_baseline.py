@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 """v2.4 schema baseline
 
 Revision ID: 202608200001

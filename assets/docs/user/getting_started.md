@@ -1,5 +1,5 @@
 # Getting Started
-Last updated: 2026-09-18
+Last updated: 2026-10-01
 
 ## Purpose
 DILIGENT is a local clinical copilot interface for Drug-Induced Liver Injury review workflows. It helps users enter clinical context, configure model providers, inspect local data, run DILI-oriented analysis, and review saved sessions.
@@ -49,12 +49,12 @@ Main navigation sections:
 - **DILI Agent**
 - **Clinical Sessions**, including the contextual **Timeline** tab
 - **Data Inspection**
-- **Configurations**
+- **Settings**
 
 Typical journey:
 1. Start the application.
 2. Confirm backend health.
-3. Open **Configurations**, choose the provider, and assign the model roles.
+3. Open **Settings → Models**, choose the provider, and assign the model roles.
 4. Add and activate any required access key.
 5. Open the DILI Agent.
 6. Enter patient and clinical context.
@@ -66,7 +66,7 @@ Typical journey:
 ## Optional Help And Tips
 The **Help** action in the existing header opens **Tips & Tricks**. It is a short, optional reference for model roles, RAG behavior, Clinical Session sections, and timeline review. Use **Show me** to restart the four-step DILI assessment walkthrough at any time. The walkthrough can be closed with its X button.
 
-The first time the DILI Agent is opened with an empty assessment, a small **Get started with DILI Agent** callout may appear in the report area. **Show me** opens the walkthrough, **Open Configurations** takes you to model setup, and the close button dismisses the callout. The callout will not return after it has been seen or dismissed in the same browser unless its content version changes.
+The first time the DILI Agent is opened with an empty assessment, a small **Get started with DILI Agent** callout may appear in the report area. **Show me** opens the walkthrough, **Open Settings** takes you to model setup, and the close button dismisses the callout. The callout will not return after it has been seen or dismissed in the same browser unless its content version changes.
 
 Help state is stored in browser-local storage. It does not contain clinical input, reports, provider keys, or session data. Popovers and walkthroughs can be opened with the keyboard, closed with Escape, and follow the active light or dark theme.
 

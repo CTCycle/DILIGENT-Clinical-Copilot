@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';

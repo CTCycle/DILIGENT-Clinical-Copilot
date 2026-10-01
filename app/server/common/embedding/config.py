@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 """Immutable semantic contract for DILIGENT's local RAG embeddings.
 
 Operational concerns such as device and cache location are deliberately kept

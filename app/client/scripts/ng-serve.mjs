@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';

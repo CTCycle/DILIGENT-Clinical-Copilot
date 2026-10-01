@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { describe, expect, it, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';

@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { createServer, request } from 'node:http';
 import path from 'node:path';

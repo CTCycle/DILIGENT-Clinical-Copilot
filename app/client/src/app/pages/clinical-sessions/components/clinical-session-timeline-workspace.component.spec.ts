@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
