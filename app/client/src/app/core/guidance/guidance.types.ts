@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 export type GuidanceStatus = 'seen' | 'dismissed' | 'skipped' | 'completed' | 'restarted';
 
 export type GuidanceId =

@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 """Lazy, strict ONNX Runtime for the canonical RAG embedding model."""
 
 from __future__ import annotations

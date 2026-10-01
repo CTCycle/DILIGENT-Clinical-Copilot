@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 """Hosted live-provider E2E coverage for the release gate.
 
 The test is opt-in because it sends synthetic clinical text to the configured

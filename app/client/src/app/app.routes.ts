@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { Routes } from '@angular/router';
 
 import { DiliAgentPageComponent } from './pages/dili-agent/dili-agent-page.component';

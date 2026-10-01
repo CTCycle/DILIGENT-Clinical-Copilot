@@ -68,68 +68,22 @@ release/DILIGENT-v3.4.0-windows-x64.sha256
 
 The portable executable is a single distribution file for no-install use. The MSI installs the same Tauri shell and packaged runtime. The `.sha256` file contains one SHA-256 entry per built artifact and must be checked before distribution. Publication requires separate tag, remote-release, and download/hash evidence.
 
-### Local 2026-09-30 validation-closure result
+### Desktop validation history
 
-The local pinned-toolchain build produced the 3.4.0 candidate. The portable
-EXE passed checksum, PE/AMD64 validation, first launch, runtime extraction,
-fresh `desktop-backend-ready.json`, `release_version=3.4.0`, `/api/health`,
-root and representative packaged API probes, the actual process window title,
-clean close, backend termination, port closure, and a second launch from the
-same data root that replaced the stale-ready-file state.
-
-| Artifact | SHA-256 |
-|---|---|
-| `DILIGENT-v3.4.0-windows-x64-portable.exe` | `29BC8E69CBBB0E8DC8446103C2D8526BF02130B724D9916C2DAE68901F2BA61A` |
-| `DILIGENT-v3.4.0-windows-x64.msi` | `B8AA3E9734ECDE0FD2DD80573C463CEFD7674E6B9E0CEACDA395C19EAEC1A263` |
-
-The MSI checksum, ProductName, ProductVersion, Manufacturer, and UpgradeCode
-metadata passed. Actual MSI install, 3.3.0-to-3.4.0 upgrade, launch, and
-uninstall are **blocked on this host** because the package is `ALLUSERS=1` and
-the validation session is not an administrator. The controlled Windows
-Installer attempts were stopped after remaining idle; no partial registration,
-packaged process, or packaged port remained. Run the MSI procedure on an
-administrator host before publication. This host limitation is not evidence of
-an MSI product failure.
-
-### Current desktop revalidation follow-up — 2026-09-30
-
-The pre-existing portable artifact was re-run from the current checkout with
-`smoke_release.ps1 -Version 3.4.0 -DesktopTarget Portable`. It reached the
-packaged ready-file, health, representative API, and native-process checks but
-failed the required title assertion: the observed title was
-`io.github.ctcycle.diligent-siw`, not `DILIGENT Clinical Copilot`. The observed
-portable SHA-256 was
-`29bc8e69cbbb0e8dc8446103c2d8526bf02130b724d9916c2dae68901f2ba61a`.
-
-The exact-toolchain rebuild was blocked by the host's protected canonical uv
-cache and protected project-environment files; no replacement artifact was
-produced. Treat the earlier portable PASS as superseded. The fresh-candidate
-continuation below is the current desktop status.
-
-### Fresh candidate rebuild and portable continuation — 2026-09-30
-
-The stale artifacts were retained under
-[`assets/QA/desktop-release-validation-20260930/prebuild-stale-artifacts/`](../../QA/desktop-release-validation-20260930/prebuild-stale-artifacts/)
-and a clean pinned-toolchain build was completed at candidate commit
-`ce5df0c65fb432a42b2be622789e11f5c5283a43`. The fresh portable SHA-256 is
-`27edd72ea371a4f9794e649108d379e4d4049d4e0aa4b838f374b66eea32924c`; the fresh
-MSI SHA-256 is
-`ac2c4cbe924d402900b37c39c12fc1b5f72615dd648e9e7a57bdcc859306466f`.
-
-The required portable smoke passed twice with the branded native title
-`DILIGENT Clinical Copilot`, HTTP health, authenticated-local API boundary,
-clean backend/port shutdown, and stale-ready-file replacement. Additional
-packaged-process checks passed warm restart, forced termination recovery,
-concurrent launch handling, space paths, non-ASCII paths, and a short second
-location. The original deep-path candidate produced a ready payload and window
-but its backend did not answer loopback HTTP; the traceback identified a
-Windows filename-length failure while importing the ONNX Runtime extension.
-The [deep-path remediation evidence](../../QA/desktop-release-validation-20260930/deep-path-remediation.md)
+The local 2026-09-30 validation-closure build produced the first 3.4.0
+candidate; that portable PASS was later superseded when a re-run of the
+pre-existing artifact failed the required native window-title assertion
+(observed title `io.github.ctcycle.diligent-siw`). The stale artifacts were
+retained under `assets/QA/desktop-release-validation-20260930/prebuild-stale-artifacts/`
+(local-only, not tracked) and a clean pinned-toolchain rebuild completed at
+candidate commit `ce5df0c65fb432a42b2be622789e11f5c5283a43` with the branded
+title `DILIGENT Clinical Copilot`. The deep-path candidate produced a ready
+payload and window but its backend did not answer loopback HTTP; the
+traceback identified a Windows filename-length failure while importing the
+ONNX Runtime extension. The [deep-path remediation evidence](../../QA/desktop-release-validation-20260930/deep-path-remediation.md)
 records the compact-layout correction, a clean rebuild at repair commit
 `2fadf0f22410665a814efc24b316cf68753e1cd6`, and two successful exact-boundary
-launches at the formerly failing path lengths. Computer Use reported no native
-app/window surface, so the full packaged UI workflow and failure suite remains
-BLOCKED.
+launches at the formerly failing path lengths.
 
 The published remote `v3.3.0` MSI and checksum were downloaded and verified,
 and the workflow/static upgrade contracts passed. MSI installation, upgrade,
@@ -138,8 +92,10 @@ remain **BLOCKED** by the non-administrator token. Fresh local EXE and MSI
 signatures are `NotSigned`, so Distribution is **BLOCKED** and the candidate
 is not distribution-ready.
 
-Evidence: [desktop-release-validation-20260930](../../QA/desktop-release-validation-20260930/report.md),
-including the [D01–D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md).
+Evidence: the `desktop-release-validation-20260930/report.md` is local-only
+(not tracked); the tracked [D01–D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md)
+and [packaged-suite-boundary](../../QA/desktop-release-validation-20260930/packaged-suite-boundary.md)
+are in git.
 
 ### Packaged-UI interactive validation — 2026-10-01
 
@@ -203,11 +159,12 @@ it is not a byte-for-byte or behaviorally equivalent v3.3.0 build. The local
 used the live release metadata, tag ancestry, and the committed Tauri staging
 manifest rather than claiming a local packaged-binary launch test.
 
-The synthetic live-flow evidence is recorded in
-[`assets/QA/e2e-validation-20260908.md`](../../QA/e2e-validation-20260908.md).
-That historical evidence does not certify the current development source.
-Portable-EXE and MSI host smoke tests must still be repeated against the final
-tagged commit for each release.
+The synthetic live-flow evidence and the complete end-to-end record for that
+historical release audit are consolidated in the [validation
+ledger](validation_ledger.md) and the [project status
+ledger](../project_status_ledger.md). That historical evidence does not certify
+the current development source. Portable-EXE and MSI host smoke tests must
+still be repeated against the final tagged commit for each release.
 
 ## Runtime and data layout
 
@@ -260,7 +217,7 @@ Run on a Windows x64 host with Rust 1.95.0/Cargo, the Windows build toolchain, t
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Release builds require a clean worktree by default; use `-AllowDirtyTree` only when the dirty state is intentional and recorded. `-OfflineWebView2` is valid only with `-DesktopTarget Msi` or `All` and changes the MSI WebView2 installation mode.
 
-Final desktop artifacts are written directly to `release/`. Intermediate desktop staging remains under `assets/QA/desktop-release-staging/`, with validation output under `assets/QA/release-audit-20260826/`; the release-only native Cargo output is kept under `runtimes/cache/cargo/target/x86_64-pc-windows-msvc/release/`.
+Final desktop artifacts are written directly to `release/`. Intermediate desktop staging remains under `assets/QA/desktop-release-staging/` and historical validation output under `assets/QA/release-audit-20260826/` (both local-only; `assets/QA/**` is git-ignored except for the tracked evidence reports); the release-only native Cargo output is kept under `runtimes/cache/cargo/target/x86_64-pc-windows-msvc/release/`.
 
 ### Interactive artifact menu
 

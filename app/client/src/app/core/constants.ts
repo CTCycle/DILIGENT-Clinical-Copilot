@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { ClinicalFormState } from "./models/types";
 
 export const API_BASE_URL = "/api";

@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod backend;

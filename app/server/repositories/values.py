@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 """Pure value normalization helpers shared by focused repositories."""
 
 from __future__ import annotations

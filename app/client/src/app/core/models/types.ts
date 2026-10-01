@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 export type CloudProvider = string;
 
 export type ReasoningLevel = "off" | "low" | "medium" | "high";

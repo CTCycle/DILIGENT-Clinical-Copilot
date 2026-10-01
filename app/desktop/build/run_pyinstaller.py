@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 """Run PyInstaller with a hosted-Windows pywin32-ctypes compatibility shim."""
 
 from __future__ import annotations

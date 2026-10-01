@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 """Remove the obsolete application configuration schema marker.
 
 Revision ID: 202608200002

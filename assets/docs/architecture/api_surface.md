@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-09-26
+Last updated: 2026-10-01
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -145,7 +145,7 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
 - `POST /api/inspection/sessions/{session_id}/timeline-jobs` accepts
   `force_regenerate` and returns a job for polling. The job resolves the
   persisted `timeline_model` role at start; provider/model controls are managed
-  from Model Configurations. Timeline previews include source-evidence,
+  from Settings → Models. Timeline previews include source-evidence,
   missing-evidence, uncertain, and undated counts.
 - Timeline deletion is scoped by both session and timeline identifiers and returns 404
   when that exact persisted timeline does not exist.

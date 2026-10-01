@@ -1,4 +1,6 @@
 @echo off
+REM Copyright © 2023–2025 Thomas Virdis
+REM Licensed under the GNU General Public License, version 3 or later.
 setlocal EnableDelayedExpansion
 
 set "SCRIPT_DIR=%~dp0"

@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-09-23
+Last updated: 2026-10-01
 
 ## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -58,7 +58,7 @@ Recommended workflow:
 8. Use the timeline to refine DILI Agent input if needed.
 
 In the **Timeline** tab, the generation action uses the model assigned to the
-Timeline role in **Configurations**. Use **Manage model roles** when that
+Timeline role in **Settings → Models**. Use **Manage model roles** when that
 assignment needs to change. Saved timelines appear as compact rows that record
 the run's provider, model, date range, event count, and evidence-quality
 warnings. Use **Open** to reopen a specific saved timeline or **Delete** to

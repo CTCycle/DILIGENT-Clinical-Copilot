@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 """Live HTTP checks for the current session and revision API boundary."""
 
 from __future__ import annotations

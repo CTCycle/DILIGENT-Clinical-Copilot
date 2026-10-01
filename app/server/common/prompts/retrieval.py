@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 from __future__ import annotations
 
 DILI_RAG_QUERY_TEMPLATE = """{drug_name} drug induced liver injury (DILI) {pattern_classification} pattern. Observed pattern: {r_score_summary}. Focus on latency, observed-versus-known pattern match, severity, risk factors, case reports, rechallenge outcomes, likelihood grading, management, contradictions, and association strength. Clinical context: {clinical_context}"""

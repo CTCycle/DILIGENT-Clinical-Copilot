@@ -1,11 +1,11 @@
 # Model Setup
-Last updated: 2026-09-07
+Last updated: 2026-10-01
 
 Sampling settings are selected automatically according to the provider, model
 family, and operation. They are not user-configurable.
 
 ## Configure Models
-Open **Configurations** from the sidebar.
+Open **Settings** from the sidebar and choose the **Models** page.
 
 This page controls how the application calls a model during analysis. Expect controls for:
 - local provider configuration
@@ -38,14 +38,14 @@ Expected behavior:
 - Cloud and Ollama catalogs are saved in the application database. Opening the page reuses the saved catalog and does not contact a provider again. Use **Refresh** when you explicitly want a new provider listing. If a refresh fails, the last valid catalog remains visible; an empty Ollama installation is saved as an empty catalog. Catalog state is scoped by provider endpoint and active credential fingerprint, so changing credentials or endpoints starts a new cache scope without exposing secrets.
 
 Recommended workflow:
-1. Open **Configurations**.
+1. Open **Settings → Models**.
 2. Choose the provider.
 3. Open the access-key dialog or management control.
 4. Paste the provider key.
 5. Save it. New keys remain inactive, so a rejected key cannot replace the current active key.
 6. Explicitly activate the key that should be used.
 7. Confirm the active-key indicator is shown.
-8. Return to **Configurations** and use **Refresh** for the selected provider when its catalog needs updating.
+8. Return to **Settings → Models** and use **Refresh** for the selected provider when its catalog needs updating.
 
 Do not paste keys into screenshots, chat messages, issue reports, or shared logs.
 
@@ -60,4 +60,9 @@ to another model or provider.
 - Revision and Timeline workflows show the configured role model and link back to
   this page; they do not contain per-run provider/model selectors.
 - If you switch from cloud to local mode, cloud-only role selections are cleared automatically.
-- When installed, `qwen3.5:2b` is the preferred fast local extractor and `qwen3.5:9b` is the recommended stronger backup option for bounded extraction tests.
+- When installed, `qwen3.5:2b` is a fast local extractor and `qwen3.5:9b` is the
+  stronger local backup option for bounded extraction tests. Note that the
+  validated timeline boundary is model-specific: exact `qwen3.5:2b` does not
+  produce grounded structured timeline output and fail-closes to a
+deterministic fallback, while exact `qwen3.5:9b` does. See the [validation
+ledger](../runtime/validation_ledger.md) for the supported local boundary.
