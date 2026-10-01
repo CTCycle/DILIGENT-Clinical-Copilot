@@ -1630,3 +1630,41 @@ deferred, and non-blocking. Containerized runtime remains
 `NOT_IMPLEMENTED` and out of scope. Tagging, GitHub Release publication,
 signing, offline WebView2 packaging, and clean-machine certification remain
 separate publication/distribution procedures.
+
+## Packaged interactive-UI validation — 2026-10-01
+
+This slice revisited the previously `BLOCKED` packaged desktop
+interactive-UI gate (D06–D11) using the available native Windows UI-automation
+driver against the exact v3.4.0 portable candidate. Baseline: `develop` HEAD
+`738a14bdfab9627cc9e38461f374d10cacd32edc` (equal to `origin/develop`), a
+docs-only successor to candidate `2f804d251769f4e01375d02459e41dd9970ec8eb`.
+Artifact SHAs matched the release manifest
+(`0209cf25…` portable, `1df49329…` MSI). The EXE ran with an isolated short
+data root under the temp area; a first attempt under the deep repository path
+reproduced the documented Windows DLL-load filename-length failure, so the
+`smoke_release.ps1`-style short root was used. Shared data, settings,
+credentials, and caches were not touched.
+
+| Check | Result |
+|---|---|
+| Packaged launch + extraction | Runtime extracted to the hash-addressed `rt/3.4.0` payload (1109 files + marker); ready payload `{"pid":19280,"port":65516,"release_version":"3.4.0"}`; health 200. |
+| Packaged API boundary | `/api/health` 200, `/` 200, unauthenticated `/api/settings` 401. |
+| Workspaces render (D06) | DILI Agent, Clinical Sessions (fresh empty state), Data Inspection (Drug Catalog/LiverTox/DILIrank/RAG tabs), Settings → General and Settings → Models all rendered in the packaged window. |
+| Settings persistence (D06) | General polling interval `1 → 2` saved (DB `2.0`, `updated_at` advanced), reload retained `2`, Reset returned to `1` (DB `1.0`). |
+| Clean close + restart persistence (D03) | Alt+F4 closed the packaged app with no leftover process/listener; relaunch health 200, DB `polling_interval=1.0` retained, UI reopened and showed `1`. |
+| Packaged preflight (D07 boundary) | With synthetic text, Run DILI analysis opened `Cannot start analysis` with 5 blocking + 1 warning; read-only DB showed zero clinical sessions after the attempt. |
+| Models surface | Runtime source, catalog with install/assigned status, cloud provider keys, current config (Local/Ollama, qwen3.5:2b roles, Granite embedding RAG) rendered. |
+
+| Gate | Status after this run | Remaining boundary |
+|---|---|---|
+| `release.desktop.v3-4-0` packaged portable interactive UI | `PARTIAL` (was `BLOCKED`) | Workspaces, Settings persistence, preflight, API boundary, and clean restart are packaged-validated. A full populated multi-drug analysis, session/timeline/revision flows, native RAG folder dialog, and failure/cancellation suites remain unexercised because a fresh packaged root has no structured sources and cloning the credential-bearing shared database was intentionally avoided. |
+| `release.desktop.v3-4-0` MSI lifecycle (D13/D14) | `BLOCKED` | Non-administrator token; no elevation attempted. |
+| Signing / clean-machine distribution | `PENDING` | Separate distribution procedures. |
+
+Detailed evidence: [packaged interactive-UI validation](../../QA/desktop-interactive-ui-validation-20261001/report.md),
+updated [D01–D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md),
+and [host checklist](../../QA/desktop-release-validation-20261001/host-checklist.md).
+
+The disposable data root and temporary captures were under the temp area and
+were removed after the read-only checks; task-owned processes were stopped,
+ports were free, and the user-started Ollama service remained running.
