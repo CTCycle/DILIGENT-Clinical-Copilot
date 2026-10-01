@@ -15,8 +15,9 @@ the same SHA. Fresh local artifacts are present under release/:
 The portable smoke and exact 230-character executable / 107-character
 LOCALAPPDATA deep-path replay passed twice. Exact-SHA CI run 36786345174 is
 green for backend quality, PostgreSQL persistence, Windows regression, and
-security. The live-provider job was skipped on push and its exact-SHA dispatch
-is pending because the available GitHub CLI credential returned HTTP 401.
+security. The live-provider job was skipped on push, then passed in exact-SHA
+workflow-dispatch run [36828262326](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36828262326)
+using the synthetic `opencode_go` / `deepseek-v4-flash` route.
 
 Current preparation status is PORTABLE VALIDATED; MSI/UPGRADE PENDING ON
 SUITABLE TEST HOST; DISTRIBUTION PENDING. The current workstation is not
