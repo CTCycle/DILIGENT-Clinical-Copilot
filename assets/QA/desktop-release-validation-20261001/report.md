@@ -107,7 +107,8 @@ separate distribution mode in this preparation session.
 The native Computer Use inventory exposed no native app/window surface. The
 portable process/API smoke passed, but packaged screen-level navigation,
 native folder selection, and visual UI interaction remain PENDING ON SUITABLE
-INTERACTIVE HOST.
+INTERACTIVE HOST. The candidate-specific manual procedure is recorded in
+host-checklist.md.
 
 ## Cleanup and release boundary
 
