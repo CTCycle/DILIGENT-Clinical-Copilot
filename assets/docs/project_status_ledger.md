@@ -41,6 +41,20 @@ The older validation reports use run-specific terms such as `PASS`, `ATTENTION`,
 
 ## Current operational summary
 
+- **Completed validation slice — 2026-10-01 packaged interactive UI:** The
+  previously `BLOCKED` packaged desktop interactive-UI lane was exercised by
+  driving the packaged Tauri/WebView2 window with the available native
+  Windows UI automation against an isolated data root. All four workspaces
+  rendered; Settings → General polling interval save/reload/reset and restart
+  persistence were DB-verified; Settings → Models rendered the catalog,
+  roles, provider keys, and current configuration; the DILI Agent preflight
+  failed closed on the fresh packaged data with zero sessions created; and
+  clean close/relaunch left no processes or listeners. Full
+  populated-session analysis, timeline, revision, and native RAG folder
+  workflows remain uncertified on the packaged surface (fresh packaged root
+  has no structured sources; cloning the credential-bearing shared database
+  was avoided). MSI lifecycle, signing, and clean-machine distribution remain
+  host/procedure boundaries. See the [packaged-UI validation report](../QA/desktop-interactive-ui-validation-20261001/report.md).
 - **Completed validation slice — 2026-09-28 follow-up:** The current RAG boundary now covers empty, unsupported-only, empty/malformed supported, missing, and non-directory inputs, fail-closed zero-supported/zero-chunk updates, and sanitized inspection error contracts. A disposable-SQLite revision test also validated recoverable missing-worker status, persisted failure metadata, unchanged source content, and deterministic retry. The affected backend/API suite passed 129 tests; RAG is `VALIDATED` for this expanded local boundary, while revision remains `PARTIAL` because fresh provider and broader lifecycle faults remain untested. See the [RAG edge validation report](../QA/rag-edge-validation-20260928/report.md) and [revision recovery report](../QA/revision-recovery-validation-20260928/report.md).
 - **Completed validation slice — 2026-09-28 revision/local-provider follow-up:** The current revision worker now persists its job identity, version identity, and recovery configuration before launch, closing a reproducible SQLite-lock race. Final-code disposable runs rechecked the live Ollama catalog, exercised unavailable-service and available-service timeout boundaries, and created a sanitized retry without changing the source report. Focused revision/runtime/API checks passed 53 tests; revision remains `PARTIAL` because no accepted local revision completed and tool-failure, true process-restart, broader lifecycle, and current cloud-provider branches remain open. See the [local Ollama revision validation report](../QA/revision-local-ollama-validation-20260928/report.md).
 
@@ -80,7 +94,7 @@ in the harness that could mask a successful pytest result with a nonzero
 | `test.automated-regression` | `VALIDATED` | Final source gates include 838 backend unit tests, 53 Full browser tests with 0 failures/errors/skips, 105 Angular tests, production build, persistence, static checks, and dependency audits. |
 | `ui.application-shell` | `VALIDATED` for required scope | Existing rendered, keyboard, focus, viewport, and application-shell accessibility evidence remains valid. Narrator/Speech Recap and broad component screen-reader certification are optional future enhancement work, explicitly outside required closure scope. |
 | `runtime.containerized` | `NOT_IMPLEMENTED` and out of scope | No container deployment requirement exists for this campaign. |
-| `release.desktop.v3-4-0` | `PORTABLE AND HOSTED CI VALIDATED; MSI/UPGRADE PENDING ON SUITABLE TEST HOST; DISTRIBUTION PENDING` | Exact candidate `2f804d251769f4e01375d02459e41dd9970ec8eb` has fresh portable/MSI/checksum outputs, standard portable smoke, and the exact 230-character executable / 107-character `%LOCALAPPDATA%` deep-path replay passing twice. Exact-SHA hosted CI is green for backend quality, PostgreSQL persistence, Windows regression, security, and the live-provider browser E2E in dispatch run [36828262326](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36828262326). Native UI interaction, administrator MSI lifecycle, signing, and clean-machine distribution remain host/procedure boundaries. See [current candidate evidence](../QA/desktop-release-validation-20261001/report.md) and the [desktop release procedure](runtime/desktop_release.md). |
+| `release.desktop.v3-4-0` | `PORTABLE AND HOSTED CI VALIDATED; PACKAGED INTERACTIVE UI PARTIAL; MSI/UPGRADE PENDING ON SUITABLE TEST HOST; DISTRIBUTION PENDING` | Exact candidate `2f804d251769f4e01375d02459e41dd9970ec8eb` has fresh portable/MSI/checksum outputs, standard portable smoke, and the exact 230-character executable / 107-character `%LOCALAPPDATA%` deep-path replay passing twice. The 2026-10-01 packaged-UI slice drove the packaged window with native UI automation: all workspaces rendered, Settings save/reload/reset/restart persistence DB-verified, preflight failed closed on fresh data, and clean close/restart left no processes. Exact-SHA hosted CI is green for backend quality, PostgreSQL persistence, Windows regression, security, and the live-provider browser E2E in dispatch run [36828262326](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36828262326). Populated packaged analysis/timeline/RAG flows and native MSI lifecycle, signing, and clean-machine distribution remain host/procedure boundaries. See [current candidate evidence](../QA/desktop-release-validation-20261001/report.md), the [packaged-UI slice](../QA/desktop-interactive-ui-validation-20261001/report.md), and the [desktop release procedure](runtime/desktop_release.md). |
 | Publication/distribution procedures | Deferred and separate | Tagging, GitHub Release publication, signing, offline WebView2 packaging, and clean-machine certification remain publication/release procedures, not source validation debt. |
 
 ## Exact v3.4.0 candidate preparation — 2026-10-01
@@ -93,10 +107,15 @@ the live-provider browser E2E. The latter completed in dispatch run
 [36828262326](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36828262326).
 
 The portable smoke and exact 230-character executable / 107-character
-LOCALAPPDATA deep-path replay passed twice. MSI install/upgrade, native
-packaged UI interaction, signing, and clean-machine distribution remain
-pending on a suitable host or release procedure. See the
-desktop-release-validation-20261001 report for the complete boundary.
+LOCALAPPDATA deep-path replay passed twice. The 2026-10-01 packaged-UI slice
+additionally drove the packaged Tauri/WebView2 window with native UI
+automation: all workspaces rendered, Settings save/reload/reset/restart
+persistence was DB-verified, the DILI Agent preflight failed closed on fresh
+data, and clean close/relaunch left no processes. Populated packaged
+analysis/timeline/RAG flows and MSI install/upgrade, native packaged UI for
+those populated flows, signing, and clean-machine distribution remain pending
+on a suitable host or release procedure. See the desktop-release-validation-
+20261001 report and the packaged-UI report for the complete boundary.
 
 ## Component ledger
 
