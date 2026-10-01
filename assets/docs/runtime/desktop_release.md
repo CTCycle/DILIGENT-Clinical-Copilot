@@ -19,16 +19,19 @@ security. The live-provider job was skipped on push, then passed in exact-SHA
 workflow-dispatch run [36828262326](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36828262326)
 using the synthetic `opencode_go` / `deepseek-v4-flash` route.
 
-Current preparation status is PORTABLE VALIDATED; MSI/UPGRADE PENDING ON
-SUITABLE TEST HOST; DISTRIBUTION PENDING. The current workstation is not
-administrator-capable, and the local EXE/MSI are NotSigned. The packaged
-portable interactive-UI slice is now partially validated via native
-automation (workspaces, Settings persistence, preflight, clean restart); a
-full populated packaged workflow and MSI lifecycle remain pending on a
-suitable host. See the current candidate evidence at
-assets/QA/desktop-release-validation-20261001/report.md and the
-packaged-UI slice at
-assets/QA/desktop-interactive-ui-validation-20261001/report.md.
+Current preparation status is PORTABLE VALIDATED, INCLUDING THE POPULATED
+PACKAGED WORKFLOW SLICE; MSI/UPGRADE PENDING ON SUITABLE TEST HOST;
+DISTRIBUTION PENDING. The current workstation is not administrator-capable,
+and the local EXE/MSI are NotSigned. The packaged portable interactive-UI and
+populated-workflow slices are validated via native automation (workspaces,
+Settings persistence, full multi-drug analysis, sessions/timeline/revisions,
+RAG ingestion/retrieval, cancellation/fail-closed, access keys); a native MSI
+lifecycle and clean-machine distribution remain pending on a suitable host.
+See the current candidate evidence at
+assets/QA/desktop-release-validation-20261001/report.md, the packaged-UI
+slice at assets/QA/desktop-interactive-ui-validation-20261001/report.md, and
+the populated-workflow slice at
+assets/QA/desktop-populated-ui-validation-20261001/report.md.
 This preparation record does not create a tag, GitHub release, upload, or
 distribution publication.
 
@@ -147,12 +150,22 @@ Settings → General polling interval save/reload/reset and restart
 persistence were proven (DB-verified); Settings → Models rendered the catalog,
 roles, provider keys, and current configuration; the DILI Agent preflight
 failed closed on the fresh packaged data; and clean close/relaunch left no
-processes or listeners. Full populated-session analysis, timeline, revision,
-and native RAG folder workflows remain uncertified on the packaged surface
-because the fresh packaged root has no structured sources and cloning the
-credential-bearing shared database was intentionally avoided. MSI lifecycle,
-signing, and clean-machine distribution remain host/procedure boundaries.
-See [the packaged-UI validation report](../../QA/desktop-interactive-ui-validation-20261001/report.md)
+processes or listeners.
+
+The populated-workflow continuation
+([2026-10-01 populated-workflow report](../../QA/desktop-populated-ui-validation-20261001/report.md))
+then certified the full synthetic multi-drug analysis (15 steps to 100%,
+rendered report with R-score and RUCAM evidence, persisted session/versions),
+session CRUD/lineage with manual-edit audit and revision fail-closed, timeline
+generation with fail-closed fallback, RAG ingestion/retrieval with citations
+and byte-identical dedup, cooperative cancellation, provider-timeout
+fail-closed paths, and the access-key lifecycle — all in the packaged window
+against a populated isolated data root (catalogs seeded via the repository's
+own update-persistence APIs after the packaged Update All confirmed the real
+ordered pipeline and was cooperatively cancelled). The native RAG folder
+dialog could not be reliably automated and remains an interaction boundary.
+MSI lifecycle, signing, and clean-machine distribution remain host/procedure
+boundaries. See the [packaged-UI validation report](../../QA/desktop-interactive-ui-validation-20261001/report.md)
 and the updated [D01–D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md).
 
 ### v3.4.0 release-candidate gate

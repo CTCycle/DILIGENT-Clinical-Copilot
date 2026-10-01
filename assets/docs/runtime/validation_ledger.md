@@ -1668,3 +1668,41 @@ and [host checklist](../../QA/desktop-release-validation-20261001/host-checklist
 The disposable data root and temporary captures were under the temp area and
 were removed after the read-only checks; task-owned processes were stopped,
 ports were free, and the user-started Ollama service remained running.
+
+## Packaged populated-workflow validation - 2026-10-01
+
+This slice covers the previously UNTESTED/BLOCKED packaged desktop gates on the
+portable v3.4.0 lane by driving the packaged Tauri/WebView2 window with native UI
+automation against a populated isolated data root. Baseline: candidate
+2f804d251769f4e01375d02459e41dd9970ec8eb on develop; portable SHA matched the
+release manifest. Only synthetic data was used; the shared database, settings,
+credentials, and caches were untouched; the user-started Ollama service was used
+read-only as the qwen3.5:9b lane.
+
+| Check | Result |
+|---|---|
+| Launch + API boundary | Ready payload elease_version=3.4.0; /api/health 200, / 200, unauthenticated /api/settings 401; title DILIGENT Clinical Copilot. |
+| Update All (packaged) | Real ordered RxNav->LiverTox->DILIrank pipeline started; RxNav full refresh is N-request-slow (letter c after ~12 min) so it was cooperatively cancelled through the packaged UI (  of 3 source updates completed. The operation was cancelled.). |
+| Catalog seed + render | Isolated DB seeded via repository update-persistence APIs (upsert_drugs_catalog_records / save_livertox_records / replace_records); packaged Data Inspection rendered populated RxNav/LiverTox/DILIrank; preflight catalog blockers cleared. |
+| D07 populated analysis | Full 15-step multi-drug analysis (Amoxicillin+Clarithromycin+Ibuprofen) completed at 100% (job 1b0e1e57); report rendered with R-score 4.85, per-drug commentary, LiverTox scores, RUCAM evidence; session 1 + versions + 3 matched drug mentions persisted. Session 1 stored ailed = hard safety-gate equires_human_review (rechallenge + causality-overstatement flags). |
+| D08 sessions/timeline/revisions | Session detail + evidence render; timeline #1 generated (qwen3.5:9b timeout -> fail-closed fallback chronology, 3 events with evidence); metadata JSON save persisted; manual edit superseded v1 -> current v2 (manual_edit) with hash audit; agentic revision fail-closed at step 1 with Timed out waiting for Ollama chat response; restart reload retained all state. |
+| D09 RAG | Update Embeddings (job 4a8b122c): 3 physical files -> 2 unique documents -> 2 chunks, byte-identical duplicate flagged; RAG-on analysis (job d9970bdc, session 2 successful, use_rag=true) cited cetaminophen.txt in the Bibliography. Native IFileDialog could not be reliably automated; packaged default RAG source folder used (boundary recorded). |
+| D11 failure/cancellation | Update-All cooperative cancel; clinical-job cancel via Stop analysis (no partial session); timeline + revision LLM timeouts fail-closed with rendered diagnostics and retryable state. |
+| D06 access keys | OpenAI key lifecycle in the packaged surface: create (encrypted at rest, plaintext masked), activate, one-active-key rotation, delete; DB-verified (Fernet values + fingerprints only). |
+| Restart + cleanup | Clean close left no process/listener; relaunch retained sessions, model config (qwen3.5:9b), timeline, RAG, deleted keys; isolated root removed. |
+
+| Gate | Status after this run | Remaining boundary |
+|---|---|---|
+| elease.desktop.v3-4-0 packaged portable populated workflow | PASS for the exercised scope | Full analysis, sessions/timeline/manual-edit/revision, timeline fallback, RAG ingestion/retrieval with citations, cooperative cancellation, provider-timeout fail-closed, and access-key lifecycle are packaged-validated. |
+| elease.desktop.v3-4-0 native RAG folder dialog / broader file-dialog & WebView2 edges | PARTIAL | The packaged IFileDialog could not be reliably automated (returned last-used folder); broader D10 edge suites remain outside scope. |
+| elease.desktop.v3-4-0 MSI lifecycle (D13/D14) | BLOCKED | Non-administrator token; no elevation attempted. |
+| Signing / clean-machine distribution | PENDING | Separate distribution procedures. |
+
+Detailed evidence: [packaged populated-workflow validation](../../QA/desktop-populated-ui-validation-20261001/report.md),
+updated [D01-D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md),
+[packaged-suite-boundary](../../QA/desktop-release-validation-20260930/packaged-suite-boundary.md),
+and [host checklist](../../QA/desktop-release-validation-20261001/host-checklist.md).
+
+The isolated data root, temporary captures, and automation helpers were removed;
+task-owned processes were stopped with no leftover listeners; the user-started
+Ollama service remained running.

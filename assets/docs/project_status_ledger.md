@@ -55,6 +55,25 @@ The older validation reports use run-specific terms such as `PASS`, `ATTENTION`,
   has no structured sources; cloning the credential-bearing shared database
   was avoided). MSI lifecycle, signing, and clean-machine distribution remain
   host/procedure boundaries. See the [packaged-UI validation report](../QA/desktop-interactive-ui-validation-20261001/report.md).
+- **Completed validation slice — 2026-10-01 populated packaged workflow:** The
+  previously UNTESTED/BLOCKED packaged-app gates were covered on the portable
+  v3.4.0 lane by driving the packaged Tauri/WebView2 window with native UI
+  automation against a populated isolated data root. The packaged Update All
+  started the real ordered RxNav→LiverTox→DILIrank pipeline (RxNav's full
+  refresh is N-request-slow, so it was cooperatively cancelled through the
+  packaged UI) and the isolated catalog was then seeded via the repository's
+  own update-persistence APIs. Validated in the packaged window: a full 15-step
+  multi-drug analysis (R-score 4.85, report/evidence/persistence; session
+  stored `failed` = safety-gate requires_human_review), session CRUD/detail,
+  metadata save, manual edit producing a manual_edit version lineage with
+  audit, agentic revision fail-closed with a timeout diagnostic, timeline
+  generation with fail-closed fallback, RAG ingestion/retrieval with citations
+  and byte-identical dedup, cooperative cancellation, and the access-key
+  lifecycle (encrypted/redacted/rotation/deletion). Clean close/relaunch
+  retained all state. The native RAG folder dialog could not be reliably
+  automated and remains an interaction boundary; MSI lifecycle and
+  signing/clean-machine distribution remain host/procedure boundaries. See the
+  [populated-workflow validation report](../QA/desktop-populated-ui-validation-20261001/report.md).
 - **Completed validation slice — 2026-09-28 follow-up:** The current RAG boundary now covers empty, unsupported-only, empty/malformed supported, missing, and non-directory inputs, fail-closed zero-supported/zero-chunk updates, and sanitized inspection error contracts. A disposable-SQLite revision test also validated recoverable missing-worker status, persisted failure metadata, unchanged source content, and deterministic retry. The affected backend/API suite passed 129 tests; RAG is `VALIDATED` for this expanded local boundary, while revision remains `PARTIAL` because fresh provider and broader lifecycle faults remain untested. See the [RAG edge validation report](../QA/rag-edge-validation-20260928/report.md) and [revision recovery report](../QA/revision-recovery-validation-20260928/report.md).
 - **Completed validation slice — 2026-09-28 revision/local-provider follow-up:** The current revision worker now persists its job identity, version identity, and recovery configuration before launch, closing a reproducible SQLite-lock race. Final-code disposable runs rechecked the live Ollama catalog, exercised unavailable-service and available-service timeout boundaries, and created a sanitized retry without changing the source report. Focused revision/runtime/API checks passed 53 tests; revision remains `PARTIAL` because no accepted local revision completed and tool-failure, true process-restart, broader lifecycle, and current cloud-provider branches remain open. See the [local Ollama revision validation report](../QA/revision-local-ollama-validation-20260928/report.md).
 
@@ -94,7 +113,7 @@ in the harness that could mask a successful pytest result with a nonzero
 | `test.automated-regression` | `VALIDATED` | Final source gates include 838 backend unit tests, 53 Full browser tests with 0 failures/errors/skips, 105 Angular tests, production build, persistence, static checks, and dependency audits. |
 | `ui.application-shell` | `VALIDATED` for required scope | Existing rendered, keyboard, focus, viewport, and application-shell accessibility evidence remains valid. Narrator/Speech Recap and broad component screen-reader certification are optional future enhancement work, explicitly outside required closure scope. |
 | `runtime.containerized` | `NOT_IMPLEMENTED` and out of scope | No container deployment requirement exists for this campaign. |
-| `release.desktop.v3-4-0` | `PORTABLE AND HOSTED CI VALIDATED; PACKAGED INTERACTIVE UI PARTIAL; MSI/UPGRADE PENDING ON SUITABLE TEST HOST; DISTRIBUTION PENDING` | Exact candidate `2f804d251769f4e01375d02459e41dd9970ec8eb` has fresh portable/MSI/checksum outputs, standard portable smoke, and the exact 230-character executable / 107-character `%LOCALAPPDATA%` deep-path replay passing twice. The 2026-10-01 packaged-UI slice drove the packaged window with native UI automation: all workspaces rendered, Settings save/reload/reset/restart persistence DB-verified, preflight failed closed on fresh data, and clean close/restart left no processes. Exact-SHA hosted CI is green for backend quality, PostgreSQL persistence, Windows regression, security, and the live-provider browser E2E in dispatch run [36828262326](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36828262326). Populated packaged analysis/timeline/RAG flows and native MSI lifecycle, signing, and clean-machine distribution remain host/procedure boundaries. See [current candidate evidence](../QA/desktop-release-validation-20261001/report.md), the [packaged-UI slice](../QA/desktop-interactive-ui-validation-20261001/report.md), and the [desktop release procedure](runtime/desktop_release.md). |
+| `release.desktop.v3-4-0` | `PORTABLE AND HOSTED CI VALIDATED; PACKAGED INTERACTIVE UI AND POPULATED WORKFLOW SLICE VALIDATED; MSI/UPGRADE PENDING ON SUITABLE TEST HOST; DISTRIBUTION PENDING` | Exact candidate `2f804d251769f4e01375d02459e41dd9970ec8eb` has fresh portable/MSI/checksum outputs, standard portable smoke, and the exact 230-character executable / 107-character `%LOCALAPPDATA%` deep-path replay passing twice. The 2026-10-01 packaged-UI slice drove the packaged window with native UI automation: all workspaces rendered, Settings save/reload/reset/restart persistence DB-verified, preflight failed closed on fresh data, and clean close/restart left no processes. The 2026-10-01 populated-workflow slice then certified in the packaged window: the full multi-drug analysis, sessions/timeline/manual-edit/revision, timeline fallback, RAG ingestion/retrieval with citations, cooperative cancellation, provider-timeout fail-closed, and the access-key lifecycle. Exact-SHA hosted CI is green for backend quality, PostgreSQL persistence, Windows regression, security, and the live-provider browser E2E in dispatch run [36828262326](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36828262326). The native RAG folder dialog, MSI lifecycle, signing, and clean-machine distribution remain host/interaction/procedure boundaries. See [current candidate evidence](../QA/desktop-release-validation-20261001/report.md), the [packaged-UI slice](../QA/desktop-interactive-ui-validation-20261001/report.md), the [populated-workflow slice](../QA/desktop-populated-ui-validation-20261001/report.md), and the [desktop release procedure](runtime/desktop_release.md). |
 | Publication/distribution procedures | Deferred and separate | Tagging, GitHub Release publication, signing, offline WebView2 packaging, and clean-machine certification remain publication/release procedures, not source validation debt. |
 
 ## Exact v3.4.0 candidate preparation — 2026-10-01
@@ -111,11 +130,15 @@ LOCALAPPDATA deep-path replay passed twice. The 2026-10-01 packaged-UI slice
 additionally drove the packaged Tauri/WebView2 window with native UI
 automation: all workspaces rendered, Settings save/reload/reset/restart
 persistence was DB-verified, the DILI Agent preflight failed closed on fresh
-data, and clean close/relaunch left no processes. Populated packaged
-analysis/timeline/RAG flows and MSI install/upgrade, native packaged UI for
-those populated flows, signing, and clean-machine distribution remain pending
-on a suitable host or release procedure. See the desktop-release-validation-
-20261001 report and the packaged-UI report for the complete boundary.
+data, and clean close/relaunch left no processes. The 2026-10-01
+populated-workflow slice then certified the full packaged window flows (multi-
+drug analysis, sessions/timeline/manual-edit/revision, timeline fallback, RAG
+ingestion/retrieval with citations, cooperative cancellation, provider-timeout
+fail-closed, and the access-key lifecycle) against a populated isolated data
+root. The native RAG folder dialog, MSI install/upgrade, signing, and
+clean-machine distribution remain pending on a suitable host or release
+procedure. See the desktop-release-validation-20261001 report, the packaged-UI
+report, and the populated-workflow report for the complete boundary.
 
 ## Component ledger
 
