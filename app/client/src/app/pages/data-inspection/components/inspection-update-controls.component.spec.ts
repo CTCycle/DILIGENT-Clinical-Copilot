@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { describe, expect, it } from 'vitest';
 
 import { InspectionUpdateControlsComponent } from './inspection-update-controls.component';

@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 from __future__ import annotations
 
 PATIENT_TIMELINE_EXTRACTION_SYSTEM_PROMPT = """Extract chronological, patient-specific clinical events from the supplied case context. Return only data that conforms to the JSON schema supplied by the application.

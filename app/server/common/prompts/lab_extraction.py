@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 from __future__ import annotations
 
 CLINICAL_LAB_EXTRACTION_SYSTEM_PROMPT = """Extract longitudinal liver-related laboratory data and onset clues from free-text clinical sections.

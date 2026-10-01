@@ -1,5 +1,5 @@
 # User Troubleshooting
-Last updated: 2026-09-18
+Last updated: 2026-10-01
 
 ## Windows desktop app does not open
 
@@ -58,7 +58,7 @@ and service status before retrying.
 
 ## Catalog Refresh Or Timeline Fallback
 
-- Opening **Configurations** reuses the last saved provider catalog. Use
+- Opening **Settings → Models** reuses the last saved provider catalog. Use
   **Refresh** when you intentionally want to contact the provider for a new
   listing.
 - If refresh fails, review the reported failure class and confirm the active

@@ -1,5 +1,5 @@
 # DILIGENT Clinical Copilot
-Last updated: 2026-09-22
+Last updated: 2026-10-01
 
 [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./app/client/package.json) [![License](https://img.shields.io/badge/license-GNU%20GPL%20v3-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
@@ -47,67 +47,63 @@ At a high level, DILIGENT combines an Angular user interface, a Python/FastAPI l
 
 ## Screenshots
 
-These current development views were captured on 2026-09-08 with a fictional
+These views were captured from the source-mode application with a fictional
 synthetic DILI case and public catalog records. They contain no real patient
-information, credentials, private files, or provider secrets. The v3.3.0
-release capture set remains available under
-`assets/QA/release-v3.3.0-screenshots/` for release-baseline comparison.
+information, credentials, private files, or provider secrets. The approved
+v3.3.0 release capture set lives under
+`assets/QA/release-v3.3.0-screenshots/`.
 
 <table>
   <tr>
     <td>
-      <img src="assets/QA/e2e-20260908-screenshots/01-dili-agent-synthetic-input.png" alt="DILI Agent with a structured synthetic case ready for review" width="620">
+      <img src="assets/QA/release-v3.3.0-screenshots/01-dili-agent-synthetic-input.png" alt="DILI Agent with a structured synthetic case ready for review" width="620">
       <br><sub><strong>DILI Agent.</strong> Enter a synthetic case and prepare an assessment.</sub>
     </td>
     <td>
-      <img src="assets/QA/e2e-20260908-screenshots/02-clinical-sessions-synthetic-report.png" alt="Clinical Sessions showing a saved synthetic report" width="620">
+      <img src="assets/QA/release-v3.3.0-screenshots/02-clinical-sessions-synthetic-report.png" alt="Clinical Sessions showing a saved synthetic report" width="620">
       <br><sub><strong>Clinical Sessions.</strong> Review a saved report and its structured findings.</sub>
     </td>
   </tr>
   <tr>
     <td>
-      <img src="assets/QA/e2e-20260908-screenshots/03-patient-timeline-overview.png" alt="Patient Timeline showing review controls and a clinical chronology" width="620">
+      <img src="assets/QA/release-v3.3.0-screenshots/03-patient-timeline-overview.png" alt="Patient Timeline showing review controls and a clinical chronology" width="620">
       <br><sub><strong>Patient Timeline.</strong> Focus chronology controls and compare dated events.</sub>
     </td>
     <td>
-      <img src="assets/QA/e2e-20260908-screenshots/06-data-inspection-drug-catalog.png" alt="Data Inspection showing public catalog records" width="620">
+      <img src="assets/QA/release-v3.3.0-screenshots/05-data-inspection-drug-catalog.png" alt="Data Inspection showing public catalog records" width="620">
       <br><sub><strong>Data Inspection.</strong> Inspect public catalog records and update status.</sub>
     </td>
   </tr>
 </table>
 
-The configuration surface used for the live provider validation is captured in
-[`assets/QA/e2e-20260908-screenshots/05-configurations-deepseek.png`](assets/QA/e2e-20260908-screenshots/05-configurations-deepseek.png).
-The complete synthetic end-to-end record, including the revision-review
-failure state and event inspector, is in
-[`assets/QA/e2e-validation-20260908.md`](assets/QA/e2e-validation-20260908.md).
+For the current validation evidence and detailed reports, see the
+[validation ledger](assets/docs/runtime/validation_ledger.md) and the
+[project status ledger](assets/docs/project_status_ledger.md).
 
-## v3.3.0 release highlights
+## Release status
 
-As of 2026-09-08, v3.3.0 is still the most recent published release. The
-current development branch contains substantial post-release work and should
-not be described as v3.3.0-equivalent until the clinical-pattern and revision
-provider findings in the end-to-end audit are resolved.
+The latest published release is **v3.3.0** (Windows x64 desktop packages):
+a portable executable for no-install use and an MSI installer for an installed
+application and shortcut. The packaged application contains the runtime it
+needs, starts its local services automatically, and keeps user data separate
+from the downloaded package. A matching SHA-256 file is published so a
+downloaded package can be checked before use or distribution.
 
-The v3.3.0 release provides Windows x64 desktop packages in two forms:
+The current source branch is the unpublished **v3.4.0 candidate**. The exact
+candidate commit has green hosted CI (including the live OpenCode Go /
+`deepseek-v4-flash` browser flow with synthetic data), and the portable EXE
+plus MSI artifacts have been built and validated, including the packaged
+interactive-UI and populated-workflow slices. MSI install/upgrade, code
+signing, and clean-machine distribution remain pending on a suitable Windows
+host, and `develop` and `main` must still be intentionally synchronized before
+an annotated `v3.4.0` tag is created. No tag, push, or release publication is
+performed by the current readiness work. Release readiness is tracked in
+[`assets/docs/runtime/desktop_release.md`](assets/docs/runtime/desktop_release.md).
 
-- a portable executable for no-install use
-- an MSI installer for an installed application and shortcut
-
-The packaged application contains the runtime it needs, starts its local services automatically, and keeps user data separate from the downloaded package. A matching SHA-256 file is published so a downloaded package can be checked before use or distribution.
-
-This release also makes the four model roles explicit in **Settings**, keeps saved session and timeline review together, and uses the native Windows directory picker for desktop RAG folder selection. The standard release workflow builds and publishes the packages from the synchronized main branch.
-
-## Current release candidate
-
-The checked-out source and lock manifests are synchronized to SemVer `3.4.0`,
-but `v3.4.0` is not published. Release status remains **NOT READY** until the
-exact candidate commit has green hosted CI, full browser E2E including the live
-OpenCode Go / `deepseek-v4-flash` provider flow with synthetic data, reviewed
-dependency-scan results, and Windows portable-EXE/MSI host smoke evidence.
-`develop` and `main` must also be intentionally synchronized before an
-annotated tag is created. No tag, push, or release publication is performed by
-the current readiness work.
+The v3.3.0 release made the four model roles explicit in **Settings**, keeps
+saved session and timeline review together, and uses the native Windows
+directory picker for desktop RAG folder selection. The standard release
+workflow builds and publishes the packages from the synchronized main branch.
 
 ## Before you use it
 

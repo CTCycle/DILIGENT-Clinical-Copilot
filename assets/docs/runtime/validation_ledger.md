@@ -1,32 +1,47 @@
-# Pre-release validation ledger
-Last updated: 2026-09-29
+# Validation ledger
+Last updated: 2026-10-01
 
-## Scope and interpretation
+## Purpose and authority
 
-This is a dated evidence register and chronological pre-release validation diary for the DILIGENT source/development tree. The high-level current operational status is canonical in [`../project_status_ledger.md`](../project_status_ledger.md); this document preserves the run-specific scope, evidence, diary, and release boundaries that explain that status. The historical feature-state register below records the validation run performed on 2026-09-18 against source revision `2e434ae1b0e276b8acbab27f65a399d306c3f691` on the `develop` branch. The current 2026-09-21 Tier 0 checkpoint is recorded above. Packaging, publication, EXE/MSI smoke tests, and clean-machine installation were intentionally outside the historical audit.
+This is a sparse, dated evidence register for DILIGENT validation. The canonical
+current operational status lives in [`project_status_ledger.md`](../project_status_ledger.md);
+this file records the decisions, guarantees, and known limitations behind that
+status and links each retained validation slice to its evidence under
+`assets/QA/`. It deliberately does not reproduce run-by-run history: the QA
+reports remain the detailed evidence, and the architecture, runtime, and coding
+documents in this tree are the product ontology that describes how each behavior
+works.
 
-The historical 2026-09-18 run used synthetic patient content only. No patient-identifying data was entered, no source refresh or embedding update job was started, and no live cloud-provider clinical analysis was submitted. The current 2026-09-22 checkpoint below separately records the exact-provider clinical and structured-source executions.
+`assets/QA/` is the supporting evidence location. Only the reports referenced
+here (plus the approved release screenshots) are tracked; disposable logs,
+scripts, and intermediate capture batches are not committed.
 
-Status meanings:
+## How to use this file
 
-- `PASS`: the named scope was executed and behaved as expected.
-- `ATTENTION`: the surface is usable, but an external dependency, partial data state, or validation limitation remains.
-- `FAIL`: the named scope has a reproducible release-blocking defect.
-- `NOT TESTED`: current evidence is absent; this is not a claim that the capability is broken.
-- `NOT APPLICABLE`: deliberately outside this source-only audit.
+1. For the current status of any component, open the component ledger in
+   [`project_status_ledger.md`](../project_status_ledger.md).
+2. To run the mandatory regression, follow [`qa_regression.md`](qa_regression.md)
+   and [`coding/testing_and_quality.md`](../coding/testing_and_quality.md).
+3. For a specific validation slice, open the evidence link in the register
+   below; the ontology document listed in the same row explains the behavior it
+   validated.
+4. Add a new slice row here (date, scope, outcome, evidence) whenever a
+   meaningful validation completes. Keep the row to a few lines and move
+   detailed prose into the QA report.
 
-## Integrated long-term evaluation strategy
+## Status vocabulary
 
-The comprehensive validation roadmap is integrated into this ledger as the
-stable campaign plan. It does not create a second status authority:
+The older QA reports use run-specific terms (`PASS`, `ATTENTION`, `FAIL`,
+`NOT TESTED`, `NOT APPLICABLE`). The project status ledger translates those into
+its current taxonomy (`VALIDATED`, `WORKING`, `PARTIAL`, `BROKEN`, `BLOCKED`,
+`UNVALIDATED`, `NOT_IMPLEMENTED`, `DEPRECATED`). A `PASS` in an old report never
+overrides a newer, narrower, or broader result.
 
-- [`project_status_ledger.md`](../project_status_ledger.md) remains the
-  canonical current operational state.
-- This document remains the dated, run-specific evidence register and diary.
-- `assets/QA/` remains the supporting evidence location for logs, screenshots,
-  reports, and validation notes.
+## Validation campaign map
 
-### Stable campaign map
+The long-term roadmap is a tiered campaign. Slices are recorded in the register
+below as they complete; the campaign itself is the roadmap, not a status
+authority.
 
 | Tier | Slices | Focus |
 |---|---|---|
@@ -37,1672 +52,135 @@ stable campaign plan. It does not create a second status authority:
 | Tier 4 | `V41`–`V53` | Timelines, agentic revision, local Ollama, PostgreSQL, Tauri, and release lifecycle |
 | Tier 5 | `V60`–`V61` | Cross-cutting resilience, accessibility, responsive behavior, and performance-sensitive UI |
 
-The campaign order is:
+## Validation register
 
-`V00 → V01 → V02 → V10 → V11 → V12 → V20 → V21 → V22 → V23 → V24 → V30 → V31 → V32 → V33 → V34 → V35 → V36 → V37 → V38 → V39 → V40 → V41 → V42 → V43 → V44 → V13 → V50 → V51 → V60 → V61 → V52 → V53`
+| Date | Slice / scope | Outcome and boundary | Evidence (tracked) | Product ontology |
+|---|---|---|---|---|
+| 2026-09-21 | Tier 0 checkpoint (`V00`–`V02`) | Baseline captured; source-launcher port-ownership defect found and remediated; automated baseline gates green. | [Tier 0 checkpoint](../../QA/tier0-validation-20260921.md); [Launcher/startup/build validation](../../QA/launcher-startup-build-validation-20260921.md) | [Startup](startup.md), [modes](modes.md) |
+| 2026-09-21 | Source-launcher port ownership (`ISSUE-006`) | Foreign listeners survive; launch fails with actionable output; owned process-tree cleanup intact. | [Launcher/startup/build validation](../../QA/launcher-startup-build-validation-20260921.md) | [Startup](startup.md), [troubleshooting](troubleshooting.md) |
+| 2026-09-22 | Production frontend build host comparison | Local Angular build host fault reproduced; exact-SHA hosted CI build green; host-specific issue, not a repository defect. | [Frontend build validation 2026-09-22](../../QA/frontend-build-validation-2026-09-22/report.md); [2026-09-24 follow-up](../../QA/frontend-build-validation-2026-09-24/report.md) | [Deployment](deployment.md) |
+| 2026-09-23 | Automated regression gate revalidation | Migration-drift and dependency-audit findings remediated (`anyio` CVE pin); hosted run green. | [Automated regression revalidation](../../QA/automated-regression-revalidation-20260923/report.md) | [Testing and quality](../coding/testing_and_quality.md) |
+| 2026-09-23/24 | Timeline local model matrix and failure attribution | Exact `qwen3.5:2b` fails the timeline structured-output contract and fail-closes to the deterministic fallback; `qwen3.5:9b` produces grounded events. Characterized as a model/task compatibility limitation. | Consolidated into [timeline Browser validation](../../QA/timeline-browser-validation-20260925/report.md) | [DILI pipeline — timeline grounding](../architecture/dili_assessment_pipeline.md) |
+| 2026-09-24 | Empty timeline extraction recovery | Populated source with no evidence-backed event now raises non-retryable `invalid_response` and persists a deterministic fallback; `DILIGENT_PYTEST_CACHE_ROOT` isolates pytest state. | [Empty timeline extraction recovery](../../QA/timeline-empty-extraction-recovery-20260924/report.md) | [DILI pipeline — timeline grounding](../architecture/dili_assessment_pipeline.md) |
+| 2026-09-25 | Supported timeline/Ollama boundary | Exact 2B fail-closed fallback and exact 9B grounded generation validated with provenance, evidence, date precision, rendering, and reload persistence. | [Timeline Browser validation](../../QA/timeline-browser-validation-20260925/report.md), [capture notes](../../QA/timeline-browser-validation-20260925/browser-capture-notes.md), [API/persistence evidence](../../QA/timeline-browser-validation-20260925/api-persistence-evidence.md) | [DILI pipeline — timeline grounding](../architecture/dili_assessment_pipeline.md), [background jobs](../architecture/background_jobs.md) |
+| 2026-09-25 | Automated regression + live-provider dispatch | Local and hosted core gates green; live-provider E2E blocked only by missing repository secret. | [Automated regression and provider validation](../../QA/automated-regression-validation-20260925/report.md) | [Testing and quality](../coding/testing_and_quality.md) |
+| 2026-09-26 | Clinical/API resilience | RAG-off, provider-failure, job/error contracts; OpenAPI catalog reconciled to 68 paths; a rendered RAG-off local run completed. | [Clinical/API resilience](../../QA/clinical-api-resilience-20260926/report.md); [Rendered local resilience](../../QA/clinical-resilience-validation-20260926/report.md) | [API surface](../architecture/api_surface.md), [DILI pipeline](../architecture/dili_assessment_pipeline.md) |
+| 2026-09-26 | UI shell keyboard + responsive | Keyboard-only tab movement and focus, 1100px guard, rendered 1100/1280/1920px surfaces; focus defect fixed. | [UI shell accessibility](../../QA/ui-accessibility-validation-20260926/report.md) | [UI experience](../ui/experience.md), [UI standards](../ui/ui_standards.md) |
+| 2026-09-27 | Revision lifecycle and current-tree | Persisted accepted/cancelled lineage, reload/reopen, audit rendering; `revision.accepted-session-finalization` validated for the exact synthetic path. | [Revision lifecycle](../../QA/revision-lifecycle-validation-20260927/report.md) | [Background jobs — revision agent](../architecture/background_jobs.md) |
+| 2026-09-28 | RAG error boundaries + revision recovery | Expanded RAG local boundary (empty/unsupported/malformed/missing, fail-closed zero updates); missing-worker recovery and deterministic retry. | [RAG edge validation](../../QA/rag-edge-validation-20260928/report.md) | [DILI pipeline — RAG readiness](../architecture/dili_assessment_pipeline.md) |
+| 2026-09-28 | Revision worker ordering + local Ollama | Job/version/recovery metadata persisted before launch (SQLite-lock race closed); unavailable-provider and timeout fail-closed with sanitized diagnostics. | [Local Ollama revision validation](../../QA/revision-local-ollama-validation-20260928/report.md) | [Background jobs — revision agent](../architecture/background_jobs.md) |
+| 2026-09-28 | Runtime settings + current-tree regression | Database-backed Settings/Models save/reload/reset validated; full local regression green. | [Runtime settings and current-tree regression](../../QA/validation-followup-20260928/report.md); [Runtime configuration UI](../../QA/runtime-configuration-ui-20260928/report.md) | [Settings UI](settings_ui.md) |
+| 2026-09-28 | Revision startup reconciliation + tool failure | Startup reconciles stale `running` runs; allow-listed tool failure fail-closes without leaking secret-shaped tokens. | [Revision restart/tool-failure validation](../../QA/revision-restart-recovery-validation-20260928/report.md) | [Background jobs — revision agent](../architecture/background_jobs.md) |
+| 2026-09-29 | NCBI LiverTox machine access | Official E-utilities → Books-OAI → LitArch chain replaces the interactive HTML path; deterministic tests and metadata preflight passed. | [NCBI LiverTox machine access](../../QA/ncbi-livertox-machine-access-validation-20260929/report.md) | [Configuration — NCBI machine access](configuration.md) |
+| 2026-09-29 | Hosted OpenCode Go live revision | Empty-secret run failed closed as infrastructure failure; approved-secret run completed a fresh non-dry revision with exact `opencode_go / deepseek-v4-flash` provenance. | [OpenCode Go live revision validation](../../QA/revision-live-provider-validation-20260929/report.md) | [Generation policy](generation_policy.md), [error handling](../coding/error_handling.md) |
+| 2026-09-29 | Live LiverTox + ordered source refresh | 195 MB LitArch archive replaced the catalog, survived restart; ordered RxNav → LiverTox → DILIrank completed; cancellation preserved last-good state. | [Live LiverTox and ordered refresh](../../QA/livertox-ordered-refresh-validation-20260929/report.md) | [Desktop release — structured source updates](desktop_release.md), [background jobs](../architecture/background_jobs.md) |
+| 2026-09-29 | Session/revision API local boundaries | Live session detail/version/manual-edit reads, metadata and audit mutations, timeline/revision errors; missing-session report mutation fixed to 404. | [Session and revision API validation](../../QA/api-local-boundaries-20260929/report.md) | [API surface](../architecture/api_surface.md) |
+| 2026-09-30 | Final validation closure | Canonical 68-path/85-operation API matrix; RAG duplicate policy (`ISSUE-005`) resolved with raw-byte SHA-256 canonical selection; Full browser harness 53/0/0/0; backend 838 tests. | [Final validation closure](../../QA/final-validation-closure-20260930/report.md) | [QA regression](qa_regression.md), [testing and quality](../coding/testing_and_quality.md) |
+| 2026-10-01 | Desktop candidate + packaged UI | Fresh v3.4.0 portable/MSI/checksum artifacts; portable smoke and deep-path replay passed; packaged interactive UI and populated workflow validated by native automation. | [Desktop release evidence](../../QA/desktop-release-validation-20261001/report.md), [host checklist](../../QA/desktop-release-validation-20261001/host-checklist.md), [D01–D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md), [packaged-UI slice](../../QA/desktop-interactive-ui-validation-20261001/report.md), [populated-workflow slice](../../QA/desktop-populated-ui-validation-20261001/report.md) | [Desktop release](desktop_release.md) |
 
-`V13` may wait for an approved disposable credential, and `V52`/`V53`
-remain release-end gates. The immediate high-risk follow-up after Tier 0 is
-`V21`, `V22`, `V36`–`V39`, `V42`, `V43`, and `V44`.
+## Key decisions and guarantees
 
-Every slice record must include its stable ID, capability, status, exact HEAD,
-environment and preconditions, executed scenarios, `VAL-*` issues, primary
-failure class, fixes and adjacent regression, evidence links, remaining gaps,
-validation date, external dependencies, and cleanup result. A screen, HTTP
-200, or isolated mock test is never sufficient for a `PASS` claim without the
-workflow and persistence evidence required by that slice.
+These are the important, validated behaviors that later work must not silently
+change. Each is preserved as a product guarantee; the ontology column above and
+the evidence register below show where each was established.
 
-The shared execution loop is **Inspect → Execute → Observe → Diagnose →
-Surgically Fix → Retest → Record**. Defects are classified as functional,
-frontend, backend, integration, persistence/state, performance, UX/workflow,
-configuration, or test/environment problems. External provider outages remain
-environment evidence unless routing, classification, fallback, recovery, or
-user feedback violates the product contract.
+- **Timeline provenance and grounding.** Local timeline runs persist exact
+  `source_kind=local`, `model_provider=ollama`, and `source_model` values; cloud
+  runs persist `opencode_go` and the exact model. Non-empty model evidence is
+  required to occur within one normalized source-text field before an event is
+  accepted. Events without preserved source evidence are dropped, and fallback
+  events keep `timing_type="uncertain"` without inventing dates from the visit
+  timestamp. Month tokens (`YYYY-MM`) stay month-precision.
+- **Timeline fail-closed behavior.** Empty or invalid structured model output
+  maps to `invalid_response` and persists a deterministic, date-precise,
+  evidence-backed fallback instead of silently succeeding or inventing facts.
+- **Local Ollama limitation.** Exact `qwen3.5:2b` did not produce grounded
+  structured timeline output under the tested conditions; this is a documented
+  model/task compatibility limitation, not a pending application gate. Do not
+  reopen it as a retry target unless the model, prompt, or timeline
+  implementation changes.
+- **Revision worker ordering.** A revision worker receives a preallocated job
+  identifier and starts only after the version and pipeline run persist their
+  job/version recovery fields, closing the reproducible SQLite-lock race.
+- **Revision startup reconciliation.** After startup, persisted `running`
+  revision runs without a live worker are marked failed with the recoverable
+  message and their active steps are terminalized; the source report and draft
+  shell remain intact for retry.
+- **Revision fail-closed safety.** Timeout, tool-failure, and unavailable-
+  provider paths fail closed with sanitized diagnostics (no secret-shaped
+  content, no raw provider detail beyond provider/model/operation context).
+  Deterministic patch validation and blocker-free QA are required before an
+  accepted child session can be created.
+- **RAG duplicate policy (`ISSUE-005`).** Supported inputs are fingerprinted by
+  raw-byte SHA-256; only byte-identical files deduplicate. The canonical source
+  is chosen by normalized relative-path ordering and retains the path-derived
+  `document_id`; duplicates stay visible in Data Inspection and in citation
+  alias metadata. Semantic deduplication is intentionally out of scope.
+- **API boundary.** The Full harness derives an explicit contract matrix from
+  `/openapi.json` (68 paths, 85 method/path operations); adding a public route
+  requires an explicit validation disposition.
+- **Settings source of truth.** Operator-editable runtime configuration is
+  persisted in the `application_configuration` singleton and edited through
+  Settings; `.env` and environment variables remain outside the UI/API.
+- **FK-safe migration.** SQLite migration transactions suspend foreign-key
+  enforcement only around the atomic parent-table rebuild, run
+  `PRAGMA foreign_key_check` before commit, and restore prior enforcement.
+- **Access-key lifecycle.** Keys are encrypted at rest, returned as
+  metadata-only fingerprints, support one-active-key rotation, are scoped by
+  provider, and are redacted from API/UI/log-visible surfaces. Provider-side
+  credential validity belongs to the provider components.
+- **Cooperative cancellation.** Pending jobs become terminal immediately; a
+  running stop-requested worker stays `running` and occupies its concurrency
+  scope until it exits. Cancellation or failure before a source's final commit
+  preserves the last usable snapshot.
 
-Comprehensive source validation requires one exact `develop` commit, no core
-capability left `UNTESTED`, `UNKNOWN`, `FAIL`, or `BLOCKED`, current exact
-provider evidence without fallback, source-refresh safety, timeline failure and
-cancellation evidence, QA-clean revision finalization with reload persistence,
-final automated gates at that same commit, resolvable evidence links, and no
-temporary credentials or validation data left in persistent user storage.
+## Known limitations
 
-## Tier 0 execution checkpoint — 2026-09-21
+- `qwen3.5:2b` timeline structured-output incompatibility (see above).
+- MSI install/upgrade/uninstall, code signing, and clean-machine distribution
+  are pending on a suitable Windows host (the current session is not an
+  administrator); the packaged portable lane and packaged interactive UI are
+  validated.
+- The native RAG folder `IFileDialog` could not be reliably automated; the
+  packaged default RAG source folder is used and the dialog remains an
+  interaction boundary.
+- Narrator/Speech Recap spoken output and broad component-level screen-reader
+  certification are optional future enhancement work, not required closure
+  scope.
+- Containerized runtime is `NOT_IMPLEMENTED` and out of scope.
+- Cloud provider availability, latency, and output/QA variance are validated
+  only for the exact `opencode_go / deepseek-v4-flash` synthetic route and the
+  supported local Ollama boundary.
+- Older historical `unknown` timeline runs remain unattributed evidence and are
+  not re-opened as product gates.
 
-The checkpoint started from a clean `develop` worktree at
-`d0e8ba1809d7a79615f300403891ae2066a574a7`. The prior status snapshot was
-`ba47761aa456e78923a0df824f76ee4016ee0af6`; the exact changed-file boundary
-and evidence-link audit are recorded in the [Tier 0 evidence report](../../QA/tier0-validation-20260921.md).
+## Evidence register (component → evidence)
 
-| Slice | Capability | Status | Executed scope and result |
-|---|---|---|---|
-| `V00` | Revision and evidence baseline | `PASS` | Recorded HEAD, branch, clean state, 713-entry tree, snapshot drift, and 109 status-ledger links; all referenced evidence paths resolved. |
-| `V01` | Source startup, migration, health, populated-data reuse, shutdown, and port ownership | `FAIL` | Fresh and populated disposable SQLite runs passed launcher initialization, Alembic head, health, frontend readiness, read-only sessions access, integrity checks, and owned-process shutdown. The occupied-port test reproduced unsafe behavior: a controlled foreign listener on 7690 was killed, then the launcher continued with exit code 0. The finding is tracked as `ISSUE-006` in the project ledger. |
-| `V02` | Automated baseline gates | `PASS` | `app\tests\run_tests.bat unit`: 742 passed; Angular/Vitest: 23 files and 96 tests passed; production build completed with `--progress=false`. |
+The component ledger in [`project_status_ledger.md`](../project_status_ledger.md)
+is the authoritative status. This register maps each component to its primary
+tracked evidence so the chain from status to report is short.
 
-The disposable databases and occupied-port run roots were removed after the
-run. Ports `7690` and `9847` were verified free, and no matching
-launcher-owned backend/frontend process remained. The fresh and populated V01
-subcases are passing, but the occupied-port ownership failure is a reproducible
-launcher defect and blocks treating V01 as complete.
-
-## V01 remediation revalidation — 2026-09-21
-
-The original V01 checkpoint above is retained as historical evidence. The
-follow-up remediation was validated against the checked-out `develop` source
-with the launcher changes present in the working tree. Full evidence is in
-[ISSUE-006 / V01 remediation revalidation](../../QA/issue-006-v01-revalidation-20260921.md).
-
-| Slice | Status | Evidence boundary |
-|---|---|---|
-| Foreign backend listener on `7690` | `PASS` | PID `42608` survived; launch returned nonzero with the port/PID remediation and did not start the application. |
-| Foreign frontend listener on `9847` | `PASS` | PID `18324` survived; launch returned nonzero with the port/PID remediation and did not start the application. |
-| Explicit cleanup with foreign listener | `PASS` | Confirmed `KillApplicationProcesses` returned nonzero and left PID `29992` listening. |
-| Owned-process prompt and shutdown | `PASS` | Declined launch preserved the owned runtime; accepted launch stopped only the matched process tree, restarted successfully, and explicit cleanup released both ports. |
-| Fresh disposable SQLite startup | `PASS` | Two launcher initialization runs reached `202609170001`; health, frontend readiness, empty sessions, and SQLite integrity passed. |
-| Populated disposable SQLite startup | `PASS` | Clone initialization and launch retained 18 sessions, 50 versions, 28 revision runs, 90 artifacts, `foreign_key_check=[]`, and `integrity_check=ok`. |
-
-Current V01 status is therefore `PASS` for the source-launcher scope. The
-packaged desktop and clean-machine gates remain separate.
-
-## Current release assessment
-
-The original populated-database migration blocker has been remediated in source. SQLite migration transactions now suspend foreign-key enforcement only while Alembic performs the atomic parent-table rebuild, run `PRAGMA foreign_key_check` before commit, and restore the connection's prior enforcement state. In the historical 2026-09-18 audit, the fix was verified with foreign keys enabled in the migration fixture and with a task-local clone of the then-current populated database through `start_on_windows.ps1 -Action InitializeDatabase`; all existing clinical/revision row counts and SQLite integrity checks were preserved. The shared source database was intentionally not advanced by that historical run.
-
-Release readiness remains blocked by the independent revision-acceptance, local-inference, access-key, timeline, packaging, and clean-machine gates. A current synthetic clinical workflow has passed through the exact configured OpenCode Go model with report, evidence, and restart persistence; this bounded clinical PASS does not certify every provider response or clinical adjudication.
-
-The historical 2026-09-18 post-remediation register counts: `PASS 13`, `ATTENTION 3`, `FAIL 0`, `NOT TESTED 21`, `NOT APPLICABLE 2`.
-
-## Clinical and structured-source validation checkpoint — 2026-09-22
-
-This checkpoint supplements the historical 2026-09-18 feature-state register and the 2026-09-21 Tier 0 checkpoint. The baseline was clean `develop` HEAD `c61c9e02aa14a489703fce1ed09adb5c3575be8d`; the validation itself used the current working tree after surgical remediations. Synthetic data only. Structured-source mutations ran in `runtimes/cache/clinical-source-refresh-20260922-c61c9e0`; the original database was not used for mutation. It reached Alembic head `202609170001` with `integrity_check=ok` and no foreign-key violations.
-
-The run covers the aggregate Tier 2 clinical workflow intent (`V20`–`V24`) and the structured-source portion of the Tier 3 campaign (`V30`–`V40`). It does not assign individual subtest mappings to `V21`/`V22` or `V36`–`V39` where the campaign index does not define that mapping.
-
-| Capability | Status | Current run evidence |
-|---|---|---|
-| Exact-provider clinical workflow | `PASS` | Synthetic multi-drug job `3da3b0f0` completed as session 4 on exact OpenCode Go `deepseek-v4-flash`. Seven provider calls returned HTTP 200; no retry or provider/model fallback. Preflight passed, and a deliberately invalid case was blocked without a job/session. |
-| Extraction, resolution, calculation, and report | `PASS` | Nitrofurantoin, amoxicillin/clavulanate, and atorvastatin remained separate with accepted RxNav identities, direct LiverTox matches, per-drug assessments and provenance. 17 observations were dated across four dates. Independently computed R-score `(420/40)/(160/120)=7.875`, hepatocellular, matched the rendered report. RAG audit was valid; 18 references retrieved, 11 bibliography entries, no citation outside the bibliography. |
-| Session persistence and recovery | `PASS` | Session 4 survived browser reload and a standard-launcher application restart with report, inputs, labs, assessments, citations, metadata, and successful status intact. Case C live reload recovered the same running job `1d2a0770` without a duplicate session. |
-| Post-refresh clinical regression | `PASS` | After the ordered-source failure and DILIrank retry, a RAG-on synthetic case completed as successful session 5. It resolved Nitrofurantoin with RxNav/LiverTox/DILIrank, retrieved RAG evidence, rendered citations, and independently matched R-score `(300/40)/(140/120)=6.4286`; its overall adjudication correctly remained `insufficient_data`. |
-| Clinical cancellation | `PASS` | `VAL-20260922-007`: The first live Stop attempt exposed delayed cooperative cancellation. A stop-aware await boundary now cancels in-flight async extraction tasks before fallbacks can be written; its unit regression passed, and exact-provider retest job `ec61953e` reached terminal `cancelled` with `progress_status=cancelled` within two seconds. |
-| Ordered structured-source Update All | `PARTIAL` | Job `b47e8264` visibly ran in order: RxNav completed after 21,202 records, LiverTox failed because NCBI Bookshelf returned a CAPTCHA challenge, and DILIrank was explicitly skipped. The combined job ended failed at 35%, one of three completed. |
-| Source preservation and retry | `PASS` for the exercised boundaries | SQLite retained 1,593 LiverTox monographs and 1,336 DILIrank records and metadata through the failed combined run; integrity was `ok` and foreign-key violations were zero. Standalone DILIrank retry `eace912c` completed with 1,336 persisted rows (733 linked, 286 unmatched, 317 ambiguous), and the UI returned to Completed. Full all-source success remains externally blocked. |
-| Cancellation and failure regression | `PASS` for structured-source job behavior | A live combined-source cancellation after the backend correction rendered all three sources as cancelled with zero completed. Unit coverage exercises pending cancellation, child exception during cancellation, and failure after an earlier source. The progress UI accurately reports completed source count. |
-
-The NCBI Bookshelf CAPTCHA was not solved or bypassed. The downloader now identifies human-verification pages, reports the upstream block, and does not fall through to obsolete URLs. This is an external refresh blocker, not a clinical/provider PASS or a reason to treat the local archive as fresh data.
-
-Current focused gates: backend `102 passed, 1 skipped` (PostgreSQL persistence needs `TEST_DATABASE_URL`), clinical extraction/cancellation slice `14 passed`, Angular tracker specs `2 files / 7 tests passed`, Ruff passed, and `git diff --check` passed with only line-ending notices. The detailed run, `VAL-*` findings, source counts, and visual observations are in [the QA report](../../QA/clinical-analysis-and-source-refresh-2026-09-22.md).
-
-Final cleanup for this checkpoint completed after the read-only integrity checks: the disposable source clone and task-created bytecode caches were removed, the original database remained unchanged, standard launcher cleanup found no application processes, and ports `7690` and `9847` were free. Five ignored pytest cache directories under `app/tests/runtimes/cache/pytest` rejected an explicit removal attempt with an ACL denial; permissions were not widened, so that locked-path residue remains recorded for follow-up.
-
-## Revision acceptance validation — 2026-09-22
-
-This checkpoint continues the revision acceptance plan on local `develop` HEAD
-`5960fe29d4f6b6b41dc235d5dd177cb420a9487b` in the development app.
-Only synthetic session 22 (`Synthetic Case C`, source version 39) was used.
-The configured Revision role remained exactly `opencode_go /
-deepseek-v4-flash`; all recorded steps used that pair, with no fallback.
-No application source or test code changed. Detailed run IDs, draft hashes,
-QA findings, and cleanup are in the [revision acceptance report](../../QA/revision-acceptance-2026-09-22.md).
-
-| Capability | Status | Current run evidence |
-|---|---|---|
-| Exact-provider revision route | `PASS` for observed routing | Runs 30–35 used exact OpenCode Go `deepseek-v4-flash` steps with no fallback. Run 29 stopped at planning with `network_unavailable` and no HTTP status. Run 34 completed the accepted path; run 35 confirmed a subsequent request selected accepted source version 61 before deliberate cancellation. Latency remained variable, so the broader provider component stays partial. |
-| Deterministic edit and QA | `PASS` for the accepted path | Runs 30, 31, and 33 exercised failed and fail-closed edits. Run 32 reached the correct insertion position but was cancelled while QA remained active. Run 34 applied the unique anchored patch before `## Bibliography`; deterministic validation passed and LLM QA reported zero blocking issues. |
-| QA-blocked draft persistence | `PASS` for the exercised failure path | Run 30 retained its draft and both failed QA artifacts. After navigating away and reloading, the UI still showed the QA-blocked state, 13 steps, 7 artifacts, and that the current report remained unchanged. Source report hash and synthetic session fields matched their pre-run values. |
-| Accepted child and subsequent lineage | `PASS` for the synthetic development path | Run 34 created child session 24/version 61 from source version 39 with `version_status=llm_qa_passed`, `llm_qa_status=passed`, `revision_kind=llm_assisted_revision`, and the exact pipeline ID. The child report exactly matched the 9,272-character persisted draft. Navigation away, full browser reload, source-session reopen, and child-session reopen all preserved the accepted result and the source report. Run 35 then persisted `source_version_id=61` from session 24 before UI cancellation, proving current-version selection without creating a second child. |
-| Focused backend/frontend regressions | `PASS` | Backend revision/provider and repository persistence suite: 88 passed, 1 skipped, 1 deprecation warning. Angular revision spec: 1 file, 4 tests passed. |
-| Production frontend build | `ATTENTION` | Both `npm.cmd run build -- --progress=false` under system Node 22.23.1 and the Angular CLI build under bundled Node 22.13.0 exited `0xC0000005` before producing build output. This host did not verify a production build; no application-code diagnostic was emitted. |
-
-The development database remained at Alembic head `202609170001`, with
-`integrity_check=ok` and no foreign-key violations after the attempts. The
-task-started processes were stopped and ports `7690` and `9847` verified free.
-`model.provider.opencode-go` remains `PARTIAL` because its broader provider
-matrix and variability requirements exceed one successful revision.
-`revision.accepted-session-finalization` is `VALIDATED` for the stated
-synthetic development scope. The automated regression component is `PARTIAL`
-for this checkpoint because its focused test slices passed but the requested
-production build did not complete.
-
-## Production frontend build host comparison — 2026-09-22
-
-This follow-up used `develop` HEAD
-`7d797e8a7bae10e86fa28f4e53409f8f81ccbb26`, the documentation-only successor
-to the revision-acceptance checkpoint above. The worktree was clean at task
-start. Windows reported build host `10.0.26200.0`, PowerShell `7.6.6`, and the
-launcher-provisioned Node.js `v22.13.0` / npm `10.9.2`. No application source
-or test files changed.
-
-| Gate | Result |
+| Component | Primary evidence |
 |---|---|
-| Fresh frontend install | `npm ci --ignore-scripts --no-audit --no-fund` against a new isolated cache first failed because sandboxed registry fetches returned `EACCES`; rerunning with network access installed 471 packages successfully. |
-| Frontend tests | `npm run test -- --no-watch`: 23 files, 97 tests passed, exit code 0. |
-| Direct production build | `npm run build -- --progress=false` terminated with `-1073741819` (`0xC0000005`) before Angular emitted build output or a diagnostic. |
-| Launcher rebuild | `start_on_windows.ps1 -Action RebuildFrontend` recognized Node `22.13.0` and reused installed dependencies, then failed on the same `0xC0000005` from `npm.cmd run build`. |
-| Exact-SHA Windows CI | [Run 35764186160](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35764186160) used this exact SHA. `Setup Node`, frontend install, frontend tests, and `Build frontend` passed. The overall CI run failed later at the full browser E2E step; `security-scan` and `backend-quality` also failed, `persistence-contract` passed, and live-provider E2E was skipped. |
-| Existing build reuse | Two standard launcher starts reported the build marker current and skipped frontend dependency synchronization and Angular build. `/api/health` and `/` returned HTTP 200, with page title `DILIGENT Clinical Copilot`; the served index SHA-256 was `8085087A6FFFD895D7B181377C37D369B2729AF7C88C44D29EAF063DEE6F1353`. The launcher action exited 1 only when the sandbox denied opening the default browser after both services were serving. This verifies current marker reuse, not fresh local build generation. |
-| Crash diagnostics and cleanup | No matching recent Application log event 1000/1001 or user-local `node.exe` crash dump/WER report was found. The native faulting module remains unknown. Task-owned listener PIDs and executable paths were rechecked before stop; both configured ports were free after cleanup. |
-
-The direct and launcher build failures are classified as specific to this
-isolated validation host because the exact SHA passed the production build on
-hosted Windows CI with Node `22.13.0`. No repository-owned cause was reproduced
-and no application workaround was introduced. Keep `test.automated-regression`
-`PARTIAL` until a fresh pinned local build succeeds or host-level diagnostics
-resolve the native failure. The overall hosted CI run was not green, and its
-other failure gates remain independent.
-
-The focused report and raw logs are under
-[`assets/QA/frontend-build-validation-2026-09-22/`](../../QA/frontend-build-validation-2026-09-22/report.md).
-
-## Timeline cancellation validation — 2026-09-23
-
-This checkpoint started from clean `develop` HEAD
-`91404256dce1aa1d538727c80822719699576df4`. It covers the cancellation
-subgate only. The overall `sessions.timeline` status remains `PARTIAL` because
-dated fallback fidelity, browser retry, and controlled persistence-failure
-behavior remain unverified.
-
-The official `start_on_windows.ps1 -Action Launch` rebuilt and started the
-application on ports 7690/9847 using a disposable SQLite database in the QA
-folder. The Browser used synthetic session 1, `Synthetic Timeline Cancellation
-QA`; the visible Timeline page showed the configured role label `qwen3.5:2b`.
-A temporary environment-gated QA hook replaced the asynchronous timeline
-extractor with a local awaitable that blocks until cancelled. The hook was
-loaded before backend startup and removed from the source tree afterward, so
-the run did not contact a provider or modify provider/model settings or
-credentials. The disposable database was removed after the evidence check.
-
-| Gate | Result |
-|---|---|
-| Backend cancellation and retry regression | `app/tests/unit/test_data_inspection_repository.py -k timeline_job`: 2 passed, including interruption during extraction, terminal `cancelled`, zero persistence, and a later successful generation. |
-| Frontend API/component regressions | 2 focused Angular spec files, 6 tests passed; includes the typed `DELETE` request, visible Stop/stopping/terminal states, request failure, and completion-race reconciliation. |
-| Ruff | Passed for the changed backend service, timeline module, and repository test. |
-| Official launcher build and health | Fresh production frontend build completed; backend `/api/health` returned `{"status":"ok"}`. |
-| In-app Browser cancellation flow | Stop was visible while status was `In progress`; after click the UI showed `Stopping…` while polling; the terminal view showed `Timeline generation cancelled.` and the enabled Generate Timeline control. |
-| Timeline history and storage | The terminal Browser view showed `No generated timelines yet`; a read-only SQLite check while the runtime was active found 0 rows in `clinical_session_timelines`, then the disposable database was removed after shutdown. |
-| Cleanup | Launcher-owned backend/frontend process trees were identity-checked and stopped; ports 7690 and 9847 were confirmed free. |
-
-The Browser accessibility-state excerpts and reproduction details are in
-[`assets/QA/timeline-cancellation-20260923/report.md`](../../QA/timeline-cancellation-20260923/report.md).
-The in-app Browser screenshot was inspected inline; this Browser surface did
-not expose a disk-export path, so the report preserves the observed rendered
-text and state without claiming a screenshot file. This is controlled local
-evidence, not live-provider validation.
-
-## Timeline fallback date fidelity and recovery — 2026-09-23
-
-This checkpoint started from clean `develop` HEAD
-`7ceacb5919e35a7a018e985be7c60fb65b4b7afd`. It covers source-date
-preservation, retry after a fallback, and persistence-failure recovery. The
-overall `sessions.timeline` gate remains `PARTIAL`: the Browser run used
-test-injected faults and a controlled extractor, so it does not establish live
-provider behavior.
-
-The official `start_on_windows.ps1 -Action Launch` ran against a disposable
-SQLite database under `runtimes/cache/qa/timeline-recovery-20260923/` on ports
-7690/9847. The seeded session contained synthetic symptom, medication, and ALT
-text. The Timeline page displayed the assigned `qwen3.5:2b` local model. A
-temporary, environment-gated `sitecustomize.py` hook was loaded into the
-backend process only; it replaced extractor call 1 with a controlled
-`network_unavailable` failure, returned a synthetic event on retry calls, and
-raised a one-time persistence exception on save call 2. The hook's event log
-confirmed the sequence. Provider settings, credentials, and the shared
-database were not changed, and no model request was sent.
-
-| Gate | Result |
-|---|---|
-| Backend date and transaction coverage | `app/tests/unit/test_data_inspection_repository.py -k "timeline or fallback_date_extraction"`: 21 passed, 7 deselected. Covers day/month/year precision, duplicate same-date tokens, missing/relative/invalid/ambiguous sources remaining undated and uncertain, no visit-timestamp inference, SQLite failure rollback, and successful retry. |
-| Frontend retry coverage | Full Angular/Vitest suite: 24 files and 102 tests passed; includes Generate re-enabled after fallback and persistence failure, followed by a successful retry. |
-| Ruff and whitespace | Ruff passed for all changed Python files, including the source, backend test, synthetic-session seed, and controlled fault hook; `git diff --check` passed. |
-| Official launcher | Launch reused the current frontend build, started backend/frontend, and passed its `/api/health` readiness check. |
-| In-app Browser fallback | After injected provider failure, the saved fallback showed 3 events: therapy `2025-01` at month precision, and symptoms and ALT at `2025-01-17` at day precision. Each event showed explicit placement and its source text. |
-| In-app Browser persistence error | Generate was enabled after fallback. The second attempt showed `Controlled QA timeline persistence failure.`; Generate became enabled again and history still showed only fallback timeline #1. |
-| In-app Browser successful retry | The third attempt showed `Timeline generated and saved.` and a second saved timeline. Reopening it showed the controlled synthetic event on `17 Jan 2025`. The app's `LLM generated` label reflects the exercised application success path only; the event came from the test hook, not an LLM. |
-| Read-only SQLite check | Exactly two rows remained after the sequence: fallback #1 and successful retry #2. The failed save did not add history. The focused backend trigger test separately confirmed history stayed empty after a failed first save before its retry. |
-| Cleanup | Launcher-owned backend/frontend trees were identity-checked and stopped; ports 7690/9847 were verified free. The disposable database, hook log, and test basetemp were removed. |
-
-Browser accessibility-state excerpts, hook setup, seed data, and reproduction
-details are in
-[`assets/QA/timeline-recovery-20260923/report.md`](../../QA/timeline-recovery-20260923/report.md).
-The Browser screenshot was inspected inline; the Browser surface did not
-provide a disk-export path, so the report records the rendered text and state
-without claiming a screenshot artifact. This is controlled local evidence,
-not live-provider validation.
-
-## Configured live Ollama timeline lane — 2026-09-23
-
-This checkpoint started from `develop` HEAD
-`7c75e51b9910a0db85ea87f225b4d542e2a76518`. The official launcher ran against
-a synthetic session and a disposable SQLite database under
-`runtimes/cache/qa/timeline-live-revalidation-20260923/`. Settings and the
-Timeline panel both showed the configured `Local (Ollama)` / `qwen3.5:2b`
-lane; the loaded Ollama catalog marked that model installed. The shared
-database, `.env`, runtime model settings, and credentials were not changed.
-
-| Gate | Result |
-|---|---|
-| Pre-fix live output | Two same-lane generations both persisted an unsupported `Onset of Hepatitis B infection` event dated `2022-05-18`. Its alleged acute-care/HBV evidence did not occur in the synthetic source. Both rows were incorrectly attributed to `model_provider=openai` despite `source_kind=local` and `source_model=qwen3.5:2b`. |
-| Evidence guard and provenance fix | Nonempty model evidence is now required to occur within one source text field after case folding and whitespace normalization. Unsupported evidence follows `invalid_response` and the existing deterministic fallback. The prompt requests a verbatim quote; local history metadata records `ollama`. No public API or type contracts changed. |
-| Focused backend regressions | Six selected tests passed, including unsupported evidence rejection, valid grounded extraction, fallback handling, and local/cloud provenance assertions. |
-| Ruff and whitespace | Ruff passed for the changed Python files with pre-existing `DTZ001` naive-datetime findings ignored; the new test timestamp uses UTC. `git diff --check` passed. |
-| Official launcher and preflight | `/api/health` returned `ok`. In Settings and Timeline, the effective source was Local (Ollama) and the assigned Timeline model was `qwen3.5:2b`; no fallback lane was selected. |
-| In-app Browser live generation | Generate and one Regenerate ran on the same configured lane. Both saved entries showed `Fallback chronology` with `Invalid structured provider response`; no unsupported event was saved. The fallback showed therapy at `2025-01` month precision and symptoms and ALT at `2025-01-17` day precision, each with source evidence. |
-| Read-only SQLite and reload | Two rows persisted, both `fallback` / `invalid_response`, model `qwen3.5:2b`, source kind `local`, provider `ollama`. After navigating away and reloading, Browser history still showed timelines #2 and #1 with three evidence-backed events each. |
-| Gate boundary | No source-grounded `llm_generated` result was obtained. Timeout, authentication, and rate-limit paths were not tested or manufactured. `sessions.timeline` remains `PARTIAL`. |
-| Cleanup | Both disposable databases and the focused test cache are temporary under `runtimes/cache/qa/`. Launcher cleanup misclassified its own listeners; exact DILIGENT process paths, commands, and PIDs were verified before stopping only task-started app processes. Ports 7690/9847 were verified free; the user-started Ollama process remained running. |
-
-Browser observations and the read-only database evidence are recorded in
-[`assets/QA/timeline-live-validation-20260923/report.md`](../../QA/timeline-live-validation-20260923/report.md).
-The rendered fallback chronology and history list were visually inspected in
-the in-app Browser. Its screenshot surface did not provide a disk-export path,
-so no screenshot artifact is claimed. The post-fix error category is recorded
-as exposed by the Browser/database; no timeout, authentication, or rate-limit
-failure was simulated.
-
-## Tier 4 timeline model and recovery validation — 2026-09-23
-
-This campaign started at develop HEAD e933d3008a5773e52b21a676bd8d9b10964ca75d.
-The official launcher ran on ports 7690/9847 against the isolated SQLite
-backup at runtimes/cache/qa/timeline-model-matrix-20260923/timeline-model-matrix.db.
-Synthetic sessions 25, 26, and 27 used identical anamnesis, medication, and
-laboratory text; the seed helper and full report are in
-[the timeline model matrix QA folder](../../QA/timeline-model-matrix-20260923/report.md).
-The shared database and saved settings were not modified. The local catalog
-refresh confirmed qwen3.5:2b and qwen3.5:9b installed. The configured
-OpenCode Go route was deepseek-v4-flash, whose catalog identity is DeepSeek
-V4.1 Flash. No credential value was output or changed.
-
-| Gate | Result |
-|---|---|
-| Focused backend timeline regressions | 45 passed across timeline retry behavior, error diagnostics, and repository persistence tests. Synthetic timeout and rate-limit errors retried successfully; authentication did not retry; timeout, authentication, and rate-limit fallback codes persisted. No real authentication failure or rate limit was triggered. |
-| Timeline component specs | 12 passed, including the timeout, authentication, and rate-limit fallback labels. |
-| Ruff | All changed Python files passed with pre-existing DTZ001 findings ignored; the two focused retry/diagnostic files passed without ignores. The repository test file has 14 untouched naive-datetime findings. |
-| Official launcher and browser | Launcher readiness returned backend health status ok. Settings and each Timeline panel showed the selected role model. Browser error/warning logs were empty, and the rendered timeline was visually inspected inline. |
-| qwen3.5:2b | Session 25 reached local Ollama and stored source_model qwen3.5:2b, source_kind local, and model_provider ollama. It saved Fallback chronology / invalid_response with three fallback_parser events. The UI showed the failure class and retained month precision for medication and day precision for symptoms and ALT. History survived reload. |
-| qwen3.5:9b | Session 26 stored the exact local Ollama provenance and an LLM-generated three-event timeline. Symptom and ALT evidence exactly matched the source at explicit day precision. The medication evidence matched the source at month precision and was marked inferred with a review note. The event Source field was Not reported and confidence was Not scored for all three events. History survived reload. |
-| DeepSeek V4.1 Flash | Session 27 used cloud / opencode_go / deepseek-v4-flash and stored three LLM-generated events with exact evidence and displayed sources from anamnesis, laboratory_analysis, and drugs. The symptom and ALT dates were day-precision; medication was month-precision. History survived reload. |
-| Read-only SQLite | Exactly one saved timeline was present per synthetic session. Session 25 persisted fallback / invalid_response and fallback_parser sources; session 26 persisted llm_generated with null event-level Source fields; session 27 persisted llm_generated with provider opencode_go and the three expected source fields. |
-| Gate boundary | sessions.timeline remains PARTIAL because qwen3.5:2b still produced no grounded LLM timeline. The local Ollama gate remains PARTIAL. This single timeline route does not promote the broader OpenCode Go provider gate. |
-| Cleanup | Task-started app processes and the isolated database/test basetemp folders were removed; ports 7690/9847 were verified free. The user-started Ollama service remained running. |
-
-The Browser screenshot was inspected inline. The Browser surface did not
-provide a disk-export path, so no screenshot file is claimed. No API, public
-type, or database schema changes were made.
-
-## Timeline source attribution validation — 2026-09-23
-
-This slice started from clean `develop` HEAD
-`309ad24558b0bafa68cd4c2827581431499b037d`. The official launcher used the
-isolated SQLite database in
-[`assets/QA/timeline-source-attribution-20260923/`](../../QA/timeline-source-attribution-20260923/)
-and synthetic sessions 1 and 2, which had identical anamnesis, medication,
-and laboratory input. The shared database, saved model settings, and
-credentials were not changed. The Timeline role was switched from 2B to 9B
-only inside the isolated QA database.
-
-The prompt now asks for the canonical field containing each verbatim evidence
-quote. The extractor derives the existing `source` field only after the
-evidence passes validation. Direct fields and same-name copies in `sections`
-count as one field; quotes missing from source text or present in multiple
-distinct fields do not receive a label. Conflicting model-supplied labels are
-overwritten. The fail-closed `invalid_response` guard remains intact; API,
-schema, and database contracts did not change.
-
-| Gate | Result |
-|---|---|
-| Focused backend timeline/retry/diagnostic/repository regressions | 56 passed, 7 deselected. Existing warnings: pytest `cache_dir` config option is unknown and Google GenAI emits a deprecation warning. |
-| Timeline component specs | 12 passed. |
-| Ruff and whitespace | All changed Python files passed `ruff check --no-cache`; `git diff --check` passed. |
-| `qwen3.5:2b` live lane | Two generations both saved fallback / `invalid_response`; each retained three evidence-backed fallback events. Each row stored `source_kind=local`, `model_provider=ollama`, `source_model=qwen3.5:2b`. The fallback retained `2025-01` month precision for medication and `2025-01-17` day precision for symptoms and ALT. |
-| `qwen3.5:9b` live lane | Two generations both saved `llm_generated` with three evidence-backed events. Each row stored `source_kind=local`, `model_provider=ollama`, `source_model=qwen3.5:9b`. The evidence mapped to `drugs`, `laboratory_analysis`, and `anamnesis`; medication remained at month precision and symptoms/ALT at day precision. All Source values rendered in the event cards and details. |
-| Confidence | The 9B model omitted confidence and rationale. Both persisted as null and the UI showed “Not scored” / “Not reported”; no confidence was invented. |
-| Persistence and input parity | All four timeline rows persisted in the isolated DB; each generation survived reload in history. The synthetic direct source fields for sessions 1 and 2 were equal. SQLite `integrity_check` returned `ok`; `foreign_key_check` had zero violations. |
-| Browser console | The in-app Browser provided accessible UI state and screenshots but no console-log reader. The DevTools shortcut did not open a console. Errors and warnings remain unverified and are not claimed empty. |
-| Gate boundary | `sessions.timeline` and `model.provider.local-ollama` remain `PARTIAL` because both exact 2B runs still returned `invalid_response`. The 9B source-label gap is resolved for the exercised synthetic case. Broader OpenCode Go and revision gates remain partial; source catalog/refresh remain partial while NCBI presents a browser verification challenge; automated regression remains partial pending host/build diagnostics and a full green run; access-key management and desktop release remain blocked on prerequisites. The RAG duplicate-file policy still needs a product decision. |
-| Cleanup | Verified task-started DILIGENT processes were stopped; ports 7690/9847 were free. The user-started Ollama process remained running. The isolated DB and focused pytest basetemp were removed after evidence capture. |
-
-The full evidence and limitations are recorded in
-[`assets/QA/timeline-source-attribution-20260923/report.md`](../../QA/timeline-source-attribution-20260923/report.md).
-The Browser-rendered Source values were inspected inline; no screenshot file
-is claimed because the Browser surface did not export one.
-
-## Local timeline model gate revalidation — 2026-09-23
-
-Revalidated from clean `develop` HEAD
-`07f7bba7908b202d3cc8683a7c1b6db79c45dd40`, equal to `origin/develop` at
-start. The official launcher started the backend and frontend against the
-isolated database in
-`runtimes/cache/qa/timeline-local-gate-20260923/`; health and frontend HTTP
-checks returned 200. The launcher's automatic default-browser open failed
-with access denied. The embedded Browser panel was 559 pixels wide and showed
-the application's 1100-pixel minimum-width message, so the rendered workflow
-was inspected in the Codex-controlled full-width Chrome surface. Only
-synthetic sessions were used; shared data, saved runtime configuration, and
-credentials were not changed.
-
-| Gate | Result |
-|---|---|
-| `qwen3.5:2b` live lane | Two generations persisted as fallback / `invalid_response`, each with three evidence-backed `fallback_parser` events. Both rows stored local / Ollama / `qwen3.5:2b` provenance; medication stayed at month precision and symptoms and ALT at day precision. The server log classified both failures as `_UnsupportedTimelineEvidenceError` after structured response parsing, at source-evidence validation. |
-| `qwen3.5:9b` live lane | Two generations persisted as `llm_generated`, each with three events and local / Ollama / `qwen3.5:9b` provenance. Exact quotes mapped to `drugs`, `laboratory_analysis`, and `anamnesis`; medication stayed at month precision and symptoms and ALT at day precision. The rendered Source values matched evidence-derived fields. Confidence and rationale remained unset when omitted. |
-| Browser and persistence | The rendered chronology and event inspector showed the correct model, evidence, source labels, and timing. Reload retained both 2B fallbacks and both 9B timelines. |
-| Focused backend suite | 70 passed, 7 deselected across patient/lab timeline extraction, retry, diagnostics, and timeline repository tests. Pytest emitted the existing unknown `cache_dir` option warning and a Google GenAI deprecation warning. |
-| Full Angular/Vitest suite | 24 test files and 105 tests passed with `npm run test -- --no-watch`. |
-| Ruff and SQLite | The synthetic seeder passed `ruff check --no-cache`; SQLite `integrity_check=ok`, with zero `foreign_key_check` rows. |
-| `test.automated-regression` | Remains `PARTIAL`: hosted run [35895672146](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35895672146) on validation commit `a004078879fbf3ce4da1b4350f893ad1403f2a3d` passed frontend tests/build and the SQLite/PostgreSQL persistence contract, but failed Alembic drift validation, Python dependency audit, and Windows browser E2E; live-provider E2E was skipped. The local fresh production build's `0xC0000005` also remains unresolved. |
-
-The detailed evidence is in
-[`assets/QA/timeline-local-gate-20260923/report.md`](../../QA/timeline-local-gate-20260923/report.md).
-The 2B guard correctly rejected unsupported model evidence; no prompt or
-extractor defect was found, so no implementation change or guard weakening was
-made. `sessions.timeline` and `model.provider.local-ollama` remain `PARTIAL`
-until grounded 2B output and broader model coverage are demonstrated. NCBI
-catalog/refresh, OpenCode Go, API-route, RAG duplicate-file, accessibility,
-access-key, and desktop release work remain separate; access-key and release
-gates remain `BLOCKED` on their documented prerequisites.
-
-## Automated regression gate revalidation — 2026-09-23
-
-This scope started from clean `develop` HEAD `f61a9ff6`, equal to
-`origin/develop`. It rechecked the current regression implementation after
-hosted run [35895672146](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35895672146)
-reported migration drift, dependency-audit findings, and a browser E2E
-failure. All runtime and test data used a disposable SQLite database; no
-shared database, saved model settings, or credentials were changed.
-
-The audit identified two CVEs in the direct `anyio==4.9.0` pin
-(`CVE-2026-63374` and `CVE-2026-64847`), with `4.14.2` listed as the fixed
-version. The direct pin and `uv.lock` now use `anyio==4.14.2`. The hosted E2E
-failure was an obsolete test expectation: `DiliJobTrackerService` persists an
-active job in `dili-agent-active-job-v1` and reconnects after reload, while
-the test expected the job to disappear. The test now checks that the saved
-job resumes, completes without a duplicate submission, renders its report,
-and clears the persisted marker. The reported migration drift did not
-reproduce on a fresh local SQLite database.
-
-Hosted rerun [35907570582](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35907570582)
-then showed that CI had not created the parent directory for its disposable
-SQLite migration database. The workflow now creates that directory before
-Alembic starts; a local run from a deliberately absent parent passed all
-three migration commands. Run 35908387779 passed this migration check and
-surfaced two Pyright errors in cancellation helpers that scheduled a generic
-`Awaitable` directly. The helpers now wrap the awaitable in a typed coroutine;
-local Pyright and focused cancellation tests passed.
-
-The final exact-SHA hosted run
-[35908957190](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35908957190)
-completed successfully on `3e73082f619024140cfdb92340831f450c6a3e13`.
-All configured jobs passed: backend migration/Ruff/Pyright/unit, Python,
-Angular, desktop, and Rust audits, SQLite/PostgreSQL persistence, and the
-Windows frontend/build/browser lane. The workflow-dispatch-only live-provider
-job was skipped as configured.
-
-| Gate | Result |
-|---|---|
-| Locked dependency install | `uv sync --locked --project app/server --all-extras` installed `anyio 4.14.2` into the existing server venv. |
-| Python dependency audit | CI-equivalent export and strict `pip-audit` completed with `No known vulnerabilities found`. |
-| Fresh SQLite migration and metadata check | `upgrade head`, `current --check-heads`, and `check` passed at `202609170001`; Alembic reported no new operations. |
-| Backend tests | Full unit suite: `789 passed`, with 7 existing deprecation warnings. Model-config focused suite: `40 passed`, with one Google GenAI deprecation warning. |
-| Browser E2E | Before the assertion fix, the full suite reproduced the single hosted failure (`40 passed, 5 skipped`). Afterward the focused recovery test passed and the full suite passed (`41 passed, 5 skipped`). |
-| In-app Browser smoke | The isolated source runtime rendered the DILI Agent shell, primary navigation, clinical input, and empty report state. No analysis was submitted. |
-| Exact-SHA hosted backend and persistence | Run `35908957190` passed migration/drift (`No new upgrade operations detected`), Ruff, Pyright (`0 errors`), backend unit (`789 passed, 7 warnings`), security audits, and SQLite/PostgreSQL persistence contract. |
-| Exact-SHA hosted Windows regression | Frontend: `24 files, 105 passed`; production build passed; model-config suite `40 passed, 1 warning`; browser E2E `39 passed, 7 skipped`. |
-| Build boundary | The official launcher verified the stored frontend fingerprint and reused the existing output. A fresh local production build was not generated; the separate local `0xC0000005` host failure remains open, although the hosted Windows build passed. |
-
-The seven hosted E2E skips are conditional: live-provider and pinned
-multilingual embedding tests require explicit opt-in; two model API tests
-need an available Ollama model; and three session/timeline UI tests need
-persisted sessions absent from the isolated CI database. The separate live-
-provider workflow lane also requires explicit dispatch and a repository
-secret. `test.automated-regression` remains `PARTIAL` because the fresh local
-production-build crash is unresolved and provider, embedding, Ollama, and
-persisted-session coverage remains unrun. No provider call, access-key
-mutation, package, or release gate is claimed here. The disposable database
-and test caches were removed, and ports `7690` and `9847` had no listeners
-after validation.
-
-## Automated regression local-build follow-up — 2026-09-24
-
-This follow-up started from clean develop HEAD
-13f6c7a079122934e4c614452421dd1ef8792e54, equal to origin/develop. The HEAD is
-a documentation-only successor to application source commit
-3e73082f619024140cfdb92340831f450c6a3e13, which passed hosted CI run
-35908957190. The status ledger named the fresh local production frontend build
-as the next action for test.automated-regression.
-
-On Windows NT 10.0.26200.0 with PowerShell 7.6.6, the official launcher used
-Node.js 22.13.0 and npm 10.9.2. From app/client, npm run test -- --no-watch
-passed with 24 test files and 105 tests. Then start_on_windows.ps1
--Action RebuildFrontend reused the installed dependencies and completed npm
-run build with exit code 0. Angular generated the production bundle in 9.894
-seconds. The resulting build-state marker records the current build and
-dependency fingerprints and Node 22.13.0. The [focused report](../../QA/frontend-build-validation-2026-09-24/report.md)
-contains the command logs and the reviewed incomplete gates.
-
-After this checkpoint was pushed as commit
-d1dc431df277a4d06e3acd745cbc25facb93ecf2, exact-SHA hosted CI run
-[35967078491](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/35967078491)
-completed successfully on that commit. Security scan, backend quality, Windows
-regression, and persistence passed. The live-provider job was skipped because
-the push event does not satisfy its workflow-dispatch and run_provider_e2e
-conditions. This leaves the live-provider lane unrun.
-
-The earlier local 0xC0000005 build failure did not reproduce on this run. Its
-native cause remains unknown, so this is evidence of a successful current
-build, not a diagnosis of the older fault. Keep test.automated-regression
-PARTIAL because the hosted live-provider lane and conditional E2E cases remain
-unrun; their credential, opt-in, model-availability, and persisted-session
-preconditions are unchanged. No local backend, database, provider, or
-application server was started or changed; ports 7690 and 9847 were free
-after the checks.
-
-The next coherent validation slice is the isolated local timeline pair:
-sessions.timeline and model.provider.local-ollama. Recheck qwen3.5:2b
-grounding alongside the qwen3.5:9b comparison, with evidence, source
-attribution, date precision, provenance, rendering, and reload checks. Keep
-the pair PARTIAL until grounded 2B output is observed. The other active
-partial and blocked gates are recorded in the focused report and remain
-separate because they depend on provider credentials, upstream NCBI
-availability, release prerequisites, or different workflow scope.
-
-## Isolated local timeline pair revalidation — 2026-09-24
-
-This slice followed the next action above and started on `develop` at clean
-HEAD `85cdf3515c3d054a6aee7fc06d64816e02252e4e`, equal to `origin/develop`.
-The official Windows launcher used a disposable SQLite database and isolated
-data root. Two synthetic sessions contained a symptom date, medication month,
-and lab date. The exact `ollama / qwen3.5:2b` and
-`ollama / qwen3.5:9b` routes were exercised in the in-app Browser.
-
-Both runs saved a fallback chronology: timeline 1 for 2B and timeline 2 for
-9B, each with `generation_error_code=unknown`, exact local/Ollama/model
-provenance, and three evidence-backed `fallback_parser` events. The medication
-remained month precision (`2025-01`); symptom and lab remained day precision
-(`2025-01-17`). The rendered history and event evidence were inspected, and
-both records survived reload. No model-generated timeline succeeded in this
-pair. The exact request exceptions were not captured, so the `unknown` records
-cannot be attributed to model quality, provider failure, or timeout.
-
-The isolated parser timeout setting was 3,600 seconds, but the timeline
-service caps its outer wait at 300 seconds. Separate short non-clinical direct
-Ollama probes took about 127 seconds for cold 9B and 96 seconds for 2B; they
-are runtime-performance context only and do not establish timeline quality.
-Cold-start and local throughput are plausible contributors to the long
-browser runs, but remain inference without the original exception. The
-in-progress browser view remained at 25% until reload; the job terminal state
-was not captured, so a progress-display defect is not confirmed.
-
-The classifier previously mapped a bare `TimeoutError()` with no message to
-`unknown`. It now recognizes the exception type, and the focused diagnostics
-suite passed **9 tests with 1 existing Google GenAI deprecation warning**.
-This corrects a proven classification gap but is not claimed to explain either
-of the two observed persisted failures. The detailed evidence, environment,
-limitations, open gates, and cleanup record are in the
-[local timeline pair report](../../QA/timeline-pair-validation-20260924/report.md).
-
-Final status: `sessions.timeline` and `model.provider.local-ollama` remain
-`PARTIAL`; exact-lane grounded output and request-specific failure attribution
-are still required. `test.automated-regression` remains `PARTIAL` despite the
-focused test passing because hosted live-provider and conditional E2E lanes
-remain unrun. Catalog/source refresh, credential, OpenCode, revision, RAG,
-accessibility, API catalog, and release leftovers remain separate as documented
-in the focused report. The disposable runtime and test cache/data were removed;
-the shared settings and database were not changed.
-
-## Focused local timeline failure attribution — 2026-09-24
-
-This follow-up started on `develop` at `a0566a6a77a5744c90e534c520ff94cd7d444184`,
-equal to `origin/develop`, and revisited the timeline/provider leftovers from
-the pair above. The official Windows launcher used a task-owned SQLite runtime
-with two synthetic sessions and exact local routes `ollama / qwen3.5:2b` and
-`ollama / qwen3.5:9b`.
-
-The 2B run persisted a fallback with `generation_error_code=invalid_response`.
-Its server trace records eight Pydantic validation errors for
-`PatientTimelineExtraction`: the response had JSON-Schema-shaped fields rather
-than a timeline instance. This is a model-response structured-output failure
-for that request. It was not a timeout, API transport, job polling, or rendering
-failure; the UI displayed the invalid-response classification and retained
-three evidence-backed fallback events with month/day precision. A single run
-does not prove that model size or performance caused the output defect.
-
-The 9B run persisted `llm_generated`, with three source-backed events and no
-generation error. The rendered detail identified evidence from the synthetic
-drug, laboratory, and anamnesis inputs, preserved month/day precision, and
-survived reload. Both persisted rows retained exact local/Ollama/model
-provenance. Read-only SQLite checks returned `integrity_check=ok` and zero
-foreign-key violations.
-
-A first PowerShell timing wrapper exited `0xC0000005` without request output;
-the following endpoint check found Ollama unavailable. That attempt is
-classified as a harness/runner failure with unknown failing stage and supplies
-no model-quality evidence. A Python standard-library client then completed
-four direct non-clinical requests (`Reply exactly OK.`, four-token limit):
-`qwen3.5:2b` cold 14.98 s / warm 0.079 s and `qwen3.5:9b` cold 39.22 s / warm
-0.605 s. These timings characterize local API latency only and cannot establish
-timeline schema conformance or grounding. They also do not back-attribute the
-prior pair's `unknown` fallbacks.
-
-The focused diagnostics suite passed **9 tests, 1 existing Google GenAI
-deprecation warning**; Ruff passed for the timeline service and focused test.
-The detailed evidence, exact failure classes, remaining independent gates, and
-cleanup record are in the [local timeline diagnostics report](../../QA/timeline-local-model-diagnostics-20260924/report.md).
-
-Final status: `sessions.timeline` and `model.provider.local-ollama` remain
-`PARTIAL`: the current 9B lane generated a grounded timeline, while the current
-2B lane failed the structured-output contract; the earlier pair's `unknown`
-errors remain unattributed, and repeatability is not established.
-`test.automated-regression` remains `PARTIAL`; hosted live-provider dispatch
-and conditional E2E prerequisites are still outstanding. The separate
-OpenCode/revision, NCBI source refresh, credential, API catalog, RAG policy,
-accessibility, container, and release gates retain their documented statuses
-and blockers.
-
-The disposable runtime and its synthetic data were removed after listener
-ownership checks. The shared settings and database were not changed.
-
-## Exact local timeline repeatability — 2026-09-24
-
-This slice started on clean develop HEAD 38b6a5380d69cfc1421d3580f6100f7592cf8c2e, equal to origin/develop. The official Windows launcher initialized and launched the application against an isolated SQLite database at assets/QA/timeline-local-model-repeatability-20260924/runtime-data/resources/database.db. The task-owned Ollama service reported the exact installed qwen3.5:2b and qwen3.5:9b digests; no model download or provider/model substitution occurred.
-
-Three synthetic sessions used identical, source-backed facts: acetaminophen taken in 2025-01, symptoms starting 2025-01-17, and ALT 75 U/L on 2025-01-17. Clinical Sessions showed the Timeline role set to qwen3.5:2b for the two independent cases. The role alone was then changed and saved as qwen3.5:9b for the control.
-
-Timeline 1 for session 1 and timeline 2 for session 2 each persisted as llm_generated with source_kind=local, model_provider=ollama, source_model=qwen3.5:2b, no generation error, and events=[]. The rendered detail views identified the exact model and showed 0 of 0 events; both saved pages retained the same empty records after reload. Because there were no events, neither case supports a source-evidence or date-precision claim. Each source did contain all three dated facts.
-
-Timeline 3 for session 3 persisted as llm_generated from qwen3.5:9b with three source-backed events. The rendered page and event inspector showed an acetaminophen event from drugs at month precision (2025-01), an ALT event from laboratory_analysis at day precision (2025-01-17), and symptom onset from anamnesis at day precision (2025-01-17). The quotes match the persisted session source fields. All three events, model provenance, and date grouping remained visible after page reload. This is a successful control for this fixture only.
-
-The retained Ollama log shows two successful /api/chat completions within each 2B job (1m51s and 1m35s for session 1; 1m26s and 1m32s for session 2) and one for the 9B control (3m41s). Each final 2B record was an empty event array accepted as llm_generated, not a saved fallback. The service log does not expose response bodies or explain the second request; the filtered backend trace confirms job completion but cannot attribute it to structured-output repair or transport retry. A prior focused run separately recorded a structured-output rejection. Together the outcomes support an unreliable-for-this-task finding under these conditions, not a universal capability claim. No code change was made because the current trace did not identify an application rejection or prompt-handling defect to repair; schema and evidence checks remain unchanged and fail closed. Supporting Ollama and backend traces are retained with the linked QA report.
-
-Read-only SQLite checks returned integrity_check=ok and foreign_key_check=[]. The focused timeline error diagnostics suite passed 9 tests with one existing Google GenAI deprecation warning. Ruff passed for the timeline service, the diagnostics test, and the seed helper after correcting an import-order finding. No application behavior, public API/type, or database schema changed.
-
-Final status: sessions.timeline and model.provider.local-ollama remain PARTIAL because neither exact 2B case produced grounded events; the 9B control passed for this fixture. Earlier same-day unknown failures remain unattributed. test.automated-regression remains PARTIAL because dispatch-only live-provider and prerequisite-dependent E2E coverage remain outstanding. Push-triggered [GitHub Actions run 36015806332](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36015806332) for commit 6472e9baf1d685ea1790762dd1471910f52416c5 completed successfully: security-scan, backend-quality, windows-regression, and persistence-contract passed; live-provider-e2e was skipped because the push event does not satisfy its dispatch condition.
-
-Independent leftovers remain as follows: model.provider.opencode-go and revision.agentic-lifecycle require a separate provider/lifecycle matrix; access-key management is BLOCKED pending an approved disposable credential and cleanup authorization; desktop release is BLOCKED pending signed/tagged, hosted, packaging, and clean-machine prerequisites; source refresh/catalog gates remain PARTIAL while NCBI presents the LiverTox master-list verification challenge. The wider API route catalog, clinical provider-failure and RAG-off cases, RAG duplicate-file policy, accessibility audit, and unimplemented container runtime remain outside this slice.
-
-The detailed report is assets/QA/timeline-local-model-repeatability-20260924/report.md. The task-owned app and Ollama service were stopped, the isolated DB and exact focused pytest cache were removed, and the relevant ports were verified clear. Ordinary Windows cleanup denied the cache removal; after verifying its absolute path under the repository cache root, the exact task-owned directory was removed with elevated cleanup.
-
-## Empty timeline recovery validation — 2026-09-24
-
-This follow-up started from clean `develop` HEAD `3b0be42d44e047f868edb9049f3d7a9f38fdf295`, equal to `origin/develop` at start. It selected the actionable `sessions.timeline`, `model.provider.local-ollama`, and focused `test.automated-regression` leftovers: prior exact 2B runs persisted evidence-free empty `llm_generated` records despite populated source facts.
-
-`PatientTimelineExtractor` now raises a non-retryable `invalid_response` when canonical clinical source text exists but normalization produces no evidence-backed event. This uses the existing inspection-service fallback and preserves an empty model result only when canonical source fields are blank. Extractor unit tests cover both cases, and a service-level regression verifies persisted fallback status, error code, source facts, and month/day date precision. The pytest root cache is now configurable through `DILIGENT_PYTEST_CACHE_ROOT`; the current focused run used an isolated QA path so the normal catalog and runtime fixtures remained active without writing to the protected shared cache.
-
-The isolated runtime selected `ollama / qwen3.5:2b`, digest `324d162be6ca5629ae4517c8710434d0bd2d665bc94dbad46e9af8fbf8a2f0df`. A forced timeline job for a synthetic session completed and saved three deterministic fallback events with exact local/Ollama/model provenance. The backend log records `_EmptyTimelineExtractionError` because the extraction normalized to no evidence-backed events despite populated clinical source fields. The service mapped that condition to `invalid_response`, saved the fallback, and a subsequent GET returned the same persisted record. Therapy retained month precision and the symptom/laboratory facts retained day precision. Ollama logged two successful chat requests, but response bodies were unavailable, so the second call is not attributed to a particular repair/retry path. Read-only SQLite checks returned `integrity_check=ok` and `foreign_key_check=[]`. [Detailed report and evidence](../../QA/timeline-empty-extraction-recovery-20260924/report.md).
-
-The Codex in-app Browser opened the local Settings page, but both Codex panel placements yielded a 672-pixel capture while the app requires at least 1100 pixels. The timeline page, rendered fallback, and UI reload could not be verified in that browser. The official launcher initialization also stopped at an access-denied protected UV cache path; a manual isolated source runtime was used, so this is not a launcher acceptance result.
-
-The focused timeline/extraction and inspection persistence suite passed 53 tests with one existing Google GenAI deprecation warning. Ruff passed for production code, extractor tests, and pytest configuration; the inspection repository test file passed Ruff with its pre-existing `DTZ001` findings ignored. `git diff --check` passed. Current `sessions.timeline` and `model.provider.local-ollama` remain `PARTIAL`: safe fallback is verified, but no grounded 2B model output was established. `api.local-boundaries` remains `WORKING` with the health/model-config/session/timeline routes exercised; the complete route catalog is still open. `test.automated-regression` remains `PARTIAL`: this focused slice passed, but hosted CI was not run for the working tree, GitHub CLI authentication is invalid, and dispatch-only/live conditional lanes need their documented inputs and model/session prerequisites.
-
-Other reviewed leftovers remain separate: `model.provider.opencode-go` and `revision.agentic-lifecycle` are `PARTIAL`; `data.inspection.catalogs` and `data.sources.refresh` are `PARTIAL` while NCBI presents a human-verification challenge; `auth.access-key-management` is `BLOCKED` pending an approved disposable credential and cleanup authorization; `release.desktop.v3-4-0` is `BLOCKED` pending signed/tagged, hosted packaging, and clean-machine prerequisites; and `runtime.containerized` is `NOT_IMPLEMENTED`. `ISSUE-005`, the accessibility audit, the remaining API route catalog, clinical provider-failure/RAG-off cases, and broader timeline-provider coverage remain separate.
-
-After evidence collection, task-owned listeners 6848, 5172, and 3788 were stopped and ports 7690, 9847, and 11434 were verified clear. The isolated database, runtime/cache files, pytest scratch paths, Ollama profile, temporary screenshots, and raw logs were removed; filtered logs and compact synthetic API/test records remain in the linked QA directory. The shared database, settings, and protected caches were left untouched.
-
-## Timeline Browser validation — 2026-09-25
-
-This slice followed the 2026-09-24 timeline handoff. It started on clean
-`develop` HEAD `11dd344970371a75173ec961d3b99d50af7f3aee`, equal to
-`origin/develop`, and used the official Windows launcher with a task-owned
-SQLite database. Three synthetic sessions contained identical source facts:
-acetaminophen in `2025-01`, symptoms on `2025-01-17`, and ALT 75 U/L on
-`2025-01-17`. The installed Ollama tags were verified without download or
-provider/model substitution.
-
-The current Codex in-app Browser rendered at `1280 × 720`, so the prior
-desktop-width gate was absent. Settings showed Local Ollama and the exact
-installed `qwen3.5:2b`/`qwen3.5:9b` models. Session 1 generated timeline 1
-with `qwen3.5:2b`; the UI and persisted API record showed
-`generation_status=fallback`, `generation_error_code=invalid_response`,
-local/Ollama provenance, three source-backed fallback events, and month/day
-date precision. The event inspector showed the source quote and normalized
-date. Reload retained the same record.
-
-The Timeline role was then changed and saved as `qwen3.5:9b` in the isolated
-database. Session 3 generated timeline 2 with `generation_status=llm_generated`,
-three source-backed events, exact local/Ollama/model provenance, and source
-fields `drugs`, `laboratory_analysis`, and `anamnesis`. The month/day date
-precision and event evidence survived reload. This is a grounded control for
-the synthetic fixture only.
-
-The focused backend suite passed **67 tests** with one existing Google GenAI
-deprecation warning. Targeted Ruff passed, Angular/Vitest passed **24 files and
-105 tests**, and the current production frontend build completed successfully.
-Read-only API checks returned HTTP 200 for health, model configuration, and
-both persisted timeline records. SQLite returned `integrity_check=ok` and no
-foreign-key violations. Detailed sanitized evidence is in the
-[2026-09-25 Browser report](../../QA/timeline-browser-validation-20260925/report.md),
-[browser capture notes](../../QA/timeline-browser-validation-20260925/browser-capture-notes.md),
-and [API/persistence evidence](../../QA/timeline-browser-validation-20260925/api-persistence-evidence.md).
-
-The acceptance boundary is deliberately scoped to the supported local route
-and safe fallback behavior. The exact `qwen3.5:2b` structured-output failure
-is a model/task compatibility limitation, not an unfinished application gate;
-the fail-closed fallback is the expected behavior for that unsupported result.
-No further 2B retry loop is scheduled unless the model, prompt contract, or
-timeline implementation changes.
-
-| Gate | Final status | Remaining limitation |
-|---|---|---|
-| `sessions.timeline` | `VALIDATED` for supported scope | Rendered fallback, source evidence, date precision, reload, and grounded output on the exact `qwen3.5:9b` local route passed. The `qwen3.5:2b` compatibility limitation is recorded but is not a pending application gate. |
-| `model.provider.local-ollama` | `VALIDATED` for supported scope | Local Ollama discovery, exact provenance, fail-closed fallback, and the grounded 9B control passed. The 2B route is not accepted as a grounded model for this task under the tested conditions. |
-| `api.local-boundaries` | `WORKING` | Exercised endpoints and persisted reads passed; the complete route catalog and all error variants remain open. |
-| `test.automated-regression` | `PARTIAL` | Current local backend/frontend tests, Ruff, and build passed; no hosted result exists for this final tree, and live-provider/conditional E2E lanes remain unrun. |
-
-Independent provider/revision, NCBI source-refresh, credential, desktop-release,
-RAG-policy, accessibility, API-catalog, and container-runtime boundaries remain
-as documented above and were not promoted by this slice.
-
-## Automated regression and live-provider validation — 2026-09-25
-
-This slice revisited the next actionable incomplete gates from the current
-ledger: `test.automated-regression` and the explicit live-provider boundary of
-`model.provider.opencode-go`. It started from clean `develop` HEAD
-`2081a076a0b02d13bc6305939c13658b1fe80494`, equal to `origin/develop`.
-
-The current implementation passed the local backend unit suite (`793 passed`,
-seven existing dependency/framework deprecation warnings), the exact CI Ruff
-target (`app/server` plus `app/tests`), Pyright (`0 errors, 0 warnings, 0
-informations`), Angular/Vitest (`24 files, 105 tests`), and the frontend
-production build. The hosted core jobs in [push run 36151424087](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36151424087)
-and [dispatch run 36153314442](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36153314442)
-passed backend quality (`793 passed`, Alembic head/drift, Ruff, and Pyright),
-the SQLite/PostgreSQL persistence contract (`29 passed`), Python/Angular/
-desktop/Rust security audits, Windows frontend tests/build, and the full browser
-E2E gate (`39 passed, 7 skipped`).
-
-The explicit provider dispatch reached `live-provider-e2e` setup, frontend
-build, and Playwright installation, then failed at the test's prerequisite
-check because the masked `OPENCODE_GO_API_KEY` workflow secret was empty:
-`DILIGENT_LIVE_PROVIDER_E2E=1 requires the OPENCODE_GO_API_KEY secret.` No
-OpenCode Go request was made, so no current live provider/model/latency/output
-acceptance can be claimed. This is an external credential blocker, not an
-application defect. The broader provider matrix and conditional model/
-embedding/persisted-session lanes remain incomplete.
-
-| Gate | Final status | Remaining limitation |
-|---|---|---|
-| `test.automated-regression` | `PARTIAL` | Current local and hosted core regression gates pass. Live-provider E2E is blocked before request by the missing repository secret, and conditional browser cases remain skipped. |
-| `model.provider.opencode-go` | `PARTIAL` | Historical exact-provider evidence remains bounded; current dispatch has no provider result until an approved `OPENCODE_GO_API_KEY` secret is available. |
-| `runtime.database.sqlite-migrations` | `VALIDATED` for the exercised CI path | Alembic and SQLite/PostgreSQL persistence checks passed; deployment-specific and clean-machine upgrade evidence remain separate. |
-
-No application code change was needed. The task-owned pytest workspace was
-removed after validation; pre-existing protected cache residue was preserved.
-
-## Clinical/API resilience and blocker revalidation — 2026-09-26
-
-This slice revisited the locally actionable clinical/API resilience boundary
-and the incomplete provider, credential, and LiverTox gates. It started from
-clean `develop` HEAD `6083c27d454e6a0ff974453b1c454364c2ef3c12`, equal to
-`origin/develop`, and used a task-owned SQLite database, access-key material
-file, and pytest cache. The backend ran at `127.0.0.1:7690`; shared settings,
-databases, source caches, vectors, and credentials were not mutated.
-
-The focused backend contract, provider-safety, preflight, job, access-key, RAG,
-and workflow suite passed **102 tests** with six existing dependency/framework
-deprecation warnings. The live HTTP model, model-config, clinical, and
-access-key suite passed **15 tests**. Direct probes returned `200` for health,
-settings, model listing, inspection jobs/sessions, and RAG browsing; the empty
-clinical latest-job lookup correctly returned `404`. The live OpenAPI document
-contained **68 API paths**, and the API catalog now matches all 68 paths after
-the documentation correction recorded in
-[the QA report](../../QA/clinical-api-resilience-20260926/report.md).
-
-The selected tests covered provider 401/429/503/530, timeout and network
-classification, bounded retries, sanitized provider details, direct OpenCode
-Go routing, RAG-off and RAG-readiness preflight behavior, clinical job
-terminal/cancellation semantics, report/bibliography safeguards, metadata-only
-access-key CRUD, and structured-source ordering/cancellation/failure
-preservation. The isolated database ended with zero access keys and zero
-clinical sessions after cleanup; `PRAGMA integrity_check` returned `ok` and
-`PRAGMA foreign_key_check` returned no rows.
-
-`VAL-20260926-001` found that `assets/docs/architecture/api_surface.md` was
-stale: five current paths were absent and the access-key provider query was
-embedded incorrectly in the path. The documentation now includes settings,
-desktop bootstrap/shutdown, RAG browsing, and the separate optional provider
-query parameter. No application API or schema change was needed.
-
-The live OpenCode Go prerequisite remained unavailable because
-`OPENCODE_GO_API_KEY` was absent, so no provider request or live clinical result
-was claimed. A read-only NCBI master-list preflight returned HTTP 200 HTML with
-a human-verification/CAPTCHA marker; no source update was started or bypassed.
-Therefore `api.local-boundaries` remains `WORKING` for its selected route scope,
-`clinical.analysis.pipeline` remains `VALIDATED` for its existing exact
-RAG-on scope, `model.provider.opencode-go` and `test.automated-regression`
-remain `PARTIAL`, `auth.access-key-management` remains `BLOCKED`, and
-`data.inspection.catalogs`/`data.sources.refresh` remain `PARTIAL`. The broader
-revision lifecycle, desktop release, and container boundaries remain unchanged.
-
-The exact backend process was stopped, ports `7690` and `9847` were free, and
-the task-owned database, key material, pytest workspace, and temporary runtime
-were removed. Protected pre-existing pytest cache residue was preserved. No
-rendered UI or screen-reader claim is made by this API-focused slice.
-
-## UI shell keyboard and responsive validation — 2026-09-26
-
-This slice revisited the `ui.application-shell` validation debt for keyboard
-operation and responsive desktop rendering. It started on `develop` at
-`e3a8fcf07adccecec66ae0cd430a382f568558ac` with the working-tree navigation
-focus fix. No LLM provider request, credential mutation, source refresh, or
-clinical analysis was performed.
-
-The official launcher was attempted first with a task-owned SQLite path. It
-stopped before application startup when the local Angular production build
-exited with `-1073741819` (`0xC0000005`). A listener was observed on source
-port `9847` during fallback, so the current source build used an isolated
-Angular cache and port `9848` while ownership was checked. The listener was
-verified as task-created and stopped during cleanup. The backend then ran
-against an isolated SQLite database on `7690`.
-
-`VAL-20260926-002` found that primary navigation handled Arrow/Home/End
-selection and `tabindex` updates but did not move focus to the newly selected
-tab. The navigation component now focuses the target button in a microtask
-after emitting the route change, and the browser regression asserts both
-selection and focus.
-
-| Check | Result |
-|---|---|
-| Isolated backend startup | Fresh task-owned SQLite migration completed; `/api/health` returned `200`. |
-| Angular/Vitest | `24` files and `105` tests passed. |
-| Production frontend build | Passed with the Angular cache isolated under the QA directory; the normal protected cache path was restored after validation. |
-| Selected browser E2E | `8 passed, 17 deselected`, including keyboard traversal, ArrowRight focus, form focus/labels, Settings routes, legacy redirect, scroll restoration, and Data Inspection navigation. |
-| Browser rendering | Current source rendered at `1280 × 720`, `1100 × 900`, and `1920 × 1080`; all four primary workspace tabs and the exercised controls were present in the AX tree. |
-| Minimum viewport guard | At `1099 × 900`, the accessible `Widen the application window to continue` alert was shown with the documented 1100-pixel requirement. |
-
-The Browser screenshots and AX observations were inspected live. No Narrator or
-Speech Recap observation was performed, so spoken screen-reader output remains
-unvalidated.
-
-| Gate | Final status | Remaining limitation |
-|---|---|---|
-| `ui.application-shell` | `PASS` for the exercised keyboard, rendered-shell, and responsive desktop scope | Spoken screen-reader output and broader component-level accessibility remain open. |
-| `test.automated-regression` | `PARTIAL` | The local frontend suite/build and selected browser slice passed; provider-key-dependent E2E and conditional hosted lanes remain independent. |
-| `runtime.startup.source-launcher` | `PASS` for its previously established source-launcher contract | This run reproduced the host-specific local Angular build failure before launch; isolated-cache build succeeded, so no launcher regression is inferred. |
-
-Provider, credential, NCBI LiverTox, desktop-release, revision-matrix,
-duplicate-file policy, and container-runtime dispositions remain unchanged.
-The exact local Ollama 2B compatibility result was not retried.
-
-## Feature-state register
-
-| # | Stable capability | Area | Status | Current evidence, route, or scenario | Persistence / external dependency / gap |
-|---:|---|---|---|---|---|
-| 1 | Standard source launcher against the populated database | Runtime / migration | `PASS` | A task-local clone of the current populated database migrated through `202609170001` via `start_on_windows.ps1 -Action InitializeDatabase`; the same 18 sessions, 38 versions, 17 revision runs, and 54 artifacts remained available. | The shared `resources/database.db` was intentionally not advanced; the clone retained `PRAGMA foreign_key_check=[]` and `PRAGMA integrity_check=ok`. |
-| 2 | Fresh SQLite bootstrap and Alembic head | Runtime / migration | `PASS` | Disposable source DB migrated through `202609170001`; `/api/health` returned 200. | Fresh DB evidence is complemented by the populated-clone remediation below. |
-| 3 | Application shell and primary workspace navigation | UI | `PASS` | Current source rendered DILI Agent, Clinical Sessions, Data Inspection, and Settings; keyboard-only tab traversal and ArrowRight focus were revalidated. | Spoken screen-reader output remains unvalidated; no provider call. [UI shell report](../../QA/ui-accessibility-validation-20260926/report.md) |
-| 4 | General runtime settings persistence | Settings | `PASS` | Changed polling interval `1 -> 2`, saved, navigated, reloaded, and restored `2 -> 1`; value and persisted timestamp remained visible. | The `application_configuration` singleton is back at typed default `1.0`; `.env` remained excluded. |
-| 5 | Settings section surfaces | Settings | `PASS` | General, Models, Data Processing, Integrations, Drug Matching, and Advanced routes rendered with database source labels and controls. | Surface validation only for sections other than General persistence. |
-| 6 | Local/cloud model configuration and access-key UX | Settings / external | `ATTENTION` | In the isolated QA database, Settings saved the Timeline role as `qwen3.5:2b` and `qwen3.5:9b` in turn; the refreshed Ollama catalog showed both installed, and the configured OpenCode Go route remained `deepseek-v4-flash`. Two 9B timeline runs now show evidence-derived Source labels; both 2B runs fell back as `invalid_response`. Cloud credential lifecycle remains unvalidated. [Timeline source attribution validation](../../QA/timeline-source-attribution-20260923/report.md); [Timeline model matrix](../../QA/timeline-model-matrix-20260923/report.md) |
-| 7 | Clinical input validation and preflight | Clinical workflow | `PASS` | Empty input showed four blocking reasons; synthetic valid input showed the two unavailable structured-source blockers before execution. | No analysis job was submitted because the preflight correctly blocked it. |
-| 8 | Clinical analysis submission, progress, terminal state, and recovery | Clinical workflow | `NOT TESTED` | Not reached in the current browser run. | Requires populated source catalogs and a usable model lane. |
-| 9 | Session creation and persisted result | Sessions / persistence | `NOT TESTED` | Not reached because clinical execution was blocked. | Existing shared rows were inspected read-only; current UI could not start on that DB. |
-| 10 | Session listing, empty state, filters, and search shell | Sessions / UI | `PASS` | Fresh runtime showed the empty state and All/Successful/Failed, search, and date-filter controls. | Populated-session interaction remains untested. |
-| 11 | Session selection, CRUD, deletion, and switch isolation | Sessions / persistence | `NOT TESTED` | Not reached with a current live populated runtime. | Requires a successful end-to-end session fixture. |
-| 12 | Patient anamnesis, therapy, laboratories, metadata, and propagation | Clinical input | `NOT TESTED` | Synthetic text was entered and displayed, but no session was persisted. | Image and metadata subpaths are recorded separately below. |
-| 13 | Patient profile image upload and image metadata | Clinical input / media | `NOT TESTED` | Upload control was present but no file was selected during this source-only run. | Needs a controlled synthetic image fixture and persistence check. |
-| 14 | Multi-drug extraction, normalization, and RxNav identity linking | Clinical pipeline | `NOT TESTED` | Not reached in a live clinical run. | Unit coverage exists; current source-catalog/provider boundary was not proven. |
-| 15 | Longitudinal laboratory capture and history propagation | Clinical pipeline | `NOT TESTED` | Not reached in a live clinical run. | Unit coverage exists; rendered session evidence is absent. |
-| 16 | Deterministic R-score and injury-pattern classification | Clinical calculation | `PASS` | Current source calculation for ALT 360/ULN 40 and ALP 150/ULN 120 produced `R=7.2`, `hepatocellular`; boundary and missing-ULN tests passed. | Calculation is deterministic and independently recomputed; rendered final-report result not tested. |
-| 17 | Per-drug assessment and cross-drug identity isolation | Clinical pipeline | `NOT TESTED` | Not reached in a live clinical run. | Requires multi-drug clinical execution and persisted evidence review. |
-| 18 | LiverTox evidence retrieval and provenance | Structured evidence | `NOT TESTED` | Fresh disposable catalog was empty; preflight reported LiverTox unavailable. | Shared DB has source rows but cannot currently start through the migration. |
-| 19 | RxNav evidence retrieval and provenance | Structured evidence | `NOT TESTED` | Fresh disposable catalog was empty; preflight reported RxNav unavailable. | Shared DB has source rows but cannot currently start through the migration. |
-| 20 | FDA DILIrank evidence retrieval and provenance | Structured evidence | `NOT TESTED` | Fresh disposable DILIrank view was empty. | Shared DB contains DILIrank records, but populated-runtime validation is blocked. |
-| 21 | RAG document listing and vector-store readiness | RAG | `PASS` | RAG view listed supported PDFs; read-only vector-store API reported collection ready, 1,317 embeddings, 99 distinct documents, dimension 384, cosine/IVF_FLAT. | Readiness/listing only; no clinical retrieval claim. |
-| 22 | RAG retrieval inside a clinical analysis | RAG / clinical workflow | `NOT TESTED` | No clinical analysis was allowed past preflight. | Requires a completed analysis with persisted citations. |
-| 23 | Bibliography and source provenance in the final report | Reporting | `NOT TESTED` | No final report was generated in the current live run. | Must be rechecked with structured sources and RAG enabled. |
-| 24 | Final conclusion coherence and uncertainty presentation | Reporting | `NOT TESTED` | No final report was generated in the current live run. | Must be reviewed against the rendered report and persisted result. |
-| 25 | Patient timeline generation, rendering, and persistence | Sessions / timeline | `PASS` for supported local scope | The 2026-09-25 Browser run rendered exact 2B fail-closed fallback and exact 9B grounded events with source evidence, date precision, provenance, and reload persistence. [Timeline Browser report](../../QA/timeline-browser-validation-20260925/report.md) | Broader providers, clinical cases, and event families remain outside the supported local scope; the exact 2B compatibility limitation is not a pending product gate. |
-| 26 | Agentic revision workflow, trace, artifacts, and persisted version | Revision | `NOT TESTED` | No revision was started in the current live run. | Shared DB contains historical revision rows, but the current app cannot start on it. |
-| 27 | Manual report editing and version/history behavior | Revision / UI | `NOT TESTED` | Not reached in the current live run. | Requires a completed report and persisted version transition. |
-| 28 | Human-review escalation and `requires_human_review` state | Revision / clinical safety | `NOT TESTED` | Not reached in the current live run. | Unit paths exist; rendered and persisted current-run evidence is absent. |
-| 29 | Cancellation, concurrency, and stale-job guards | Background jobs | `NOT TESTED` | Not reached in the current live runtime. | Automated coverage exists; current populated migration remains a prerequisite for release evidence. |
-| 30 | Structured-source inspection UI and dependency messaging | Data Inspection | `ATTENTION` | Drug Catalog, LiverTox, and DILIrank pages rendered empty on the disposable DB; RAG was populated; Update All/Update Embeddings were intentionally not invoked. | External/source data is not proven current; controls were not mutated during audit. |
-| 31 | Ordered structured-source update and reconciliation jobs | Data Inspection / jobs | `NOT TESTED` | No source update job was started. | Deliberately excluded to avoid mutating source caches during validation. |
-| 32 | Health and inspection API boundaries on a fresh runtime | API | PASS | This isolated run returned 200/202 for health, model config, session listing, timeline job start/poll, and timeline read; OpenAPI contained the expected timeline routes. Read-only SQLite integrity and FK checks passed. [Recovery report](../../QA/timeline-empty-extraction-recovery-20260924/report.md) | Complete API route catalog and error variants remain outside this focused run. |
-| 33 | Browser smoke, visible error handling, and console diagnostics | UI / QA | `PASS` | DILI Agent, Settings, Clinical Sessions, and Data Inspection rendered; browser error/warn diagnostics were empty; blocking dialogs were visible and actionable. | One viewport and smoke coverage; not a full accessibility audit. |
-| 34 | Backend unit and supported model-config gates | Automated QA | PASS | Exact-SHA hosted run `35908957190` remains prior evidence. The current focused timeline/extraction and inspection persistence suite passed 53 tests with one existing deprecation warning; Ruff passed on the touched core files, and the inspection test passed with pre-existing `DTZ001` findings ignored. | This does not replace the full backend suite, hosted CI for this working tree, or live-provider E2E. [Recovery report](../../QA/timeline-empty-extraction-recovery-20260924/report.md) |
-| 35 | Frontend test and production build gates | Automated QA | `PASS` | Current source Angular/Vitest passed `24 files, 105 tests`; production build passed with an isolated writable Angular cache; the selected current browser E2E slice passed `8/8`. Exact-SHA hosted Windows run `35908957190` also passed the frontend suite/build. | The default local launcher cache path remains protected on this host and reproduced `0xC0000005` before startup; provider-key and conditional browser lanes remain separate. |
-| 36 | Exact OpenCode Go / DeepSeek end-to-end clinical provider lane | External provider | `NOT TESTED` | No live cloud clinical call was made; disposable DB had no active OpenCode key, and the shared runtime was blocked before provider resolution. | Must be validated without fallback before release. |
-| 37 | Restart and reuse of existing persisted clinical data | Persistence / release | `ATTENTION` | The populated clone reopened through the launcher database-initialization path after migration, preserving 18 sessions, 45 drug mentions, 228 lab observations, 18 results, and SQLite integrity. | The shared source database was intentionally not advanced; rendered populated-session reuse remains untested. |
-| 38 | EXE/MSI packaging, installer, checksum, and publication | Release packaging | `NOT APPLICABLE` | Explicitly outside this source/development audit. | Separate release gate. |
-| 39 | Clean-machine install and Windows host smoke | Release packaging | `NOT APPLICABLE` | Explicitly outside this source/development audit. | Separate release gate. |
-| 40 | Full browser E2E and persisted clinical-job recovery | Automated QA | `PASS` | Local Chromium suite `41 passed, 5 skipped`; exact-SHA hosted Windows suite `39 passed, 7 skipped`. Persisted-job recovery completes and clears its saved marker after reload. | Hosted skips are the opt-in provider and embedding lanes, unavailable Ollama-model checks, and session/timeline cases without persisted CI sessions; live-provider workflow job is skipped on push. |
-
-## Release blockers and required remediation
-
-### B1 — populated-database migration remediation (resolved)
-
-The current populated database has 38 `clinical_session_versions`, 17 revision runs, and 54 revision artifacts. The revision-run, review, and artifact tables contain foreign keys to `clinical_session_versions`. The migration coordinator now temporarily disables SQLite enforcement inside the existing atomic migration transaction, validates `PRAGMA foreign_key_check` before commit, and restores enforcement afterward. This allows migration `202609170001` to batch-recreate the parent table without weakening post-migration integrity.
-
-The migration fixture now enables `PRAGMA foreign_keys=ON` and exercises revision runs, review rows, and artifacts. Ten migration tests and the full 731-test backend unit suite pass. A clone of the unchanged source database was migrated through the standard launcher initialization path with all populated counts preserved. The shared database remains unchanged by this remediation run, so direct source-runtime session UI reuse is still marked `ATTENTION`.
-
-### B2 — current clinical/provider evidence is incomplete
-
-Because the populated runtime cannot start, the audit could not prove a current rendered clinical report, source citations, timeline, revision, manual edit/history, or exact `opencode_go / deepseek-v4-flash` provider execution. These are `NOT TESTED`, not inferred from historical reports or catalog reachability.
-
-### B3 — task-local pytest cache configuration (resolved for this slice)
-
-The root pytest fixture previously hardcoded its embedded database and temp files under `runtimes/cache/pytest`, which this host protects. `app/tests/conftest.py` now accepts `DILIGENT_PYTEST_CACHE_ROOT`; the focused suite passed with its embedded database and scratch fixtures isolated under `assets/QA/timeline-empty-extraction-recovery-20260924/pytest-workspace`, while retaining the normal root fixtures. The shared cache remains untouched and should not be assumed writable on this host. Hosted CI and live-provider gates remain independent.
-
-## Validation diary
-
-### 2026-09-18, Europe/Rome, approximately 12:26–12:47
-
-1. Recorded the clean `develop` worktree and source revision `2e434ae1b0e276b8acbab27f65a399d306c3f691`; inspected the project index, runtime settings, and existing QA documentation.
-2. Started with the prescribed launcher. It found the configured environments and waited for backend health, but the populated DB stopped at migration `202609170001`. A foreground source invocation reproduced the `sqlite3.IntegrityError` and exited. The shared DB remained at `202609100001` with `PRAGMA integrity_check=ok`.
-3. Re-ran the application with a disposable SQLite DB through the source backend and client preview. Startup reached head, catalog seeding completed, health/API probes returned 2xx, and the UI rendered.
-4. Exercised Settings persistence, model/access-key guardrails without entering a secret, clinical validation/preflight, empty Clinical Sessions, Data Inspection views, and RAG vector-store inspection. The synthetic case was not submitted to a model. No source update or embedding update job was invoked.
-5. Ran the backend unit suite with a writable QA cache (`731 passed`), the supported model-config regression slice (`40 + 10 passed`), the frontend suite (`23 files / 94 tests passed`), and the production client build (successful).
-6. Rechecked the browser after reload, verified the settings baseline remained `1`, inspected browser diagnostics (`[]`), stopped the task-owned backend/frontend listeners, and retained only small source-runtime log evidence under `assets/QA/pre-release-e2e-20260918/`. Disposable DB/cache files were removed.
-
-### 2026-09-18, populated-database migration remediation
-
-1. Added FK-safe SQLite migration coordination: enforcement is suspended only around the atomic Alembic transaction, `PRAGMA foreign_key_check` gates commit, and the prior connection state is restored.
-2. Enabled foreign keys in the migration test engine and expanded the cancellation fixture to cover revision-run, review, and artifact child relationships.
-3. Migrated a clone of the source database through `start_on_windows.ps1 -Action InitializeDatabase`; the clone reached `202609170001` with 18 sessions, 38 versions, 17 revision runs, 54 artifacts, `foreign_key_check=[]`, and `integrity_check=ok`.
-4. Confirmed the source database remained at `202609100001` with its original counts and `integrity_check=ok`. The provider and live clinical workflow gates remain untested.
-
-### 2026-09-26, rendered local RAG-off clinical resilience
-
-1. Reviewed the current status ledger and selected the locally actionable
-   clinical resilience boundary: populated-source preflight, a real rendered
-   RAG-off clinical run, terminal report generation, and persisted session
-   selection. The run used synthetic content only and did not require or use a
-   cloud credential.
-2. Attempted the official launcher first with a task-owned fresh database. The
-   Angular production build exited with Windows status `-1073741819`
-   (`0xC0000005`) before application startup. Redirecting only the Angular
-   cache to the task QA directory made the source build pass; the repository
-   configuration was restored before continuing. This is retained as a
-   host-specific startup limitation, not an application regression.
-3. Started a manual source fallback on a disposable clone of the populated
-   database. Ollama catalog refresh discovered exact `qwen3.5:2b` and
-   `qwen3.5:9b` models. The runtime was configured with cloud services disabled
-   and exact local `qwen3.5:9b` parser/clinical roles. The populated preflight
-   returned `ready=true` with `rag_readiness.requested=false`.
-4. In the in-app Browser, submitted job `b7b404c4` from the DILI Agent page.
-   The RAG control was visibly unchecked and disabled during execution, the
-   status advanced through the pipeline, and the job completed at 100% after
-   approximately 921 seconds. The rendered report showed the synthetic patient,
-   mixed pattern/R-score 4.85, one detected Amoxicillin, laboratory values,
-   source text, explicit clinical limitations, and no RAG bibliography.
-5. The completed result recorded `session_id=25`, `use_rag=false`, zero RAG
-   references, no raw retrieved text, `contract_valid=true`, and a faithful
-   audit with no discrepancies. The Browser then showed
-   `Synthetic Resilience Subject — Session 25 · Version 1 — Successful` in
-   Clinical Sessions, and selecting the row rendered the persisted report and
-   evidence tables.
-6. The local model emitted no semantically valid anamnesis enrichment and
-   laboratory LLM extraction also failed; both paths retained or merged
-   deterministic candidates and the clinical job still completed. This is
-   recorded as safe degradation and model-quality limitation, not as a silent
-   provider fallback. The report itself still requires clinical review and
-   carries unresolved competing-cause limitations.
-7. The focused existing backend/persistence slice passed **42 tests** with one
-   skip. No application source defect required an in-scope fix. The task-owned
-   runtime, databases, process logs, and caches were removed after evidence
-   capture; the protected repository caches and shared database were preserved.
-
-| Gate | Final status | Remaining limitation |
-|---|---|---|
-| `clinical.input-preflight` | `PASS` for this slice | Fresh empty data still blocks safely; populated no-RAG preflight is now current. |
-| `clinical.analysis.pipeline` | `PASS` for the supported local RAG-off boundary | Synthetic/local qwen3.5:9b only; cloud-provider, broader RAG, and broader clinical variants remain open. |
-| `model.provider.local-ollama` | `PASS` for the exercised local boundary | Exact 9B provenance is current; slow/degraded extraction and broader model/provider matrices remain bounded limitations. |
-| `sessions.crud-persistence` | `PASS` for creation/list/selection | Deletion, image bytes, and file-picker bridge were not revalidated here. |
-| `test.automated-regression` | `PARTIAL` | Focused local suite passed; live provider and conditional lanes remain incomplete. |
-| `model.provider.opencode-go` | `PARTIAL` | `OPENCODE_GO_API_KEY` remains absent; no new cloud request was made. |
-| `auth.access-key-management` | `BLOCKED` | Approved disposable credential lifecycle is unavailable. |
-| `data.inspection.catalogs` / `data.sources.refresh` | `PARTIAL` | NCBI LiverTox human-verification blocker remains; no refresh was attempted. |
-| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged/hosted/clean-machine/publication gates remain separate. |
-| `runtime.containerized` | `NOT IMPLEMENTED` | No supported container runtime exists. |
-
-## Evidence register
-
-- `app/server/services/clinical/timeline.py:48,422-430` — populated clinical source with no normalized evidence-backed event now raises non-retryable `invalid_response`.
-- `app/tests/unit/test_patient_timeline_extraction.py:268-306` — extractor rejection with populated source and valid empty result with blank source.
-- `app/tests/unit/test_data_inspection_repository.py:589-591,734-778` — empty model extraction is converted to and persisted as a date-precise deterministic fallback.
-- `app/tests/conftest.py:27-29` — task-local pytest cache root override used to keep test databases and temp files under QA.
-- `assets/QA/timeline-empty-extraction-recovery-20260924/report.md` — current exact local API result, gate disposition, in-app Browser limitation, and cleanup.
-- `app/server/migrations/versions/202609170001_add_cancelled_revision_status.py:40-45` — parent-table batch alteration now covered by the FK-safe migration transaction.
-- `app/tests/unit/test_database_migrations.py:14-22,186-260` — migration fixture and its foreign-key configuration gap.
-- `assets/QA/pre-release-e2e-20260918/manual-backend.stderr.log` — disposable source startup and request-runtime log.
-- `assets/QA/pre-release-e2e-20260918/manual-backend.stdout.log` — disposable backend process output.
-- `assets/QA/pre-release-e2e-20260918/manual-frontend-2.stdout.log` — disposable frontend preview output.
-- `assets/QA/release-blocker-remediation-20260917.md` — historical evidence only; it was not used as current release proof.
-- `assets/QA/release-blocker-remediation-20260918.md` — current FK-safe migration remediation evidence.
-
-The in-app Browser captures from this run were inspected inline for DILI Agent, Settings, Clinical Sessions, and Data Inspection/RAG. The browser tool did not expose a disk-export path for those captures, so this ledger records the visual assertions and the reproducible routes rather than inventing screenshot filenames.
-
-## Revision lifecycle and current-tree revalidation — 2026-09-27
-
-1. Reviewed the current status ledger and selected the coherent locally actionable
-   revision slice: current revision-agent/API contracts, persisted accepted and
-   cancelled lineage, reload/reopen behavior, rendered audit state, and adjacent
-   frontend/backend regression coverage. The provider, credential, source-refresh,
-   release, and container blockers were kept separate rather than being inferred
-   as resolved by this slice.
-2. The checked-out `develop` tree was at
-   `f68ab5cfc86c27d9c40329a1b452d5339568aaa8`, equal to `origin/develop` at the
-   start of validation. A copy of the existing synthetic revision database was
-   used under the task QA directory; the shared database, settings, credentials,
-   and provider caches were not mutated.
-3. The current backend/API contracts passed the focused suites: revision-agent
-   and persistence **31 passed**; adjacent context, generation, transport, job,
-   repository, and session-contract tests **71 passed, 1 skipped**; and clinical
-   safety/OpenAPI/revision-route tests **18 passed**. The canonical Angular runner
-   passed **24 files / 105 tests**. Existing warnings were retained as warnings.
-   A first direct Vitest invocation was invalid because it omitted Angular's test
-   environment; its failures were not used as product evidence.
-4. A manual source runtime on the cloned database returned healthy backend status
-   at port `7690`; the OpenAPI catalog exposed `68` paths. SQLite returned
-   `integrity_check=ok` and no foreign-key violations. The official launcher was
-   attempted first and failed closed before process creation because a pre-existing
-   listener occupied UI port `9847` during a noninteractive invocation. An isolated
-   preview on `9848` was used for rendered evidence; no launcher defect is inferred.
-5. Read-only API and SQLite inspection agreed on the persisted records. Accepted
-   version `61` belongs to source session `22` through child session `24`, has
-   `version_status=llm_qa_passed`, `llm_qa_status=passed`, and
-   `clinical_review_status=not_reviewed`. Its completed run
-   `3c2f2186c2d443759ff1ce871dc7f91e` retains exact historical
-   `opencode_go / deepseek-v4-flash` provenance, seven completed steps, and five
-   artifacts including passed quality review. Follow-on version `62` has
-   `source_version_id=61`, no child session, `version_status=cancelled`, and
-   `llm_qa_status=not_run`; run `886026e90e37416b9a9188947b6be9e4` remains
-   cancelled.
-6. At `1280 × 720`, the in-app Browser rendered the Revision surface with the
-   configured model, unchanged-current-report notice, accepted trace, five
-   artifacts, passed quality review, and the separate terminal cancellation state.
-   Reloading and manually reopening the source session retained the accepted
-   trace, artifacts, and review state. No approve/reject action was performed:
-   the persisted version remains subject to an authorized clinical reviewer.
-   These are rendered UI observations, not spoken screen-reader evidence; the
-   Browser exposed no durable screenshot export path.
-
-| Gate | Final status | Evidence boundary and remaining limitation |
-|---|---|---|
-| `revision.agentic-lifecycle` | `PARTIAL` | Current contracts, accepted/cancelled persistence, lineage, reload/reopen, manual-review boundary, and audit rendering are revalidated. Fresh current provider execution, broader model variability, timeout/tool-failure/backend-restart injection, and every lifecycle branch remain incomplete. |
-| `revision.accepted-session-finalization` | `VALIDATED` for the exact synthetic accepted path | Version `61` remains QA-clean, linked to child session `24`, and reloadable without replacing the source. Broader provider coverage remains separate. |
-| `api.local-boundaries` | `WORKING` for the exercised revision route scope | Revision version/run/step/artifact/review reads and the 68-path catalog passed; all response/error variants and mutating route groups remain outside this slice. |
-| `test.automated-regression` | `PARTIAL` | Focused current-tree backend, API, and frontend suites passed. Live-provider and conditional hosted/browser lanes remain incomplete. |
-| `model.provider.opencode-go` | `PARTIAL` | Exact historical provider identity is preserved and visible; this local run made no current provider request because the key was not injected into the local process. A hosted or explicitly injected live-provider run is still required. |
-| `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available; no credential material was entered or mutated. |
-| `data.sources.refresh` | `PARTIAL` | The NCBI LiverTox human-verification blocker remains independent; no refresh was attempted. |
-| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged artifact, hosted packaging, clean-machine, and publication gates were not part of this source-mode slice. |
-| `ui.application-shell` | `VALIDATED` for previously stated scope | The revision surface rendered without a regression at the tested desktop viewport; spoken screen-reader output remains unvalidated. |
-
-No application source defect was found in this slice, so no product-code fix was
-required. The task-owned backend, preview, cloned database, logs, and pytest
-workspace were removed after evidence capture; the shared database and protected
-repository residue were preserved. The next actionable revision work requires an
-approved provider secret or an explicitly configured working local Ollama service,
-followed by one fresh non-dry accepted or fail-closed run plus retry/recovery
-coverage. Do not approve the persisted revision without an authorized clinical
-reviewer.
-
-## RAG error boundaries and revision worker recovery — 2026-09-28
-
-1. Reviewed the current status ledger and selected the coherent local follow-up:
-   RAG inventory/update error boundaries and persisted revision recovery after
-   an in-memory worker disappears. The duplicate-file policy (`ISSUE-005`) was
-   revisited and intentionally left unchanged. Provider-backed execution,
-   access-key mutation, NCBI refresh, desktop publication, and spoken
-   Narrator/Speech Recap output remained separate gates.
-2. The checked-out `develop` tree was at
-   `e8ab2eeadf89247be9bb1f3fac3fff7e598f5f61`, equal to `origin/develop` before
-   this validation. RAG fixtures, pytest temporary databases, and caches were
-   isolated under task QA paths; no shared database or provider cache was
-   changed.
-3. RAG inventory and update boundaries were tested with empty, unsupported-only,
-   empty-supported, malformed-supported, missing, and non-directory fixtures.
-   The current contracts enumerate all files for inspection, filter ingestion
-   to active loaders, ignore empty/malformed documents, reject invalid roots
-   before vector setup, and fail closed before manifest replacement when zero
-   supported files or zero chunks are produced. Inspection browse/listing
-   responses retained sanitized 403/404/422 behavior and explicit unsupported
-   flags.
-4. The revision recovery test persisted a running revision in disposable
-   SQLite, queried it through a fresh `JobManager`, observed a sanitized
-   recoverable failure, confirmed persisted failed metadata and unchanged source
-   content, then retried with a deterministic runner and observed successful
-   `llm_qa_passed` completion under a new run/job identity. No provider request
-   was made.
-5. The focused RAG/revision suite passed **44 tests**. The affected backend/API
-   regression passed **129 tests** with three dependency/deprecation warnings.
-   Ruff lint passed, Pyright reported `0 errors, 0 warnings, 0 informations`,
-   and `git diff --check` passed. No frontend files changed, so the canonical
-   Angular suite was not rerun for this slice.
-
-| Gate | Final status | Evidence boundary and remaining limitation |
-|---|---|---|
-| `rag.ingestion-retrieval` | `VALIDATED` for the expanded local boundary | Recursive inventory, unsupported visibility, empty/malformed input handling, invalid-root preflight, zero-supported/zero-chunk fail-closed updates, and affected API errors are covered. Duplicate policy, filesystem ACL failures, and fresh provider-backed vector execution remain outside scope. |
-| `revision.agentic-lifecycle` | `PARTIAL` | Missing-worker recovery, sanitized status, persisted metadata, source preservation, and deterministic retry are covered. Fresh provider execution, timeout/tool-failure injection, true process restart, and all lifecycle branches remain open. |
-| `api.local-boundaries` | `WORKING` for the affected RAG/revision contracts | The selected browse/listing/update/recovery contracts passed; the full 68-path response/error and mutating-route matrix is not certified by this slice. |
-| `test.automated-regression` | `PARTIAL` | The affected local backend/API suites are green; live-provider and conditional browser/hosted lanes remain incomplete. |
-| `model.provider.opencode-go` | `PARTIAL` | No local `OPENCODE_GO_API_KEY` was available and no live request was made. |
-| `data.inspection.catalogs` / `data.sources.refresh` | `PARTIAL` | NCBI Bookshelf still serves the human-verification challenge for LiverTox. |
-| `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available or mutated. |
-| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged/hosted/clean-machine publication prerequisites remain separate. |
-| spoken Narrator/Speech Recap output | `UNVALIDATED` | Rendered/keyboard/AX evidence does not establish audible screen-reader output. |
-
-Detailed evidence: [RAG edge validation and gate triage](../QA/rag-edge-validation-20260928/report.md) and [revision recovery validation](../QA/revision-recovery-validation-20260928/report.md).
-
-Task-owned pytest caches, temporary databases, fixtures, and generated Python
-bytecode were cleaned after validation. No task-owned server, browser, watcher,
-or helper process remained running.
-
-## Revision worker launch ordering and local Ollama boundary — 2026-09-28
-
-1. Reviewed the current component ledger after the RAG/recovery follow-up and
-   selected the next coherent local slice: revision worker-start ordering,
-   persisted recovery metadata, fresh local-provider failure/timeout behavior,
-   and retry/source-preservation evidence. OpenCode Go, access-key mutation,
-   NCBI refresh, desktop publication, and spoken screen-reader output remain
-   independent gates.
-2. The checked-out `develop` tree was at `84ac223e`, equal to `origin/develop`
-   before this working-tree change. A disposable clone of the existing
-   database was used for every live revision attempt. The shared database,
-   settings, credentials, and provider caches were not mutated.
-3. The first live attempt against the pre-fix implementation reproduced
-   `sqlite3.OperationalError: database is locked` while the caller persisted
-   revision-run configuration after the worker had already started. The fix
-   preallocates the job identifier, persists the job/version recovery fields
-   before launch, passes that identifier into `JobManager.start_job`, and
-   rejects duplicate identifiers under the job-manager lock. A regression now
-   reads both persisted records before allowing the worker to start.
-4. The local Ollama catalog was re-discovered from the live `/api/tags`
-   endpoint after the model-update concern. Ollama `0.34.0` returned seven
-   models and still contained the exact selected `qwen3.5:9b` model with
-   parameter size `9.7B` and digest
-   `6488c96fa5faab64bb65cbd30d4289e20e6130ef535a93ef9a49f42eda893ea7`. This
-   evidence is catalog- and digest-scoped; it is not a claim that the model
-   name will remain installed in a later catalog.
-5. Final-code live validation used resolved `ollama / qwen3.5:9b` with cloud
-   services disabled and the source report `Possible drug-induced liver injury
-   from amoxicillin. Clinical review is required.` The fresh attempt failed
-   closed while Ollama was unavailable (`95e38fb4`, pipeline
-   `178faacb7fbc4454a6f06907575c5a8c`); retry produced a new failed job
-   (`c80ac3d6`, pipeline `4a42a7d71e18471895ba53bf75b45900`). After the local
-   server was started, a retry against the persisted failed run created
-   `cd7d4faa` / pipeline `ce5b911c275c438c9faade1fe31a4652`, version `66`, and
-   reached the configured 45-second local inference cap at
-   `revision_agent_planner`. User-facing errors were sanitized; bounded step
-   diagnostics retained only provider/model/operation context, and the source
-   report remained unchanged in every attempt.
-6. The final-code focused revision suite passed **33 tests** and the combined
-   revision/runtime/API regression passed **53 tests** with two existing
-   dependency/deprecation warnings. Ruff passed, Pyright reported `0 errors,
-   0 warnings, 0 informations`, and `git diff --check` passed. No frontend
-   files changed, so the canonical Angular suite was not rerun.
-
-| Gate | Final status | Evidence boundary and remaining limitation |
-|---|---|---|
-| `revision.agentic-lifecycle` | `PARTIAL` | Worker-start ordering, recovery metadata, unavailable-provider and timeout fail-closed boundaries, sanitized errors, retry creation, and source preservation are validated. No accepted revision completed in the current local model lane; tool-failure injection beyond provider timeout, true process restart, broader provider/model variance, and every lifecycle branch remain incomplete. |
-| `revision.accepted-session-finalization` | `VALIDATED` for the previously accepted synthetic path only | This slice did not create a new accepted child session. Existing accepted evidence remains bounded to its recorded provider/model and authorized clinical-review state. |
-| `api.local-boundaries` | `WORKING` for the exercised revision start/status/retry persistence boundary | Start, status, retry, run, step, and version records were checked in disposable SQLite. The complete 68-path response/error and mutating-route matrix remains outside scope. |
-| `test.automated-regression` | `PARTIAL` | The affected final-code backend/API regression is green. Frontend, hosted live-provider, and conditional browser lanes were not rerun. |
-| `model.provider.local-ollama` | `VALIDATED` for the existing timeline scope; revision scope remains partial | The current catalog still contains `qwen3.5:9b`, but revision planning exceeded the 45-second local cap. This does not establish local revision acceptance or change the supported timeline evidence. |
-| `model.provider.opencode-go` | `PARTIAL` | No current OpenCode Go request was made because the local process had no approved key. |
-| `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available or mutated. |
-| `data.sources.refresh` | `PARTIAL` | NCBI LiverTox remains behind the upstream human-verification challenge. |
-| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged/hosted/clean-machine publication evidence remains separate. |
-| spoken Narrator/Speech Recap output | `UNVALIDATED` | Rendered and keyboard evidence does not establish audible screen-reader output. |
-
-Detailed evidence: [local Ollama revision validation](../QA/revision-local-ollama-validation-20260928/report.md).
-
-Task-owned disposable databases, pytest caches, generated bytecode, and the
-direct Ollama server were removed or stopped after capture. Protected cache
-residue was preserved.
-
-## Runtime settings migration and current-tree regression — 2026-09-28
-
-1. Reviewed the current status ledger after the revision/local-provider follow-up
-   and selected the next coherent implementation slice: the database-backed
-   Settings and Models/RAG surfaces introduced by the current `develop` commit,
-   plus the adjacent current-tree regression boundary. Provider-key, approved
-   credential, NCBI refresh, duplicate-file policy, spoken screen-reader,
-   container, and desktop-release gates remained independent.
-2. The checked-out tree was at `c09c1291b2372343930fd902cf4dca59739bd967`,
-   equal to `origin/develop` before this evidence-only documentation update.
-   The shared SQLite database was cloned under the task QA directory. All
-   Settings mutations and model-config API changes used the clone; the shared
-   database, credentials, and provider caches were not changed.
-3. The isolated runtime returned `source=database`, the five typed settings
-   categories, `environment_editable=false`, and a persisted update timestamp.
-   The General Settings UI saved polling interval `1 -> 2`, retained `2` after
-   reload, reset to typed default `1`, and the API confirmed `1.0` after reset.
-   The legacy `settings/configurations.json` file was absent and the desktop
-   runtime payload had no reference to it.
-4. The Models surface rendered the current provider/model configuration and the
-   RAG settings modal with Retrieval, Chunking, Embeddings, Ranking, and Index
-   sections. The 1280x720 General Settings, save/reset, and RAG modal captures
-   are retained in [the QA report](../../QA/validation-followup-20260928/report.md).
-   No console errors or failed requests were observed. The in-app CUA browser
-   surface timed out twice during discovery; bundled Playwright was used as the
-   documented fallback after that tool was unavailable.
-5. The current backend unit/persistence suite passed `824` tests with `14`
-   documented skips and nine warnings. Runtime-settings/model-config focused
-   unit tests passed `65`; revision/runtime/API focused tests passed `53`; the
-   model-config API slice passed `5`; and the Settings/navigation browser slice
-   passed `4` with `21` deselected. The Angular suite passed `24 files / 105
-   tests`, the production build passed, Ruff passed, Pyright reported `0
-   errors, 0 warnings, 0 informations`, and `git diff --check` passed.
-6. No application source defect was found. The affected settings/model-config
-   boundary is validated, the application-shell evidence is current for the
-   rendered scope, and the revision regression remains green after the settings
-   migration. Hosted live-provider, conditional browser prerequisites, current
-   cloud-provider output, true process-restart recovery, and the remaining
-   external gates are not inferred as passes.
-
-| Gate | Final status | Evidence boundary and remaining limitation |
-|---|---|---|
-| `settings.runtime-model-configuration` | `VALIDATED` | Database source, typed persistence, save/reload/reset, model-config compatibility, legacy-file removal, rendered UI, focused tests, full backend/frontend/build/static checks passed. |
-| `ui.application-shell` | `VALIDATED` for the exercised scope | Current Settings/Models surfaces rendered at 1280x720 without console or request failures. Spoken Narrator/Speech Recap output remains unvalidated. |
-| `api.local-boundaries` | `WORKING` for the exercised settings/model-config scope | Settings and model-config routes passed on an isolated clone; the complete 68-path response/error and mutating-route matrix remains outside scope. |
-| `revision.agentic-lifecycle` | `PARTIAL` | The current 53-test revision/runtime/API regression remains green. Fresh live-provider acceptance, true process-restart recovery, tool-failure injection beyond existing cases, broader model variance, and every lifecycle branch remain incomplete. |
-| `test.automated-regression` | `PARTIAL` | Current local backend/frontend/static/build checks are green; hosted live-provider, conditional browser, and hosted exact-commit lanes remain incomplete. |
-| `model.provider.opencode-go` | `PARTIAL` | No approved local `OPENCODE_GO_API_KEY` was present, so no current cloud request was made. |
-| `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available or mutated. |
-| `data.inspection.catalogs` / `data.sources.refresh` | `PARTIAL` | The NCBI Bookshelf human-verification blocker remains. |
-| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged, hosted packaging, clean-machine, and publication prerequisites remain separate. |
-
-Detailed evidence: [runtime settings and current-tree regression](../../QA/validation-followup-20260928/report.md).
-
-Task-owned cloned databases, logs, pytest caches, generated bytecode, and local
-servers were removed after capture. Ports `7690`, `7692`, `9847`, and `9849`
-were checked offline. Protected repository cache residue was preserved.
-
-## Revision startup reconciliation and tool-failure validation — 2026-09-28
-
-1. The current ledger identified revision lifecycle failure/recovery as the
-   next local slice that did not require provider credentials. OpenCode Go,
-   access-key mutation, NCBI refresh, duplicate-file policy, desktop
-   publication, and spoken screen-reader output remained separate boundaries.
-2. The implementation audit found that `architecture/background_jobs.md`
-   described startup reconciliation, but `app_lifespan` did not invoke it. A
-   missing worker was only reconciled by a later status poll, and persisted
-   active steps could remain `running`.
-3. The repair adds startup reconciliation after database and job-manager
-   initialization. Persisted `running` revision runs without a live pending or
-   running worker are marked `failed` with the existing recoverable message;
-   still-active steps are terminalized with the same sanitized error. The
-   source session and draft shell remain intact for retry.
-4. A disposable SQLite process-restart surrogate created a running revision
-   plus planner step, then invoked the recovery path with a fresh `JobManager`.
-   The run and step became `failed`, the source report was unchanged, and a
-   deterministic retry completed as `llm_qa_passed` under a new run/job
-   identity.
-5. A controlled allow-listed tool exception containing a secret-shaped token
-   failed the revision closed. The job/run exposed only the generic retry
-   message, the persisted task error omitted the token, and the source report
-   remained unchanged.
-6. The focused revision/startup suite passed **37 tests**. Affected
-   migration/job/API/cloud-error checks passed **41 tests**. The full backend
-   unit suite passed **811 tests** with seven existing dependency/deprecation
-   warnings. Ruff, Pyright (`0 errors, 0 warnings, 0 informations`), changed
-   module compilation, and `git diff --check` passed.
-
-| Gate | Final status | Evidence boundary and remaining limitation |
-|---|---|---|
-| `revision.agentic-lifecycle` | `PARTIAL` | Startup worker-loss recovery, active-step terminalization, sanitized tool failure, source preservation, and deterministic retry are validated. Fresh accepted current-provider execution, broader model variance, timeout/provider branches beyond existing coverage, and every lifecycle branch remain open. |
-| `api.local-boundaries` | `WORKING` for the exercised revision recovery boundary | Fresh-manager startup reconciliation plus revision status/retry persistence passed; the complete 68-path response/error and mutating-route matrix remains outside scope. |
-| `test.automated-regression` | `PARTIAL` | Full local backend unit and affected static checks are green. Frontend, hosted live-provider, conditional browser, and hosted exact-commit lanes remain incomplete. |
-| `model.provider.opencode-go` | `PARTIAL` | No approved current key was available and no cloud request was made. Historical exact-provider evidence remains bounded. |
-| `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available or mutated. |
-| `data.inspection.catalogs` / `data.sources.refresh` | `PARTIAL` | NCBI Bookshelf still requires human verification for the LiverTox master list. |
-| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged, hosted packaging, clean-machine, and publication prerequisites remain separate. |
-| spoken Narrator/Speech Recap output | `UNVALIDATED` | Rendered, keyboard, and accessibility-tree evidence does not establish audible output. |
-
-Detailed evidence: [revision restart/tool-failure validation](../../QA/revision-restart-recovery-validation-20260928/report.md).
-
-## Revision cancellation and timeout follow-up — 2026-09-28
-
-The next credential-free revision slice exercised the public service
-cancellation path while a deterministic planner call was held open. The
-in-memory job remained `running` with `stop_requested=true` until the worker
-observed the cooperative stop; the persisted run and planner step became
-`cancelled`, the same-root retry stayed blocked during worker unwind, and a
-new retry was admitted after exit. The retry completed its deterministic no-op
-path as `requires_human_review`, and the source report was unchanged throughout.
-
-A second test raised the real `LLMTimeout` contract for `ollama /
-qwen3.5:9b`. The persisted run and planner step retained exact provider,
-model, operation, `error_code=timeout`, and `retryable=true` metadata without
-raw provider detail or secret-shaped content.
-
-The selected revision/runtime/startup/API/cloud-error/clinical-route suite
-passed **79 tests** with two existing dependency/deprecation warnings. The
-revision subset contained **50 passing tests** after adding the two regression
-checks. Targeted Ruff, Pyright from `app/server` (`0 errors, 0 warnings, 0
-informations`), and `git diff --check` passed. No application source defect
-was found, so the implementation was unchanged; the cancellation and timeout
-tests remain as regression evidence.
-
-| Gate | Final status | Evidence boundary and remaining limitation |
-|---|---|---|
-| `revision.agentic-lifecycle` | `PARTIAL` | Cooperative service cancellation, same-root admission, timeout diagnostics, source preservation, startup recovery, tool failure, unavailable-provider failure, and deterministic retry are validated. Fresh accepted current-provider execution, broader provider/model variance, and every lifecycle branch remain incomplete. |
-| `revision.accepted-session-finalization` | `VALIDATED` for the exact previous synthetic accepted path | This slice cancelled before finalization and did not create a new accepted child session. The prior accepted record remains bounded to its recorded provider/model and review state. |
-| `api.local-boundaries` | `WORKING` for the exercised revision cancellation/status/retry boundary | The service-level cancellation and retry contracts passed; the complete 68-path response/error and mutating-route matrix remains outside scope. |
-| `test.automated-regression` | `PARTIAL` | The selected local backend/API/static checks are green. Hosted live-provider, conditional browser, and hosted exact-commit lanes remain incomplete. |
-| `model.provider.opencode-go` | `PARTIAL` | No approved current key was available and no cloud request was made. Historical exact-provider evidence remains bounded. |
-| `model.provider.local-ollama` | `VALIDATED` for the existing timeline scope; revision scope remains partial | The timeout contract is validated without changing the supported timeline boundary. No accepted local revision was produced. |
-| `auth.access-key-management` | `BLOCKED` | No approved disposable credential was available or mutated. |
-| `data.inspection.catalogs` / `data.sources.refresh` | `PARTIAL` | The NCBI Bookshelf human-verification blocker remains. |
-| `release.desktop.v3-4-0` | `BLOCKED` | Signed/tagged, hosted packaging, clean-machine, and publication prerequisites remain separate. |
-| spoken Narrator/Speech Recap output | `UNVALIDATED` | Rendered, keyboard, and accessibility-tree evidence does not establish audible output. |
-
-Detailed evidence: [revision cancellation and timeout validation](../../QA/revision-cancellation-timeout-validation-20260928/report.md).
-
-## NCBI LiverTox machine-access implementation — 2026-09-29
-
-1. Replaced the automated LiverTox Bookshelf HTML discovery path with a
-   sequential official-service chain: E-utilities exact-RID identity lookup,
-   Books-OAI `nbk_ftext` metadata discovery, LitArch `file_list.csv` archive
-   resolution, and safe archive-member master-list fallback. No runtime request
-   to the normal Bookshelf HTML page remains in the discovery path.
-2. Added the database-backed `ncbi_contact_email` Integration setting with a
-   reusable backend/frontend structural validator, deterministic legacy/blank
-   fallback, Settings API persistence/reload/reset mapping, and email input
-   guidance. The contact is request identity, not a credential, and is not
-   emitted in update results, source metadata, clinical artifacts, or ordinary
-   logs.
-3. Hardened XLSX and tarball downloads with `.part` staging, source validation,
-   safe tar-member checks, and replacement only after validation. A temporary
-   extension-related validator defect found by the fallback test was fixed by
-   validating staged XLSX bytes through memory buffers.
-4. The focused updater/settings/timeout suite passed **33 tests**. The full
-   backend unit suite passed **832 tests**. Ruff passed, Pyright reported
-   `0 errors, 0 warnings, 0 informations`, the Angular suite passed **24 files
-   / 105 tests**, and `npm run build` passed. The synchronized OpenAPI document
-   parses with **68 paths / 104 schemas** and contains the new Integration
-   field in both read and patch schemas.
-5. A read-only live NCBI preflight identified the expected E-utilities record,
-   OAI metadata format, and dynamic LitArch archive path. The current OAI
-   spreadsheet response was challenge HTML; the resolved archive metadata
-   reported **195,497,807 bytes**. The archive was intentionally not downloaded
-   during this run.
-6. A disposable backend plus in-app Browser at 1280×720 rendered the
-   Integrations contact field, effective fallback, email semantics, production
-   guidance, and malformed-email Save guard. The temporary services were
-   stopped after capture.
-
-| Gate | Final status | Evidence boundary and remaining limitation |
-|---|---|---|
-| `data.inspection.catalogs` | `PARTIAL` | Discovery and fallback contracts are implemented and tested; no live catalog replacement was completed. |
-| `data.sources.refresh` | `PARTIAL` | The new machine-access chain passed deterministic tests and metadata preflight; full archive refresh and ordered Update All remain unvalidated. |
-| `settings.runtime-model-configuration` | `VALIDATED` for the NCBI contact field | Missing/blank fallback, custom persistence/reload/reset, malformed API rejection, Angular rendering, and browser validation passed. |
-| `ui.application-shell` | `VALIDATED` for the exercised Integrations scope | The rendered contact field, help copy, effective default, and invalid-email guard were observed in the in-app Browser. |
-| `test.automated-regression` | `PARTIAL` | Local backend/frontend/static/build checks are green; live archive/catalog, hosted provider, and ordered refresh gates remain outside scope. |
-
-Evidence: [NCBI LiverTox machine-access validation](../../QA/ncbi-livertox-machine-access-validation-20260929/report.md).
-
-## Hosted OpenCode Go fresh revision attempt — 2026-09-29
-
-The existing opt-in `live-provider-e2e` path was extended at commit
-`37691d5512245a6bde29e8a125683b40046cbcc5` on `develop` to retain the new
-synthetic clinical session, start a non-dry revision through the public API,
-poll the job to terminal state, and re-query the persisted run, steps, version,
-artifacts, QA result, and lineage. The test asserts the exact
-`opencode_go / deepseek-v4-flash` route, no fallback, sanitized errors and
-logs, source preservation, and one bounded retry only when a first revision
-failure is explicitly retryable. The harness passes the isolated backend log
-directory to the test. Existing deterministic cancellation, timeout,
-startup-recovery, tool-failure, and retry evidence was retained rather than
-replayed against the external provider.
-
-The hosted dispatch was [Actions run
-36568880619](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36568880619)
-with `run_provider_e2e=true`. The workflow wiring was confirmed: it sets both
-SQLite variables to the isolated
-`runtimes/cache/pytest/live-provider.sqlite3` path and maps
-`OPENCODE_GO_API_KEY` from the approved repository secret expression. On the
-runner, however, that environment value was empty. The live test stopped at
-its explicit credential guard before access-key creation, connectivity, the
-clinical request, or revision launch. No provider request, revision result, or
-credential-bearing output was produced. The authenticated local secret-name
-query also returned no repository secret names; no secret value was read or
-recorded.
-
-The local focused backend/provider/API slice passed **131 tests** with two
-existing dependency/deprecation warnings. The opt-in live test skipped without
-the live flag; Ruff/format, Pyright (`0 errors, 0 warnings, 0 informations`),
-and `git diff --check` passed. Hosted persistence-contract, backend-quality,
-security-scan, and windows-regression jobs passed; only the live-provider job
-failed at the missing/empty secret preflight.
-
-| Gate | Status after this attempt | Current boundary |
-|---|---|---|
-| `model.provider.opencode-go` | `PARTIAL` | Exact-route configuration and fail-closed secret handling are covered by the new test, but no current hosted provider request occurred. Historical exact-route records remain supporting evidence only. |
-| `revision.agentic-lifecycle` | `PARTIAL` | Existing deterministic persistence, accepted-finalization, cancellation, timeout, startup-recovery, tool-failure, retry, and UI evidence remains current. The fresh live revision lifecycle was not reached because of the infrastructure failure. |
-
-Outcome classification for this run is **infrastructure failure**. Accepted,
-QA-blocked, and retryable-provider-failure outcomes were not observed and were
-not inferred. Configure the approved repository secret without recording its
-value, then rerun the existing workflow; only a fresh run that reaches the
-revision request can extend either gate's live-provider boundary.
-
-Evidence: [OpenCode Go live revision validation](../../QA/revision-live-provider-validation-20260929/report.md).
-
-## Hosted OpenCode Go fresh revision completion — 2026-09-29
-
-The empty-secret attempt above was followed without changing the validation
-criteria. The approved OpenCode access key was recovered from the existing
-encrypted `resources/database.db` record and supplied to the repository secret
-without recording its value. The final hosted run used commit
-`28c566bf40573a076c82d2cf3dd9116e48047d72` on `develop` with
-`run_provider_e2e=true`:
-[Actions run 36574845168](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36574845168),
-live job `109428303300`.
-
-All five workflow jobs passed. The hosted log showed
-`DILIGENT_LIVE_PROVIDER_E2E=1`, a redacted non-empty `OPENCODE_GO_API_KEY`,
-and both SQLite variables mapped to the isolated
-`runtimes/cache/pytest/live-provider.sqlite3` path. The live test completed as
-`1 passed in 1794.58s (0:29:54)`.
-
-The test reached the real configured `opencode_go / deepseek-v4-flash` route
-for connectivity, the synthetic clinical request, and a fresh non-dry
-revision. It then re-queried the public job, pipeline run, planner/tool/editor/
-QA steps, revision version, artifacts, exact provenance, source session, and
-lineage after reload. The passing assertions require no provider/model
-fallback, sanitized errors and logs, persisted draft and QA state, deterministic
-patch validation, source preservation, and a bounded retry with a new job/run
-identity only if the first provider failure is explicitly retryable. Accepted
-child creation and the QA-blocked no-child branch are both checked
-conditionally; the current hosted stdout does not print which of those two
-legitimate terminal sub-branches occurred, so no separate accepted-path claim
-is made here.
-
-| Gate | Current status | Validated scope and remaining boundary |
-|---|---|---|
-| `model.provider.opencode-go` | `VALIDATED` for the exact hosted route | Current hosted connectivity, clinical execution, and fresh revision execution preserved exact `opencode_go / deepseek-v4-flash` with no fallback. Broader provider/model, latency, and output/QA variability remain outside scope. |
-| `revision.agentic-lifecycle` | `VALIDATED` for the documented exact-provider synthetic scope | The fresh live run is coherent across version shell, pipeline run, planner, allow-listed tool trace, draft, QA, provenance, lineage, source preservation, readable artifacts, reload, and conditional retry/accepted-child behavior. Existing deterministic cancellation, timeout, startup-recovery, tool-failure, retry, accepted-finalization, persistence, and UI evidence remains supporting scope; every lifecycle permutation is not claimed. |
-
-Outcome classification is explicit: run `36568880619` is an infrastructure
-failure caused by the empty secret; run `36574845168` is a completed legitimate
-terminal revision lifecycle; no retryable provider failure was reported in the
-retained hosted output; and the accepted-versus-QA-blocked sub-branch is not
-separately observable from the current test log. Evidence: [OpenCode Go live
-revision validation](../../QA/revision-live-provider-validation-20260929/report.md).
-
-## Access-key lifecycle and deterministic automated regression — 2026-09-29
-
-This current-tree validation corrected the boundary between DILIGENT credential
-storage and provider credential acceptance. The access-key component was tested
-with synthetic format-valid values only; no synthetic value was sent to an
-external provider and no additional real key was acquired.
-
-The API lifecycle created two same-provider keys, confirmed inactive creation,
-activated A then B with exactly one active row after each transition, listed
-metadata-only fingerprints, asserted plaintext redaction, rejected activation
-and deletion through the wrong provider boundary, deleted both keys, and
-explicitly asserted the final provider list was empty. The file-backed SQLite
-unit contract reopened the same database and encryption material through fresh
-serializer/engine instances, preserved metadata and active state, confirmed
-ciphertext did not contain plaintext, decrypted internally, deleted the key,
-and verified cleanup after another reopen. Rendered Chromium coverage added a
-synthetic key from Settings → Models, displayed only its fingerprint, activated
-it, reloaded/reopened the dialog, verified active state, deleted it, and
-asserted the plaintext never appeared in `document.body.innerText`.
-
-The canonical Windows harness now owns seed, fake-Ollama, startup, readiness,
-suite selection, JUnit skip accounting, diagnostics, and cleanup. The Full
-suite excludes the live-provider and heavyweight multilingual embedding files.
-Its JUnit result was **46 passed, 0 failed, 0 errors, 0 skipped**. The complete
-backend unit suite was **833 passed**; local SQLite persistence was **15 passed
-and 14 intentionally skipped PostgreSQL parameterizations** without
-`TEST_DATABASE_URL`. The hosted `persistence-contract` job remains the
-mandatory PostgreSQL execution. Angular/Vitest was **24 files / 105 tests
-passed**, the production build passed, Pyright reported **0 errors, 0 warnings,
-0 informations**, and Alembic upgrade/current-head/drift passed. Pip-audit
-reported no known vulnerabilities, both npm audits reported **0
-vulnerabilities**, and cargo-audit passed with six allowed unmaintained-crate
-warnings.
-
-| Gate | Current status | Evidence boundary |
-|---|---|---|
-| `auth.access-key-management` | `VALIDATED` | DILIGENT secure lifecycle only: encryption, persistence/reopen, metadata-only responses, activation/rotation, provider scope, deletion, and redaction. Provider-side key validity belongs to `model.provider.*`. |
-| `test.automated-regression` | `VALIDATED` | Mandatory deterministic matrix is green with zero Full-suite skips. Local PostgreSQL convenience skips do not replace the hosted two-engine contract. |
-| `model.provider.opencode-go` | `VALIDATED` for the exact hosted route | Existing hosted run `36574845168` remains the real-key connectivity/clinical/revision evidence. A new hosted dispatch is appropriate after a final implementation commit because this task changed the harness. |
-| `release.desktop.v3-4-0` | Not a validation component | v3.4.0 delivery checks remain in `runtime/desktop_release.md` as release-readiness procedures. |
-
-Evidence: [access-key and automated regression report](../../QA/access-key-automated-regression-20260929/report.md).
-
-## Session and revision API local-boundary follow-up — 2026-09-29
-
-The current component ledger identified the session/revision HTTP boundary as
-the next locally actionable slice after the hosted provider, source-refresh,
-access-key, and deterministic regression follow-ups. This run deliberately
-left the RAG duplicate-file decision, broader route matrix, provider/model
-variance, spoken screen-reader output, desktop delivery, and container runtime
-as independent boundaries.
-
-The selected live HTTP checks ran through the canonical Windows `Full` harness
-against a task-owned SQLite database seeded with one synthetic session and one
-persisted timeline. They covered session list/detail/version/manual-edit reads,
-metadata and report-audit mutations, timeline reads and missing-record errors,
-revision validation and missing-record errors, and cleanup of the edited report
-back to its original text. The final run passed **48 tests** with **zero
-skips**.
-
-The first live attempt exposed one implementation defect: a report mutation for
-a missing session raised the repository's "no persisted version" error before
-checking session existence, and the API returned a sanitized `500`. The
-repository now checks the session first, returns `None` for a missing session,
-and retains the explicit runtime error for an existing session without a
-persisted version. The final live run returned the expected `404`, and the
-focused repository/API/revision/settings/access-key suite passed **113 tests**.
-
-Changed-file Ruff checks, full-server Pyright (`0 errors, 0 warnings, 0
-informations`), and `git diff --check` passed. The harness stopped its owned
-process trees and ports `7690`, `9847`, and `11435` were free afterward.
-
-| Gate | Final status | Evidence boundary |
-|---|---|---|
-| `api.local-boundaries` | `WORKING` for the exercised session/revision slice | Live success, mutation, validation, and not-found contracts passed. The complete 68-path response/error and mutating-route matrix remains open. |
-| `sessions.crud-persistence` | `VALIDATED` for the exercised session update/manual-audit boundary | Metadata and manual report persistence were checked on the disposable seed; binary image storage and Chrome-specific file-picker behavior remain outside scope. |
-| `revision.agentic-lifecycle` | `VALIDATED` for the existing exact-provider synthetic scope; API error boundary rechecked here | No provider-backed revision was started in this credential-free local slice, so provider/model or lifecycle permutation coverage is unchanged. |
-| `test.automated-regression` | `VALIDATED` for the deterministic local and hosted mandatory matrix | The current local Full suite is green with zero skips, and hosted commit CI [36620242445](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36620242445) passed `backend-quality`, `persistence-contract`, `windows-regression`, and `security-scan` on `ba5a722a`. `live-provider-e2e` was intentionally skipped with `run_provider_e2e=false`. |
-
-Evidence: [session and revision API validation](../../QA/api-local-boundaries-20260929/report.md).
-
-## Final validation-closure campaign — 2026-09-30
-
-This entry is the consolidated local closure record for the defined DILIGENT
-scope. The final closure source and evidence are committed on `develop` as
-`35f064fda07761499c6c7d97f794e93942623a01`; validation began from base
-revision `c52119d7` and completed against the closure working tree.
-
-### API local-boundaries
-
-`app/tests/e2e/test_api_local_boundaries.py` now owns an explicit contract
-matrix derived from `/openapi.json`. The live application reported 68 paths and
-85 method/path operations, and the matrix failed unless the current operation
-set matched exactly. The Full harness covered root/runtime, clinical,
-model/configuration, access-key, session/timeline/revision,
-inspection/catalog, runtime-observation, structured-source, and RAG route
-families with deterministic success, validation, not-found, cancellation,
-persistence, or already-validated external integration boundary evidence. No
-uncontrolled network refresh was introduced into this local gate.
-
-The final canonical command was:
-
-```powershell
-$env:DILIGENT_BROWSER_E2E_CACHE_ROOT='G:\Projects\Repositories\Active projects\DILIGENT Clinical Copilot\assets\QA\.scratch-final-browser-e2e-final'
-$env:PLAYWRIGHT_BROWSERS_PATH='G:\Projects\Repositories\Active projects\DILIGENT Clinical Copilot\runtimes\cache\playwright'
-.\app\tests\ci\run_browser_e2e.ps1 -Suite Full
-```
-
-The transient JUnit `assets/QA/.scratch-final-browser-e2e-final/pytest/browser-e2e-logs/full-junit.xml` recorded **53 passed, 0 failures, 0 errors, 0 skipped** before the disposable scratch root was removed after verification.
-
-### ISSUE-005 / RAG duplicate policy
-
-Supported input files now receive a raw-byte SHA-256 fingerprint. Only
-byte-identical files group together; semantic or normalized-text deduplication
-is not attempted. The canonical source is selected by normalized relative-path
-ordering, retains the existing path-derived `document_id`, and carries every
-duplicate relative path in metadata. Data Inspection keeps every physical file
-visible and labels canonical, duplicate, and unsupported rows.
-
-The disposable real-embedding fixture contained two identical files and one
-different file. A fresh generation rebuild reported:
-
-| Metric | Result |
-|---|---:|
-| Physical supported files | 3 |
-| Unique ingested documents | 2 |
-| Chunks | 2 |
-| Duplicate files | 1 |
-| Vector documents | 2 |
-| Retrieved duplicated evidence | 1 canonical result |
-
-The source manifest hash was
-`29d94eca3b43e35a8f5e765e30e3fa80b8186978fd8b91fbfa00994cb305a1ac`. Inspection
-showed the canonical path with alias `z-copy.txt`, the duplicate row pointing
-to that canonical path, and the distinct file as a second canonical document.
-Retrieval and bibliography provenance used the canonical path. Repeating the
-fresh-generation build preserved the same canonical selection and counts;
-append behavior in an already-populated collection remains an explicit
-maintenance concern rather than being misrepresented as fresh-generation
-idempotence.
-
-### Final source matrix
-
-The following checks passed on the final source state:
-
-- Python compilation with an isolated bytecode root.
-- Alembic upgrade to `202609170001 (head)` and `alembic check` with no drift.
-- Ruff, Pyright (`0 errors, 0 warnings, 0 informations`), and `git diff --check`.
-- Backend unit suite: **838 passed, 7 warnings**.
-- SQLite persistence contract: **15 passed, 14 intentional PostgreSQL skips** without `TEST_DATABASE_URL`.
-- Angular/Vitest: **24 files, 105 tests passed**.
-- Angular production build.
-- pip-audit: no known vulnerabilities.
-- npm audits: 0 vulnerabilities after the lockfile-only remediation.
-- cargo-audit: passed with six allowed unmaintained-crate warnings; no denied unsound finding.
-
-### Current-source revalidation and harness repair — 2026-09-30
-
-The current `develop` source was rechecked on Windows NT 10.0.26200.0 with
-PowerShell 7.6.6, Python 3.14.7, Node.js 22.23.1, and the repository Chromium
-runtime. The four changed RAG/API unit modules passed **40 tests** with three
-dependency/framework deprecation warnings. The host could not write the
-repository `runtimes/cache` subtree, so the disposable test root and explicit
-pytest cache were placed under a new ignored `assets/QA/.scratch-*` directory;
-the initial setup-only failure was not a product result.
-
-The canonical Full browser harness then passed **53 tests, 0 failures, 0
-errors, 0 skips**, returned shell exit code `0`, and left ports `7690`, `9847`,
-and `11435` free. The first run had exposed a cleanup-race defect in
-`app/tests/ci/run_browser_e2e.ps1`: a benign `taskkill.exe` status could mask a
-successful pytest run. The harness now preserves the test result explicitly;
-the post-fix Full run is the regression evidence. This is a harness-only fix;
-no product behavior or validation boundary changed.
-
-### Packaged Windows evidence
-
-The pinned `1.95.0` Rust toolchain built the local 3.4.0 candidate with:
-
-```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.4.0 -DesktopTarget All -AllowDirtyTree
-```
-
-| Artifact | SHA-256 | Evidence |
-|---|---|---|
-| `release/DILIGENT-v3.4.0-windows-x64-portable.exe` | `29BC8E69CBBB0E8DC8446103C2D8526BF02130B724D9916C2DAE68901F2BA61A` | PE/AMD64, checksum, extraction, ready payload, version, health, API, window title, clean close, port closure, and second launch passed. |
-| `release/DILIGENT-v3.4.0-windows-x64.msi` | `B8AA3E9734ECDE0FD2DD80573C463CEFD7674E6B9E0CEACDA395C19EAEC1A263` | Checksum and ProductName/ProductVersion/UpgradeCode metadata passed. |
-
-Portable smoke ran twice from one data root. Both launches reported
-`DILIGENT Clinical Copilot`, `release_version=3.4.0`, `/api/health` 200, clean
-backend termination, closed random ports, and a fresh ready file; the second
-launch replaced the stale ready-file state. Representative secured endpoints
-returned their intended unauthenticated desktop boundary (401) to an external
-probe, while the shell bootstrap and root/health endpoints succeeded.
-
-The published 3.3.0 MSI checksum and metadata were verified. Actual 3.3.0
-install, 3.4.0 upgrade, and uninstall could not be executed because this host
-is not an administrator and the MSI is `ALLUSERS=1`; both controlled
-`msiexec` attempts remained idle and were terminated after confirmation. No
-partial registration, DILIGENT process, or listening packaged backend port
-remained. MSI install/upgrade is therefore **BLOCKED BY HOST PREREQUISITE**, not
-claimed as a product PASS. A real administrator-host run is still required for
-that release-readiness procedure.
-
-Narrator/Speech Recap and broad screen-reader certification are optional,
-deferred, and non-blocking. Containerized runtime remains
-`NOT_IMPLEMENTED` and out of scope. Tagging, GitHub Release publication,
-signing, offline WebView2 packaging, and clean-machine certification remain
-separate publication/distribution procedures.
-
-## Packaged interactive-UI validation — 2026-10-01
-
-This slice revisited the previously `BLOCKED` packaged desktop
-interactive-UI gate (D06–D11) using the available native Windows UI-automation
-driver against the exact v3.4.0 portable candidate. Baseline: `develop` HEAD
-`738a14bdfab9627cc9e38461f374d10cacd32edc` (equal to `origin/develop`), a
-docs-only successor to candidate `2f804d251769f4e01375d02459e41dd9970ec8eb`.
-Artifact SHAs matched the release manifest
-(`0209cf25…` portable, `1df49329…` MSI). The EXE ran with an isolated short
-data root under the temp area; a first attempt under the deep repository path
-reproduced the documented Windows DLL-load filename-length failure, so the
-`smoke_release.ps1`-style short root was used. Shared data, settings,
-credentials, and caches were not touched.
-
-| Check | Result |
-|---|---|
-| Packaged launch + extraction | Runtime extracted to the hash-addressed `rt/3.4.0` payload (1109 files + marker); ready payload `{"pid":19280,"port":65516,"release_version":"3.4.0"}`; health 200. |
-| Packaged API boundary | `/api/health` 200, `/` 200, unauthenticated `/api/settings` 401. |
-| Workspaces render (D06) | DILI Agent, Clinical Sessions (fresh empty state), Data Inspection (Drug Catalog/LiverTox/DILIrank/RAG tabs), Settings → General and Settings → Models all rendered in the packaged window. |
-| Settings persistence (D06) | General polling interval `1 → 2` saved (DB `2.0`, `updated_at` advanced), reload retained `2`, Reset returned to `1` (DB `1.0`). |
-| Clean close + restart persistence (D03) | Alt+F4 closed the packaged app with no leftover process/listener; relaunch health 200, DB `polling_interval=1.0` retained, UI reopened and showed `1`. |
-| Packaged preflight (D07 boundary) | With synthetic text, Run DILI analysis opened `Cannot start analysis` with 5 blocking + 1 warning; read-only DB showed zero clinical sessions after the attempt. |
-| Models surface | Runtime source, catalog with install/assigned status, cloud provider keys, current config (Local/Ollama, qwen3.5:2b roles, Granite embedding RAG) rendered. |
-
-| Gate | Status after this run | Remaining boundary |
-|---|---|---|
-| `release.desktop.v3-4-0` packaged portable interactive UI | `PARTIAL` (was `BLOCKED`) | Workspaces, Settings persistence, preflight, API boundary, and clean restart are packaged-validated. A full populated multi-drug analysis, session/timeline/revision flows, native RAG folder dialog, and failure/cancellation suites remain unexercised because a fresh packaged root has no structured sources and cloning the credential-bearing shared database was intentionally avoided. |
-| `release.desktop.v3-4-0` MSI lifecycle (D13/D14) | `BLOCKED` | Non-administrator token; no elevation attempted. |
-| Signing / clean-machine distribution | `PENDING` | Separate distribution procedures. |
-
-Detailed evidence: [packaged interactive-UI validation](../../QA/desktop-interactive-ui-validation-20261001/report.md),
-updated [D01–D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md),
-and [host checklist](../../QA/desktop-release-validation-20261001/host-checklist.md).
-
-The disposable data root and temporary captures were under the temp area and
-were removed after the read-only checks; task-owned processes were stopped,
-ports were free, and the user-started Ollama service remained running.
-
-## Packaged populated-workflow validation - 2026-10-01
-
-This slice covers the previously UNTESTED/BLOCKED packaged desktop gates on the
-portable v3.4.0 lane by driving the packaged Tauri/WebView2 window with native UI
-automation against a populated isolated data root. Baseline: candidate
-2f804d251769f4e01375d02459e41dd9970ec8eb on develop; portable SHA matched the
-release manifest. Only synthetic data was used; the shared database, settings,
-credentials, and caches were untouched; the user-started Ollama service was used
-read-only as the qwen3.5:9b lane.
-
-| Check | Result |
-|---|---|
-| Launch + API boundary | Ready payload elease_version=3.4.0; /api/health 200, / 200, unauthenticated /api/settings 401; title DILIGENT Clinical Copilot. |
-| Update All (packaged) | Real ordered RxNav->LiverTox->DILIrank pipeline started; RxNav full refresh is N-request-slow (letter c after ~12 min) so it was cooperatively cancelled through the packaged UI (  of 3 source updates completed. The operation was cancelled.). |
-| Catalog seed + render | Isolated DB seeded via repository update-persistence APIs (upsert_drugs_catalog_records / save_livertox_records / replace_records); packaged Data Inspection rendered populated RxNav/LiverTox/DILIrank; preflight catalog blockers cleared. |
-| D07 populated analysis | Full 15-step multi-drug analysis (Amoxicillin+Clarithromycin+Ibuprofen) completed at 100% (job 1b0e1e57); report rendered with R-score 4.85, per-drug commentary, LiverTox scores, RUCAM evidence; session 1 + versions + 3 matched drug mentions persisted. Session 1 stored ailed = hard safety-gate equires_human_review (rechallenge + causality-overstatement flags). |
-| D08 sessions/timeline/revisions | Session detail + evidence render; timeline #1 generated (qwen3.5:9b timeout -> fail-closed fallback chronology, 3 events with evidence); metadata JSON save persisted; manual edit superseded v1 -> current v2 (manual_edit) with hash audit; agentic revision fail-closed at step 1 with Timed out waiting for Ollama chat response; restart reload retained all state. |
-| D09 RAG | Update Embeddings (job 4a8b122c): 3 physical files -> 2 unique documents -> 2 chunks, byte-identical duplicate flagged; RAG-on analysis (job d9970bdc, session 2 successful, use_rag=true) cited cetaminophen.txt in the Bibliography. Native IFileDialog could not be reliably automated; packaged default RAG source folder used (boundary recorded). |
-| D11 failure/cancellation | Update-All cooperative cancel; clinical-job cancel via Stop analysis (no partial session); timeline + revision LLM timeouts fail-closed with rendered diagnostics and retryable state. |
-| D06 access keys | OpenAI key lifecycle in the packaged surface: create (encrypted at rest, plaintext masked), activate, one-active-key rotation, delete; DB-verified (Fernet values + fingerprints only). |
-| Restart + cleanup | Clean close left no process/listener; relaunch retained sessions, model config (qwen3.5:9b), timeline, RAG, deleted keys; isolated root removed. |
-
-| Gate | Status after this run | Remaining boundary |
-|---|---|---|
-| elease.desktop.v3-4-0 packaged portable populated workflow | PASS for the exercised scope | Full analysis, sessions/timeline/manual-edit/revision, timeline fallback, RAG ingestion/retrieval with citations, cooperative cancellation, provider-timeout fail-closed, and access-key lifecycle are packaged-validated. |
-| elease.desktop.v3-4-0 native RAG folder dialog / broader file-dialog & WebView2 edges | PARTIAL | The packaged IFileDialog could not be reliably automated (returned last-used folder); broader D10 edge suites remain outside scope. |
-| elease.desktop.v3-4-0 MSI lifecycle (D13/D14) | BLOCKED | Non-administrator token; no elevation attempted. |
-| Signing / clean-machine distribution | PENDING | Separate distribution procedures. |
-
-Detailed evidence: [packaged populated-workflow validation](../../QA/desktop-populated-ui-validation-20261001/report.md),
-updated [D01-D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md),
-[packaged-suite-boundary](../../QA/desktop-release-validation-20260930/packaged-suite-boundary.md),
-and [host checklist](../../QA/desktop-release-validation-20261001/host-checklist.md).
-
-The isolated data root, temporary captures, and automation helpers were removed;
-task-owned processes were stopped with no leftover listeners; the user-started
-Ollama service remained running.
+| `runtime.startup.source-launcher`, `runtime.database.sqlite-migrations` | [Tier 0](../../QA/tier0-validation-20260921.md); [Launcher/startup/build](../../QA/launcher-startup-build-validation-20260921.md) |
+| `api.local-boundaries` | [Final closure](../../QA/final-validation-closure-20260930/report.md); [Session/revision API](../../QA/api-local-boundaries-20260929/report.md); [Clinical/API resilience](../../QA/clinical-api-resilience-20260926/report.md) |
+| `ui.application-shell` | [Final closure](../../QA/final-validation-closure-20260930/report.md); [UI shell accessibility](../../QA/ui-accessibility-validation-20260926/report.md) |
+| `settings.runtime-model-configuration` | [Runtime settings regression](../../QA/validation-followup-20260928/report.md); [Runtime configuration UI](../../QA/runtime-configuration-ui-20260928/report.md) |
+| `auth.access-key-management` | [Final closure](../../QA/final-validation-closure-20260930/report.md); [Clinical/API resilience](../../QA/clinical-api-resilience-20260926/report.md) |
+| `model.provider.opencode-go`, `revision.agentic-lifecycle`, `revision.accepted-session-finalization` | [Live provider revision](../../QA/revision-live-provider-validation-20260929/report.md); [Revision lifecycle](../../QA/revision-lifecycle-validation-20260927/report.md); [Revision restart/tool-failure](../../QA/revision-restart-recovery-validation-20260928/report.md); [Local Ollama revision](../../QA/revision-local-ollama-validation-20260928/report.md) |
+| `model.provider.local-ollama`, `sessions.timeline` | [Timeline Browser validation](../../QA/timeline-browser-validation-20260925/report.md); [Empty extraction recovery](../../QA/timeline-empty-extraction-recovery-20260924/report.md) |
+| `clinical.analysis.pipeline`, `clinical.input-preflight`, `clinical.drug-resolution.guardrails`, `clinical.calculation.safety-audit` | [Clinical/API resilience](../../QA/clinical-api-resilience-20260926/report.md); [Rendered local resilience](../../QA/clinical-resilience-validation-20260926/report.md); [DILI pipeline](../architecture/dili_assessment_pipeline.md) |
+| `data.inspection.catalogs`, `data.sources.refresh` | [Live LiverTox + ordered refresh](../../QA/livertox-ordered-refresh-validation-20260929/report.md); [NCBI machine access](../../QA/ncbi-livertox-machine-access-validation-20260929/report.md) |
+| `rag.ingestion-retrieval` | [Final closure](../../QA/final-validation-closure-20260930/report.md); [RAG edge validation](../../QA/rag-edge-validation-20260928/report.md) |
+| `sessions.crud-persistence` | [Session/revision API](../../QA/api-local-boundaries-20260929/report.md); [Final closure](../../QA/final-validation-closure-20260930/report.md) |
+| `test.automated-regression` | [Final closure](../../QA/final-validation-closure-20260930/report.md); [Automated regression 2026-09-23](../../QA/automated-regression-revalidation-20260923/report.md); [Automated regression 2026-09-25](../../QA/automated-regression-validation-20260925/report.md) |
+| `release.desktop.v3-4-0` (release readiness) | [Desktop candidate evidence](../../QA/desktop-release-validation-20261001/report.md); [Packaged-UI slice](../../QA/desktop-interactive-ui-validation-20261001/report.md); [Populated-workflow slice](../../QA/desktop-populated-ui-validation-20261001/report.md); [D01–D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md); [Deep-path remediation](../../QA/desktop-release-validation-20260930/deep-path-remediation.md); [Packaged suite boundary](../../QA/desktop-release-validation-20260930/packaged-suite-boundary.md); [Desktop release](desktop_release.md) |
+
+## Maintenance
+
+- Keep this file sparse. A new slice is one table row plus at most one new
+  guarantee or limitation line.
+- Always update the component ledger and, when behavior changed, the product
+  ontology document named in the row, together with a `Last updated:` date.
+- Only reference evidence that is actually tracked under `assets/QA/`.
+- Detailed narratives belong in the QA report, not here.

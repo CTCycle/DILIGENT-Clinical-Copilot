@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { Component, ElementRef, HostListener, inject, signal } from '@angular/core';
 
 import { AppNotification, NotificationService } from '../../core/services/notification.service';

@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { LucideSparkles, LucideX } from '@lucide/angular';
 

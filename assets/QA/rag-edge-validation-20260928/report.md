@@ -73,9 +73,9 @@ the affected inspection/update contracts:
   contracts while unsupported files remain visible with an explicit false
   `supported_for_ingestion` flag.
 
-The revision recovery test is recorded separately in
-`assets/QA/revision-recovery-validation-20260928/report.md` and is not counted
-as live provider or vector-store execution.
+The revision recovery test is recorded separately in the
+[revision restart/tool-failure validation](../revision-restart-recovery-validation-20260928/report.md)
+and is not counted as live provider or vector-store execution.
 
 Focused commands and results:
 

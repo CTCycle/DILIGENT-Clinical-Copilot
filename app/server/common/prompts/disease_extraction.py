@@ -1,3 +1,6 @@
+# Copyright © 2023–2025 Thomas Virdis
+# Licensed under the GNU General Public License, version 3 or later.
+
 from __future__ import annotations
 
 ANAMNESIS_DISEASE_EXTRACTION_SYSTEM_PROMPT = """Extract structured disease and condition information from patient anamnesis or medical history, including non-English source text.

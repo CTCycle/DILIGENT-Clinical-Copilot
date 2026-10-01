@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { ClinicalFormState, ClinicalRequestPayload, RuntimeSettings } from "./models/types";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

@@ -100,8 +100,7 @@ windows-regression jobs also passed for this commit.
 The existing deterministic cancellation, timeout, startup-recovery,
 tool-failure, accepted-finalization, and retry evidence remains the supporting
 boundary in the
-[revision restart/tool-failure report](../revision-restart-recovery-validation-20260928/report.md),
-[revision cancellation/timeout report](../revision-cancellation-timeout-validation-20260928/report.md),
+[revision restart/tool-failure report](../revision-restart-recovery-validation-20260928/report.md)
 and [revision lifecycle report](../revision-lifecycle-validation-20260927/report.md).
 Those cases were not redundantly replayed against a paid external provider.
 

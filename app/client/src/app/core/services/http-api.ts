@@ -1,3 +1,6 @@
+// Copyright © 2023–2025 Thomas Virdis
+// Licensed under the GNU General Public License, version 3 or later.
+
 import { HTTP_TIMEOUT_SECONDS } from "../constants";
 import { ApiResult } from "../models/types";
 import { isRecord } from "../utils";

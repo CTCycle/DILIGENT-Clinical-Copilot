@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-09-29
+Last updated: 2026-10-01
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -97,7 +97,7 @@ branch-status record.
 - `runtime/qa_regression.md`
   - Repeatable regression slice for model configuration and app-flow validation.
 - `runtime/validation_ledger.md`
-  - Dated feature-state evidence register and chronological pre-release validation diary; its findings are summarized into `project_status_ledger.md` rather than serving as a second current-status authority.
+  - Sparse dated evidence register and validation diary; it records decisions, guarantees, and known limitations and links each retained slice to its tracked QA report. Its findings are summarized into `project_status_ledger.md` rather than serving as a second current-status authority.
 
 ### UI
 - `ui/design_tokens.md`
@@ -134,6 +134,7 @@ branch-status record.
 - Defer reading until the task proves the file is needed.
 - Keep all affected documents updated whenever behavior, architecture, runtime, or UX changes.
 - Treat `project_status_ledger.md` as the canonical current operational status. Before substantial implementation or validation work, inspect it; after a meaningful change or test, update the affected component, active issue or validation-debt entry, and evidence links. Keep detailed reports in their existing architecture, runtime, or `assets/QA/` locations.
+- `assets/QA/` is the supporting evidence location. Only the reports and screenshots referenced by the ledgers are tracked (`assets/QA/**` is git-ignored otherwise); link only tracked evidence so a fresh checkout stays self-consistent.
 - Always include a `Last updated: YYYY-MM-DD` line when modifying a document.
 - Pre-select files to read by folder structure and task intent before opening them.
 
