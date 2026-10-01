@@ -80,7 +80,7 @@ in the harness that could mask a successful pytest result with a nonzero
 | `test.automated-regression` | `VALIDATED` | Final source gates include 838 backend unit tests, 53 Full browser tests with 0 failures/errors/skips, 105 Angular tests, production build, persistence, static checks, and dependency audits. |
 | `ui.application-shell` | `VALIDATED` for required scope | Existing rendered, keyboard, focus, viewport, and application-shell accessibility evidence remains valid. Narrator/Speech Recap and broad component screen-reader certification are optional future enhancement work, explicitly outside required closure scope. |
 | `runtime.containerized` | `NOT_IMPLEMENTED` and out of scope | No container deployment requirement exists for this campaign. |
-| `release.desktop.v3-4-0` | `PORTABLE VALIDATED; MSI/UPGRADE PENDING ON SUITABLE TEST HOST; DISTRIBUTION PENDING` | Exact candidate `2f804d251769f4e01375d02459e41dd9970ec8eb` has fresh portable/MSI/checksum outputs, standard portable smoke, and the exact 230-character executable / 107-character `%LOCALAPPDATA%` deep-path replay passing twice. Exact-SHA hosted CI is green for backend quality, PostgreSQL persistence, Windows regression, and security; the live-provider dispatch remains pending because the available GitHub CLI credential returned HTTP 401. Native UI interaction, administrator MSI lifecycle, signing, and clean-machine distribution remain host/procedure boundaries. See [current candidate evidence](../QA/desktop-release-validation-20261001/report.md) and the [desktop release procedure](runtime/desktop_release.md). |
+| `release.desktop.v3-4-0` | `PORTABLE AND HOSTED CI VALIDATED; MSI/UPGRADE PENDING ON SUITABLE TEST HOST; DISTRIBUTION PENDING` | Exact candidate `2f804d251769f4e01375d02459e41dd9970ec8eb` has fresh portable/MSI/checksum outputs, standard portable smoke, and the exact 230-character executable / 107-character `%LOCALAPPDATA%` deep-path replay passing twice. Exact-SHA hosted CI is green for backend quality, PostgreSQL persistence, Windows regression, security, and the live-provider browser E2E in dispatch run [36828262326](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36828262326). Native UI interaction, administrator MSI lifecycle, signing, and clean-machine distribution remain host/procedure boundaries. See [current candidate evidence](../QA/desktop-release-validation-20261001/report.md) and the [desktop release procedure](runtime/desktop_release.md). |
 | Publication/distribution procedures | Deferred and separate | Tagging, GitHub Release publication, signing, offline WebView2 packaging, and clean-machine certification remain publication/release procedures, not source validation debt. |
 
 ## Exact v3.4.0 candidate preparation — 2026-10-01
@@ -88,9 +88,9 @@ in the harness that could mask a successful pytest result with a nonzero
 The prepared product candidate is 2f804d251769f4e01375d02459e41dd9970ec8eb on
 develop, with origin/develop at the same SHA. Fresh portable, MSI, and
 checksum artifacts are present locally. The exact-SHA hosted CI run is green
-for backend quality, PostgreSQL persistence, Windows regression, and security.
-The live-provider dispatch remains pending because the available GitHub CLI
-credential returned HTTP 401 before a workflow run was created.
+for backend quality, PostgreSQL persistence, Windows regression, security, and
+the live-provider browser E2E. The latter completed in dispatch run
+[36828262326](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36828262326).
 
 The portable smoke and exact 230-character executable / 107-character
 LOCALAPPDATA deep-path replay passed twice. MSI install/upgrade, native

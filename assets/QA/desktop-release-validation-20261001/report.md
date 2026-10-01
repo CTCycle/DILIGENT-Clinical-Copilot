@@ -49,11 +49,13 @@ Exact-SHA CI run 36786345174 completed successfully:
 - windows-regression, including frontend build and Full browser E2E: PASS
 - security-scan, including Python, Angular, and Rust audits: PASS
 
-The live-provider-e2e job was skipped by the push event. A workflow dispatch
-with run_provider_e2e=true was attempted for the exact candidate on
-2026-10-01, but the available GitHub CLI credential returned HTTP 401 before a
-workflow run was created. The exact-candidate live-provider route therefore
-remains pending external GitHub authentication; this is not a product failure.
+The live-provider-e2e job was skipped by the push event. The exact candidate
+was then exercised by workflow-dispatch run
+[36828262326](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/36828262326),
+which completed successfully on 2026-10-01. Its live-provider browser E2E
+passed using the synthetic clinical flow and the exact `opencode_go` /
+`deepseek-v4-flash` route, including the non-dry revision path. The hosted
+dispatch did not create a tag, release, or distribution upload.
 
 ## Fresh desktop artifacts
 
