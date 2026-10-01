@@ -1,0 +1,60 @@
+﻿01-10-2026 17:28:33 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'GET']>
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - send_request_body.complete
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Thu, 01 Oct 2026 15:28:33 GMT'), (b'Transfer-Encoding', b'chunked')])
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'GET']>
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_body.complete
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - response_closed.started
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - response_closed.complete
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - send_request_headers.complete
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - send_request_body.complete
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Thu, 01 Oct 2026 15:28:33 GMT'), (b'Transfer-Encoding', b'chunked')])
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_body.complete
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - response_closed.started
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - response_closed.complete
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - send_request_headers.complete
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - send_request_body.complete
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Thu, 01 Oct 2026 15:28:33 GMT'), (b'Transfer-Encoding', b'chunked')])
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - receive_response_body.complete
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - response_closed.started
+01-10-2026 17:28:33 - httpcore.http11 - DEBUG - response_closed.complete
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'GET']>
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - send_request_headers.complete
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'GET']>
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - send_request_body.complete
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Thu, 01 Oct 2026 15:28:34 GMT'), (b'Content-Length', b'382')])
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'GET']>
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - receive_response_body.complete
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - response_closed.started
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - response_closed.complete
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - send_request_headers.complete
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - send_request_body.complete
+01-10-2026 17:28:34 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+01-10-2026 17:28:39 - root - INFO - Cancellation requested for job 0e5c0b82
+01-10-2026 17:28:39 - root - INFO - Clinical analysis stop requested for job 0e5c0b82
+01-10-2026 17:28:39 - httpcore.http11 - DEBUG - receive_response_headers.failed exception=CancelledError()
+01-10-2026 17:28:39 - httpcore.http11 - DEBUG - response_closed.started
+01-10-2026 17:28:39 - httpcore.http11 - DEBUG - response_closed.complete
+01-10-2026 17:35:54 - httpcore.connection - DEBUG - close.started
+01-10-2026 17:35:54 - httpcore.connection - DEBUG - close.complete
+01-10-2026 17:36:09 - root - INFO - Acquired SQLite exclusive Alembic migration lock
+01-10-2026 17:36:09 - alembic.runtime.migration - INFO - Context impl SQLiteImpl.
+01-10-2026 17:36:09 - alembic.runtime.migration - INFO - Will assume non-transactional DDL.
+01-10-2026 17:36:09 - root - INFO - Alembic schema check: current=('202609170001',) target=('202609170001',) tables=23
+01-10-2026 17:36:09 - alembic.runtime.migration - INFO - Context impl SQLiteImpl.
+01-10-2026 17:36:09 - alembic.runtime.migration - INFO - Will assume non-transactional DDL.
+01-10-2026 17:36:09 - alembic.runtime.migration - INFO - Context impl SQLiteImpl.
+01-10-2026 17:36:09 - alembic.runtime.migration - INFO - Will assume non-transactional DDL.
+01-10-2026 17:36:09 - root - INFO - Model configuration initialization completed for SQLite: seeded=True
+01-10-2026 17:36:09 - root - INFO - SQLite database is synchronized at C:\Users\THOMAS~1\AppData\Local\Temp\opencode\dcpop-20261001-161723\DILIGENT\data\resources\database.db
