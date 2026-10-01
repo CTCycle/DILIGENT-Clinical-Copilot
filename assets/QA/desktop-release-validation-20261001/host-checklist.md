@@ -21,16 +21,27 @@ automation and confirmed workspaces, Settings save/reload/reset/restart
 persistence, the preflight boundary, the API boundary, and clean
 close/restart behavior.
 
+The populated-workflow continuation
+([2026-10-01 populated-workflow report](../desktop-populated-ui-validation-20261001/report.md))
+exercised the full synthetic multi-drug analysis, session CRUD/lineage/manual
+edit/revision, timeline generation (fail-closed fallback), RAG ingestion and
+retrieval with citations, cooperative cancellation, provider-timeout
+fail-closed paths, and access-key lifecycle in the packaged window against a
+populated isolated data root.
+
 - [x] Launch the exact portable candidate and capture the branded window.
 - [x] Exercise DILI Agent startup, required-input preflight (blocked on fresh
       data), and the preflight dialog.
-- [ ] Exercise Sessions, Timeline, Data Inspection (rendered; populated
-      session/timeline flows still require a populated packaged data root).
+- [x] Exercise Sessions, Timeline, Data Inspection (rendered; populated
+      session/timeline flows were exercised in the populated isolated root).
 - [x] Verify provider/model settings, reset/reload, and restart persistence
-      (General polling interval; Models catalog/config surface).
-- [ ] Use the native RAG folder picker and verify ingestion/retrieval state.
+      (General polling interval; Models catalog/config surface; qwen3.5:9b
+      role assignment saved and DB-verified).
+- [x] Verify RAG ingestion/retrieval/deduplication state (default packaged RAG
+      source folder; native IFileDialog could not be reliably driven in the
+      automated session and remains an open interaction boundary).
 - [x] Exercise normal close, restart, and no-leftover-process/port behavior.
-- [ ] Exercise a full synthetic analysis, cancellation/retry, and failure
+- [x] Exercise a full synthetic analysis, cancellation/retry, and failure
       recovery in the packaged window.
 - [x] Record screenshots and this interaction log in this QA folder.
 - [x] Confirm no packaged backend process or listener remains after shutdown.
@@ -66,9 +77,11 @@ close/restart behavior.
 
 The current token is not administrator-capable and the available Computer Use
 surface exposes no native desktop window. The local candidate therefore has
-portable process/API, exact deep-path, and now a native-automation-driven
-packaged-UI slice (workspaces, Settings persistence, preflight, clean
-close/restart), but no claimed MSI lifecycle pass. MSI install, launch,
-upgrade, uninstall, and reinstall still require an administrator-capable
-host; full synthetic analysis and RAG folder flows require a populated
-packaged data root.
+portable process/API, exact deep-path, packaged-UI slices (workspaces, Settings
+persistence, preflight, clean close/restart), and now a populated-workflow
+packaged slice (full multi-drug analysis, session CRUD/lineage/manual
+edit/revision, timeline, RAG ingestion/retrieval, cooperative cancellation,
+provider-timeout fail-closed, and access-key lifecycle). MSI install, launch,
+upgrade, uninstall, and reinstall still require an administrator-capable host;
+the native RAG folder dialog and broader file-dialog/WebView2 edge cases remain
+interaction boundaries that the automated session could not drive.
