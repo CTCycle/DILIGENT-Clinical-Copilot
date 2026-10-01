@@ -14,15 +14,26 @@ completed before a later release decision.
 
 ## Interactive packaged UI
 
-- [ ] Launch the exact portable candidate and capture the branded window.
-- [ ] Exercise DILI Agent startup, required-input preflight, and a synthetic
-      analysis.
-- [ ] Exercise Sessions, Timeline, Data Inspection, and Settings.
-- [ ] Verify provider/model settings, reset/reload, and restart persistence.
+Progress on the packaged portable surface is recorded in
+[the 2026-10-01 packaged-UI validation report](../desktop-interactive-ui-validation-20261001/report.md),
+which drove the packaged Tauri/WebView2 window with the available native UI
+automation and confirmed workspaces, Settings save/reload/reset/restart
+persistence, the preflight boundary, the API boundary, and clean
+close/restart behavior.
+
+- [x] Launch the exact portable candidate and capture the branded window.
+- [x] Exercise DILI Agent startup, required-input preflight (blocked on fresh
+      data), and the preflight dialog.
+- [ ] Exercise Sessions, Timeline, Data Inspection (rendered; populated
+      session/timeline flows still require a populated packaged data root).
+- [x] Verify provider/model settings, reset/reload, and restart persistence
+      (General polling interval; Models catalog/config surface).
 - [ ] Use the native RAG folder picker and verify ingestion/retrieval state.
-- [ ] Exercise normal close, restart, cancellation/retry, and failure recovery.
-- [ ] Record screenshots or an interaction log in this QA folder.
-- [ ] Confirm no packaged backend process or listener remains after shutdown.
+- [x] Exercise normal close, restart, and no-leftover-process/port behavior.
+- [ ] Exercise a full synthetic analysis, cancellation/retry, and failure
+      recovery in the packaged window.
+- [x] Record screenshots and this interaction log in this QA folder.
+- [x] Confirm no packaged backend process or listener remains after shutdown.
 
 ## MSI lifecycle
 
@@ -55,5 +66,9 @@ completed before a later release decision.
 
 The current token is not administrator-capable and the available Computer Use
 surface exposes no native desktop window. The local candidate therefore has
-portable process/API and exact deep-path evidence, but no claimed screen-level
-UI or MSI lifecycle pass.
+portable process/API, exact deep-path, and now a native-automation-driven
+packaged-UI slice (workspaces, Settings persistence, preflight, clean
+close/restart), but no claimed MSI lifecycle pass. MSI install, launch,
+upgrade, uninstall, and reinstall still require an administrator-capable
+host; full synthetic analysis and RAG folder flows require a populated
+packaged data root.
