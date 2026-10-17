@@ -1,5 +1,5 @@
 # Validation ledger
-Last updated: 2026-10-01
+Last updated: 2026-10-17
 
 ## Purpose and authority
 
@@ -77,6 +77,7 @@ authority.
 | 2026-09-29 | Session/revision API local boundaries | Live session detail/version/manual-edit reads, metadata and audit mutations, timeline/revision errors; missing-session report mutation fixed to 404. | [Session and revision API validation](../../QA/api-local-boundaries-20260929/report.md) | [API surface](../architecture/api_surface.md) |
 | 2026-09-30 | Final validation closure | Canonical 68-path/85-operation API matrix; RAG duplicate policy (`ISSUE-005`) resolved with raw-byte SHA-256 canonical selection; Full browser harness 53/0/0/0; backend 838 tests. | [Final validation closure](../../QA/final-validation-closure-20260930/report.md) | [QA regression](qa_regression.md), [testing and quality](../coding/testing_and_quality.md) |
 | 2026-10-01 | Desktop candidate + packaged UI | Fresh v3.4.0 portable/MSI/checksum artifacts; portable smoke and deep-path replay passed; packaged interactive UI and populated workflow validated by native automation. | [Desktop release evidence](../../QA/desktop-release-validation-20261001/report.md), [host checklist](../../QA/desktop-release-validation-20261001/host-checklist.md), [D01–D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md), [packaged-UI slice](../../QA/desktop-interactive-ui-validation-20261001/report.md), [populated-workflow slice](../../QA/desktop-populated-ui-validation-20261001/report.md) | [Desktop release](desktop_release.md) |
+| 2026-10-17 | Dependency security refresh + current-source regression | Updated Python, Angular, and Rust dependency locks to clear audit findings; local package/PDF checks and desktop crate tests passed; hosted backend, Windows regression, persistence, and security jobs passed. Push-triggered live-provider E2E skipped. Existing v3.4.0 artifacts predate this source update and need a fresh candidate build and validation. | [Dependency security refresh](../../QA/security-dependency-refresh-20261017/report.md); [hosted CI run 39033116041](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39033116041) | [Testing and quality](../coding/testing_and_quality.md), [QA regression](qa_regression.md), [Desktop release](desktop_release.md) |
 
 ## Key decisions and guarantees
 
