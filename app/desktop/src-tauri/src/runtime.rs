@@ -210,12 +210,10 @@ pub fn prepare_runtime(version: &str) -> Result<RuntimePaths, String> {
             let mut members = std::collections::HashSet::new();
             for index in 0..archive.len() {
                 let mut member = archive.by_index(index).map_err(|error| error.to_string())?;
-                let relative = safe_member_path(member.name())?;
+                let member_name = member.name().map_err(|error| error.to_string())?;
+                let relative = safe_member_path(&member_name)?;
                 if !members.insert(relative.clone()) {
-                    return Err(format!(
-                        "duplicate runtime archive member: {}",
-                        member.name()
-                    ));
+                    return Err(format!("duplicate runtime archive member: {member_name}"));
                 }
                 if member.is_dir() {
                     fs::create_dir_all(temporary.join(relative))
