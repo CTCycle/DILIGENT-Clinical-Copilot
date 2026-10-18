@@ -165,7 +165,7 @@ def _safe_json(value: Any, limit: int = MAX_JSON_CHARS) -> str:
 def _requested_append_sentence(instruction: str | None) -> str | None:
     text = str(instruction or "").strip()
     match = re.match(
-        r"^Append exactly this sentence to the revised report:\s*"
+        r"^(?:Read the session context once,\s*then\s+)?Append exactly this sentence to the revised report:\s*"
         r"(?P<sentence>.+?)(?=\s+(?:Preserve|Keep|Do not|Ensure|Maintain)\b|$)",
         text,
         flags=re.IGNORECASE | re.DOTALL,
