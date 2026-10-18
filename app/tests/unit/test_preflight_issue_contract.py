@@ -7,7 +7,13 @@ from contextlib import nullcontext
 from datetime import date
 from types import SimpleNamespace
 
-from domain.clinical.entities import ClinicalSessionRequest
+import pytest
+
+from domain.clinical.entities import (
+    ClinicalPipelineValidationError,
+    ClinicalSessionRequest,
+    PipelineIssue,
+)
 from domain.clinical.robustness import (
     ClinicalInputPreflightIssue,
     RagReadiness,
@@ -16,6 +22,82 @@ from services.session.preflight import (
     _present_preflight_issue,
     validate_clinical_input_preflight,
 )
+
+
+###############################################################################
+def _reject_incomplete_patient(request: ClinicalSessionRequest, **kwargs):
+    issues = [
+        PipelineIssue(
+            severity="error",
+            code="missing_anamnesis",
+            message="Provide anamnesis.",
+            field="anamnesis",
+        )
+    ]
+    if request.visit_date is None:
+        issues.append(
+            PipelineIssue(
+                severity="error",
+                code="missing_visit_date",
+                message="Provide the visit date.",
+                field="visit_date",
+            )
+        )
+    raise ClinicalPipelineValidationError(issues=issues, message=issues[0].message)
+
+
+###############################################################################
+@pytest.mark.parametrize("visit_date", [None, date(2026, 10, 18)])
+def test_visit_date_blocker_is_unique_and_other_validation_survives(
+    monkeypatch,
+    visit_date: date | None,
+) -> None:
+    service = SimpleNamespace(
+        apply_persisted_runtime_configuration=lambda: None,
+        prepare_structured_clinical_input=_reject_incomplete_patient,
+        session_repository=SimpleNamespace(
+            session_factory=lambda: nullcontext(
+                SimpleNamespace(connection=lambda: None)
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        "services.session.preflight._validate_provider_key", lambda issues: None
+    )
+    monkeypatch.setattr(
+        "services.session.preflight._runtime_settings",
+        lambda: {"clinical_provider": "ollama"},
+    )
+    monkeypatch.setattr(
+        "services.session.preflight.check_rag_readiness",
+        lambda requested: RagReadiness(
+            requested=requested, available=True, backend="onnxruntime"
+        ),
+    )
+    result = validate_clinical_input_preflight(
+        service,
+        ClinicalSessionRequest(
+            visit_date=visit_date,
+            selected_model_providers=["ollama"],
+            clinical_input="## Anamnesis\n"
+            + "Clinical history. " * 65
+            + "\n## Therapy\nAmoxicillin 500 mg daily.\n## Laboratory analysis\nALT 200 U/L.",
+        ),
+        knowledge_repository=SimpleNamespace(
+            list_livertox_catalog=lambda **kwargs: ([{}], 1)
+        ),
+        drug_catalog_repository=SimpleNamespace(
+            list_rxnav_catalog=lambda **kwargs: ([{}], 1)
+        ),
+    )
+    codes = [issue.code for issue in result.blocking_issues]
+    assert codes == (
+        ["visit_date_missing", "missing_anamnesis"]
+        if visit_date is None
+        else ["missing_anamnesis"]
+    )
+    assert result.ready is False
+
 
 ###############################################################################
 def test_blocking_issue_is_enriched_with_modal_metadata() -> None:
@@ -34,6 +116,7 @@ def test_blocking_issue_is_enriched_with_modal_metadata() -> None:
     assert issue.consequence
     assert issue.continuation_allowed is False
 
+
 ###############################################################################
 def test_unknown_warning_receives_safe_fallback_metadata() -> None:
     issue = _present_preflight_issue(
@@ -48,6 +131,7 @@ def test_unknown_warning_receives_safe_fallback_metadata() -> None:
     assert issue.title == "Review required"
     assert issue.affected_section == "Future Section"
     assert issue.continuation_allowed is True
+
 
 ###############################################################################
 def test_too_short_input_is_presented_as_blocking() -> None:
@@ -66,6 +150,7 @@ def test_too_short_input_is_presented_as_blocking() -> None:
     )
     assert issue.affected_section == "Clinical input"
     assert issue.continuation_allowed is False
+
 
 ###############################################################################
 def test_missing_sections_do_not_add_a_generic_preflight_failure(monkeypatch) -> None:
@@ -115,6 +200,7 @@ def test_missing_sections_do_not_add_a_generic_preflight_failure(monkeypatch) ->
     assert "clinical_input_too_short" in blocking_codes
     assert "required_sections_missing" in blocking_codes
     assert "preflight_failed" not in blocking_codes
+
 
 ###############################################################################
 def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(

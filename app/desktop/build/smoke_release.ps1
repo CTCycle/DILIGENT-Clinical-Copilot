@@ -13,12 +13,22 @@ param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string]$UpgradeFromVersion = '3.3.0',
     [string]$PreviousMsiPath,
-    [string]$PreviousChecksumPath
+    [string]$PreviousChecksumPath,
+    [switch]$RequireSignature,
+    [switch]$TestDeepPath,
+    [string]$ReportDirectory
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../..')).Path
 $artifactRoot = Join-Path $repoRoot 'release'
+$qaRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot 'assets/QA'))
+if (-not $ReportDirectory) { $ReportDirectory = Join-Path $qaRoot "desktop-smoke-$Version-$([guid]::NewGuid())" }
+$ReportDirectory = [IO.Path]::GetFullPath($ReportDirectory)
+if (-not $ReportDirectory.StartsWith($qaRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Desktop smoke reports must be stored under assets/QA.'
+}
+New-Item -ItemType Directory -Path $ReportDirectory -Force | Out-Null
 $portablePath = Join-Path $artifactRoot "DILIGENT-v$Version-windows-x64-portable.exe"
 $msiPath = Join-Path $artifactRoot "DILIGENT-v$Version-windows-x64.msi"
 $checksumPath = Join-Path $artifactRoot "DILIGENT-v$Version-windows-x64.sha256"
@@ -316,6 +326,9 @@ function Invoke-PortableSmoke(
     [string]$expectedVersion = $Version,
     [string]$isolatedRoot
 ) {
+    if ($RequireSignature -and $expectedVersion -eq $Version) {
+        & (Join-Path $PSScriptRoot 'sign_artifact.ps1') -Path $executable | Out-Null
+    }
     if ([string]::IsNullOrWhiteSpace($isolatedRoot)) {
         $isolatedRoot = Join-Path $smokeRoot $label
     }
@@ -361,7 +374,8 @@ function Invoke-PortableSmoke(
                 throw "$label window title was '$windowTitle', expected 'DILIGENT Clinical Copilot'."
             }
             if ($launchIndex -eq 1) {
-                $runtimeRoot = Join-Path $isolatedRoot "DILIGENT/rt/$expectedVersion"
+                $runtimeCache = if ($expectedVersion -eq $UpgradeFromVersion -and $expectedVersion -ne $Version) { 'runtime' } else { 'rt' }
+                $runtimeRoot = Join-Path $isolatedRoot "DILIGENT/$runtimeCache/$expectedVersion"
                 $extractionMarker = Get-ChildItem -LiteralPath $runtimeRoot -Filter 'extraction.complete' -File -Recurse -ErrorAction SilentlyContinue |
                     Select-Object -First 1
                 if ($null -eq $extractionMarker) {
@@ -439,11 +453,66 @@ function Resolve-InstalledExecutable($entry) {
     return $null
 }
 
+function Invoke-MsiOperation([string]$operation, [string]$package, [string]$label) {
+    $log = Join-Path $ReportDirectory "$label.log"
+    $result = Start-Process -FilePath 'msiexec.exe' -ArgumentList @(
+        $operation, ('"{0}"' -f $package), '/qn', '/norestart', '/L*v', ('"{0}"' -f $log)
+    ) -Wait -PassThru -WindowStyle Hidden
+    if ($result.ExitCode -notin @(0, 3010)) { throw "$label failed with MSI exit code $($result.ExitCode); see $log" }
+    $report[$label] = @{ exit_code = $result.ExitCode; log = Split-Path -Leaf $log }
+}
+
+function Invoke-UpgradeFixture([string]$upgradeRoot, [switch]$Seed, [switch]$Capture, [switch]$CheckHead) {
+    $dataRoot = Join-Path $upgradeRoot 'DILIGENT/data'
+    $database = Join-Path $dataRoot 'resources/database.db'
+    $python = Join-Path $repoRoot 'app/server/.venv/Scripts/python.exe'
+    if ($Seed) {
+        $archive = Join-Path $smokeRoot 'baseline-source.zip'
+        & git -C $repoRoot archive --format=zip "--output=$archive" "v$UpgradeFromVersion" app/server
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to archive the published baseline source.' }
+        $baselineSource = Join-Path $smokeRoot 'baseline-source'
+        Expand-Archive -LiteralPath $archive -DestinationPath $baselineSource
+        $sourceRoot = Join-Path $baselineSource 'app/server'
+        $baselineMarker = Get-ChildItem -LiteralPath (Join-Path $upgradeRoot "DILIGENT/runtime/$UpgradeFromVersion") -Filter extraction.complete -File -Recurse | Select-Object -First 1
+        if ($null -eq $baselineMarker) { throw 'The baseline application runtime was not extracted.' }
+        $environment = @{
+            DILIGENT_SQLITE_PATH = $database; DATABASE_SQLITE_PATH = $database
+            DILIGENT_DATA_ROOT = $dataRoot; DATABASE_BACKEND = 'sqlite'; EMBEDDED_DATABASE = 'true'
+            DILIGENT_RUNTIME_ROOT = $baselineMarker.DirectoryName
+            DILIGENT_RELEASE_VERSION = $UpgradeFromVersion
+            PYTHONHOME = Join-Path $repoRoot 'runtimes/python'
+        }
+        $saved = @{}
+        try {
+            foreach ($key in $environment.Keys) {
+                $saved[$key] = [Environment]::GetEnvironmentVariable($key)
+                [Environment]::SetEnvironmentVariable($key, $environment[$key])
+            }
+            & $python (Join-Path $PSScriptRoot 'seed_upgrade_fixture.py') $sourceRoot
+            if ($LASTEXITCODE -ne 0) { throw 'Baseline application repository seeding failed.' }
+        }
+        finally {
+            foreach ($key in $saved.Keys) { [Environment]::SetEnvironmentVariable($key, $saved[$key]) }
+        }
+    }
+    $arguments = @((Join-Path $PSScriptRoot 'check_upgrade_fixture.py'), $database, (Join-Path $ReportDirectory 'upgrade-data.json'))
+    if ($Capture) { $arguments += '--capture' }
+    if ($CheckHead) { $arguments += @('--expected-head', '202609170001') }
+    & $python @arguments
+    if ($LASTEXITCODE -ne 0) { throw 'MSI database preservation/integrity check failed.' }
+}
+
 function Invoke-MsiSmoke {
     if (-not $InstallMsi) {
         throw 'MSI smoke requires the explicit -InstallMsi switch.'
     }
     $metadata = Get-MsiMetadata -path $msiPath
+    $administrator = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $administrator) { throw 'MSI lifecycle smoke requires an administrator-capable disposable host.' }
+    if ($null -ne (Find-InstalledProduct -productCode $metadata.ProductCode -productName $metadata.ProductName)) {
+        throw 'Refusing to alter an existing DILIGENT installation; use a clean disposable host.'
+    }
+    if ($RequireSignature) { & (Join-Path $PSScriptRoot 'sign_artifact.ps1') -Path $msiPath | Out-Null }
     if ($metadata.ProductCode -notmatch '^\{[0-9A-Fa-f-]+\}$') { throw "MSI ProductCode is invalid: $($metadata.ProductCode)" }
     if ($metadata.ProductVersion -ne $Version) { throw "MSI ProductVersion $($metadata.ProductVersion) does not match $Version" }
     if ($metadata.Manufacturer -ne 'CTCycle') { throw "MSI Manufacturer must be CTCycle, found $($metadata.Manufacturer)" }
@@ -460,17 +529,17 @@ function Invoke-MsiSmoke {
     $installed = $false
     $uninstallAttempted = $false
     try {
-        $install = Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', $msiPath, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden
-        if ($install.ExitCode -notin @(0, 3010)) { throw "MSI install failed with exit code $($install.ExitCode)." }
+        Invoke-MsiOperation '/i' $msiPath 'msi_install'
+        $installed = $true
         $entry = Find-InstalledProduct -productCode $metadata.ProductCode -productName $metadata.ProductName
         if ($null -eq $entry) { throw 'Installed MSI product was not found in the Windows uninstall registry.' }
         $installedExecutable = Resolve-InstalledExecutable $entry
         if (-not $installedExecutable) { throw 'Installed MSI executable was not found.' }
         $installed = $true
         Invoke-PortableSmoke -executable $installedExecutable -label 'msi_launch'
-        $uninstall = Start-Process -FilePath 'msiexec.exe' -ArgumentList '/x', $metadata.ProductCode, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden
+        Invoke-MsiOperation '/x' $metadata.ProductCode 'msi_uninstall'
+        $installed = $false
         $uninstallAttempted = $true
-        if ($uninstall.ExitCode -notin @(0, 3010)) { throw "MSI uninstall failed with exit code $($uninstall.ExitCode)." }
         $remaining = Find-InstalledProduct -productCode $metadata.ProductCode -productName $metadata.ProductName
         if ($null -ne $remaining -or (Test-Path -LiteralPath $installedExecutable -PathType Leaf)) {
             throw 'MSI uninstall left the product registered or executable on disk.'
@@ -481,6 +550,19 @@ function Invoke-MsiSmoke {
             uninstalled = $true
             product_absent = $true
         }
+        Invoke-MsiOperation '/i' $msiPath 'msi_reinstall'
+        $installed = $true
+        $uninstallAttempted = $false
+        $reinstalled = Find-InstalledProduct -productCode $metadata.ProductCode -productName $metadata.ProductName
+        if ($null -eq $reinstalled) { throw 'Reinstalled MSI product was not found.' }
+        $installedExecutable = Resolve-InstalledExecutable $reinstalled
+        if (-not $installedExecutable) { throw 'Reinstalled executable was not found.' }
+        Invoke-PortableSmoke -executable $installedExecutable -label 'msi_reinstall_launch' | Out-Null
+        Invoke-MsiOperation '/x' $metadata.ProductCode 'msi_reinstall_uninstall'
+        $installed = $false
+        if ($null -ne (Find-InstalledProduct $metadata.ProductCode $metadata.ProductName) -or
+            (Test-Path -LiteralPath $installedExecutable)) { throw 'Reinstall uninstall left product files or registration.' }
+        $report.msi_reinstall = @{ installed = $true; launched = $true; uninstalled = $true; product_absent = $true }
     }
     finally {
         if ($installed -and -not $uninstallAttempted) {
@@ -519,23 +601,21 @@ function Invoke-MsiUpgradeSmoke {
     $installedExecutable = $null
     $markerPath = Join-Path $upgradeRoot 'DILIGENT/data/state/upgrade-survival-marker.txt'
     try {
-        $installPrevious = Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', $previousMsiPath, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden
-        if ($installPrevious.ExitCode -notin @(0, 3010)) {
-            throw "Previous MSI install failed with exit code $($installPrevious.ExitCode)."
-        }
+        Invoke-MsiOperation '/i' $previousMsiPath 'msi_baseline_install'
+        $installedPrevious = $true
         $previousEntry = Find-InstalledProduct -productCode $previousMetadata.ProductCode -productName $previousMetadata.ProductName
         if ($null -eq $previousEntry) { throw 'Previous MSI product was not found after installation.' }
         $previousExecutable = Resolve-InstalledExecutable $previousEntry
         if (-not $previousExecutable) { throw 'Previous MSI executable was not found.' }
         $installedPrevious = $true
         Invoke-PortableSmoke -executable $previousExecutable -label 'msi_upgrade_previous' -expectedVersion $UpgradeFromVersion -isolatedRoot $upgradeRoot | Out-Null
+        Invoke-UpgradeFixture -upgradeRoot $upgradeRoot -Seed -Capture
+        Invoke-PortableSmoke -executable $previousExecutable -label 'msi_upgrade_populated_previous' -expectedVersion $UpgradeFromVersion -isolatedRoot $upgradeRoot | Out-Null
+        Invoke-UpgradeFixture -upgradeRoot $upgradeRoot
         New-Item -ItemType Directory -Path (Split-Path -Parent $markerPath) -Force | Out-Null
         Set-Content -LiteralPath $markerPath -Value 'persistent user-data marker' -Encoding UTF8
 
-        $upgrade = Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', $msiPath, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden
-        if ($upgrade.ExitCode -notin @(0, 3010)) {
-            throw "MSI upgrade to $Version failed with exit code $($upgrade.ExitCode)."
-        }
+        Invoke-MsiOperation '/i' $msiPath 'msi_upgrade_install'
         $currentEntry = Find-InstalledProduct -productCode $metadata.ProductCode -productName $metadata.ProductName
         if ($null -eq $currentEntry) { throw 'Current MSI product was not found after upgrade.' }
         if ([string]$currentEntry.DisplayVersion -ne $Version) {
@@ -544,12 +624,12 @@ function Invoke-MsiUpgradeSmoke {
         $installedExecutable = Resolve-InstalledExecutable $currentEntry
         if (-not $installedExecutable) { throw 'Upgraded MSI executable was not found.' }
         Invoke-PortableSmoke -executable $installedExecutable -label 'msi_upgrade_current' -expectedVersion $Version -isolatedRoot $upgradeRoot | Out-Null
+        Invoke-UpgradeFixture -upgradeRoot $upgradeRoot -CheckHead
         if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
             throw 'Persistent user-data marker did not survive the MSI upgrade.'
         }
-        $uninstall = Start-Process -FilePath 'msiexec.exe' -ArgumentList '/x', $metadata.ProductCode, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden
+        Invoke-MsiOperation '/x' $metadata.ProductCode 'msi_upgrade_uninstall'
         $uninstallAttempted = $true
-        if ($uninstall.ExitCode -notin @(0, 3010)) { throw "MSI upgrade uninstall failed with exit code $($uninstall.ExitCode)." }
         $remaining = Find-InstalledProduct -productCode $metadata.ProductCode -productName $metadata.ProductName
         if ($null -ne $remaining -or ($installedExecutable -and (Test-Path -LiteralPath $installedExecutable -PathType Leaf))) {
             throw 'MSI upgrade uninstall left the product registered or executable on disk.'
@@ -557,6 +637,7 @@ function Invoke-MsiUpgradeSmoke {
         if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
             throw 'Persistent user data was removed by MSI uninstall.'
         }
+        Invoke-UpgradeFixture -upgradeRoot $upgradeRoot -CheckHead
         $report.msi_upgrade = [ordered]@{
             previous_version = $UpgradeFromVersion
             previous_msi_sha256 = $previousHash
@@ -567,6 +648,9 @@ function Invoke-MsiUpgradeSmoke {
             uninstalled_current = $true
             binaries_and_registration_removed = $true
             user_data_survived_uninstall = $true
+            sessions_versions_settings_preserved = $true
+            database_integrity_verified = $true
+            migration_head_verified = $true
         }
     }
     finally {
@@ -592,6 +676,17 @@ try {
         Assert-PortablePe -path $portablePath
         $portableHash = Assert-Checksum -artifactPath $portablePath -manifestPath $checksumPath
         Invoke-PortableSmoke -executable $portablePath -label 'portable_launch'
+        if ($TestDeepPath) {
+            $padding = 107 - $smokeRoot.Length - 1
+            if ($padding -lt 1) { throw 'Set TEMP to a shorter path for the exact deep-path replay.' }
+            $deepRoot = Join-Path $smokeRoot ('d' * $padding)
+            $deepDirectory = Join-Path $deepRoot ('e' * (230 - $deepRoot.Length - 2 - 'portable.exe'.Length))
+            New-Item -ItemType Directory -Path $deepDirectory -Force | Out-Null
+            $deepExecutable = Join-Path $deepDirectory 'portable.exe'
+            Copy-Item -LiteralPath $portablePath -Destination $deepExecutable
+            Invoke-PortableSmoke -executable $deepExecutable -label 'portable_deep_path' -isolatedRoot $deepRoot | Out-Null
+            $report.deep_path = @{ executable_length = $deepExecutable.Length; localappdata_length = $deepRoot.Length }
+        }
         $report.portable_sha256 = $portableHash
     }
     if ($DesktopTarget -in @('Msi', 'All')) {
@@ -618,8 +713,22 @@ finally {
         }
         $process.Dispose()
     }
-    if (Test-Path -LiteralPath $smokeRoot) {
-        Remove-Item -LiteralPath $smokeRoot -Recurse -Force -ErrorAction SilentlyContinue
+    $resolvedSmokeRoot = [IO.Path]::GetFullPath($smokeRoot)
+    $resolvedTempParent = [IO.Path]::GetFullPath($tempParent).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if (-not $resolvedSmokeRoot.StartsWith($resolvedTempParent, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Refusing smoke cleanup outside the temporary root.'
     }
-    $report | ConvertTo-Json -Depth 8
+    $cleanupError = $null
+    if (Test-Path -LiteralPath $smokeRoot) {
+        try { Remove-Item -LiteralPath $smokeRoot -Recurse -Force -ErrorAction Stop }
+        catch {
+            $cleanupError = $_.Exception.Message
+            $report.success = $false
+            $report.cleanup_error = $cleanupError
+        }
+    }
+    $json = $report | ConvertTo-Json -Depth 8
+    Set-Content -LiteralPath (Join-Path $ReportDirectory 'smoke.json') -Value $json -Encoding utf8
+    $json
+    if ($cleanupError) { throw "Desktop smoke cleanup failed: $cleanupError" }
 }
