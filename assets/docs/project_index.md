@@ -13,7 +13,7 @@ branch-status record.
 
 - Backend, frontend, and desktop source manifests report synchronized candidate version `3.4.0`.
 - Release versions use strict `major.minor.patch` SemVer and must remain synchronized across the frontend, backend, and desktop manifests; the backend exposes the frontend package version unless `DILIGENT_RELEASE_VERSION` is explicitly set for packaging.
-- The latest published desktop release is `v3.3.0`; `3.4.0` is an unpublished release candidate. Its portable EXE, MSI, checksum manifest, synchronized source/tag state, hosted CI, vulnerability review, and Windows host smoke evidence are release-readiness checks tracked separately from product validation components.
+- The latest published desktop release is `v3.4.0` (2026-10-18), tagged at `d4efa5e0bccfa552c80a5edeff2168bfaa718639`. Its unsigned portable EXE and MSI digests, hosted gates, native validation, and publication readback are recorded in the [release-gate report](../QA/release-gates-20261018/report.md) and [desktop release procedure](runtime/desktop_release.md), separately from product validation components.
 - Model configuration reads are cache-only and non-cacheable. Provider contact is limited to explicit catalog load/refresh operations, and catalog attempts persist in `provider_model_catalog_cache`.
 - Runtime-manageable values are persisted in the database `application_configuration`
   singleton and exposed through the centralized Settings area and typed
