@@ -1,14 +1,10 @@
 # DILI Assessment Workflow
-Last updated: 2026-10-01
+Last updated: 2026-10-18
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
 
 This is the main assessment page. It collects clinical context and submits a structured request to the backend analysis endpoint.
-
-![DILI Agent with a structured fictional case ready for review](../../QA/release-v3.3.0-screenshots/01-dili-agent-synthetic-input.png)
-
-_DILI Agent with synthetic input prepared for a review._
 
 Typical input areas include:
 - patient identifier or case identifier
