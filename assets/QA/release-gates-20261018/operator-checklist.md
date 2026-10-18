@@ -1,17 +1,20 @@
 # v3.4.0 operator acceptance
 Last updated: 2026-10-18
 
-Status: **UNRUN — awaiting a signed candidate.** Do not approve publication based
-on the earlier unsigned portable candidate or source/browser checks alone.
+Status: **UNRUN — awaiting the exact candidate.** Do not approve publication based
+on the earlier portable candidate or source/browser checks alone.
+
+Signing was explicitly waived by the user on 2026-10-18. This checklist retains
+the native, MSI, and clean-machine gates; it does not require a publisher certificate.
 
 ## Candidate identity
 
 Download `desktop-candidate-<prepare-run-id>-<attempt>` from a successful
 Windows Desktop Release `prepare` run. Extract into a disposable QA directory.
 Keep `candidate.json`, `qa/smoke.json`, and the checksum manifest together.
-Record source SHA, run ID/attempt, EXE/MSI SHA-256, publisher thumbprint,
+Record source SHA, run ID/attempt, EXE/MSI SHA-256, explicit `NotSigned` status,
 Windows build, WebView2 version, model IDs, test date, and operator identity.
-Verify artifact hashes and trusted timestamped signatures before executing.
+Verify artifact hashes and confirm the approved unsigned disposition before executing.
 Store the completed report and screenshots under `assets/QA/`; include the
 candidate hashes in the evidence reference supplied to `publish`.
 
@@ -48,11 +51,11 @@ Use an administrator-capable disposable Windows 11 host with no DILIGENT
 installation. Preserve a VM snapshot if available. The supported release mode
 is the existing **online** WebView2 bootstrapper; offline certification is excluded.
 
-- [ ] On a clean host without WebView2, install the exact signed MSI with network
+- [ ] On a clean host without WebView2, install the exact unsigned MSI with network
   access; record bootstrapper/installer behavior and exit code.
 - [ ] Launch as a standard user, inspect the window/health contract, and close
   cleanly without administrator credentials or development tools.
-- [ ] Verify the installed executable's trusted signature and expected publisher.
+- [ ] Confirm the installed executable is `NotSigned`, matching the approved policy.
 - [ ] Confirm install/upgrade/uninstall/reinstall receipts from the prepare run.
   Re-run on the disposable client host when needed using the checksum-verified
   published v3.3.0 MSI and the maintained smoke harness. Preserve installer logs.
@@ -66,4 +69,4 @@ evidence. Dispatch `publish` on synchronized `main` with the same version,
 successful prepare run ID, and the completed evidence reference. Approve the
 `desktop-release` environment only after every required item passes. Record
 the approval's attestation in the GitHub review comment. Leave missing or failed
-items pending; do not approve using a source smoke or an unsigned substitute.
+items pending; do not approve using a source smoke or a different candidate.
