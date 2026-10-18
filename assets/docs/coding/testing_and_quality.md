@@ -1,69 +1,64 @@
-# Testing And Quality
-Last updated: 2026-09-29
+# Testing and Quality
+Last updated: 2026-10-18
 
 ## Testing standards
 
-- Add unit tests for backend service and repository logic changes.
-- Add API and rendered browser coverage for user-visible or workflow changes.
+- Add unit tests for backend service and repository changes.
+- Add API and rendered-browser coverage for user-visible behavior and workflows.
 - Use deterministic assertions and isolate external integrations in explicitly named lanes.
-- Store durable validation evidence under `assets/QA/`; keep generated caches and logs disposable.
+- Keep evidence claims scoped to the code, environment, and workflows actually exercised.
+- Put durable behavior and limitations in their existing product-concept documents. Local logs, caches, and screenshots belong in ignored scratch space; do not add a tracked report for every run.
 
-## Mandatory automated-regression matrix
+## Mandatory regression matrix
 
-`test.automated-regression` is the deterministic product-regression component. Its mandatory CI matrix is:
+The Windows CI workflow is the required source-regression gate. It covers:
 
-- backend compilation;
-- Alembic upgrade, current/head, and metadata-drift checks;
-- Ruff;
-- Pyright;
-- the complete backend unit suite;
-- the SQLite and PostgreSQL persistence contracts;
-- Angular/Vitest;
-- the Angular production build;
-- deterministic Windows browser E2E;
-- the synthetic access-key lifecycle (unit, API, and rendered UI coverage);
-- dependency and security audits.
+- backend compilation, Alembic upgrade/head and metadata-drift checks, Ruff, Pyright, and backend unit tests;
+- SQLite and PostgreSQL persistence contracts;
+- Angular/Vitest and the Angular production build;
+- deterministic Windows browser E2E and the synthetic access-key lifecycle;
+- Python, frontend, and desktop dependency/security audits.
 
-The Windows browser job invokes the single harness at
-`app/tests/ci/run_browser_e2e.ps1 -Suite Full`. The harness seeds its isolated
-SQLite database through repositories, starts the controlled Ollama protocol
-fixture, starts backend/frontend services, runs the selected E2E files, checks
-the JUnit result, emits diagnostics, and cleans up its process trees. The Full
-suite excludes `test_live_provider_flow.py` and the heavyweight
-`test_multilingual_embedding_runtime.py`; those are not unexplained mandatory
-skips. A non-zero JUnit `skipped` count fails the Full suite.
+The canonical browser command, from the repository root, is:
 
-The deterministic seed owns the persisted clinical-session, detail, timeline,
-and timetable prerequisites. The fake Ollama service supplies one installed
-model and the `/api/tags`, pull-job, show, status, and minimal embedding
-protocol needed by the mandatory model API path. Real Ollama compatibility and
-real embedding execution remain separate provider/RAG integration coverage.
+~~~powershell
+.\app\tests\ci\run_browser_e2e.ps1 -Suite Full
+~~~
 
-## Persistence and external-lane boundaries
+The Full harness seeds an isolated SQLite database through repositories, starts a controlled Ollama protocol fixture and the application services, runs the browser suite, validates JUnit results, emits diagnostics, and cleans up its process trees. It fails when a mandatory test is skipped. It excludes the live-provider test and heavyweight real-embedding integration; those are explicit lanes.
 
-`app/tests/persistence/conftest.py` may skip PostgreSQL parameterizations in a
-local SQLite-only run when `TEST_DATABASE_URL` is absent. That is a convenience
-boundary, not missing mandatory coverage: the hosted `persistence-contract`
-job supplies PostgreSQL and executes both engines. Do not require every
-developer workstation to run PostgreSQL just to produce a zero-skip headline.
+The deterministic fixture supplies the model API responses needed by mandatory browser coverage. It does not prove compatibility with an installed Ollama model or real embedding execution.
 
-The `LiveProvider` harness lane runs only
-`app/tests/e2e/test_live_provider_flow.py` and requires the hosted OpenCode Go
-credential. Provider-side credential validity, provider-specific key formats,
-real provider connectivity, and local Ollama installation are outside
-`auth.access-key-management` and the deterministic Full suite. The access-key
-gate uses synthetic format-valid values and validates DILIGENT's encrypted
-storage, metadata-only responses, activation/rotation, restart persistence,
-provider scope, deletion, and redaction behavior.
+## External integration lanes
 
-Embedding-dependent browser behavior may remain in its explicit optional RAG
-lane. Core CI proves controlled ready/unavailable states without downloading
-an uncontrolled embedding artifact; heavyweight real embedding coverage belongs
-to `rag.ingestion-retrieval`.
+The hosted PostgreSQL job supplies PostgreSQL for the persistence contract. A local SQLite-only persistence run may skip PostgreSQL parameterizations when TEST_DATABASE_URL is absent; that local convenience does not replace hosted coverage.
 
-## Quality gates
+To exercise the live provider route, use the explicit LiveProvider lane:
 
-- Keep API-to-service-to-repository layering intact and do not bypass domain validation models.
-- For model-configuration changes, include persistence/cache and API contract coverage; provider contact is asserted only for explicit load, refresh, or connectivity operations.
-- Database schema changes require a reviewed Alembic revision. CI runs upgrade/head and drift checks.
-- Documentation changes must be checked for stale paths, routes, version claims, and commands.
+~~~powershell
+.\app\tests\ci\run_browser_e2e.ps1 -Suite LiveProvider
+~~~
+
+It runs the live-provider flow and requires DILIGENT_LIVE_PROVIDER_E2E=1 plus OPENCODE_GO_API_KEY in the hosted secret store. Never copy provider credentials into source, logs, or evidence. Synthetic access-key lifecycle tests prove DILIGENT's storage and redaction behavior, not provider-side credential validity.
+
+Real local Ollama compatibility and heavyweight embedding behavior remain provider/RAG integration coverage; a deterministic fixture or a successful API response is not a substitute for those lanes.
+
+## Local persistence slice
+
+For SQLite-only work, from the repository root:
+
+~~~powershell
+Set-Location .\app\server
+.\.venv\Scripts\python.exe -m pytest ..\tests\persistence -q
+~~~
+
+Without TEST_DATABASE_URL, PostgreSQL parameterizations are intentionally skipped. The hosted persistence contract remains the acceptance gate for both engines.
+
+## Quality and documentation review
+
+- Keep API-to-service-to-repository layering intact and validate requests through domain models.
+- For model-configuration changes, cover persistence/cache and API contracts; assert provider contact only for explicit load, refresh, or connectivity operations.
+- Database schema changes require a reviewed Alembic revision and upgrade/head/drift coverage.
+- For UI changes, inspect rendered behavior and keyboard/accessibility behavior at the supported desktop widths.
+- Check documentation links, routes, version claims, and commands after documentation changes.
+- Use [desktop release](../runtime/desktop_release.md) for portable/MSI build, lifecycle, publication, and downloaded-byte gates. Source regression does not establish package parity, signing, clean-machine installation, or release publication.

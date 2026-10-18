@@ -1,5 +1,5 @@
 # Local Deployment
-Last updated: 2026-09-22
+Last updated: 2026-10-18
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
@@ -73,16 +73,14 @@ existing output contract and does not require this source-mode marker.
 
 ## Windows desktop distribution
 
-Build from a Windows x64 host with Rust/Cargo, the Windows build toolchain, and the pinned frontend/backend dependencies. The current source manifests report synchronized unpublished candidate version `3.4.0`:
+The latest published desktop release is `v3.4.0`. It contains a Tauri portable EXE and MSI built from synchronized source. Current release status, exact artifact hashes, hosted and native validation, unsigned disclosure, and the WebView2 waiver are recorded in the [desktop release document](desktop_release.md).
 
 ```powershell
 .\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.4.0 -DesktopTarget All
 ```
 
-The build produces `DILIGENT-v<version>-windows-x64-portable.exe`, `DILIGENT-v<version>-windows-x64.msi`, and a matching `.sha256` file under `release/`. The portable EXE is a single-file Tauri distribution; the MSI installs the same shell and packaged runtime. Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Add `-OfflineWebView2` only for an MSI when an offline WebView2 installer is required. Release builds reject dirty worktrees unless `-AllowDirtyTree` is supplied.
+For a later release, use the synchronized version from the source manifests. The build produces a portable EXE, MSI, and matching `.sha256` file under `release/`. Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Add `-OfflineWebView2` only for an MSI that must carry an offline WebView2 installer. Release builds reject dirty worktrees unless `-AllowDirtyTree` is supplied intentionally.
 
-The portable executable embeds the PyInstaller backend and deterministic runtime archive. At runtime it extracts immutable content to `%LOCALAPPDATA%\DILIGENT\runtime\<version>\<payload-sha256>`, starts the backend on a random localhost port, and keeps mutable user data under `%LOCALAPPDATA%\DILIGENT\data`. It uses the system WebView2 runtime. MSI uninstall removes installed program files but preserves `%LOCALAPPDATA%\DILIGENT\data`.
+The portable executable embeds the frozen backend and deterministic runtime archive. It extracts immutable content under `%LOCALAPPDATA%\DILIGENT\rt\<version>\<payload-sha256>`, starts the backend on a random localhost port, and keeps mutable user data under `%LOCALAPPDATA%\DILIGENT\data`. MSI uninstall removes installed program files but preserves user data.
 
-Before distribution, verify the `.sha256` file and perform the tracked Windows host smoke script for the portable EXE and MSI. Clean-machine, MSI upgrade/uninstall, WebView2 offline, code-signing, and enterprise deployment tests remain separate release gates.
-
-The annotated `v3.4.0` tag must not be created until hosted CI, full browser and live-provider E2E, vulnerability-scan review, and Windows EXE/MSI smoke evidence are green and `main` is intentionally synchronized with the candidate source. Pushing that tag later invokes `.github/workflows/release.yml` on Windows; this session does not create or publish it.
+Use the [desktop release procedure](desktop_release.md) for the required prepare/publish gates and Windows lifecycle checks. A source build or successful local smoke does not establish signing, clean-machine compatibility, or publication.

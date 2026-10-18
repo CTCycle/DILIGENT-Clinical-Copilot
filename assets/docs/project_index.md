@@ -11,7 +11,7 @@ The exact source commit is intentionally read from git (`git rev-parse
 develop`) rather than duplicated here, so this index does not become a stale
 branch-status record.
 
-- Backend, frontend, and desktop source manifests report synchronized candidate version `3.4.0`.
+- Backend, frontend, and desktop source manifests report synchronized version `3.4.0`.
 - Release versions use strict `major.minor.patch` SemVer and must remain synchronized across the frontend, backend, and desktop manifests; the backend exposes the frontend package version unless `DILIGENT_RELEASE_VERSION` is explicitly set for packaging.
 - The latest published desktop release is `v3.4.0` (2026-10-18), tagged at `d4efa5e0bccfa552c80a5edeff2168bfaa718639`. Its unsigned portable EXE and MSI digests, hosted gates, native validation, and publication readback are recorded in the [release-gate report](../QA/release-gates-20261018/report.md) and [desktop release procedure](runtime/desktop_release.md), separately from product validation components.
 - Model configuration reads are cache-only and non-cacheable. Provider contact is limited to explicit catalog load/refresh operations, and catalog attempts persist in `provider_model_catalog_cache`.
@@ -25,7 +25,7 @@ branch-status record.
 - The mandatory regression matrix uses the shared deterministic Windows browser harness (`run_browser_e2e.ps1 -Suite Full`), including seeded session/timeline prerequisites, a fake Ollama protocol fixture, and the synthetic access-key lifecycle; the real OpenCode Go path is a separate `LiveProvider` integration lane.
 - Deterministic hepatic injury-pattern calculation is shared by the clinical workflow and DILI evidence; nonqualifying laboratory pairs remain indeterminate rather than being promoted to a qualifying anchor.
 - Combined structured-source updates are backend-owned and ordered RxNav -> LiverTox -> DILIrank; RAG has a separate job and control. RxNav and LiverTox source-owned records are reconciled only after a complete successful snapshot is prepared.
-- Desktop release uses manual `prepare`/`publish` workflow modes. Preparation validates synchronized `main`/`develop`, backend/frontend, browser/provider E2E, security, explicit unsigned status, and Windows lifecycle gates; publication promotes the exact candidate after protected-environment native/clean-machine approval. These are release prerequisites, not product validation gates.
+- Desktop release uses manual `prepare`/`publish` workflow modes. Preparation validates synchronized `main`/`develop`, backend/frontend, browser/provider E2E, security, explicit signing status, and Windows lifecycle gates; publication promotes the exact candidate after protected-environment operator review. Any unavailable host checks are recorded as waivers, not passes. These are release prerequisites, not product validation gates.
 - Angular page and component state uses signals/computed state in current model-configuration, access-key, clinical-session preview, and runtime-settings surfaces.
 - The primary UI navigation has four workspaces: DILI Agent, Clinical Sessions, Data Inspection, and Settings; Patient Timeline is opened from a selected session's Timeline tab. Settings contains General, Models, Data Processing, Integrations, Drug Matching, and Advanced pages with persistent left navigation.
 - FDA DILIrank 2.0 is a structured drug-level hepatotoxicity knowledge source. Its complete source snapshot is persisted separately, only canonical or trusted LiverTox/RxNorm identity links are eligible for clinical use, and unlinked or ambiguous source rows remain inspectable without becoming patient-level causality evidence.
@@ -94,10 +94,8 @@ branch-status record.
   - Windows Tauri packaging, artifacts, extraction, and release validation.
 - `runtime/troubleshooting.md`
   - Startup failures, port conflicts, backend launch recovery steps, and Angular sandbox-build fallback guidance for `spawn EPERM`.
-- `runtime/qa_regression.md`
-  - Repeatable regression slice for model configuration and app-flow validation.
 - `runtime/validation_ledger.md`
-  - Sparse dated evidence register and validation diary; it records decisions, guarantees, and known limitations and links each retained slice to its tracked QA report. Its findings are summarized into `project_status_ledger.md` rather than serving as a second current-status authority.
+  - Cross-cutting validation boundaries and durable findings linked to the product concepts they support. It is not a run-by-run diary or a second status catalog.
 
 ### UI
 - `ui/design_tokens.md`
@@ -133,8 +131,9 @@ branch-status record.
 - Read documentation files only when required by the active task.
 - Defer reading until the task proves the file is needed.
 - Keep all affected documents updated whenever behavior, architecture, runtime, or UX changes.
-- Treat `project_status_ledger.md` as the canonical current operational status. Before substantial implementation or validation work, inspect it; after a meaningful change or test, update the affected component, active issue or validation-debt entry, and evidence links. Keep detailed reports in their existing architecture, runtime, or `assets/QA/` locations.
-- `assets/QA/` is the supporting evidence location. Only the reports and screenshots referenced by the ledgers are tracked (`assets/QA/**` is git-ignored otherwise); link only tracked evidence so a fresh checkout stays self-consistent.
+- Treat `project_status_ledger.md` as the canonical current operational status. Before substantial implementation or validation work, inspect it; after a meaningful change or test, update the affected component or issue and its concept links.
+- Put durable behavior, guarantees, and known limits in the existing architecture, runtime, coding, or user document for that concept. Use `runtime/validation_ledger.md` only for cross-cutting validation boundaries that do not belong to one leaf document.
+- `assets/QA/` is git-ignored scratch space for local runs. Track only compact evidence needed to substantiate a current external release or acceptance claim; avoid committing duplicate run narratives, screenshots, logs, and checklists when the durable result belongs in the documentation ontology.
 - Always include a `Last updated: YYYY-MM-DD` line when modifying a document.
 - Pre-select files to read by folder structure and task intent before opening them.
 
