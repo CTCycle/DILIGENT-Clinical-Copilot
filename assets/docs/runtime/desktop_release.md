@@ -1,14 +1,31 @@
 # DILIGENT Desktop Release
 Last updated: 2026-10-18
 
-## Current release-gate campaign — 2026-10-18
+## Current release — v3.4.0 published 2026-10-18
 
-v3.4.0 remains **NOT RELEASE READY**. The duplicate date blocker is fixed and
-source/browser validation passed. A new explicitly unsigned candidate,
-MSI execution, populated native acceptance, and clean Windows 11 distribution
-remain required. Earlier 3.4.0 binaries and their evidence are historical;
-source changes require a new preparation. The user waived signing on 2026-10-18;
-public release notes disclose unsigned status. See the
+Status: **PUBLISHED; exact candidate and downloaded release bytes verified.**
+The public [v3.4.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.4.0)
+is GitHub's latest release. Tag `v3.4.0` resolves to
+`d4efa5e0bccfa552c80a5edeff2168bfaa718639`, the source used by successful
+prepare run [39109627873](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39109627873)
+and successful publish run
+[39125173765](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39125173765).
+The workflow promoted the immutable candidate without rebuilding it.
+
+| Published artifact | SHA-256 |
+|---|---|
+| DILIGENT-v3.4.0-windows-x64-portable.exe | 702f8df1ff1520fe3a43aafc8cfbc589c10a9502cdf2eb2d0264d78a049acd26 |
+| DILIGENT-v3.4.0-windows-x64.msi | 3587f93c019e9983e11a5b54955d88e747d0dfbc08b3d369e0447d12e502243d |
+
+The downloaded EXE and MSI bytes match these published digests. The downloaded
+portable EXE launched, rendered DILI Agent, returned `/api/health` status
+`ok`, and closed cleanly. Hosted prepare evidence covers the MSI install,
+upgrade, reinstall, and uninstall lifecycle. The user authorized the unsigned
+distribution policy on 2026-10-18; the release notes disclose that neither
+binary has a publisher signature. The clean-host WebView2 check was waived on
+2026-10-18 because only one Windows machine was available. Native QA also
+recorded a known follow-up: a manual report edit clears previously saved
+metadata; it was documented and not changed in this candidate. See the
 [release-gate report](../../QA/release-gates-20261018/report.md) and
 [operator acceptance checklist](../../QA/release-gates-20261018/operator-checklist.md).
 
@@ -63,7 +80,8 @@ The runtime allowlist excludes source code, tests, documentation, credentials, `
 
 ## Historical candidate status — before release-gate implementation
 
-The current source manifests report synchronized candidate version `3.4.0`.
+As of 2026-10-17, before release-gate implementation, the source manifests
+reported synchronized candidate version `3.4.0`.
 Fresh portable, MSI, and checksum artifacts were built on 2026-10-17 from clean
 `develop` commit `37624def8a0f3eba0dfb9990f536aea4b3c0e8a9`; the portable launch
 and exact deep-path smokes passed, and MSI metadata and artifact hashes were
@@ -71,15 +89,18 @@ verified. A native portable Tauri shell/dialog smoke passed on 2026-10-18, but
 the broader populated native workflows were not repeated, so full package UI
 parity remains `PARTIAL`. MSI lifecycle, live-provider E2E, signing, branch
 synchronization, and clean-machine distribution remain separate pending gates.
-The [latest GitHub release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/latest)
-was verified as `v3.3.0` on 2026-10-18. Live GitHub branch refs are
+The pre-publication GitHub readback earlier on 2026-10-18 showed the
+[latest release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/latest)
+as `v3.3.0`. Live GitHub branch refs at that point were
 `develop` = `37624def8a0f3eba0dfb9990f536aea4b3c0e8a9` and `main` =
 `3e341c5a84def4805c6d4ddbf36b67a9071dad3a`, so the required synchronization
-is still pending. The [`v3.4.0` tag lookup](https://api.github.com/repos/CTCycle/DILIGENT-Clinical-Copilot/git/ref/tags/v3.4.0)
-returned 404; no tag or release was created. See the
+was still pending. The [`v3.4.0` tag lookup](https://api.github.com/repos/CTCycle/DILIGENT-Clinical-Copilot/git/ref/tags/v3.4.0)
+returned 404 in that pre-publication check. This historical state predates the
+published release recorded at the top of this document. See the
 [current dependency and packaged candidate evidence](../../QA/security-dependency-refresh-20261017/report.md).
-Publication is confirmed only after the portable EXE and MSI, release tag,
-remote-release metadata, and downloaded hash evidence have all been verified.
+At the time of this historical snapshot, publication was unconfirmed. Those
+readback criteria are now satisfied for v3.4.0, as recorded at the top of this
+document.
 
 ### Portable browser-workflow comparison — 2026-10-17
 
@@ -193,7 +214,7 @@ MSI lifecycle, signing, and clean-machine distribution remain host/procedure
 boundaries. See the [packaged-UI validation report](../../QA/desktop-interactive-ui-validation-20261001/report.md)
 and the updated [D01–D14 matrix](../../QA/desktop-release-validation-20260930/D01-D14-matrix.md).
 
-### v3.4.0 release-candidate gate
+### Historical v3.4.0 release-candidate gate — 2026-10-01
 
 Status: **CURRENT-SOURCE CANDIDATE BUILT; PORTABLE, DEEP-PATH, AND NATIVE SHELL SMOKE VALIDATED; FULL NATIVE UI PARITY PARTIAL; MSI LIFECYCLE, LIVE-PROVIDER E2E, SIGNING, BRANCH SYNCHRONIZATION, AND DISTRIBUTION PENDING**. The source and lock manifests are synchronized to strict SemVer `3.4.0`; the fresh local candidate remains unpublished until all remaining independent gates have current evidence:
 
