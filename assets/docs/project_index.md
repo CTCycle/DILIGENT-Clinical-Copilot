@@ -61,7 +61,7 @@ branch-status record.
 - `architecture/backend_layers.md`
   - Layer responsibilities, request flow, and async or sync execution rules.
 - `architecture/persistence.md`
-  - Database, vectors, resources, and persisted artifact locations.
+  - Database, vectors, data files, and persisted artifact locations.
 - `architecture/background_jobs.md`
   - Centralized job lifecycle, polling, cancellation, and active job types.
 

@@ -1788,19 +1788,19 @@ function Remove-AllData {
     Import-DotEnv
     if (-not (Confirm-DestructiveAction 'remove all local user data')) { return }
 
-    $resourceRootValue = if ($env:DILIGENT_RESOURCES_PATH) { $env:DILIGENT_RESOURCES_PATH } else { 'resources' }
-    $resourceRoot = Resolve-LauncherPath -Path $resourceRootValue
+    $dataPathValue = if ($env:DILIGENT_DATA_PATH) { $env:DILIGENT_DATA_PATH } else { 'data' }
+    $dataPath = Resolve-LauncherPath -Path $dataPathValue
     $databasePath = if ($env:DILIGENT_SQLITE_PATH) {
         Resolve-LauncherPath -Path $env:DILIGENT_SQLITE_PATH
     }
     else {
-        Join-Path $resourceRoot 'database.db'
+        Join-Path $dataPath 'database.db'
     }
     $keyMaterialPath = if ($env:DILIGENT_ACCESS_KEY_MATERIAL_FILE) {
         Resolve-LauncherPath -Path $env:DILIGENT_ACCESS_KEY_MATERIAL_FILE
     }
     else {
-        Join-Path $resourceRoot 'access-key-material.json'
+        Join-Path $dataPath 'access-key-material.json'
     }
 
     $targets = @(
@@ -1810,11 +1810,11 @@ function Remove-AllData {
         [pscustomobject]@{ Path = ('{0}-shm' -f $databasePath); Label = 'SQLite shared-memory file' },
         [pscustomobject]@{ Path = $keyMaterialPath; Label = 'access-key material' },
         [pscustomobject]@{ Path = (Join-Path $RuntimeCacheDir 'logs'); Label = 'application logs' },
-        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'sources/archives'); Label = 'downloaded source archives' },
-        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'sources/documents'); Label = 'user source documents' },
-        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'sources/vectors'); Label = 'generated vector index' },
-        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'exports'); Label = 'user exports' },
-        [pscustomobject]@{ Path = (Join-Path $resourceRoot 'state'); Label = 'runtime state' }
+        [pscustomobject]@{ Path = (Join-Path $dataPath 'sources/archives'); Label = 'downloaded source archives' },
+        [pscustomobject]@{ Path = (Join-Path $dataPath 'sources/documents'); Label = 'user source documents' },
+        [pscustomobject]@{ Path = (Join-Path $dataPath 'sources/vectors'); Label = 'generated vector index' },
+        [pscustomobject]@{ Path = (Join-Path $dataPath 'exports'); Label = 'user exports' },
+        [pscustomobject]@{ Path = (Join-Path $dataPath 'state'); Label = 'runtime state' }
     )
 
     $removed = 0
@@ -2014,7 +2014,7 @@ function Test-FrozenBackend {
     $stdoutPath = Join-Path $qaRoot 'launcher-frozen-backend.stdout.log'
     $stderrPath = Join-Path $qaRoot 'launcher-frozen-backend.stderr.log'
     New-Item -ItemType Directory -Path $qaRoot -Force | Out-Null
-    New-Item -ItemType Directory -Path (Split-Path -Parent $readyFile), (Join-Path $dataRoot 'resources') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Split-Path -Parent $readyFile), $dataRoot -Force | Out-Null
     $psi = [Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $backend
     $psi.Arguments = "--ready-file `"$readyFile`" --host 127.0.0.1"
@@ -2025,8 +2025,8 @@ function Test-FrozenBackend {
     $sessionSecret = [guid]::NewGuid().ToString('N')
     foreach ($pair in @{
         DILIGENT_DESKTOP='true'; DILIGENT_DESKTOP_SESSION_SECRET=$sessionSecret; DILIGENT_RELEASE_VERSION=$Version; DILIGENT_RUNTIME_ROOT=(Join-Path $StageRoot 'runtime-stage')
-        DILIGENT_DATA_ROOT=$dataRoot; DILIGENT_SQLITE_PATH=(Join-Path $dataRoot 'resources/database.db')
-        DILIGENT_ACCESS_KEY_MATERIAL_FILE=(Join-Path $dataRoot 'resources/access-key-material.json'); DILIGENT_RESOURCES_PATH=(Join-Path $StageRoot 'runtime-stage/resources'); RELOAD='false'
+        DILIGENT_DATA_ROOT=$dataRoot; DILIGENT_SQLITE_PATH=(Join-Path $dataRoot 'database.db')
+        DILIGENT_ACCESS_KEY_MATERIAL_FILE=(Join-Path $dataRoot 'access-key-material.json'); RELOAD='false'
     }.GetEnumerator()) { $psi.Environment[$pair.Key] = [string]$pair.Value }
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $psi
@@ -2067,7 +2067,7 @@ function Test-FrozenBackend {
         $authorizedConfig = Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/api/model-config" `
             -WebSession $desktopSession -TimeoutSec 30
         if ($authorizedConfig.StatusCode -ne 200) { throw 'Frozen backend authorized model-config check failed' }
-        $databasePath = Join-Path $dataRoot 'resources/database.db'
+        $databasePath = Join-Path $dataRoot 'database.db'
         if (-not (Test-Path -LiteralPath $databasePath -PathType Leaf)) {
             throw 'Frozen backend did not create its SQLite database during startup'
         }
@@ -2089,12 +2089,12 @@ function New-DesktopRuntimeArchive {
     $payloadRoot = Join-Path $StageRoot 'runtime-stage'
     New-Item -ItemType Directory -Path $payloadRoot -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $StageRoot 'backend') -Destination (Join-Path $payloadRoot 'backend') -Recurse
-    foreach ($relative in @('app/client/dist/browser', 'resources/catalogs', 'settings')) {
+    foreach ($relative in @('app/client/dist/browser', 'data/catalogs', 'settings')) {
         New-Item -ItemType Directory -Path (Join-Path $payloadRoot $relative) -Force | Out-Null
     }
     $frontendOutputRoot = if ($script:DesktopFrontendOutputDir) { Join-Path $script:DesktopFrontendOutputDir 'browser' } else { Join-Path $ClientDir 'dist/browser' }
     Copy-Item -Path (Join-Path $frontendOutputRoot '*') -Destination (Join-Path $payloadRoot 'app/client/dist/browser') -Recurse -Force
-    Copy-Item -Path (Join-Path $RepoRoot 'resources/catalogs/*') -Destination (Join-Path $payloadRoot 'resources/catalogs') -Recurse -Force
+    Copy-Item -Path (Join-Path $RepoRoot 'data/catalogs/*') -Destination (Join-Path $payloadRoot 'data/catalogs') -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'settings/.env.example') -Destination (Join-Path $payloadRoot 'settings/.env.example')
     $runtimeOutput = Join-Path $StageRoot 'runtime/diligent-runtime.zip'
     $manifestOutput = Join-Path $StageRoot 'runtime/runtime-manifest.json'
@@ -2474,7 +2474,8 @@ function Read-DesktopArtifactSelection {
     $numberWidth = ([string]$entries.Count).Length
     $labelWidth = ($entries | ForEach-Object { $_.Label.Length } | Measure-Object -Maximum).Maximum
     Write-Host ''
-    Write-Host (if ($Operation -eq 'Create') { 'CREATE DESKTOP RELEASE ARTIFACTS' } else { 'REMOVE DESKTOP RELEASE ARTIFACTS' }) -ForegroundColor Yellow
+    $menuHeading = if ($Operation -eq 'Create') { 'CREATE DESKTOP RELEASE ARTIFACTS' } else { 'REMOVE DESKTOP RELEASE ARTIFACTS' }
+    Write-Host $menuHeading -ForegroundColor Yellow
     foreach ($entry in $entries) {
         Write-MenuOption -Entry $entry -NumberWidth $numberWidth -LabelWidth $labelWidth
     }

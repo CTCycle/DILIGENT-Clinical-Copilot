@@ -45,7 +45,7 @@ flowchart LR
     subgraph Storage["Persistence"]
         SQL[(SQLite / PostgreSQL)]
         Lance[(LanceDB)]
-        Files[(Runtime resources)]
+        Files[(Runtime data)]
     end
 
     subgraph External["External systems"]
@@ -83,48 +83,30 @@ Maintained source-level structure, with build and cache artifacts omitted:
 |   |-- .env.example
 |   `-- (operator settings live in application_configuration)
 |-- app/
-|   |-- resources/
-|   |   |-- catalogs/
-|   |   |-- models/
-|   |   |-- logs/
-|   |   `-- sources/
+|   |-- client/
+|   |   |-- package.json
+|   |   `-- src/
+|   |-- desktop/
+|   |   |-- build/             # runtime payload and PyInstaller inputs
+|   |   `-- src-tauri/         # Tauri shell, backend lifecycle, and extraction
 |   |-- server/
 |   |   |-- app.py
 |   |   |-- api/
 |   |   |-- configurations/
 |   |   |-- domain/
 |   |   |-- repositories/
-|   |   |   |-- schemas/clinical.py
-|   |   |   |-- schemas/knowledge.py
-|   |   |   |-- schemas/security.py
-|   |   |   `-- schemas/configuration.py
 |   |   |-- services/
-|   |   |-- common/
-|   |   |   |-- catalogs/
-|   |   |   |   |-- provider.py
-|   |   |   |   |-- manifest_loader.py
-|   |   |   |-- utils/
-|   |   |   |-- security/
-|   |   |   |-- prompts/
-|   |-- client/
-|   |   |-- package.json
-|   |   |-- src/
-|   |   |   |-- main.ts
-|   |   |   |-- styles.scss
-|   |   |   `-- app/
-|   |   |       |-- app.ts
-|   |   |       |-- app.routes.ts
-|   |   |       |-- core/
-|   |   |       |-- components/
-|   |   |       `-- pages/
+|   |   `-- common/
 |   `-- tests/
 |       |-- run_tests.bat
-|       |-- conftest.py
 |       |-- unit/
 |       `-- e2e/
-|-- app/desktop/
-|   |-- build/                 # runtime payload and PyInstaller inputs
-|   `-- src-tauri/             # Tauri shell, backend lifecycle, and extraction
+|-- data/
+|   |-- catalogs/
+|   `-- sources/
+|       |-- archives/
+|       |-- documents/
+|       `-- vectors/
 `-- assets/docs/
     |-- architecture/
     |-- coding/
