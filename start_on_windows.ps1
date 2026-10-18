@@ -15,7 +15,6 @@ param(
     [ValidateSet('Portable', 'Msi', 'All')]
     [string]$DesktopTarget = 'All',
     [switch]$OfflineWebView2,
-    [switch]$SignDesktopRelease,
     [switch]$AllDesktopReleases,
     [switch]$AllowDirtyTree
 )
@@ -1852,9 +1851,6 @@ function Read-InstallationType {
 function Assert-DesktopParameterContract {
     param([switch]$Interactive)
 
-    if ($SignDesktopRelease -and $Action -ne 'BuildDesktopRelease') {
-        throw '-SignDesktopRelease is valid only with BuildDesktopRelease'
-    }
     if ($OfflineWebView2 -and $Action -ne 'BuildDesktopRelease') {
         throw '-OfflineWebView2 is valid only with BuildDesktopRelease'
     }
@@ -2142,9 +2138,6 @@ function Build-TauriApplication {
     Invoke-Checked -FilePath $DesktopTauriCli -WorkingDirectory $DesktopDir -ArgumentList @(
         'build', '--target', $DesktopTargetTriple, '--config', $ConfigurationPath, '--no-bundle'
     )
-    if ($SignDesktopRelease) {
-        & (Join-Path $DesktopDir 'build/sign_artifact.ps1') -Action Sign -Path (Join-Path $CargoTargetDir "$DesktopTargetTriple/release/diligent-desktop.exe") | Out-Null
-    }
     if ($DesktopTarget -in @('Msi', 'All')) {
         Invoke-Checked -FilePath $DesktopTauriCli -WorkingDirectory $DesktopDir -ArgumentList @(
             'bundle', '--target', $DesktopTargetTriple, '--config', $ConfigurationPath, '--bundles', 'msi'
@@ -2229,9 +2222,6 @@ function Publish-DesktopArtifacts {
         $msiName = "DILIGENT Clinical Copilot_${Version}_x64_en-US.msi"
         $builtMsi = Join-Path $CargoTargetDir "$DesktopTargetTriple/release/bundle/msi/$msiName"
         if (-not (Test-Path -LiteralPath $builtMsi -PathType Leaf)) { throw "Tauri x64 MSI artifact was not found: $builtMsi" }
-        if ($SignDesktopRelease) {
-            & (Join-Path $DesktopDir 'build/sign_artifact.ps1') -Action Sign -Path $builtMsi | Out-Null
-        }
         Copy-DesktopArtifact -Source $builtMsi -Destination $msi
         Test-MsiMetadata -Path $msi
     }

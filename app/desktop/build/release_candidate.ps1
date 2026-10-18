@@ -96,7 +96,9 @@ function Assert-Artifacts($receipt, [string]$directory) {
     foreach ($file in $files[0..1]) {
         $records = @($manifest | Where-Object { $_ -match ('^' + $receipt.files.$file + '\s+\*?' + [regex]::Escape($file) + '$') })
         if ($records.Count -ne 1) { throw "Checksum manifest must contain exactly one matching entry for $file." }
-        & "$PSScriptRoot/sign_artifact.ps1" -Path (Join-Path $directory $file) | Out-Null
+        if ((Get-AuthenticodeSignature -LiteralPath (Join-Path $directory $file)).Status -ne 'NotSigned') {
+            throw "Candidate signature status does not match the unsigned release policy: $file"
+        }
     }
 }
 
@@ -130,11 +132,11 @@ switch ($Action) {
             version = $Version; source_sha = $sha; run_id = $env:GITHUB_RUN_ID
             run_attempt = $env:GITHUB_RUN_ATTEMPT; gates = $gateResults; files = $hashes
             smoke_sha256 = (Get-FileHash $smokePath -Algorithm SHA256).Hash.ToLowerInvariant()
-            signer = $env:WINDOWS_CODESIGN_CERT_THUMBPRINT
+            signing = 'unsigned'
         }
         Assert-Artifacts $receipt $ArtifactDirectory
         $receipt | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $ArtifactDirectory 'candidate.json') -Encoding utf8
-        "Signed candidate $sha, run $env:GITHUB_RUN_ID`n$($receipt.files | ConvertTo-Json)" >> $env:GITHUB_STEP_SUMMARY
+        "Unsigned candidate $sha, run $env:GITHUB_RUN_ID`n$($receipt.files | ConvertTo-Json)" >> $env:GITHUB_STEP_SUMMARY
     }
     { $_ -in 'Verify', 'Publish' } {
         Assert-Source
@@ -143,7 +145,7 @@ switch ($Action) {
         $receipt = Get-Content (Join-Path $ArtifactDirectory 'candidate.json') -Raw | ConvertFrom-Json
         if ($receipt.version -ne $Version -or $receipt.source_sha -ne $sha -or
             [string]$receipt.run_id -ne $CandidateRunId -or [int]$receipt.run_attempt -ne $run.run_attempt -or
-            $receipt.signer -ne $env:WINDOWS_CODESIGN_CERT_THUMBPRINT) { throw 'Candidate receipt provenance does not match the selected run.' }
+            $receipt.signing -ne 'unsigned') { throw 'Candidate receipt provenance or unsigned policy does not match the selected run.' }
         foreach ($gate in $requiredGates) {
             if ($receipt.gates.$gate -ne 'success') { throw "Candidate receipt lacks $gate." }
         }
@@ -156,7 +158,7 @@ switch ($Action) {
             & gh api --method POST "repos/$repo/git/refs" -f "ref=refs/tags/$tag" -f "sha=$sha" | Out-Null
             if ($LASTEXITCODE -ne 0) { throw 'Could not create the verified release tag.' }
             $notes = Join-Path $ArtifactDirectory 'release-notes.md'
-            @("Validated source: $sha", "Candidate: $($run.html_url)", "Operator evidence: $env:OPERATOR_EVIDENCE", '', 'The attached binaries are the signed, tested candidate; no rebuild was performed.') | Set-Content $notes
+            @("Validated source: $sha", "Candidate: $($run.html_url)", "Operator evidence: $env:OPERATOR_EVIDENCE", '', '**Unsigned distribution:** these binaries have no publisher signature. Windows may show an unknown-publisher or SmartScreen warning.', '', 'The attached binaries are the tested candidate; no rebuild was performed.') | Set-Content $notes
             & gh release create $tag --repo $repo --verify-tag --draft --title "DILIGENT Clinical Copilot $tag" --notes-file $notes
             if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed; the tag remains for investigation.' }
             foreach ($file in @($files) + @('candidate.json')) {
@@ -175,7 +177,7 @@ switch ($Action) {
             $releaseRoot = Join-Path (Resolve-Path '.').Path 'release'
             if ((Resolve-Path -LiteralPath $ArtifactDirectory).Path -ne $releaseRoot) { throw 'Publication expects the release artifact directory.' }
             foreach ($file in $files) { Copy-Item -LiteralPath (Join-Path $download $file) -Destination (Join-Path $releaseRoot $file) -Force }
-            & "$PSScriptRoot/smoke_release.ps1" -Version $Version -DesktopTarget Portable -RequireSignature -ReportDirectory (Join-Path (Resolve-Path 'assets/QA').Path "published-smoke-$env:GITHUB_RUN_ID") | Out-Null
+            & "$PSScriptRoot/smoke_release.ps1" -Version $Version -DesktopTarget Portable -RequireUnsigned -ReportDirectory (Join-Path (Resolve-Path 'assets/QA').Path "published-smoke-$env:GITHUB_RUN_ID") | Out-Null
             Assert-SynchronizedSource
             & gh release edit $tag --repo $repo --draft=false --latest
             if ($LASTEXITCODE -ne 0) { throw 'Publishing the verified draft release failed.' }

@@ -4,10 +4,11 @@ Last updated: 2026-10-18
 ## Current release-gate campaign — 2026-10-18
 
 v3.4.0 remains **NOT RELEASE READY**. The duplicate date blocker is fixed and
-source/browser validation passed. Signing material, a new signed candidate,
+source/browser validation passed. A new explicitly unsigned candidate,
 MSI execution, populated native acceptance, and clean Windows 11 distribution
 remain required. Earlier 3.4.0 binaries and their evidence are historical;
-source changes require a new preparation. See the
+source changes require a new preparation. The user waived signing on 2026-10-18;
+public release notes disclose unsigned status. See the
 [release-gate report](../../QA/release-gates-20261018/report.md) and
 [operator acceptance checklist](../../QA/release-gates-20261018/operator-checklist.md).
 
@@ -329,24 +330,21 @@ version. Pushing a tag does not publish a release.
 
 Preparation requires backend quality/migration/unit gates, SQLite/PostgreSQL
 persistence, frontend tests/build, the canonical `Full` browser harness, the
-explicit `LiveProvider` lane, and dependency security audits. It builds once
-with `-SignDesktopRelease`: the raw shell is signed before MSI bundling, the
-completed MSI is signed, and final checksums are generated. Windows smoke
+explicit `LiveProvider` lane, and dependency security audits. It builds once using the approved unsigned distribution policy and generates
+final checksums. Receipts and artifact checks must explicitly agree on
+`signing=unsigned` / `NotSigned`; no certificate or signing secret is required.
+Windows smoke
 verifies portable/deep-path launches and real install/upgrade/uninstall/reinstall,
-including installed-shell signature and populated-data preservation. The
+including installed-shell unsigned status and populated-data preservation. The
 checksum-verified published v3.3.0 MSI supplies the baseline; fixture data is
 written using v3.3.0 repositories and read again by the baseline application.
 The baseline `runtime` directory and current `rt` directory are explicitly
 accounted for. Receipts state which checks actually ran.
 
-Configure these values through secure repository settings before preparation:
+The existing `OPENCODE_GO_API_KEY` repository secret is required for provider
+E2E. Keep it in GitHub's secret store; never copy it into QA evidence.
 
-- Secrets: `WINDOWS_CODESIGN_PFX_BASE64`, `WINDOWS_CODESIGN_PFX_PASSWORD`,
-  and the existing `OPENCODE_GO_API_KEY`.
-- Variables: `WINDOWS_CODESIGN_CERT_THUMBPRINT`, `WINDOWS_CODESIGN_TIMESTAMP_URL`
-  (an HTTPS timestamp service).
-
-The candidate artifact `desktop-candidate-<run-id>-<attempt>` retains the signed
+The candidate artifact `desktop-candidate-<run-id>-<attempt>` retains the unsigned
 EXE/MSI, checksum manifest, `candidate.json`, and Windows lifecycle receipts.
 Its 30-day retention is an operational limit: an expired candidate must be
 prepared and accepted again. QA diagnostics remain under `assets/QA/` and are
@@ -363,10 +361,10 @@ that human attestation.
 Dispatch `publish` with `candidate_run_id` and a completed `operator_evidence`
 reference including candidate hashes. Publication checks the exact source SHA,
 successful prepare run/attempt, every required job, immutable candidate receipt,
-artifact digests, trusted timestamped signatures, branch equality, and absence
+artifact digests, explicit unsigned status, branch equality, and absence
 of both tag and release. It downloads the existing candidate without rebuilding.
 After reviewer approval, it creates the tag and a draft release, uploads the
-unchanged assets, downloads them again for hash/signature and portable-launch
+unchanged assets, downloads them again for hash/unsigned-status and portable-launch
 verification, then publishes and verifies external release/tag/latest metadata.
 API errors never count as tag/release absence. A failed draft remains unpublished
 for investigation; existing tags/releases are never silently overwritten.
