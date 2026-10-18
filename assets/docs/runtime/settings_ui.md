@@ -1,5 +1,5 @@
 # Runtime Settings UI
-Last updated: 2026-09-29
+Last updated: 2026-10-18
 
 ## Scope
 
@@ -10,9 +10,9 @@ runtime work. In-flight jobs keep the configuration captured when they were
 created.
 
 The UI does not expose environment variables, credentials, deployment
-configuration, database connection settings, hosts, ports, resource paths,
+configuration, database connection settings, hosts, ports, data paths,
 Ollama endpoints, or other `.env`-owned values. Immutable reference catalogs
-under `resources/catalogs/` remain source-controlled reference data.
+under `data/catalogs/` remain source-controlled reference data.
 
 The Settings routes are:
 

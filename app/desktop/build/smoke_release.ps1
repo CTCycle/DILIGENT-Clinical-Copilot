@@ -465,7 +465,7 @@ function Invoke-MsiOperation([string]$operation, [string]$package, [string]$labe
 
 function Invoke-UpgradeFixture([string]$upgradeRoot, [switch]$Seed, [switch]$Capture, [switch]$CheckHead) {
     $dataRoot = Join-Path $upgradeRoot 'DILIGENT/data'
-    $database = Join-Path $dataRoot 'resources/database.db'
+    $database = Join-Path $dataRoot 'database.db'
     $python = Join-Path $repoRoot 'app/server/.venv/Scripts/python.exe'
     if ($Seed) {
         $archive = Join-Path $smokeRoot 'baseline-source.zip'

@@ -68,7 +68,7 @@ existing output contract and does not require this source-mode marker.
 ## Deployment Constraints
 - Network deployment, reverse proxies, and unauthenticated multi-user access are unsupported.
 - No supported container deployment path exists.
-- Backend resources and the frontend build must remain aligned within the local repository checkout.
+- Backend data files and the frontend build must remain aligned within the local repository checkout.
 - Offline source deployments must pre-populate and verify `runtimes/cache/embeddings/<revision>/`; packaged deployments use `%LOCALAPPDATA%\DILIGENT\data\cache\embeddings\<revision>\`. A complete rebuild is mandatory after this model migration.
 
 ## Windows desktop distribution
