@@ -361,8 +361,6 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 120
     env:
-      WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
-      WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
       WINDOWS_CODESIGN_CERT_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_CERT_THUMBPRINT }}
       WINDOWS_CODESIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_CODESIGN_TIMESTAMP_URL }}
     steps:
@@ -371,6 +369,9 @@ jobs:
           fetch-depth: 0
       - name: Require trusted signing configuration
         shell: pwsh
+        env:
+          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
+          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
         run: |
           foreach ($name in @('WINDOWS_CODESIGN_PFX_BASE64', 'WINDOWS_CODESIGN_PFX_PASSWORD', 'WINDOWS_CODESIGN_CERT_THUMBPRINT', 'WINDOWS_CODESIGN_TIMESTAMP_URL')) {
             if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "Missing signing configuration: $name" }
@@ -384,6 +385,9 @@ jobs:
           targets: x86_64-pc-windows-msvc
       - name: Build and sign once, including the executable inside the MSI
         shell: pwsh
+        env:
+          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
+          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
         run: .\start_on_windows.ps1 -Action BuildDesktopRelease -Version $env:RELEASE_VERSION -DesktopTarget All -SignDesktopRelease
       - name: Install locked validation extras in the existing environment
         shell: pwsh
