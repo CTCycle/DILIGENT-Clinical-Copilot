@@ -1,5 +1,5 @@
 # Runtime Modes
-Last updated: 2026-08-02
+Last updated: 2026-10-18
 
 ## Supported Modes
 ### Local Application
@@ -31,8 +31,8 @@ Last updated: 2026-08-02
 - The frontend and backend use the same local API contract.
 - Shared persistence and services across modes:
   - SQL database
-  - LanceDB vectors in resource paths
-  - resource catalogs and source documents
+  - LanceDB vectors in data paths
+  - data catalogs and source documents
 
 ## Limitations
 - DILIGENT is designed for single-user localhost operation. Authenticated network deployment is not supported.

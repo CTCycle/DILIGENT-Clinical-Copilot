@@ -11,10 +11,11 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet
 
-from common.paths import RESOURCES_PATH, ROOT_DIR
+from common.paths import DATA_PATH, ROOT_DIR
 
 DEFAULT_KEY_PURPOSE = "provider_access_keys"
 EXTERNAL_KEY_FILE_ENV = "DILIGENT_ACCESS_KEY_MATERIAL_FILE"
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class ExternalEncryptionMaterial:
     activated_at: datetime
     deactivated_at: datetime | None = None
     id: int | None = None
+
 
 ###############################################################################
 class AccessKeyEncryptionMaterialSerializer:
@@ -47,7 +49,7 @@ class AccessKeyEncryptionMaterialSerializer:
     def external_path() -> Path:
         configured = os.getenv(EXTERNAL_KEY_FILE_ENV, "").strip()
         if not configured:
-            return RESOURCES_PATH / "access-key-material.json"
+            return DATA_PATH / "access-key-material.json"
         path = Path(configured).expanduser()
         return path if path.is_absolute() else ROOT_DIR / path
 

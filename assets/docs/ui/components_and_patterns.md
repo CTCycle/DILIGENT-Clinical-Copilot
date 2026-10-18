@@ -1,5 +1,5 @@
 # Components And Patterns
-Last updated: 2026-09-25
+Last updated: 2026-10-18
 
 ## Page Layout Patterns
 - Primary route pages render inside the shared `.page-container` frame under the root shell. Keep the 59px navigation header and shared content origin stable; route components should not add duplicate outer gutters or independent page-width limits.
@@ -7,7 +7,7 @@ Last updated: 2026-09-25
 - DILI page uses a desktop split grid through `.stitch-dili-grid` with a persistent sidebar.
 - Model configuration uses a desktop multi-column layout through `.model-config-layout`.
 - Clinical Sessions uses a list-detail workspace with AI preview, session editing, metadata summaries, revision actions, and timeline actions.
-- Data Inspection uses tabbed sections with scroll-aware tables and lists for reference data and RAG resources.
+- Data Inspection uses tabbed sections with scroll-aware tables and lists for reference data and RAG datasets.
 - Clinical Sessions keeps preview rendering and related view state in focused preview components; page-level orchestration should not reabsorb that logic.
 - Model Configurations and access-key dialogs use signal-backed local state, explicit loading/saving states, and provider-response sequencing.
 

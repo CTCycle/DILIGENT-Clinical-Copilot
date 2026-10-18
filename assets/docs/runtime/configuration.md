@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-09-29
+Last updated: 2026-10-18
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
@@ -49,13 +49,13 @@ The Tauri shell sets these desktop-only variables when it starts the frozen back
 - `VITE_API_BASE_URL=/api`
 - `RELOAD=false`
 
-## Source-mode Resource Location
+## Source-mode Data Location
 
-- `DILIGENT_RESOURCES_PATH=resources`
+- `DILIGENT_DATA_PATH=data`
 
-This optional path relocates the source-mode resource tree. Relative paths are
+This optional path relocates the source-mode data tree. Relative paths are
 resolved from the repository root. The embedded SQLite database defaults to
-`<resource-root>/database.db`; an explicit `DILIGENT_SQLITE_PATH` still takes
+`<data-root>/database.db`; an explicit `DILIGENT_SQLITE_PATH` still takes
 precedence. Packaged desktop mode uses `DILIGENT_RUNTIME_ROOT` and
 `DILIGENT_DATA_ROOT` instead.
 
@@ -63,14 +63,14 @@ precedence. Packaged desktop mode uses `DILIGENT_RUNTIME_ROOT` and
 - `settings/.env`
   - database mode and connection settings
   - local host and port values
-  - resource paths, Ollama endpoints, deployment values, and secrets
+  - data paths, Ollama endpoints, deployment values, and secrets
 - `application_configuration` database singleton
   - job polling interval
   - model/provider selections and access-key references
   - complete RAG settings
   - ingestion, session pipeline, language detection, matcher, integration,
     timeout, and evidence settings
-- `resources/catalogs/*.json`
+- `data/catalogs/*.json`
   - canonical immutable reference catalogs for text normalization, extraction,
     matching, DILI behavior, language, security filters, generation policy, and
     model capabilities

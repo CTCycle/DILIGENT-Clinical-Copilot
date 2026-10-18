@@ -81,18 +81,18 @@ For LLM-generated timelines, events without preserved source evidence are not pa
 Open **Data Inspection** from the sidebar.
 
 Expected capabilities:
-- resource or table selection for RxNav, LiverTox, FDA DILIrank 2.0, and RAG
+- data-source or table selection for RxNav, LiverTox, FDA DILIrank 2.0, and RAG
 - refresh controls
 - record counts or metadata
 - table-style inspection
 - search, filter, or pagination where supported
-- embedding or resource update status where supported
+- embedding or data-update status where supported
 
 The **DILIrank** view is read-only. It shows FDA compound name, linked canonical drug when a safe deterministic link exists, LTKB ID, DILI concern class, severity class, labeling section, and source comment. `Unlinked` is an intentional state: it means the FDA row is preserved but is not eligible to contribute to clinical consultation. Do not infer a missing mapping manually from display similarity.
 
 Recommended workflow:
 1. Open **Data Inspection**.
-2. Select the resource or dataset.
+2. Select the data source or dataset.
 3. Refresh the view.
 4. Confirm expected records are present.
 5. Use filters or pagination to inspect specific records.
@@ -100,8 +100,8 @@ Recommended workflow:
 
 Do not edit local database files manually while the application is running.
 
-## Update Local Resources
-Some resources or embeddings may require initialization or refresh through the Data Inspection update controls or through:
+## Update Local Data Sources
+Some data sources or embeddings may require initialization or refresh through the Data Inspection update controls or through:
 
 ```text
 start_on_windows.ps1
@@ -114,5 +114,5 @@ Use the launcher menu options for database initialization, dependency maintenanc
 Expected result:
 - progress is reported
 - long-running jobs show status
-- refreshed resources become available after completion
+- refreshed data sources become available after completion
 - restarting the application after maintenance is recommended

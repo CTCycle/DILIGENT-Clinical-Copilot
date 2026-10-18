@@ -1,5 +1,5 @@
 # User Troubleshooting
-Last updated: 2026-10-01
+Last updated: 2026-10-18
 
 ## Windows desktop app does not open
 
@@ -76,7 +76,7 @@ Check that:
 
 ## Data Inspection Is Empty
 Check that:
-- local resources exist under the expected resource directories
+- local data exists under the expected data directories
 - database initialization completed successfully
 - embedding or catalog update jobs completed successfully
 - the backend was restarted after maintenance

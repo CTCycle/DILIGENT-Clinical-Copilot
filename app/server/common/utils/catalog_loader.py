@@ -10,9 +10,10 @@ from typing import Any
 
 from common.paths import CATALOGS_PATH
 
+
 ###############################################################################
 class CatalogLoader:
-    """Load static JSON catalogs from resources/catalogs at runtime."""
+    """Load static JSON catalogs from data/catalogs at runtime."""
 
     # -------------------------------------------------------------------------
     @staticmethod

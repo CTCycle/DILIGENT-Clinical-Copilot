@@ -24,7 +24,7 @@ The latest published release is [v3.4.0](https://github.com/CTCycle/DILIGENT-Cli
 
 The v3.4.0 binaries are unsigned. The release notes disclose that they have no publisher signature and may produce an unknown-publisher or SmartScreen warning. Windows WebView2 is required. Release verification and its recorded limits are in the [desktop release record](assets/docs/runtime/desktop_release.md).
 
-The packaged app starts its local services and stores settings, sessions, resources, and keys in the user's local application-data area. It is intended for a desktop-width window; authenticated shared-network deployment and mobile use are not supported.
+The packaged app starts its local services and stores settings, sessions, data, and keys in the user's local application-data area. It is intended for a desktop-width window; authenticated shared-network deployment and mobile use are not supported.
 
 ## Start DILIGENT
 

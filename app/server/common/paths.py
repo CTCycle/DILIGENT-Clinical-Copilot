@@ -12,23 +12,23 @@ RUNTIME_LAYOUT = resolve_runtime_layout()
 APP_DIR = RUNTIME_LAYOUT.application_root
 ROOT_DIR = RUNTIME_LAYOUT.runtime_root
 SETTINGS_PATH = RUNTIME_LAYOUT.settings_root
-IMMUTABLE_RESOURCES_PATH = RUNTIME_LAYOUT.immutable_resources_root
-RESOURCES_PATH = RUNTIME_LAYOUT.mutable_resources_root
+IMMUTABLE_DATA_PATH = RUNTIME_LAYOUT.immutable_data_root
+DATA_PATH = RUNTIME_LAYOUT.mutable_data_root
 CACHE_PATH = RUNTIME_LAYOUT.cache_root
-TOOLS_PATH = IMMUTABLE_RESOURCES_PATH / "tools"
-SOURCES_PATH = RESOURCES_PATH / "sources"
+TOOLS_PATH = IMMUTABLE_DATA_PATH / "tools"
+SOURCES_PATH = DATA_PATH / "sources"
 EMBEDDING_MODELS_PATH = CACHE_PATH / "embeddings"
 ARCHIVES_PATH = SOURCES_PATH / "archives"
 DOCS_PATH = SOURCES_PATH / "documents"
 LOGS_PATH = CACHE_PATH / "logs"
 VECTOR_DB_PATH = SOURCES_PATH / "vectors"
 RAG_ACTIVE_GENERATION_POINTER_PATH = VECTOR_DB_PATH / "active_generation.json"
-CATALOGS_PATH = IMMUTABLE_RESOURCES_PATH / "catalogs"
+CATALOGS_PATH = IMMUTABLE_DATA_PATH / "catalogs"
 RXNAV_CURATED_ALIASES_PATH = SOURCES_PATH / "rxnav_curated_aliases.json"
 ENV_FILE_PATH = SETTINGS_PATH / ".env"
 ENV_EXAMPLE_PATH = RUNTIME_LAYOUT.settings_template_root / ".env.example"
 DATABASE_FILE_PATH = Path(
-    os.getenv("DILIGENT_SQLITE_PATH") or str(RESOURCES_PATH / "database.db")
+    os.getenv("DILIGENT_SQLITE_PATH") or str(DATA_PATH / "database.db")
 )
 CLIENT_DIST_PATH = APP_DIR / "client" / "dist" / "browser"
 CLIENT_ASSETS_PATH = CLIENT_DIST_PATH / "assets"
@@ -39,8 +39,8 @@ __all__ = [
     "ROOT_DIR",
     "SETTINGS_PATH",
     "RUNTIME_LAYOUT",
-    "IMMUTABLE_RESOURCES_PATH",
-    "RESOURCES_PATH",
+    "IMMUTABLE_DATA_PATH",
+    "DATA_PATH",
     "CACHE_PATH",
     "TOOLS_PATH",
     "SOURCES_PATH",

@@ -10,7 +10,8 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
-RESOURCE_PATH_ENV = "DILIGENT_RESOURCES_PATH"
+DATA_PATH_ENV = "DILIGENT_DATA_PATH"
+
 
 ###############################################################################
 @dataclass(frozen=True, slots=True)
@@ -22,10 +23,11 @@ class RuntimeLayout:
     application_root: Path
     settings_template_root: Path
     settings_root: Path
-    immutable_resources_root: Path
-    mutable_resources_root: Path
+    immutable_data_root: Path
+    mutable_data_root: Path
     cache_root: Path
     client_dist_root: Path
+
 
 ###############################################################################
 def _resolve_required_absolute_environment_path(name: str) -> Path:
@@ -37,15 +39,14 @@ def _resolve_required_absolute_environment_path(name: str) -> Path:
         raise RuntimeError(f"{name} must be an absolute path")
     return path.resolve()
 
+
 ###############################################################################
-def _resolve_source_resources_root(repository_root: Path, default_root: Path) -> Path:
-    configured = os.getenv(RESOURCE_PATH_ENV, "").strip()
+def _resolve_source_data_root(repository_root: Path, default_root: Path) -> Path:
+    configured = os.getenv(DATA_PATH_ENV, "").strip()
     if not configured:
         env_path = repository_root / "settings" / ".env"
         if env_path.is_file():
-            configured = str(
-                dotenv_values(env_path).get(RESOURCE_PATH_ENV) or ""
-            ).strip()
+            configured = str(dotenv_values(env_path).get(DATA_PATH_ENV) or "").strip()
     if not configured:
         return default_root
 
@@ -54,24 +55,24 @@ def _resolve_source_resources_root(repository_root: Path, default_root: Path) ->
         path = repository_root / path
     return path.resolve()
 
+
 ###############################################################################
 def _resolve_source_layout() -> RuntimeLayout:
     repository_root = Path(__file__).resolve().parents[3]
     application_root = repository_root / "app"
-    resources_root = _resolve_source_resources_root(
-        repository_root, repository_root / "resources"
-    )
+    data_root = _resolve_source_data_root(repository_root, repository_root / "data")
     return RuntimeLayout(
         packaged=False,
         runtime_root=repository_root,
         application_root=application_root,
         settings_template_root=repository_root / "settings",
         settings_root=repository_root / "settings",
-        immutable_resources_root=resources_root,
-        mutable_resources_root=resources_root,
+        immutable_data_root=data_root,
+        mutable_data_root=data_root,
         cache_root=repository_root / "runtimes" / "cache",
         client_dist_root=application_root / "client" / "dist" / "browser",
     )
+
 
 ###############################################################################
 def _resolve_packaged_layout() -> RuntimeLayout:
@@ -84,11 +85,12 @@ def _resolve_packaged_layout() -> RuntimeLayout:
         application_root=application_root,
         settings_template_root=runtime_root / "settings",
         settings_root=data_root / "settings",
-        immutable_resources_root=runtime_root / "resources",
-        mutable_resources_root=data_root / "resources",
+        immutable_data_root=runtime_root / "data",
+        mutable_data_root=data_root,
         cache_root=data_root / "cache",
         client_dist_root=application_root / "client" / "dist" / "browser",
     )
+
 
 ###############################################################################
 @lru_cache(maxsize=1)
