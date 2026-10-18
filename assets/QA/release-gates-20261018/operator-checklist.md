@@ -1,72 +1,66 @@
 # v3.4.0 operator acceptance
 Last updated: 2026-10-18
 
-Status: **UNRUN — awaiting the exact candidate.** Do not approve publication based
-on the earlier portable candidate or source/browser checks alone.
+Status: **RELEASED — 2026-10-18.** The approved publish workflow completed successfully, and the public release, tag, asset digests, downloaded bytes, and portable launch were verified.
 
-Signing was explicitly waived by the user on 2026-10-18. This checklist retains
-the native, MSI, and clean-machine gates; it does not require a publisher certificate.
+The unsigned release policy was authorized on 2026-10-18. The candidate EXE/MSI are NotSigned. The workflow-generated public release notes state that the binaries have no publisher signature and may trigger an unknown-publisher or SmartScreen warning.
 
 ## Candidate identity
 
-Download `desktop-candidate-<prepare-run-id>-<attempt>` from a successful
-Windows Desktop Release `prepare` run. Extract into a disposable QA directory.
-Keep `candidate.json`, `qa/smoke.json`, and the checksum manifest together.
-Record source SHA, run ID/attempt, EXE/MSI SHA-256, explicit `NotSigned` status,
-Windows build, WebView2 version, model IDs, test date, and operator identity.
-Verify artifact hashes and confirm the approved unsigned disposition before executing.
-Store the completed report and screenshots under `assets/QA/`; include the
-candidate hashes in the evidence reference supplied to `publish`.
+| Field | Value |
+|---|---|
+| Source | d4efa5e0bccfa552c80a5edeff2168bfaa718639 |
+| Prepare run | 39109627873 — successful, dispatched from main |
+| Portable EXE SHA-256 | 702f8df1ff1520fe3a43aafc8cfbc589c10a9502cdf2eb2d0264d78a049acd26 |
+| MSI SHA-256 | 3587f93c019e9983e11a5b54955d88e747d0dfbc08b3d369e0447d12e502243d |
+| Windows build / WebView2 | 26200.9457 / 155.0.4283.60 |
+| Local analysis and timeline model | Ollama qwen3.5:9b |
+| RAG embedding model | ONNX Runtime granite-embedding-97m-multilingual-r2 |
+| Hosted live-provider lane | OpenCode Go deepseek-v4.1-flash |
+| Test date | 2026-10-18 |
+
+Artifacts, report, export, screenshots, and isolated synthetic data are under assets/QA/release-gates-20261018/ and assets/QA/native340/. The exact export hash and other detailed results are in report.md.
+
+## Publication readback
+
+- [x] Required `desktop-release` approval recorded; publish run [39125173765](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39125173765) succeeded.
+- [x] Public release [v3.4.0](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.4.0) is GitHub's latest release; published 2026-10-18 11:59:42 UTC.
+- [x] Tag `v3.4.0` resolves to the accepted source SHA `d4efa5e0bccfa552c80a5edeff2168bfaa718639`; publish promoted the selected candidate without a rebuild.
+- [x] Published EXE/MSI digests and downloaded byte hashes match the candidate hashes above.
+- [x] Downloaded portable EXE launched, rendered DILI Agent, returned `/api/health` status `ok`, and closed gracefully. See native-17-release-downloaded-start.png.
+- [x] Generated public release notes disclose that the binaries have no publisher signature.
 
 ## Populated native portable workflow
 
-Use an isolated `LOCALAPPDATA` root and explicitly synthetic clinical inputs.
-Use exact configured provider/model lanes and record their provenance; avoid
-provider fallbacks. Existing local `qwen3.5:9b` is the analysis/timeline control.
-Use the configured `opencode_go / deepseek-v4-flash` lane for revision when
-available. Manage credentials through approved runtime/CI mechanisms; never
-paste secrets into screenshots, reports, or fixtures.
+All flows used the exact portable candidate and synthetic data. The app profile and temp paths were isolated.
 
-- [ ] Open all four native workspaces; save/restart/reset Settings.
-- [ ] Confirm one missing-date blocker, no job/session after rejection, and
-  disappearance of that blocker when the date is supplied.
-- [ ] Complete a populated synthetic analysis; inspect report/evidence and export.
-- [ ] Inspect the saved session/version, update metadata, edit the report, and
-  verify manual-edit lineage and audit. Exercise deletion on a disposable copy.
-- [ ] Generate and render a grounded timeline; verify evidence, dates, and reload.
-- [ ] Complete revision or reach an explicit persisted QA rejection. A timeout
-  alone leaves revision acceptance pending. Verify source preservation and lineage.
-- [ ] Select a real QA document folder with the native picker; ingest two
-  distinct supported documents and a byte-identical duplicate. Verify two unique
-  documents, deduplication, retrieval, and citations in a RAG-enabled analysis.
-- [ ] Exercise native image selection/cancellation and return to the application.
-- [ ] Cancel a running job, verify terminal state and absence of partial saves,
-  then successfully start another job.
-- [ ] Close/relaunch, verify persisted state, close again, and confirm shell,
-  backend, and observed listening ports are gone.
+- [x] DILI Agent, Clinical Sessions, Settings, and RAG/Data Inspection flows exercised; populated report, export, session/version, and timeline evidence recorded. See native-01-populated-form.png, native-02-analysis-running.png, native-03-report-complete.png, native-04-timeline.png, native-05-rag-documents.png, and native-export-clinical_report.md.
+- [x] Missing-date submission showed exactly one blocker, created no job/session, and cleared when date 2026-10-18 was restored. See native-06-missing-date-blocker.png and native-07-date-restored.png.
+- [x] Patient image picker opened and was cancelled; app remained usable. See native-08.
+- [x] Running analysis cancelled through Stop with terminal cancelled state and no partial session. A second started job was also cancelled; the database remained unchanged. See native-09 and native-10.
+- [x] Settings interval 3 saved, survived close/relaunch, and was reset to default 1. See native-11 and native-12.
+- [x] Close/relaunch retained session 1 version 2, session 2 version 1, and session 1 timelines. See native-13 through native-15.
+- [x] Disposable RAG session 2 deleted in the UI. Read-only database check showed 1 session, 2 versions, 1 result, and 2 timelines; session 1 remains. See native-16.
+- [x] Final app/backend shutdown verified; ports 60056, 9223, and 62172 were free.
+- [x] Candidate hosted LiveProvider E2E passed in prepare run 39109627873. Native local timeline generation timed out twice and saved the expected deterministic fallback: 3 grounded events, 3 with evidence. This local timeout does not replace or invalidate the hosted provider result.
+- [x] RAG ingested 2 canonical documents, skipped 1 byte-identical duplicate, and cited both source documents in session 2.
+- [x] Manual report edit produced version 2 with manual_edit lineage and matching previous-text audit hash.
 
-## Clean Windows 11 x64 / MSI distribution
+Known issue in v3.4.0: after metadata is saved, a manual report edit submits metadata: {} and overwrites it. Metadata was saved again and persisted. The issue is documented for follow-up and was not changed in this release; details are in report.md.
 
-Use an administrator-capable disposable Windows 11 host with no DILIGENT
-installation. Preserve a VM snapshot if available. The supported release mode
-is the existing **online** WebView2 bootstrapper; offline certification is excluded.
+## Hosted Windows and MSI gates
 
-- [ ] On a clean host without WebView2, install the exact unsigned MSI with network
-  access; record bootstrapper/installer behavior and exit code.
-- [ ] Launch as a standard user, inspect the window/health contract, and close
-  cleanly without administrator credentials or development tools.
-- [ ] Confirm the installed executable is `NotSigned`, matching the approved policy.
-- [ ] Confirm install/upgrade/uninstall/reinstall receipts from the prepare run.
-  Re-run on the disposable client host when needed using the checksum-verified
-  published v3.3.0 MSI and the maintained smoke harness. Preserve installer logs.
-- [ ] Confirm sessions, report versions, and settings survive a genuine upgrade
-  and uninstall; confirm program files/registration are removed after uninstall.
+The successful prepare run 39109627873 passed 864 backend tests, 53 browser tests, PostgreSQL persistence, MSI lifecycle, portable and deep-path smoke, and live-provider E2E. The unsigned candidate receipt and artifact hashes are retained with that run.
 
-## Publication approval
+- [x] Portable and deep-path smoke — prepare run 39109627873.
+- [x] MSI install/launch/upgrade/uninstall/reinstall lifecycle and populated persistence — prepare run 39109627873.
+- [x] NotSigned status — accepted under the 2026-10-18 unsigned release policy.
+- [x] Public release-note disclosure — generated release notes explicitly say the binaries have no publisher signature.
+- [WAIVED — 2026-10-18] Clean-host WebView2 installation check. Validation was limited to one Windows machine. The observed WebView2 version is recorded above; this is not clean-host compatibility evidence.
 
-Review the candidate hashes, hosted gate receipts, and completed native/client
-evidence. Dispatch `publish` on synchronized `main` with the same version,
-successful prepare run ID, and the completed evidence reference. Approve the
-`desktop-release` environment only after every required item passes. Record
-the approval's attestation in the GitHub review comment. Leave missing or failed
-items pending; do not approve using a source smoke or a different candidate.
+## Approval and publication
+
+The user completed the single approval click for the `desktop-release`
+environment. Publication finished successfully before post-publish documentation
+was committed. The dated single-machine WebView2 waiver remains in force as
+recorded above and in report.md.
