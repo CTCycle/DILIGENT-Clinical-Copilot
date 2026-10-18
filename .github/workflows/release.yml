@@ -115,10 +115,11 @@ jobs:
         shell: pwsh
         env:
           EMBEDDED_DATABASE: "true"
-          DILIGENT_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-preflight.sqlite3
+          DILIGENT_SQLITE_PATH: ${{ github.workspace }}\assets\QA\release-gates\backend\preflight.sqlite3
         run: |
           $ErrorActionPreference = "Stop"
           $python = Join-Path $env:GITHUB_WORKSPACE "app\server\.venv\Scripts\python.exe"
+          New-Item -ItemType Directory -Path (Split-Path -Parent $env:DILIGENT_SQLITE_PATH) -Force | Out-Null
           function Invoke-Checked([string]$label, [string]$executable, [string[]]$arguments) {
             & $executable @arguments
             if ($LASTEXITCODE -ne 0) {
