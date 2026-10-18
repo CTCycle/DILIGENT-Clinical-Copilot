@@ -93,7 +93,12 @@ def _invoke(
             $global:LASTEXITCODE = 0
             $responses[$endpoint]
         }
-        & ./app/desktop/build/release_candidate.ps1 -Action $env:RELEASE_TEST_ACTION -Version 3.4.0 -CandidateRunId 123 -ArtifactDirectory $env:RELEASE_TEST_DIRECTORY
+        try {
+            & ./app/desktop/build/release_candidate.ps1 -Action $env:RELEASE_TEST_ACTION -Version 3.4.0 -CandidateRunId 123 -ArtifactDirectory $env:RELEASE_TEST_DIRECTORY
+        } catch {
+            [Console]::Error.WriteLine($_.Exception.Message)
+            exit 1
+        }
     """
     return subprocess.run(
         [pwsh, "-NoProfile", "-NonInteractive", "-Command", command],
