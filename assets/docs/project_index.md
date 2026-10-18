@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-10-01
+Last updated: 2026-10-18
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -25,7 +25,7 @@ branch-status record.
 - The mandatory regression matrix uses the shared deterministic Windows browser harness (`run_browser_e2e.ps1 -Suite Full`), including seeded session/timeline prerequisites, a fake Ollama protocol fixture, and the synthetic access-key lifecycle; the real OpenCode Go path is a separate `LiveProvider` integration lane.
 - Deterministic hepatic injury-pattern calculation is shared by the clinical workflow and DILI evidence; nonqualifying laboratory pairs remain indeterminate rather than being promoted to a qualifying anchor.
 - Combined structured-source updates are backend-owned and ordered RxNav -> LiverTox -> DILIrank; RAG has a separate job and control. RxNav and LiverTox source-owned records are reconciled only after a complete successful snapshot is prepared.
-- Desktop tag publication has a preflight that requires the tag SHA to equal `origin/main` and checks backend, frontend, browser/provider E2E, vulnerability review, packaging, and Windows EXE/MSI smoke readiness before publication. These are release prerequisites, not product validation gates.
+- Desktop release uses manual `prepare`/`publish` workflow modes. Preparation validates synchronized `main`/`develop`, backend/frontend, browser/provider E2E, security, signing, and Windows lifecycle gates; publication promotes the exact signed candidate after protected-environment native/clean-machine approval. These are release prerequisites, not product validation gates.
 - Angular page and component state uses signals/computed state in current model-configuration, access-key, clinical-session preview, and runtime-settings surfaces.
 - The primary UI navigation has four workspaces: DILI Agent, Clinical Sessions, Data Inspection, and Settings; Patient Timeline is opened from a selected session's Timeline tab. Settings contains General, Models, Data Processing, Integrations, Drug Matching, and Advanced pages with persistent left navigation.
 - FDA DILIrank 2.0 is a structured drug-level hepatotoxicity knowledge source. Its complete source snapshot is persisted separately, only canonical or trusted LiverTox/RxNorm identity links are eligible for clinical use, and unlinked or ambiguous source rows remain inspectable without becoming patient-level causality evidence.

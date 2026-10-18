@@ -7,6 +7,7 @@ import json
 
 from playwright.sync_api import Page, Route, expect
 
+
 ###############################################################################
 def _fill_valid_fields(page: Page) -> None:
     page.get_by_label("Clinical Input").fill(
@@ -16,6 +17,7 @@ def _fill_valid_fields(page: Page) -> None:
         + "## Laboratory analysis\nALT 210 U/L, ALP 160 U/L, bilirubin 2.1 mg/dL."
     )
     page.get_by_label("Visit Date").fill("2026-07-17")
+
 
 ###############################################################################
 def _issue(severity: str, code: str, field: str) -> dict:
@@ -31,6 +33,7 @@ def _issue(severity: str, code: str, field: str) -> dict:
         "continuation_allowed": severity == "non_blocking",
     }
 
+
 ###############################################################################
 def _preflight_body(blocking: list[dict], warnings: list[dict]) -> str:
     return json.dumps(
@@ -45,6 +48,7 @@ def _preflight_body(blocking: list[dict], warnings: list[dict]) -> str:
         }
     )
 
+
 ###############################################################################
 def test_blocking_preflight_modal_prevents_job_submission(
     page: Page,
@@ -57,36 +61,37 @@ def test_blocking_preflight_modal_prevents_job_submission(
         submission_count += 1
         route.abort()
 
-    page.route(
-        "**/api/clinical/validate-input",
-        lambda route: route.fulfill(
-            status=200,
-            content_type="application/json",
-            body=_preflight_body(
-                [
-                    _issue("blocking", "clinical_input_missing", "clinical_input"),
-                    _issue("blocking", "visit_date_missing", "visit_date"),
-                ],
-                [],
-            ),
-        ),
-    )
     page.route("**/api/clinical/jobs", count_jobs)
     try:
         page.goto(base_url)
-        page.get_by_role("button", name="Run DILI analysis").click()
+        sessions_before = page.request.get(f"{base_url}/api/inspection/sessions").json()
+        _fill_valid_fields(page)
+        page.get_by_label("Visit Date").fill("")
+        with page.expect_response("**/api/clinical/validate-input") as response:
+            page.get_by_role("button", name="Run DILI analysis").click()
+        body = response.value.json()
+        codes = [issue["code"] for issue in body["blocking_issues"]]
+        assert codes.count("visit_date_missing") == 1
+        assert "missing_visit_date" not in codes
 
         dialog = page.get_by_role("dialog")
         expect(dialog).to_be_visible()
         expect(dialog).to_contain_text("Cannot start analysis")
-        expect(dialog.locator(".preflight-issue")).to_have_count(2)
+        expect(dialog.get_by_text("Visit date is missing", exact=True)).to_have_count(1)
+        expect(dialog.locator(".preflight-issue")).to_have_count(
+            len(body["blocking_issues"]) + len(body["non_blocking_issues"])
+        )
         expect(
             dialog.get_by_role("button", name="Continue with limitations")
         ).to_have_count(0)
         assert submission_count == 0
+        assert (
+            page.request.get(f"{base_url}/api/inspection/sessions").json()
+            == sessions_before
+        )
     finally:
-        page.unroute("**/api/clinical/validate-input")
         page.unroute("**/api/clinical/jobs", count_jobs)
+
 
 ###############################################################################
 def test_warning_acceptance_starts_one_job_and_preserves_form(
@@ -171,6 +176,7 @@ def test_warning_acceptance_starts_one_job_and_preserves_form(
         page.unroute("**/api/clinical/jobs")
         page.unroute("**/api/clinical/jobs/preflight-warning**")
 
+
 ###############################################################################
 def test_long_preflight_list_scrolls_without_hiding_header_or_actions(
     page: Page,
@@ -218,6 +224,7 @@ def test_long_preflight_list_scrolls_without_hiding_header_or_actions(
     finally:
         page.unroute("**/api/clinical/validate-input")
 
+
 ###############################################################################
 def test_focus_is_trapped_inside_warning_modal(
     page: Page,
@@ -251,6 +258,7 @@ def test_focus_is_trapped_inside_warning_modal(
         expect(close_button).to_be_focused()
     finally:
         page.unroute("**/api/clinical/validate-input")
+
 
 ###############################################################################
 def test_escape_does_not_close_blocking_modal(

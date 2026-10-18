@@ -1,7 +1,17 @@
 # DILIGENT Desktop Release
-Last updated: 2026-10-01
+Last updated: 2026-10-18
 
-## Exact candidate preparation — 2026-10-01
+## Current release-gate campaign — 2026-10-18
+
+v3.4.0 remains **NOT RELEASE READY**. The duplicate date blocker is fixed and
+source/browser validation passed. Signing material, a new signed candidate,
+MSI execution, populated native acceptance, and clean Windows 11 distribution
+remain required. Earlier 3.4.0 binaries and their evidence are historical;
+source changes require a new preparation. See the
+[release-gate report](../../QA/release-gates-20261018/report.md) and
+[operator acceptance checklist](../../QA/release-gates-20261018/operator-checklist.md).
+
+## Historical candidate preparation — 2026-10-01
 
 The prepared product candidate is
 2f804d251769f4e01375d02459e41dd9970ec8eb on develop, with origin/develop at
@@ -50,13 +60,71 @@ The locked desktop toolchain is Tauri CLI `2.11.4`, Tauri crate `2.11.5`, Tauri 
 
 The runtime allowlist excludes source code, tests, documentation, credentials, `.env`, databases, logs, models, vectors, archives, documents, caches, and development runtimes. The packaged shell uses the system WebView2 runtime; the MSI can instead carry an offline WebView2 installer when built with `-OfflineWebView2`.
 
-## Current source and artifact status
+## Historical candidate status — before release-gate implementation
 
-The current source manifests report synchronized candidate version `3.4.0`. The
-latest published desktop release remains `v3.3.0`; no `v3.4.0` tag or release is
-created by the current local readiness work. Publication is confirmed only after
-the portable EXE and MSI, annotated tag, remote-release metadata, and downloaded
-hash evidence have all been verified.
+The current source manifests report synchronized candidate version `3.4.0`.
+Fresh portable, MSI, and checksum artifacts were built on 2026-10-17 from clean
+`develop` commit `37624def8a0f3eba0dfb9990f536aea4b3c0e8a9`; the portable launch
+and exact deep-path smokes passed, and MSI metadata and artifact hashes were
+verified. A native portable Tauri shell/dialog smoke passed on 2026-10-18, but
+the broader populated native workflows were not repeated, so full package UI
+parity remains `PARTIAL`. MSI lifecycle, live-provider E2E, signing, branch
+synchronization, and clean-machine distribution remain separate pending gates.
+The [latest GitHub release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/latest)
+was verified as `v3.3.0` on 2026-10-18. Live GitHub branch refs are
+`develop` = `37624def8a0f3eba0dfb9990f536aea4b3c0e8a9` and `main` =
+`3e341c5a84def4805c6d4ddbf36b67a9071dad3a`, so the required synchronization
+is still pending. The [`v3.4.0` tag lookup](https://api.github.com/repos/CTCycle/DILIGENT-Clinical-Copilot/git/ref/tags/v3.4.0)
+returned 404; no tag or release was created. See the
+[current dependency and packaged candidate evidence](../../QA/security-dependency-refresh-20261017/report.md).
+Publication is confirmed only after the portable EXE and MSI, release tag,
+remote-release metadata, and downloaded hash evidence have all been verified.
+
+### Portable browser-workflow comparison — 2026-10-17
+
+The source backend at `37624def` was compared with the fresh portable frozen
+backend in the in-app browser using the exact candidate Angular bundle (16/16
+browser files matched). Against separate disposable data roots, shared
+navigation/catalog states, Settings save/reload/reset, the empty-data
+fail-closed preflight, and one identical synthetic amoxicillin assessment on
+local `qwen3.5:9b` produced matching user-visible results; both session lists
+showed `Successful`, and persisted report text had the same SHA-256. The output
+remained indeterminate and required clinician review; its persisted LLM-QA and
+clinical-review states were `not_run` and `not_reviewed`.
+
+This establishes the common browser surface and packaged backend workflow, not
+the complete Tauri shell. The available UI automation exposed browser tabs but
+no native-window inventory, so native shell interactions and file dialogs stay
+unvalidated; overall package UI parity is `PARTIAL`. Provider-dependent cloud
+checks remain pending because no provider credentials were available.
+
+### Native portable Tauri smoke — 2026-10-18
+
+The current v3.4.0 portable candidate was launched in its native Tauri window
+with an isolated temporary data root. The four primary workspace areas
+rendered. A Settings value survived navigation and clean restart, and resetting
+defaults persisted across restart. The native RAG folder dialog selected an
+empty disposable QA directory; the patient-image dialog opened and was
+cancelled without selecting a file. An intentionally short synthetic DILI
+Agent draft was blocked by native preflight (5 blockers, 1 warning); the
+Clinical Sessions view remained empty, confirming no session was created. The
+missing visit date appeared twice with the same title. The app closed cleanly
+with no remaining package process or listener on the observed runtime ports.
+
+This validates current-candidate shell startup, basic navigation, a Settings
+persistence path, native dialog open/select/cancel behavior, and shutdown. It
+does not repeat populated analysis, session/revision, or RAG ingestion flows;
+overall package UI parity remains `PARTIAL`. The duplicate date blocker is a
+small preflight UX cleanup item. Screenshots and detailed observations are in
+the [current candidate report](../../QA/security-dependency-refresh-20261017/report.md).
+
+The MSI was inspected without installation or elevation. Product metadata,
+signature state, embedded CAB, and file-table version/size were read; the
+extracted MSI payload carries the same runtime archive digest as the portable
+candidate. The extracted shell PE has a different SHA-256 from the portable EXE,
+so no shell-binary identity is claimed. MSI install/upgrade/uninstall/reinstall
+remain admin-dependent; signing and distribution remain separate pending gates.
+The detailed evidence and limitations are in the [current candidate report](../../QA/security-dependency-refresh-20261017/report.md).
 
 The expected output names for a verified `3.4.0` build are:
 
@@ -126,20 +194,29 @@ and the updated [D01–D14 matrix](../../QA/desktop-release-validation-20260930/
 
 ### v3.4.0 release-candidate gate
 
-Status: **PORTABLE VALIDATED; MSI/UPGRADE PENDING ON SUITABLE TEST HOST; DISTRIBUTION PENDING**. The source and lock manifests are synchronized to strict
-SemVer `3.4.0`, but the candidate must remain unpublished until all of these
-independent gates have current evidence:
+Status: **CURRENT-SOURCE CANDIDATE BUILT; PORTABLE, DEEP-PATH, AND NATIVE SHELL SMOKE VALIDATED; FULL NATIVE UI PARITY PARTIAL; MSI LIFECYCLE, LIVE-PROVIDER E2E, SIGNING, BRANCH SYNCHRONIZATION, AND DISTRIBUTION PENDING**. The source and lock manifests are synchronized to strict SemVer `3.4.0`; the fresh local candidate remains unpublished until all remaining independent gates have current evidence:
 
-- hosted CI is green for the exact candidate commit;
-- the complete browser E2E suite passes, including the explicit live provider
-  flow using synthetic data and the approved OpenCode Go / `deepseek-v4-flash`
+- hosted CI passed dependency, backend, persistence, Windows regression, and
+  documentation-push checks; the push-triggered live-provider job was skipped;
+- the complete browser E2E lane still needs explicit live-provider evidence
+  using synthetic data and the approved OpenCode Go / `deepseek-v4-flash`
   configuration;
-- the portable EXE launches and shuts down cleanly, and the MSI installs,
-  launches, upgrades, and uninstalls on a Windows host;
-- Python, npm, and Cargo dependency scans have been reviewed with no unresolved
+- the fresh portable EXE passed two launches and two exact deep-path launches;
+  a current native shell/dialog smoke also passed; populated native workflows
+  remain unverified on this candidate. MSI metadata and checksums passed, while
+  MSI install, launch, upgrade, uninstall, and reinstall remain pending on an
+  administrator-capable host; no registered DILIGENT entry was found in the
+  standard current-user or machine Add/Remove Programs paths, so this host has
+  no prior MSI install available as an upgrade baseline;
+- both candidate artifacts are unsigned; no signing certificate or
+  `signtool.exe` is available on this host. Signing must be completed and
+  verified for the release artifacts;
+- Python, npm, and Cargo dependency scans passed with no unresolved
   release-blocking findings;
-- `develop` and `main` are intentionally synchronized before an annotated
-  `v3.4.0` tag is created.
+- GitHub's `develop` and `main` endpoints returned
+  `37624def8a0f3eba0dfb9990f536aea4b3c0e8a9` and
+  `3e341c5a84def4805c6d4ddbf36b67a9071dad3a`, respectively; branch
+  synchronization is required before an annotated `v3.4.0` tag is created.
 
 This preparation record does not create a tag, publish a GitHub release, or
 upload assets. The candidate remains on origin/develop without a v3.4.0 tag or
@@ -246,17 +323,56 @@ permanent running state.
 
 ## GitHub Actions publication
 
-`.github/workflows/release.yml` runs on a `vX.Y.Z` tag. Its release preflight
-first requires the tagged commit to equal `origin/main`, then runs the backend
-quality/migration/unit/persistence gates, frontend tests and production build,
-the complete browser suite, the explicit live provider flow, dependency scans,
-and Windows EXE/MSI host smoke checks. Packaging and publication depend on all
-of those gates. The workflow builds both Windows desktop targets from the
-verified tag, creates or updates the matching GitHub Release, and attaches the
-portable EXE, MSI, and `.sha256` manifest. It refuses to overwrite an existing
-non-identical asset. Create a new SemVer tag only after `develop` and `main`
-have been intentionally synchronized and the local release validation has
-passed.
+`.github/workflows/release.yml` is manually dispatched from synchronized
+`main`/`develop` with `mode=prepare` or `mode=publish` and a strict source-matching
+version. Pushing a tag does not publish a release.
+
+Preparation requires backend quality/migration/unit gates, SQLite/PostgreSQL
+persistence, frontend tests/build, the canonical `Full` browser harness, the
+explicit `LiveProvider` lane, and dependency security audits. It builds once
+with `-SignDesktopRelease`: the raw shell is signed before MSI bundling, the
+completed MSI is signed, and final checksums are generated. Windows smoke
+verifies portable/deep-path launches and real install/upgrade/uninstall/reinstall,
+including installed-shell signature and populated-data preservation. The
+checksum-verified published v3.3.0 MSI supplies the baseline; fixture data is
+written using v3.3.0 repositories and read again by the baseline application.
+The baseline `runtime` directory and current `rt` directory are explicitly
+accounted for. Receipts state which checks actually ran.
+
+Configure these values through secure repository settings before preparation:
+
+- Secrets: `WINDOWS_CODESIGN_PFX_BASE64`, `WINDOWS_CODESIGN_PFX_PASSWORD`,
+  and the existing `OPENCODE_GO_API_KEY`.
+- Variables: `WINDOWS_CODESIGN_CERT_THUMBPRINT`, `WINDOWS_CODESIGN_TIMESTAMP_URL`
+  (an HTTPS timestamp service).
+
+The candidate artifact `desktop-candidate-<run-id>-<attempt>` retains the signed
+EXE/MSI, checksum manifest, `candidate.json`, and Windows lifecycle receipts.
+Its 30-day retention is an operational limit: an expired candidate must be
+prepared and accepted again. QA diagnostics remain under `assets/QA/` and are
+uploaded as workflow artifacts; private keys, `.env`, and user databases are
+not candidate assets.
+
+Complete the linked operator checklist against those hashes before publication.
+The `desktop-release` environment must require a reviewer, disable administrator
+bypass, and allow only `main`. Its approval attests to populated native Tauri
+workflows and clean Windows 11 x64/online-WebView2/standard-user acceptance.
+This session configured CTCycle as the reviewer. Automated smoke never supplies
+that human attestation.
+
+Dispatch `publish` with `candidate_run_id` and a completed `operator_evidence`
+reference including candidate hashes. Publication checks the exact source SHA,
+successful prepare run/attempt, every required job, immutable candidate receipt,
+artifact digests, trusted timestamped signatures, branch equality, and absence
+of both tag and release. It downloads the existing candidate without rebuilding.
+After reviewer approval, it creates the tag and a draft release, uploads the
+unchanged assets, downloads them again for hash/signature and portable-launch
+verification, then publishes and verifies external release/tag/latest metadata.
+API errors never count as tag/release absence. A failed draft remains unpublished
+for investigation; existing tags/releases are never silently overwritten.
+
+Only after publication should final detailed QA documentation be committed and
+branches synchronized again. Keep the release tag fixed at the tested source SHA.
 
 The workflow uses the launcher's pinned portable Python runtime rather than installing a second host Python. The launcher clears inherited `PYTHONHOME`, `PYTHONPATH`, and user-site settings, then points `PYTHONHOME` at `runtimes/python` so the project venv uses the same embeddable interpreter family as the release runtime. The PyInstaller bootstrap removes hosted-toolcache Python entries from `sys.path`, registers only the pinned venv and `runtimes/python` native directories, explicitly loads the matching `libffi-8.dll` by absolute path through the CFFI bridge, preloads the supported CFFI native backend, and only then imports `ctypes`. Together these keep PyInstaller on the same embedded-Python and DLL set used by the release launcher without rewriting the host PATH.
 
@@ -272,7 +388,7 @@ The launcher validates:
 - Tauri compilation;
 - portable executable size, MSI metadata, and SHA-256 entries;
 - `app/desktop/build/smoke_release.ps1` portable launch/close and MSI install,
-  upgrade, launch, and uninstall checks on a Windows host.
+  upgrade, launch, uninstall, and reinstall checks on a Windows host.
 
 After publishing, perform a Windows host smoke test by opening the portable EXE, confirming a window titled `DILIGENT Clinical Copilot`, checking `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`, and requesting the port recorded there at `/api/health`. MSI install, upgrade, uninstall, WebView2 offline installation, code signing, and clean-machine testing remain separate distribution gates.
 

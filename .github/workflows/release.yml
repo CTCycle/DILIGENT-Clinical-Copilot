@@ -1,15 +1,33 @@
 name: Windows Desktop Release
+run-name: Desktop ${{ inputs.mode }} v${{ inputs.version }}
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Prepare a signed candidate or publish an already tested candidate
+        type: choice
+        options: [prepare, publish]
+        default: prepare
+        required: true
+      version:
+        description: Exact major.minor.patch release version
+        type: string
+        default: '3.4.0'
+        required: true
+      candidate_run_id:
+        description: Successful prepare run ID (publish only)
+        type: string
+      operator_evidence:
+        description: Native and clean Windows 11 QA evidence reference, including tested hashes (publish only)
+        type: string
 
 permissions:
-  contents: write
+  contents: read
+  actions: read
 
 concurrency:
-  group: desktop-release-${{ github.ref }}
+  group: desktop-release-${{ inputs.version }}
   cancel-in-progress: false
 
 env:
@@ -28,14 +46,29 @@ env:
   RUFF_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/ruff
   UV_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/uv
 
+  RELEASE_VERSION: ${{ inputs.version }}
+
 jobs:
+  source:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Require synchronized source, version, and absent tag/release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\app\desktop\build\release_candidate.ps1 -Action Source -Version $env:RELEASE_VERSION
+
   release-preflight:
+    if: inputs.mode == 'prepare'
+    needs: source
     permissions:
       contents: read
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
-      - name: Checkout tagged release
+      - name: Checkout candidate source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
@@ -54,20 +87,6 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22.13.0"
-
-      - name: Verify tagged SHA is synchronized with main
-        shell: pwsh
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          git fetch --no-tags origin main
-          $tagSha = (git rev-parse "refs/tags/$($env:RELEASE_TAG)^{commit}").Trim()
-          $mainSha = (git rev-parse "refs/remotes/origin/main^{commit}").Trim()
-          if ($tagSha -ne $mainSha) {
-            throw "Release tag $($env:RELEASE_TAG) resolves to $tagSha, but origin/main is $mainSha."
-          }
-          Write-Output "Release tag is synchronized with origin/main: $tagSha"
 
       - name: Verify launcher release parameter contract
         shell: pwsh
@@ -135,112 +154,24 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\runtimes\cache\playwright
         run: .\.venv\Scripts\python.exe -m playwright install chromium
 
-      - name: Run full release browser E2E suite
+      - name: Run canonical full browser regression
         shell: pwsh
         env:
-          DATABASE_BACKEND: sqlite
-          EMBEDDED_DATABASE: "true"
-          DATABASE_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-e2e.sqlite3
-          DILIGENT_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-e2e.sqlite3
-          APP_TEST_BACKEND_URL: http://127.0.0.1:7690
-          APP_TEST_FRONTEND_URL: http://127.0.0.1:9847
-          FASTAPI_HOST: 127.0.0.1
-          FASTAPI_PORT: "7690"
-          UI_HOST: 127.0.0.1
-          UI_PORT: "9847"
-          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\runtimes\cache\playwright
-        run: |
-          $ErrorActionPreference = "Stop"
-          $python = Join-Path $env:GITHUB_WORKSPACE "app\server\.venv\Scripts\python.exe"
-          $backendDir = Join-Path $env:GITHUB_WORKSPACE "app\server"
-          $frontendDir = Join-Path $env:GITHUB_WORKSPACE "app\client"
-          $logDir = Join-Path $env:GITHUB_WORKSPACE "runtimes/cache/pytest/release-e2e-logs"
-          New-Item -ItemType Directory -Path $logDir -Force | Out-Null
-          $backend = $null
-          $frontend = $null
-          $backendReady = $false
-          $frontendReady = $false
+          DILIGENT_BROWSER_E2E_CACHE_ROOT: ${{ github.workspace }}/assets/QA/release-gates/browser-cache
+        run: .\app\tests\ci\run_browser_e2e.ps1 -Suite Full
 
-          function Write-Diagnostics($label, $process, $stdoutPath, $stderrPath) {
-            Write-Output "[$label]"
-            if ($null -eq $process) {
-              Write-Output "Process was not created."
-            } else {
-              $process.Refresh()
-              Write-Output "PID=$($process.Id) HasExited=$($process.HasExited)"
-              if ($process.HasExited) { Write-Output "ExitCode=$($process.ExitCode)" }
-            }
-            foreach ($log in @($stdoutPath, $stderrPath)) {
-              if (Test-Path -LiteralPath $log) {
-                Write-Output "--- $log ---"
-                Get-Content -LiteralPath $log -Tail 200
-              }
-            }
-          }
-
-          $backendOut = Join-Path $logDir "backend.out.log"
-          $backendErr = Join-Path $logDir "backend.err.log"
-          $frontendOut = Join-Path $logDir "frontend.out.log"
-          $frontendErr = Join-Path $logDir "frontend.err.log"
-          $backend = Start-Process -FilePath $python -ArgumentList "-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "7690" -WorkingDirectory $backendDir -RedirectStandardOutput $backendOut -RedirectStandardError $backendErr -WindowStyle Hidden -PassThru
-          try {
-            $backendDeadline = (Get-Date).AddMinutes(3)
-            while ((Get-Date) -lt $backendDeadline) {
-              try {
-                $health = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7690/api/health" -TimeoutSec 3
-                $config = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7690/api/model-config" -TimeoutSec 3
-                if ($health.StatusCode -eq 200 -and $config.StatusCode -eq 200) {
-                  $backendReady = $true
-                  break
-                }
-              } catch {
-                $backend.Refresh()
-                if ($backend.HasExited) { break }
-              }
-              Start-Sleep -Milliseconds 500
-            }
-            if (-not $backendReady) {
-              Write-Diagnostics "backend readiness failure" $backend $backendOut $backendErr
-              throw "Backend readiness failed before the release E2E deadline."
-            }
-
-            $frontend = Start-Process -FilePath "npm.cmd" -ArgumentList "run", "preview", "--", "--host", "127.0.0.1", "--port", "9847", "--strictPort" -WorkingDirectory $frontendDir -RedirectStandardOutput $frontendOut -RedirectStandardError $frontendErr -WindowStyle Hidden -PassThru
-            $frontendDeadline = (Get-Date).AddMinutes(3)
-            while ((Get-Date) -lt $frontendDeadline) {
-              try {
-                $response = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:9847/" -TimeoutSec 3
-                if ($response.StatusCode -lt 500) {
-                  $frontendReady = $true
-                  break
-                }
-              } catch {
-                $frontend.Refresh()
-                if ($frontend.HasExited) { break }
-              }
-              Start-Sleep -Milliseconds 500
-            }
-            if (-not $frontendReady) {
-              Write-Diagnostics "frontend readiness failure" $frontend $frontendOut $frontendErr
-              throw "Frontend readiness failed before the release E2E deadline."
-            }
-
-            & $python -m pytest app/tests/e2e -q
-            if ($LASTEXITCODE -ne 0) {
-              throw "Full release browser E2E suite failed with exit code $LASTEXITCODE"
-            }
-          } finally {
-            if (-not $backendReady -or -not $frontendReady) {
-              Write-Diagnostics "release E2E cleanup" $backend $backendOut $backendErr
-              Write-Diagnostics "release E2E cleanup" $frontend $frontendOut $frontendErr
-            }
-            foreach ($process in @($backend, $frontend)) {
-              if ($null -ne $process -and -not $process.HasExited) {
-                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-              }
-            }
-          }
+      - name: Retain deterministic browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-full-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: assets/QA/release-gates/browser-cache/pytest/browser-e2e-logs/**
+          if-no-files-found: ignore
+          retention-days: 14
 
   release-persistence-preflight:
+    if: inputs.mode == 'prepare'
+    needs: source
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -260,7 +191,7 @@ jobs:
           --health-timeout=5s
           --health-retries=12
     steps:
-      - name: Checkout tagged release
+      - name: Checkout candidate source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
@@ -288,6 +219,8 @@ jobs:
         run: python -m pytest ../tests/persistence -q
 
   release-live-provider-e2e:
+    if: inputs.mode == 'prepare'
+    needs: source
     permissions:
       contents: read
     runs-on: windows-latest
@@ -304,7 +237,7 @@ jobs:
       DILIGENT_LIVE_PROVIDER_E2E: '1'
       OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
     steps:
-      - name: Checkout tagged release
+      - name: Checkout candidate source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Python
@@ -355,24 +288,27 @@ jobs:
           DATABASE_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-live-provider.sqlite3
           DILIGENT_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-live-provider.sqlite3
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\runtimes\cache\playwright
+          DILIGENT_BROWSER_E2E_CACHE_ROOT: ${{ github.workspace }}/assets/QA/release-gates/provider-cache
         run: .\app\tests\ci\run_browser_e2e.ps1 -Suite LiveProvider
 
-      - name: Upload provider E2E diagnostics on failure
-        if: failure()
+      - name: Retain provider E2E diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: release-live-provider-e2e-logs-${{ github.run_id }}
+          name: release-live-provider-e2e-logs-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 3
           if-no-files-found: ignore
-          path: runtimes/cache/pytest/browser-e2e-logs/**
+          path: assets/QA/release-gates/provider-cache/pytest/browser-e2e-logs/**
 
   release-security-preflight:
+    if: inputs.mode == 'prepare'
+    needs: source
     permissions:
       contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Checkout tagged release
+      - name: Checkout candidate source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Python
@@ -418,323 +354,131 @@ jobs:
         # is intentionally excluded from the target-specific unsoundness gate.
         run: cargo audit --file app/desktop/src-tauri/Cargo.lock --target-os windows --target-arch x86_64 --deny unsound --ignore RUSTSEC-2024-0429
 
-  package-and-publish:
-    permissions:
-      contents: write
-    needs: [release-preflight, release-persistence-preflight, release-live-provider-e2e, release-security-preflight]
+  prepare:
+    if: inputs.mode == 'prepare'
+    needs: [source, release-preflight, release-persistence-preflight, release-live-provider-e2e, release-security-preflight]
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
+    env:
+      WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
+      WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
+      WINDOWS_CODESIGN_CERT_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_CERT_THUMBPRINT }}
+      WINDOWS_CODESIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_CODESIGN_TIMESTAMP_URL }}
     steps:
-      - name: Checkout tagged release
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-
-      - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - name: Require trusted signing configuration
+        shell: pwsh
+        run: |
+          foreach ($name in @('WINDOWS_CODESIGN_PFX_BASE64', 'WINDOWS_CODESIGN_PFX_PASSWORD', 'WINDOWS_CODESIGN_CERT_THUMBPRINT', 'WINDOWS_CODESIGN_TIMESTAMP_URL')) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "Missing signing configuration: $name" }
+          }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22.13.0"
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master 2026-08-26
+          node-version: '22.13.0'
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
         with:
           toolchain: 1.95.0
           targets: x86_64-pc-windows-msvc
-
-      - name: Build Windows desktop artifacts
+      - name: Build and sign once, including the executable inside the MSI
         shell: pwsh
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          if ($env:RELEASE_TAG -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
-            throw "Unsupported release tag: $env:RELEASE_TAG"
-          }
-          $version = $Matches.version
-          & .\start_on_windows.ps1 -Action BuildDesktopRelease -Version $version -DesktopTarget All
-          if ($LASTEXITCODE -ne 0) {
-            throw "Desktop release build failed with exit code $LASTEXITCODE"
-          }
-
-      - name: Sign Windows desktop artifacts
+        run: .\start_on_windows.ps1 -Action BuildDesktopRelease -Version $env:RELEASE_VERSION -DesktopTarget All -SignDesktopRelease
+      - name: Install locked validation extras in the existing environment
         shell: pwsh
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
-          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
-          WINDOWS_CODESIGN_CERT_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_CERT_THUMBPRINT }}
-          WINDOWS_CODESIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_CODESIGN_TIMESTAMP_URL }}
+        working-directory: app/server
         run: |
-          $ErrorActionPreference = "Stop"
-          foreach ($required in @(
-            "WINDOWS_CODESIGN_PFX_BASE64",
-            "WINDOWS_CODESIGN_PFX_PASSWORD",
-            "WINDOWS_CODESIGN_CERT_THUMBPRINT",
-            "WINDOWS_CODESIGN_TIMESTAMP_URL"
-          )) {
-            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($required))) {
-              throw "Missing required Windows signing material: $required"
-            }
-          }
-
-          $version = $env:RELEASE_TAG.Substring(1)
-          $artifacts = @(
-            (Join-Path "release" "DILIGENT-v$version-windows-x64-portable.exe"),
-            (Join-Path "release" "DILIGENT-v$version-windows-x64.msi")
-          )
-          foreach ($artifact in $artifacts) {
-            if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
-              throw "Cannot sign missing release artifact: $artifact"
-            }
-          }
-
-          $signtoolCommand = Get-Command signtool.exe -ErrorAction SilentlyContinue
-          if ($null -eq $signtoolCommand) {
-            $signtoolCommand = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -File -Recurse -ErrorAction SilentlyContinue |
-              Sort-Object FullName -Descending |
-              Select-Object -First 1
-          }
-          if ($null -eq $signtoolCommand) {
-            throw "Windows SDK signtool.exe was not found; refusing to publish unsigned artifacts."
-          }
-          $signtool = if ($signtoolCommand.PSObject.Properties.Name -contains "Source") {
-            $signtoolCommand.Source
-          } else {
-            $signtoolCommand.FullName
-          }
-
-          $pfxPath = Join-Path $env:RUNNER_TEMP "diligent-release-signing.pfx"
-          try {
-            try {
-              [IO.File]::WriteAllBytes(
-                $pfxPath,
-                [Convert]::FromBase64String($env:WINDOWS_CODESIGN_PFX_BASE64)
-              )
-            } catch {
-              throw "WINDOWS_CODESIGN_PFX_BASE64 is not valid base64: $($_.Exception.Message)"
-            }
-            if ((Get-Item -LiteralPath $pfxPath).Length -le 0) {
-              throw "Decoded Windows signing PFX is empty."
-            }
-
-            foreach ($artifact in $artifacts) {
-              & $signtool sign /fd SHA256 /td SHA256 /tr $env:WINDOWS_CODESIGN_TIMESTAMP_URL /f $pfxPath /p $env:WINDOWS_CODESIGN_PFX_PASSWORD $artifact
-              if ($LASTEXITCODE -ne 0) {
-                throw "Authenticode signing failed for $artifact with exit code $LASTEXITCODE"
-              }
-            }
-
-            $expectedThumbprint = ($env:WINDOWS_CODESIGN_CERT_THUMBPRINT -replace '\s', '').ToUpperInvariant()
-            foreach ($artifact in $artifacts) {
-              $signature = Get-AuthenticodeSignature -LiteralPath $artifact
-              if ($signature.Status -ne "Valid" -or $null -eq $signature.SignerCertificate) {
-                throw "Authenticode validation failed for ${artifact}: status=$($signature.Status)"
-              }
-              $actualThumbprint = ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
-              if ($actualThumbprint -ne $expectedThumbprint) {
-                throw "Unexpected Authenticode signer for ${artifact}: $actualThumbprint != $expectedThumbprint"
-              }
-              if ($signature.SignerCertificate.NotAfter -lt (Get-Date)) {
-                throw "Authenticode signer certificate is expired for $artifact."
-              }
-              & $signtool verify /pa /all /tw $artifact
-              if ($LASTEXITCODE -ne 0) {
-                throw "signtool verification failed for $artifact with exit code $LASTEXITCODE"
-              }
-              Write-Output "Signed and verified: $(Split-Path -Leaf $artifact) ($actualThumbprint)"
-            }
-          } finally {
-            if (Test-Path -LiteralPath $pfxPath -PathType Leaf) {
-              Remove-Item -LiteralPath $pfxPath -Force -ErrorAction SilentlyContinue
-            }
-          }
-
-      - name: Regenerate signed artifact checksums
-        shell: pwsh
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          $version = $env:RELEASE_TAG.Substring(1)
-          $artifacts = @(
-            (Join-Path "release" "DILIGENT-v$version-windows-x64-portable.exe"),
-            (Join-Path "release" "DILIGENT-v$version-windows-x64.msi")
-          )
-          foreach ($artifact in $artifacts) {
-            if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
-              throw "Cannot checksum missing signed release artifact: $artifact"
-            }
-          }
-          $manifest = Join-Path "release" "DILIGENT-v$version-windows-x64.sha256"
-          $lines = foreach ($artifact in $artifacts) {
-            $name = Split-Path -Leaf $artifact
-            "SHA256  $name"
-            "$((Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant())  $name"
-          }
-          Set-Content -LiteralPath $manifest -Value $lines -Encoding ascii
-          $manifestText = Get-Content -LiteralPath $manifest -Raw
-          foreach ($artifact in $artifacts) {
-            $name = Split-Path -Leaf $artifact
-            $hash = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
-            if ($manifestText -notmatch [regex]::Escape("$hash  $name")) {
-              throw "Regenerated checksum manifest does not match $name"
-            }
-          }
-          Write-Output "Signed artifact checksum manifest regenerated and verified: $manifest"
-
-      - name: Verify release version contract
-        shell: pwsh
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          $version = $env:RELEASE_TAG.Substring(1)
-          $jsonPaths = @("app/client/package.json", "app/desktop/package.json")
-          foreach ($path in $jsonPaths) {
-            $actual = (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).version
-            if ($actual -ne $version) { throw "Version mismatch in ${path}: $actual != $version" }
-          }
-          $lockJsonPaths = @("app/client/package-lock.json", "app/desktop/package-lock.json")
-          foreach ($path in $lockJsonPaths) {
-            $lockJson = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json -AsHashtable
-            $rootPackage = $lockJson['packages']['']
-            if ($null -eq $rootPackage -or $rootPackage['version'] -ne $version) {
-              throw "Lockfile root version mismatch in ${path}: $($rootPackage['version']) != $version"
-            }
-          }
-          $textChecks = @(
-            @("app/server/pyproject.toml", '(?m)^version\s*=\s*"([^"]+)"'),
-            @("app/desktop/src-tauri/Cargo.toml", '(?m)^version\s*=\s*"([^"]+)"'),
-            @("app/desktop/src-tauri/tauri.conf.json", '"version"\s*:\s*"([^"]+)"'),
-            @("app/shared/openapi.json", '"version"\s*:\s*"([^"]+)"')
-          )
-          foreach ($check in $textChecks) {
-            $match = [regex]::Match((Get-Content -LiteralPath $check[0] -Raw), $check[1])
-            if (-not $match.Success -or $match.Groups[1].Value -ne $version) { throw "Version mismatch in $($check[0])" }
-          }
-          $lockMatch = [regex]::Match((Get-Content -LiteralPath "app/server/uv.lock" -Raw), '(?ms)\[\[package\]\]\s*name = "diligent"\s*version = "([^"]+)"')
-          if (-not $lockMatch.Success -or $lockMatch.Groups[1].Value -ne $version) { throw "uv.lock does not match $version" }
-          $cargoLockMatch = [regex]::Match((Get-Content -LiteralPath "app/desktop/src-tauri/Cargo.lock" -Raw), '(?ms)\[\[package\]\]\s*name = "diligent-desktop"\s*version = "([^"]+)"')
-          if (-not $cargoLockMatch.Success -or $cargoLockMatch.Groups[1].Value -ne $version) { throw "Cargo.lock does not match $version" }
-          Write-Output "Release version contract verified: $version"
-
-      - name: Verify release artifacts
-        shell: pwsh
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          $version = $env:RELEASE_TAG.Substring(1)
-          $artifacts = @(
-            (Join-Path "release" "DILIGENT-v$version-windows-x64-portable.exe"),
-            (Join-Path "release" "DILIGENT-v$version-windows-x64.msi"),
-            (Join-Path "release" "DILIGENT-v$version-windows-x64.sha256")
-          )
-          foreach ($artifact in $artifacts) {
-            if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
-              throw "Missing release artifact: $artifact"
-            }
-            $item = Get-Item -LiteralPath $artifact
-            if ($item.Length -le 0) {
-              throw "Empty release artifact: $artifact"
-            }
-            Write-Output "$($item.Name): $($item.Length) bytes"
-          }
-          $checksumText = Get-Content -LiteralPath $artifacts[2] -Raw
-          foreach ($artifact in $artifacts[0..1]) {
-            $name = Split-Path -Leaf $artifact
-            $hash = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
-            if ($checksumText -notmatch [regex]::Escape("$hash  $name")) {
-              throw "Checksum manifest does not match $name"
-            }
-          }
-
-      - name: Download published MSI for upgrade validation
+          & ../../runtimes/uv/uv.exe sync --locked --all-extras --group desktop-build
+          if ($LASTEXITCODE -ne 0) { throw 'Validation dependency installation failed.' }
+      - name: Download the published v3.3.0 upgrade baseline
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $previousVersion = '3.3.0'
-          $upgradeDir = Join-Path $env:RUNNER_TEMP "diligent-upgrade-from-$previousVersion"
-          New-Item -ItemType Directory -Path $upgradeDir -Force | Out-Null
-          gh release download "v$previousVersion" --repo $env:GITHUB_REPOSITORY `
-            --pattern "DILIGENT-v$previousVersion-windows-x64.msi" `
-            --pattern "DILIGENT-v$previousVersion-windows-x64.sha256" `
-            --dir $upgradeDir --clobber
-          if ($LASTEXITCODE -ne 0) {
-            throw "Could not download the published v$previousVersion MSI upgrade inputs."
-          }
-          $previousMsi = Join-Path $upgradeDir "DILIGENT-v$previousVersion-windows-x64.msi"
-          $previousChecksum = Join-Path $upgradeDir "DILIGENT-v$previousVersion-windows-x64.sha256"
-          foreach ($path in @($previousMsi, $previousChecksum)) {
-            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-              throw "Missing published MSI upgrade input: $path"
-            }
-          }
-          $checksumText = Get-Content -LiteralPath $previousChecksum -Raw
-          $name = Split-Path -Leaf $previousMsi
-          $hash = (Get-FileHash -LiteralPath $previousMsi -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($checksumText -notmatch [regex]::Escape("$hash  $name")) {
-            throw "Published v$previousVersion MSI checksum does not match $name"
-          }
-          "DILIGENT_UPGRADE_MSI=$previousMsi" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "DILIGENT_UPGRADE_CHECKSUM=$previousChecksum" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          Write-Output "Published v$previousVersion MSI upgrade inputs verified."
-
-      - name: Smoke test Windows EXE and MSI
+          New-Item -ItemType Directory -Path assets/QA/release-gates/baseline -Force | Out-Null
+          gh release download v3.3.0 --repo $env:GITHUB_REPOSITORY --pattern DILIGENT-v3.3.0-windows-x64.msi --pattern DILIGENT-v3.3.0-windows-x64.sha256 --dir assets/QA/release-gates/baseline
+          if ($LASTEXITCODE -ne 0) { throw 'Published upgrade baseline download failed.' }
+      - name: Validate signed portable, deep paths, MSI lifecycle, and populated upgrade
+        shell: pwsh
+        run: |
+          .\app\desktop\build\smoke_release.ps1 -Version $env:RELEASE_VERSION -DesktopTarget All -InstallMsi -TestUpgrade -RequireSignature -TestDeepPath -PreviousMsiPath assets/QA/release-gates/baseline/DILIGENT-v3.3.0-windows-x64.msi -PreviousChecksumPath assets/QA/release-gates/baseline/DILIGENT-v3.3.0-windows-x64.sha256 -ReportDirectory "$env:GITHUB_WORKSPACE/assets/QA/release-gates/msi"
+      - name: Record exact source, artifact hashes, and gate provenance
         shell: pwsh
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_GATE_RESULTS: ${{ toJSON(needs) }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $version = $env:RELEASE_TAG.Substring(1)
-          .\app\desktop\build\smoke_release.ps1 `
-            -Version $version `
-            -DesktopTarget All `
-            -InstallMsi `
-            -TestUpgrade `
-            -UpgradeFromVersion 3.3.0 `
-            -PreviousMsiPath $env:DILIGENT_UPGRADE_MSI `
-            -PreviousChecksumPath $env:DILIGENT_UPGRADE_CHECKSUM
+          New-Item -ItemType Directory -Path candidate/qa -Force | Out-Null
+          Copy-Item release/* -Destination candidate
+          Copy-Item assets/QA/release-gates/msi/* -Destination candidate/qa
+          .\app\desktop\build\release_candidate.ps1 -Action Record -Version $env:RELEASE_VERSION -ArtifactDirectory candidate
+      - name: Retain the immutable signed candidate for operator validation and promotion
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: candidate/**
+          if-no-files-found: error
+          retention-days: 30
+      - name: Retain lifecycle diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-lifecycle-${{ github.run_id }}-${{ github.run_attempt }}
+          path: assets/QA/release-gates/msi/**
+          if-no-files-found: ignore
+          retention-days: 30
 
-      - name: Create or update GitHub Release
+  publication-preflight:
+    if: inputs.mode == 'publish'
+    needs: source
+    runs-on: windows-latest
+    timeout-minutes: 5
+    outputs:
+      attempt: ${{ steps.candidate.outputs.attempt }}
+      candidate_url: ${{ steps.candidate.outputs.candidate_url }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check candidate provenance and required reviewer protection
+        id: candidate
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          $repo = $env:GITHUB_REPOSITORY
-          $tag = $env:RELEASE_TAG
-          $version = $tag.Substring(1)
-          gh release view $tag --repo $repo *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --repo $repo --verify-tag --generate-notes --title "DILIGENT Clinical Copilot $tag"
-            if ($LASTEXITCODE -ne 0) {
-              throw "GitHub Release creation failed with exit code $LASTEXITCODE"
-            }
-          }
-          $artifacts = @(
-            (Join-Path "release" "DILIGENT-v$version-windows-x64-portable.exe"),
-            (Join-Path "release" "DILIGENT-v$version-windows-x64.msi"),
-            (Join-Path "release" "DILIGENT-v$version-windows-x64.sha256")
-          )
-          $existingNames = @(gh release view $tag --repo $repo --json assets --jq '.assets[].name')
-          $downloadDir = Join-Path $env:RUNNER_TEMP "diligent-release-existing"
-          New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
-          foreach ($artifact in $artifacts) {
-            $name = Split-Path -Leaf $artifact
-            if ($existingNames -contains $name) {
-              gh release download $tag --repo $repo --pattern $name --dir $downloadDir --clobber
-              if ($LASTEXITCODE -ne 0) { throw "Could not download existing release asset $name" }
-              $existing = Join-Path $downloadDir $name
-              $localHash = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
-              $existingHash = (Get-FileHash -LiteralPath $existing -Algorithm SHA256).Hash.ToLowerInvariant()
-              if ($localHash -ne $existingHash) { throw "Refusing to overwrite non-identical release asset $name" }
-              Write-Output "Existing release asset is byte-identical: $name"
-              continue
-            }
-            gh release upload $tag --repo $repo $artifact
-            if ($LASTEXITCODE -ne 0) { throw "GitHub Release asset upload failed for $name" }
-          }
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          OPERATOR_EVIDENCE: ${{ inputs.operator_evidence }}
+        run: .\app\desktop\build\release_candidate.ps1 -Action Candidate -Version $env:RELEASE_VERSION -CandidateRunId $env:CANDIDATE_RUN_ID
+
+  publish:
+    if: inputs.mode == 'publish'
+    needs: [source, publication-preflight]
+    environment:
+      name: desktop-release
+      url: ${{ needs.publication-preflight.outputs.candidate_url }}
+    permissions:
+      contents: write
+      actions: read
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      OPERATOR_EVIDENCE: ${{ inputs.operator_evidence }}
+      WINDOWS_CODESIGN_CERT_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_CERT_THUMBPRINT }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Download the selected immutable candidate without rebuilding
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id }}
+          name: desktop-candidate-${{ inputs.candidate_run_id }}-${{ needs.publication-preflight.outputs.attempt }}
+          path: release
+      - name: Verify and promote the operator-approved candidate
+        shell: pwsh
+        run: .\app\desktop\build\release_candidate.ps1 -Action Publish -Version $env:RELEASE_VERSION -CandidateRunId $env:CANDIDATE_RUN_ID
+      - name: Retain distribution verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: assets/QA/**
+          if-no-files-found: ignore
+          retention-days: 30

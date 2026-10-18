@@ -390,10 +390,18 @@ def validate_clinical_input_preflight(
         service.ensure_submission_requirements(patient_payload)
     except ClinicalPipelineValidationError as exc:
         for issue in exc.issues:
+            code = (
+                "visit_date_missing" if issue.code == "missing_visit_date" else issue.code
+            )
+            if code == "visit_date_missing" and any(
+                existing.code == code and existing.field == issue.field
+                for existing in blocking
+            ):
+                continue
             blocking.append(
                 ClinicalInputPreflightIssue(
                     severity="blocking",
-                    code=issue.code,
+                    code=code,
                     message=issue.message,
                     field=issue.field,
                 )
@@ -708,10 +716,6 @@ _ISSUE_PRESENTATIONS: dict[str, tuple[str, str]] = {
     "missing_timed_drug": (
         "Medication timing is missing",
         "Latency and exposure chronology cannot be evaluated reliably.",
-    ),
-    "missing_visit_date": (
-        "Visit date is missing",
-        "The workflow cannot anchor the clinical chronology or persist a valid assessment date.",
     ),
     "minimum_extraction_quality_not_met": (
         "Clinical extraction confidence is low",
