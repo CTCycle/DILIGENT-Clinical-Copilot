@@ -14,7 +14,7 @@ param(
     [string]$UpgradeFromVersion = '3.3.0',
     [string]$PreviousMsiPath,
     [string]$PreviousChecksumPath,
-    [switch]$RequireSignature,
+    [switch]$RequireUnsigned,
     [switch]$TestDeepPath,
     [string]$ReportDirectory
 )
@@ -326,8 +326,9 @@ function Invoke-PortableSmoke(
     [string]$expectedVersion = $Version,
     [string]$isolatedRoot
 ) {
-    if ($RequireSignature -and $expectedVersion -eq $Version) {
-        & (Join-Path $PSScriptRoot 'sign_artifact.ps1') -Path $executable | Out-Null
+    if ($RequireUnsigned -and $expectedVersion -eq $Version -and
+        (Get-AuthenticodeSignature -LiteralPath $executable).Status -ne 'NotSigned') {
+        throw 'The candidate must match the explicitly unsigned release policy.'
     }
     if ([string]::IsNullOrWhiteSpace($isolatedRoot)) {
         $isolatedRoot = Join-Path $smokeRoot $label
@@ -498,8 +499,13 @@ function Invoke-UpgradeFixture([string]$upgradeRoot, [switch]$Seed, [switch]$Cap
     $arguments = @((Join-Path $PSScriptRoot 'check_upgrade_fixture.py'), $database, (Join-Path $ReportDirectory 'upgrade-data.json'))
     if ($Capture) { $arguments += '--capture' }
     if ($CheckHead) { $arguments += @('--expected-head', '202609170001') }
-    & $python @arguments
-    if ($LASTEXITCODE -ne 0) { throw 'MSI database preservation/integrity check failed.' }
+    $previousPythonHome = $env:PYTHONHOME
+    try {
+        $env:PYTHONHOME = Join-Path $repoRoot 'runtimes/python'
+        & $python @arguments
+        if ($LASTEXITCODE -ne 0) { throw 'MSI database preservation/integrity check failed.' }
+    }
+    finally { $env:PYTHONHOME = $previousPythonHome }
 }
 
 function Invoke-MsiSmoke {
@@ -512,7 +518,9 @@ function Invoke-MsiSmoke {
     if ($null -ne (Find-InstalledProduct -productCode $metadata.ProductCode -productName $metadata.ProductName)) {
         throw 'Refusing to alter an existing DILIGENT installation; use a clean disposable host.'
     }
-    if ($RequireSignature) { & (Join-Path $PSScriptRoot 'sign_artifact.ps1') -Path $msiPath | Out-Null }
+    if ($RequireUnsigned -and (Get-AuthenticodeSignature -LiteralPath $msiPath).Status -ne 'NotSigned') {
+        throw 'The MSI must match the explicitly unsigned release policy.'
+    }
     if ($metadata.ProductCode -notmatch '^\{[0-9A-Fa-f-]+\}$') { throw "MSI ProductCode is invalid: $($metadata.ProductCode)" }
     if ($metadata.ProductVersion -ne $Version) { throw "MSI ProductVersion $($metadata.ProductVersion) does not match $Version" }
     if ($metadata.Manufacturer -ne 'CTCycle') { throw "MSI Manufacturer must be CTCycle, found $($metadata.Manufacturer)" }

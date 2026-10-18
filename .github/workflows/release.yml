@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Prepare a signed candidate or publish an already tested candidate
+        description: Prepare an unsigned candidate or publish an already tested candidate
         type: choice
         options: [prepare, publish]
         default: prepare
@@ -360,22 +360,10 @@ jobs:
     needs: [source, release-preflight, release-persistence-preflight, release-live-provider-e2e, release-security-preflight]
     runs-on: windows-latest
     timeout-minutes: 120
-    env:
-      WINDOWS_CODESIGN_CERT_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_CERT_THUMBPRINT }}
-      WINDOWS_CODESIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_CODESIGN_TIMESTAMP_URL }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - name: Require trusted signing configuration
-        shell: pwsh
-        env:
-          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
-          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
-        run: |
-          foreach ($name in @('WINDOWS_CODESIGN_PFX_BASE64', 'WINDOWS_CODESIGN_PFX_PASSWORD', 'WINDOWS_CODESIGN_CERT_THUMBPRINT', 'WINDOWS_CODESIGN_TIMESTAMP_URL')) {
-            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "Missing signing configuration: $name" }
-          }
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22.13.0'
@@ -383,15 +371,14 @@ jobs:
         with:
           toolchain: 1.95.0
           targets: x86_64-pc-windows-msvc
-      - name: Build and sign once, including the executable inside the MSI
+      - name: Build the explicitly unsigned candidate once
         shell: pwsh
-        env:
-          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
-          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
-        run: .\start_on_windows.ps1 -Action BuildDesktopRelease -Version $env:RELEASE_VERSION -DesktopTarget All -SignDesktopRelease
+        run: .\start_on_windows.ps1 -Action BuildDesktopRelease -Version $env:RELEASE_VERSION -DesktopTarget All
       - name: Install locked validation extras in the existing environment
         shell: pwsh
         working-directory: app/server
+        env:
+          PYTHONHOME: ${{ github.workspace }}/runtimes/python
         run: |
           & ../../runtimes/uv/uv.exe sync --locked --all-extras --group desktop-build
           if ($LASTEXITCODE -ne 0) { throw 'Validation dependency installation failed.' }
@@ -403,10 +390,10 @@ jobs:
           New-Item -ItemType Directory -Path assets/QA/release-gates/baseline -Force | Out-Null
           gh release download v3.3.0 --repo $env:GITHUB_REPOSITORY --pattern DILIGENT-v3.3.0-windows-x64.msi --pattern DILIGENT-v3.3.0-windows-x64.sha256 --dir assets/QA/release-gates/baseline
           if ($LASTEXITCODE -ne 0) { throw 'Published upgrade baseline download failed.' }
-      - name: Validate signed portable, deep paths, MSI lifecycle, and populated upgrade
+      - name: Validate unsigned portable, deep paths, MSI lifecycle, and populated upgrade
         shell: pwsh
         run: |
-          .\app\desktop\build\smoke_release.ps1 -Version $env:RELEASE_VERSION -DesktopTarget All -InstallMsi -TestUpgrade -RequireSignature -TestDeepPath -PreviousMsiPath assets/QA/release-gates/baseline/DILIGENT-v3.3.0-windows-x64.msi -PreviousChecksumPath assets/QA/release-gates/baseline/DILIGENT-v3.3.0-windows-x64.sha256 -ReportDirectory "$env:GITHUB_WORKSPACE/assets/QA/release-gates/msi"
+          .\app\desktop\build\smoke_release.ps1 -Version $env:RELEASE_VERSION -DesktopTarget All -InstallMsi -TestUpgrade -RequireUnsigned -TestDeepPath -PreviousMsiPath assets/QA/release-gates/baseline/DILIGENT-v3.3.0-windows-x64.msi -PreviousChecksumPath assets/QA/release-gates/baseline/DILIGENT-v3.3.0-windows-x64.sha256 -ReportDirectory "$env:GITHUB_WORKSPACE/assets/QA/release-gates/msi"
       - name: Record exact source, artifact hashes, and gate provenance
         shell: pwsh
         env:
@@ -416,7 +403,7 @@ jobs:
           Copy-Item release/* -Destination candidate
           Copy-Item assets/QA/release-gates/msi/* -Destination candidate/qa
           .\app\desktop\build\release_candidate.ps1 -Action Record -Version $env:RELEASE_VERSION -ArtifactDirectory candidate
-      - name: Retain the immutable signed candidate for operator validation and promotion
+      - name: Retain the immutable unsigned candidate for operator validation and promotion
         uses: actions/upload-artifact@v4
         with:
           name: desktop-candidate-${{ github.run_id }}-${{ github.run_attempt }}
@@ -466,7 +453,6 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
       OPERATOR_EVIDENCE: ${{ inputs.operator_evidence }}
-      WINDOWS_CODESIGN_CERT_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_CERT_THUMBPRINT }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Download the selected immutable candidate without rebuilding

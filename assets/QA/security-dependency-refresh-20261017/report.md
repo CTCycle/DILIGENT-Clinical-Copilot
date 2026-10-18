@@ -221,6 +221,6 @@ GitHub release, upload, or publication was performed.
 
 The 2026-10-18 release-gate source changes supersede these unsigned 3.4.0
 binaries. Retain this report and its hashes as historical evidence. The duplicate
-visit-date finding is fixed and revalidated in source; signing, MSI execution,
-and native/clean-machine acceptance require the new exact candidate. See the
+visit-date finding is fixed and revalidated in source; MSI execution and native/clean-machine acceptance require the new exact
+candidate. Signing was explicitly waived by the user for the release. See the
 [release-gate follow-up](../release-gates-20261018/report.md).
