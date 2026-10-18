@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-10-01
+Last updated: 2026-10-18
 
 ## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -32,6 +32,7 @@ If a session is missing, confirm that the assessment completed successfully and 
 
 Important distinctions:
 - Manual report edits do not create a new official version.
+- Current known behavior: saving a manual report edit replaces saved session metadata with an empty object. Re-enter and save needed attachment or session metadata after editing. This is a v3.4.0 follow-up recorded in the [project status ledger](../project_status_ledger.md).
 - LLM-assisted revision creates a new versioned draft and keeps the previous version unchanged.
 - Human clinical review status is separate from LLM QA status.
 - Backend-provided matched drugs, structured case fields, revision entities, RxNav identifiers, LiverTox matches, and linked FDA DILIrank identifiers are authoritative persisted evidence only within their documented source semantics.
@@ -42,10 +43,6 @@ Important distinctions:
 Select a session in **Clinical Sessions**, then open its **Timeline** tab. Saved timeline previews open at `/sessions/:sessionId/timetable/:timelineId`; the route without `:timelineId` starts from the session workspace. There is no separate Patient Timeline item in the primary sidebar.
 
 Use it to review event order, clinical sequence, and patient chronology where data is available.
-
-![Patient Timeline showing review controls and a clinical chronology](../../QA/release-v3.3.0-screenshots/03-patient-timeline-overview.png)
-
-_Patient Timeline review controls and the first complete chronology event._
 
 Recommended workflow:
 1. Open **Clinical Sessions**.
@@ -72,10 +69,6 @@ dense/compact/comfortable density, and previous/next navigation to focus review.
 Selecting an event opens the desktop Event inspector. Approximate placement, a **Fallback chronology**, and **Missing
 source evidence** are visible warnings, not clinical confirmation.
 
-![Timeline event inspector showing supporting detail for a laboratory event](../../QA/release-v3.3.0-screenshots/04-patient-timeline-event-inspector.png)
-
-_Event inspector with timing, confidence, and source evidence for a synthetic laboratory event._
-
 Use the help popover beside **Review controls** when the filter names need context. Evidence filters describe source support, density changes reading comfort, uncertain timing keeps approximate events visible, and **Inspect details** opens the event's source and confidence rationale. These controls do not alter the saved timeline.
 
 Timeline generation may show a fallback notice when model extraction does not complete. For an explicitly selected OpenCode Go model, a temporary model-catalog outage does not prevent the known routed request from being attempted. The notice identifies the failure class, such as provider network unavailable, provider timeout, authentication rejected, rate limited, upstream error, invalid structured response, or incomplete configuration. Transient network, timeout, rate-limit, and upstream failures are retried with bounded backoff before fallback.
@@ -86,10 +79,6 @@ For LLM-generated timelines, events without preserved source evidence are not pa
 
 ## Inspect Local Data
 Open **Data Inspection** from the sidebar.
-
-![Data Inspection showing public amoxicillin catalog records](../../QA/release-v3.3.0-screenshots/05-data-inspection-drug-catalog.png)
-
-_Data Inspection filtered to public catalog records._
 
 Expected capabilities:
 - resource or table selection for RxNav, LiverTox, FDA DILIrank 2.0, and RAG

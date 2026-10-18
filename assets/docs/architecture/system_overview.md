@@ -1,5 +1,5 @@
 # System Overview
-Last updated: 2026-10-01
+Last updated: 2026-10-18
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
@@ -149,7 +149,7 @@ Maintained source-level structure, with build and cache artifacts omitted:
 
 The release pipeline produces a no-install portable EXE, an MSI, and a SHA-256 manifest. The EXE and MSI share the same embedded deterministic runtime archive; the shell keeps mutable user data outside that archive under `%LOCALAPPDATA%\DILIGENT\data`.
 
-The tag-triggered `.github/workflows/release.yml` rebuilds both Windows artifacts from the release tag and attaches the portable EXE and MSI to the matching GitHub Release.
+`.github/workflows/release.yml` is manually dispatched in `prepare` and `publish` modes. Preparation builds and validates an immutable candidate; after protected-environment approval, publication promotes that same candidate without rebuilding, creates the tag, and attaches the portable EXE and MSI. Pushing a tag alone does not publish a release.
 
 Backend ownership is explicit: API endpoints call services, services
 orchestrate domain contracts, and focused repositories own persistence.

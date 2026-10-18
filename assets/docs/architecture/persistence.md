@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-09-28
+Last updated: 2026-10-18
 
 ## Relational Database
 
@@ -211,6 +211,7 @@ erDiagram
   application startup and explicit initialization never use `create_all()`.
 - Startup and installation serialize migration attempts, inspect the current
   Alembic head, and apply pending revisions before repositories or services run.
+- SQLite migrations that rebuild referenced tables temporarily disable foreign-key enforcement within the atomic migration transaction, run `PRAGMA foreign_key_check` before commit, and restore the prior enforcement setting. Any violation aborts the migration.
 - Fresh databases are upgraded through the linear Alembic history before the
   application starts. Populated databases without an Alembic revision are
   rejected before application tables are changed; the runtime never guesses or

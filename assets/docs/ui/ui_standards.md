@@ -1,5 +1,5 @@
 # UI Standards
-Last updated: 2026-08-20
+Last updated: 2026-10-18
 
 ## Spacing Scale
 - Use the root spacing tokens from `app/client/src/styles.scss`: `--space-xs` through `--space-3xl`.
@@ -32,4 +32,4 @@ Last updated: 2026-08-20
 | Reuse existing tokens before adding a new value. | Add near-duplicate colors, radii, or fractional font sizes for one screen. |
 | Preserve current workflow and information architecture. | Redesign a page when a token or spacing polish is enough. |
 | Keep dense data tables and timeline canvases usable within the desktop workspace. | Create small-screen layouts or touch-first substitutes. |
-| Store validation notes and screenshots in `assets/QA/`. | Scatter audit artifacts across source folders. |
+| Keep local captures in ignored `assets/QA/` scratch space and put durable findings in the related product document. | Track a separate audit report for every UI review. |
