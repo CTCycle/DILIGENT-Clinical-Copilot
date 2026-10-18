@@ -19,6 +19,12 @@ unknown-publisher or SmartScreen warning. Earlier 3.4.0 binaries remain historic
   `signing=unsigned`; preparation and promotion verify `NotSigned` status on the
   EXE/MSI and installed shell. The signing-only helper and launcher hooks were
   removed. No certificate or signing credentials are required or fabricated.
+- A live-provider run exposed a deterministic revision-normalization defect:
+  `Read the session context once, then append exactly...` was not recognized
+  because the append parser only accepted instructions starting with `Append`.
+  The explicit context-read prefix is now supported, with regression coverage
+  for forced append, negation, and truncated canonical context. No live assertion
+  was relaxed. The 39-test revision-agent suite passed locally.
 - MSI smoke now covers install, launch, uninstall, reinstall, relaunch, and
   uninstall. Genuine v3.3.0 upgrade uses published checksum-verified MSI bytes,
   the baseline's runtime-directory convention, and synthetic data persisted
@@ -68,7 +74,11 @@ that skip is not provider evidence. The separate
 [release preparation run 39108643638](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39108643638)
 executed and passed the live-provider E2E using the configured hosted credential
 and exact existing OpenCode Go/model lane. No provider secret was downloaded.
-The unsigned-policy revision requires a fresh preparation before promotion.
+The unsigned-policy run [39109135829](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39109135829)
+passed source, browser/frontend/backend, persistence, and security gates, but
+provider E2E failed because its requested append was absent. That failure led to
+the normalization fix above. No candidate from that failed run was accepted;
+the repaired exact source requires fresh preparation before promotion.
 
 The first hosted attempts exposed a PowerShell error-message wrapping assumption
 in a new guard test and a missing fresh-host SQLite parent directory. Both were

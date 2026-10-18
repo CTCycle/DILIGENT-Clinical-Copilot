@@ -381,9 +381,13 @@ def test_revision_context_exposes_exact_section_offsets_and_truncation_state() -
     assert truncated["source_length"] == len(truncated_report)
 
 ###############################################################################
-def test_revision_runner_does_not_auto_append_when_canonical_context_is_truncated() -> None:
+@pytest.mark.parametrize("prefix", ["", "Read the session context once, then "])
+def test_revision_runner_does_not_auto_append_when_canonical_context_is_truncated(
+    prefix: str,
+) -> None:
     request = SessionRevisionRequest(
-        revision_instruction="Append exactly this sentence to the revised report: Human review is required."
+        revision_instruction=prefix
+        + "Append exactly this sentence to the revised report: Human review is required."
     )
     draft = RevisionDraftResult(
         revised_report_text="Canonical report.",
@@ -405,10 +409,14 @@ def test_revision_runner_does_not_auto_append_when_canonical_context_is_truncate
     assert normalized.patches == []
     assert any("not fully available" in issue for issue in normalized.unresolved_issues)
 
+
 ###############################################################################
-def test_requested_append_sentence_is_extracted_from_explicit_instruction() -> None:
+@pytest.mark.parametrize("prefix", ["", "Read the session context once, then "])
+def test_requested_append_sentence_is_extracted_from_explicit_instruction(
+    prefix: str,
+) -> None:
     instruction = (
-        "Append exactly this sentence to the revised report: "
+        prefix + "Append exactly this sentence to the revised report: "
         "Reviewer instruction check: human clinical review is required before reuse. "
         "Preserve all existing clinical facts and sections."
     )
@@ -417,6 +425,18 @@ def test_requested_append_sentence_is_extracted_from_explicit_instruction() -> N
         "Reviewer instruction check: human clinical review is required before reuse."
     )
     assert _requested_append_sentence("Focus on unsupported claims.") is None
+    assert _requested_append_sentence("Do not " + instruction) is None
+    normalized, applied = RevisionAgentRunner._normalize_draft(
+        source_report="Canonical report.",
+        draft=RevisionDraftResult(revised_report_text="Canonical report.", patches=[]),
+        request=SessionRevisionRequest(revision_instruction=instruction),
+        canonical_report_editability={"available": True, "editable": True},
+    )
+    assert applied == (
+        "Canonical report.\n\n"
+        "Reviewer instruction check: human clinical review is required before reuse."
+    )
+    assert normalized.revised_report_text == applied
 
 ###############################################################################
 def test_revision_context_preserves_long_canonical_report() -> None:
