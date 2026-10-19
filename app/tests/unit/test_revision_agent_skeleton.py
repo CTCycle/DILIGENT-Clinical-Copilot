@@ -1109,9 +1109,48 @@ def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
     run = service.get_revision_run(pipeline_run_id)
     assert run is not None
     assert run["status"] == "failed"
-    assert run["error"] == {
-        "message": "Revision processing failed. Retry the revision if needed."
-    }
+    assert run["error"]["message"] == (
+        "Revision processing failed. Retry the revision if needed."
+    )
+    assert run["error"]["provider"] == run["configuration"]["model_provider"]
+    assert run["error"]["model"] == run["configuration"]["model_name"]
+    assert run["error"]["retryable"] is False
+
+###############################################################################
+def test_unattributed_retryable_revision_failure_keeps_runtime_metadata(
+    tmp_path: Path,
+) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+
+    class RetryableFailure(RuntimeError):
+        retryable = True
+
+    class RetryableRevisionRunner:
+        def run_agentic(self, **_kwargs: Any) -> dict[str, Any]:
+            raise RetryableFailure("Transient provider failure")
+
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = RetryableRevisionRunner()
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    pipeline_run_id = started["result"]["pipeline_run_id"]
+    for _ in range(50):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] == "failed":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Retryable revision failure did not fail")
+
+    run = service.get_revision_run(pipeline_run_id)
+    assert run is not None
+    assert run["error"]["message"] == (
+        "Revision processing failed. Retry the revision if needed."
+    )
+    assert run["error"]["provider"] == run["configuration"]["model_provider"]
+    assert run["error"]["model"] == run["configuration"]["model_name"]
+    assert run["error"]["retryable"] is True
+    assert "Transient provider failure" not in run["error"]["message"]
 
 ###############################################################################
 def test_revision_provider_failure_persists_sanitized_retry_metadata(
@@ -1523,9 +1562,12 @@ def test_revision_tool_failure_fails_closed_without_leaking_detail(
     run = service.get_revision_run(pipeline_run_id)
     assert run is not None
     assert run["status"] == "failed"
-    assert run["error"] == {
-        "message": "Revision processing failed. Retry the revision if needed."
-    }
+    assert run["error"]["message"] == (
+        "Revision processing failed. Retry the revision if needed."
+    )
+    assert run["error"]["provider"] == run["configuration"]["model_provider"]
+    assert run["error"]["model"] == run["configuration"]["model_name"]
+    assert "tool-secret" not in str(run["error"])
     steps = service.list_revision_steps(pipeline_run_id)
     task_step = next(
         step for step in steps if step["step_name"] == "revision_agent_task_1"
