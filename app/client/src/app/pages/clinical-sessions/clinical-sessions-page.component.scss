@@ -41,7 +41,7 @@
 
 .clinical-session-link-field span {
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-sm);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -283,7 +283,7 @@
   border-radius: 999px;
   background: var(--cs-success-bg);
   color: var(--cs-success-text);
-  font-size: 10px;
+  font-size: var(--font-xs);
   font-weight: 800;
   line-height: 1;
   padding: 1px 6px;
@@ -551,7 +551,7 @@
 
 .clinical-session-drug-evidence-table th {
   color: var(--cs-faint);
-  font-size: 10px;
+  font-size: var(--font-xs);
   font-weight: 800;
 }
 
@@ -586,7 +586,7 @@
 .clinical-session-drug-evidence-table small {
   margin-top: 2px;
   color: var(--cs-faint);
-  font-size: 10px;
+  font-size: var(--font-xs);
   line-height: 1.25;
 }
 
