@@ -1,5 +1,5 @@
 # Project Status Ledger
-Last updated: 2026-10-18
+Last updated: 2026-10-19
 
 ## Purpose and authority
 
@@ -33,7 +33,7 @@ A status applies only to its stated scope. In particular, PUBLISHED is not a gen
 | runtime.database.sqlite-migrations | VALIDATED | Populated SQLite migration, Alembic head, and metadata-drift checks. | 2026-09-23 | [Persistence](architecture/persistence.md); [deployment](runtime/deployment.md) |
 | api.local-boundaries | VALIDATED | Full harness classifies all 68 OpenAPI paths and 85 operations; external integrations remain separate. | 2026-09-30 | [API surface](architecture/api_surface.md); [testing and quality](coding/testing_and_quality.md) |
 | ui.application-shell | VALIDATED | Visual pass: DILI, Settings, Session tabs, populated Timeline, and Inspection in both themes at 1100/1280/1440/1920px; 1099px notice, Save focus/visibility, and modal Escape/focus return checked. Broad screen-reader coverage deferred. | 2026-10-19 | [Experience](ui/experience.md); [UI standards](ui/ui_standards.md); [Component patterns](ui/components_and_patterns.md) |
-| settings.runtime-model-configuration | VALIDATED | Database-backed save, reload, reset, provider/model selection, and restart persistence. | 2026-10-18 | [Settings UI](runtime/settings_ui.md); [model setup](user/model_setup.md) |
+| settings.runtime-model-configuration | PARTIAL | Database-backed save, reload, reset, provider/model selection, and restart persistence were validated on 2026-10-18; autosave persistence was not exercised in the browser. | 2026-10-19 | [Settings UI](runtime/settings_ui.md); [model setup](user/model_setup.md) |
 | auth.access-key-management | VALIDATED | Encrypted persistence, metadata-only responses, activation, rotation, scoping, deletion, and redaction. Provider acceptance is separate. | 2026-09-30 | [Model setup](user/model_setup.md); [testing and quality](coding/testing_and_quality.md) |
 | model.provider.opencode-go | VALIDATED for exact hosted route | OpenCode Go / deepseek-v4.1-flash synthetic release flow. Other provider/model combinations are not certified. | 2026-10-18 | [Generation policy](runtime/generation_policy.md); [validation boundaries](runtime/validation_ledger.md) |
 | model.provider.local-ollama | VALIDATED for supported timeline boundary | Exact qwen3.5:2b fails closed to a source-backed fallback; qwen3.5:9b has produced grounded events. Broader model coverage is not claimed. | 2026-10-18 | [Runtime modes](runtime/modes.md); [timeline workflow](user/sessions_timeline_and_data.md) |

@@ -29,8 +29,8 @@ describe('ModelConfigPageComponent', () => {
 
   it('requires and saves explicit cloud role assignments after runtime toggle', async () => {
     const persistSpy = vi
-      .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<void> }, 'persistConfigPatch')
-      .mockResolvedValue();
+      .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<boolean> }, 'persistConfigPatch')
+      .mockResolvedValue(true);
 
     component.draftConfig.set({
       useCloudServices: false,
@@ -197,8 +197,8 @@ describe('ModelConfigPageComponent', () => {
 
   it('persists only backend-supported RAG fields and preserves hybrid weights', async () => {
     const persistSpy = vi
-      .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<void> }, 'persistConfigPatch')
-      .mockResolvedValue();
+      .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<boolean> }, 'persistConfigPatch')
+      .mockResolvedValue(true);
 
     const draftWithRuntimeOnlyDevice = {
       allow_local_filesystem_access: true,
@@ -249,7 +249,8 @@ describe('ModelConfigPageComponent', () => {
       false,
       'rag',
     );
-    expect(component.ragSettingsModalOpen()).toBe(false);
+    expect(component.ragSettingsModalOpen()).toBe(true);
+    component.draftRagSettings.set(component.ragSettings());
   });
 
   it('validates hybrid weights while hybrid search is enabled', () => {
@@ -273,8 +274,8 @@ describe('ModelConfigPageComponent', () => {
   it('cancels pending reasoning persistence when the page is destroyed', () => {
     vi.useFakeTimers();
     const persistSpy = vi
-      .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<void> }, 'persistConfigPatch')
-      .mockResolvedValue();
+      .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<boolean> }, 'persistConfigPatch')
+      .mockResolvedValue(true);
 
     component.handleReasoningLevelChange(2);
     fixture.destroy();

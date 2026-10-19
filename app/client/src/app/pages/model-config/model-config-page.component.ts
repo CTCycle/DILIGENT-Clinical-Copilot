@@ -58,6 +58,7 @@ import {
 import { EMPTY_RUNTIME_SETTINGS } from '../../core/model-config';
 
 const MODEL_BATCH_SIZE = 12;
+const MODEL_CONFIG_AUTOSAVE_DELAY_MS = 400;
 const REASONING_LEVELS: readonly ReasoningLevel[] = ['off', 'low', 'medium', 'high'];
 type SaveOperation = 'configuration' | 'reasoning' | 'rag';
 
@@ -174,6 +175,16 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   readonly ragSettings = computed(() => this.normalizeRagSettings(this.modelConfigState.data()?.rag_settings));
   readonly draftRagSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });
   readonly ragSettingsModalOpen = signal(false);
+  readonly ragSettingsSaveError = signal('');
+  readonly isRagDirty = computed(
+    () => JSON.stringify(this.ragSettings()) !== JSON.stringify(this.draftRagSettings()),
+  );
+  readonly ragSettingsStatus = computed(() => {
+    if (this.ragSettingsValidationMessage()) return this.ragSettingsValidationMessage();
+    if (this.ragSettingsSaveError()) return this.ragSettingsSaveError();
+    if (this.isRagSaving()) return 'Saving changes...';
+    return this.isRagDirty() ? 'Changes save automatically.' : 'All changes saved.';
+  });
   readonly activeRagSettingsSection = signal<RagSettingsSectionKey>(DEFAULT_RAG_SETTINGS_SECTION);
   readonly embeddingRuntime = computed(() => this.modelConfigState.data()?.embedding_runtime ?? null);
   readonly embeddingIndex = computed(() => this.modelConfigState.data()?.embedding_index ?? null);
@@ -187,7 +198,9 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   readonly draftConfig = signal<DraftRuntimeConfig>(resolveDraftFromSettings(EMPTY_RUNTIME_SETTINGS));
   readonly lastUpdatedAt = computed(() => this.modelConfigState.data()?.updated_at ?? null);
   readonly catalogProviderInFlight = signal<CatalogProvider | null>(null);
+  private configurationSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private reasoningSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private ragSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly saveRevisions: Record<SaveOperation, number> = {
     configuration: 0,
     reasoning: 0,
@@ -309,10 +322,6 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     }
     return '';
   });
-
-  readonly ragSettingsSaveDisabled = computed(
-    () => this.isRagSaving() || this.isLoading() || !!this.ragSettingsValidationMessage(),
-  );
 
   readonly lastSavedLabel = computed(() => {
     const updatedAt = this.lastUpdatedAt();
@@ -454,36 +463,43 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     return '';
   });
 
-  readonly saveDisabled = computed(() => {
+  readonly isConfigurationDirty = computed(() => {
     const settings = this.modelConfigState.settings();
-    if (!settings) return true;
+    if (!settings) return false;
     const draft = this.draftConfig();
     const savedProvider = resolveProvider(settings.provider, this.cloudChoices());
     const savedCloudModel = resolveCloudModel(savedProvider, settings.cloudModel, this.cloudChoices(), true);
-    const hasAllRoleAssignments = [
-      draft.clinicalModel,
-      draft.textExtractionModel,
-      draft.revisionModel,
-      draft.timelineModel,
-    ].every((modelName) => modelName.trim().length > 0);
-    const hasPendingChanges =
-      draft.useCloudServices !== settings.useCloudServices ||
+    return draft.useCloudServices !== settings.useCloudServices ||
       this.draftProvider() !== savedProvider ||
       (this.draftCloudModel() || '') !== (savedCloudModel || '') ||
       draft.clinicalModel !== settings.clinicalModel ||
       draft.textExtractionModel !== settings.textExtractionModel ||
       draft.revisionModel !== settings.revisionModel ||
       draft.timelineModel !== settings.timelineModel;
-
-    return (
-      this.isLoading() ||
-      this.isConfigurationSaving() ||
-      !hasPendingChanges ||
-      !hasAllRoleAssignments ||
-      (draft.useCloudServices && !this.draftCloudModel())
-    );
   });
-
+  readonly configurationSaveValidationMessage = computed(() => {
+    if (!this.isConfigurationDirty()) return '';
+    const draft = this.draftConfig();
+    const hasAllRoleAssignments = [
+      draft.clinicalModel,
+      draft.textExtractionModel,
+      draft.revisionModel,
+      draft.timelineModel,
+    ].every((modelName) => modelName.trim().length > 0);
+    if (!hasAllRoleAssignments) return 'Select a model for every role to save configuration automatically.';
+    const missingLocalModels = this.missingRequiredModels();
+    if (!draft.useCloudServices && missingLocalModels.length) {
+      return `Install selected local models to save automatically: ${missingLocalModels.join(', ')}.`;
+    }
+    if (draft.useCloudServices && !this.draftCloudModel()) return 'Select a cloud model to save automatically.';
+    return '';
+  });
+  readonly configurationSaveStatus = computed(() => {
+    if (this.isConfigurationSaving()) return 'Saving configuration...';
+    if (this.configurationSaveValidationMessage()) return this.configurationSaveValidationMessage();
+    if (this.isConfigurationDirty()) return 'Changes save automatically.';
+    return `Last saved: ${this.lastSavedLabel()}`;
+  });
   async ngOnInit(): Promise<void> {
     await this.loadModelConfig(true, true);
     this.applyPreviewDefaultState();
@@ -493,6 +509,18 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    const shouldSaveConfiguration =
+      !this.isConfigurationSaving() &&
+      this.isConfigurationDirty() &&
+      !this.configurationSaveValidationMessage();
+    this.clearConfigurationSaveTimer();
+    if (shouldSaveConfiguration) void this.handleSaveConfiguration();
+    const shouldSaveRag =
+      !this.isRagSaving() &&
+      this.isRagDirty() &&
+      !this.ragSettingsValidationMessage();
+    this.clearRagSaveTimer();
+    if (shouldSaveRag) void this.saveRagSettings();
     if (this.reasoningSaveTimer !== null) {
       clearTimeout(this.reasoningSaveTimer);
       this.reasoningSaveTimer = null;
@@ -549,16 +577,18 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     successMessage = '',
     syncDraft = true,
     operation: SaveOperation = 'configuration',
-  ): Promise<void> {
+  ): Promise<boolean> {
     const revision = ++this.saveRevisions[operation];
     this.savingOperations.update((current) => new Set(current).add(operation));
     try {
       const payload = await updateModelConfigState(patch);
-      if (revision !== this.saveRevisions[operation]) return;
+      if (revision !== this.saveRevisions[operation]) return false;
       this.applyPersistedConfigToState(payload, patch, syncDraft);
       this.statusMessage.set(successMessage);
+      return true;
     } catch (error) {
       this.statusMessage.set(formatUnknownError(error, 'Unable to save model settings.'));
+      return false;
     } finally {
       if (revision === this.saveRevisions[operation]) {
         this.savingOperations.update((current) => {
@@ -623,7 +653,9 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     if (!nextSettings) return;
     if ('rag_settings' in patch) {
       const nextRagSettings = this.ragSettings();
-      if (!this.ragSettingsModalOpen()) this.draftRagSettings.set({ ...nextRagSettings });
+      if (!this.ragSettingsModalOpen() && !this.isRagDirty()) {
+        this.draftRagSettings.set({ ...nextRagSettings });
+      }
     }
     this.previewCloudModelOverrides.update((previous) => ({
       ...previous,
@@ -723,6 +755,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       timelineModel: role === 'timeline' ? modelName : previous.timelineModel,
       cloudModel: previous.useCloudServices && !previous.cloudModel ? modelName : previous.cloudModel,
     }));
+    this.scheduleConfigurationSave();
   }
 
   handleCloudSwitchChange(value: boolean): void {
@@ -735,18 +768,23 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       revisionModel: '',
       timelineModel: '',
     }));
+    this.scheduleConfigurationSave();
   }
 
   openRagSettingsPanel(): void {
     this.draftRagSettings.set({ ...this.ragSettings() });
+    this.ragSettingsSaveError.set('');
     this.activeRagSettingsSection.set(DEFAULT_RAG_SETTINGS_SECTION);
     this.ragSettingsModalOpen.set(true);
   }
 
   closeRagSettingsPanel(): void {
+    this.clearRagSaveTimer();
+    if (this.isRagDirty() && !this.ragSettingsValidationMessage()) {
+      void this.saveRagSettings();
+    }
     this.ragSettingsModalOpen.set(false);
     this.activeRagSettingsSection.set(DEFAULT_RAG_SETTINGS_SECTION);
-    this.draftRagSettings.set({ ...this.ragSettings() });
   }
 
   setActiveRagSettingsSection(section: RagSettingsSectionKey): void {
@@ -770,6 +808,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       ...previous,
       [key]: Number.isFinite(parsed) ? Math.max(0, parsed) : 0,
     }));
+    this.onRagDraftChanged();
   }
 
   setDraftRagFloat(
@@ -781,6 +820,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       ...previous,
       [key]: Number.isFinite(parsed) ? Math.max(0, parsed) : 0,
     }));
+    this.onRagDraftChanged();
   }
 
   setDraftRagText(
@@ -791,6 +831,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       ...previous,
       [key]: value,
     }));
+    this.onRagDraftChanged();
   }
 
   setDraftRagBoolean(
@@ -804,20 +845,31 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       ...previous,
       [key]: value,
     }));
+    this.onRagDraftChanged();
   }
 
   async saveRagSettings(): Promise<void> {
-    if (this.ragSettingsValidationMessage()) return;
-    const draft = this.draftRagSettings() as DraftRagSettings & { embedding_device?: unknown };
+    this.clearRagSaveTimer();
+    if (
+      !this.isRagDirty() ||
+      this.isRagSaving() ||
+      this.ragSettingsValidationMessage()
+    ) return;
+    const draft = { ...this.draftRagSettings() } as DraftRagSettings & { embedding_device?: unknown };
     const { embedding_device: runtimeOnlyDevice, ...persistedRagSettings } = draft;
     void runtimeOnlyDevice;
-    await this.persistConfigPatch(
+    const saved = await this.persistConfigPatch(
       { rag_settings: persistedRagSettings },
       'RAG settings saved.',
       false,
       'rag',
     );
-    this.ragSettingsModalOpen.set(false);
+    if (!saved) {
+      this.ragSettingsSaveError.set(this.statusMessage() || 'Unable to save RAG settings.');
+      return;
+    }
+    this.ragSettingsSaveError.set('');
+    if (this.isRagDirty() && !this.ragSettingsValidationMessage()) this.scheduleRagSave();
   }
 
   handleProviderChange(provider: CloudProvider): void {
@@ -835,6 +887,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     this.modelSearchQuery.set('');
     this.resetVisibleModelLimit();
     void this.ensureSelectedCatalog();
+    this.scheduleConfigurationSave();
   }
 
   handleCloudModelChange(modelName: string): void {
@@ -843,6 +896,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       [this.draftProvider()]: modelName,
     }));
     this.draftConfig.update((previous) => ({ ...previous, cloudModel: modelName || null }));
+    this.scheduleConfigurationSave();
   }
 
   handleReasoningLevelChange(level: number): void {
@@ -859,6 +913,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   }
 
   async handleSaveConfiguration(): Promise<void> {
+    this.clearConfigurationSaveTimer();
     const draft = this.draftConfig();
     if ([
       draft.clinicalModel,
@@ -888,6 +943,51 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       'Configuration saved.',
       true,
     );
+  }
+
+  private scheduleConfigurationSave(): void {
+    this.clearConfigurationSaveTimer();
+    this.statusMessage.set('');
+    if (
+      !this.isConfigurationDirty() ||
+      this.configurationSaveValidationMessage() ||
+      this.isLoading() ||
+      this.isConfigurationSaving()
+    ) return;
+    this.configurationSaveTimer = setTimeout(() => {
+      this.configurationSaveTimer = null;
+      void this.handleSaveConfiguration();
+    }, MODEL_CONFIG_AUTOSAVE_DELAY_MS);
+  }
+
+  private scheduleRagSave(): void {
+    this.clearRagSaveTimer();
+    if (
+      !this.isRagDirty() ||
+      this.ragSettingsValidationMessage() ||
+      this.isLoading()
+    ) return;
+    this.ragSaveTimer = setTimeout(() => {
+      this.ragSaveTimer = null;
+      void this.saveRagSettings();
+    }, MODEL_CONFIG_AUTOSAVE_DELAY_MS);
+  }
+
+  private onRagDraftChanged(): void {
+    this.ragSettingsSaveError.set('');
+    this.scheduleRagSave();
+  }
+
+  private clearConfigurationSaveTimer(): void {
+    if (this.configurationSaveTimer === null) return;
+    clearTimeout(this.configurationSaveTimer);
+    this.configurationSaveTimer = null;
+  }
+
+  private clearRagSaveTimer(): void {
+    if (this.ragSaveTimer === null) return;
+    clearTimeout(this.ragSaveTimer);
+    this.ragSaveTimer = null;
   }
 
   openKeys(provider: AccessKeyProvider): void {

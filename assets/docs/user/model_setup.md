@@ -1,5 +1,5 @@
 # Model Setup
-Last updated: 2026-10-01
+Last updated: 2026-10-19
 
 Sampling settings are selected automatically according to the provider, model
 family, and operation. They are not user-configurable.
@@ -11,7 +11,7 @@ This page controls how the application calls a model during analysis. Expect con
 - local provider configuration
 - cloud provider configuration
 - model selection
-- saving or applying model settings
+- automatically saved model settings
 - provider access-key management where credentials are required
 
 Recommended workflow:
@@ -19,8 +19,11 @@ Recommended workflow:
 2. For local testing, select an Ollama-compatible model if available.
 3. Select a catalog model independently for the **Clinical**, **Text extraction**,
    **Revision**, and **Timeline** roles. A model may hold more than one role.
-4. Save or apply the configuration.
-5. Add and activate an access key if the provider requires one.
+4. Valid model assignments, reasoning preferences, and RAG settings save automatically
+   after a short pause. If a provider change clears the role assignments, select
+   a model for each role to complete and save the configuration.
+5. Add and activate an access key if the provider requires one. Key creation and
+   activation remain explicit actions in the access-key controls.
 
 ## Manage Access Keys
 Supported provider key operations currently cover:
