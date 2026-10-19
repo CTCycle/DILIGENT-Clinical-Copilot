@@ -20,6 +20,7 @@ Last updated: 2026-10-19
 - Status UI must use semantic text/background/border tokens and include text labels or icons where color conveys meaning.
 
 ## Component Rules
+- Primary buttons use a flat `--color-brand` fill (no gradient); their disabled state switches to the muted surface rather than only fading.
 - Buttons must have a visible hover state, visible `:focus-visible`, distinct disabled state, and comfortable hit area.
 - Icon-only actions use `--icon-action-size` and retain accessible names and tooltips.
 - Inputs must have associated labels or explicit ARIA labels, tokenized padding, and a visible focus state.

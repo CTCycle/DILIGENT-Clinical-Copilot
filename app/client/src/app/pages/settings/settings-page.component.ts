@@ -13,11 +13,11 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 })
 export class SettingsPageComponent {
   readonly navItems = [
-    { path: '/settings/general', label: 'General', description: 'Application runtime behavior' },
-    { path: '/settings/models', label: 'Models', description: 'Providers, roles, reasoning, and RAG' },
-    { path: '/settings/data', label: 'Data Processing', description: 'Drug-name ingestion limits' },
-    { path: '/settings/integrations', label: 'Integrations', description: 'LiverTox and RxNav runtime controls' },
-    { path: '/settings/matching', label: 'Drug Matching', description: 'Confidence, cache, and spelling controls' },
-    { path: '/settings/advanced', label: 'Advanced', description: 'Runtime timeouts and limits' },
+    { path: '/settings/general', label: 'General' },
+    { path: '/settings/models', label: 'Models' },
+    { path: '/settings/data', label: 'Data Processing' },
+    { path: '/settings/integrations', label: 'Integrations' },
+    { path: '/settings/matching', label: 'Drug Matching' },
+    { path: '/settings/advanced', label: 'Advanced' },
   ] as const;
 }

@@ -27,7 +27,6 @@
   line-height: 1.2;
 }
 
-.settings-navigation-heading p,
 .settings-environment-note {
   margin: 0;
   color: var(--color-text-secondary);
@@ -35,25 +34,19 @@
   line-height: 1.45;
 }
 
-.settings-kicker {
-  color: var(--color-text-muted);
-  font-size: var(--font-xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .settings-navigation-list {
   display: grid;
   gap: var(--space-xs);
-  margin: var(--space-xl) 0;
+  margin: var(--space-lg) 0;
 }
 
 .settings-navigation-link {
-  display: grid;
-  gap: var(--space-xs);
-  min-height: var(--control-height-lg);
-  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  align-items: center;
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-md);
+  font-size: var(--font-base);
+  font-weight: 600;
   border-left: 3px solid transparent;
   border-radius: var(--radius-md);
   color: var(--color-text-primary);
@@ -74,17 +67,6 @@
   border-left-color: var(--color-brand);
   background: var(--color-brand-bg);
   color: var(--color-brand);
-}
-
-.settings-navigation-link span {
-  font-size: var(--font-base);
-  font-weight: 600;
-}
-
-.settings-navigation-link small {
-  color: var(--color-text-secondary);
-  font-size: var(--font-xs);
-  line-height: 1.35;
 }
 
 .settings-environment-note {
