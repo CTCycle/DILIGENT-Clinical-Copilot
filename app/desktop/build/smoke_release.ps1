@@ -353,11 +353,52 @@ function Invoke-PortableSmoke(
                 }
             }
             $process = Start-DesktopProcess -executable $executable -isolatedRoot $isolatedRoot
-            $readyResult = Wait-ReadyPayload `
-                -readyPath $readyPath `
-                -expectedVersion $expectedVersion `
-                -previousWriteTimeUtc $previousWriteTimeUtc `
-                -previousPid $previousPid
+            try {
+                $readyResult = Wait-ReadyPayload `
+                    -readyPath $readyPath `
+                    -expectedVersion $expectedVersion `
+                    -previousWriteTimeUtc $previousWriteTimeUtc `
+                    -previousPid $previousPid
+            }
+            catch {
+                $readyFailure = $_.Exception.Message
+                $processExited = $null
+                $processExitCode = $null
+                $windowTitle = ''
+                try {
+                    $process.Refresh()
+                    $processExited = [bool]$process.HasExited
+                    if ($processExited) { $processExitCode = $process.ExitCode }
+                    $windowTitle = [string]$process.MainWindowTitle
+                }
+                catch {
+                }
+                $backendLogPath = Join-Path (Split-Path -Parent (Split-Path -Parent $readyPath)) 'cache/logs/desktop-backend.log'
+                $backendLogTail = ''
+                if (Test-Path -LiteralPath $backendLogPath -PathType Leaf) {
+                    try {
+                        $backendLogTail = (Get-Content -LiteralPath $backendLogPath -Tail 60 -ErrorAction Stop | Out-String).Trim()
+                    }
+                    catch {
+                        $backendLogTail = "Unable to read backend log: $($_.Exception.Message)"
+                    }
+                }
+                else {
+                    $backendLogTail = 'Backend log was not created.'
+                }
+                if ($backendLogTail.Length -gt 12000) {
+                    $backendLogTail = $backendLogTail.Substring($backendLogTail.Length - 12000)
+                }
+                $details = [ordered]@{
+                    wait_error = $readyFailure
+                    process_exited = $processExited
+                    process_exit_code = $processExitCode
+                    window_title = $windowTitle
+                    backend_log_path = $backendLogPath
+                    backend_log_tail = $backendLogTail
+                } | ConvertTo-Json -Compress -Depth 4
+                throw "Backend readiness failed: $details"
+            }
             $ready = $readyResult.Ready
             $port = [int]$ready.port
             $backendPid = [int]$ready.pid
