@@ -13,6 +13,9 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
+RELEASE_VERSION = json.loads(
+    (ROOT / "app" / "desktop" / "package.json").read_text(encoding="utf-8")
+)["version"]
 SHA = "a" * 40
 REPO = "CTCycle/DILIGENT-Clinical-Copilot"
 GATES = (
@@ -28,7 +31,7 @@ def _responses() -> dict:
     return {
         f"{base}/branches/main": {"commit": {"sha": SHA}},
         f"{base}/branches/develop": {"commit": {"sha": SHA}},
-        f"{base}/git/matching-refs/tags/v3.4.0": [],
+        f"{base}/git/matching-refs/tags/v{RELEASE_VERSION}": [],
         f"{base}/releases?per_page=100": None,
         f"{base}/environments/desktop-release": {
             "can_admins_bypass": False,
@@ -81,6 +84,7 @@ def _invoke(
         "RELEASE_TEST_RESPONSES": str(fixtures),
         "RELEASE_TEST_DIRECTORY": str(tmp_path),
         "RELEASE_TEST_ACTION": action,
+        "RELEASE_TEST_VERSION": RELEASE_VERSION,
     }
     # No network or mutation is allowed: an unexpected endpoint/method fails.
     command = r"""
@@ -93,7 +97,7 @@ def _invoke(
             $responses[$endpoint]
         }
         try {
-            & ./app/desktop/build/release_candidate.ps1 -Action $env:RELEASE_TEST_ACTION -Version 3.4.0 -CandidateRunId 123 -ArtifactDirectory $env:RELEASE_TEST_DIRECTORY
+            & ./app/desktop/build/release_candidate.ps1 -Action $env:RELEASE_TEST_ACTION -Version $env:RELEASE_TEST_VERSION -CandidateRunId 123 -ArtifactDirectory $env:RELEASE_TEST_DIRECTORY
         } catch {
             [Console]::Error.WriteLine($_.Exception.Message)
             exit 1
@@ -130,8 +134,8 @@ def test_release_rejects_incomplete_or_unrelated_evidence(
         responses[f"{base}/branches/develop"]["commit"]["sha"] = "c" * 40
         expected = "not synchronized"
     elif failure == "existing_tag":
-        responses[f"{base}/git/matching-refs/tags/v3.4.0"] = [
-            {"ref": "refs/tags/v3.4.0"}
+        responses[f"{base}/git/matching-refs/tags/v{RELEASE_VERSION}"] = [
+            {"ref": f"refs/tags/v{RELEASE_VERSION}"}
         ]
         expected = "already exists"
     elif failure == "wrong_run":
@@ -156,10 +160,10 @@ def test_release_rejects_modified_candidate_before_publication(tmp_path: Path) -
     qa.mkdir()
     smoke = qa / "smoke.json"
     smoke.write_text('{"success": true}', encoding="utf-8")
-    executable = "DILIGENT-v3.4.0-windows-x64-portable.exe"
+    executable = f"DILIGENT-v{RELEASE_VERSION}-windows-x64-portable.exe"
     (tmp_path / executable).write_bytes(b"tampered candidate")
     receipt = {
-        "version": "3.4.0",
+        "version": RELEASE_VERSION,
         "source_sha": SHA,
         "run_id": "123",
         "run_attempt": 1,
