@@ -64,7 +64,7 @@ export const SETTINGS_SECTION_DEFINITIONS: Record<
 > = {
   general: {
     title: 'General',
-    description: 'Application-wide runtime behavior applied to new background work.',
+    description: 'Application-wide runtime behavior.',
     fields: [
       {
         key: 'polling_interval',
@@ -81,7 +81,7 @@ export const SETTINGS_SECTION_DEFINITIONS: Record<
   },
   data: {
     title: 'Data Processing',
-    description: 'Ingestion, pipeline concurrency, and clinical language detection thresholds.',
+    description: 'Ingestion, concurrency, and language detection.',
     fields: [
       { key: 'drug_name_min_length', label: 'Minimum drug-name length', help: 'Shortest normalized drug name accepted during ingestion.', scope: 'Ingestion', kind: 'number', min: 1, max: 200, step: 1, unit: 'characters' },
       { key: 'drug_name_max_length', label: 'Maximum drug-name length', help: 'Longest normalized drug name accepted during ingestion.', scope: 'Ingestion', kind: 'number', min: 1, max: 1000, step: 1, unit: 'characters' },
@@ -101,7 +101,7 @@ export const SETTINGS_SECTION_DEFINITIONS: Record<
   },
   integrations: {
     title: 'Integrations',
-    description: 'Non-secret runtime controls for LiverTox and RxNav operations.',
+    description: 'LiverTox and RxNav controls.',
     fields: [
       { key: 'ncbi_contact_email', label: 'NCBI developer contact email', help: 'Contact address sent with NCBI automated requests. Use a valid developer or organization email registered with NCBI for production use. The bundled .local value is only a compatibility fallback.', scope: 'NCBI / LiverTox', kind: 'email' },
       { key: 'livertox_download_timeout', label: 'LiverTox download timeout', help: 'Maximum wait for a LiverTox download request.', scope: 'LiverTox', kind: 'number', min: 1, max: 3600, step: 1, unit: 'seconds' },
@@ -115,7 +115,7 @@ export const SETTINGS_SECTION_DEFINITIONS: Record<
   },
   matching: {
     title: 'Drug Matching',
-    description: 'Confidence thresholds, cache sizes, and spelling behavior for new matching work.',
+    description: 'Confidence, cache, and spelling.',
     fields: [
       { key: 'direct_confidence', label: 'Direct-match confidence', help: 'Confidence assigned to an exact catalog match.', scope: 'Matcher', kind: 'number', min: 0, max: 1, step: 0.01, unit: 'score' },
       { key: 'master_confidence', label: 'Master-list confidence', help: 'Confidence assigned to a trusted master-list match.', scope: 'Matcher', kind: 'number', min: 0, max: 1, step: 0.01, unit: 'score' },
@@ -135,7 +135,7 @@ export const SETTINGS_SECTION_DEFINITIONS: Record<
   },
   advanced: {
     title: 'Advanced',
-    description: 'Technical runtime budgets resolved dynamically for newly created model and evidence work.',
+    description: 'Timeouts and evidence limits.',
     fields: [
       { key: 'default_llm_timeout', label: 'Default LLM timeout', help: 'Base timeout used when a more specific budget does not apply.', scope: 'LLM runtime', kind: 'number', min: 1, max: 86400, step: 1, unit: 'seconds' },
       { key: 'parser_llm_timeout', label: 'Parser LLM timeout', help: 'Timeout budget used by new parser work.', scope: 'LLM runtime', kind: 'number', min: 1, max: 86400, step: 1, unit: 'seconds' },

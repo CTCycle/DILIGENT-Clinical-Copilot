@@ -3,9 +3,7 @@
 <main class="page-container settings-page">
   <aside class="settings-navigation" aria-label="Settings sections">
     <div class="settings-navigation-heading">
-      <span class="settings-kicker">Application</span>
       <h1>Settings</h1>
-      <p>Runtime controls persisted through the Settings UI.</p>
     </div>
 
     <nav class="settings-navigation-list">
@@ -17,14 +15,13 @@
           [routerLinkActiveOptions]="{ exact: true }"
           [ariaCurrentWhenActive]="'page'"
         >
-          <span>{{ item.label }}</span>
-          <small>{{ item.description }}</small>
+          {{ item.label }}
         </a>
       }
     </nav>
 
     <p class="settings-environment-note">
-      Environment and deployment configuration from <code>.env</code> is intentionally not editable here.
+      Environment, credentials, and deployment settings from <code>.env</code> are not editable here.
     </p>
   </aside>
 

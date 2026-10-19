@@ -28,7 +28,6 @@ import {
   formatUnknownError,
   normalizeVisitDateInput,
 } from '../../core/utils';
-import { formatAppDateOnly } from '../../core/utils/date-formatting';
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const STALL_THRESHOLD_MS = 600_000;
@@ -561,10 +560,6 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   get patientImageDataUrl(): string | null {
     return this.vm.form.patientImageDataUrl;
-  }
-
-  get recordedDateLabel(): string {
-    return formatAppDateOnly(this.vm.form.visitDate, 'Not set');
   }
 
 

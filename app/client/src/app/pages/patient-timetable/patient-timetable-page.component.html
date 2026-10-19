@@ -33,7 +33,6 @@
           <div class="generation-summary-heading">
             <span class="status-indicator" aria-hidden="true"></span>
             <div>
-              <span class="section-kicker">Timeline provenance</span>
               <h2 id="timeline-summary-title">{{ generationStatusLabel() }}</h2>
             </div>
           </div>
@@ -65,8 +64,7 @@
       <section class="review-toolbar" data-guidance-target="timeline-review-controls" aria-labelledby="review-toolbar-title">
         <div class="toolbar-heading">
           <div>
-            <span class="section-kicker">Review controls</span>
-            <h2 id="review-toolbar-title">Filter the timeline</h2>
+            <h2 id="review-toolbar-title">Filters</h2>
           </div>
           <app-help-popover
             ariaLabel="Explain timeline review controls"
@@ -104,7 +102,6 @@
               <div>
                 <span class="section-kicker">{{ rangeLabel() }}</span>
                 <h2 id="chronology-title">Clinical chronology</h2>
-                <p>Events are grouped by date, with same-day findings shown together.</p>
               </div>
               <div class="chronology-legend" aria-label="Event category legend">
                 <span><i class="legend-swatch is-clinical" aria-hidden="true"></i>Clinical</span>
@@ -208,8 +205,7 @@
         <aside class="evidence-panel" [class.is-open]="selectedEvent()" role="complementary" aria-label="Event inspector" aria-live="polite">
           <div class="evidence-panel-header">
             <div>
-              <span class="section-kicker">Event details</span>
-              <h2>Event inspector</h2>
+              <h2>Event details</h2>
             </div>
             <button type="button" class="icon-button" aria-label="Close event inspector" (click)="closeInspector()"><svg lucideX size="16" aria-hidden="true"></svg></button>
           </div>

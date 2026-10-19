@@ -3,13 +3,8 @@
 <section class="operational-settings-page">
   <header class="operational-settings-header">
     <div>
-      <span class="operational-settings-kicker">Runtime settings</span>
       <h2>{{ definition().title }}</h2>
       <p>{{ definition().description }}</p>
-    </div>
-    <div class="operational-settings-source" title="Authoritative runtime settings source">
-      <span>Source</span>
-      <code>Database / Settings UI</code>
     </div>
   </header>
 
@@ -135,8 +130,4 @@
       </footer>
     </form>
   }
-
-  <p class="operational-settings-boundary">
-    Environment variables, credentials, ports, database configuration, filesystem/bootstrap paths, and deployment settings are not part of this Settings surface.
-  </p>
 </section>
