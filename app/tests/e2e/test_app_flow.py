@@ -348,7 +348,7 @@ def test_model_config_navigation(page: Page, base_url: str):
     model_button = page.get_by_role("tab", name="Settings")
     expect(model_button).to_be_visible()
     model_button.click()
-    page.get_by_role("link", name=re.compile(r"^Models Providers")).click()
+    page.get_by_role("link", name="Models").click()
 
     expect(page).to_have_url(re.compile(r"/settings/models/?$"))
     expect(page.get_by_role("heading", name="Runtime Source")).to_be_visible()
@@ -367,7 +367,7 @@ def test_primary_navigation_restores_scroll_position(page: Page, base_url: str):
     page.get_by_role("tab", name="DILI Agent").click()
 
     expect(page).to_have_url(re.compile(r"/?$"))
-    expect(page.get_by_role("heading", name="Clinical Input")).to_be_visible()
+    expect(page.get_by_label("Clinical Input")).to_be_visible()
     assert page.evaluate("document.documentElement.scrollTop") < 1
 
 ###############################################################################
@@ -502,7 +502,7 @@ def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
             "Extracting therapy and medication data"
         )
         page.get_by_role("tab", name="Settings").click()
-        page.get_by_role("link", name=re.compile(r"^Models Providers")).click()
+        page.get_by_role("link", name="Models").click()
         expect(page).to_have_url(re.compile(r"/settings/models/?$"))
         page.wait_for_timeout(900)
         page.get_by_role("tab", name="DILI Agent").click()
@@ -859,7 +859,7 @@ def test_home_form_state_persists_across_back_forward_navigation(
     )
 
     page.get_by_role("tab", name="Settings").click()
-    page.get_by_role("link", name=re.compile(r"^Models Providers")).click()
+    page.get_by_role("link", name="Models").click()
     expect(page).to_have_url(re.compile(r"/settings/models/?$"))
 
     page.go_back()
