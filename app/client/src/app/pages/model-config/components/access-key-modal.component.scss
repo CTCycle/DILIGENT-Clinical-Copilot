@@ -113,12 +113,12 @@
 }
 
 .access-key-action {
-  width: 38px;
-  height: 38px;
+  width: var(--icon-action-size);
+  height: var(--icon-action-size);
   padding: 0;
   border: 1px solid rgba(148, 163, 184, 0.48);
-  border-radius: 10px;
-  background: #fff;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
   color: var(--color-text-secondary);
   display: inline-flex;
   align-items: center;
@@ -161,6 +161,11 @@
 .access-key-action.is-danger:hover:not(:disabled) {
   border-color: rgba(220, 38, 38, 0.42);
   background: rgba(254, 242, 242, 0.95);
+}
+
+.access-key-action:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .access-key-action:disabled {
