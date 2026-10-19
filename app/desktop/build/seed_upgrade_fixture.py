@@ -9,7 +9,7 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-# The harness supplies a git-archived, exact published v3.3.0 source directory.
+# The harness supplies a git-archived source directory from the published baseline.
 sys.path.insert(0, str(Path(sys.argv[1]).resolve()))
 
 from configurations.startup import get_server_settings  # noqa: E402
@@ -21,7 +21,7 @@ from repositories.serialization.application_configuration import (  # noqa: E402
 )
 
 
-def seed() -> None:
+def seed(baseline_version: str) -> None:
     settings = get_server_settings().database
     if settings.backend != "sqlite":
         raise RuntimeError("Upgrade seeding requires isolated SQLite storage.")
@@ -38,7 +38,7 @@ def seed() -> None:
             "drugs": "Amoxicillin 500 mg BID",
             "laboratory_analysis": "ALT 210 U/L; ALP 130 U/L.",
             "session_result_payload": {
-                "report": "Synthetic v3.3.0 upgrade preservation report.",
+                "report": f"Synthetic v{baseline_version} upgrade preservation report.",
                 "issues": [],
             },
         }
@@ -56,4 +56,4 @@ def seed() -> None:
 
 
 if __name__ == "__main__":
-    seed()
+    seed(sys.argv[2])
