@@ -452,7 +452,18 @@ def test_live_opencode_go_provider_and_browser_clinical_flow(
             _assert_secret_absent(first_error, provider_key, scope="revision failure")
             assert first_error.get("provider") == PROVIDER
             assert first_error.get("model") == MODEL
-            assert first_error.get("retryable") is True
+            failed_steps = [
+                {
+                    "step_name": step.get("step_name"),
+                    "error": step.get("error"),
+                }
+                for step in first_attempt["steps"]
+                if step.get("status") != "completed"
+            ]
+            assert first_error.get("retryable") is True, {
+                "revision_error": first_error,
+                "failed_steps": failed_steps,
+            }
 
             retry_response = api_context.post(
                 f"/api/inspection/sessions/revision/pipeline-runs/"
