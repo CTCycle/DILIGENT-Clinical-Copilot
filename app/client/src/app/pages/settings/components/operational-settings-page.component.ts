@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License, version 3 or later.
 
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -222,6 +222,8 @@ export function validateRuntimeSettingsSection(
   return '';
 }
 
+const SETTINGS_AUTOSAVE_DELAY_MS = 400;
+
 @Component({
   selector: 'app-operational-settings-page',
   standalone: true,
@@ -229,7 +231,7 @@ export function validateRuntimeSettingsSection(
   templateUrl: './operational-settings-page.component.html',
   styleUrl: './operational-settings-page.component.scss',
 })
-export class OperationalSettingsPageComponent implements OnInit {
+export class OperationalSettingsPageComponent implements OnInit, OnDestroy {
   readonly settingsState = inject(RuntimeSettingsStateService);
   private readonly route = inject(ActivatedRoute);
 
@@ -254,10 +256,16 @@ export class OperationalSettingsPageComponent implements OnInit {
   readonly canSave = computed(
     () => this.isDirty() && !this.isSaving() && !this.isResetting() && !this.validationMessage(),
   );
+  readonly autoSaveStatus = computed(() => {
+    if (!this.isDirty()) return '';
+    if (this.validationMessage()) return 'Changes need attention before they can be saved.';
+    return this.isSaving() ? 'Saving changes...' : 'Changes save automatically.';
+  });
   readonly updatedAtLabel = computed(() => {
     const updatedAt = this.settingsState.data()?.updated_at;
     return updatedAt ? formatAppDateTime(updatedAt, updatedAt) : 'Not available';
   });
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.route.data
@@ -265,6 +273,9 @@ export class OperationalSettingsPageComponent implements OnInit {
       .subscribe((data) => {
         const nextSection = data['settingsSection'];
         if (!isRuntimeSettingsCategory(nextSection)) return;
+        const shouldSaveCurrentSection = this.canSave();
+        this.clearSaveTimer();
+        if (shouldSaveCurrentSection) void this.save();
         this.section.set(nextSection);
         this.statusMessage.set('');
         this.syncDraft();
@@ -275,6 +286,12 @@ export class OperationalSettingsPageComponent implements OnInit {
     await this.loadSettings(false);
   }
 
+  ngOnDestroy(): void {
+    const shouldSaveCurrentSection = this.canSave();
+    this.clearSaveTimer();
+    if (shouldSaveCurrentSection) void this.save();
+  }
+
   fieldValue(field: SettingFieldDescriptor): number | string | boolean | null {
     const values = this.draft();
     if (!values) return null;
@@ -282,6 +299,7 @@ export class OperationalSettingsPageComponent implements OnInit {
   }
 
   updateField(field: SettingFieldDescriptor, rawValue: number | string | boolean | null): void {
+    if (this.isSaving() || this.isResetting()) return;
     const current = this.draft();
     if (!current) return;
     let value: number | string | boolean;
@@ -299,11 +317,7 @@ export class OperationalSettingsPageComponent implements OnInit {
     } as unknown as RuntimeCategorySettings;
     this.draft.set({ ...current, [category]: nextCategory } as RuntimeSettingsValues);
     this.statusMessage.set('');
-  }
-
-  discardChanges(): void {
-    this.syncDraft();
-    this.statusMessage.set('Changes discarded.');
+    this.scheduleSave();
   }
 
   async retryLoad(): Promise<void> {
@@ -313,6 +327,7 @@ export class OperationalSettingsPageComponent implements OnInit {
   async save(): Promise<void> {
     const values = this.draft();
     if (!values || !this.canSave()) return;
+    this.clearSaveTimer();
     const category = this.section();
     const payload = { [category]: { ...values[category] } } as RuntimeSettingsUpdateRequest;
 
@@ -320,15 +335,20 @@ export class OperationalSettingsPageComponent implements OnInit {
     try {
       await this.settingsState.update(payload);
       this.syncDraft();
-      this.statusMessage.set('Settings saved and applied to new runtime work.');
+      if (this.section() === category) {
+        this.statusMessage.set('Settings saved and applied to new runtime work.');
+      }
     } catch (error) {
-      this.statusMessage.set(formatUnknownError(error, 'Unable to save settings.'));
+      if (this.section() === category) {
+        this.statusMessage.set(formatUnknownError(error, 'Unable to save settings.'));
+      }
     } finally {
       this.isSaving.set(false);
     }
   }
 
   async resetToDefaults(): Promise<void> {
+    this.clearSaveTimer();
     if (this.isSaving() || this.isResetting()) return;
     this.isResetting.set(true);
     try {
@@ -355,5 +375,20 @@ export class OperationalSettingsPageComponent implements OnInit {
   private syncDraft(): void {
     const values = this.settingsState.data()?.values;
     if (values) this.draft.set(cloneValues(values));
+  }
+
+  private scheduleSave(): void {
+    this.clearSaveTimer();
+    if (!this.isDirty() || this.validationMessage()) return;
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      void this.save();
+    }, SETTINGS_AUTOSAVE_DELAY_MS);
+  }
+
+  private clearSaveTimer(): void {
+    if (this.saveTimer === null) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = null;
   }
 }

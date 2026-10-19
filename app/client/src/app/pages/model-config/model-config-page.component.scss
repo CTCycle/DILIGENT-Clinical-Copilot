@@ -790,8 +790,7 @@
   margin-bottom: 0;
 }
 
-.model-config-test-btn svg,
-.model-config-save-btn svg {
+.model-config-test-btn svg {
   width: 14px;
   height: 14px;
   fill: none;
@@ -935,25 +934,6 @@
   margin-top: auto;
   border-top: 1px solid color-mix(in srgb, var(--mc-border) 66%, transparent);
   padding-top: 18px;
-}
-
-.model-config-save-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  height: 40px;
-  min-height: 40px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--color-brand-ui);
-  color: var(--color-text-on-brand);
-  font-size: var(--font-sm);
-  font-weight: 800;
-}
-
-.model-config-save-btn:disabled {
-  opacity: 1;
 }
 
 .model-config-saved-note {
