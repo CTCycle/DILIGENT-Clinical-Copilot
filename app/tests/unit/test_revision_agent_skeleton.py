@@ -338,6 +338,35 @@ def test_revision_error_payload_persists_sanitized_provider_status() -> None:
     assert "provider_detail" not in payload
 
 ###############################################################################
+def test_structured_parse_failure_is_retryable_and_keeps_details_private() -> None:
+    runtime = RevisionAgentRuntime(
+        provider="opencode_go",
+        model="deepseek-v4-flash",
+    )
+    error = RuntimeError(
+        "Structured parsing failed: private-response-fragment did not match schema"
+    )
+
+    step_payload = revision_error_payload(error, runtime=runtime)
+    run_payload = revision_error_payload(
+        error,
+        runtime=runtime,
+        fallback_message="Revision processing failed. Retry the revision if needed.",
+    )
+
+    assert step_payload["retryable"] is True
+    assert step_payload["message"] == (
+        "The provider response did not match the required structure after repair."
+    )
+    assert run_payload["retryable"] is True
+    assert run_payload["message"] == (
+        "Revision processing failed. Retry the revision if needed."
+    )
+    assert step_payload["provider"] == runtime.provider
+    assert step_payload["model"] == runtime.model
+    assert "private-response-fragment" not in str(step_payload)
+
+###############################################################################
 def test_revision_context_exposes_exact_section_offsets_and_truncation_state() -> None:
     report = "# Summary\nSupported.\n\n## Global Conclusion\nReview required.\n\n# Follow-up\nPending."
     context = build_revision_context(

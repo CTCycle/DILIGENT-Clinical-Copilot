@@ -23,6 +23,10 @@ Retries are allowed only for transient failures and must define:
 - backoff policy
 - hard stop condition
 
+After structured-output repair attempts are exhausted, a model-generated schema
+failure may be marked retryable for an explicit revision retry. Persist a generic
+message for that failure; do not expose the rejected model output.
+
 OpenAI JSON mode requests must include an explicit JSON instruction in the
 request messages/instructions. Structured validation remains authoritative;
 invalid fallback output must never silently replace deterministic clinical facts.
