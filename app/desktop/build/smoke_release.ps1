@@ -375,7 +375,7 @@ function Invoke-PortableSmoke(
                 throw "$label window title was '$windowTitle', expected 'DILIGENT Clinical Copilot'."
             }
             if ($launchIndex -eq 1) {
-                $runtimeCache = if ($expectedVersion -eq $UpgradeFromVersion -and $expectedVersion -ne $Version) { 'runtime' } else { 'rt' }
+                $runtimeCache = 'rt'
                 $runtimeRoot = Join-Path $isolatedRoot "DILIGENT/$runtimeCache/$expectedVersion"
                 $extractionMarker = Get-ChildItem -LiteralPath $runtimeRoot -Filter 'extraction.complete' -File -Recurse -ErrorAction SilentlyContinue |
                     Select-Object -First 1
@@ -474,7 +474,7 @@ function Invoke-UpgradeFixture([string]$upgradeRoot, [switch]$Seed, [switch]$Cap
         $baselineSource = Join-Path $smokeRoot 'baseline-source'
         Expand-Archive -LiteralPath $archive -DestinationPath $baselineSource
         $sourceRoot = Join-Path $baselineSource 'app/server'
-        $baselineMarker = Get-ChildItem -LiteralPath (Join-Path $upgradeRoot "DILIGENT/runtime/$UpgradeFromVersion") -Filter extraction.complete -File -Recurse | Select-Object -First 1
+        $baselineMarker = Get-ChildItem -LiteralPath (Join-Path $upgradeRoot "DILIGENT/rt/$UpgradeFromVersion") -Filter extraction.complete -File -Recurse | Select-Object -First 1
         if ($null -eq $baselineMarker) { throw 'The baseline application runtime was not extracted.' }
         $environment = @{
             DILIGENT_SQLITE_PATH = $database; DATABASE_SQLITE_PATH = $database
