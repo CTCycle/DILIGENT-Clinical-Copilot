@@ -88,7 +88,7 @@ h4 {
 
 h1 {
   margin: 0;
-  font-size: clamp(var(--font-2xl), 4vw, 40px);
+  font-size: clamp(var(--font-2xl), 3vw, var(--font-3xl));
   line-height: 1.12;
   letter-spacing: -0.02em;
 }
@@ -928,6 +928,7 @@ button:disabled {
 
 /* Keep session context and generation provenance visually within one enterprise panel. */
 .timetable-header {
+  padding: var(--space-2xl);
   border-bottom-color: var(--color-divider);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   box-shadow: none;
@@ -935,12 +936,17 @@ button:disabled {
 
 .generation-summary {
   margin-top: 0;
-  padding: var(--space-xl) var(--space-3xl);
+  gap: var(--space-xl);
+  padding: var(--space-xl) var(--space-2xl);
   border-top: 0;
   border-color: var(--color-border-subtle);
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
   background: color-mix(in srgb, var(--color-surface-alt) 38%, var(--color-surface));
   box-shadow: var(--shadow-sm);
+}
+
+.generation-summary > .generation-summary-main > p {
+  margin-top: var(--space-sm);
 }
 
 .generation-summary.is-warning {

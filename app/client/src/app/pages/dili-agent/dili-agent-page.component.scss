@@ -13,7 +13,7 @@
   gap: var(--space-md);
   align-items: start;
   margin-top: var(--space-lg);
-  padding: 0;
+  padding: var(--space-sm) 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -23,9 +23,9 @@
 }
 
 .stitch-dili-rag-toggle input {
-  width: 1rem;
-  height: 1rem;
-  margin-top: 0.125rem;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
 }
 
 .stitch-dili-rag-toggle span {

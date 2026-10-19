@@ -9,16 +9,27 @@
   align-items: center;
   align-content: center;
   gap: var(--space-sm);
+  min-width: 0;
   min-height: var(--control-height-md);
   height: auto;
   margin-bottom: var(--space-md);
   padding: var(--space-xs) 0 var(--space-sm);
   border-bottom: 1px solid var(--color-divider);
   background: transparent;
-  overflow-x: auto;
-  overflow-y: visible;
-  scrollbar-width: thin;
   white-space: nowrap;
+}
+
+.clinical-session-toolbar-scroll {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-sm);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 3px;
+  margin: -3px;
+  scrollbar-width: thin;
 }
 
 .clinical-session-toolbar-group {
@@ -53,6 +64,14 @@
 
 .clinical-session-toolbar-group-standalone { margin-left: auto; }
 .clinical-session-toolbar-group-editing { height: var(--control-height-sm); overflow: visible; }
+
+.clinical-session-save-group {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding-left: var(--space-sm);
+  border-left: 1px solid var(--color-divider);
+}
 
 .clinical-session-editor-toolbar button {
   display: inline-flex;
