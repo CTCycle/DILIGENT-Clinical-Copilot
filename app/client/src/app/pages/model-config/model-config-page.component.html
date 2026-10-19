@@ -456,11 +456,9 @@
         </section>
 
         <div class="model-config-summary-actions">
-          <button class="btn btn-primary model-config-save-btn" type="button" (click)="handleSaveConfiguration()" [disabled]="saveDisabled()">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.75h12.25L19.25 7v12.25H4.75V4.75H5Z" /><path d="M8 4.75v5h7v-5M8 15h8" /></svg>
-            {{ isConfigurationSaving() ? 'Saving...' : 'Save Configuration' }}
-          </button>
-          <small class="model-config-saved-note">Last saved: {{ lastSavedLabel() }}</small>
+          <small class="model-config-saved-note" role="status" aria-live="polite">
+            {{ configurationSaveStatus() }}
+          </small>
         </div>
       </aside>
     </div>
@@ -733,12 +731,15 @@
     </div>
 
     <div modal-footer class="model-config-rag-modal-footer">
-      <span [class.is-error]="ragSettingsValidationMessage()">{{ ragSettingsValidationMessage() || 'Ready to save.' }}</span>
+      <span
+        [class.is-error]="!!ragSettingsValidationMessage() || !!ragSettingsSaveError()"
+        role="status"
+        aria-live="polite"
+      >
+        {{ ragSettingsStatus() }}
+      </span>
       <div>
-        <button type="button" class="model-config-rag-modal-primary" (click)="saveRagSettings()" [disabled]="ragSettingsSaveDisabled()">
-          {{ isRagSaving() ? 'Saving...' : 'Save settings' }}
-        </button>
-        <button type="button" class="model-config-rag-modal-secondary" (click)="closeRagSettingsPanel()">Cancel</button>
+        <button type="button" class="model-config-rag-modal-secondary" (click)="closeRagSettingsPanel()">Done</button>
       </div>
     </div>
   </app-modal-shell>

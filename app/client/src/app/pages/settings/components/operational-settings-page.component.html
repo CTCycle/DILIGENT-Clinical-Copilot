@@ -99,7 +99,7 @@
         <div class="operational-settings-meta">
           <span>Last persisted: {{ updatedAtLabel() }}</span>
           @if (isDirty()) {
-            <strong>Unsaved changes</strong>
+            <strong>{{ autoSaveStatus() }}</strong>
           }
         </div>
         <div class="operational-settings-buttons">
@@ -110,21 +110,6 @@
             [disabled]="isSaving() || isResetting()"
           >
             {{ isResetting() ? 'Resetting...' : 'Reset to defaults' }}
-          </button>
-          <button
-            type="button"
-            class="btn btn-secondary settings-secondary-button"
-            (click)="discardChanges()"
-            [disabled]="!isDirty() || isSaving() || isResetting()"
-          >
-            Discard
-          </button>
-          <button
-            type="submit"
-            class="btn btn-primary settings-primary-button"
-            [disabled]="!canSave()"
-          >
-            {{ isSaving() ? 'Saving...' : 'Save changes' }}
           </button>
         </div>
       </footer>

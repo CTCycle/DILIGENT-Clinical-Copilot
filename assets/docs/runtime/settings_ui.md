@@ -1,5 +1,5 @@
 # Runtime Settings UI
-Last updated: 2026-10-18
+Last updated: 2026-10-19
 
 ## Scope
 
@@ -76,6 +76,13 @@ Controls are typed numeric, boolean, email, text, or select inputs. Backend mode
 enforce bounds and relationships such as drug-name minimum/maximum lengths,
 language confidence ordering, selected retrieval documents not exceeding
 candidate documents, and timeout caps not falling below the minimum timeout.
+
+Valid edits in operational Settings categories are persisted automatically after
+a short pause. Cross-field or field-level validation errors keep the current
+draft unsaved until corrected. The Models page also saves valid provider, model,
+reasoning, and RAG changes automatically; provider/model changes that do not yet
+assign all required roles remain pending with guidance in the page. Reset to
+defaults persists the selected operational category immediately.
 
 The Integrations category includes `ncbi_contact_email`. The value is trimmed
 and validated as a basic developer email address, then persisted in the
