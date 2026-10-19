@@ -108,8 +108,12 @@ def revision_error_payload(
         candidate = getattr(response, "status_code", None)
         status_code = candidate if isinstance(candidate, int) else None
     retryable = getattr(exc, "retryable", None)
+    structured_parse_failure = (
+        isinstance(exc, RuntimeError)
+        and str(exc).startswith("Structured parsing failed:")
+    )
     if retryable is None:
-        retryable = bool(
+        retryable = structured_parse_failure or bool(
             isinstance(status_code, int)
             and (status_code in {408, 409, 425, 429} or status_code >= 500)
         )
@@ -130,7 +134,12 @@ def revision_error_payload(
             status_code,
         )
     )
-    if fallback_message and not has_exception_metadata:
+    if structured_parse_failure:
+        message = (
+            fallback_message
+            or "The provider response did not match the required structure after repair."
+        )
+    elif fallback_message and not has_exception_metadata:
         if runtime is None:
             return {"message": fallback_message}
         message = fallback_message
