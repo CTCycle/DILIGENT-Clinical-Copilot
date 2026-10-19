@@ -121,12 +121,19 @@ def revision_error_payload(
             message = str(exc)
     else:
         message = str(exc)
-    has_provider_metadata = any(
+    has_exception_metadata = any(
         value is not None
-        for value in (provider, model, getattr(exc, "error_code", None), status_code)
+        for value in (
+            getattr(exc, "provider", None),
+            getattr(exc, "model", None),
+            getattr(exc, "error_code", None),
+            status_code,
+        )
     )
-    if not has_provider_metadata and fallback_message:
-        return {"message": fallback_message}
+    if fallback_message and not has_exception_metadata:
+        if runtime is None:
+            return {"message": fallback_message}
+        message = fallback_message
     payload: dict[str, Any] = {
         "message": _sanitize_error_message(message),
         "error_type": type(exc).__name__,

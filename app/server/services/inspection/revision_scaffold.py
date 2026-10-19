@@ -10,6 +10,7 @@ from domain.inspection import SessionRevisionRequest
 from services.inspection.revision_agent import (
     REVISION_PROVIDER_MAX_RETRIES,
     RevisionAgentCancelled,
+    RevisionAgentRuntime,
     revision_error_payload,
     resolve_revision_agent_runtime,
 )
@@ -44,6 +45,16 @@ class InspectionRevisionScaffoldMixin:
     def _run_revision_agent(self, **kwargs: Any) -> dict[str, Any]:
         pipeline_run_id = str(kwargs["pipeline_run_id"])
         job_id = str(kwargs["job_id"])
+        model_configuration = kwargs.get("model_configuration")
+        runtime: RevisionAgentRuntime | None = None
+        if isinstance(model_configuration, dict):
+            provider = model_configuration.get("model_provider")
+            model = model_configuration.get("model_name")
+            if provider and model:
+                runtime = RevisionAgentRuntime(
+                    provider=str(provider),
+                    model=str(model),
+                )
         kwargs["stop_check"] = lambda: self.jobs.should_stop(job_id)
         kwargs["progress_update"] = lambda patch: self.jobs.update_result(
             job_id,
@@ -61,6 +72,7 @@ class InspectionRevisionScaffoldMixin:
                 pipeline_run_id=pipeline_run_id,
                 error=revision_error_payload(
                     exc,
+                    runtime=runtime,
                     fallback_message=(
                         "Revision processing failed. Retry the revision if needed."
                     ),
