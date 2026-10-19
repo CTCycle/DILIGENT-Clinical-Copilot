@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-10-18
+Last updated: 2026-10-19
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
@@ -58,6 +58,14 @@ resolved from the repository root. The embedded SQLite database defaults to
 `<data-root>/database.db`; an explicit `DILIGENT_SQLITE_PATH` still takes
 precedence. Packaged desktop mode uses `DILIGENT_RUNTIME_ROOT` and
 `DILIGENT_DATA_ROOT` instead.
+
+At startup, the backend migrates known mutable entries from the former
+`resources` layout into the active `data` root. Packaged mode checks
+`<data-root>/resources`; source mode checks the repository `resources` path
+only when using the default `data` root. An explicit source-mode data-root
+override is left independent. The migration preflights destination conflicts,
+does not follow symbolic links, and stops without moving data if it finds a
+conflict; identical duplicate files are removed from the legacy location.
 
 ## Operational Settings By Source
 - `settings/.env`
