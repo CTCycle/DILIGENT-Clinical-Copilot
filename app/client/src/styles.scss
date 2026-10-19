@@ -11,18 +11,18 @@
   --focus-ring-offset: 2px;
 
   /* Colors */
-  --color-brand: #036c55;
-  --color-brand-light: #9ef3d6;
-  --color-brand-ui: #036c55;
-  --color-brand-ui-light: #9ef3d6;
+  --color-brand: #0f7d5a;
+  --color-brand-light: #8edfbf;
+  --color-brand-ui: #0f7d5a;
+  --color-brand-ui-light: #8edfbf;
   --color-text-on-brand: #ffffff;
-  --color-brand-bg: rgba(3, 108, 85, 0.08);
+  --color-brand-bg: rgba(15, 125, 90, 0.1);
   --color-text-primary: #2d3433;
   --color-text-secondary: #596060;
   --color-text-muted: #757c7b;
   --color-text-subtle: #acb3b2;
   --color-surface: #ffffff;
-  --color-surface-alt: #f0f4f3;
+  --color-surface-alt: #e8f0eb;
   --color-border: #acb3b2;
   --color-border-subtle: rgba(172, 179, 178, 0.2);
   --color-divider: #dde4e3;
@@ -84,7 +84,8 @@
 
   /* Background */
   --app-background:
-    radial-gradient(circle at top left, #f0f4f3 0%, #f8faf9 100%);
+    radial-gradient(118% 92% at 0% 0%, rgba(80, 181, 143, 0.22) 0%, rgba(80, 181, 143, 0) 68%),
+    linear-gradient(150deg, #f7fbf9 0%, #eef6f2 58%, #e8f3ed 100%);
   color: var(--color-text-primary);
 }
 
@@ -3496,18 +3497,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* ============================================
    UI Refresh Overrides
    ============================================ */
-:root {
-  --color-brand: #0f7d5a;
-  --color-brand-light: #8edfbf;
-  --color-brand-ui: #0f7d5a;
-  --color-brand-ui-light: #8edfbf;
-  --color-brand-bg: rgba(15, 125, 90, 0.1);
-  --color-surface-alt: #e8f0eb;
-  --app-background:
-    radial-gradient(118% 92% at 0% 0%, rgba(80, 181, 143, 0.22) 0%, rgba(80, 181, 143, 0) 68%),
-    linear-gradient(150deg, #f7fbf9 0%, #eef6f2 58%, #e8f3ed 100%);
-}
-
 .stitch-dili-heading h1 {
   font-size: clamp(30px, 2.75vw, 35px);
   letter-spacing: -0.012em;
@@ -3554,7 +3543,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stitch-dili-controls .toggle-label {
-  font-size: 15px;
+  font-size: var(--font-base);
   font-weight: 650;
 }
 
@@ -4884,7 +4873,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .model-config-local-row .model-config-model-description {
-  font-size: 0.875rem;
+  font-size: var(--font-base);
   line-height: 1.25;
 }
 
@@ -5077,7 +5066,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .model-config-header-compact .lede {
-  font-size: 13px;
+  font-size: var(--font-base);
   line-height: 1.45;
 }
 

@@ -123,8 +123,8 @@
 .model-config-rag-settings-btn {
   display: inline-grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: var(--icon-action-size);
+  height: var(--icon-action-size);
   border: 1px solid var(--mc-border);
   border-radius: var(--radius-sm);
   background: var(--mc-surface-soft);
@@ -184,7 +184,7 @@
   border: 1px solid var(--mc-border-strong);
   border-radius: 50%;
   color: var(--mc-muted);
-  font-size: 10px;
+  font-size: var(--font-xs);
   font-style: normal;
   line-height: 1;
   text-align: center;
@@ -332,7 +332,7 @@
 .model-config-cloud-row select,
 .model-config-temperature-input {
   width: 100%;
-  min-height: 38px;
+  min-height: var(--control-height-sm);
   border: 1px solid var(--mc-border);
   border-radius: var(--radius-sm);
   background: var(--mc-surface);
@@ -360,8 +360,9 @@
 .model-config-catalog-refresh {
   display: inline-grid;
   place-items: center;
-  width: 38px;
-  min-height: 38px;
+  width: var(--control-height-sm);
+  min-height: var(--control-height-sm);
+  font-size: var(--font-sm);
   padding: 0;
   border: 1px solid var(--mc-border);
   border-radius: var(--radius-sm);
@@ -440,7 +441,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-height: 34px;
+  min-height: var(--control-height-sm);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: var(--mc-surface-soft);
@@ -785,7 +786,7 @@
 
 .model-config-provider-name strong {
   color: var(--mc-text);
-  font-size: 13px;
+  font-size: var(--font-base);
 }
 
 .model-config-provider-name small {
@@ -799,7 +800,7 @@
   justify-content: center;
   gap: 8px;
   min-width: 180px;
-  min-height: 38px;
+  min-height: var(--control-height-sm);
   border: 1px solid var(--mc-border-strong);
   border-radius: var(--radius-sm);
   background: var(--mc-surface);
