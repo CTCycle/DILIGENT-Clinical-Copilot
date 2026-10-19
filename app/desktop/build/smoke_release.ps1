@@ -11,7 +11,7 @@ param(
     [switch]$InstallMsi,
     [switch]$TestUpgrade,
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$UpgradeFromVersion = '3.3.0',
+    [string]$UpgradeFromVersion = '3.4.0',
     [string]$PreviousMsiPath,
     [string]$PreviousChecksumPath,
     [switch]$RequireUnsigned,
@@ -489,7 +489,7 @@ function Invoke-UpgradeFixture([string]$upgradeRoot, [switch]$Seed, [switch]$Cap
                 $saved[$key] = [Environment]::GetEnvironmentVariable($key)
                 [Environment]::SetEnvironmentVariable($key, $environment[$key])
             }
-            & $python (Join-Path $PSScriptRoot 'seed_upgrade_fixture.py') $sourceRoot
+            & $python (Join-Path $PSScriptRoot 'seed_upgrade_fixture.py') $sourceRoot $UpgradeFromVersion
             if ($LASTEXITCODE -ne 0) { throw 'Baseline application repository seeding failed.' }
         }
         finally {
