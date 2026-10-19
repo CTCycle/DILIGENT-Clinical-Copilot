@@ -87,6 +87,11 @@
   line-height: 1.4;
 }
 
+.operational-setting-copy small {
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+}
+
 .operational-setting-copy code {
   width: fit-content;
   color: var(--color-text-muted);

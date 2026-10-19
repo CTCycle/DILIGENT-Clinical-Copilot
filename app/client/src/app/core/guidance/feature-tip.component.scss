@@ -25,7 +25,7 @@
   height: 30px;
   border-radius: 50%;
   background: var(--color-brand);
-  color: #fff;
+  color: var(--color-text-on-brand);
   font-size: var(--font-md);
 }
 
@@ -81,7 +81,7 @@
 .guidance-feature-tip-action {
   border: 1px solid var(--color-brand);
   background: var(--color-brand);
-  color: #fff;
+  color: var(--color-text-on-brand);
 }
 
 .guidance-feature-tip-action:hover {
