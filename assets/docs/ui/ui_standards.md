@@ -1,5 +1,5 @@
 # UI Standards
-Last updated: 2026-10-18
+Last updated: 2026-10-19
 
 ## Spacing Scale
 - Use the root spacing tokens from `app/client/src/styles.scss`: `--space-xs` through `--space-3xl`.
@@ -21,8 +21,11 @@ Last updated: 2026-10-18
 
 ## Component Rules
 - Buttons must have a visible hover state, visible `:focus-visible`, distinct disabled state, and comfortable hit area.
+- Icon-only actions use `--icon-action-size` and retain accessible names and tooltips.
 - Inputs must have associated labels or explicit ARIA labels, tokenized padding, and a visible focus state.
+- Instructional placeholder text uses the theme text tokens at full opacity.
 - Use `ModalShellComponent` for app dialogs unless a page has a documented specialized modal pattern.
+- Modal content uses an opaque theme surface; the overlay provides background dimming.
 - Tabs and dense navigation remain desktop-oriented and must not clip labels at the supported minimum width of `1100px`.
 - Cards and panels should use `--radius-sm` through `--radius-xl` and `--shadow-sm` through `--shadow-lg`.
 

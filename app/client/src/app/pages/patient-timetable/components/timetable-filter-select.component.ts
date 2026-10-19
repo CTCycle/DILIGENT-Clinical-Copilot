@@ -26,6 +26,45 @@ export type TimetableFilterOption = Readonly<{
       :host {
         display: contents;
       }
+
+      .toolbar-group {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-xs);
+        min-width: 160px;
+        color: var(--color-text-secondary);
+        font-size: var(--font-sm);
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      select {
+        width: 100%;
+        min-width: 0;
+        min-height: var(--control-height-md);
+        padding: var(--space-sm) var(--space-md);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        background: var(--color-surface);
+        color: var(--color-text-primary);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      select:hover:not(:disabled) {
+        border-color: var(--color-brand);
+      }
+
+      select:focus-visible {
+        outline: var(--focus-ring);
+        outline-offset: var(--focus-ring-offset);
+      }
+
+      select:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
     `,
   ],
 })

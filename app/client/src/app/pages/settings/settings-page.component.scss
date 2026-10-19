@@ -15,7 +15,7 @@
 
 .settings-navigation {
   position: sticky;
-  top: calc(var(--app-top-nav-height) + var(--space-md));
+  top: var(--space-2xl);
   min-width: 0;
   padding-right: var(--space-lg);
   border-right: 1px solid var(--color-divider);

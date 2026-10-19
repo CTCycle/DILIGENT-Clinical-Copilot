@@ -640,10 +640,10 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  width: 30px;
-  min-width: 30px;
-  height: 30px;
-  min-height: 30px;
+  width: var(--icon-action-size);
+  min-width: var(--icon-action-size);
+  height: var(--icon-action-size);
+  min-height: var(--icon-action-size);
   border: 1px solid var(--mc-border-strong);
   border-radius: var(--radius-sm);
   background: var(--mc-surface);
@@ -670,8 +670,8 @@
 .model-config-action-btn svg,
 :host ::ng-deep .model-config-role-action svg {
   flex: none;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -680,8 +680,8 @@
 }
 
 :host ::ng-deep .model-config-role-action {
-  width: 30px;
-  min-width: 30px;
+  width: var(--icon-action-size);
+  min-width: var(--icon-action-size);
   max-width: none;
   padding: 0;
   line-height: 1.1;
