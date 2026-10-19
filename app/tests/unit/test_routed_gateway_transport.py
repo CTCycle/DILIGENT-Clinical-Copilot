@@ -111,7 +111,7 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
     headers = captured["default_headers"]
     assert isinstance(headers, dict)
     assert headers["x-opencode-session"]
-    assert headers["User-Agent"] == "diligent-clinical-copilot/3.4.0"
+    assert headers["User-Agent"] == "diligent-clinical-copilot/3.5.0"
     assert "clinical prompt" not in caplog.text
     assert "route_source=documented_opencode_go_route@2026-09-14" in caplog.text
     assert "Cloud chat request attempted" in caplog.text
