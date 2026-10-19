@@ -2870,7 +2870,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  min-height: 38px;
+  min-height: var(--control-height-sm);
   padding: 8px 10px;
   font-size: var(--font-sm);
   font-weight: 600;
