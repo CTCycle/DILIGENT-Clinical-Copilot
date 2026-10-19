@@ -15,6 +15,7 @@
   --color-brand-light: #9ef3d6;
   --color-brand-ui: #036c55;
   --color-brand-ui-light: #9ef3d6;
+  --color-text-on-brand: #ffffff;
   --color-brand-bg: rgba(3, 108, 85, 0.08);
   --color-text-primary: #2d3433;
   --color-text-secondary: #596060;
@@ -93,6 +94,7 @@
   --color-brand-light: #4ade80;
   --color-brand-ui: #0e6c47;
   --color-brand-ui-light: #14945f;
+  --color-text-on-brand: #05291c;
   --color-brand-bg: rgba(34, 197, 94, 0.14);
   --color-text-primary: #e2e8f0;
   --color-text-secondary: #cbd5e1;
@@ -348,9 +350,9 @@ app-root {
 }
 
 .stitch-dili-input-unified::placeholder {
-  color: color-mix(in srgb, var(--color-text-secondary) 72%, transparent);
-  opacity: 0.72;
-  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  opacity: 1;
+  font-size: var(--font-base);
   line-height: 1.6;
 }
 
@@ -2063,6 +2065,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   overflow: hidden;
 }
 
+.modal-container.guidance-tips-modal {
+  --modal-max-width: 640px;
+}
+
 .preflight-modal .modal-body {
   min-height: 0;
   overflow: hidden;
@@ -2220,6 +2226,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-radius: var(--radius-sm);
   background: rgba(248, 250, 252, 0.8);
   font-size: var(--font-sm);
+}
+
+:root[data-theme="dark"] .access-key-empty {
+  border-color: var(--color-border-subtle);
+  background: var(--color-surface-alt);
 }
 
 .access-key-list {
@@ -2769,7 +2780,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  --inspection-control-height: 32px;
+  --inspection-control-height: var(--control-height-sm);
   --inspection-icon-action-size: 38px;
 }
 
@@ -3126,7 +3137,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: color-mix(in srgb, var(--color-brand) 14%, var(--color-surface));
   border-bottom-color: color-mix(in srgb, var(--color-brand) 34%, var(--color-divider));
   z-index: 1;
-  font-size: var(--font-xs);
+  font-size: var(--font-sm);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -3266,8 +3277,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-mini-btn {
   min-height: var(--inspection-control-height);
-  padding: 4px 9px;
-  font-size: var(--font-xs);
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--font-sm);
 }
 
 .inspection-widget .field {
@@ -3528,7 +3539,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stitch-dili-inline-fields {
-  gap: 6px;
+  gap: var(--space-sm);
 }
 
 .stitch-dili-inline-fields .field label {
@@ -3537,7 +3548,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .stitch-dili-inline-fields .field input[type="text"],
 .stitch-dili-inline-fields .field input[type="date"] {
-  min-height: 32px;
+  min-height: var(--control-height-sm);
   padding-top: 6px;
   padding-bottom: 6px;
 }
@@ -3729,6 +3740,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 :root[data-theme="dark"] .report-shell {
   background: rgba(15, 23, 42, 0.72);
   border-color: rgba(71, 85, 105, 0.58);
+}
+
+:root[data-theme="dark"] .modal-container {
+  background: var(--color-surface);
+  border-color: var(--color-border);
 }
 
 :root[data-theme="dark"] .report-toolbar,
@@ -3962,6 +3978,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-widget-header {
   align-items: center;
+  gap: var(--space-md);
 }
 
 .inspection-controls-half {
@@ -4471,6 +4488,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
 }
 
+:root[data-theme="dark"] .stitch-dili-actions .btn-primary {
+  color: var(--color-text-on-brand);
+}
+
 .stitch-dili-actions .btn:disabled {
   color: var(--color-text-muted);
   background: var(--color-surface-alt);
@@ -4640,7 +4661,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 :root[data-theme="dark"] .stitch-dili-workbench textarea::placeholder {
-  color: #91a8b0;
+  color: var(--color-text-secondary);
+  opacity: 1;
 }
 
 :root[data-theme="dark"] .stitch-dili-patient h3,
@@ -5562,11 +5584,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-preview-a-layout .model-config-action-btn,
 .model-config-page .model-config-preview-a-layout .model-config-role-action {
-  width: 30px;
-  min-width: 30px;
-  max-width: 30px;
-  height: 30px;
-  min-height: 30px;
+  width: var(--icon-action-size);
+  min-width: var(--icon-action-size);
+  max-width: var(--icon-action-size);
+  height: var(--icon-action-size);
+  min-height: var(--icon-action-size);
   padding-right: 0;
   padding-left: 0;
   font-size: var(--font-xs);
@@ -5597,9 +5619,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-role-action {
-  width: 30px;
-  min-width: 30px;
-  max-width: 30px;
+  width: var(--icon-action-size);
+  min-width: var(--icon-action-size);
+  max-width: var(--icon-action-size);
   white-space: nowrap;
 }
 
@@ -6104,7 +6126,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .app-main .model-config-page .model-config-control-rail > app-model-config-toggle-card {
+  .app-main .model-config-page .model-config-control-rail > .model-config-runtime-card {
     grid-column: 1 / -1;
+  }
+
+  .app-main .model-config-page .model-config-control-rail > app-model-config-toggle-card {
+    grid-column: auto;
+  }
+
+  .clinical-sessions-page .clinical-session-metadata-actions .clinical-session-metadata-action-card {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-md);
+  }
+
+  .clinical-sessions-page .clinical-session-metadata-actions .clinical-session-metadata-action-card > .btn {
+    grid-column: 2;
+    justify-self: start;
   }
 }
