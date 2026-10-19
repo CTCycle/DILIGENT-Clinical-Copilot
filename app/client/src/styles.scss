@@ -4358,7 +4358,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: var(--color-surface-alt);
   border: 0;
   box-shadow: none;
-  padding: var(--space-2xl);
+  padding: var(--space-2xl) 0;
 }
 
 .stitch-dili-input-grid {
