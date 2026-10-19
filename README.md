@@ -23,21 +23,15 @@ DILIGENT brings clinical history, medication exposure, symptoms, laboratory resu
 
 Enter clinical context in the DILI Agent before starting an assessment.
 
-![DILI Agent case entry](assets/figures/01-dili-agent-synthetic-input.png)
+![DILI Agent case entry](assets/figures/01-dili-agent.png)
 
-Open a saved session to review the report and its structured findings.
+Open a saved session to review its report and structured findings. This documentation-only example is synthetic; it does not represent a patient, clinical assessment, or model output.
 
-![Clinical session report](assets/figures/02-clinical-sessions-synthetic-report.png)
+![Synthetic clinical session report](assets/figures/02-clinical-session-synthetic-report.png)
 
-Review generated timelines in chronological order, then inspect supporting evidence for an individual event.
+Configure retrieval and ranking behavior in Settings. Changes are saved automatically.
 
-![Patient timeline](assets/figures/03-patient-timeline-overview.png)
-
-![Timeline event details](assets/figures/04-patient-timeline-event-inspector.png)
-
-Data Inspection provides access to curated drug catalog records.
-
-![Drug catalog](assets/figures/05-data-inspection-drug-catalog.png)
+![RAG settings with autosave status](assets/figures/03-rag-settings-autosave.png)
 
 ## Technology Stack
 

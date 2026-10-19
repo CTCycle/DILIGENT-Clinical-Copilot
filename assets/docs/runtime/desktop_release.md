@@ -1,5 +1,5 @@
 # Windows Desktop Release
-Last updated: 2026-10-18
+Last updated: 2026-10-19
 
 ## Published release: v3.4.0
 
@@ -51,7 +51,7 @@ Clinical-session attachments and patient profile images use normal HTML file inp
 Build on Windows x64 with Rust/Cargo, the Windows C++ build tools, network access for dependencies and the WebView2 bootstrapper, and the repository launcher for pinned runtimes. Set the version to the synchronized source manifest version:
 
 ~~~powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.4.0 -DesktopTarget All
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.5.0 -DesktopTarget All
 ~~~
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` to build one artifact. `-OfflineWebView2` applies only to MSI builds. Release builds require a clean worktree unless `-AllowDirtyTree` is supplied intentionally and recorded.
