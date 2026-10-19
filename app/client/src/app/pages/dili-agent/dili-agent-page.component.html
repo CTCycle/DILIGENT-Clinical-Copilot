@@ -5,15 +5,6 @@
     <section class="stitch-dili-main stitch-dili-workbench">
       <div class="stitch-dili-input-grid">
         <div class="stitch-dili-input-group stitch-dili-input-group--wide">
-          <h3>
-            <svg class="stitch-dili-label-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M7 2.75A2.75 2.75 0 0 0 4.25 5.5v13A2.75 2.75 0 0 0 7 21.25h10A2.75 2.75 0 0 0 19.75 18.5v-8.9a2.75 2.75 0 0 0-.807-1.943l-4.6-4.6A2.75 2.75 0 0 0 12.4 2.75H7Zm5.05 1.5 4.45 4.45c.16.16.26.36.3.57H13A1.25 1.25 0 0 1 11.75 8V4.26c.12.02.23.06.3.12ZM7 4.25h3.25V8A2.75 2.75 0 0 0 13 10.75h3.75v7.75A1.25 1.25 0 0 1 15.5 19.75H7a1.25 1.25 0 0 1-1.25-1.25v-13A1.25 1.25 0 0 1 7 4.25Z"
-              />
-            </svg>
-            Clinical Input
-          </h3>
           <textarea
             id="clinical-input"
             data-guidance-target="dili-clinical-input"
@@ -51,10 +42,7 @@
             aria-label="Patient profile image file picker"
             (change)="handlePatientImageSelection($event)"
           />
-          <div>
-            <h3>{{ patientNameLabel }}</h3>
-            <p>Recorded: {{ recordedDateLabel }}</p>
-          </div>
+          <h3>{{ patientNameLabel }}</h3>
         </div>
 
         <div class="stitch-dili-inline-fields" data-guidance-target="dili-patient-details">
@@ -91,7 +79,7 @@
           />
           <span>
             <strong>Use RAG evidence</strong>
-            <small>Retrieve indexed source documents and include compact bibliography references.</small>
+            <small>Cite indexed source documents.</small>
           </span>
         </label>
 
@@ -107,11 +95,9 @@
           >
             {{ runActionLabel }}
           </button>
-          <div class="stitch-dili-clear-container">
-            <button class="stitch-dili-clear" type="button" (click)="clearAll()" [disabled]="vm.isRunning">
-              Clear all
-            </button>
-          </div>
+          <button class="stitch-dili-clear" type="button" (click)="clearAll()" [disabled]="vm.isRunning">
+            Clear all
+          </button>
         </div>
       </section>
 
@@ -131,7 +117,7 @@
           <button class="toolbar-btn" type="button" (click)="toggleReportExpanded()" [disabled]="!vm.exportUrl">Expand</button>
         }
         <button class="toolbar-btn" type="button" (click)="downloadReport()" [disabled]="!vm.exportUrl">
-          Download report
+          Download
         </button>
       </div>
 

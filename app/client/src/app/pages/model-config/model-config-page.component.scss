@@ -506,47 +506,23 @@
   vertical-align: middle;
 }
 
+/* Column widths: the Actions column is fixed to fit five icon buttons; the
+   context label wraps instead of spilling into the adjacent Quant column. */
 .model-config-table th:first-child,
-.model-config-table td:first-child {
-  width: 30%;
-}
-
-.model-config-table th:nth-child(2),
-.model-config-table td:nth-child(2),
-.model-config-table th:nth-child(3),
-.model-config-table td:nth-child(3),
-.model-config-table th:nth-child(4),
-.model-config-table td:nth-child(4) {
-  width: 9%;
-}
-
-.model-config-table th:nth-child(5),
-.model-config-table td:nth-child(5) {
-  width: 16%;
-}
-
-.model-config-table th:nth-child(6),
-.model-config-table td:nth-child(6) {
-  width: 23%;
-  padding-left: 18px;
-}
-
-/* Four independent role buttons need a little more room, while the context
-   label must wrap instead of spilling into the adjacent Quant column. */
-.model-config-table th:first-child,
-.model-config-table td:first-child { width: 27%; }
+.model-config-table td:first-child { width: 24%; }
 .model-config-table th:nth-child(2),
 .model-config-table td:nth-child(2) { width: 8%; }
 .model-config-table th:nth-child(3),
-.model-config-table td:nth-child(3) {
-  width: 14%;
-}
+.model-config-table td:nth-child(3) { width: 12%; }
 .model-config-table th:nth-child(4),
 .model-config-table td:nth-child(4) { width: 8%; }
 .model-config-table th:nth-child(5),
-.model-config-table td:nth-child(5) { width: 16%; }
+.model-config-table td:nth-child(5) { width: 14%; }
 .model-config-table th:nth-child(6),
-.model-config-table td:nth-child(6) { width: 27%; }
+.model-config-table td:nth-child(6) {
+  width: 248px;
+  padding-left: 18px;
+}
 
 .model-config-table td {
   color: var(--mc-text);
