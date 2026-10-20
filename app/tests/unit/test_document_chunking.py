@@ -10,7 +10,6 @@ from domain.documents import Document
 from repositories.serialization.document_chunker import DocumentChunker
 from repositories.serialization.document_serializer import DocumentSerializer
 
-
 ###############################################################################
 def test_textual_document_metadata_uses_heading_title_fallback(tmp_path: Path) -> None:
     file_path = tmp_path / "study.txt"
@@ -142,6 +141,7 @@ def test_duplicate_content_is_deduplicated_with_stable_canonical_provenance(
     )
 
 
+###############################################################################
 def test_same_filename_with_different_bytes_remains_two_documents(
     tmp_path: Path,
 ) -> None:
@@ -161,6 +161,7 @@ def test_same_filename_with_different_bytes_remains_two_documents(
     }
 
 
+###############################################################################
 def test_different_filenames_with_identical_bytes_are_deduplicated(
     tmp_path: Path,
 ) -> None:
@@ -179,6 +180,7 @@ def test_different_filenames_with_identical_bytes_are_deduplicated(
     ]
 
 
+###############################################################################
 def test_modified_content_stops_being_considered_a_duplicate(tmp_path: Path) -> None:
     first_path = tmp_path / "first.txt"
     second_path = tmp_path / "second.txt"

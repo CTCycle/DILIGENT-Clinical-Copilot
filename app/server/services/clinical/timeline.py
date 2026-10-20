@@ -41,6 +41,7 @@ CANONICAL_TIMELINE_SOURCE_FIELDS = (
 )
 
 
+###############################################################################
 class _UnsupportedTimelineEvidenceError(ValueError):
     """Raised when a model's quoted timeline evidence is absent from the source."""
 
@@ -48,6 +49,7 @@ class _UnsupportedTimelineEvidenceError(ValueError):
     retryable = False
 
 
+###############################################################################
 class _EmptyTimelineExtractionError(ValueError):
     """Raised when clinical source fields yield no usable timeline events."""
 
@@ -55,6 +57,7 @@ class _EmptyTimelineExtractionError(ValueError):
     retryable = False
 
 
+###############################################################################
 def _iter_source_text_values(value: Any) -> Iterator[str]:
     if isinstance(value, str):
         yield value
@@ -66,10 +69,12 @@ def _iter_source_text_values(value: Any) -> Iterator[str]:
             yield from _iter_source_text_values(nested_value)
 
 
+###############################################################################
 def _normalize_evidence_text(value: str) -> str:
     return " ".join(value.casefold().split())
 
 
+###############################################################################
 def _has_source_evidence(source_payload: dict[str, Any], evidence: str) -> bool:
     normalized_evidence = _normalize_evidence_text(evidence)
     return bool(normalized_evidence) and any(
@@ -78,6 +83,7 @@ def _has_source_evidence(source_payload: dict[str, Any], evidence: str) -> bool:
     )
 
 
+###############################################################################
 def _canonical_source_text_fields(
     source_payload: dict[str, Any],
 ) -> dict[str, list[str]]:
@@ -99,6 +105,7 @@ def _canonical_source_text_fields(
     return fields
 
 
+###############################################################################
 def _source_field_for_evidence(
     source_payload: dict[str, Any], evidence: str | None
 ) -> str | None:
@@ -117,7 +124,6 @@ def _source_field_for_evidence(
         )
     ]
     return matches[0] if len(matches) == 1 else None
-
 
 ###############################################################################
 class PatientTimelineExtractor:

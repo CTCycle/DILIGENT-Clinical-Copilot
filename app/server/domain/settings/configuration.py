@@ -9,7 +9,6 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from domain.model_configs import ReasoningLevel
 
-
 ###############################################################################
 def normalize_ncbi_contact_email(value: str) -> str:
     if not isinstance(value, str):
@@ -29,7 +28,6 @@ def normalize_ncbi_contact_email(value: str) -> str:
 
 NCBIContactEmail = Annotated[str, BeforeValidator(normalize_ncbi_contact_email)]
 
-
 ###############################################################################
 class FastAPISettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -37,12 +35,10 @@ class FastAPISettings(BaseModel):
     description: str
     version: str
 
-
 ###############################################################################
 class JobsSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     polling_interval: float = Field(gt=0)
-
 
 ###############################################################################
 class DatabaseSettings(BaseModel):
@@ -66,7 +62,6 @@ class DatabaseSettings(BaseModel):
     insert_commit_interval: int
     select_page_size: int
 
-
 ###############################################################################
 class DrugsMatcherSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -84,7 +79,6 @@ class DrugsMatcherSettings(BaseModel):
     spelling_short_name_length: int
     spelling_short_max_distance: int
     spelling_long_max_distance: int
-
 
 ###############################################################################
 class RagSettings(BaseModel):
@@ -105,7 +99,6 @@ class RagSettings(BaseModel):
     vector_index_type: str
     vector_stream_batch_size: int
     embedding_offline_mode: bool
-
 
 ###############################################################################
 class RuntimeSettings(BaseModel):
@@ -129,14 +122,12 @@ class RuntimeSettings(BaseModel):
     rxnav_request_timeout: float
     rxnav_max_concurrency: int
 
-
 ###############################################################################
 class IngestionSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     drug_name_min_length: int
     drug_name_max_length: int
     drug_name_max_tokens: int
-
 
 ###############################################################################
 class LLMRuntimeDefaults(BaseModel):
@@ -149,7 +140,6 @@ class LLMRuntimeDefaults(BaseModel):
     reasoning_level: ReasoningLevel
     ollama_host_default: str
 
-
 ###############################################################################
 class SessionPipelineSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -160,7 +150,6 @@ class SessionPipelineSettings(BaseModel):
     clinical_assessment_batch_size: int
     clinical_assessment_max_concurrency: int
 
-
 ###############################################################################
 class ClinicalLanguageDetectionSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -169,7 +158,6 @@ class ClinicalLanguageDetectionSettings(BaseModel):
     high_confidence_min_margin: float
     moderate_confidence_min_score: float
     moderate_confidence_min_margin: float
-
 
 ###############################################################################
 class ServerSettings(BaseModel):

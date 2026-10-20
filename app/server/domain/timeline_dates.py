@@ -80,7 +80,6 @@ def normalize_timeline_interval(
         precision=precision,
     )
 
-
 ###############################################################################
 def extract_single_explicit_timeline_date(
     text: str | None,

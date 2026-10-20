@@ -10,6 +10,7 @@ from common.runtime_layout import RuntimeLayout
 from configurations.runtime_bootstrap import migrate_legacy_data_layout
 
 
+###############################################################################
 def _runtime_layout(
     runtime_root: Path, data_root: Path, *, packaged: bool
 ) -> RuntimeLayout:
@@ -26,6 +27,7 @@ def _runtime_layout(
     )
 
 
+###############################################################################
 def test_packaged_data_migration_merges_without_replacing_existing_state(
     tmp_path: Path,
 ) -> None:
@@ -63,6 +65,7 @@ def test_packaged_data_migration_merges_without_replacing_existing_state(
     assert not legacy_root.exists()
 
 
+###############################################################################
 def test_source_data_migration_preserves_catalogs_and_merges_sources(
     tmp_path: Path,
 ) -> None:
@@ -89,6 +92,7 @@ def test_source_data_migration_preserves_catalogs_and_merges_sources(
     assert (old_root / "catalogs" / "old.json").is_file()
 
 
+###############################################################################
 def test_data_migration_stops_before_moving_anything_on_conflict(
     tmp_path: Path,
 ) -> None:

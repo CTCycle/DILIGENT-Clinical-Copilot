@@ -19,7 +19,6 @@ def _assert_metadata_only(payload: object, plaintext_keys: tuple[str, ...]) -> N
     assert isinstance(fingerprint, str)
     assert re.fullmatch(r"[0-9a-f]{64}", fingerprint)
 
-
 ###############################################################################
 def _list_provider_keys(
     api_context: APIRequestContext,
@@ -33,7 +32,6 @@ def _list_provider_keys(
     for row in payload:
         _assert_metadata_only(row, plaintext_keys)
     return payload
-
 
 ###############################################################################
 def test_access_keys_complete_synthetic_lifecycle(

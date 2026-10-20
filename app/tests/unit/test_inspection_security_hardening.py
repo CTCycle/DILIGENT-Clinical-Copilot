@@ -24,7 +24,6 @@ from pydantic import ValidationError
 from repositories.drug_catalog_repository import _build_search_pattern
 from services.inspection import DataInspectionService
 
-
 ###############################################################################
 def get_route_owner(router: Any, route_path: str) -> Any:
     for route in router.routes:
@@ -343,6 +342,7 @@ def test_rag_document_listing_exposes_unsupported_files_as_not_ingestible(
     unsupported_path = tmp_path / "nested" / "legacy.doc"
     unsupported_path.write_bytes(b"legacy binary Word document")
 
+    ###############################################################################
     class FakeVectorDatabase:
 
         # -------------------------------------------------------------------------

@@ -23,7 +23,6 @@ from services.session.preflight import (
     validate_clinical_input_preflight,
 )
 
-
 ###############################################################################
 def _reject_incomplete_patient(request: ClinicalSessionRequest, **kwargs):
     issues = [
@@ -44,7 +43,6 @@ def _reject_incomplete_patient(request: ClinicalSessionRequest, **kwargs):
             )
         )
     raise ClinicalPipelineValidationError(issues=issues, message=issues[0].message)
-
 
 ###############################################################################
 @pytest.mark.parametrize("visit_date", [None, date(2026, 10, 18)])
@@ -98,7 +96,6 @@ def test_visit_date_blocker_is_unique_and_other_validation_survives(
     )
     assert result.ready is False
 
-
 ###############################################################################
 def test_blocking_issue_is_enriched_with_modal_metadata() -> None:
     issue = _present_preflight_issue(
@@ -116,7 +113,6 @@ def test_blocking_issue_is_enriched_with_modal_metadata() -> None:
     assert issue.consequence
     assert issue.continuation_allowed is False
 
-
 ###############################################################################
 def test_unknown_warning_receives_safe_fallback_metadata() -> None:
     issue = _present_preflight_issue(
@@ -131,7 +127,6 @@ def test_unknown_warning_receives_safe_fallback_metadata() -> None:
     assert issue.title == "Review required"
     assert issue.affected_section == "Future Section"
     assert issue.continuation_allowed is True
-
 
 ###############################################################################
 def test_too_short_input_is_presented_as_blocking() -> None:
@@ -150,7 +145,6 @@ def test_too_short_input_is_presented_as_blocking() -> None:
     )
     assert issue.affected_section == "Clinical input"
     assert issue.continuation_allowed is False
-
 
 ###############################################################################
 def test_missing_sections_do_not_add_a_generic_preflight_failure(monkeypatch) -> None:
@@ -200,7 +194,6 @@ def test_missing_sections_do_not_add_a_generic_preflight_failure(monkeypatch) ->
     assert "clinical_input_too_short" in blocking_codes
     assert "required_sections_missing" in blocking_codes
     assert "preflight_failed" not in blocking_codes
-
 
 ###############################################################################
 def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(

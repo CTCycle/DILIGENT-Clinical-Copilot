@@ -30,7 +30,6 @@ from repositories.serialization.application_configuration import (
     ApplicationConfigurationSerializer,
 )
 
-
 ###############################################################################
 class RuntimeSettingsService:
 
