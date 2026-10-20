@@ -1,5 +1,5 @@
 # Validation Ledger
-Last updated: 2026-10-18
+Last updated: 2026-10-20
 
 ## Purpose and authority
 
@@ -21,7 +21,7 @@ This file keeps only cross-cutting validation findings, guarantees, and limits t
 | Timeline and local model | Exact Ollama qwen3.5:2b safely falls back to a source-backed, date-precise timeline with provider/model provenance; it is not a grounded structured-output route for this task. Exact qwen3.5:9b has produced grounded, evidence-linked events that survive reload. Broader model and event-family coverage is not claimed. | [Runtime modes](modes.md); [sessions and timeline](../user/sessions_timeline_and_data.md) |
 | Revision lifecycle | The exact hosted OpenCode Go / deepseek-v4.1-flash synthetic release flow passed. Worker recovery, timeout, retry, and failure contracts have focused coverage, while provider/model variation and broader accepted-versus-QA-blocked branches remain partial. | [Generation policy](generation_policy.md); [background jobs](../architecture/background_jobs.md); [testing and quality](../coding/testing_and_quality.md) |
 | Application shell | Desktop layout, keyboard navigation, and the minimum-width behavior have rendered validation. Broad component-level screen-reader and spoken-output certification is optional future work. | [Experience](../ui/experience.md); [UI standards](../ui/ui_standards.md) |
-| Desktop release | v3.4.0 publication, exact candidate identity, downloaded-byte hashes, hosted MSI lifecycle, native populated workflows, unsigned disclosure, and the single-machine WebView2 waiver are documented in the release record and its one retained evidence report. | [Desktop release](desktop_release.md); [v3.4.0 release evidence](../../QA/release-gates-20261018/report.md) |
+| Desktop release | v3.5.0 publication, exact candidate identity, published asset digest readback, hosted MSI lifecycle, local portable launch/health smoke, unsigned disclosure, and owner-approved waivers are documented in the release record. Candidate-specific populated analysis and clean-host compatibility are not claimed. | [Desktop release](desktop_release.md); [v3.5.0 release evidence](../../QA/release-gates-20261020/report.md) |
 
 ## Evidence maintenance
 
